@@ -62,8 +62,11 @@ Backups are private files and must stay outside the checkout and served folders.
 
 ```sh
 rer import --input ../platter-backup.rer --yes
+rer setup --owner-email you@example.com
 rer dev
 ```
+
+Use the same owner email that the backup contains in the setup step above. A review backup may use the `owner@FOLDER.test` address printed by its original `rer dev`; keep that original address when restoring into a differently named checkout. This protects the archived owner and approval authors.
 
 Owner identities, business records, revisions, approvals, acceptances, invoice CSVs and import journals travel. Sign-in sessions, agent keys, client invitations, verification sessions, outbox messages and private provider settings do not. Use **Send fresh client link** for a restored sent proposal. RER refuses a nonempty destination or damaged archive. When restoring an older backup after erasure, supply a newer backup's erasure journal: `rer import --input ../old.rer --journal ../latest.rer --yes`. Such an old restore is refused rather than reviving erased data.
 

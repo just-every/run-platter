@@ -1,0 +1,14 @@
+CREATE TABLE p_guard(ok INTEGER NOT NULL CHECK(ok=1));
+CREATE TABLE p_clients(id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,version INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE p_proposals(id TEXT PRIMARY KEY,client_id TEXT NOT NULL REFERENCES p_clients(id) ON DELETE RESTRICT,title TEXT NOT NULL,scope TEXT NOT NULL,version INTEGER NOT NULL,revision INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('draft','approved','sent','accepted')),deposit_bps INTEGER NOT NULL CHECK(deposit_bps BETWEEN 1 AND 10000),options TEXT NOT NULL,prepared_by TEXT NOT NULL,approved_by TEXT,approved_at INTEGER,created_at INTEGER NOT NULL);
+CREATE TABLE p_revisions(proposal_id TEXT NOT NULL REFERENCES p_proposals(id),revision INTEGER NOT NULL,snapshot TEXT NOT NULL,prepared_by TEXT NOT NULL,prepared_at INTEGER NOT NULL,PRIMARY KEY(proposal_id,revision));
+CREATE TABLE p_shares(proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),revision INTEGER NOT NULL,token TEXT NOT NULL UNIQUE,code_hash TEXT,code_expires INTEGER,code_attempts INTEGER NOT NULL DEFAULT 0,code_generation INTEGER NOT NULL DEFAULT 0,code_sent_at INTEGER,session_hash TEXT,session_expires INTEGER);
+CREATE TABLE p_acceptances(proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),revision INTEGER NOT NULL,snapshot TEXT NOT NULL,name TEXT NOT NULL,email TEXT NOT NULL,option_id TEXT NOT NULL,total_cents INTEGER NOT NULL,deposit_cents INTEGER NOT NULL,accepted_at INTEGER NOT NULL,consent TEXT NOT NULL);
+CREATE TABLE p_invoices(id TEXT PRIMARY KEY,proposal_id TEXT NOT NULL UNIQUE REFERENCES p_acceptances(proposal_id),number TEXT NOT NULL UNIQUE,csv TEXT NOT NULL,exported_at INTEGER NOT NULL,exported_by TEXT NOT NULL);
+CREATE TABLE p_approvals(id TEXT PRIMARY KEY,proposal_id TEXT NOT NULL REFERENCES p_proposals(id),revision INTEGER NOT NULL,actor_id TEXT NOT NULL,approved_at INTEGER NOT NULL);
+CREATE TABLE p_agent_keys(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL REFERENCES oa_operators(id),owner_version INTEGER NOT NULL,label TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,revoked_at INTEGER);
+CREATE TABLE p_mail(id TEXT PRIMARY KEY,proposal_id TEXT NOT NULL REFERENCES p_proposals(id),recipient TEXT NOT NULL,subject TEXT NOT NULL,body TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending','local','sending','accepted','uncertain')),created_at INTEGER NOT NULL);
+CREATE TRIGGER p_frozen_proposal BEFORE UPDATE ON p_proposals WHEN OLD.status='accepted' BEGIN SELECT RAISE(ABORT,'Accepted proposals are frozen'); END;
+CREATE TRIGGER p_frozen_revision BEFORE UPDATE ON p_revisions BEGIN SELECT RAISE(ABORT,'Revisions are immutable'); END;
+CREATE TRIGGER p_frozen_acceptance BEFORE UPDATE ON p_acceptances BEGIN SELECT RAISE(ABORT,'Acceptance is immutable'); END;
+CREATE TRIGGER p_frozen_invoice BEFORE UPDATE ON p_invoices BEGIN SELECT RAISE(ABORT,'Export is immutable'); END;

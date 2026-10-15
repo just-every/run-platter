@@ -1,0 +1,25 @@
+*{box-sizing:border-box}
+body{margin:0;background:var(--rer-page,#f4f6f5);color:var(--rer-text,#1b2724);font-family:var(--rer-font-body,Arial,sans-serif);line-height:1.6}
+a{color:var(--rer-link,#1f5f52);text-underline-offset:.18em}
+:focus-visible{outline:3px solid var(--rer-focus,#1b2724);outline-offset:4px}
+.skip{position:absolute;top:-5rem;left:1rem;padding:.6rem 1rem;background:var(--rer-surface,#fff);z-index:2}.skip:focus{top:.5rem}
+header{display:flex;align-items:center;flex-wrap:wrap;gap:1.5rem;padding:1rem max(1.25rem,calc((100% - 1080px)/2));border-bottom:1px solid var(--rer-border,#6b7c76);background:var(--rer-surface,#fff)}
+.brand{font-size:1.4rem;font-weight:650;text-decoration:none;color:inherit}
+nav{display:flex;flex-wrap:wrap;gap:1rem}nav a[aria-current=page]{font-weight:650;text-decoration-thickness:2px}
+.identity{font-size:.9rem;color:var(--rer-muted,#4a5a55);margin:0;overflow-wrap:anywhere}
+main{width:min(100% - 2.5rem,960px);margin:2rem auto 4rem}.client-page{max-width:720px}
+h1,h2,h3{font-family:var(--rer-font-heading,var(--rer-font-body,Arial,sans-serif));line-height:1.25;overflow-wrap:anywhere}h1{font-size:2rem;margin:0 0 1.5rem}h2{font-size:1.3rem;margin:0 0 1rem}h3{font-size:1.05rem;margin:1.25rem 0 .5rem}
+p{margin:.5rem 0 1rem;text-wrap:pretty}
+.panel{background:var(--rer-surface,#fff);border:1px solid var(--rer-border,#6b7c76);border-radius:var(--rer-radius,12px);padding:1.5rem;margin:0 0 1.25rem;overflow-wrap:anywhere}
+form{display:grid;gap:1rem;margin:1rem 0}form:last-child{margin-bottom:0}label{display:grid;gap:.35rem;font-weight:500}
+input:not([type=hidden]):not([type=checkbox]):not([type=radio]),textarea,select{width:100%;min-height:44px;border:1px solid var(--rer-border,#6b7c76);border-radius:6px;padding:.65rem .75rem;background:var(--rer-surface,#fff);color:inherit;font:inherit}
+textarea{resize:vertical}fieldset{min-width:0;border:1px solid var(--rer-border,#6b7c76);border-radius:6px;display:grid;gap:1rem;padding:1rem;margin:0}legend{font-weight:600;padding:0 .4rem}
+button{justify-self:start;min-height:44px;max-width:100%;padding:.65rem 1.1rem;border:1px solid var(--rer-accent,var(--rer-text,#1b2724));border-radius:6px;background:var(--rer-accent,var(--rer-text,#1b2724));color:var(--rer-accent-text,var(--rer-surface,#fff));font:inherit;font-weight:600;cursor:pointer}
+button.secondary{background:var(--rer-surface,#fff);color:var(--rer-text,#1b2724)}button.danger{background:var(--rer-surface,#fff);color:var(--rer-text,#1b2724);text-decoration:underline}
+.choice{display:flex;align-items:flex-start;gap:.75rem;font-weight:400}.choice input{flex:none;width:20px;height:20px;margin:.25rem 0 0;accent-color:var(--rer-text,#1b2724)}
+.records{list-style:none;padding:0;margin:0}.records>li{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:1rem 0;border-bottom:1px solid var(--rer-border,#6b7c76)}.records>li:last-child{border-bottom:0;padding-bottom:0}.records>li:first-child{padding-top:0}.records p{margin:.3rem 0}.records form{margin:0}.records article{width:100%}.records h3{margin-top:0}
+.actions{display:flex;flex-wrap:wrap;gap:.5rem}.status{font-size:.9rem;font-weight:600;text-transform:capitalize}.muted{color:var(--rer-muted,#4a5a55)}
+dl{display:grid;grid-template-columns:minmax(100px,1fr) minmax(0,3fr);gap:.45rem 1rem}dt{color:var(--rer-muted,#4a5a55)}dd{margin:0;overflow-wrap:anywhere}
+.notice{border:1px solid var(--rer-border,#6b7c76);border-left-width:5px;background:var(--rer-surface,#fff);border-radius:6px;padding:1rem;margin:0 0 1.25rem}.notice p:last-child{margin-bottom:0}.error{border-left-style:double;border-left-width:7px}
+.preserve{white-space:pre-wrap;overflow-wrap:anywhere}.wrap{overflow-wrap:anywhere;word-break:break-word}.json{white-space:pre-wrap;overflow-wrap:anywhere;max-height:32rem;overflow:auto;font-size:.9rem;padding:.5rem}
+@media(max-width:600px){header{gap:.75rem;padding:1rem}nav{width:100%;order:3;gap:.8rem}.identity{font-size:.8rem}main{width:calc(100% - 2rem);margin-top:1.5rem}.panel{padding:1rem}.records>li{flex-wrap:wrap}dl{grid-template-columns:1fr;gap:.1rem}dd{margin-bottom:.75rem}button{width:100%}.actions{width:100%}.actions form{flex:1}}

@@ -1,0 +1,46 @@
+name: Verify
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  shards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [runtime, business, archive]
+    env:
+      CI: 'true'
+      PLATTER_VERIFY_SHARD: ${{ matrix.shard }}
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+      - run: corepack enable && corepack prepare pnpm@10.12.4 --activate
+      - run: pnpm install --frozen-lockfile
+      - if: matrix.shard == 'runtime'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify runtime and hosted output
+        if: matrix.shard == 'runtime'
+        run: pnpm verify
+      - name: Verify business or archive flow
+        if: matrix.shard != 'runtime'
+        run: pnpm verify:app
+  verify:
+    if: always()
+    needs: shards
+    runs-on: ubuntu-latest
+    steps:
+      - run: test '${{ needs.shards.result }}' = success

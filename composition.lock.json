@@ -1,0 +1,776 @@
+{
+  "schemaVersion": 2,
+  "composition": {
+    "base": "base",
+    "family": "proposals",
+    "edition": "platter",
+    "modules": [
+      "delivery-producer",
+      "job-queue",
+      "release",
+      "deploy-kit",
+      "container",
+      "demo-host",
+      "demo",
+      "integrations",
+      "mail",
+      "ai",
+      "portability",
+      "d1-transport",
+      "erasure",
+      "dependencies",
+      "operator-auth",
+      "owner-claim"
+    ]
+  },
+  "repositories": {
+    "family": {
+      "repository": "just-every/run-platter",
+      "commit": "8d521a70a637e8794a542ce15a61c7ade38a4418"
+    },
+    "base": {
+      "repository": "runeditrun/base",
+      "commit": "a06bd065124c2b45fa879e62736fb5e1987efdaa"
+    }
+  },
+  "assemblyTool": {
+    "repository": "runeditrun/base",
+    "commit": "a06bd065124c2b45fa879e62736fb5e1987efdaa"
+  },
+  "descriptor": {
+    "schemaVersion": 2,
+    "base": "base",
+    "family": "proposals",
+    "edition": "platter",
+    "modules": [
+      "delivery-producer",
+      "job-queue",
+      "release",
+      "deploy-kit",
+      "container",
+      "demo-host",
+      "demo",
+      "integrations",
+      "mail",
+      "ai",
+      "portability",
+      "d1-transport",
+      "erasure",
+      "dependencies",
+      "operator-auth",
+      "owner-claim"
+    ],
+    "source": "editions/platter",
+    "copies": [
+      {
+        "component": "proposals",
+        "repository": "family",
+        "source": "core",
+        "target": "src/family/proposals"
+      },
+      {
+        "component": "base",
+        "repository": "base",
+        "source": "foundation/runtime",
+        "target": "src/base"
+      },
+      {
+        "component": "base",
+        "repository": "base",
+        "source": "LICENSE",
+        "target": "LICENSE"
+      },
+      {
+        "component": "operator-auth",
+        "repository": "base",
+        "source": "modules/operator-auth/accounts/schema/provider-control.sql",
+        "target": "migrations/core/0006_provider_control.sql"
+      },
+      {
+        "component": "dependencies",
+        "repository": "base",
+        "source": "modules/dependencies/schema/dependencies.sql",
+        "target": "migrations/core/0007_dependencies.sql"
+      },
+      {
+        "component": "owner-claim",
+        "repository": "base",
+        "source": "modules/owner-claim/schema/owner-claim.sql",
+        "target": "migrations/core/0008_owner_claim.sql"
+      },
+      {
+        "component": "owner-claim",
+        "repository": "base",
+        "source": "modules/owner-claim/schema/idp.sql",
+        "target": "migrations/core/0009_idp_owner.sql"
+      },
+      {
+        "component": "operator-auth",
+        "repository": "base",
+        "source": "modules/operator-auth/accounts/schema/provider-pins.sql",
+        "target": "migrations/core/0010_provider_pins.sql"
+      },
+      {
+        "component": "operator-auth",
+        "repository": "base",
+        "source": "modules/operator-auth/accounts/schema/dependency-setup.sql",
+        "target": "migrations/core/0011_dependency_setup.sql"
+      },
+      {
+        "component": "dependencies",
+        "repository": "base",
+        "source": "modules/dependencies/schema/approval-attempt.sql",
+        "target": "migrations/core/0012_dependency_approval.sql"
+      },
+      {
+        "component": "operator-auth",
+        "repository": "base",
+        "source": "modules/operator-auth/accounts/schema/owner-signin.sql",
+        "target": "migrations/core/0014_owner_signin.sql"
+      },
+      {
+        "component": "operator-auth",
+        "repository": "base",
+        "source": "modules/operator-auth/accounts/schema/operator-auth.sql",
+        "target": "migrations/core/0001_owner.sql"
+      },
+      {
+        "component": "operator-auth",
+        "repository": "base",
+        "source": "modules/operator-auth/identity/oidc/schema/oidc.sql",
+        "target": "migrations/core/0005_identity_providers.sql"
+      },
+      {
+        "component": "mail",
+        "repository": "base",
+        "source": "modules/mail/src/development/schema.sql",
+        "target": "migrations/core/0002_outbox.sql"
+      },
+      {
+        "component": "portability",
+        "repository": "base",
+        "source": "modules/portability/schema/portability.sql",
+        "target": "migrations/core/0003_portability.sql"
+      },
+      {
+        "component": "erasure",
+        "repository": "base",
+        "source": "modules/erasure/schema/erasure.sql",
+        "target": "migrations/core/0013_erasure.sql"
+      },
+      {
+        "component": "base",
+        "repository": "base",
+        "source": "export/SEED-COMMAND-CONTRACT.md",
+        "target": "SEED-COMMAND-CONTRACT.md"
+      },
+      {
+        "component": "base",
+        "repository": "base",
+        "source": "export/RUN-LOCALLY.md",
+        "target": "RUN-LOCALLY.md"
+      },
+      {
+        "component": "base",
+        "repository": "base",
+        "source": "export/HOMEPAGE-VARIANTS.md",
+        "target": "HOMEPAGE-VARIANTS.md"
+      },
+      {
+        "component": "base",
+        "repository": "base",
+        "source": "export/VERIFY-WORKFLOW.md",
+        "target": "VERIFY-WORKFLOW.md"
+      }
+    ]
+  },
+  "descriptorSha256": "a0211813fc4fa2cbe532b3319682b25e1c3eb18be0e9a2d54b82ddf63056355d",
+  "familyManifestSha256": "f18fd452666f5257c03fa0b861847d4fd68eac9f80479509cd8b534a4c498b8b",
+  "files": {
+    ".github/workflows/verify.yml": {
+      "sha256": "2ec00a1710d9bf28d147bde31756152872acf4a041dd1fc065041a18c305dc36",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/.github/workflows/verify.yml"
+    },
+    ".gitignore": {
+      "sha256": "b1997dc843f26bc9915cbf4a00c8b27a7740ca899d173c4980f23f37b3931388",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/.gitignore"
+    },
+    ".node-version": {
+      "sha256": "a0e27aeeac42d6102f4ff2bce40d8fb011c07e5cb28eff3c9d77e68df29e5dd6",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/.node-version"
+    },
+    "ACCEPTANCE.md": {
+      "sha256": "3bc373df1bad4b9a8504993a2c4cd675b0a102dd365db16c1f5ee698b971121e",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/ACCEPTANCE.md"
+    },
+    "AGENTS.md": {
+      "sha256": "ad1095617257cdb7d82bfaa7a519e0a44a2dbcd0d28cdc68366f34a21876c4e9",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/AGENTS.md"
+    },
+    "CONTRACT.md": {
+      "sha256": "9e91218af05ec9d170b13be2d6091386caf2451797f008bfe0eea4c47f0c8d11",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/CONTRACT.md"
+    },
+    "HOMEPAGE-VARIANTS.md": {
+      "sha256": "e0a118d5efb0703d43f96c0562624f943db2e57f508a25172bd334242ee535aa",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "export/HOMEPAGE-VARIANTS.md"
+    },
+    "LICENSE": {
+      "sha256": "2f5076ef027045b9e0e72df8aa61ca8551e54b1877d531656d6e7985b2c32324",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "LICENSE"
+    },
+    "ONBOARDING.md": {
+      "sha256": "fdbfd832168f2a05e187ea2385c4675f0efce246278e6f720ba403fdc754bbf7",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/ONBOARDING.md"
+    },
+    "OPERATIONS.json": {
+      "sha256": "63c81f40fb06d49afe932b24fcb350a312f3d21ac89c551e3b8f22a949c1f3d4",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/OPERATIONS.json"
+    },
+    "OPERATIONS.md": {
+      "sha256": "7527df736f900b9a53b10e2f4cc2fb88572964dfb0018122a428b326162d59cc",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/OPERATIONS.md"
+    },
+    "README.md": {
+      "sha256": "d488ce1e5081da394d8e52b8dee8fb65af8119ecf20a7dc7e3e8d1f4d7019a14",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/README.md"
+    },
+    "RUN-LOCALLY.md": {
+      "sha256": "3d4e1bf5a29e887dcde9173a10d8e8a8bc2e657771d109da7661f3e5730d2dde",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "export/RUN-LOCALLY.md"
+    },
+    "SEED-COMMAND-CONTRACT.md": {
+      "sha256": "0b97e2459883fbb77845844cf20e6760dc775881fd26640a6a6dae050504b891",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "export/SEED-COMMAND-CONTRACT.md"
+    },
+    "VERIFY-WORKFLOW.md": {
+      "sha256": "befd010a8a91cdcf6d8fac6e2cb3356f00d2f3df8d29137065678ff64d788b2c",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "export/VERIFY-WORKFLOW.md"
+    },
+    "deploy-site.json": {
+      "sha256": "cb500b0d8c2acd26f2bfe91165abddef6e2317e6b9dcf83a62887a1a7b65b3e9",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/deploy-site.json"
+    },
+    "deploy.json": {
+      "sha256": "70c2bc8e2d063d6a28aeb95d0c57449e5b4731f02dcb69b24fdf46874544d0d7",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/deploy.json"
+    },
+    "migrations/core/0001_owner.sql": {
+      "sha256": "389e6fc3201a73ab5e7280bbe4fdb793b652b84f157e444bab48cc3c25eb8c41",
+      "mode": 420,
+      "component": "operator-auth",
+      "repository": "base",
+      "source": "modules/operator-auth/accounts/schema/operator-auth.sql"
+    },
+    "migrations/core/0002_outbox.sql": {
+      "sha256": "45d6b03eadfe1e91737763ae85cdff74e7216f859869e34431550bba48294996",
+      "mode": 420,
+      "component": "mail",
+      "repository": "base",
+      "source": "modules/mail/src/development/schema.sql"
+    },
+    "migrations/core/0003_portability.sql": {
+      "sha256": "c7db9042f6d5c571e10297c02df858ad2f3466beb4fa85649fee407cc228747b",
+      "mode": 420,
+      "component": "portability",
+      "repository": "base",
+      "source": "modules/portability/schema/portability.sql"
+    },
+    "migrations/core/0004_first_run.sql": {
+      "sha256": "aef92de36233195e5a03cce67b192c5c0c38033b695f7ebce6062fc89152c2a9",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/migrations/core/0004_first_run.sql"
+    },
+    "migrations/core/0005_identity_providers.sql": {
+      "sha256": "f879fb86b079e591dfe4a8513752a8e0394e252b940aa35d3f7430f27b7382c6",
+      "mode": 420,
+      "component": "operator-auth",
+      "repository": "base",
+      "source": "modules/operator-auth/identity/oidc/schema/oidc.sql"
+    },
+    "migrations/core/0006_provider_control.sql": {
+      "sha256": "f19cc7a792538a8ff36d87760a3cad58fccab0316984488d1834af14fbf37cfe",
+      "mode": 420,
+      "component": "operator-auth",
+      "repository": "base",
+      "source": "modules/operator-auth/accounts/schema/provider-control.sql"
+    },
+    "migrations/core/0007_dependencies.sql": {
+      "sha256": "3481d8aef870a9eda153a1617e99bb71a408e61a25dea92bb132efa7dd1c2526",
+      "mode": 420,
+      "component": "dependencies",
+      "repository": "base",
+      "source": "modules/dependencies/schema/dependencies.sql"
+    },
+    "migrations/core/0008_owner_claim.sql": {
+      "sha256": "c3ffe653727bb4867b064dc2489df5013613f08f4b5998d2fe2b6a8485cdb815",
+      "mode": 420,
+      "component": "owner-claim",
+      "repository": "base",
+      "source": "modules/owner-claim/schema/owner-claim.sql"
+    },
+    "migrations/core/0009_idp_owner.sql": {
+      "sha256": "a870102648a2226b18a2fe8168d096389b698af88333d112fa8137e582fc2b33",
+      "mode": 420,
+      "component": "owner-claim",
+      "repository": "base",
+      "source": "modules/owner-claim/schema/idp.sql"
+    },
+    "migrations/core/0010_provider_pins.sql": {
+      "sha256": "f0cfb6b3740869fd098ee449efb25807f8b1ef51c353fd07bafeb00ce38aeb63",
+      "mode": 420,
+      "component": "operator-auth",
+      "repository": "base",
+      "source": "modules/operator-auth/accounts/schema/provider-pins.sql"
+    },
+    "migrations/core/0011_dependency_setup.sql": {
+      "sha256": "7b36f7e1fb0991fe3e808613d911393bbad3386ead06427082c69a48c5738108",
+      "mode": 420,
+      "component": "operator-auth",
+      "repository": "base",
+      "source": "modules/operator-auth/accounts/schema/dependency-setup.sql"
+    },
+    "migrations/core/0012_dependency_approval.sql": {
+      "sha256": "7d3742369189b69ea28bdc000097f150f83221c6474f7e177c7b5590691b67e9",
+      "mode": 420,
+      "component": "dependencies",
+      "repository": "base",
+      "source": "modules/dependencies/schema/approval-attempt.sql"
+    },
+    "migrations/core/0013_erasure.sql": {
+      "sha256": "44fd4fac1aee4fda0d1d580373cbed9ef3da837e0186e7fe2130fb68dfceadbe",
+      "mode": 420,
+      "component": "erasure",
+      "repository": "base",
+      "source": "modules/erasure/schema/erasure.sql"
+    },
+    "migrations/core/0014_owner_signin.sql": {
+      "sha256": "98da904e768e35b43fb1be83d9dcc9c9b5d86ab3a795234ed5223c4fddc567d9",
+      "mode": 420,
+      "component": "operator-auth",
+      "repository": "base",
+      "source": "modules/operator-auth/accounts/schema/owner-signin.sql"
+    },
+    "package.json": {
+      "sha256": "3bf6830de1bf9c6446585130637d2bd57df181a706f45d9232b68f7427f50655",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/package.json"
+    },
+    "pnpm-lock.yaml": {
+      "sha256": "50d2ff7492e751c6054917a853b31a411353cc89122e6869c60f5bc988334914",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/pnpm-lock.yaml"
+    },
+    "public/brand/band.svg": {
+      "sha256": "595e6226645ca8873d4e06c4417a7f42c2e6940094ab06baa4be6fc74e8fa1e3",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/public/brand/band.svg"
+    },
+    "public/brand/mark.svg": {
+      "sha256": "c2c2a7325e51067c043bbd8a945e830ba6caeea4ca298615e310a931a58a181d",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/public/brand/mark.svg"
+    },
+    "public/fonts/README.md": {
+      "sha256": "f89bdce214a6b69aa9cf8d9a49059abd95c5f4124a1e6924085eff9e07f654fa",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/public/fonts/README.md"
+    },
+    "public/fonts/fonts.css": {
+      "sha256": "54e7fe8d3bf3b18338a9613769090602af4c38f596a5dc8408a204d4900447f1",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/public/fonts/fonts.css"
+    },
+    "public/fonts/outfit/LICENSE.txt": {
+      "sha256": "0e5fcef5d93bfcae273c11c00f0bb453d3b5491860e1ac8b658767b7577c938f",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/public/fonts/outfit/LICENSE.txt"
+    },
+    "public/fonts/outfit/outfit-latin-ext-wght-normal.woff2": {
+      "sha256": "0f53d1c03b3918d744a843b5039001ee31695ca1e255e3914188df81beb461e9",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/public/fonts/outfit/outfit-latin-ext-wght-normal.woff2"
+    },
+    "public/fonts/outfit/outfit-latin-wght-normal.woff2": {
+      "sha256": "6c18d579fd87c3776be068b762cbc83fde3acb543d49eabd3ade842eb987e887",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/public/fonts/outfit/outfit-latin-wght-normal.woff2"
+    },
+    "public/rer-theme.css": {
+      "sha256": "a959e0a17df8abb03a123c04eb773b5e9183d426ed7f43424f8622d02433ddb1",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/public/rer-theme.css"
+    },
+    "rer-setup.json": {
+      "sha256": "dfa9fe3f1c912028bb6de055bff00fc27be6bbf1af0d93350c82612c375bff38",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/rer-setup.json"
+    },
+    "scripts/install.mjs": {
+      "sha256": "d019951cdb181aecfc3bb62349a69d6047848413ef98ba264b4790d29a95a3d3",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/scripts/install.mjs"
+    },
+    "scripts/installer/local.mjs": {
+      "sha256": "589f717bd38844ee75af4aa22ac245b7f2d9e6016512f7a797b313991c48c2ba",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/scripts/installer/local.mjs"
+    },
+    "scripts/installer/seed.mjs": {
+      "sha256": "7bd4e291b926f9744cf262a2bb119502fe7506a8f142a67409c0b32293c949f9",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/scripts/installer/seed.mjs"
+    },
+    "scripts/installer/ui/background.svg": {
+      "sha256": "b234f98362d278ad8fb176ede8a88b8bd66d016147ab758ecb81a096c7115d26",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/scripts/installer/ui/background.svg"
+    },
+    "scripts/installer/ui/seed.mjs": {
+      "sha256": "205dbe9d58c2b6315a99b75f91448cf5251f4e7b188804ec48a86d26503a4eef",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/scripts/installer/ui/seed.mjs"
+    },
+    "scripts/operations-config.mjs": {
+      "sha256": "decbd8619e40c741708b49639d54282bd19edc4581a782b240d96a423ad47f01",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/scripts/operations-config.mjs"
+    },
+    "seed.json": {
+      "sha256": "b7a00e9769e00a4201370cd7448e699b527914dfa8fac741bcc5ff8a7c50f484",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/seed.json"
+    },
+    "src/auth.server.ts": {
+      "sha256": "abaea7ff882e3c087db7312604a6c84ffeaac16ceb29f3c5d435f0aee7065556",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/auth.server.ts"
+    },
+    "src/base/deployment-health.ts": {
+      "sha256": "49f4dac80429ea7d9477b40799a6242f9af4870f3229df70d0ac1f635476b8b7",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/deployment-health.ts"
+    },
+    "src/base/dispatch.ts": {
+      "sha256": "695ff1bf5bdcf65a429e3853eb80bcb477297c29e55221f6cad08dcff6ba610c",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/dispatch.ts"
+    },
+    "src/base/font-head.ts": {
+      "sha256": "937fe339a397abee96e4279f2e310fa336eb30b2ec3aeb98f2c09ed0ba7d5dac",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/font-head.ts"
+    },
+    "src/base/font-response.ts": {
+      "sha256": "55abc935a78085735ae5b7f2d441ee7a5a67d9c797417f9b5ac3c2449f8c91a8",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/font-response.ts"
+    },
+    "src/base/hydration/README.md": {
+      "sha256": "a25e8a1a787e141590c9b46efb313b8ba6d9b135fad880d3aacfd5289c205244",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/hydration/README.md"
+    },
+    "src/base/hydration/intro-guard.ts": {
+      "sha256": "abc289d53537b631ad6de323b9123c843aea7498aa50d429a4786d7819194fcd",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/hydration/intro-guard.ts"
+    },
+    "src/base/hydration/report.ts": {
+      "sha256": "38792ad67dc33c9ccd9537bcfc41b7f21a57f0d6f6266d045cb71d70630cf3d7",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/hydration/report.ts"
+    },
+    "src/base/hydration/unit.tsx": {
+      "sha256": "932bf2aa40a05c76f3a2c25a121db282e17c7bc839f9c37cd102ffe7f4e7ceca",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/hydration/unit.tsx"
+    },
+    "src/base/identity.ts": {
+      "sha256": "0ad0cad48af3e2c6a40d931e6065185e87208600bc99ab5f886d5d571d5be547",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/identity.ts"
+    },
+    "src/base/lobby.ts": {
+      "sha256": "876f708136f0001b6e23871c54f4a1c7fc9c78f29882a55b9a9c7c793ad4466d",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/lobby.ts"
+    },
+    "src/base/page-style.ts": {
+      "sha256": "58211f173d3b6d9245e80f217c2f3e4e743d59a559e63817865644a991215111",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/page-style.ts"
+    },
+    "src/base/rejected-response.ts": {
+      "sha256": "4aa9861a20497b9dde6f95951dcbecf60cee69e8dad1923c1110ef35abc10686",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/rejected-response.ts"
+    },
+    "src/base/run-site.ts": {
+      "sha256": "b902f9421d902f73fac0fe50c874d1200f1dca33a811fb52c60a9bb76c95ea40",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/run-site.ts"
+    },
+    "src/base/setup-state.ts": {
+      "sha256": "e4be71efeeec308d7a1ace213a2d58001cfdab2488140aac807bc71d70e47403",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/setup-state.ts"
+    },
+    "src/base/setup.ts": {
+      "sha256": "5599d7b1953d093e33c2d3cb8914b2b761547310d2ef0c40699573b439a33516",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/setup.ts"
+    },
+    "src/base/static-assets.ts": {
+      "sha256": "d6ed4098fbee2dc6d557eb1365e9a56b5f5435ad869357cb7d8472a8d0c70e76",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/static-assets.ts"
+    },
+    "src/base/theme-frame.ts": {
+      "sha256": "adb66c1805f7683aa090e85e5881a8137342941e59e973ee264843bd57f7ba62",
+      "mode": 420,
+      "component": "base",
+      "repository": "base",
+      "source": "foundation/runtime/theme-frame.ts"
+    },
+    "src/branding.json": {
+      "sha256": "900c77d8c41f92c2d049165e00fa80249e9a894a4d42bb7c7dee0ad44b3f8977",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/branding.json"
+    },
+    "src/client.tsx": {
+      "sha256": "4fee14f6b63bceec0df77131ffd959fc4d02e3c501982a1f4b5b30c96c1d936a",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/client.tsx"
+    },
+    "src/dev-personas.ts": {
+      "sha256": "7d24cb83de4302472d944adeb1b0467a54cd1f50112223fded8302c34163fdf6",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/dev-personas.ts"
+    },
+    "src/family/proposals/README.md": {
+      "sha256": "84abac66e4a87409fe44223296a73279af8284cc6921e072ad751f1b8927e4c8",
+      "mode": 420,
+      "component": "proposals",
+      "repository": "family",
+      "source": "core/README.md"
+    },
+    "src/identity.ts": {
+      "sha256": "9e0f9307ef2710f8da1ec82b9622ba5bdea9f0fa6ffce18e78c25c593fcfc6b8",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/identity.ts"
+    },
+    "src/mail.server.d.mts": {
+      "sha256": "2e3eaa0588f12f6f04b565b948a0b8b823c201f349cdf9dd75c42c2d2413732b",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/mail.server.d.mts"
+    },
+    "src/mail.server.mjs": {
+      "sha256": "e9a55283ad92d2f4d5012b34d181d49e5fd0b453559bb0d98fc58595224328b9",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/mail.server.mjs"
+    },
+    "src/router.tsx": {
+      "sha256": "8e28d274af3e0490efcc0de2537d6808583814cc1f18298f2d9516f30cdc1af4",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/router.tsx"
+    },
+    "src/routes/__root.tsx": {
+      "sha256": "7aafa1921c62c90cb99053fc7148b012cd2701636d10205815c69239ffdb1252",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/routes/__root.tsx"
+    },
+    "src/server.dev.ts": {
+      "sha256": "4892545be3afaf55d1a45b99933f017baa43512d7152f56b21422010aa70b8a5",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/server.dev.ts"
+    },
+    "src/server.ts": {
+      "sha256": "05d0b2d1c936cf66fc2bdc838762404d277242f54264cd006533ad031925801f",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/server.ts"
+    },
+    "src/site/pages.ts": {
+      "sha256": "81e289a77a207453c874ab57e1b6dad07bbfd9c2e9683d61b2b27f1699a61876",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/site/pages.ts"
+    },
+    "src/site/run.json": {
+      "sha256": "98ff87160a59fd1831e0d407abed4cc42e67dfe2b7862151305d17f2d5ce0ebf",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/src/site/run.json"
+    },
+    "tsconfig.json": {
+      "sha256": "54d38c791f1570448bf550f708c01bede26a02111c9da21a242501ac252989bc",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/tsconfig.json"
+    },
+    "vite.config.ts": {
+      "sha256": "69d8500df3aa2e5500aee9e303deefd12da7f17ac38916e8452eac0d7b1aca10",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/vite.config.ts"
+    },
+    "wrangler.jsonc": {
+      "sha256": "c89f5194947e3c134c7009c499b87c7eb1abb4a49050051c25c8d042f94aa198",
+      "mode": 420,
+      "component": "platter",
+      "repository": "family",
+      "source": "editions/platter/wrangler.jsonc"
+    }
+  },
+  "runtimePackage": {
+    "name": "@runeditrun/rer",
+    "version": "0.2.22"
+  }
+}

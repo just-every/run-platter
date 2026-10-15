@@ -1,0 +1,23 @@
+name: Clone journey
+on:
+  schedule:
+    - cron: '23 15 * * *'
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  journey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+      - run: npm install --global @runeditrun/rer@0.2.22
+      - run: rer dev --detach
+      - run: rer dev --stop

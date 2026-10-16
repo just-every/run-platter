@@ -2,7 +2,7 @@
 .docs-nav{display:flex;flex-direction:column;gap:8px;align-self:start;position:sticky;top:24px;font-size:15px}
 .docs-nav a{padding:8px 12px;text-decoration:none;border-radius:999px}
 .docs-nav a[aria-current=page]{background:var(--pl-glaze-soft)}
-.docs-article{min-width:0}
+.docs-article{min-width:0;overflow-wrap:anywhere}
 .docs-article h1{font-size:44px;margin-bottom:24px}
 .docs-article h2{font-size:28px;margin:40px 0 16px}
 .docs-article h3{font-size:21px;margin:28px 0 12px}
@@ -22,4 +22,3 @@
 .docs-source{font-size:14px;color:var(--pl-muted);border-top:1px solid var(--pl-rule);padding-top:20px}
 .docs-table{overflow:auto}
 @media(max-width:760px){.docs-nav ul{flex-direction:row;flex-wrap:wrap}.docs-nav>p{width:100%;padding:0 10px 8px}}
-.docs-article{overflow-wrap:anywhere}

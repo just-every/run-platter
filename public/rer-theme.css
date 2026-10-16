@@ -37,7 +37,7 @@
 .rer-themed.rer-themed :focus-visible{outline-color:var(--pl-ink)}
 @media(max-width:600px){
   .rer-themed.rer-themed body{padding:72px 16px;font-size:16px}
-  .rer-themed body::before{width:360px;max-width:calc(100vw - 16px);height:calc(100% - 40px);min-height:560px;border-width:10px}
+  .rer-themed body::before{width:360px;max-width:calc(100vw - 16px);height:560px;border-width:10px}
   .rer-themed.rer-themed main{padding:20px;max-width:358px}
   .rer-themed.rer-themed h1{font-size:34px}
   .rer-themed.rer-themed dl{grid-template-columns:1fr;gap:0}

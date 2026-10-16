@@ -10,7 +10,7 @@ Prepare two priced options, send an approved offer, and keep your client's accep
 - [Move in your clients](MOVE-IN.md): preview a client CSV, apply it and undo an unused import.
 - [Backup and restore](BACKUP-RESTORE.md): preserve business records and move them into a fresh installation.
 
-These guides describe your installed Platter app. Open its own address to use **Proposals**, **Clients**, **Import** and **Agent access**. The public run site contains instructions; it does not hold your proposals or sign you into your installation.
+These guides describe your installed Platter app. Open its own address to use **Proposals**, **Clients**, **Import** and **Agent access**. The public run site at https://run-platter.com contains instructions; it does not hold your proposals or sign you into your installation.
 
 ## What Platter keeps
 

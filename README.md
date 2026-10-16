@@ -20,7 +20,7 @@ RER installs the pinned dependencies, selects Node 22.20.0, creates local D1, an
 
 For a real owner's local install, use `rer setup --owner-email you@example.com` before `rer dev`. Review installs use a local owner automatically. To stop the managed server, run `rer dev --stop`.
 
-The local run-site address printed as `RER_SITE` has the marketing homepage, `/run` and [the docs](docs/README.md). The installed app’s `/` is the Lobby.
+The run site is live at https://run-platter.com, with the run page at https://run-platter.com/run. Locally, the address printed as `RER_SITE` has the same marketing homepage, `/run` and [the docs](docs/README.md). The installed app’s `/` is the Lobby.
 
 ## Send and accept an offer
 

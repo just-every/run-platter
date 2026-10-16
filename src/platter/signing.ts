@@ -4,6 +4,7 @@ import type { Bindings } from '../auth.server'
 import { need,text,hash,secret,snapshot,fail } from './model'
 import { queueMail,dispatchMail } from './mail'
 const cookieName='platter_client'
+function sixDigitCode(){const limit=4294000000,v=new Uint32Array(1);do crypto.getRandomValues(v);while(v[0]>=limit);return String(v[0]%1000000).padStart(6,'0')}
 export async function clientContext(env:Bindings,token:string,request:Request){need(/^[a-f0-9]{64}$/.test(token),'Proposal invitation not found',404);const share=await env.DB.prepare('SELECT * FROM p_shares WHERE token=?').bind(token).first<any>();need(share,'Proposal invitation not found',404);const row=await env.DB.prepare('SELECT p.*,c.name AS clientName,c.email AS clientEmail FROM p_proposals p JOIN p_clients c ON c.id=p.client_id WHERE p.id=?').bind(share.proposal_id).first<any>();need(row&&share.revision===row.revision&&['sent','accepted'].includes(row.status),'This proposal has been replaced',409)
  const cookie=request.headers.get('cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith(cookieName+'='))?.slice(cookieName.length+1),verified=Boolean(cookie&&share.session_hash&&share.session_expires>Date.now()&&await hash(cookie)===share.session_hash)
  return{share,row,verified,token}
@@ -14,7 +15,7 @@ async function atomic(env:Bindings,c:any,writes:D1PreparedStatement[],condition:
 export async function clientCommand(env:Bindings,c:Awaited<ReturnType<typeof clientContext>>,name:string,p:Record<string,unknown>){const{row,share}=c,db=env.DB,at=Date.now()
  if(name==='code.request'){
   need(!share.code_sent_at||share.code_sent_at<=at-60000,'Wait one minute before requesting another code',429);need(share.code_generation<10,'Code request limit reached. Contact the sender.',429)
-  const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,'0'),generation=share.code_generation+1,codeHash=await hash(`${env.SESSION_SECRET}:${share.token}:${generation}:${code}`)
+  const code=sixDigitCode(),generation=share.code_generation+1,codeHash=await hash(`${env.SESSION_SECRET}:${share.token}:${generation}:${code}`)
   await atomic(env,c,[db.prepare('UPDATE p_shares SET code_hash=?,code_expires=?,code_attempts=0,code_generation=?,code_sent_at=? WHERE token=?').bind(codeHash,at+600000,generation,at,c.token),queueMail(env,row.id,row.clientEmail,'Your Platter verification code',`Your verification code is ${code}. It expires in 10 minutes.\nProposal: ${row.title}`)],'s.code_generation=?',[share.code_generation],true);await dispatchMail(env,row.id);return{message:'Verification code queued for your email.'}
  }
  if(name==='code.verify'){

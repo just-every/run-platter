@@ -20,6 +20,8 @@ RER installs the pinned dependencies, selects Node 22.20.0, creates local D1, an
 
 For a real owner's local install, use `rer setup --owner-email you@example.com` before `rer dev`. Review installs use a local owner automatically. To stop the managed server, run `rer dev --stop`.
 
+The local run-site address printed as `RER_SITE` has the marketing homepage, `/run` and [the docs](docs/README.md). The installed app’s `/` is the Lobby.
+
 ## Send and accept an offer
 
 1. Open **Clients**, add your client's name and email, then return to **Proposals**.
@@ -79,14 +81,14 @@ Use your own Cloudflare account, D1 and verified mail sender. A push does not de
 3. Commit your nonsecret configuration, then run `rer deploy`. RER provisions the declared resources on that account, applies all migrations, configures the origin and checks health. [OPERATIONS.md](OPERATIONS.md) covers account permissions and private configuration.
 4. Use `rer signin` for the hosted owner's initial entry, then complete setup. Test real mail with your own mailbox before inviting clients. Mail marked **Accepted by provider** means handoff, not delivery. An uncertain provider attempt is retained and is not retried automatically.
 
-The optional product domain is not needed to run or deploy this seed. There is no run-site deployment in this round.
+The optional product domain is not needed to run or deploy this seed. The run site can be built locally with `rer build --site`. Its homepage links to `/run`; the domain is not registered yet, so use the local commands above. Run-site deployment stays off until its release gate.
 
 ## Development
 
-The checkout pins `@runeditrun/rer` 0.2.22 in package mode and Node 22.20.0. After stopping dev:
+The checkout pins `@runeditrun/rer` 0.2.25 in package mode and Node 22.20.0. After stopping dev:
 
 ```sh
 rer verify
 ```
 
-Verify builds, typechecks, runs eight integration tests through Worker/auth/D1 and archive commands, and checks the hosted build. CI runs runtime, business-flow and archive shards in parallel. Clone/install journeys belong to release tags and the nightly workflow. Build and deploy do not run tests. See [source reuse](docs/SOURCE.md) for the Base starting revision and sibling adaptations. The theme and shared setup/sign-in components come from Base; a visual design pass follows this seed round.
+Verify builds, typechecks, runs eight integration tests through Worker/auth/D1 and archive commands, and checks the hosted build. CI runs runtime, business-flow and archive shards in parallel. Clone/install journeys belong to release tags and the nightly workflow. Build and deploy do not run tests. See [source reuse](docs/SOURCE.md) for the Base starting revision and sibling adaptations. The porcelain theme carries the picked Platter design through the run site, docs, shared setup/sign-in screens and app.

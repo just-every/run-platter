@@ -12,4 +12,6 @@ Archives preserve business records, approvals, immutable acceptance and deposit 
 
 Local proposal mail is captured without provider delivery. Hosted mail is queued durably, claimed before contacting a configured sender, and retains uncertain outcomes without blind retry. Provider acceptance is not recipient delivery. Real hosting and mail delivery require the installer's account and provider configuration and were not exercised by this seed round.
 
-Source acquisition and command effects follow SEED-COMMAND-CONTRACT.md. Domain acceptance is in ACCEPTANCE.md. Independent release review, visual design, provider proof and domain purchase remain later work.
+Source acquisition and command effects follow SEED-COMMAND-CONTRACT.md. Domain acceptance is in ACCEPTANCE.md. Independent release review, provider proof and domain purchase remain later work.
+
+The public run site is built with `rer build --site`: its homepage’s Run Platter action opens `/run`, and `/docs` renders the repository’s Markdown guides without JavaScript. The installed root stays the shared Lobby. Run-site deployment is guarded by `RUN_SITE_DEPLOY` and remains off pending its gate.

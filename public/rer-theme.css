@@ -1,25 +1,49 @@
-/* This edition's declared theme. The installer, sign-in, confirmation, /setup
-   read these --rer-* tokens; the app serves this file and its fonts.
-   Buttons keep the colour chosen at setup (src/branding.json primaryColor)
-   because no --rer-accent is declared here; declare --rer-accent and
-   --rer-accent-text together to fix them instead. */
-@font-face {
-  font-family: Outfit;
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url('/fonts/outfit/outfit-latin-wght-normal.woff2') format('woff2');
-}
+@import url('/fonts/fonts.css');
 :root {
-  --rer-font-body: Outfit, Arial, sans-serif;
-  --rer-font-heading: Outfit, Arial, sans-serif;
-  --rer-page: #f4f6f5;
-  --rer-surface: #ffffff;
-  --rer-text: #1b2724;
-  --rer-muted: #4a5a55;
-  --rer-border: #6b7c76;
-  --rer-focus: #1b2724;
-  --rer-link: #1f5f52;
-  --rer-radius: 12px;
+  --pl-paper: #F8F6F1;
+  --pl-surface: #FFFFFF;
+  --pl-porcelain: #F2F0EC;
+  --pl-ink: #1F2121;
+  --pl-muted: #5B6062;
+  --pl-rule: #DCD9D3;
+  --pl-glaze: #8CBBBA;
+  --pl-glaze-soft: #BBDFDA;
+  --pl-glaze-wash: #ECF6F3;
+  --pl-shadow-card: 0 1px 2px rgb(31 33 33 / .06), 0 8px 24px rgb(31 33 33 / .06);
+  --pl-shadow-plate: 0 18px 40px rgb(80 70 55 / .18);
+  --rer-font-body: 'Rethink Sans', system-ui, sans-serif;
+  --rer-font-heading: var(--rer-font-body);
+  --rer-page: var(--pl-paper);
+  --rer-surface: var(--pl-surface);
+  --rer-text: var(--pl-ink);
+  --rer-muted: var(--pl-muted);
+  --rer-border: #8A8F90;
+  --rer-accent: var(--pl-ink);
+  --rer-accent-text: var(--pl-surface);
+  --rer-focus: var(--pl-ink);
+  --rer-link: var(--pl-ink);
+  --rer-radius: 16px;
+  --rer-button-radius: 999px;
   --rer-logo: url('/brand/mark.svg');
 }
+/* Base owns the forms; this edition supplies their porcelain setting. */
+.rer-themed.rer-themed body{position:relative;isolation:isolate;display:grid;place-items:center;min-height:100vh;padding:100px 16px;font-size:17px}
+.rer-themed body::before{content:"";position:absolute;z-index:-1;pointer-events:none;width:min(1000px,96vw);height:560px;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;background:var(--pl-porcelain);border:14px solid white;box-shadow:inset 0 0 0 6px var(--pl-glaze),inset 0 20px 30px rgb(80 70 55 / .1),var(--pl-shadow-plate)}
+.rer-themed.rer-themed main{width:100%;max-width:480px;margin:0;padding:28px;border:1px solid var(--pl-rule);box-shadow:var(--pl-shadow-card)}
+.rer-themed.rer-themed h1{font-size:44px;line-height:1.1;letter-spacing:-.025em;font-weight:600;text-wrap:initial}
+.rer-themed.rer-themed button{border-radius:999px;min-height:44px}
+.rer-themed.rer-themed input:not([type=checkbox]):not([type=hidden]){border-radius:10px}
+.rer-themed.rer-themed .rer-brand{font-size:24px;color:var(--pl-ink);margin-bottom:28px}
+.rer-themed.rer-themed :focus-visible{outline-color:var(--pl-ink)}
+@media(max-width:600px){
+  .rer-themed.rer-themed body{padding:72px 16px;font-size:16px}
+  .rer-themed body::before{width:360px;max-width:calc(100vw - 16px);height:calc(100% - 40px);min-height:560px;border-width:10px}
+  .rer-themed.rer-themed main{padding:20px;max-width:358px}
+  .rer-themed.rer-themed h1{font-size:34px}
+  .rer-themed.rer-themed dl{grid-template-columns:1fr;gap:0}
+  .rer-themed.rer-themed dd{margin-bottom:12px}
+}
+/* The shared Run page uses the same small glaze fills as Platter's app. */
+.step .num{background:var(--pl-glaze-soft);color:var(--pl-ink)}
+.rer-themed.rer-themed .rer-brand{justify-content:center}
+.rer-themed.rer-themed h1,.rer-themed.rer-themed main>p:not(.rer-brand){text-align:center}

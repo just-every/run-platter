@@ -1,4 +1,37 @@
-# Client CSV
+# Move in your clients
+
+Bring an existing client list into Platter with a reviewed CSV import. Open
+**Import** in your installed app as the owner.
+
+## Preview and apply
+
+1. Prepare a file in the format below, or start with the
+   [sample client CSV](../fixtures/clients.csv).
+2. Paste its contents into **CSV content** and choose **Preview import**.
+3. Check the reviewed clients, counts, review notes and conflicts. Preview
+   writes no client records. Correct any problems and preview again.
+4. Choose **Apply reviewed import** to apply the exact CSV you reviewed.
+5. Read **Import result** and **Import history**. If an import needs more work,
+   choose **Resume reviewed import** until it completes.
+
+Use **View journal** to inspect the retained original data and the changes
+made by an import. If you change the CSV after previewing it, preview the new
+contents before applying them.
+
+## Undo an unused import
+
+In **Import history**, choose **Undo import**. If it runs in passes, choose
+**Continue undo** until it completes. Undo removes only unchanged clients
+created by that import; later changes or dependent proposals block removal.
+Clients already undone in earlier passes stay removed if another record
+blocks the rest.
+
+For a client added directly in **Clients**, **Erase unused client** requires
+typing its exact name. Only clients without proposal or import history can be
+erased this way. Undo an unused import to remove its clients. Accepted
+agreements remain retained business records.
+
+## CSV format
 
 Platter's first move-in kit imports clients. An active owner can preview a CSV,
 apply that exact reviewed file, inspect its journal, and undo it.

@@ -7,4 +7,6 @@
 - The owner previews a Client CSV move-in, applies that exact reviewed file, reads its journal, and undoes an unused import.
 - The owner erases an unused client and exports/restores business records using RER archives, with an erasure journal preventing an older backup from restoring erased data.
 
-Not required: payment collection, GST calculation, statutory signatures, provider calls, domain purchase, brand/homepage design, document analytics or a docs/run site. Offers are GST-free AUD; a real deployment requires the owner's Cloudflare account and verified mail configuration. This seed round is not an independently reviewed release.
+Not required: payment collection, GST calculation, statutory signatures, provider calls, domain purchase or document analytics. Offers are GST-free AUD; a real deployment requires the owner's Cloudflare account and verified mail configuration. This seed round is not an independently reviewed release.
+
+- The static run site shows the picked Platter homepage, `/run` instructions and repository Markdown at `/docs`. The installed `/` remains Base’s Lobby; sign-in, setup and app screens share the porcelain theme. Site deployment remains off until the run-site gate.

@@ -22,5 +22,5 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
   if (state.actor?.role === 'owner' && url.pathname === '/app/proposal' && state.outbox?.length) {
     content += panel('Local development mail', `<p>Messages captured locally for this installation.</p><ul class="records">${state.outbox.map((message: any) => `<li><article><h3>${escape(message.subject)}</h3><p>To: ${escape(message.recipient)} · ${escape(message.status)}</p><p class="preserve">${escape(message.body)}</p></article></li>`).join('')}</ul>`)
   }
-  return document(title, content, { actor: state.actor, path, feedback })
+  return document(title, content, { actor: state.actor, path, feedback, beforeTitle: url.pathname === '/app/proposal' ? '<p class="breadcrumb"><a href="/app">All proposals</a></p>' : undefined })
 }

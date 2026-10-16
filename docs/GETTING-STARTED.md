@@ -4,15 +4,13 @@ Run Platter on your own computer first. You need Git, an internet connection for
 
 ## Launch Platter
 
-Install the RER launcher, clone the source and launch from the checkout folder:
+One line installs the RER launcher, clones the source and launches Platter:
 
 ```sh
-npx -y @runeditrun/rer cli install
-export PATH="$HOME/.local/bin:$PATH"
-git clone https://github.com/just-every/run-platter.git
-cd run-platter
-rer dev
+npx -y @runeditrun/rer dev just-every/run-platter
 ```
+
+To start it again later, run `cd run-platter && rer dev`.
 
 The first launch can take a few minutes. RER prepares local storage and a local owner account. Open the private **RER_OPEN** link printed in your terminal on this computer. Keep that link private: it signs you in as the owner. If a launch is interrupted, run `rer dev` again to resume.
 

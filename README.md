@@ -6,15 +6,13 @@ The first release handles **GST-free AUD offers**. It does not collect payments 
 
 ## Run from a fresh clone
 
-Install Git and the RER launcher, then:
+Install Git, then run one line. It installs the RER launcher, clones Platter and starts it:
 
 ```sh
-npx -y @runeditrun/rer cli install
-export PATH="$HOME/.local/bin:$PATH"
-git clone https://github.com/just-every/run-platter.git
-cd run-platter
-rer dev
+npx -y @runeditrun/rer dev just-every/run-platter
 ```
+
+To start it again later, run `cd run-platter && rer dev`.
 
 RER installs the pinned dependencies, selects Node 22.20.0, creates local D1, and opens a local owner account. The first run takes a few minutes and needs 15 GiB free. Open the private `RER_OPEN` URL printed in your terminal. Keep that link private. Complete the short setup screen, then open **Proposals** at `/app`.
 

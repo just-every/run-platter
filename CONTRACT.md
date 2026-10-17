@@ -16,7 +16,7 @@ This is a target contract: the product Platter is being built towards, with each
 
 A buyer replacing an incumbent needs the whole job, so the target is the whole job:
 
-- **Write.** A branded drag-and-drop editor with templates, a reusable content library, variables from the CRM, rich media, conditional content, attachments such as the firm's W-9, Word import with tokens and quote tables mapped, PDF pages for signing, Word and PDF export, a client PDF before signing, duplicating, locked sections, search and folders, unpriced documents such as NDAs and SOWs, a custom domain, a phone-ready client page in the client's language, and a measured performance budget on large proposals (`EDIT-001` to `EDIT-017`).
+- **Write.** A branded drag-and-drop editor with templates, a reusable content library, variables from the CRM, rich media, conditional content, attachments such as the firm's W-9, Word import with tokens and quote tables mapped, PDF pages for signing, Word and PDF export, a client PDF before signing, a preview of the client page before sending, duplicating, locked sections, search and folders, unpriced documents such as NDAs and SOWs, a custom domain, a phone-ready client page in the client's language, and a measured performance budget on large proposals (`EDIT-001` to `EDIT-018`).
 - **Price.** A catalogue, USD pricing tables with quantities and units, packages and optional items the client chooses, one-off and recurring fees, discounts, US sales tax, internal cost and margin, and payment terms with deposits and milestones (`CAT-001`, `PRICE-001` to `PRICE-008`).
 - **Work as a team.** Live co-editing, internal comments, version history, approval rules by value, discount, margin and terms, one approval policy stating who approves, who sends and whether a proposal that matches no rule needs approval, and approval requests that reach the approver (`COLLAB-*`, `APPROVE-*`, `PROP-001`).
 - **Send and track.** Sending from Gmail or Microsoft 365 or by text message, a reusable public signing link, an editable subject and message from shared email templates, delivery and bounce states, several recipients with roles, replacing a signer on a sent proposal, withdrawing a proposal sent in error, expiry, notifications, view and section-level analytics and forwarded stakeholders, with tracking disclosed (`SEND-*`, `TRACK-*`).
@@ -90,7 +90,7 @@ These clauses complete the category job alongside the published guarantees. Each
 
 #### EDIT-001 — Branded drag-and-drop proposal editor.
 
-A member builds a proposal from blocks: cover page, heading, rich text, image, video, columns, pricing table (`PRICE-001`), quote or testimonial, team bio, case study, terms, form field (`SIGN-007`), signature block and page break. Every signature block and field is assigned to one recipient, or in a template to one recipient role (`SIGN-011`). Blocks are added from a palette, reordered by drag or keyboard, duplicated and deleted with undo. A brand kit sets the logo, colours, fonts and a default cover. One document renders as a responsive web page for the client and as a paginated US Letter PDF (`EDIT-005`) with the same content. Edits autosave under the version guard of `COLLAB-001`, and the editor meets the large-proposal performance budget of `EDIT-011`.
+A member builds a proposal from blocks: cover page, heading, rich text, image, video, columns, pricing table (`PRICE-001`), quote or testimonial, team bio, case study, terms, form field (`SIGN-007`), signature block and page break. Every signature block and field is assigned to one recipient, or in a template to one recipient role (`SIGN-011`). Blocks are added from a palette, reordered by drag or keyboard, duplicated and deleted with undo. A brand kit sets the logo, colours, fonts and a default cover. One document renders as a responsive web page for the client and as a paginated US Letter PDF (`EDIT-005`) with the same content, and members and approvers see that client page for an unsent revision through the preview of `EDIT-018`. Edits autosave under the version guard of `COLLAB-001`, and the editor meets the large-proposal performance budget of `EDIT-011`.
 
 *Acceptance:* A browser journey at 1440 and 390 pixels builds a proposal from blank with every block type, reorders by drag and by keyboard, applies a brand kit, reloads and sees the same document, and exports a PDF whose pages carry the same blocks in order; the `EDIT-011` budget journey passes on the same build.
 
@@ -154,7 +154,7 @@ An owner serves client links from their own domain, such as `proposals.example.c
 
 #### EDIT-009 — Conditional content by package.
 
-A section can be shown only when a package, optional item or variable has a given value, so choosing the Premium package shows its deliverables and timeline. The accepted agreement and PDF contain exactly what the client saw for their selection.
+A section can be shown only when a package, optional item or variable has a given value, so choosing the Premium package shows its deliverables and timeline. The accepted agreement and PDF contain exactly what the client saw for their selection. Members check each selection's sections before sending in the `EDIT-018` preview.
 
 *Acceptance:* Make a timeline section depend on the Premium package, accept the Standard package and see the section absent from the agreement and PDF, then accept Premium on another copy and see it present.
 
@@ -224,6 +224,14 @@ Each recipient sees the client page, emails, disclosures (`SIGN-003`, `TRACK-004
 
 *Status:* missing. The client page and mail are English only.
 
+#### EDIT-018 — Client-page preview before sending.
+
+Before a revision is sent, anyone who may view the proposal under `TEAM-001`, including a collaborator, and every approver named on a pending approval step for it (`APPROVE-001`, `APPROVE-003`) opens a preview of that exact revision's client page as it will render after sending, with a width switch between desktop (1440 pixels) and phone (390 pixels). The preview is interactive as the client page is: choosing a package, toggling optional items and changing client-editable quantities (`PRICE-002`) recalculate the totals, discounts, sales tax (`PRICE-005`), deposit and payment schedule (`PRICE-007`) and show or hide conditional sections (`EDIT-009`) through the same server calculation the client page uses, and the same quantity limits apply. The member chooses the recipient or template role to view as (`SEND-003`, `SIGN-011`) and sees only that recipient's assigned fields and signing step, in that recipient's language (`EDIT-017`). Variables show their filled values, and an unfilled one is marked as `EDIT-004` would block it. An unsent negotiated revision of a sent proposal (`NEG-001`) is previewed the same way. A preview cannot be signed, accepted, paid, declined, commented on or submitted: those controls show but are disabled, and the matching requests made from a preview are refused (403). Opening or using a preview creates no revision, clears no approval, records no view or reading analytics (`TRACK-001` to `TRACK-003`), schedules no reminder, starts no expiry and sends no mail or text. A banner the client never sees marks the page as a preview, names the revision and the recipient viewed as, and links back to the editor. The preview is served on a member-only route under the member's own session: it is never reachable from a client link or a client session, and a client share token opens only the sent client page. An approval request (`APPROVE-002`) links to the preview of the exact revision awaiting approval, and an approval given after previewing binds that same revision (`PROP-001`).
+
+*Acceptance:* Build a draft with three packages (Basic, Standard and Premium), an optional item, a client-editable quantity limited to 1 to 10, a timeline section shown only for Premium, sales tax, a 30% deposit and two signers, each with their own fields. Open the preview at 1440 and 390 pixels: both widths render the client page under the preview banner naming revision 1. Choose Premium, add the optional item and set the quantity to 4: the totals, tax, deposit and payment schedule update and the Premium timeline section appears; after approval and sending, the same choices on the client page show the same amounts to the cent and the same sections. Setting the quantity to 11 in the preview is refused, as on the client page. View as signer 2: only signer 2's fields show, and sign, accept and pay requests from the preview are refused (403). Afterwards the revision number and approvals are unchanged, and the proposal timeline, the tracking store, the reminder schedule, the mail fake and the SMS fake hold nothing from the preview. Submit the draft for approval: the manager named on the pending step opens the preview from the link in the approval request (`APPROVE-002`) and sees revision 1. A member outside the proposal's team is refused (403). Requesting the preview route without a member session, including from the client's verified session after sending, returns 401 with none of the proposal.
+
+*Status:* missing. The owner's proposal page lists the scope and both options before approval, but there is no preview of the client page for an unsent revision: the client page and its private link exist only once a proposal is sent.
+
 ### Catalogue and pricing
 
 #### CAT-001 — Service and product catalogue.
@@ -244,7 +252,7 @@ A proposal has any number of pricing tables in USD, each with line items (name, 
 
 #### PRICE-002 — Packages and optional items the client chooses.
 
-A proposal offers any number of packages (good, better, best) and optional items the client can add or remove. Quantities can be client-editable within a minimum and maximum the firm sets. Totals, tax, deposit and the payment schedule update as the client chooses, and the agreement records exactly the selection signed.
+A proposal offers any number of packages (good, better, best) and optional items the client can add or remove. Quantities can be client-editable within a minimum and maximum the firm sets. Totals, tax, deposit and the payment schedule update as the client chooses, and the agreement records exactly the selection signed. The sender and approvers try the same choices before sending in the `EDIT-018` preview, which uses the same calculation.
 
 *Acceptance:* Offer three packages and two optional items with an editable quantity between 1 and 10; as the client choose the middle package, add one item and set quantity 4; the server totals, agreement and PDF all show that selection; quantity 11 is refused.
 
@@ -334,9 +342,9 @@ Admins set approval rules by total value, discount, margin, payment terms, edite
 
 #### APPROVE-002 — Approval requests that reach the approver.
 
-An approval request reaches the approver by email, Slack, Microsoft Teams, Nook or mobile push, with a summary of what triggered the rule. The approver approves or rejects with a note from the request, including on a phone (`MOB-001`). Overdue requests remind the approver and the requester sees who holds it.
+An approval request reaches the approver by email, Slack, Microsoft Teams, Nook or mobile push, with a summary of what triggered the rule and a link to the client-page preview of the exact revision awaiting approval (`EDIT-018`). The approver approves or rejects with a note from the request, including on a phone (`MOB-001`). Overdue requests remind the approver and the requester sees who holds it.
 
-*Acceptance:* Submit a proposal that needs approval, approve it from the Slack fake's action, reject another from email with a note, and see an overdue reminder after the set delay.
+*Acceptance:* Submit a proposal that needs approval: the Slack fake's request and the email each carry a link that opens the `EDIT-018` preview of the revision awaiting approval, under the approver's session. Approve it from the Slack fake's action, reject another from email with a note, and see an overdue reminder after the set delay.
 
 *Status:* missing. No approval notifications.
 
@@ -368,7 +376,7 @@ Each send shows queued, accepted by provider, delivered, deferred, bounced or co
 
 #### SEND-003 — Recipients, roles and sharing.
 
-A proposal has any number of recipients with a role: signer, client-side approver, viewer or CC. A proposal created from a template starts with the template's role slots, fields and order (`SIGN-011`), and sending is refused (409) while a signer, approver or countersigner slot is unfilled. Each recipient has their own link and verification. The firm can also share by link (with verification) or embed the proposal on its site. Removing a recipient revokes their link, and withdrawing the proposal revokes every link at once (`SEND-010`). Replacing a signer on a sent proposal is `SEND-007`, and a signer delegating is `SIGN-009`.
+A proposal has any number of recipients with a role: signer, client-side approver, viewer or CC. A proposal created from a template starts with the template's role slots, fields and order (`SIGN-011`), and sending is refused (409) while a signer, approver or countersigner slot is unfilled. Each recipient has their own link and verification. Before sending, the sender previews the client page as each recipient (`EDIT-018`). The firm can also share by link (with verification) or embed the proposal on its site. Removing a recipient revokes their link, and withdrawing the proposal revokes every link at once (`SEND-010`). Replacing a signer on a sent proposal is `SEND-007`, and a signer delegating is `SIGN-009`.
 
 *Acceptance:* Add a signer, a CFO approver and a viewer; each opens their own link; the viewer cannot sign; remove the viewer and see their link refused.
 
@@ -392,9 +400,9 @@ The sender and watchers are notified when a proposal is first viewed, commented 
 
 #### SEND-006 — Editable subject, message and shared email templates.
 
-Every send, reminder (`FOLLOW-001`), fresh invitation (`PROP-002`), revision send (`NEG-001`), signer replacement (`SEND-007`) and net-terms invoice (`PAY-008`) shows the email before it goes, with an editable subject and personal message. Admins keep shared email templates per event (send, reminder, expiry notice, invoice, completion) with variables from `EDIT-004` such as `{client.first_name}`, `{client.company}`, `{proposal.title}`, `{sender.name}` and `{proposal.expires_on}`; they set the default template per event and per proposal template, and can lock a template so members pick it but do not edit it. A variable with no value blocks the send as in `EDIT-004`. A scheduled reminder uses the template the sender chose, and the sender can edit its text before it goes. The exact subject and body sent, after filling, are kept on the proposal timeline with recipient and time and in the agreement package. The verification code email (`SIGN-001`) keeps fixed wording.
+Every send, reminder (`FOLLOW-001`), fresh invitation (`PROP-002`), revision send (`NEG-001`), signer replacement (`SEND-007`) and net-terms invoice (`PAY-008`) shows the email before it goes, with an editable subject and personal message. Admins keep shared email templates per event (send, reminder, expiry notice, invoice, completion) with variables from `EDIT-004` such as `{client.first_name}`, `{client.company}`, `{proposal.title}`, `{sender.name}` and `{proposal.expires_on}`; they set the default template per event and per proposal template, and can lock a template so members pick it but do not edit it. A variable with no value blocks the send as in `EDIT-004`. A scheduled reminder uses the template the sender chose, and the sender can edit its text before it goes. The exact subject and body sent, after filling, are kept on the proposal timeline with recipient and time and in the agreement package. The verification code email (`SIGN-001`) keeps fixed wording. Before sending, anyone who may edit or send the proposal sends a test to themselves: the filled subject, prefixed "[Test]", and body go only to the member's own sign-in address, never to a recipient, and the message's proposal link opens the `EDIT-018` preview under a member session instead of a client link. A test send needs no approval, freezes nothing, creates no revision, records no view, schedules no reminder, is never put in the agreement package, and is listed on the proposal timeline as a test send; it is limited to 10 per member per proposal per day (429).
 
-*Acceptance:* Save a template with subject "Proposal for {client.company}" and a body starting "Hi {client.first_name},"; send with it to Dana at Acme: the mail fake and the timeline both hold the subject "Proposal for Acme" and the body "Hi Dana," exactly. Edit the text of the scheduled second reminder: the first reminder in the mail fake carries the template text and the second carries the edited text. Send with an unfilled variable (refused, naming it); as a member edit a locked template's text (refused).
+*Acceptance:* Save a template with subject "Proposal for {client.company}" and a body starting "Hi {client.first_name},"; send with it to Dana at Acme: the mail fake and the timeline both hold the subject "Proposal for Acme" and the body "Hi Dana," exactly. Edit the text of the scheduled second reminder: the first reminder in the mail fake carries the template text and the second carries the edited text. Send with an unfilled variable (refused, naming it); as a member edit a locked template's text (refused). On an unapproved draft, send a test to me: the mail fake holds exactly one message, to the member's own address, with the subject "[Test] Proposal for Acme"; its link opens the preview with the member's session and returns 401 without one; the proposal is still an unapproved draft at the same revision, with no tracking record, no reminder scheduled and no client link; a request that names another address for the test is refused (400), and the eleventh test that day is refused (429).
 
 *Status:* missing. Proposal mail has a fixed subject ("Your proposal:" and the title) and a fixed body, set in src/platter/commands.ts; no editing, templates or timeline copy.
 
@@ -484,9 +492,9 @@ Every open proposal has a sales owner, a next action and a due date. Each sales 
 
 #### FOLLOW-003 — Expiry and renewal notifications.
 
-The sender is told before a proposal expires and before an accepted agreement's term ends or renews, with lead times the admin sets, and each notice opens a follow-up (`FOLLOW-002`) and, for renewals, offers `RENEW-002`.
+The sender (the proposal's sales owner, and its watchers under `SEND-005`) is told before a sent, unaccepted proposal expires and before an accepted agreement's term ends or renews. These are notices to the firm, separate from `SEND-004`'s expiry warning to unsigned signers, and each has its own setting: the sender's expiry notice is on by default 3 days before expiry, the renewal notice is on by default 30 days before the term ends, and the signer warning is on by default 1 day before expiry (`FOLLOW-006`). The owner or an admin changes each lead time or turns either notice off for the workspace (`TEAM-001`), and the sender changes them per proposal like the other delivery settings of `FOLLOW-006`. Each notice goes by the sender's channels under `SEND-005` and opens a follow-up (`FOLLOW-002`) due on the notice day; a renewal notice offers `RENEW-002`. A proposal accepted, declined or withdrawn before the notice day gets no expiry notice, and a changed expiry date moves the notice with it.
 
-*Acceptance:* Set a 3-day expiry notice and a 30-day renewal notice; advance the clock; see each notice and its follow-up item.
+*Acceptance:* With the workspace defaults (sender expiry notice 3 days before, renewal notice 30 days before, signer warning 1 day before), send a proposal on 1 March with a 14-day expiry, so it expires on 15 March: the sender's expiry notice and a follow-up due 12 March arrive on 12 March and not before, and each unsigned signer's warning reaches the mail fake on 14 March. Extend that proposal to 22 March before 12 March: the sender's notice moves to 19 March. Accept a second proposal on 1 March 2026 with a 12-month term ending 28 February 2027: the renewal notice and a follow-up offering `RENEW-002` arrive on 29 January 2027. Turn the sender's expiry notice off for the workspace and send a third proposal on 1 March with a 14-day expiry: no sender notice arrives on 12 March, while the signer warning still reaches the mail fake on 14 March. A fourth proposal accepted on 10 March with expiry on 15 March gets no expiry notice. A sales member's change to the workspace lead times is refused (403).
 
 *Status:* missing. No expiry or renewal notices.
 
@@ -1187,7 +1195,7 @@ How the approved scope for Platter (category, incumbents, missing items and push
 
 | Approved scope item | Clauses |
 | --- | --- |
-| Branded drag-and-drop proposal editor with templates, reusable content and service libraries, images, video and PDF/Word import and export | `EDIT-001` to `EDIT-017`, `CAT-001` |
+| Branded drag-and-drop proposal editor with templates, reusable content and service libraries, images, video and PDF/Word import and export | `EDIT-001` to `EDIT-018`, `CAT-001` |
 | Interactive USD pricing tables with optional items, packages, quantities, recurring fees, discounts and configurable US sales tax, replacing the two-option GST-free AUD format | `PRICE-001` to `PRICE-008`, `CAT-001` |
 | Tracked sending with view and section-level engagement analytics, reminders, expiry, comments and negotiated revisions | `SEND-001` to `SEND-010`, `TRACK-001` to `TRACK-004`, `FOLLOW-001` to `FOLLOW-006`, `NEG-001`, `NEG-002` |
 | Legally binding e-signature (ESIGN/UETA) with audit trail and a downloadable signed agreement, plus multi-signer support | `SIGN-001` to `SIGN-011`, `SEND-007` |
@@ -1206,8 +1214,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 9 | 3 | 0 | 12 |
-| Target and push further | 0 | 31 | 96 | 127 |
-| All | 9 | 34 | 96 | 139 |
+| Target and push further | 0 | 31 | 97 | 128 |
+| All | 9 | 34 | 97 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1240,6 +1248,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `EDIT-015` | Locked template sections | target | missing |  | No templates, so no section locks. |
 | `EDIT-016` | Proposal search and folders | target | missing |  | A single proposal list; no search or folders. |
 | `EDIT-017` | Client page in the client's language | target | missing |  | The client page and mail are English only. |
+| `EDIT-018` | Client-page preview before sending | target | missing |  | The owner's proposal page lists the scope and both options before approval, but there is no preview of the client page for an unsent revision: the client page and its private link exist only once a proposal is sent. |
 | `CAT-001` | Service and product catalogue | target | missing |  | No catalogue. |
 | `PRICE-001` | USD pricing tables with line items | target | partial | `src/platter/model.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs` | Two fixed one-off option totals in AUD; no line items, quantities, units or multiple tables. |
 | `PRICE-002` | Packages and optional items the client chooses | target | partial | `src/platter/signing.ts`, `tests/platter.test.mjs` | Exactly two fixed options; no add-ons, editable quantities or any number of packages. |

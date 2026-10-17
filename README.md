@@ -16,7 +16,7 @@ To start it again later, run `cd run-platter && rer dev`.
 
 RER installs the pinned dependencies, selects Node 22.20.0, creates local D1, and opens a local owner account. The first run takes a few minutes and needs 15 GiB free. Open the private `RER_OPEN` URL printed in your terminal. Keep that link private. Complete the short setup screen, then open **Proposals** at `/app`.
 
-For a real owner's local install, use `rer setup --owner-email you@example.com` before `rer dev`. Review installs use a local owner automatically. To stop the managed server, run `rer dev --stop`.
+For a real owner's local install, run `npx -y @runeditrun/rer setup just-every/run-platter --owner-email you@example.com` in place of the one line, then `cd run-platter && rer dev`. Review installs use a local owner automatically. To stop the managed server, run `rer dev --stop`.
 
 The run site is live at https://run-platter.com, with the run page at https://run-platter.com/run. Locally, the address printed as `RER_SITE` has the same marketing homepage, `/run` and [the docs](docs/README.md). The installed app’s `/` is the Lobby.
 

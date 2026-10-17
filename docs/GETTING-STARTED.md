@@ -31,10 +31,11 @@ Have an existing client list? Use the [CSV move-in guide](MOVE-IN.md) to review 
 
 ## Use your real owner mailbox
 
-For a real owner's local installation, prepare the owner before the first launch:
+For a real owner's local installation, prepare the owner before the first launch, in place of the one line:
 
 ```sh
-rer setup --owner-email you@example.com
+npx -y @runeditrun/rer setup just-every/run-platter --owner-email you@example.com
+cd run-platter
 rer dev
 ```
 

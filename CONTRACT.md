@@ -1209,7 +1209,7 @@ How the approved scope for Platter (category, incumbents, missing items and push
 
 ## Status
 
-Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed57b` (17 October 2026). Evidence is the test or file that backs the status; Gap says what is missing. No status here is acceptance.
+Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed57b` (17 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |

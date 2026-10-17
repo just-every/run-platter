@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "projectId": "just-every/run-platter",
+  "name": "Platter",
+  "sourceRepository": "https://github.com/just-every/run-platter",
+  "license": "MIT"
+}

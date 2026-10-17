@@ -27,7 +27,8 @@ export async function seedStudio(env: Bindings, ownerEmail: string, now: Date): 
   for (const key of keys) writes.push(db.prepare('INSERT INTO p_agent_keys (id, owner_id, owner_version, label, token_hash, created_at, expires_at, revoked_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING')
     .bind(keyId(key.n), owner.id, owner.version, key.label, await hash(secret()), ago(key.created), ago(key.created) + 30 * DAY, key.revoked === undefined ? null : ago(key.revoked)))
   for (const [n, name, email] of clients) writes.push(db.prepare('INSERT INTO p_clients (id, name, email) VALUES (?, ?, ?) ON CONFLICT DO NOTHING').bind(clientId(n), name, email))
-  for (const sample of proposals) writes.push(...await proposalWrites(env, sample, { ago, owner: owner.id, ownerEmail, preparer }))
+  // Each proposal's events keep their order but fall at its own time of day.
+  for (const sample of proposals) writes.push(...await proposalWrites(env, sample, { ago: days => ago(days) - (sample.n * 53 % 240) * MINUTE, owner: owner.id, ownerEmail, preparer }))
   await db.batch(writes)
 }
 

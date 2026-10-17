@@ -201,13 +201,6 @@
       "repository": "family",
       "source": "editions/platter/.gitignore"
     },
-    ".node-version": {
-      "sha256": "a0e27aeeac42d6102f4ff2bce40d8fb011c07e5cb28eff3c9d77e68df29e5dd6",
-      "mode": 420,
-      "component": "platter",
-      "repository": "family",
-      "source": "editions/platter/.node-version"
-    },
     "ACCEPTANCE.md": {
       "sha256": "3bc373df1bad4b9a8504993a2c4cd675b0a102dd365db16c1f5ee698b971121e",
       "mode": 420,
@@ -228,20 +221,6 @@
       "component": "platter",
       "repository": "family",
       "source": "editions/platter/CONTRACT.md"
-    },
-    "HOMEPAGE-VARIANTS.md": {
-      "sha256": "e0a118d5efb0703d43f96c0562624f943db2e57f508a25172bd334242ee535aa",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "export/HOMEPAGE-VARIANTS.md"
-    },
-    "LICENSE": {
-      "sha256": "2f5076ef027045b9e0e72df8aa61ca8551e54b1877d531656d6e7985b2c32324",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "LICENSE"
     },
     "ONBOARDING.md": {
       "sha256": "fdbfd832168f2a05e187ea2385c4675f0efce246278e6f720ba403fdc754bbf7",
@@ -277,20 +256,6 @@
       "component": "base",
       "repository": "base",
       "source": "export/RUN-LOCALLY.md"
-    },
-    "SEED-COMMAND-CONTRACT.md": {
-      "sha256": "0b97e2459883fbb77845844cf20e6760dc775881fd26640a6a6dae050504b891",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "export/SEED-COMMAND-CONTRACT.md"
-    },
-    "VERIFY-WORKFLOW.md": {
-      "sha256": "befd010a8a91cdcf6d8fac6e2cb3356f00d2f3df8d29137065678ff64d788b2c",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "export/VERIFY-WORKFLOW.md"
     },
     "deploy-site.json": {
       "sha256": "cb500b0d8c2acd26f2bfe91165abddef6e2317e6b9dcf83a62887a1a7b65b3e9",
@@ -495,33 +460,12 @@
       "repository": "family",
       "source": "editions/platter/scripts/installer/local.mjs"
     },
-    "scripts/installer/seed.mjs": {
-      "sha256": "7bd4e291b926f9744cf262a2bb119502fe7506a8f142a67409c0b32293c949f9",
-      "mode": 420,
-      "component": "platter",
-      "repository": "family",
-      "source": "editions/platter/scripts/installer/seed.mjs"
-    },
-    "scripts/installer/ui/background.svg": {
-      "sha256": "b234f98362d278ad8fb176ede8a88b8bd66d016147ab758ecb81a096c7115d26",
-      "mode": 420,
-      "component": "platter",
-      "repository": "family",
-      "source": "editions/platter/scripts/installer/ui/background.svg"
-    },
     "scripts/installer/ui/seed.mjs": {
       "sha256": "205dbe9d58c2b6315a99b75f91448cf5251f4e7b188804ec48a86d26503a4eef",
       "mode": 420,
       "component": "platter",
       "repository": "family",
       "source": "editions/platter/scripts/installer/ui/seed.mjs"
-    },
-    "scripts/operations-config.mjs": {
-      "sha256": "decbd8619e40c741708b49639d54282bd19edc4581a782b240d96a423ad47f01",
-      "mode": 420,
-      "component": "platter",
-      "repository": "family",
-      "source": "editions/platter/scripts/operations-config.mjs"
     },
     "seed.json": {
       "sha256": "b7a00e9769e00a4201370cd7448e699b527914dfa8fac741bcc5ff8a7c50f484",
@@ -537,20 +481,6 @@
       "repository": "family",
       "source": "editions/platter/src/auth.server.ts"
     },
-    "src/base/deployment-health.ts": {
-      "sha256": "49f4dac80429ea7d9477b40799a6242f9af4870f3229df70d0ac1f635476b8b7",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/deployment-health.ts"
-    },
-    "src/base/dispatch.ts": {
-      "sha256": "695ff1bf5bdcf65a429e3853eb80bcb477297c29e55221f6cad08dcff6ba610c",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/dispatch.ts"
-    },
     "src/base/font-head.ts": {
       "sha256": "937fe339a397abee96e4279f2e310fa336eb30b2ec3aeb98f2c09ed0ba7d5dac",
       "mode": 420,
@@ -558,117 +488,12 @@
       "repository": "base",
       "source": "foundation/runtime/font-head.ts"
     },
-    "src/base/font-response.ts": {
-      "sha256": "55abc935a78085735ae5b7f2d441ee7a5a67d9c797417f9b5ac3c2449f8c91a8",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/font-response.ts"
-    },
-    "src/base/hydration/README.md": {
-      "sha256": "a25e8a1a787e141590c9b46efb313b8ba6d9b135fad880d3aacfd5289c205244",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/hydration/README.md"
-    },
-    "src/base/hydration/intro-guard.ts": {
-      "sha256": "abc289d53537b631ad6de323b9123c843aea7498aa50d429a4786d7819194fcd",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/hydration/intro-guard.ts"
-    },
-    "src/base/hydration/report.ts": {
-      "sha256": "38792ad67dc33c9ccd9537bcfc41b7f21a57f0d6f6266d045cb71d70630cf3d7",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/hydration/report.ts"
-    },
-    "src/base/hydration/unit.tsx": {
-      "sha256": "932bf2aa40a05c76f3a2c25a121db282e17c7bc839f9c37cd102ffe7f4e7ceca",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/hydration/unit.tsx"
-    },
-    "src/base/identity.ts": {
-      "sha256": "0ad0cad48af3e2c6a40d931e6065185e87208600bc99ab5f886d5d571d5be547",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/identity.ts"
-    },
-    "src/base/lobby.ts": {
-      "sha256": "876f708136f0001b6e23871c54f4a1c7fc9c78f29882a55b9a9c7c793ad4466d",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/lobby.ts"
-    },
-    "src/base/page-style.ts": {
-      "sha256": "58211f173d3b6d9245e80f217c2f3e4e743d59a559e63817865644a991215111",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/page-style.ts"
-    },
-    "src/base/rejected-response.ts": {
-      "sha256": "4aa9861a20497b9dde6f95951dcbecf60cee69e8dad1923c1110ef35abc10686",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/rejected-response.ts"
-    },
-    "src/base/run-site.ts": {
-      "sha256": "b902f9421d902f73fac0fe50c874d1200f1dca33a811fb52c60a9bb76c95ea40",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/run-site.ts"
-    },
-    "src/base/setup-state.ts": {
-      "sha256": "e4be71efeeec308d7a1ace213a2d58001cfdab2488140aac807bc71d70e47403",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/setup-state.ts"
-    },
-    "src/base/setup.ts": {
-      "sha256": "5599d7b1953d093e33c2d3cb8914b2b761547310d2ef0c40699573b439a33516",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/setup.ts"
-    },
-    "src/base/static-assets.ts": {
-      "sha256": "d6ed4098fbee2dc6d557eb1365e9a56b5f5435ad869357cb7d8472a8d0c70e76",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/static-assets.ts"
-    },
-    "src/base/theme-frame.ts": {
-      "sha256": "adb66c1805f7683aa090e85e5881a8137342941e59e973ee264843bd57f7ba62",
-      "mode": 420,
-      "component": "base",
-      "repository": "base",
-      "source": "foundation/runtime/theme-frame.ts"
-    },
     "src/branding.json": {
       "sha256": "900c77d8c41f92c2d049165e00fa80249e9a894a4d42bb7c7dee0ad44b3f8977",
       "mode": 420,
       "component": "platter",
       "repository": "family",
       "source": "editions/platter/src/branding.json"
-    },
-    "src/client.tsx": {
-      "sha256": "4fee14f6b63bceec0df77131ffd959fc4d02e3c501982a1f4b5b30c96c1d936a",
-      "mode": 420,
-      "component": "platter",
-      "repository": "family",
-      "source": "editions/platter/src/client.tsx"
     },
     "src/dev-personas.ts": {
       "sha256": "7d24cb83de4302472d944adeb1b0467a54cd1f50112223fded8302c34163fdf6",
@@ -704,13 +529,6 @@
       "component": "platter",
       "repository": "family",
       "source": "editions/platter/src/mail.server.mjs"
-    },
-    "src/router.tsx": {
-      "sha256": "8e28d274af3e0490efcc0de2537d6808583814cc1f18298f2d9516f30cdc1af4",
-      "mode": 420,
-      "component": "platter",
-      "repository": "family",
-      "source": "editions/platter/src/router.tsx"
     },
     "src/routes/__root.tsx": {
       "sha256": "7aafa1921c62c90cb99053fc7148b012cd2701636d10205815c69239ffdb1252",

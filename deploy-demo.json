@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "domain": "run-platter.com",
+  "name": "Platter",
+  "ownerEmail": "maya@lanternstreet.example",
+  "settings": {
+    "MAIL_FROM": "proposals@lanternstreet.example"
+  }
+}

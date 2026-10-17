@@ -25,6 +25,7 @@
   ],
   "exclude": [
     "src/modules/**/tests",
-    "src/modules/**/live-proof"
+    "src/modules/**/live-proof",
+    "src/modules/import-kit/src/door"
   ]
 }

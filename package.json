@@ -26,7 +26,7 @@
     "check": "rer check",
     "deps": "rer install",
     "rer": "rer",
-    "test:platter": "node --test --test-concurrency=1 tests/platter.test.mjs",
+    "test:platter": "node --test --test-concurrency=1 tests/platter.test.mjs tests/demo.test.mjs",
     "test:archive": "node --test tests/archive.test.mjs"
   },
   "dependencies": {
@@ -40,7 +40,7 @@
     "@cloudflare/vite-plugin": "1.54.5",
     "@cloudflare/workers-types": "5.20260908.1",
     "@playwright/test": "1.63.0",
-    "@runeditrun/rer": "0.2.42",
+    "@runeditrun/rer": "0.2.47",
     "@types/node": "22.20.5",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",

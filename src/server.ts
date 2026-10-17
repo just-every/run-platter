@@ -1,5 +1,6 @@
-import { platterResponse } from './platter/http'
 import { withDemo } from '@runeditrun/rer/internal/modules/demo/index.mjs'
+import { platterResponse } from './platter/http'
+import { seedDemo } from './demo'
 import { rejectedResponse } from './base/rejected-response'
 import start from '@tanstack/react-start/server-entry'
 import { Hono } from 'hono'
@@ -39,4 +40,4 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
     if (lobby) return lobby
     return rejectedResponse(request, await dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request))))
   },
-} satisfies ExportedHandler<Bindings>)
+} satisfies ExportedHandler<Bindings>, { seed: seedDemo })

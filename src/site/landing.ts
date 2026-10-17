@@ -1,6 +1,6 @@
 import { siteDocument } from './frame'
 
-const actions = () => '<div class="site-actions"><a class="button" href="/run">Run Platter →</a><a href="/docs">Read the docs</a></div>'
+const actions = (demo = false) => `<div class="site-actions"><a class="button" href="/run">Run Platter →</a>${demo ? '<a class="button" href="https://demo.run-platter.com/">Try the demo</a>' : ''}<a href="/docs">Read the docs</a></div>`
 const radio = (selected = false) => `<span class="draw-radio${selected ? ' selected' : ''}" aria-hidden="true"></span>`
 const download = '<span class="draw-button secondary">Download deposit invoice CSV</span>'
 const offered = (title: string, price: string, deposit: string, selected = false) => `<div class="draw-option${selected ? ' chosen' : ''}"><strong>${title}</strong><b>${price}</b><span>Deposit ${deposit}</span></div>`
@@ -17,7 +17,7 @@ const included = [
   ['Your own account','<circle cx="16" cy="11" r="5"/><path d="M6 28v-3a10 10 0 0 1 20 0v3"/>'],
 ]
 export function landingHtml(): string {
-  const content = `<main id="main" class="landing"><section class="landing-hero"><h1><span>Send a proposal.</span> <span>Get a yes.</span></h1><p class="subhead">Offer two prices. Your client picks one, accepts online, and the deposit invoice is ready.</p><p class="alternative">100% free, open source alternative to <strong>Qwilr</strong>, <strong>Proposify</strong> and <strong>PandaDoc</strong></p>${actions()}<p class="licence">Free and open source, MIT licensed.</p>${heroDrawing()}</section><div class="features">`
+  const content = `<main id="main" class="landing"><section class="landing-hero"><h1><span>Send a proposal.</span> <span>Get a yes.</span></h1><p class="subhead">Offer two prices. Your client picks one, accepts online, and the deposit invoice is ready.</p><p class="alternative">100% free, open source alternative to <strong>Qwilr</strong>, <strong>Proposify</strong> and <strong>PandaDoc</strong></p>${actions(true)}<p class="licence">Free and open source, MIT licensed.</p>${heroDrawing()}</section><div class="features">`
     + feature('options','Two prices, side by side.','Give every proposal two options and a deposit. Your client sees exactly what each one costs.',`<span class="draw-label">Offer options</span><div class="draw-options">${offered('Essentials','$2,400.00','$600.00')}${offered('Campaign','$4,200.00','$1,050.00',true)}</div>`)
     + feature('free','100% free.','Free as in code, free as in cost. MIT licensed, on your own computer or your own account.','<span class="license-card">MIT License</span>','compact')
     + feature('kept','The yes, kept exactly.','Sending freezes the offer. The acceptance records who chose which option, and when.','<strong>Client acceptance</strong><dl><dt>Accepted by</dt><dd>Priya Shah</dd><dt>Chosen option</dt><dd>Campaign</dd><dt>Total</dt><dd>$4,200.00</dd><dt>Deposit due</dt><dd>$1,050.00</dd></dl>')

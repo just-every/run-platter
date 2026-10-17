@@ -12,20 +12,20 @@ This is a target contract: the product Platter is being built towards, with each
 | Incumbents a buyer switches from | PandaDoc, Proposify, Better Proposals |
 | Up-and-comers it must also beat | Qwilr, Ignition |
 | First buyer | A US owner or sales lead at a service business, agency or consultancy with 1 to 50 staff, quoting in USD, collecting deposits by card or ACH through their own Stripe account, and running HubSpot, Salesforce or Orbit with QuickBooks Online or Xero |
-| What switching means | Their templates, content library, products, contacts and open and signed documents arrive from PandaDoc, Proposify, Better Proposals, Qwilr or Ignition with a list of what did not map; every daily job (write, price, approve, send, track, follow up, negotiate, sign, get paid, hand off, report) has a Platter equivalent; their CRM, accounting, mailbox, file store, chat and delivery tools plug in |
+| What switching means | Their templates, content library, products, contacts and open and signed documents arrive from PandaDoc, Proposify, Better Proposals, Qwilr or Ignition (by API where the buyer's plan has one, otherwise from the files any customer can export) with a list of what did not map; every daily job (write, price, approve, send, track, follow up, negotiate, sign, get paid, hand off, report) has a Platter equivalent; their CRM, accounting, mailbox, file store, chat and delivery tools plug in |
 
 A buyer replacing an incumbent needs the whole job, so the target is the whole job:
 
-- **Write.** A branded drag-and-drop editor with templates, a reusable content library, variables from the CRM, rich media, conditional content, attachments such as the firm's W-9, Word and PDF import and export, a custom domain and a phone-ready client page (`EDIT-001` to `EDIT-010`).
+- **Write.** A branded drag-and-drop editor with templates, a reusable content library, variables from the CRM, rich media, conditional content, attachments such as the firm's W-9, Word and PDF import and export, a client PDF before signing, duplicating, locked sections, search and folders, unpriced documents such as NDAs and SOWs, a custom domain, a phone-ready client page in the client's language, and a measured performance budget on large proposals (`EDIT-001` to `EDIT-017`).
 - **Price.** A catalogue, USD pricing tables with quantities and units, packages and optional items the client chooses, one-off and recurring fees, discounts, US sales tax, internal cost and margin, and payment terms with deposits and milestones (`CAT-001`, `PRICE-001` to `PRICE-008`).
 - **Work as a team.** Live co-editing, internal comments, version history, approval rules by value, discount, margin and terms, and approval requests that reach the approver (`COLLAB-*`, `APPROVE-*`, `PROP-001`).
-- **Send and track.** Sending from Gmail or Microsoft 365, delivery and bounce states, several recipients with roles, expiry, notifications, view and section-level analytics and forwarded stakeholders, with tracking disclosed (`SEND-*`, `TRACK-*`).
+- **Send and track.** Sending from Gmail or Microsoft 365 or by text message, an editable subject and message from shared email templates, delivery and bounce states, several recipients with roles, replacing a signer on a sent proposal, expiry, notifications, view and section-level analytics and forwarded stakeholders, with tracking disclosed (`SEND-*`, `TRACK-*`).
 - **Follow up and negotiate.** Reminders, an accountable next-action queue, expiry and renewal notices, client questions, decline reasons, negotiated revisions and client-suggested edits (`FOLLOW-*`, `NEG-*`).
-- **Sign.** ESIGN and UETA signatures, several signers with order and countersignature, a signed PDF with certificate of completion, SMS and ID verification, fields collected at signing and acceptance on the client's own paper (`SIGN-001` to `SIGN-008`).
-- **Get paid.** Stripe card and ACH collection in the proposal, deposits at acceptance, milestone and recurring schedules, payment states, retries, refunds, disputes and offline checks and wires (`PAY-*`), synced to QuickBooks Online, Xero or Pantry with one invoice authority and reconciliation (`ACCT-*`, `INV-001`).
+- **Sign.** ESIGN and UETA signatures, several signers with order and countersignature, a signed PDF with certificate of completion, SMS and ID verification, fields collected at signing, acceptance on the client's own paper and delegation by the signer (`SIGN-001` to `SIGN-009`, `SEND-007`).
+- **Get paid.** Stripe card and ACH collection in the proposal, deposits at acceptance, milestone and recurring schedules, net-terms invoices with a pay link and overdue tracking, payment states, retries, refunds, disputes, offline checks and wires, and PayPal, Square or Authorize.net for firms not on Stripe (`PAY-*`), synced to QuickBooks Online, Xero or Pantry with one invoice authority, payout and fee clearing, and reconciliation (`ACCT-*`, `INV-001`).
 - **Connect.** HubSpot, Salesforce, Orbit, Pipedrive and Zoho CRM sync; status-driven automations; document archiving to Google Drive, OneDrive, SharePoint, Box or Chest; Slack, Teams and Nook; a public API, webhooks, Zapier, Make and Crank; and handoff of the accepted scope to Asana, Trello, monday.com, ClickUp, Jira, Vector or Gauge (`CRM-*`, `AUTO-*`, `HAND-*`).
-- **Renew, report and administer.** Bulk sends and renewals, pipeline, win-rate, content and revenue reports, roles, SSO and SCIM, several brands and an audit log (`RENEW-*`, `REPORT-*`, `TEAM-*`).
-- **Move in and out, anywhere.** Importers for PandaDoc, Proposify, Better Proposals, Qwilr and Ignition that keep open proposals and payment schedules running, CSV move-in, complete archives and erasure, and phone and native apps (`MIG-*`, `IMPORT-001`, `PORT-*`, `PRIV-001`, `MOB-*`).
+- **Renew, report and administer.** Bulk sends and renewals, pipeline, win-rate, content and revenue reports, roles, SSO and SCIM, several brands, an audit log and a security review pack for procurement (`RENEW-*`, `REPORT-*`, `TEAM-*`).
+- **Move in and out, anywhere.** Importers for PandaDoc, Proposify, Better Proposals, Qwilr and Ignition, working from exported files when the buyer has no API access, that keep open proposals and payment schedules running, CSV move-in, complete archives and erasure, and phone and native apps (`MIG-*`, `IMPORT-001`, `PORT-*`, `PRIV-001`, `MOB-*`).
 - **Agents beyond the category.** Drafts from discovery calls tested against the firm's real delivery costs, capacity and outcomes, questions and payment exceptions chased to resolution, and out-of-scope delivery turned into separately approved change orders (`AI-*`, `AGENT-*`).
 
 ### Neighbouring products stay separate
@@ -67,7 +67,7 @@ These clauses hold today and stay binding as the product grows. Where a target c
 
 - **PROP-001 — The owner approves the exact revision.** Only a person with the owner role approves a proposal, and approval names one exact revision. Saving a new revision clears the approval, so a changed price or scope can never be sent on an earlier approval. Each approval is recorded with its approver, revision and time. `APPROVE-001` adds rules and routing on top of this guarantee; it never removes it. **Acceptance evidence:** Approve a stale revision (409), approve the current one, revise the price, try to send (409), approve the new revision and send; two approval records exist.
 - **PROP-002 — Sending freezes the offer.** Sending freezes the approved revision: its scope, options and prices can no longer be edited in place. The owner can send a fresh invitation, which rotates the client link and clears any verification session without changing the offer. A change after sending is a new revision under `NEG-001`, never an edit to what the client already holds. **Acceptance evidence:** Send an approved proposal, try to revise it (409), send a fresh invitation and confirm the old link is refused and the offer unchanged.
-- **SIGN-001 — Verified-mailbox acceptance.** A client invitation grants access only to its own frozen offer. Acceptance needs a mailbox verification code: six digits, single use, valid for 10 minutes, at most five attempts, one request a minute and ten codes per invitation. Verification grants acceptance authority only for that invitation and revision, through an HttpOnly, SameSite=Strict cookie scoped to the invitation path. **Acceptance evidence:** Accept before verifying (401), verify, submit a code again (401), exhaust five wrong attempts and see the right code refused, expire a code and see it refused.
+- **SIGN-001 — Verified-mailbox acceptance.** A client invitation grants access only to its own frozen offer. Acceptance needs a mailbox verification code: six digits, single use, valid for 10 minutes, at most five attempts, one request a minute and ten codes per invitation. Verification grants acceptance authority only for that invitation and revision, through an HttpOnly, SameSite=Strict cookie scoped to the invitation path. The code stays the default identity check for every proposal; a firm that wants the incumbents' link-only acceptance chooses it explicitly per proposal or template under `SIGN-006`, and the certificate records the method. **Acceptance evidence:** Accept before verifying (401), verify, submit a code again (401), exhaust five wrong attempts and see the right code refused, expire a code and see it refused.
 - **SIGN-002 — Immutable acceptance with an integer-cent deposit.** Acceptance requires a verified mailbox, a typed full name, one offered option and explicit consent. One D1 transaction retains the exact approved snapshot, signer, consent text and time, and calculates the deposit in integer cents, rounding to the nearest cent. A second acceptance returns the first; nothing in the product edits an accepted agreement. **Acceptance evidence:** Accept with an unknown option (400), accept option two with consent, accept again with another name and option, and read back the first acceptance with total 420000 and deposit 105000 cents.
 - **INV-001 — One retained deposit invoice per acceptance.** An owner exports the accepted deposit as an invoice record. A unique proposal-to-invoice binding makes concurrent and repeated exports return one retained invoice with one number, and the export can be downloaded again without creating another. Re-downloading never authorizes posting the same invoice to accounting twice; `ACCT-004` carries this one-invoice rule into live accounting sync. The first release writes a Xero-format CSV; the export rejects proposals that are not accepted. Spreadsheet formula characters in client-controlled cells are neutralised. **Acceptance evidence:** Export an unaccepted proposal (409), export an accepted one twice concurrently and get one invoice, and download its CSV.
 
@@ -90,9 +90,9 @@ These clauses complete the category job alongside the published guarantees. Each
 
 #### EDIT-001 — Branded drag-and-drop proposal editor.
 
-A member builds a proposal from blocks: cover page, heading, rich text, image, video, columns, pricing table (`PRICE-001`), quote or testimonial, team bio, case study, terms, form field (`SIGN-007`), signature block and page break. Blocks are added from a palette, reordered by drag or keyboard, duplicated and deleted with undo. A brand kit sets the logo, colours, fonts and a default cover. One document renders as a responsive web page for the client and as a paginated US Letter PDF (`EDIT-005`) with the same content. Edits autosave under the version guard of `COLLAB-001`, and the editor stays responsive on a 40-page proposal with 30 images.
+A member builds a proposal from blocks: cover page, heading, rich text, image, video, columns, pricing table (`PRICE-001`), quote or testimonial, team bio, case study, terms, form field (`SIGN-007`), signature block and page break. Blocks are added from a palette, reordered by drag or keyboard, duplicated and deleted with undo. A brand kit sets the logo, colours, fonts and a default cover. One document renders as a responsive web page for the client and as a paginated US Letter PDF (`EDIT-005`) with the same content. Edits autosave under the version guard of `COLLAB-001`, and the editor meets the large-proposal performance budget of `EDIT-011`.
 
-*Acceptance:* A browser journey at 1440 and 390 pixels builds a proposal from blank with every block type, reorders by drag and by keyboard, applies a brand kit, reloads and sees the same document, and exports a PDF whose pages carry the same blocks in order.
+*Acceptance:* A browser journey at 1440 and 390 pixels builds a proposal from blank with every block type, reorders by drag and by keyboard, applies a brand kit, reloads and sees the same document, and exports a PDF whose pages carry the same blocks in order; the `EDIT-011` budget journey passes on the same build.
 
 *Status:* partial. Only a title, scope and two-option form with fixed Platter styling; no block editor, layouts or brand kit. (`src/platter/ui/proposals.ts`, `src/platter/commands.ts`)
 
@@ -168,6 +168,62 @@ A proposal carries attachments such as the firm's W-9, certificate of insurance,
 
 *Status:* missing. No attachments.
 
+#### EDIT-011 — Large-proposal performance budget.
+
+The editor and client page stay fast on the proposals agencies actually send. The reference document is 40 US Letter pages with 30 images (2400-pixel JPEGs of about 500 KB each) and four pricing tables of 15 lines. Measured in Chromium at 1440 by 900 pixels with the CPU throttled 4× through the DevTools protocol (`Emulation.setCPUThrottlingRate`): the editor opens from navigation to editable (the first block accepts input) in at most 3 seconds; keystroke-to-paint latency over 200 keystrokes typed into a block on page 30 has a p95 of at most 100 ms; a drag reorder of a section completes, from drop to repainted order, in at most 300 ms; and a pricing-table quantity edit shows the server-confirmed total in at most 500 ms. The client page of the same proposal at 390 pixels with the same throttle reaches largest contentful paint in at most 2.5 seconds and loads images below the fold lazily. A measure over budget is a failing acceptance run.
+
+*Acceptance:* A browser journey creates the reference proposal through the public API, applies the 4× throttle, opens it at 1440 pixels and records time to editable, the p95 of 200 keystroke-to-paint intervals (Event Timing API), one drag reorder and one quantity edit, then opens the client page at 390 pixels and records largest contentful paint; the run reports each measured value and fails if any exceeds its budget.
+
+*Status:* missing. No block editor exists, so no budget is measured; no large-proposal fixture or timing journey.
+
+#### EDIT-012 — Duplicate a proposal for another client.
+
+A member duplicates any proposal (draft, sent, accepted or lost) into a new draft for the same or another client. The copy keeps blocks, pricing tables, attachments and settings, refills variables (`EDIT-004`) from the new client and deal, and clears recipients, approvals, views, comments, signatures and payments. The copy is a new proposal that needs its own approval (`PROP-001`); the source is never changed.
+
+*Acceptance:* Duplicate an accepted proposal for Acme into a draft for Beta Co: blocks and prices match, variables show Beta's contact, there are no recipients, approvals, views or signatures, sending is refused until approval, and Acme's agreement is byte-identical.
+
+*Status:* missing. No duplicate action; a proposal can only be created from blank.
+
+#### EDIT-013 — Documents without pricing.
+
+A firm sends and signs documents that carry no pricing table, such as a statement of work, NDA, master services agreement or change authorization, built in the editor or uploaded as a PDF with fields (`EDIT-005`). Approval, sending, tracking, reminders and signing work as for any proposal; the payment step, deposit, invoice and accounting sync are skipped, and the agreement records that no amount was agreed.
+
+*Acceptance:* Upload a two-page NDA PDF, place signature and date fields for two signers, approve and send, and sign as both: the agreement completes with its signed PDF and certificate, no payment step is shown, no invoice exists and the accounting fake receives no call.
+
+*Status:* missing. Every proposal requires two priced options; there is no unpriced document type.
+
+#### EDIT-014 — Client PDF download before signing.
+
+A recipient can download a PDF of the revision they are viewing before signing, so their procurement team can circulate it, unless the firm turns this off per proposal or template. The PDF carries the selection made so far, the revision number and "Not signed" on every page, and each download is on the timeline (`TRACK-001`). The signed agreement PDF remains `SIGN-005`.
+
+*Acceptance:* As a verified client, choose a package and download the PDF: every page reads "Not signed, revision 2" and shows the chosen package, and the timeline lists the download; turn downloads off on another proposal and see no download action and the PDF route refused (403).
+
+*Status:* missing. The client page offers no download; PDF export does not exist.
+
+#### EDIT-015 — Locked template sections.
+
+Template owners lock sections such as legal terms, warranties and payment terms. Members using the template can place and reorder a locked section but not edit it; only roles with template rights (`TEAM-001`) can unlock it in one proposal, and an unlock is recorded in the audit log (`TEAM-004`) and can trigger an approval rule (`APPROVE-001`). Locks are enforced on the server, not only in the editor.
+
+*Acceptance:* Lock the terms section in a template; as a sales member try to edit it in the editor and through the API (both refused); as an admin unlock it in one proposal and edit it, and see the unlock in the audit log and approval required before sending.
+
+*Status:* missing. No templates, so no section locks.
+
+#### EDIT-016 — Proposal search and folders.
+
+Members search every proposal, template and agreement they may see by title, client, contact, owner, status, amount, date and the full text of the content, including uploaded PDFs, and file proposals in folders with team access rules. Results and folders respect permissions on the server.
+
+*Acceptance:* Seed 500 proposals; search a phrase that appears only in the body of two proposals and one uploaded PDF and get exactly those three within one second; file proposals in a team folder and see a member outside the team find none of them by search or by folder.
+
+*Status:* missing. A single proposal list; no search or folders.
+
+#### EDIT-017 — Client page in the client's language.
+
+Each recipient sees the client page, emails, disclosures (`SIGN-003`, `TRACK-004`), verification and signing steps in their language: at least English, Spanish, French, German and Portuguese, set per recipient or taken from the browser. The firm's own content is never machine-translated without the firm's approval (`AI-002`), and the certificate of completion (`SIGN-005`) records the language shown.
+
+*Acceptance:* Set a recipient to Spanish: the invitation email, client page controls, ESIGN disclosure, verification and signing steps are in Spanish, the string catalogue check finds no untranslated English string on those screens, and the certificate records Spanish.
+
+*Status:* missing. The client page and mail are English only.
+
 ### Catalogue and pricing
 
 #### CAT-001 — Service and product catalogue.
@@ -212,9 +268,9 @@ Discounts apply to a line, a group or the total, as a percentage or a fixed amou
 
 #### PRICE-005 — US sales tax.
 
-Each line is taxable or not under a tax code. Tax is calculated from the client's service or billing address, either by owner-configured state, county and city rates or by Stripe Tax or Avalara AvaTax. A tax-exempt client uploads an exemption or resale certificate, which is stored with the agreement. Tax shows as its own line and flows to invoices with the matching tax code (`ACCT-001`, `ACCT-002`). Platter calculates; filing returns stays with the tax service (see Honest boundaries).
+Each line is taxable or not under a tax code. Tax is calculated from the client's service or billing address by one of three methods the owner picks: owner-configured rates, Stripe Tax or Avalara AvaTax. Owner-configured rates are set per jurisdiction as state, county, city and special-district components with effective dates; Platter sums the components that apply to the address, computes tax on the taxable subtotal per jurisdiction in integer cents rounded half up, and freezes the rate used with the sent revision, so a later rate change never alters a sent quote. With Stripe Tax or AvaTax, Platter sends each line's amount, tax code and the addresses, applies the returned tax to the cent, and commits the AvaTax transaction when the invoice is issued. A tax-exempt client uploads an exemption or resale certificate, which is stored with the agreement. Tax shows as its own line and flows to invoices with the matching tax code (`ACCT-001`, `ACCT-002`). Platter calculates; filing returns stays with the tax service (see Honest boundaries).
 
-*Acceptance:* Quote a taxable and a non-taxable line to clients in Texas and Oregon with a Stripe Tax fake, and see tax only on the Texas taxable line; mark a client exempt with a certificate and see zero tax; sync the invoice and see the tax code in the QuickBooks Online fake.
+*Acceptance:* With owner-configured rates for Austin, Texas (state 6.25%, city 1% and transit authority 1%, 8.25% in all), quote a $1,000.00 taxable line and a $500.00 non-taxable line to an Austin client and see $82.50 tax as its own line, and the same quote to a Portland, Oregon client with $0.00 tax; give the city rate a new value with a future effective date and see the sent quote unchanged. Run the same two quotes through a Stripe Tax fake and an Avalara AvaTax fake: each fake's request carries the line tax codes and addresses, the returned tax is applied to the cent, and the AvaTax transaction is committed when the invoice is issued. Mark a client exempt with a certificate and see zero tax; sync the invoice and see the tax code in the QuickBooks Online fake.
 
 *Status:* missing. No tax handling beyond a fixed GST-free export.
 
@@ -272,7 +328,7 @@ Every saved revision is listed with author and time. A member compares any two r
 
 Admins set approval rules by total value, discount, margin, payment terms, edited legal terms or template, and route each to named approvers or a role, in sequence or in parallel. Proposals that match no rule go straight to send if the admin allows it. `PROP-001`'s exact-revision binding applies to every approver.
 
-*Acceptance:* Set rules: over $25,000 needs a manager, a discount over 15% needs the owner. A $30,000 proposal with 20% discount needs both in order; editing after the first approval clears both.
+*Acceptance:* Set rules: over $25,000 needs a manager, a discount over 15% needs the owner. A $30,000 proposal with 20% discount needs both in order; editing after the first approval clears both. A parallel rule routes edited legal terms to counsel and finance at once: it completes only when both approve, in either order, and one rejection stops it.
 
 *Status:* partial. Owner approval on every revision; no rules by amount, discount, margin or terms, and no routing to named approvers. (`src/platter/commands.ts`, `tests/platter.test.mjs`)
 
@@ -304,7 +360,7 @@ Each send shows queued, accepted by provider, delivered, deferred, bounced or co
 
 #### SEND-003 — Recipients, roles and sharing.
 
-A proposal has any number of recipients with a role: signer, client-side approver, viewer or CC. Each recipient has their own link and verification. The firm can also share by link (with verification) or embed the proposal on its site. Removing a recipient revokes their link.
+A proposal has any number of recipients with a role: signer, client-side approver, viewer or CC. Each recipient has their own link and verification. The firm can also share by link (with verification) or embed the proposal on its site. Removing a recipient revokes their link. Replacing a signer on a sent proposal is `SEND-007`, and a signer delegating is `SIGN-009`.
 
 *Acceptance:* Add a signer, a CFO approver and a viewer; each opens their own link; the viewer cannot sign; remove the viewer and see their link refused.
 
@@ -320,19 +376,43 @@ A proposal can expire on a date. After expiry the client sees an expired page an
 
 #### SEND-005 — Completion and activity notifications.
 
-The sender and watchers are notified when a proposal is first viewed, commented on, signed, declined, paid or fails payment, by email, Slack, Microsoft Teams, Nook or push, under per-person preferences.
+The sender and watchers are notified when a proposal is first viewed, commented on, signed, declined, paid or fails payment, by email, Slack, Microsoft Teams, Nook or push, under per-person preferences that choose the events and channels for each person.
 
-*Acceptance:* Watch a proposal with Slack and email on; open, comment, sign and pay as the client; see four notifications in each channel fake with links back to the proposal.
+*Acceptance:* Watch a proposal with Slack and email on; open, comment, sign and pay as the client; see four notifications in each channel fake with links back to the proposal. A second watcher who turned view notifications off and chose email only gets three emails and no Slack message.
 
 *Status:* missing. No notifications to the sender.
+
+#### SEND-006 — Editable subject, message and shared email templates.
+
+Every send, reminder (`FOLLOW-001`), fresh invitation (`PROP-002`), revision send (`NEG-001`), signer replacement (`SEND-007`) and net-terms invoice (`PAY-008`) shows the email before it goes, with an editable subject and personal message. Admins keep shared email templates per event (send, reminder, expiry notice, invoice, completion) with variables from `EDIT-004` such as `{client.first_name}`, `{client.company}`, `{proposal.title}`, `{sender.name}` and `{proposal.expires_on}`; they set the default template per event and per proposal template, and can lock a template so members pick it but do not edit it. A variable with no value blocks the send as in `EDIT-004`. A scheduled reminder uses the template the sender chose, and the sender can edit its text before it goes. The exact subject and body sent, after filling, are kept on the proposal timeline with recipient and time and in the agreement package. The verification code email (`SIGN-001`) keeps fixed wording.
+
+*Acceptance:* Save a template with subject "Proposal for {client.company}" and a body starting "Hi {client.first_name},"; send with it to Dana at Acme: the mail fake and the timeline both hold the subject "Proposal for Acme" and the body "Hi Dana," exactly. Edit the text of the scheduled second reminder: the first reminder in the mail fake carries the template text and the second carries the edited text. Send with an unfilled variable (refused, naming it); as a member edit a locked template's text (refused).
+
+*Status:* missing. Proposal mail has a fixed subject ("Your proposal:" and the title) and a fixed body, set in src/platter/commands.ts; no editing, templates or timeline copy.
+
+#### SEND-007 — Replace an unsigned signer on a sent proposal.
+
+When the client says someone else signs ("our COO signs, not me"), the sender replaces a recipient who has not signed on a sent proposal, with a reason. The offer, its revision and its approvals are unchanged and no re-approval is needed. The replaced recipient's link and verification session are revoked at once; the new signer gets their own link and identity check (`SIGN-001`, `SIGN-006`), the same place in the signing order (`SIGN-004`) and the message of `SEND-006`. The replacement (who, by whom, when and why) is on the timeline and in the certificate of completion (`SIGN-005`). A recipient who has signed can never be replaced, and nothing is replaced on an accepted agreement.
+
+*Acceptance:* Send revision 2 with the client CEO as signer and replace the CEO with the COO: the proposal is still revision 2 with its original approval and no new approval request; the CEO's link is refused; the COO verifies and signs; the certificate lists the replacement with reason and time. On another proposal sign as the CEO, then try to replace the CEO (409).
+
+*Status:* missing. One client recipient fixed at sending; a fresh invitation (`PROP-002`) rotates the link but cannot change who receives it.
+
+#### SEND-008 — Sending and reminders by text message.
+
+A sender delivers the proposal link, reminders and completion notices by text message to a US mobile number through Twilio, alongside or instead of email. Texts go from a registered A2P 10DLC number or toll-free number, record the recipient's consent, honour STOP and HELP under carrier rules and the TCPA, respect the quiet hours of `FOLLOW-001`, and appear on the timeline with their delivery status.
+
+*Acceptance:* With a Twilio fake: send a proposal by text and see the message with its link on the timeline with the delivery callback state; reply STOP and see later reminders by text suppressed while email reminders continue; a text reminder due at 6 am in the recipient's time zone waits until quiet hours end.
+
+*Status:* missing. Email only; no SMS.
 
 ### Engagement tracking
 
 #### TRACK-001 — View tracking and live open alerts.
 
-Platter records each verified or unverified view of a client link with time, recipient, approximate location and device class, and alerts the sender on first open and on a return visit after a quiet period. The proposal shows a view timeline.
+Platter records each verified or unverified view of a client link with time, recipient, approximate location and device class, and alerts the sender on first open and on a return visit after a quiet period the owner sets (30 minutes by default). The proposal shows a view timeline.
 
-*Acceptance:* Open the proposal as two recipients on desktop and phone; the sender gets an alert and the timeline lists both views with device class.
+*Acceptance:* Open the proposal as two recipients on desktop and phone; the sender gets an alert and the timeline lists both views with device class. With a 30-minute quiet period, the first recipient's return visit 10 minutes later raises no alert and a visit 45 minutes after that raises one return-visit alert.
 
 *Status:* missing. No view tracking.
 
@@ -364,17 +444,17 @@ The client page discloses that views are measured. Platter uses no third-party t
 
 #### FOLLOW-001 — Scheduled reminders to unsigned recipients.
 
-Each proposal has a reminder schedule (for example 2, 5 and 9 days after sending, and 3 days before expiry), sent in the recipient's time zone outside quiet hours. Reminders stop on acceptance, decline, expiry or the recipient's opt-out, and never exceed the cap the owner sets. Every reminder is on the timeline.
+Each proposal has a reminder schedule (for example 2, 5 and 9 days after sending, and 3 days before expiry), sent in the recipient's time zone outside quiet hours (8 pm to 8 am by default; the owner sets them). A reminder due inside quiet hours waits until they end. Reminders stop on acceptance, decline, expiry or the recipient's opt-out, and never exceed the cap the owner sets. Each reminder carries the subject and message of `SEND-006`, and every reminder is on the timeline.
 
-*Acceptance:* Send with reminders at 2 and 5 days and advance the clock: two reminders arrive; on another proposal, accept after the first and see no second; opt out and see none.
+*Acceptance:* Send to a recipient in Pacific time with reminders at 2, 5 and 9 days, quiet hours 8 pm to 8 am and a cap of 2, and advance the clock: two reminders arrive, each between 8 am and 8 pm Pacific (one due at 6 am Pacific arrives at 8 am), and the 9-day reminder is not sent because of the cap; on another proposal, accept after the first reminder and see no second; opt out and see none.
 
 *Status:* missing. No reminders.
 
 #### FOLLOW-002 — Next-action follow-up queue by sales owner.
 
-Every open proposal has an owner, a next action and a due date. Each sales owner sees a queue of due follow-ups ranked by value and engagement (`TRACK-001`, `TRACK-002`): viewed but not signed, unopened, bounced, questions waiting and expiring soon. A follow-up stays open until the owner completes it, the client acts, or it is dismissed with a reason; a notification alone never closes it.
+Every open proposal has a sales owner, a next action and a due date. Each sales owner's queue, and a manager's view of the team, lists follow-ups in one stated order. First come overdue items (due before today in the owner's time zone), oldest due date first; then items due today; then upcoming items by due date. Within the same due date, the reason ranks: bounced email (`SEND-002`), then a client question waiting (`FOLLOW-004`), then a failed or overdue payment (`PAY-005`, `PAY-008`), then expiring within 3 days (`SEND-004`), then viewed but not signed (`TRACK-001`, `TRACK-002`), then unopened. Ties within one reason sort by proposal value (one-off total plus first-year recurring value), highest first, then by earliest sent time, then by proposal number, so the order is fully determined. A follow-up stays open until the owner completes it with a logged action, the client acts, or it is dismissed with a reason; a notification alone never closes it.
 
-*Acceptance:* Send five proposals with different engagement; the owner's queue ranks them, completing one with a logged call closes it, and an unopened proposal's follow-up stays open after its notification.
+*Acceptance:* With the clock at 10 March, seed seven proposals for one owner: A $8,000 viewed, due 9 March; B $40,000 unopened, due 10 March; C $5,000 bounced, due 10 March; D $12,000 question waiting, due 10 March; E $20,000 viewed, due 10 March; F $30,000 viewed, due 10 March; G $9,000 unopened, due 12 March. The queue reads exactly A, C, D, F, E, B, G. Completing C with a logged call removes it; B's follow-up stays open after its notification is sent; dismissing E without a reason is refused (400).
 
 *Status:* missing. No follow-up queue.
 
@@ -424,15 +504,15 @@ Where the firm allows it, a client suggests edits to text sections (not prices) 
 
 Signing meets the federal ESIGN Act and state UETA: each signer is shown the electronic records disclosure and consents before signing, can withdraw consent and ask for paper, and adopts a typed, drawn or uploaded signature. Signature, initials and date fields can be placed anywhere. Intent to sign is explicit, and the signed record is retained and reproducible.
 
-*Acceptance:* Sign as a client who reads the disclosure and consents, draws a signature and initials three fields; a second client withdraws consent and the firm is told; the signed record reproduces the same document and signature.
+*Acceptance:* Sign as a client who reads the disclosure and consents, draws a signature and initials three fields; a second client withdraws consent and the firm is told; a third client uploads a PNG of their signature and adopts it; the signed record reproduces the same document and each adopted signature.
 
 *Status:* partial. A typed name and consent are stored; no ESIGN consumer disclosure, consent withdrawal, drawn signature, initials or signature fields. (`src/platter/signing.ts`, `tests/platter.test.mjs`)
 
 #### SIGN-004 — Multiple signers, signing order and countersignature.
 
-A proposal can require several signers on the client side and a countersignature from the firm, in a set order or in parallel. Each signer verifies separately; the agreement completes when the last required signature lands, and each party is told.
+A proposal can require several signers on the client side and a countersignature from the firm, in a set order or in parallel groups. Each signer verifies separately; the agreement completes when the last required signature lands, and each party is told. A signer can be replaced by the sender (`SEND-007`) or, where allowed, delegate (`SIGN-009`) without changing the order.
 
-*Acceptance:* Require client CEO then CFO, then the firm's owner; the CFO cannot sign before the CEO; after all three the agreement is complete and each party gets the completion email.
+*Acceptance:* Require client CEO then CFO, then the firm's owner; the CFO cannot sign before the CEO; after all three the agreement is complete and each party gets the completion email. On another proposal, put two client signers in one parallel group followed by the firm's countersignature: the two sign in either order, the firm cannot countersign before both have signed, and the agreement completes after the countersignature.
 
 *Status:* missing. One client signer only.
 
@@ -446,9 +526,9 @@ On completion, Platter produces the signed agreement PDF and a certificate of co
 
 #### SIGN-006 — Signer identity options.
 
-Per proposal, the firm chooses the identity check for each signer: mailbox code (`SIGN-001`), a text-message code to a US mobile number through Twilio, or government ID verification through Stripe Identity or Persona. The method used is recorded in the certificate.
+Per proposal, the firm chooses the identity check for each signer: mailbox code (`SIGN-001`, the default), link only, a text-message code to a US mobile number through Twilio, or government ID verification through Stripe Identity or Persona. Link only matches the incumbents' default for low-risk documents: possession of the personal link delivered to that recipient's mailbox is the check, it must be chosen explicitly per proposal or template, and a link opened on a new device and network after a forward (`TRACK-003`) still asks for the mailbox code before it can sign. The method used is recorded in the certificate.
 
-*Acceptance:* Require SMS for one signer and ID verification for another with Twilio and Stripe Identity fakes; wrong SMS codes are limited as in `SIGN-001`; the certificate names each method.
+*Acceptance:* Require SMS for one signer and ID verification for another with Twilio and Stripe Identity fakes; wrong SMS codes are limited as in `SIGN-001`; the certificate names each method. On another proposal choose link only: the recipient signs from their link without a code and the certificate reads "email link only"; the same link opened from a second device and network after a forward asks for the mailbox code; a proposal with no choice made still requires the code.
 
 *Status:* partial. Mailbox code only; no SMS code or ID verification. (`src/platter/signing.ts`, `tests/platter.test.mjs`)
 
@@ -468,13 +548,21 @@ When a client signs through their own procurement or signing system, the owner u
 
 *Status:* missing. No way to record acceptance signed outside Platter.
 
+#### SIGN-009 — Recipient delegation of signing.
+
+Where the firm turns delegation on for a proposal or template, a signer who is not the right person delegates from their own link to a named person with email (and a mobile number when that signer's check is SMS). The delegate must pass the identity check set for that signer (`SIGN-006`) before seeing the agreement; the delegator's link is revoked; the sender is notified and can undo the delegation before the delegate signs. Delegation never changes the offer, revision, approvals or signing order, is refused once the delegator has signed or when delegation is off, and is recorded in the certificate of completion (`SIGN-005`).
+
+*Acceptance:* With delegation off, try to delegate from the CEO's link (refused); turn it on and delegate to the COO: the CEO's link is refused and the sender is notified; the COO verifies and signs, and the certificate shows the CEO delegated to the COO with the time; on another proposal sign as the CEO and then try to delegate (409).
+
+*Status:* missing. One fixed client signer; no delegation.
+
 ### Payments
 
 #### PAY-001 — Stripe card and ACH collection in the proposal.
 
 The owner connects their own Stripe account. The client pays inside the proposal by card, Apple Pay, Google Pay or ACH bank debit, with bank verification through Stripe Financial Connections or micro-deposits. The ACH debit authorization text is shown and stored with the agreement. Card and bank numbers never touch Platter. The owner chooses which methods each proposal offers and whether to pass through a fee where allowed.
 
-*Acceptance:* In Stripe test mode, connect an account, accept and pay a deposit by test card and by test ACH; see the authorization text retained; inspect the database and logs for card or bank numbers (none).
+*Acceptance:* In Stripe test mode, connect an account, accept and pay a deposit by test card, by Apple Pay and Google Pay test wallets, and by test ACH; see the authorization text retained; inspect the database and logs for card or bank numbers (none). Turn on a 3% card fee after confirming it is allowed: the card total shows the fee as its own line, ACH shows none, and a client whose billing state the firm marked as not allowing surcharges sees no fee.
 
 *Status:* missing. No payment collection.
 
@@ -488,9 +576,9 @@ Accept and pay is one flow: after signing, the client pays the deposit or first 
 
 #### PAY-003 — Milestone and recurring payment schedules.
 
-The accepted schedule (`PRICE-007`) is executed: milestones are charged or invoiced on their date or when the owner marks the event done, and recurring fees are charged on their interval against the payment method the client authorized, or sent as invoices on net terms. The client can update the payment method from a link.
+The accepted schedule (`PRICE-007`) is executed: milestones are charged or invoiced on their date or when the owner marks the event done, and recurring fees are charged on their interval against the payment method the client authorized, or sent as net-terms invoices with a pay link and overdue tracking (`PAY-008`). The client can update the payment method from a link.
 
-*Acceptance:* Accept a deposit, two milestones and a monthly retainer; mark milestone one done and see it charged; advance the clock a month and see the retainer charged; update the payment method from the client link.
+*Acceptance:* Accept a deposit, a charged milestone, a net-30 milestone and a monthly retainer; mark milestone one done and see it charged; mark the net-30 milestone done and see an invoice issued, not a charge, followed by the `PAY-008` journey; advance the clock a month and see the retainer charged; update the payment method from the client link.
 
 *Status:* missing. No schedules.
 
@@ -526,13 +614,29 @@ US clients often pay by check, wire or ACH credit. Invoices show remittance deta
 
 *Status:* missing. No offline payments.
 
+#### PAY-008 — Net-terms invoices with a pay link and overdue tracking.
+
+When a scheduled amount is on net terms (net 15, net 30 or a custom number of days), Platter issues an invoice when its date arrives or its milestone is marked done: an email to the billing contact (`SIGN-007`) with the invoice number, amount, due date, a PDF invoice and a pay link, using the invoice template of `SEND-006`. The pay link opens a page where the client pays by card or ACH (`PAY-001`, `PAY-009`) or reads remittance details for check and wire (`PAY-007`). An unpaid invoice is due through its due date and turns overdue the next day in the firm's time zone: it counts in the agreement's overdue total (`PAY-004`), opens a follow-up in the owner's queue (`FOLLOW-002`) and sends overdue reminders on the owner's schedule. A payment from the link is processing until the provider reports success and paid only on that evidence. When the accounting system is the invoice authority (`ACCT-004`), the invoice sent is the one in QuickBooks Online, Xero or Pantry, never a second one.
+
+*Acceptance:* Accept a proposal with a $6,000.00 milestone on net 30 and mark it done on 1 March: the mail fake holds one invoice email with amount $6,000.00, due date 31 March, a PDF and a pay link. On 31 March it is due, not overdue. Advance to 1 April: it is overdue in the agreement's `PAY-004` totals and in the owner's `FOLLOW-002` queue, and an overdue reminder is sent. Pay by Stripe test ACH from the link: it shows processing, then paid after the success event, the follow-up closes, and exactly one invoice exists locally and in the QuickBooks Online fake.
+
+*Status:* missing. No invoices are sent to the client; the only invoice is the owner's deposit CSV export.
+
+#### PAY-009 — PayPal, Square and Authorize.net collection.
+
+A firm that does not take payment through Stripe connects its own PayPal, Square or Authorize.net account instead, and the client pays the deposit, milestones and net-terms invoices inside the proposal by card, or by PayPal or Venmo where PayPal is connected. Payment states, retries, refunds and accounting sync work as for Stripe (`PAY-002` to `PAY-008`, `ACCT-001` to `ACCT-006`), with each processor's signed webhooks or notifications processed once per event. Where a processor cannot charge a stored method for a schedule, Platter sends a pay link for each scheduled amount and says so when the firm connects it. Card numbers never touch Platter.
+
+*Acceptance:* With PayPal, Square and Authorize.net sandbox fakes: connect each in turn, accept and pay a deposit, refund half of it, replay each webhook twice, and see the same payment states and QuickBooks Online fake records as the Stripe journey with one record per event; inspect the database and logs for card numbers (none).
+
+*Status:* missing. No payment processors are connected.
+
 ### Accounting sync
 
 #### ACCT-001 — QuickBooks Online invoices and payments.
 
-The owner connects QuickBooks Online. On acceptance, Platter creates or matches the customer, creates invoices for the deposit and each scheduled amount with items, tax codes and the income accounts set in the catalogue, and records Stripe and offline payments, refunds and fees against them. Invoices paid in QuickBooks Online, including through QuickBooks Payments, are read back as paid.
+The owner connects QuickBooks Online. On acceptance, Platter creates or matches the customer, creates invoices for the deposit and each scheduled amount with items, tax codes and the income accounts set in the catalogue, and records Stripe and offline payments, refunds and fees against them, with Stripe payouts and fees posted through a clearing account (`ACCT-006`). Invoices paid in QuickBooks Online, including through QuickBooks Payments, are read back as paid.
 
-*Acceptance:* With a QuickBooks Online sandbox fake: accept a proposal and see one customer and one deposit invoice with the right tax code; pay by Stripe and see the payment applied; pay the next invoice in QuickBooks and see it paid in Platter.
+*Acceptance:* With a QuickBooks Online sandbox fake: accept a proposal and see one customer and one deposit invoice with the right tax code; pay by Stripe and see the payment applied in full with its fee posted as in `ACCT-006`; pay the next invoice in QuickBooks and see it paid in Platter.
 
 *Status:* missing. No QuickBooks connection.
 
@@ -567,6 +671,14 @@ Without a live connection, the owner exports invoices, payments and schedules as
 *Acceptance:* Export the deposit and two milestones in QuickBooks and Xero formats and import them into each sandbox without errors; exporting again returns the same retained files.
 
 *Status:* partial. An AUD Xero deposit CSV only; no USD QuickBooks or Xero files and no payment or schedule export. (`src/platter/invoices.ts`, `tests/platter.test.mjs`)
+
+#### ACCT-006 — Stripe payouts, fees and clearing in accounting.
+
+Stripe pays out net of fees, so a firm's bank deposit never equals its invoices. Platter posts each Stripe payment gross against its invoice into a clearing account the owner picks (such as "Stripe clearing" in QuickBooks Online or Xero), posts Stripe's processing fees to the owner's fee expense account, and records each payout as one transfer from clearing to the bank account for the payout's net amount, so the bank feed matches one deposit per payout and the clearing account returns to zero. Refunds, dispute amounts and dispute fees post through the same clearing account. The same posting applies to the processors of `PAY-009`.
+
+*Acceptance:* In a QuickBooks Online fake and a Xero fake: take card payments of $1,000.00 and $500.00 with fees of $29.30 and $14.80 and one payout of $1,455.90; see both invoices paid in full, $44.10 in the fee expense account, one $1,455.90 transfer to the bank account and the clearing account at $0.00; refund $100.00 and see clearing and the bank match the next payout.
+
+*Status:* missing. No payment or accounting connection, so no payout or fee posting.
 
 ### CRM sync
 
@@ -640,7 +752,7 @@ A documented REST API creates proposals from templates, fills variables, reads s
 
 Published Zapier and Make apps and a [Crank](https://github.com/just-every/run-crank) connector expose Platter's triggers (proposal sent, viewed, signed, paid) and actions (create proposal from template, add client).
 
-*Acceptance:* Run a Zap in Zapier's test environment that creates a proposal from a form submission and fires on signed.
+*Acceptance:* Run a Zap in Zapier's test environment that creates a proposal from a form submission and fires on signed; run a Make scenario in Make's test environment that fires on paid and adds a client; run the same trigger and action against a Crank instance; each trigger fires once per event.
 
 *Status:* missing. No automation-platform apps.
 
@@ -754,55 +866,71 @@ Every action by people, agents and integrations (edits, approvals, sends, views,
 
 *Status:* partial. Approvals and preparers are recorded; there is no complete, searchable or exportable activity log. (`src/platter/commands.ts`, `tests/platter.test.mjs`)
 
+#### TEAM-005 — Security review pack for procurement.
+
+A buyer's procurement or IT team gets what they ask an incumbent for. A security page states each control Platter implements (encryption and credential custody `SEC-001`, access control `TEAM-001` and `TEAM-002`, audit `TEAM-004`, erasure `PRIV-001`, archives and restore `PORT-001`), each linked to the clause and test that prove it. The pack also holds a subprocessor list, a data processing addendum, and completed standard questionnaires (CAIQ Lite and SIG Lite). For Run Edit Run's hosted service it includes the current SOC 2 Type II report, delivered under NDA on request. For a self-hosted installation, the pack states which controls the installer's own Cloudflare account carries.
+
+*Acceptance:* Open the security page: every control statement links to a clause whose status is done, and none links to a partial or missing clause; download the subprocessor list and DPA; request the SOC 2 report, accept the NDA and receive the report for the current period; a questionnaire answer naming a control links to the same clause as the page.
+
+*Status:* missing. No security page, questionnaire answers, DPA, subprocessor list or audit report.
+
 ### Migration from incumbents
 
 #### MIG-001 — PandaDoc move-in.
 
-With the buyer's PandaDoc API key, Platter imports templates, content library items, pricing-table products, contacts and documents. Completed documents arrive as retained, read-only agreements with their signed PDF and audit trail; open documents arrive as drafts ready to send from Platter. The import follows `IMPORT-001`'s preview, journal and undo, and lists everything that did not map.
+A PandaDoc customer on any plan moves in without API access, because PandaDoc gives Business and Starter accounts only its Sandbox API and keeps the Production API for approved Enterprise accounts. Through the self-serve route of `MIG-007`, the buyer uploads PandaDoc's bulk download zips (PDFs in the account's folder tree, with the eSignature certificate pages on completed documents, exported in batches of 200 to 300 and without attachments) and PandaDoc's catalogue CSV (Name, SKU, Type, SKUs_in_bundle, Category, Price, Cost, Currency, Description, Images, Billing_frequency and custom-field columns). The mapping: completed documents with a certificate become retained, read-only agreements keeping the original PDF and certificate byte-identical with their SHA-256 recorded; open documents (draft, sent or viewed) become drafts converted from their PDF (`EDIT-005`) that can be reissued under `MIG-005`; the folder tree becomes Platter folders (`EDIT-016`); catalogue rows become catalogue items (`CAT-001`), bundles become packages, and non-USD rows are listed rather than converted; template and content library bodies come from the buyer's PDF or Word downloads of them, converted to editable blocks (`EDIT-005`); contacts come from the connected CRM (`CRM-001` to `CRM-004`) or a contacts CSV, including the file PandaDoc support provides on request (`MIG-006`), because PandaDoc has no self-serve contact export. Where the buyer has the Production API, Platter also reads document statuses, recipients, template roles, fields, tokens, pricing-table items and folder metadata to enrich what the files carry. PandaDoc's template details response holds no body text, so a template found through the API is listed as "convert from PDF" with its roles and tokens kept, and its body arrives only from its PDF or Word file. Without the Production API, the import report states what arrived (signed agreements with certificates, open documents as drafts, folders, catalogue, converted template and library bodies, and contacts from the CRM or CSV) and lists as unmapped what the files cannot carry: attachments, template roles and merge tokens, pricing-table formulas, comments, view analytics and audit events beyond the certificate. Everything runs under `IMPORT-001`'s preview, journal and undo.
 
-*Acceptance:* Against a PandaDoc API fake with 5 templates, 20 library items, 30 products and 50 documents in every status, preview, apply and see each item mapped or listed as unmapped; undo the import.
+*Acceptance:* With fixtures in PandaDoc's real export shapes, namely two bulk zips (250 and 40 PDFs) with a three-level folder tree, completed documents carrying certificate pages and open documents without, a catalogue CSV with the export columns, a bundle row and a custom-field column, and a template details JSON response with roles and tokens and no body: preview and apply with no API key, and see completed documents as retained agreements whose PDFs and certificates are byte-identical with matching SHA-256, open documents as drafts, folders matching the tree, catalogue items and the bundle package matching the CSV, and a report listing what arrived and each unmapped kind. Then connect a PandaDoc API fake returning the template details response: the template is listed as "convert from PDF" with its roles and tokens; uploading its PDF yields editable blocks with those tokens mapped to variables. Uploading the same zip again adds nothing; undo the import.
 
 *Status:* missing. No PandaDoc import.
 
 #### MIG-002 — Proposify move-in.
 
-Platter imports Proposify templates, content library sections and fee tables, clients and proposals through its API, with signed proposals as read-only agreements and open ones as drafts, under the same preview, journal and undo.
+Platter imports Proposify templates, content library sections, fee tables, clients and proposals through the Proposify API where the buyer has it (Proposify offers its API on the Business plan, enabled by its Customer Success team), with signed proposals as read-only agreements and open ones as drafts. Without API access, the buyer uses the `MIG-007` route: proposal PDFs downloaded from Proposify, with signed ones kept as retained agreements with their signature page byte-identical and open ones as drafts for reissue; Proposify's documents report exported as CSV for status, value, client and dates, matched to each PDF; clients and catalogue items by CSV (`MIG-006`) or from the CRM; and templates and library sections by PDF or Word conversion (`EDIT-005`). Either way the import report states what arrived and lists what did not map, under `IMPORT-001`'s preview, journal and undo.
 
-*Acceptance:* Run the `MIG-001` journey against a Proposify API fake.
+*Acceptance:* Run the `MIG-001` journey against a Proposify API fake; then, with no API, import 30 Proposify PDFs and a documents report CSV and see each PDF matched to its report row with status, value and client, signed ones retained byte-identical, open ones as drafts, and the unmapped list stated.
 
 *Status:* missing. No Proposify import.
 
 #### MIG-003 — Better Proposals move-in.
 
-Platter imports Better Proposals templates, content, contacts and proposals through its API, under the same preview, journal and undo.
+Platter imports Better Proposals templates, content, contacts and proposals through its API where the buyer's plan includes API access, and otherwise through the `MIG-007` route from downloaded proposal PDFs and CSV files, under the same preview, journal and undo and with the same report of what did not map.
 
-*Acceptance:* Run the `MIG-001` journey against a Better Proposals API fake.
+*Acceptance:* Run the `MIG-001` journey against a Better Proposals API fake, then run the no-API journey of `MIG-002` with Better Proposals PDFs and a contacts CSV.
 
 *Status:* missing. No Better Proposals import.
 
 #### MIG-004 — Qwilr and Ignition move-in.
 
-Platter imports Qwilr pages, templates and quotes through its API, and Ignition clients, services, proposals and billing schedules from its exports, under the same preview, journal and undo.
+Platter imports Qwilr pages, templates and quotes through its API where the buyer's plan has it enabled, and otherwise from Qwilr PDF exports through `MIG-007`; it imports Ignition clients, services, proposals and billing schedules from Ignition's exports. Both run under the same preview, journal and undo.
 
-*Acceptance:* Run the `MIG-001` journey against a Qwilr API fake and an Ignition export fixture, including one active billing schedule.
+*Acceptance:* Run the `MIG-001` journey against a Qwilr API fake and against Qwilr PDF exports with no API, and against an Ignition export fixture including one active billing schedule.
 
 *Status:* missing. No Qwilr or Ignition import.
 
 #### MIG-005 — Open proposals and payment schedules continue.
 
-At move-in, proposals sent but not signed in the old tool can be reissued from Platter with a new link, and signed agreements with active Stripe schedules or subscriptions are adopted by their Stripe IDs, so no client is charged twice and no scheduled payment is missed.
+At move-in, proposals sent but not signed in the old tool can be reissued from Platter with a new link, and signed agreements with active Stripe schedules or subscriptions are adopted by their Stripe IDs, so no client is charged twice and no scheduled payment is missed. A reissued proposal links to the imported original and is listed for the buyer to void in the old tool.
 
-*Acceptance:* Import an Ignition agreement with an active Stripe subscription fake, adopt it, advance a month and see exactly one charge recorded against the imported agreement.
+*Acceptance:* Import an Ignition agreement with an active Stripe subscription fake, adopt it, advance a month and see exactly one charge recorded against the imported agreement. Import a PandaDoc document that was sent but not signed and reissue it: it follows `PROP-001` approval, the client gets a new Platter link, the new proposal links to the imported original, and the original is listed as "void in PandaDoc".
 
 *Status:* missing. No in-flight migration.
 
 #### MIG-006 — Clients, contacts and catalogue CSV move-in.
 
-The CSV kit imports companies, contacts with titles and phone numbers, billing and service addresses, tax-exempt status and catalogue items, with the preview, fingerprint, journal and undo of `IMPORT-001`.
+The CSV kit imports companies, contacts with titles and phone numbers, billing and service addresses, tax-exempt status and catalogue items, with the preview, fingerprint, journal and undo of `IMPORT-001`. It reads the incumbents' own contact and catalogue CSV layouts (including PandaDoc's catalogue CSV and the contact file PandaDoc support provides) as well as Platter's.
 
-*Acceptance:* Import a CSV of 200 contacts across 60 companies with addresses and exemptions, and 50 catalogue items, preview, apply and undo.
+*Acceptance:* Import a CSV of 200 contacts across 60 companies with addresses and exemptions, and 50 catalogue items, preview, apply and undo; import PandaDoc's catalogue CSV layout unchanged and see the same items as `MIG-001`.
 
 *Status:* partial. Client name and email only. (`src/platter/movein/index.ts`, `tests/platter.test.mjs`)
+
+#### MIG-007 — Move-in from exported files without API access.
+
+For every incumbent, a buyer without API access moves in from the files the incumbent lets any customer export: document PDFs (one at a time or in bulk zips, across several uploads into one import), catalogue and contact CSVs, and report CSVs. Platter detects signed documents by their signature certificate or signature page and keeps them as retained, read-only agreements with the original file byte-identical and its SHA-256 recorded; matches each PDF to report rows by title, client and date and holds ambiguous matches for the buyer to review; converts template and library files to editable blocks (`EDIT-005`); and resumes an interrupted upload without duplicating anything. Every import ends with a report of what arrived, what is held for review and what did not map, under `IMPORT-001`'s preview, journal and undo.
+
+*Acceptance:* Import three zips in two sessions with an interrupted upload between them and one PDF present in two zips: there is one agreement per document and nothing is duplicated; an ambiguous report row is held for review until the buyer picks its PDF; the report's counts of arrived, held and unmapped items match the fixture; undo removes everything the import wrote.
+
+*Status:* missing. No document import; only the client CSV kit exists.
 
 ### Mobile
 
@@ -962,7 +1090,7 @@ Every agent action is logged with the data it read, what it produced, the model 
 
 What Platter does not do, and how a US buyer gets it:
 
-- **Moving or holding money.** Platter never holds client funds, operates card or ACH networks, extends credit or stores card or bank numbers. Payments run through the firm's own Stripe account (`PAY-001`); firms that take payment through QuickBooks Payments or another processor take it on the accounting invoice, and Platter reads the paid state back (`ACCT-001`). Card surcharging and fee pass-through are offered only where the firm confirms card-network rules and state law allow them.
+- **Moving or holding money.** Platter never holds client funds, operates card or ACH networks, extends credit or stores card or bank numbers. Payments run through the firm's own Stripe, PayPal, Square or Authorize.net account (`PAY-001`, `PAY-009`); firms that take payment through QuickBooks Payments take it on the accounting invoice, and Platter reads the paid state back (`ACCT-001`). Card surcharging and fee pass-through are offered only where the firm confirms card-network rules and state law allow them.
 - **Filing sales tax.** Platter calculates and shows sales tax and records exemption certificates (`PRICE-005`); registering, filing and remitting returns stays with Stripe Tax, Avalara or the firm's accountant.
 - **Notarization and qualified trust services.** Platter provides ESIGN and UETA signatures with SMS and ID verification options (`SIGN-003`, `SIGN-006`). Remote online notarization goes through a notary platform such as Proof, and documents that require wet signatures by law (such as some real-estate and family-law instruments) are out of scope.
 - **Legal advice.** Platter records consent, intent and audit evidence; whether a given agreement is enforceable is for the firm's counsel.
@@ -976,13 +1104,13 @@ How the approved scope for Platter (category, incumbents, missing items and push
 
 | Approved scope item | Clauses |
 | --- | --- |
-| Branded drag-and-drop proposal editor with templates, reusable content and service libraries, images, video and PDF/Word import and export | `EDIT-001` to `EDIT-010`, `CAT-001` |
+| Branded drag-and-drop proposal editor with templates, reusable content and service libraries, images, video and PDF/Word import and export | `EDIT-001` to `EDIT-017`, `CAT-001` |
 | Interactive USD pricing tables with optional items, packages, quantities, recurring fees, discounts and configurable US sales tax, replacing the two-option GST-free AUD format | `PRICE-001` to `PRICE-008`, `CAT-001` |
-| Tracked sending with view and section-level engagement analytics, reminders, expiry, comments and negotiated revisions | `SEND-001` to `SEND-005`, `TRACK-001` to `TRACK-004`, `FOLLOW-001` to `FOLLOW-005`, `NEG-001`, `NEG-002` |
-| Legally binding e-signature (ESIGN/UETA) with audit trail and a downloadable signed agreement, plus multi-signer support | `SIGN-001` to `SIGN-008` |
-| Stripe card and ACH collection of deposits, milestone and recurring payments at acceptance, synced to QuickBooks Online and Xero | `PAY-001` to `PAY-007`, `ACCT-001` to `ACCT-005`, `INV-001` |
+| Tracked sending with view and section-level engagement analytics, reminders, expiry, comments and negotiated revisions | `SEND-001` to `SEND-008`, `TRACK-001` to `TRACK-004`, `FOLLOW-001` to `FOLLOW-005`, `NEG-001`, `NEG-002` |
+| Legally binding e-signature (ESIGN/UETA) with audit trail and a downloadable signed agreement, plus multi-signer support | `SIGN-001` to `SIGN-009`, `SEND-007` |
+| Stripe card and ACH collection of deposits, milestone and recurring payments at acceptance, synced to QuickBooks Online and Xero | `PAY-001` to `PAY-009`, `ACCT-001` to `ACCT-006`, `INV-001` |
 | Two-way HubSpot, Salesforce and Orbit deal sync with line items, plus pipeline and win-rate reporting | `CRM-001` to `CRM-004`, `REPORT-001` to `REPORT-005` |
-| Import and migration from each named incumbent and up-and-comer | `MIG-001` to `MIG-006`, `IMPORT-001` |
+| Import and migration from each named incumbent and up-and-comer | `MIG-001` to `MIG-007`, `IMPORT-001` |
 | Roles, approvals, mobile, follow-up and the integrations the category runs on | `TEAM-*`, `APPROVE-*`, `MOB-*`, `FOLLOW-*`, `AUTO-*`, `HAND-*`, `SEND-001` |
 | Push further: drafts from discovery calls tested against delivery costs, capacity and past win and margin outcomes with assumptions visible | `AGENT-001`, `AGENT-002`, `AGENT-007`, `AI-001`, `AI-004` |
 | Push further: client questions and payment exceptions chased to resolution | `AGENT-003`, `AGENT-004`, `AGENT-005` |
@@ -995,8 +1123,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 9 | 3 | 0 | 12 |
-| Target and push further | 0 | 30 | 74 | 104 |
-| All | 9 | 33 | 74 | 116 |
+| Target and push further | 0 | 30 | 90 | 120 |
+| All | 9 | 33 | 90 | 132 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1022,6 +1150,13 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `EDIT-008` | Custom domain and branded client experience | target | missing |  | Client links use the installation origin with Platter styling. |
 | `EDIT-009` | Conditional content by package | target | missing |  | No conditional content. |
 | `EDIT-010` | Attachments and vendor documents | target | missing |  | No attachments. |
+| `EDIT-011` | Large-proposal performance budget | target | missing |  | No block editor exists, so no budget is measured; no large-proposal fixture or timing journey. |
+| `EDIT-012` | Duplicate a proposal for another client | target | missing |  | No duplicate action; a proposal can only be created from blank. |
+| `EDIT-013` | Documents without pricing | target | missing |  | Every proposal requires two priced options; there is no unpriced document type. |
+| `EDIT-014` | Client PDF download before signing | target | missing |  | The client page offers no download; PDF export does not exist. |
+| `EDIT-015` | Locked template sections | target | missing |  | No templates, so no section locks. |
+| `EDIT-016` | Proposal search and folders | target | missing |  | A single proposal list; no search or folders. |
+| `EDIT-017` | Client page in the client's language | target | missing |  | The client page and mail are English only. |
 | `CAT-001` | Service and product catalogue | target | missing |  | No catalogue. |
 | `PRICE-001` | USD pricing tables with line items | target | partial | `src/platter/model.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs` | Two fixed one-off option totals in AUD; no line items, quantities, units or multiple tables. |
 | `PRICE-002` | Packages and optional items the client chooses | target | partial | `src/platter/signing.ts`, `tests/platter.test.mjs` | Exactly two fixed options; no add-ons, editable quantities or any number of packages. |
@@ -1041,6 +1176,9 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `SEND-003` | Recipients, roles and sharing | target | missing |  | One client recipient per proposal. |
 | `SEND-004` | Expiry and reopening | target | missing |  | Offers never expire. |
 | `SEND-005` | Completion and activity notifications | target | missing |  | No notifications to the sender. |
+| `SEND-006` | Editable subject, message and shared email templates | target | missing |  | Proposal mail has a fixed subject ("Your proposal:" and the title) and a fixed body, set in src/platter/commands.ts; no editing, templates or timeline copy. |
+| `SEND-007` | Replace an unsigned signer on a sent proposal | target | missing |  | One client recipient fixed at sending; a fresh invitation (`PROP-002`) rotates the link but cannot change who receives it. |
+| `SEND-008` | Sending and reminders by text message | target | missing |  | Email only; no SMS. |
 | `TRACK-001` | View tracking and live open alerts | target | missing |  | No view tracking. |
 | `TRACK-002` | Section-level reading analytics | target | missing |  | No reading analytics. |
 | `TRACK-003` | Forwarded stakeholder identification | target | missing |  | No forwarding detection. |
@@ -1058,6 +1196,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `SIGN-006` | Signer identity options | target | partial | `src/platter/signing.ts`, `tests/platter.test.mjs` | Mailbox code only; no SMS code or ID verification. |
 | `SIGN-007` | Fields collected at acceptance | target | missing |  | Only name, option and consent are collected. |
 | `SIGN-008` | Acceptance on the client's own paper | target | missing |  | No way to record acceptance signed outside Platter. |
+| `SIGN-009` | Recipient delegation of signing | target | missing |  | One fixed client signer; no delegation. |
 | `PAY-001` | Stripe card and ACH collection in the proposal | target | missing |  | No payment collection. |
 | `PAY-002` | Deposit or partial payment at acceptance | target | partial | `src/platter/signing.ts`, `src/platter/invoices.ts`, `tests/platter.test.mjs` | The deposit is calculated and exported, never collected. |
 | `PAY-003` | Milestone and recurring payment schedules | target | missing |  | No schedules. |
@@ -1065,11 +1204,14 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `PAY-005` | Failed-payment retries and notices | target | missing |  | No retries or notices. |
 | `PAY-006` | Refunds and disputes | target | missing |  | No refunds or disputes. |
 | `PAY-007` | Check, wire and ACH credit payments | target | missing |  | No offline payments. |
+| `PAY-008` | Net-terms invoices with a pay link and overdue tracking | target | missing |  | No invoices are sent to the client; the only invoice is the owner's deposit CSV export. |
+| `PAY-009` | PayPal, Square and Authorize.net collection | target | missing |  | No payment processors are connected. |
 | `ACCT-001` | QuickBooks Online invoices and payments | target | missing |  | No QuickBooks connection. |
 | `ACCT-002` | Xero invoices and payments | target | partial | `src/platter/invoices.ts`, `tests/platter.test.mjs` | A Xero-format AUD deposit CSV only; no API sync, USD, schedules or payments. |
 | `ACCT-003` | Pantry invoices and payments | target | missing |  | No Pantry connection. |
 | `ACCT-004` | One invoice authority and reconciliation | target | partial | `src/platter/invoices.ts`, `tests/platter.test.mjs` | A unique local binding prevents duplicate exports; there is no authority choice, provider ID or payment matching. |
 | `ACCT-005` | Invoice and payment export files | target | partial | `src/platter/invoices.ts`, `tests/platter.test.mjs` | An AUD Xero deposit CSV only; no USD QuickBooks or Xero files and no payment or schedule export. |
+| `ACCT-006` | Stripe payouts, fees and clearing in accounting | target | missing |  | No payment or accounting connection, so no payout or fee posting. |
 | `CRM-001` | HubSpot two-way deal sync | target | missing |  | No HubSpot connection. |
 | `CRM-002` | Salesforce two-way opportunity sync | target | missing |  | No Salesforce connection. |
 | `CRM-003` | Orbit two-way deal sync | target | missing |  | No Orbit connection. |
@@ -1092,12 +1234,14 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `TEAM-002` | Single sign-on and SCIM provisioning | target | missing |  | No SSO or SCIM. |
 | `TEAM-003` | Multiple brands and workspaces | target | missing |  | One workspace and brand. |
 | `TEAM-004` | Audit log | target | partial | `src/platter/commands.ts`, `tests/platter.test.mjs` | Approvals and preparers are recorded; there is no complete, searchable or exportable activity log. |
+| `TEAM-005` | Security review pack for procurement | target | missing |  | No security page, questionnaire answers, DPA, subprocessor list or audit report. |
 | `MIG-001` | PandaDoc move-in | target | missing |  | No PandaDoc import. |
 | `MIG-002` | Proposify move-in | target | missing |  | No Proposify import. |
 | `MIG-003` | Better Proposals move-in | target | missing |  | No Better Proposals import. |
 | `MIG-004` | Qwilr and Ignition move-in | target | missing |  | No Qwilr or Ignition import. |
 | `MIG-005` | Open proposals and payment schedules continue | target | missing |  | No in-flight migration. |
 | `MIG-006` | Clients, contacts and catalogue CSV move-in | target | partial | `src/platter/movein/index.ts`, `tests/platter.test.mjs` | Client name and email only. |
+| `MIG-007` | Move-in from exported files without API access | target | missing |  | No document import; only the client CSV kit exists. |
 | `MOB-001` | Team app on a phone | target | partial | `src/platter/ui/shared.ts` | The team pages have viewport and narrow-screen styling only; there is no phone journey for creating, sending or approving. |
 | `MOB-002` | iOS and Android apps with push notifications | target | missing |  | No native apps or push. |
 | `AI-001` | Drafts from meeting notes, transcripts and email | target | partial | `src/platter/http.ts`, `tests/platter.test.mjs` | External agents can post structured drafts; there is no ingestion of notes, transcripts or email and no in-product drafting. |

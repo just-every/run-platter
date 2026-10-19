@@ -27,7 +27,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -57,7 +57,10 @@ test('TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business rec
     const pendingShare=await h.cmd('proposal.send',{id:pending.id,version:2})
     await h.cmd('proposal.negotiate',{...offer,id:pending.id,version:3,scope:'Negotiated campaign scope',priceTwo:'4600'})
     await h.cmd('proposal.approve',{id:pending.id,version:4,revision:2})
-    await h.cmd('proposal.prepare',{...offer,title:'Work in progress'})
+    const work=await h.cmd('proposal.prepare',{...offer,title:'Work in progress'})
+    const request=async()=>{const r=await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'request_send',arguments:{id:work.id,revision:1}}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,200);assert.ok(!r.value.result.isError);return JSON.parse(r.value.result.content[0].text).request}
+    const dismissed=await request();await h.cmd('send-request.resolve',{id:dismissed.id,status:'dismissed'});await request()
+    const beforeRequests=(await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests
     const csv='client_id,name,email\narchive-import,Imported studio,imported@studio.example'
     const preview=await h.cmd('import.preview',{csv})
     assert.equal(preview.canApply,true)
@@ -84,6 +87,9 @@ test('TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business rec
     assert.ok(rows(bytes).length>0);assert.deepEqual(rows(await readFile(again,'utf8')),rows(bytes))
     const archived=rows(bytes).flatMap(part=>part.items).filter(item=>item.kind==='row')
     assert.deepEqual(archived.filter(item=>item.table==='p_audit').map(item=>item.row).sort((a,b)=>a.occurred_at-b.occurred_at||a.id.localeCompare(b.id)),beforeAudit,'TEAM-004 audit survives the public CLI archive exactly')
+    const requests=archived.filter(item=>item.table==='p_send_requests').map(item=>item.row)
+    assert.equal(requests.length,2)
+    for(const row of requests)assert.deepEqual(row,Object.fromEntries(Object.keys(row).map(field=>[field,beforeRequests.find(r=>r.id===row.id)[field]])),'AI-003 request and resolution custody survives the CLI archive')
     const revisions=archived.filter(item=>item.table==='p_revisions'&&item.row.proposal_id===proposal.id)
     const approvals=archived.filter(item=>item.table==='p_approvals'&&item.row.proposal_id===proposal.id)
     assert.equal(revisions.length,2)
@@ -98,6 +104,8 @@ test('TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business rec
     const restoredState=await h.state(restoredOwner)
     assert.deepEqual(business(restoredState),before)
     assert.deepEqual(restoredState.agentKeys,[])
+    assert.deepEqual((await h.send('/api/platter/send-requests',undefined,restoredOwner)).value.requests,beforeRequests)
+    assert.equal((await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'ping'},'',{authorization:'Bearer '+key.token})).status,401)
     assert.deepEqual(restoredState.outbox,[])
     assert.ok(restoredState.proposals.every(p=>!p.shareToken&&!p.delivery))
     assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id},restoredOwner),journal)

@@ -246,3 +246,51 @@ test('TEAM-004 current person, agent, invitation, signature, native, import and 
  assert.equal((await h.send('/api/platter/audit?from=invalid',undefined,h.owner)).status,400)
  assert.equal((await h.send('/api/platter/audit',undefined,'')).status,401)
 }))
+
+test('AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund',()=>run(async h=>{
+ const endpoint='/api/platter/agent/mcp',key=await h.cmd('agent.create',{label:'MCP assistant'})
+ let sequence=0
+ const transport=async(method,params={},token=key.token,extra={})=>h.send(endpoint,{jsonrpc:'2.0',id:++sequence,method,params},'',{authorization:'Bearer '+token,accept:'application/json, text/event-stream','mcp-protocol-version':'2025-06-18',...extra})
+ const rpc=async(method,params={})=>{const r=await transport(method,params);assert.equal(r.status,200,r.text);assert.ok(!r.value.error,r.text);return r.value.result}
+ const call=async(name,args={})=>{const result=await rpc('tools/call',{name,arguments:args});assert.ok(!result.isError,JSON.stringify(result));return JSON.parse(result.content[0].text)}
+ assert.equal((await h.send(endpoint,{jsonrpc:'2.0',id:1,method:'ping'})).status,401)
+ const initialized=await rpc('initialize',{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'Platter acceptance MCP client',version:'1'}})
+ assert.equal(initialized.protocolVersion,'2025-06-18');assert.ok(initialized.capabilities.tools)
+ const notified=await h.send(endpoint,{jsonrpc:'2.0',method:'notifications/initialized'},'',{authorization:'Bearer '+key.token});assert.equal(notified.status,202);assert.equal(notified.text,'')
+ const listed=await rpc('tools/list');assert.ok(listed.tools.every(t=>t.inputSchema.type==='object'));assert.deepEqual(listed.tools.map(t=>t.name).sort(),['prepare_proposal','read_engagement','read_proposal','request_send','revise_proposal','search_proposals'])
+ const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
+ const found=await call('search_proposals',{query:'Northstar'});assert.ok(found.clients.some(c=>c.id===client.id));assert.equal(found.proposalCount,0)
+ const p=await call('prepare_proposal',{...offer,depositPercent:25,clientId:client.id})
+ let current=await call('read_proposal',{id:p.id});assert.equal(current.status,'draft');assert.equal(current.prepared_by,'agent:'+key.id);assert.ok(!current.shareToken)
+ assert.ok((await call('search_proposals',{query:'photography',status:'draft',limit:1})).proposals.some(x=>x.id===p.id))
+ const engagement=await call('read_engagement',{id:p.id});assert.equal(engagement.viewTracking.available,false);assert.equal(engagement.sectionReading.available,false);assert.equal(engagement.acceptance,null);assert.equal(engagement.delivery,null)
+ const before=await h.state(),requested=await call('request_send',{id:p.id,revision:1}),again=await call('request_send',{id:p.id,revision:1})
+ assert.equal(again.request.id,requested.request.id)
+ const queued=await h.send('/api/platter/send-requests',undefined,h.owner);assert.equal(queued.status,200);assert.equal(queued.value.requests.length,1);assert.equal(queued.value.requests[0].actionable,1)
+ const after=await h.state();assert.deepEqual(after.proposals,before.proposals);assert.deepEqual(after.outbox,before.outbox)
+ for(const name of ['approve','proposal.approve','send','proposal.send','sign','refund']){
+  const refused=await rpc('tools/call',{name,arguments:{id:p.id}});assert.equal(refused.isError,true);assert.match(refused.content[0].text,/Forbidden/)
+ }
+ await h.cmd('proposal.send',{id:p.id,version:1},h.owner,409)
+ await h.cmd('send-request.resolve',{id:requested.request.id,status:'fulfilled'},h.owner,409)
+ const changed=await call('revise_proposal',{...offer,depositPercent:25,clientId:client.id,id:p.id,version:1,scope:'A revised campaign plan'})
+ assert.equal(changed.revision,2);assert.equal((await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests[0].actionable,0)
+ const stale=await rpc('tools/call',{name:'request_send',arguments:{id:p.id,revision:1}});assert.equal(stale.isError,true)
+ await h.cmd('send-request.resolve',{id:requested.request.id,status:'dismissed'})
+ const next=await call('request_send',{id:p.id,revision:2})
+ await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const sent=await h.cmd('proposal.send',{id:p.id,version:3})
+ await h.cmd('send-request.resolve',{id:next.request.id,status:'fulfilled'})
+ current=await call('read_proposal',{id:p.id});assert.equal(current.status,'sent');assert.ok(!JSON.stringify(current).includes(new URL(sent.shareUrl).pathname.slice(3)))
+ const finalQueue=(await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests
+ assert.deepEqual(finalQueue.map(r=>r.status).sort(),['dismissed','fulfilled'])
+ const malformed=await transport('tools/call',{name:'prepare_proposal',arguments:{...offer,depositPercent:25,clientId:client.id,extra:'refused'}});assert.equal(malformed.value.error.code,-32602)
+ assert.equal((await transport('ping',{},key.token,{origin:'https://foreign.example'})).status,403)
+ assert.equal((await transport('ping',{},key.token,{'mcp-protocol-version':'unsupported'})).status,400)
+ assert.equal((await h.send(endpoint,undefined,'',{authorization:'Bearer '+key.token})).status,405)
+ await h.send('/auth/invite',{email:'mcp-member@studio.example',displayName:'MCP member',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('mcp-member@studio.example')
+ assert.equal((await h.send('/api/platter/send-requests',undefined,member)).status,403)
+ await h.cmd('send-request.resolve',{id:next.request.id,status:'dismissed'},member,403)
+ const audit=(await h.send('/api/platter/audit?actor='+encodeURIComponent('agent:'+key.id),undefined,h.owner)).value.rows
+ for(const action of ['mcp.search_proposals','mcp.prepare_proposal','mcp.read_proposal','mcp.read_engagement','mcp.request_send','mcp.revise_proposal'])assert.ok(audit.some(row=>row.action===action&&row.actor_role==='agent'),action)
+ await h.cmd('agent.revoke',{id:key.id});assert.equal((await transport('ping')).status,401)
+}))

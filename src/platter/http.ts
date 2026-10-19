@@ -1,3 +1,5 @@
+import { handleMcp } from './mcp'
+import { sendRequests, resolveSendRequest } from './send-requests'
 import { auditRows, auditCsv, recordAudit } from './audit'
 import { auditPage } from './ui/audit'
 import { document } from './ui/shared'
@@ -25,16 +27,18 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    fail('Not found',404)
   }
   actor=await principal(request,env,isAgent)
+  if(path==='/api/platter/agent/mcp')return handleMcp(request,env,actor)
   if(request.method==='GET'){
    if(path==='/app/audit'||path==='/api/platter/audit'||path==='/api/platter/audit.csv'){const rows=await auditRows(env.DB,actor,url.searchParams);return path==='/app/audit'?document('Audit log',auditPage(rows,url.searchParams),{actor,path}):path.endsWith('.csv')?new Response(auditCsv(rows),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename=platter-audit.csv'}}):json({rows})}
    if(pages.has(path)){if(path==='/app/proposal'){const id=url.searchParams.get('id');if(id&&(await env.DB.prepare('SELECT id FROM p_proposals WHERE id=?').bind(id).first()))await recordAudit(env.DB,actor,'proposal.view',id)}return renderApp(await state(env,actor),path+url.search)}
+   if(path==='/api/platter/send-requests')return json({requests:await sendRequests(env.DB,actor)})
    if(path==='/api/platter/pipeline'){need(actor.role==='owner','Only the owner views the pipeline report',403);return json(pipeline((await state(env,actor)).proposals,url.searchParams))}
    if(path==='/api/platter/state'||path==='/api/platter/agent/context')return json(await state(env,actor))
    const file=path.match(/^\/api\/platter\/invoices\/([\w-]+)\.csv$/);if(file){need(actor.role==='owner','Only the owner downloads exports',403);const row=await env.DB.prepare('SELECT csv FROM p_invoices WHERE id=?').bind(file[1]).first<any>();need(row,'Export not found',404);await recordAudit(env.DB,actor,'invoice.download',file[1]);return new Response(row.csv,{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="platter-deposit.csv"'}})}
   }else if(['/app/action','/api/platter/command','/api/platter/agent/command'].includes(path)){
    const p=await body(request),name=path==='/app/action'?url.searchParams.get('name')??'':String(p.name??''),input=path==='/app/action'?p:p.input as Record<string,unknown>;need(input&&typeof input==='object'&&!Array.isArray(input),'Provide an input object')
    if(isAgent)need(['proposal.prepare','proposal.revise'].includes(name),'Agents only prepare proposal drafts',403)
-   let result=name.startsWith('agent.')?await credentialCommand(env.DB,actor,name,input):name.startsWith('import.')?await importCommand(env.DB,actor,name,input):await command(env,actor,name,input)
+   let result=name==='send-request.resolve'?await resolveSendRequest(env.DB,actor,input):name.startsWith('agent.')?await credentialCommand(env.DB,actor,name,input):name.startsWith('import.')?await importCommand(env.DB,actor,name,input):await command(env,actor,name,input)
    const subject=String((result as any)?.job?.id??(result as any)?.id??input.id??'clients');await recordAudit(env.DB,actor,name,subject)
    if(path==='/app/action'){if(['import.preview','import.apply'].includes(name))result={...result as any,csv:input.csv};const returnPath=back==='/app/proposal'?back+'?id='+encodeURIComponent(String(input.id??(result as any)?.id??'')):back;return renderApp(await state(env,actor),returnPath,{message:'Saved.',result})}
    return json(result)

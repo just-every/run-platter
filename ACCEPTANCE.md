@@ -208,7 +208,7 @@ Not yet supported (target clauses below): USD pricing tables, payment collection
 
 - **AI-001 — Drafts from meeting notes, transcripts and email** (partial). Draft from a fixture transcript; every section cites a transcript line; prices come only from catalog items; under the default policy the draft needs approval before sending, and the same draft prepared through an agent key is refused at send (409) until a manager or the owner approves it even with "approval required for every proposal" off.
 - **AI-002 — Writing assistant in the editor** (missing). Ask to shorten a section, see a suggested change, accept it, and see a request to change a price refused.
-- **AI-003 — MCP server for AI assistants** (partial). Connect an MCP client with a scoped key, draft a proposal, read its status, request sending (queued for the owner), and see approve refused.
+- **AI-003 — MCP server for AI assistants** (done; `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`). Connect a scoped MCP client, initialize/list schemas, search existing proposals/clients, prepare/revise a structured draft, read status and honestly unavailable view/reading analytics, and request sending into an owner-only queue. Replaying the same active request returns one row, changes no offer/approval/mail, and never authorizes sending. Approve/send/sign/refund calls are refused; revocation ends access, foreign origins fail, and tool responses carry no invitation credentials. A changed revision makes its request visibly stale; an owner dismisses it or marks a request fulfilled only after the same revision was actually sent (premature: 409; member queue read/resolve: 403). The real 1440/390 owner journey explicitly approves/sends; CLI archives preserve requests/resolutions and opaque provenance with credentials excluded. Tool actions have TEAM-004 audit rows. EDIT-002 inherits template drafting, TRACK-001/002 engagement tools and TEAM-001 scoped visibility, with this same journey extended before those capabilities ship.
 - **AI-004 — Explainable price suggestions** (missing). From a fixture history, see a suggested range with sample size and three linked examples, and see the price unchanged until the member applies it.
 
 ### Privacy, security and portability
@@ -233,4 +233,4 @@ Not yet supported (target clauses below): USD pricing tables, payment collection
 
 ## Counts
 
-140 clauses: 18 done, 26 partial, 96 missing. Published: 12 done, 0 partial, 0 missing of 12. Target and push further: 6 done, 26 partial, 96 missing of 128.
+140 clauses: 19 done, 25 partial, 96 missing. Published: 12 done, 0 partial, 0 missing of 12. Target and push further: 7 done, 25 partial, 96 missing of 128.

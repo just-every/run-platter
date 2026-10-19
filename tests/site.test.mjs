@@ -239,3 +239,36 @@ test('TEAM-004 owner searches audit actions and downloads the same filtered acti
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('AI-003 desktop and phone owners review MCP requests, approve/send explicitly, and dismiss stale requests', {timeout:120000}, async()=>{
+ let app,browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  const screenshots=process.env.PLATTER_SCREENSHOTS
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),command=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200);return r.json()}
+    const capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`AI-003-${name}-${width}.png`),fullPage:true})}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const client=await command('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),key=await command('agent.create',{label:'Campaign drafting assistant'})
+    let id=0
+    const rpc=async(method,params={})=>{const r=await context.request.post(app.origin+'/api/platter/agent/mcp',{headers:{authorization:'Bearer '+key.token,accept:'application/json, text/event-stream','mcp-protocol-version':'2025-06-18'},data:{jsonrpc:'2.0',id:++id,method,params}});assert.equal(r.status(),200);const v=await r.json();assert.ok(!v.error);return v.result}
+    const tool=async(name,args)=>{const r=await rpc('tools/call',{name,arguments:args});assert.ok(!r.isError,JSON.stringify(r));return JSON.parse(r.content[0].text)}
+    await rpc('initialize',{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'Browser acceptance MCP client',version:'1'}})
+    await page.getByRole('link',{name:'Agent access',exact:true}).click();assert.match(await page.locator('main').innerText(),/No send requests yet/);await capture('empty')
+    const offer={clientId:client.id,title:'Autumn campaign photography',scope:'Campaign planning, studio production and edited photographs.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:25}
+    const p=await tool('prepare_proposal',offer);await tool('request_send',{id:p.id,revision:1});await page.reload()
+    assert.match(await page.locator('main').innerText(),/Ready for review/);await capture('pending')
+    await page.getByRole('link',{name:offer.title,exact:true}).click();assert.equal(await page.getByRole('button',{name:'Approve this revision'}).count(),1)
+    await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click()
+    await page.getByRole('link',{name:'Agent access',exact:true}).click();await page.getByRole('button',{name:'Mark request fulfilled'}).click();assert.match(await page.locator('main').innerText(),/fulfilled/);await capture('fulfilled')
+    const other=await tool('prepare_proposal',{...offer,title:'Winter campaign concept'});await tool('request_send',{id:other.id,revision:1});await tool('revise_proposal',{...offer,id:other.id,version:1,title:'Winter campaign concept',scope:'A changed draft awaits a new owner review.'})
+    await page.reload();assert.match(await page.locator('main').innerText(),/Stale request/);await capture('stale')
+    await page.getByRole('button',{name:'Dismiss request',exact:true}).click();assert.match(await page.locator('main').innerText(),/dismissed/);assert.equal(await page.getByRole('button',{name:'Dismiss request',exact:true}).count(),0);await capture('dismissed')
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

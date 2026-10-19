@@ -47,3 +47,37 @@ Open the prepared proposal in your browser and check its client, scope, prices a
 Agent keys cannot approve or send proposals, manage access, erase clients, import clients, or export invoices. Browser members can also prepare drafts; owner actions retain the approval author, revision and time.
 
 Keys are bound to the active owner and current account version. They do not travel in [backups](BACKUP-RESTORE.md). After a restore, create new keys for agents that still need access.
+
+## MCP assistants (AI-003)
+
+Configure a Streamable HTTP MCP connection to your installed origin at
+`/api/platter/agent/mcp`, using the same private Bearer key created above.
+The endpoint uses stateless JSON-RPC over HTTP POST and supports MCP protocol
+versions `2025-03-26` and `2025-06-18`. Initialize with your client's information,
+then list tools. Requests use `Content-Type: application/json` and
+`Accept: application/json, text/event-stream`; subsequent requests carry the
+negotiated `MCP-Protocol-Version` header. Responses are JSON; there is no SSE
+subscription (GET returns 405). See the [MCP transport specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports).
+
+| Tool | What it does |
+| --- | --- |
+| `search_proposals` | Searches title, scope and client, optionally by status; returns existing clients for drafting. |
+| `read_proposal` | Reads status, revision, version and the current offer without invitation credentials. |
+| `read_engagement` | Reads recorded mail outcome and acceptance; labels view and section analytics unavailable. Provider acceptance never means delivery or reading. |
+| `prepare_proposal` | Prepares the current structured two-option draft for an existing client. |
+| `revise_proposal` | Saves a version-guarded draft revision, clearing previous approval. |
+| `request_send` | Queues an exact draft/approved revision for the owner, without approval or mail. |
+
+Tool argument schemas come from `tools/list`. Draft fields match the HTTP example
+above, except MCP uses a number for `depositPercent` (for example `25`). Template
+drafting and reading analytics become available with EDIT-002 and TRACK-001/002;
+they are not simulated. Keys keep their existing draft-only authority, expiry,
+owner binding and immediate revocation. No tool approves, sends, signs or refunds.
+
+The owner opens **Agent access → Agent send requests**, follows the proposal link,
+reviews the exact revision, then explicitly approves and sends it. Requesting alone
+changes neither the offer nor its approvals or mail. Repeating an active request
+returns the same request. Editing the proposal makes the old request visibly stale.
+The owner can dismiss it, or mark it fulfilled only after that same revision was
+actually sent. Requests and their opaque key provenance travel in business archives;
+the credentials themselves never do.

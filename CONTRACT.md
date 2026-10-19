@@ -1081,11 +1081,13 @@ In the editor a member asks to rewrite, shorten, adjust tone, summarize or trans
 
 #### AI-003 — MCP server for AI assistants.
 
-An MCP server lets Claude, ChatGPT and other assistants search proposals, read status and engagement, draft from templates and request sending, under scoped, revocable keys. Assistants can request but never approve, send, sign or refund.
+An MCP server lets Claude, ChatGPT and other assistants search proposals, read status and engagement, draft from templates and request sending, under scoped, revocable keys. Assistants can request but never approve, send, sign or refund. Every capability available today conforms: the stateless Streamable HTTP endpoint `/api/platter/agent/mcp` uses existing owner-bound, draft-only agent keys (`ACCESS-001`), with their current expiry, immediate revocation and account-version binding. Tools search proposals and existing clients, read current offer/status and recorded delivery/acceptance, prepare or version-guard a structured draft, and queue an exact draft/approved revision for the owner. View and reading analytics are honestly unavailable, and provider acceptance is never claimed as delivery or reading. `EDIT-002` inherits drafting from templates and `TRACK-001`/`TRACK-002` inherit engagement tools and their same named MCP journey before shipping. `TEAM-001` inherits its visibility rules before shipping. No template, tracking or role capability is simulated.
 
-*Acceptance:* Connect an MCP client with a scoped key, draft a proposal, read its status, request sending (queued for the owner), and see approve refused.
+An owner send request is a retained request, never authorization: it changes no offer, approval or mail. Repeating an active request for the same key, proposal and revision returns the same row. A later revision makes it visibly stale. The owner opens Agent access, reviews the proposal, explicitly approves and sends it under the standing policy, and may mark a request fulfilled only after that exact revision is sent or accepted; the owner may dismiss a request without sending. Other roles cannot read or resolve the queue. Requests and their opaque key provenance travel in archives; keys do not. MCP tool actions extend `TEAM-004`'s audit journey.
 
-*Status:* partial. An HTTP agent key limited to preparing and revising drafts; no MCP server or tools for search, status or send requests. (`src/platter/http.ts`, `src/platter/credentials.ts`, `tests/platter.test.mjs`)
+*Acceptance:* Connect an MCP client with an existing scoped key; initialize and list schemas; search existing clients/proposals, prepare and revise a draft, read status and the honestly labeled engagement fields, request sending and see one retained owner request on replay, with no approval, offer or mail change. Approve/send/sign/refund tool calls are refused, as are revoked keys and foreign origins. Edit a requested revision and see the stale request; the owner dismisses it, approves and explicitly sends the current revision, then marks only that revision's request fulfilled. A premature fulfillment is refused (409), members cannot read/resolve the queue (403), and invitation credentials are absent from tool responses. Exercise the real queue at 1440 and 390 pixels; export and restore requests and resolutions through the public CLI with credentials excluded. `EDIT-002`, `TRACK-001`, `TRACK-002` and `TEAM-001` extend this journey before shipping.
+
+*Status:* done. Named AI-003 HTTP MCP client, browser queue and CLI archive journeys assert all current tools, request boundaries, immediate revocation and custody. (`src/platter/mcp.ts`, `src/platter/send-requests.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### AI-004 — Explainable price suggestions.
 
@@ -1234,8 +1236,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 6 | 26 | 96 | 128 |
-| All | 18 | 26 | 96 | 140 |
+| Target and push further | 7 | 25 | 96 | 128 |
+| All | 19 | 25 | 96 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1365,7 +1367,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `MOB-002` | iOS and Android apps with push notifications | target | missing |  | No native apps or push. |
 | `AI-001` | Drafts from meeting notes, transcripts and email | target | partial | `src/platter/http.ts`, `tests/platter.test.mjs` | External agents can post structured drafts; there is no ingestion of notes, transcripts or email and no in-product drafting. |
 | `AI-002` | Writing assistant in the editor | target | missing |  | No writing assistant. |
-| `AI-003` | MCP server for AI assistants | target | partial | `src/platter/http.ts`, `src/platter/credentials.ts`, `tests/platter.test.mjs` | An HTTP agent key limited to preparing and revising drafts; no MCP server or tools for search, status or send requests. |
+| `AI-003` | MCP server for AI assistants | target | done | `src/platter/mcp.ts`, `src/platter/send-requests.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `AI-004` | Explainable price suggestions | target | missing |  | No price suggestions. |
 | `PRIV-001` | Erasure across contacts, tracking and synced systems | target | partial | `src/platter/commands.ts`, `tests/platter.test.mjs` | Only unused client records can be erased; no contacts, tracking data or notice to synced systems. |
 | `PORT-002` | Complete product archive | target | done | `tests/archive.test.mjs`, `src/platter/archive-policy.mjs` |  |

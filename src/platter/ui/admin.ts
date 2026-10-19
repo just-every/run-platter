@@ -1,4 +1,4 @@
-import { area, date, empty, escape, field, form, hidden, ownerOnly, panel, statusPill, type Feedback } from './shared'
+import { area, date, empty, escape, field, form, hidden, ownerOnly, panel, proposalPath, statusPill, type Feedback } from './shared'
 
 export function clientsPage(state: any): string {
   if (state.actor?.role !== 'owner') return ownerOnly()
@@ -10,7 +10,7 @@ export function accessPage(state: any): string {
   if (state.actor?.role !== 'owner') return ownerOnly()
   const keys = state.agentKeys ?? []
   const list = keys.length ? `<ul class="records">${keys.map((key: any) => `<li><div><strong>${escape(key.label)}</strong><p>Created ${date(key.createdAt)} · Expires ${date(key.expiresAt)}</p></div><div class="actions">${key.revokedAt ? `<span class="muted">Revoked ${date(key.revokedAt)}</span>` : statusPill('Active') + form('agent.revoke', '/app/access', hidden('id', key.id) + '<button class="secondary">Revoke key</button>')}</div></li>`).join('')}</ul>` : empty('No agent keys yet.')
-  return panel('Create agent key', '<p>Agent keys allow proposal preparation. Owner approval is required before an offer can be sent. Save the generated key securely; it is shown only once.</p>' + form('agent.create', '/app/access', field('Key label', 'label', '', 'required placeholder="Proposal assistant"') + '<button>Create key</button>', 'agent-new')) + panel('Agent keys', list)
+  return panel('Create agent key', '<p>Agent keys allow proposal preparation. Owner approval is required before an offer can be sent. Save the generated key securely; it is shown only once.</p>' + form('agent.create', '/app/access', field('Key label', 'label', '', 'required placeholder="Proposal assistant"') + '<button>Create key</button>', 'agent-new')) + panel('Agent keys', list) + sendRequestPanel(state)
 }
 function journalResult(result: any): string {
   return `<pre class="json" tabindex="0" aria-label="Import journal">${escape(JSON.stringify(result, null, 2))}</pre>`
@@ -36,4 +36,9 @@ export function importPage(state: any, feedback?: Feedback): string {
   const jobs = state.importJobs ?? []
   html += panel('Import history', jobs.length ? `<ul class="records">${jobs.map((job: any, index: number) => `<li><div><strong>Import ${index + 1}</strong><p>${escape(job.state ?? job.status)} · ${escape(job.checkpoint ?? 0)} of ${escape(job.total ?? 0)} changes</p></div><div class="actions">${form('import.journal', '/app/import', hidden('id', job.id) + '<button class="secondary">View journal</button>')}${job.undoneAt || job.undone_at || job.state === 'undone' || job.status === 'undone' ? '<span>Undone</span>' : (['completed', 'undoing'].includes(job.state) ? form('import.undo', '/app/import', hidden('id', job.id) + `<button class="secondary">${job.state === 'undoing' ? 'Continue undo' : 'Undo import'}</button>`) : '')}</div></li>`).join('')}</ul>` : empty('No imports have been applied.'))
   return html
+}
+
+export function sendRequestPanel(state: any): string {
+ const requests = state.sendRequests ?? []
+ return panel('Agent send requests', '<p>Requests are for owner review. They do not approve a revision or send an invitation.</p>' + (requests.length ? `<ul class="records">${requests.map((request: any) => `<li><article><h3><a href="${escape(proposalPath(request.proposal_id))}">${escape(request.title)}</a></h3><p>Revision ${escape(request.revision)} · ${date(request.requested_at)} · ${escape(request.status)}</p><p class="wrap">Agent key ${escape(request.agent_key_id)}</p>${request.status === 'pending' ? `<p>${request.actionable ? 'Ready for review: open the proposal to approve and send.' : request.revision !== request.current_revision ? 'Stale request: the proposal revision has changed.' : 'The proposal is no longer awaiting sending.'}</p>` + form('send-request.resolve', '/app/access', hidden('id', request.id) + hidden('status', 'dismissed') + '<button class="secondary">Dismiss request</button>') + (request.revision === request.current_revision && ['sent', 'accepted'].includes(request.proposal_status) ? form('send-request.resolve', '/app/access', hidden('id', request.id) + hidden('status', 'fulfilled') + '<button>Mark request fulfilled</button>') : '') : ''}</article></li>`).join('')}</ul>` : '<p>No send requests yet.</p>'))
 }

@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { run } from './harness.mjs'
+import { run, harness } from './harness.mjs'
+import { pdfPages } from './pdf-document.mjs'
 const offer={title:'Northstar brand photography',scope:'One studio shoot, edited photographs, and usage licence.',optionOne:'Studio essentials',priceOne:'2400.00',optionTwo:'Full campaign',priceTwo:'4200.00',depositPercent:'25'}
 async function draft(h){const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'});const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id});return{client,p}}
 async function sent(h){const{client,p}=await draft(h);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:p.id,version:2});return{client,p,path:new URL(share.shareUrl).pathname}}
@@ -563,3 +564,51 @@ test('REPORT-005 / TEAM-004 pipeline exports to CSV as filtered and emails weekl
  await h.cmd('report.unschedule',{id:created.id});assert.equal((await h.state()).reportSchedules.length,0)
  const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows;for(const action of ['report.export','report.schedule','report.unschedule'])assert.ok(audit.some(x=>x.action===action&&x.actor_id&&x.occurred_at),'TEAM-004 '+action)
 }))
+
+
+test('EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and every page marked; disabling refuses download without a write', {timeout:60000}, async()=>{
+ const h=await harness({assetsDirectory:'public'})
+ try {
+  const finish=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(finish.status,303)
+  const {client,p}=await draft(h),scope='Café · 東京 · 😀.\n'+Array.from({length:70},(_,i)=>`Deliverable ${i+1}: Studio photographs and campaign usage rights.`).join('\n'),terms='Payment follows the chosen option. Final term marker.'
+  await h.cmd('proposal.revise',{...offer,clientId:client.id,id:p.id,version:1,scope,terms,depositPercent:'33.33',priceTwo:'111.11'})
+  await h.cmd('proposal.approve',{id:p.id,version:2,revision:2})
+  const share=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(share.shareUrl).pathname
+  const before=await h.state(),beforeRow=before.proposals.find(row=>row.id===p.id)
+  assert.equal((await h.send(path+'/download.pdf?optionId=two')).status,401)
+  const cookie=await verified(h,path)
+  const fetchPdf=async(optionId,session=cookie)=>h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId='+optionId,{headers:{host:new URL(h.origin).host,cookie:session}})
+  let response=await fetchPdf('unknown');assert.equal(response.status,400)
+  assert.equal((await h.state()).proposals.find(row=>row.id===p.id).pdfDownloads.length,0)
+  response=await fetchPdf('two');assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'application/pdf');assert.match(response.headers.get('content-disposition'),/attachment/);assert.equal(response.headers.get('cache-control'),'no-store')
+  const pages=await pdfPages(await response.arrayBuffer()),text=pages.join(' ')
+  assert.ok(pages.length>=2);for(const page of pages)assert.ok(page.includes('Not signed, revision 2'))
+  for(const value of [offer.title,'Northstar Coffee','avery@northstar.example','Café','東京','😀','Deliverable 1:','Deliverable 70:','Final term marker.','Selected option: Full campaign','Selected option total: USD 111.11','Deposit due: USD 37.03','Studio essentials','USD 2,400.00'])assert.ok(text.includes(value),value+' is preserved')
+  response=await fetchPdf('one');assert.equal(response.status,200);assert.ok((await pdfPages(await response.arrayBuffer())).join(' ').includes('Selected option total: USD 2,400.00'))
+  const after=(await h.state()).proposals.find(row=>row.id===p.id)
+  assert.equal(after.version,beforeRow.version);assert.equal(after.revision,2);assert.equal(after.status,'sent');assert.equal(after.acceptance,undefined);assert.equal(after.approved_at,beforeRow.approved_at);assert.equal(after.pdfDownloads.length,2)
+  assert.deepEqual(after.pdfDownloads.map(d=>[d.revision,d.option_id,d.client_id]),[[2,'two',client.id],[2,'one',client.id]])
+  const timeline=await h.send('/app/proposal?id='+p.id,undefined,h.owner);assert.match(timeline.text,/PDF download timeline/)
+  await h.send('/auth/invite',{email:'pdf-member@studio.example',displayName:'Studio colleague',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('pdf-member@studio.example')
+  await h.cmd('pdf.downloads',{id:p.id,version:after.version,enabled:false},member,403)
+  await h.cmd('pdf.downloads',{id:p.id,version:after.version-1,enabled:false},h.owner,409)
+  await h.cmd('pdf.downloads',{id:p.id,version:after.version,enabled:false},h.owner,403,{origin:'https://foreign.example'})
+  await h.cmd('pdf.downloads',{id:p.id,version:after.version,enabled:false})
+  const auditBefore=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+  assert.equal((await fetchPdf('two')).status,403)
+  assert.deepEqual((await h.send('/api/platter/audit',undefined,h.owner)).value.rows,auditBefore)
+  assert.ok(!(await h.send(path,undefined,cookie)).text.includes('Download unsigned proposal PDF'))
+  assert.equal((await h.state()).proposals.find(row=>row.id===p.id).pdfDownloads.length,2)
+  const current=(await h.state()).proposals.find(row=>row.id===p.id)
+  await h.cmd('pdf.downloads',{id:p.id,version:current.version,enabled:true})
+  const fresh=await h.cmd('proposal.send',{id:p.id,version:current.version+1})
+  assert.equal((await fetchPdf('two')).status,404,'rotated invitation never downloads old bytes')
+  const newPath=new URL(fresh.shareUrl).pathname,newCookie=await verified(h,newPath)
+  await h.send(newPath+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true},newCookie)
+  assert.equal((await h.send(newPath+'/download.pdf?optionId=two',undefined,newCookie)).status,409,'unsigned download is not a signed agreement PDF')
+  const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+  assert.equal(audit.filter(r=>r.action==='proposal.pdf.download').length,2)
+  for(const row of audit.filter(r=>r.action==='proposal.pdf.download')){assert.equal(row.actor_id,client.id);assert.equal(row.actor_role,'client');assert.equal(row.subject,p.id);assert.ok(row.occurred_at)}
+  assert.ok(audit.some(r=>r.action==='pdf.downloads'&&r.actor_role==='owner'))
+ } finally { await h.close() }
+})

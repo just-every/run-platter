@@ -94,6 +94,8 @@ These clauses complete the category job alongside the published guarantees. Each
 
 A member builds a proposal from blocks: cover page, heading, rich text, image, video, columns, pricing table (`PRICE-001`), quote or testimonial, team bio, case study, terms, form field (`SIGN-007`), signature block and page break. Every signature block and field is assigned to one recipient, or in a template to one recipient role (`SIGN-011`). Blocks are added from a palette, reordered by drag or keyboard, duplicated and deleted with undo. A brand kit sets the logo, colors, fonts and a default cover. One document renders as a responsive web page for the client and as a paginated US Letter PDF (`EDIT-005`) with the same content, and members and approvers see that client page for an unsent revision through the preview of `EDIT-018`. Edits autosave under the version guard of `COLLAB-001`, and the editor meets the large-proposal performance budget of `EDIT-011`.
 
+All added blocks and media extend EDIT-014’s exact-revision, selected-price and every-page unsigned PDF journey before shipping.
+
 *Acceptance:* A browser journey at 1440 and 390 pixels builds a proposal from blank with every block type, reorders by drag and by keyboard, applies a brand kit, reloads and sees the same document, and exports a PDF whose pages carry the same blocks in order; the `EDIT-011` budget journey passes on the same build.
 
 *Status:* partial. Only a title, scope and two-option form with fixed Platter styling; no block editor, layouts or brand kit. (`src/platter/ui/proposals.ts`, `src/platter/commands.ts`)
@@ -101,6 +103,8 @@ A member builds a proposal from blocks: cover page, heading, rich text, image, v
 #### EDIT-002 — Proposal templates.
 
 Owners, admins, managers and content editors publish templates (layout, blocks, default pricing tables, terms, payment methods (`PAY-001`), deposit and payment schedule (`PRICE-007`), reminder schedule and expiry period (`FOLLOW-006`), variables, and recipient roles with their assigned fields, signing order and pre-assigned recipients under `SIGN-011`) that members start proposals from; a proposal started from a template opens with the template's role slots to fill. Platter ships starter templates for US agencies, consultancies, IT managed services, creative studios and professional services. Any member who edits proposals can save one as a personal template they own; only the template roles of `TEAM-001` edit shared templates. Templates have owners, folders and access rules (`TEAM-001`), and changing a template never changes proposals already created from it.
+
+Template defaults inherit EDIT-014’s PDF-download enable/disable setting and identical named PDF assertions before shipping.
 
 *Acceptance:* Create a template with a pricing table and variables, start two proposals from it, edit the template, and confirm both proposals are unchanged while a third proposal picks up the edit. On a fresh installation the five starter templates (agency, consultancy, IT managed services, creative studio, professional services) are listed, and each starts a proposal with a pricing table and filled variables. Put a template in a folder limited to the Design team: a Design-team member lists and uses it, and a Sales-team member neither lists it nor starts from it (403). A sales member saves a proposal as a personal template and is recorded as its owner, and their edit of a shared template is refused (403). A proposal started from a template with recipient roles opens with those role slots, as the `SIGN-011` journey checks. A template set to offer card and ACH only, a 30% deposit with a net-15 milestone, reminders at 2, 5 and 9 days and a 14-day expiry starts a proposal carrying all of them, as the `PAY-001`, `PRICE-007` and `FOLLOW-006` journeys check, and editing them on that proposal leaves the template unchanged.
 
@@ -125,6 +129,8 @@ Text and pricing can use variables: client company, contact name and title, addr
 #### EDIT-005 — Word and PDF import and export.
 
 A member uploads a Word (.docx) file, such as a template or document downloaded as Microsoft Word from PandaDoc, Proposify or Better Proposals, and gets editable blocks (`EDIT-001`) with headings, paragraphs, lists, tables and images kept. Incumbent merge tokens, such as PandaDoc's `[Client.Company]`, `[Client.FirstName]` and `[Sender.FirstName]`, become `EDIT-004` variables through a published mapping table; a token with no mapping becomes a custom variable and is listed. A table whose header row names price, quantity or SKU columns (a quote or pricing table) becomes a `PRICE-001` pricing table: a row whose SKU, or failing that its name, matches a `CAT-001` item becomes a priced line item linked to that item at the row's quantity and price, and a row that matches nothing becomes an unlinked line item at its own name and price and is listed as unmatched for the member to link or keep. Images that the source file dropped, such as those PandaDoc leaves out of quote tables in its Word downloads, are listed as missing, never invented. A .docx can instead be imported as content library items (`EDIT-003`): the file is split at each Heading 1, and each part becomes one item named by its heading. A PDF upload is never converted to editable blocks. It becomes fixed pages, kept byte-identical, that carry signature, initials, date and form fields (`SIGN-003`, `SIGN-007`); the member can append editor blocks after them, including a pricing table, and set a payment schedule (`PRICE-007`), so a fixed-page document can still take payment at acceptance. Any proposal exports to PDF (US Letter or A4) and to Word: headings become Word heading styles, each pricing table becomes a Word table with every line's name, quantity, unit price and total, and images are embedded. The signed agreement PDF is `SIGN-005`.
+
+All imported blocks, fixed pages and media extend EDIT-014’s exact unsigned PDF assertions before shipping.
 
 *Acceptance:* Import a catalog CSV, then upload a PandaDoc-shaped .docx template with headings, an image, `[Client.Company]` and `[Sender.FirstName]` tokens and a six-row quote table, five of whose SKUs are in the catalog and one of which is not: the result is a template whose blocks are editable, whose tokens are variables, and whose pricing table holds six priced line items, five linked to their catalog items and one listed as unmatched. Upload a .docx of 10 Heading 1 sections as library items and get 10 items named by those headings. Upload a PDF: its pages stay byte-identical and uneditable, a signature field is placed on page 3, and a pricing table appended after the last page totals the lines added. Export a proposal with three headings, a four-line pricing table and two images to .docx and PDF: the .docx has the three headings as Word heading styles, a Word table with each of the four lines' name, quantity, unit price and total, and both images embedded; the PDF has the same blocks in the same order.
 
@@ -198,9 +204,11 @@ A firm sends and signs documents that carry no pricing table, such as a statemen
 
 A recipient can download a PDF of the revision they are viewing before signing, so their procurement team can circulate it, unless the firm turns this off per proposal or template. The PDF carries the selection made so far, the revision number and "Not signed" on every page, and each download is on the timeline (`TRACK-001`). The signed agreement PDF remains `SIGN-005`.
 
+Every document capability available today conforms: a mailbox-verified invited client downloads the exact sent revision with their selected fixed option, currency and integer-cent deposit. Every US Letter page says "Not signed, revision N"; it is an unsigned offer, never a signed agreement PDF or certificate. The owner enables or disables downloads per proposal, without changing its content or approval; a disabled download is absent and the route returns 403. The TEAM-004 timeline records each successful download with client, revision, option and server time. Settings and download history travel in PORT-002 archives, while invitation credentials stay local. `EDIT-002` inherits the template default; `EDIT-001` and `EDIT-005` inherit all added blocks and media; `PRICE-002` inherits expanded selection; `TRACK-001` inherits its engagement timeline. Each extends the same named PDF assertions before shipping.
+
 *Acceptance:* As a verified client, choose a package and download the PDF: every page reads "Not signed, revision 2" and shows the chosen package, and the timeline lists the download; turn downloads off on another proposal and see no download action and the PDF route refused (403).
 
-*Status:* missing. The client page offers no download; PDF export does not exist.
+*Status:* done. Named EDIT-014 HTTP, 1440/390 browser and public CLI archive journeys assert exact revision and selected prices, every-page marking, Unicode and multipage content, owner setting, disabled/unauthorized/stale-link refusals, unchanged approval and offer, download timeline and archive custody. (`src/platter/documents/client-pdf.ts`, `src/platter/documents/offer-pdf.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### EDIT-015 — Locked template sections.
 
@@ -255,6 +263,8 @@ A proposal has any number of pricing tables in USD, each with line items (name, 
 #### PRICE-002 — Packages and optional items the client chooses.
 
 A proposal offers any number of packages (good, better, best) and optional items the client can add or remove. Quantities can be client-editable within a minimum and maximum the firm sets. Totals, tax, deposit and the payment schedule update as the client chooses, and the agreement records exactly the selection signed. The sender and approvers try the same choices before sending in the `EDIT-018` preview, which uses the same calculation.
+
+Expanded package, optional-item and quantity choices extend EDIT-014’s selected-price and deposit assertions before shipping.
 
 *Acceptance:* Offer three packages and two optional items with an editable quantity between 1 and 10; as the client choose the middle package, add one item and set quantity 4; the server totals, agreement and PDF all show that selection; quantity 11 is refused.
 
@@ -457,6 +467,8 @@ Anyone who may send a proposal under `APPROVE-003` withdraws it, with a reason, 
 Platter records each verified or unverified view of a client link with time, recipient, approximate location and device class, and alerts the sender on first open and on a return visit after a quiet period the owner sets (30 minutes by default). The proposal shows a view timeline.
 
 Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with viewed, including filters, sorting, counts and totals under its visibility rules.
+
+The engagement timeline inherits EDIT-014’s successful PDF-download events and identical named assertions before shipping.
 
 *Acceptance:* Open the proposal as two recipients on desktop and phone; the sender gets an alert and the timeline lists both views with device class and approximate location (city, region and country from the request address through an IP-location fixture: Austin, Texas, United States for the first and Portland, Oregon, United States for the second). With a 30-minute quiet period, the first recipient's return visit 10 minutes later raises no alert and a visit 45 minutes after that raises one return-visit alert.
 
@@ -1248,8 +1260,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 13 | 24 | 91 | 128 |
-| All | 25 | 24 | 91 | 140 |
+| Target and push further | 14 | 24 | 90 | 128 |
+| All | 26 | 24 | 90 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1278,7 +1290,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `EDIT-011` | Large-proposal performance budget | target | missing |  | No block editor exists, so no budget is measured; no large-proposal fixture or timing journey. |
 | `EDIT-012` | Duplicate a proposal for another client | target | missing |  | No duplicate action; a proposal can only be created from blank. |
 | `EDIT-013` | Documents without pricing | target | missing |  | Every proposal requires two priced options; there is no unpriced document type. |
-| `EDIT-014` | Client PDF download before signing | target | missing |  | The client page offers no download; PDF export does not exist. |
+| `EDIT-014` | Client PDF download before signing | target | done | `src/platter/documents/client-pdf.ts`, `src/platter/documents/offer-pdf.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `EDIT-015` | Locked template sections | target | missing |  | No templates, so no section locks. |
 | `EDIT-016` | Proposal search and folders | target | missing |  | A single proposal list; no search or folders. |
 | `EDIT-017` | Client page in the client's language | target | missing |  | The client page and mail are English only. |

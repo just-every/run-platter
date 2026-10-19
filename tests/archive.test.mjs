@@ -27,13 +27,13 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
     for (const path of [source,restored,erased]) await checkout(path)
     await exec(process.execPath, [resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'], { cwd:source, env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'}, maxBuffer:2e6 })
-    h=await harness({root:source})
+    h=await harness({root:source,assetsDirectory:'public'})
     const p=await h.cmd('client.save',{name:'Temporary joiner',email:'temporary@studio.example'})
     const key=await h.cmd('agent.create',{label:'Excluded secret'})
     assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,200)
@@ -75,6 +75,8 @@ test('EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 pub
     await upload({id:work.id,version:1},'Northstar-case-study.pdf','%PDF case study')
     const request=async()=>{const r=await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'request_send',arguments:{id:work.id,revision:2}}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,200);assert.ok(!r.value.result.isError);return JSON.parse(r.value.result.content[0].text).request}
     const dismissed=await request();await h.cmd('send-request.resolve',{id:dismissed.id,status:'dismissed'});await request()
+    const pdf=await h.mf.dispatchFetch(h.origin+suggestPath+'/download.pdf?optionId=two',{headers:{cookie:suggestSession.cookie,host:new URL(h.origin).host}});assert.equal(pdf.status,200);assert.equal(pdf.headers.get('content-type'),'application/pdf');await pdf.arrayBuffer()
+    await h.cmd('pdf.downloads',{id:work.id,version:2,enabled:false})
     const beforeRequests=(await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests
     const csv='client_id,name,email\narchive-import,Imported studio,imported@studio.example'
     const preview=await h.cmd('import.preview',{csv})
@@ -129,6 +131,8 @@ test('EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 pub
     assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id},restoredOwner),journal)
     assert.equal((await h.send(invoicePath,undefined,restoredOwner)).text,invoiceCsv)
     for(const file of frozenAttachments){const r=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+proposal.id+'/'+file.id,{headers:{cookie:restoredOwner,host:new URL(h.origin).host}});assert.equal(r.status,200);assert.deepEqual(new Uint8Array(await r.arrayBuffer()),file.kind==='w9'?attachmentBytes:new TextEncoder().encode('%PDF insurance'))}
+    assert.equal(restoredState.proposals.find(p=>p.id===pending.id).pdfDownloads.length,1,'EDIT-014 download timeline survives CLI restore')
+    assert.equal(restoredState.proposals.find(p=>p.id===work.id).pdfDownloadsEnabled,false,'EDIT-014 per-proposal PDF policy survives CLI restore')
     assert.deepEqual(restoredState.vendorDocuments,beforeVendorDocuments,'EDIT-010 current defaults and all replaced originals survive CLI restore')
     const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})
     assert.equal(setup.status,303)

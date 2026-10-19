@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
+import { pdfPages } from './pdf-document.mjs'
 import { builtSite, installedApp } from './site-harness.mjs'
 
 test('SITE-001 built homepage opens run instructions, Markdown docs work without JavaScript, installed root remains the Lobby', { timeout: 120000 }, async () => {
@@ -505,4 +506,39 @@ test('REPORT-005 desktop and phone export the filtered pipeline CSV and schedule
    }finally{await context.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}
+})
+
+
+test('EDIT-014 client selects and downloads revision 2 at desktop and phone; owner timeline and per-proposal disable remain authoritative', {timeout:120000}, async()=>{
+ let app,browser
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ try {
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try {
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`EDIT-014-${name}-${width}.png`),fullPage:true})}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    const client=await cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),offer={clientId:client.id,title:'Brand photography for Northstar Coffee',scope:'One studio shoot, edited photographs, and campaign usage rights.',terms:'Delivery within 30 days, following client feedback.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'}
+    const made=await cmd('proposal.prepare',offer);await cmd('proposal.revise',{...offer,id:made.id,version:1,scope:'Two studio shoots, edited photographs, and campaign usage rights.'})
+    await page.goto(app.origin+'/app/proposal?id='+made.id);await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();await capture('owner-enabled')
+    await page.getByRole('link',{name:'Open client proposal',exact:true}).click();const clientUrl=page.url()
+    assert.equal(await page.getByRole('button',{name:'Download unsigned proposal PDF'}).count(),0)
+    await page.getByRole('button',{name:'Send verification code'}).click()
+    const state=await (await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click();await page.getByRole('radio',{name:/Full campaign/}).check();await capture('client-selection')
+    const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Download unsigned proposal PDF'}).click(),page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/download.pdf')).then(async r=>assert.equal(r.status(),200,r.status()===200?'PDF response':await r.text()))])
+    const pages=await pdfPages(await readFile(await download.path()));assert.ok(pages.every(p=>p.includes('Not signed, revision 2')));assert.ok(pages.join(' ').includes('Selected option total: USD 4,200.00'));assert.ok(pages.join(' ').includes('Deposit due: USD 1,050.00'))
+    await page.goto(app.origin+'/app/proposal?id='+made.id);assert.match(await page.getByRole('list',{name:'PDF download timeline'}).innerText(),/Revision 2.*two/);await capture('owner-timeline')
+    await page.getByRole('button',{name:'Turn off client PDF downloads'}).click();await capture('owner-disabled')
+    await page.goto(clientUrl);assert.equal(await page.getByRole('button',{name:'Download unsigned proposal PDF'}).count(),0);await capture('client-disabled')
+    assert.equal((await context.request.get(clientUrl+'/download.pdf?optionId=two')).status(),403)
+    const after=await (await context.request.get(app.origin+'/api/platter/state')).json(),proposal=after.proposals.find(p=>p.id===made.id)
+    assert.equal(proposal.status,'sent');assert.equal(proposal.revision,2);assert.equal(proposal.acceptance,undefined);assert.equal(proposal.pdfDownloads.length,1)
+   } finally { await context.close();await app.close();app=undefined }
+  }
+ } finally { await browser?.close();await app?.close() }
 })

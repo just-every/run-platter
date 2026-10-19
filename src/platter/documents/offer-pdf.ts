@@ -1,0 +1,69 @@
+import { need } from '../model'
+import { PdfText } from './pdf-text'
+
+function amount(cents: number, currency: string) {
+ need(Number.isSafeInteger(cents) && cents >= 0, 'Invalid offer price')
+ const whole = Math.floor(cents / 100).toLocaleString('en-US')
+ return `${currency} ${whole}.${String(cents % 100).padStart(2, '0')}`
+}
+
+/** Render the current offer only. Caller owns authorization and revision selection. */
+export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Array | ArrayBuffer)[] = []): Promise<Uint8Array> {
+ const options = typeof view.options === 'string' ? JSON.parse(view.options) : view.options
+ need(Array.isArray(options), 'Offer options are missing')
+ const selected = options.find((option: any) => option.id === optionId)
+ need(selected, 'Choose one offered option')
+ const revision = Number(view.revision)
+ const depositBps = Number(view.deposit_bps)
+ need(Number.isSafeInteger(revision) && revision > 0, 'Invalid proposal revision')
+ need(Number.isSafeInteger(depositBps) && depositBps >= 0 && depositBps <= 10000, 'Invalid offer deposit')
+ const currency = view.currency ?? 'AUD'
+ need(currency === 'AUD' || currency === 'USD', 'Unsupported offer currency')
+ const deposit = (cents: number) => {
+  need(Number.isSafeInteger(cents) && cents >= 0 && Number.isSafeInteger(cents * depositBps), 'Invalid offer price')
+  return Math.round(cents * depositBps / 10000)
+ }
+ const pdf = await PdfText.create(revision, fontBytes)
+ pdf.document.setTitle(String(view.title ?? ''))
+ pdf.document.setSubject(`Not signed, revision ${revision}`)
+ pdf.document.setCreator('Platter')
+ pdf.document.setProducer('Platter')
+
+ pdf.text(String(view.title ?? ''), 22)
+ pdf.gap(8)
+ if (view.clientName != null) pdf.text(`Client: ${view.clientName}`)
+ if (view.clientEmail != null) pdf.text(`Client email: ${view.clientEmail}`)
+ pdf.text(`Revision ${revision}`)
+ pdf.text(`Not signed, revision ${revision}`)
+ pdf.gap()
+ pdf.text(`Selected option: ${selected.label}`, 13)
+ pdf.text(`Selected option total: ${amount(selected.cents, currency)}`)
+ pdf.text(`Deposit due: ${amount(deposit(selected.cents), currency)}`)
+
+ pdf.heading('Scope of work')
+ pdf.text(String(view.scope ?? ''))
+ pdf.heading('Terms')
+ pdf.text(view.terms ? String(view.terms) : 'No additional terms.')
+
+ pdf.heading('Offer options')
+ pdf.text(currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.')
+ pdf.text(`Deposit: ${depositBps / 100}% of the chosen option.`)
+ for (const option of options) {
+  pdf.gap(8)
+  pdf.text(`${option.id === optionId ? 'Selected option' : 'Option'}: ${option.label}`, 12)
+  pdf.text(`Total: ${amount(option.cents, currency)}`)
+  pdf.text(`Deposit due: ${amount(deposit(option.cents), currency)}`)
+ }
+
+ pdf.heading('Proposal attachments')
+ const attachments = typeof view.attachments === 'string' ? JSON.parse(view.attachments) : view.attachments ?? []
+ need(Array.isArray(attachments), 'Invalid proposal attachments')
+ if (!attachments.length) pdf.text('No attachments.')
+ for (const attachment of attachments) {
+  pdf.text(String(attachment.filename ?? ''))
+  if (attachment.size != null) pdf.text(`Size: ${attachment.size} bytes`, 9)
+  if (attachment.sha256) pdf.text(`SHA-256: ${attachment.sha256}`, 9)
+  pdf.gap(6)
+ }
+ return pdf.document.save()
+}

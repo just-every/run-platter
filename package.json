@@ -30,9 +30,11 @@
     "test:archive": "node --test tests/archive.test.mjs"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "1.1.1",
     "@tanstack/react-router": "1.170.33",
     "@tanstack/react-start": "1.168.50",
     "hono": "4.13.7",
+    "pdf-lib": "1.17.1",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -47,6 +49,7 @@
     "@vitejs/plugin-react": "6.1.1",
     "esbuild": "0.28.1",
     "miniflare": "5.20260907.0-alpha",
+    "pdfjs-dist": "5.4.296",
     "typescript": "5.9.3",
     "vite": "8.2.2",
     "wrangler": "4.129.1"

@@ -1,3 +1,4 @@
+import { pdfPanel } from './client-pdf'
 import { bounceInbox, deliveryPanel } from './delivery'
 import { proposalAttachments } from './attachments'
 import { suggestionsPanel } from './suggestions'
@@ -35,7 +36,7 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   const owner = state.actor?.role === 'owner'
   const frozen = p.status === 'sent' || p.status === 'accepted'
   const summary = `<p class="proposal-status">${statusPill(p.status)} · Revision ${escape(p.revision)}</p><dl><dt>Client</dt><dd>${escape(p.clientName)} · ${escape(p.clientEmail)}</dd><dt>Prepared by</dt><dd>${escape(p.preparedByName || p.prepared_by)}</dd><dt>Approved by</dt><dd>${escape(p.approvedByName || p.approved_by || 'Awaiting approval')}</dd><dt>Approved at</dt><dd>${date(p.approved_at)}</dd></dl><h3>Scope of work</h3><p class="preserve">${escape(p.scope)}</p><h3>Terms</h3><p class="preserve">${escape(p.terms||'No additional terms.')}</p><h3>Offered prices</h3><p>${p.currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'}</p>${optionPair(p.options ?? [], p.deposit_bps, p.acceptance?.optionId, p.currency)}<p>Deposit: ${escape(Number(p.deposit_bps) / 100)}% of the chosen option.</p>`
-  let html = panel(p.title, summary) + proposalAttachments(state,p)
+  let html = panel(p.title, summary) + proposalAttachments(state,p) + pdfPanel(state,p)
   if(p.negotiating) html += panel('Negotiated draft', `<p>Revision ${escape(p.sentRevision)} remains available to the client until this revision is approved and sent. If the client accepts it first, this draft cannot be sent.</p>`)
   if(p.status === 'sent' && ['owner','member'].includes(state.actor?.role)) html += panel('Negotiate a new revision', '<p>The sent offer stays frozen. Prepare changed terms for a new approval before replacing the client invitation.</p>' + editor(state,p,true))
   if (!frozen && ['owner', 'member'].includes(state.actor?.role)) html += panel('Revise proposal', '<p>Saving a revision clears any previous approval. The owner must approve the revised offer before sending.</p>' + editor(state, p))

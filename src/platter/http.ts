@@ -1,3 +1,4 @@
+import { clientPdf } from './documents/client-pdf'
 import { businessOriginal, businessRecords } from './business-records'
 import { deliveryWebhook } from './delivery'
 import { attachmentUpload } from './attachment-commands'
@@ -30,7 +31,8 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   need(url.origin===env.AUTH_ORIGIN&&(!request.headers.has('host')||request.headers.get('host')===url.host),'Wrong application origin',403);need(['GET','POST'].includes(request.method),'Method not allowed',405)
   if(path==='/api/platter/mail/events')return await deliveryWebhook(request,env)
   if(request.method==='POST'&&!isAgent)need(request.headers.get('origin')===env.AUTH_ORIGIN&&request.headers.get('sec-fetch-site')!=='cross-site','Cross-site request refused',403)
-  if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/action|\/attachments\/([\w-]+))?$/);need(match,'Invitation not found',404);context=await clientContext(env,match[1],request)
+  if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/action|\/download\.pdf|\/attachments\/([\w-]+))?$/);need(match,'Invitation not found',404);context=await clientContext(env,match[1],request)
+   if(match[2]==='/download.pdf'){const input=request.method==='POST'?await body(request):Object.fromEntries(url.searchParams);return await clientPdf(env,context,String(input.optionId??''))}
    if(request.method==='GET'&&match[3]){const file=copyAttachments(snapshot(context.row).attachments).find(f=>f.id===match[3]);need(file,'Attachment not found',404);await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},'attachment.download',context.row.id);return downloadAttachment(env.DB,file)}
    if(request.method==='GET'&&!match[2]){await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},'proposal.view',context.row.id);return renderClient(await clientView(env,context),match[1])}
    if(request.method==='POST'&&match[2]==='/action'){const result=await clientCommand(env,context,url.searchParams.get('name')??'',await body(request));await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},url.searchParams.get('name')==='accept'?'proposal.accept':String(url.searchParams.get('name')),context.row.id);const cookie=(result as any).cookie;const response=renderClient(await clientView(env,await clientContext(env,match[1],cookie?new Request(request.url,{headers:{cookie:cookie.split(';')[0]}}):request)),match[1],{message:(result as any).message??'Saved.'});if(cookie)response.headers.set('set-cookie',cookie);return response}

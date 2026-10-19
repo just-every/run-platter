@@ -18,5 +18,8 @@
       "database_id": "local-foundation-only",
       "migrations_dir": "migrations/core"
     }
-  ]
+  ],
+  "assets": {
+    "binding": "ASSETS"
+  }
 }

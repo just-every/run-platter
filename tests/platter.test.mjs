@@ -493,6 +493,7 @@ test('SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by uplo
  r=await record({...fields,version:2},signed);assert.equal(r.status,409)
  r=await record({...fields,attest:''},signed);assert.equal(r.status,400);assert.match(r.text,/Confirm that the file is the client/)
  r=await record(fields,undefined);assert.equal(r.status,400);assert.match(r.text,/Choose the client-signed file/)
+ r=await record(fields,new Uint8Array(10*1024*1024+1));assert.equal(r.status,413);assert.match(r.text,/10 MB or smaller/)
  r=await record({...fields,signedOn:new Date(Date.now()+3*86400000).toISOString().slice(0,10)},signed);assert.equal(r.status,400);assert.match(r.text,/cannot be in the future/)
  r=await record({...fields,signedOn:'2026-02-30'},signed);assert.equal(r.status,400);assert.match(r.text,/YYYY-MM-DD/)
  r=await record({...fields,optionId:'three'},signed);assert.equal(r.status,400)
@@ -504,7 +505,7 @@ test('SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by uplo
  const accepted=(await h.state()).proposals.find(x=>x.id===p.id),a=accepted.acceptance
  assert.equal(accepted.status,'accepted');assert.equal(a.method,'upload');assert.equal(a.name,'Morgan Lee');assert.equal(a.signedOn,'2026-10-15');assert.equal(a.attestedBy,'owner@studio.example');assert.equal(a.optionId,'two');assert.equal(a.totalCents,420000);assert.equal(a.depositCents,105000);assert.equal(a.revision,1)
  assert.match((await h.db.prepare('SELECT consent FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).consent,/did not verify the signature/)
- const file=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+p.id+'/'+a.signedCopy.id,{headers:{cookie:h.owner}});assert.equal(file.status,200);assert.deepEqual(new Uint8Array(await file.arrayBuffer()),signed);assert.match(file.headers.get('content-disposition'),/^attachment;.*Northstar-signed\.pdf/)
+ const file=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+p.id+'/'+a.signedCopy.id,{headers:{cookie:h.owner}});assert.equal(file.status,200);assert.deepEqual(new Uint8Array(await file.arrayBuffer()),signed);assert.match(file.headers.get('content-disposition'),/^attachment;.*Northstar-signed\.pdf/);assert.equal(file.headers.get('x-content-type-options'),'nosniff')
  assert.equal((await record(fields,signed)).status,409,'a recorded acceptance is never replaced')
  const cookie=await verified(h,path)
  r=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie);assert.equal(r.status,200);assert.match(r.text,/Accepted by upload: signed outside Platter/);assert.match(r.text,/Morgan Lee/);assert.ok(!r.text.includes('Morgan Lee · avery@'),'the client mailbox is not shown as the paper signer');assert.ok(!r.text.includes('Northstar-signed.pdf'),'the client page does not serve the uploaded copy')

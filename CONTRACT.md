@@ -326,11 +326,11 @@ Members leave internal comments on any block, mention a colleague, and assign a 
 
 #### COLLAB-003 — Version history with compare and restore.
 
-Every saved revision is listed with author and time. A member compares any two revisions, with text, line-item and price changes highlighted, and restores an earlier draft revision as a new revision that needs approval again.
+Every saved revision is listed with author and time. A member compares any two revisions, with text, line-item and price changes highlighted, and restores an earlier draft revision as a new revision that needs approval again. This covers every field and priced option the product supports today. `PRICE-001` inherits comparison of each added line-item field before it ships; `EDIT-001` and `PRICE-007` inherit comparison and restoration of their added document and payment-term fields. Restore retains the proposal identity, creates the next revision under the current actor and time, preserves earlier snapshots, clears current approval and is refused for sent or accepted offers.
 
 *Acceptance:* Make three revisions, compare the first and third and see the changed price and text, restore the first as revision four and see approval required.
 
-*Status:* partial. Revision snapshots are stored; there is no history view, compare or restore. (`src/platter/commands.ts`, `tests/platter.test.mjs`)
+*Status:* done. Named COLLAB-003 HTTP and 1440/390 browser journeys exercise saved authors and times, text/option/price comparisons and restoration into an unapproved fourth revision. (`src/platter/history.ts`, `src/platter/ui/history.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`)
 
 #### APPROVE-001 — Approval rules and routing.
 
@@ -1214,8 +1214,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 0 | 31 | 97 | 128 |
-| All | 12 | 31 | 97 | 140 |
+| Target and push further | 1 | 30 | 97 | 128 |
+| All | 13 | 30 | 97 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1260,7 +1260,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `PRICE-008` | First-release AUD agreements stay exact | target | partial | `src/platter/signing.ts`, `tests/archive.test.mjs` | Accepted records are immutable and survive archives, but amounts carry no currency field and there is no migration to currency-tagged amounts. |
 | `COLLAB-001` | Real-time team editing | target | partial | `src/platter/commands.ts`, `tests/platter.test.mjs` | Version-guarded saves refuse conflicting edits with 409; there is no live co-editing or presence. |
 | `COLLAB-002` | Internal comments, mentions and assignments | target | missing |  | No internal comments. |
-| `COLLAB-003` | Version history with compare and restore | target | partial | `src/platter/commands.ts`, `tests/platter.test.mjs` | Revision snapshots are stored; there is no history view, compare or restore. |
+| `COLLAB-003` | Version history with compare and restore | target | done | `src/platter/history.ts`, `src/platter/ui/history.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs` |  |
 | `APPROVE-001` | Approval rules and routing | target | partial | `src/platter/commands.ts`, `tests/platter.test.mjs` | Owner approval on every revision; no rules by amount, discount, margin or terms, and no routing to named approvers. |
 | `APPROVE-002` | Approval requests that reach the approver | target | missing |  | No approval notifications. |
 | `APPROVE-003` | Who approves, who sends and what needs approval | target | partial | `src/platter/commands.ts`, `tests/platter.test.mjs` | Only the fixed default exists: every proposal needs approval, and only the owner approves and sends (one owner-role check in the approve-and-send command); there are no admin, manager or sales roles, no approval-required setting and no default-approver choice. |

@@ -1,3 +1,4 @@
+import { historyPanel } from './history'
 import { area, date, empty, escape, field, form, hidden, money, optionPair, panel, proposalPath, statusPill } from './shared'
 
 function editor(state: any, proposal?: any): string {
@@ -21,7 +22,7 @@ export function proposalsPage(state: any): string {
   const canPrepare = ['owner', 'member'].includes(state.actor?.role)
   return panel('Your proposals', list) + (canPrepare ? panel('Prepare a proposal', state.clients?.length ? editor(state) : '<p>Add a client before preparing a proposal.</p>' + (state.actor.role === 'owner' ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) : '')
 }
-export function proposalPage(state: any, id: string): string | null {
+export function proposalPage(state: any, id: string, selection = new URLSearchParams()): string | null {
   const p = state.proposals?.find((item: any) => String(item.id) === id)
   if (!p) return null
   const path = proposalPath(p.id)
@@ -36,5 +37,5 @@ export function proposalPage(state: any, id: string): string | null {
   if (owner && p.status === 'sent') html += panel('Send a fresh invitation', '<p>This replaces any previous client link and verification session while keeping the offer frozen.</p>' + form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + '<button>Send fresh client link</button>'))
   if (p.acceptance) html += panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)} · ${escape(p.acceptance.email)}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd></dl><p>The accepted agreement is permanent.</p>`)
   if (owner && p.acceptance) html += panel('Invoice export', form('invoice.export', path, hidden('id', p.id) + '<button>Export invoice CSV</button>') + (p.invoice ? `<p>Invoice ${escape(p.invoice.number)} · Exported ${date(p.invoice.exported_at)}</p><a href="/api/platter/invoices/${encodeURIComponent(p.invoice.id)}.csv">Download deposit invoice CSV</a>` : ''))
-  return html
+  return html + historyPanel(state, p, selection)
 }

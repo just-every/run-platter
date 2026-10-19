@@ -5,12 +5,14 @@ import archivePolicy from './archive-policy.mjs'
 import { need,fail,text,email,dollars,exact,commit,proposal,snapshot,secret,type Actor } from './model'
 import { queueMail,dispatchMail,proposalMail } from './mail'
 import { exportInvoice } from './invoices'
+import { restoreFields } from './history'
 
 export function proposalFields(p:Record<string,unknown>){
  const deposit=Number(p.depositPercent);need(Number.isFinite(deposit)&&Number.isInteger(deposit*100)&&deposit>0&&deposit<=100,'Deposit must be from 0.01 to 100 percent')
  return{client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:[{id:'one',label:text(p.optionOne,'the first option',200),cents:dollars(p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:dollars(p.priceTwo)}]}
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){const db=env.DB,at=Date.now()
+ if(name==='proposal.restore')return command(env,a,'proposal.revise',await restoreFields(db,a,p))
  if(name==='client.save'){
   need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email) VALUES(?,?,?)').bind(id,text(p.name,'a client name'),email(p.email))]);return{id}
  }

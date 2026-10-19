@@ -38,7 +38,7 @@ Not yet supported (target clauses below): USD pricing tables, payment collection
 ### Mail and the public site
 
 - **MAIL-001 — Durable proposal mail with honest outcomes** (done; `tests/mail.test.mjs`, named MAIL-001 journeys). A Workers journey with a provider fake at the network edge: send, see the row claimed before the call, return accepted, then return a timeout and see the row left uncertain and not resent.
-- **SITE-001 — Public run site and documentation** (partial). Build the site, open `/` and follow Run Platter to `/run`, open `/docs` with JavaScript disabled, and open the installed `/` to see the Lobby.
+- **SITE-001 — Public run site and documentation** (done; `tests/site.test.mjs`, named SITE-001 browser journey at 1440 and 390). Build the site, open `/` and follow Run Platter to `/run`, open `/docs` with JavaScript disabled, and open the installed `/` to see the Lobby.
 
 ## Target clauses
 

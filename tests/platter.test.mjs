@@ -184,3 +184,65 @@ test('REPORT-001 thirty proposals filter by recorded owner/status and every fiel
  const accepted=fixture.find(p=>p.status==='accepted');await h.cmd('invoice.export',{id:accepted.id})
  assert.equal((await report()).rows.find(p=>p.id===accepted.id).nextAction,'complete')
 }))
+
+test('TEAM-004 current person, agent, invitation, signature, native, import and invoice actions have searchable/exportable actors and times',()=>run(async h=>{
+ const first=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+ assert.ok(first.some(r=>r.action==='native.auth.bootstrap'&&r.actor_role==='owner'))
+ const{client,p}=await draft(h)
+ await h.cmd('proposal.revise',{...offer,clientId:client.id,id:p.id,version:1,scope:'A second draft'})
+ await h.cmd('proposal.restore',{id:p.id,version:2,revision:1})
+ await h.cmd('proposal.approve',{id:p.id,version:3,revision:3})
+ const shared=await h.cmd('proposal.send',{id:p.id,version:4}),path=new URL(shared.shareUrl).pathname
+ await h.send(path)
+ await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:p.id,version:5,scope:'A negotiated draft'})
+ const cookie=await verified(h,path)
+ assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
+ const invoice=await h.cmd('invoice.export',{id:p.id})
+ await h.send('/api/platter/invoices/'+invoice.id+'.csv',undefined,h.owner)
+ const key=await h.cmd('agent.create',{label:'Private credential label'})
+ const agent=await h.send('/api/platter/agent/command',{name:'proposal.prepare',input:{...offer,clientId:client.id}},'',{authorization:'Bearer '+key.token});assert.equal(agent.status,200)
+ await h.cmd('agent.revoke',{id:key.id})
+ const spare=await h.cmd('client.save',{name:'Unused person',email:'unused@studio.example'})
+ await h.cmd('client.erase',{id:spare.id,confirmName:'Unused person'})
+ const csv='client_id,name,email\naudit-import,Imported person,imported@studio.example'
+ const preview=await h.cmd('import.preview',{csv}),applied=await h.cmd('import.apply',{csv,fingerprint:preview.fingerprint})
+ await h.cmd('import.journal',{id:applied.job.id});await h.cmd('import.undo',{id:applied.job.id})
+ await h.send('/auth/invite',{email:'member@studio.example',displayName:'Studio colleague',role:'member',returnTo:'/app'},h.owner)
+ await h.signIn('member@studio.example')
+ const operators=(await h.send('/auth/operators',undefined,h.owner)).value
+ const memberId=(Array.isArray(operators)?operators:operators.operators).find(o=>o.email==='member@studio.example').id
+ const roleChange=await h.send('/auth/operator/role',{operatorId:memberId,role:'admin'},h.owner);assert.equal(roleChange.status,200,roleChange.text)
+ assert.equal((await h.send('/auth/operator/role',{operatorId:memberId,role:'member'},h.owner)).status,200)
+ const settings=await h.send('/auth/settings/identity',{idpSignIn:false},h.owner);assert.equal(settings.status,200,settings.text)
+ const member=await h.signIn('member@studio.example')
+ const before=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+ for(const route of ['/api/platter/audit','/api/platter/audit.csv','/app/audit'])assert.equal((await h.send(route,undefined,member)).status,403)
+ await h.cmd('proposal.approve',{id:agent.value.id,version:1,revision:1},member,403)
+ const rows=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+ assert.deepEqual(rows,before,'refusals have no write')
+ const actions=['client.save','client.erase','proposal.prepare','proposal.revise','proposal.restore','proposal.approve','proposal.send','proposal.negotiate','proposal.view','code.request','code.verify','proposal.accept','invoice.export','invoice.download','agent.create','agent.revoke','import.preview','import.apply','import.journal','import.undo','native.auth.bootstrap','native.auth.invite','native.auth.magic-link','native.auth.confirm','native.auth.operator.role','native.auth.settings.identity']
+ for(const action of actions){const found=rows.filter(r=>r.action===action);assert.ok(found.length,action);assert.ok(found.every(r=>r.actor_id&&r.actor_role&&r.subject&&Number.isSafeInteger(r.occurred_at)&&r.occurred_at>0),action)}
+ assert.ok(rows.some(r=>r.action==='proposal.prepare'&&r.subject===agent.value.id&&r.actor_id==='agent:'+key.id&&r.actor_role==='agent'))
+ assert.ok(rows.some(r=>r.action==='proposal.accept'&&r.subject===p.id&&r.actor_id===client.id&&r.actor_role==='client'))
+ assert.ok(rows.some(r=>r.action==='proposal.view'&&r.subject===p.id&&r.actor_id==='unidentified'&&r.actor_role==='invitation'))
+ const who=(await h.state()).actor.id
+ assert.ok(rows.some(r=>r.action==='proposal.approve'&&r.actor_id===who&&r.actor_role==='owner'))
+ for(const [query,expected] of [
+  ['action=proposal.prepare',rows.filter(r=>r.action==='proposal.prepare')],
+  ['actor='+encodeURIComponent('agent:'+key.id),rows.filter(r=>r.actor_id==='agent:'+key.id)],
+  ['subject='+p.id,rows.filter(r=>r.subject===p.id)],
+  ['q='+p.id,rows.filter(r=>[r.actor_id,r.action,r.subject].some(v=>v.toLowerCase().includes(p.id.toLowerCase())))],
+  ['from='+rows[0].occurred_at+'&to='+rows[0].occurred_at,rows.filter(r=>r.occurred_at===rows[0].occurred_at)],
+ ]){
+  assert.deepEqual((await h.send('/api/platter/audit?'+query,undefined,h.owner)).value.rows,expected)
+  const exported=await h.send('/api/platter/audit.csv?'+query,undefined,h.owner);assert.equal(exported.status,200)
+  const fields=['id','actor_id','actor_role','action','subject','occurred_at']
+  const decoded=exported.text.trim().split('\r\n').slice(1).map(line=>line.slice(1,-1).split('","'))
+  assert.deepEqual(decoded,expected.map(r=>fields.map(f=>String(r[f]))))
+ }
+ assert.ok(rows.some(r=>r.action==='native.auth.operator.role'&&r.subject===memberId&&r.actor_id===who))
+ const serialized=JSON.stringify(rows)
+ for(const sensitive of [key.token,cookie.split('=')[1],path.slice(3),'Private credential label','Unused person','imported@studio.example','A negotiated draft'])assert.ok(!serialized.includes(sensitive),'audit excludes credentials and input payloads')
+ assert.equal((await h.send('/api/platter/audit?from=invalid',undefined,h.owner)).status,400)
+ assert.equal((await h.send('/api/platter/audit',undefined,'')).status,401)
+}))

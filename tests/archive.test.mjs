@@ -27,7 +27,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -69,6 +69,7 @@ test('NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and im
     assert.ok(journal.provenance.length>0)
     const business=state=>({clients:state.clients,proposals:state.proposals.map(({delivery,shareToken,...proposal})=>proposal),importJobs:state.importJobs})
     const before=business(await h.state())
+    const beforeAudit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
     assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','approved','draft'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
@@ -82,6 +83,7 @@ test('NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and im
     const rows=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part')
     assert.ok(rows(bytes).length>0);assert.deepEqual(rows(await readFile(again,'utf8')),rows(bytes))
     const archived=rows(bytes).flatMap(part=>part.items).filter(item=>item.kind==='row')
+    assert.deepEqual(archived.filter(item=>item.table==='p_audit').map(item=>item.row).sort((a,b)=>a.occurred_at-b.occurred_at||a.id.localeCompare(b.id)),beforeAudit,'TEAM-004 audit survives the public CLI archive exactly')
     const revisions=archived.filter(item=>item.table==='p_revisions'&&item.row.proposal_id===proposal.id)
     const approvals=archived.filter(item=>item.table==='p_approvals'&&item.row.proposal_id===proposal.id)
     assert.equal(revisions.length,2)

@@ -211,3 +211,31 @@ test('REPORT-001 desktop and phone pipeline filters, value sort, totals and clea
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('TEAM-004 owner searches audit actions and downloads the same filtered activity at desktop and phone widths', {timeout:120000}, async()=>{
+ let app,browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  const screenshots=process.env.PLATTER_SCREENSHOTS
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),command=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200);return r.json()}
+    const capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`TEAM-004-${name}-${width}.png`),fullPage:true})}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const client=await command('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
+    const proposal=await command('proposal.prepare',{clientId:client.id,title:'Autumn campaign photography',scope:'Campaign planning, a studio production day and edited photographs.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'})
+    await command('proposal.approve',{id:proposal.id,version:1,revision:1});await command('proposal.send',{id:proposal.id,version:2})
+    await page.goto(app.origin+'/app');await page.getByRole('link',{name:'Audit log',exact:true}).click()
+    assert.equal(await page.getByRole('heading',{name:'Audit log',exact:true}).count(),1);assert.ok(await page.getByRole('heading',{name:'proposal.send',exact:true}).count());await capture('all')
+    await page.getByLabel('Subject ID',{exact:true}).fill(proposal.id);await page.getByLabel('Action',{exact:true}).fill('proposal.approve');await page.getByRole('button',{name:'Search audit log'}).click()
+    assert.equal(await page.getByRole('heading',{name:'proposal.approve',exact:true}).count(),1);assert.equal(await page.getByRole('heading',{name:'proposal.send',exact:true}).count(),0);await capture('filtered')
+    const csv=await context.request.get(app.origin+await page.getByRole('link',{name:'Download audit CSV'}).getAttribute('href'));assert.equal(csv.status(),200);assert.match(await csv.text(),/proposal.approve/);assert.ok(!(await csv.text()).includes('proposal.send'))
+    await page.getByLabel('Search activity',{exact:true}).fill('no matching activity');await page.getByRole('button',{name:'Search audit log'}).click();assert.match(await page.locator('main').innerText(),/No activity matches/);await capture('empty')
+    await page.getByRole('link',{name:'Clear search'}).click();assert.ok(await page.getByRole('heading',{name:'proposal.send',exact:true}).count());await capture('cleared')
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

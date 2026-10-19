@@ -1,3 +1,4 @@
+import { withAuthAudit } from './platter/auth-audit'
 import { rejectedResponse } from './base/rejected-response'
 import { createDependencies } from '@runeditrun/rer/internal/modules/dependencies/index.mjs'
 import { createIdpOwnerClaimHandler, createOwnerClaimHandler } from '@runeditrun/rer/internal/modules/owner-claim/index.mjs'
@@ -76,6 +77,6 @@ async function handleAuthResponse(request: Request, original: Bindings): Promise
 }
 
 export async function authResponse(request: Request, original: Bindings): Promise<Response | null> {
- const response = await handleAuthResponse(request, original)
+ const response = await withAuthAudit(request, original, () => handleAuthResponse(request, original))
  return response ? rejectedResponse(request, response) : null
 }

@@ -969,11 +969,13 @@ A firm runs several brands or business units, each with its own brand kit, domai
 
 #### TEAM-004 — Audit log.
 
-Every action by people, agents and integrations (edits, approvals, sends, views, signatures, payments, refunds, setting and permission changes) is logged with actor, time and subject, searchable by admins and exportable to CSV.
+Every action by people, agents and integrations (edits, approvals, sends, views, signatures, payments, refunds, setting and permission changes) is logged with actor, time and subject, searchable by admins and exportable to CSV. This applies to every capability that exists today: successful client and proposal commands, revision restore and negotiation, agent-key management, client invitation views and verification/acceptance, client-import preview/apply/journal/undo, invoice export/download, and native Base authentication, setup, settings and permission actions. The owner acts for admin until `TEAM-001` ships; search and CSV are owner-only, with other roles refused (403). Rows retain an opaque actor record id and role (agent key id for agents), action, subject record id and server epoch-millisecond time. Unverified invitation views identify an unknown person, never the named client; verified client actions identify the client record. Credentials, codes, command payloads, IP addresses, devices and invitation tokens are never copied into the log. Exact actor/action/subject filters combine with case-insensitive literal search and inclusive epoch-millisecond time bounds; CSV returns the same ordered filtered rows. Audit rows travel in the business archive. Logging starts on upgrade; earlier history is not invented. Refused actions write nothing, preserving `HTTP-001`.
 
-*Acceptance:* Perform one action of each kind and see each in the log with its actor; export it and see the same rows.
+Every future capability must extend this audit journey before shipping: document and pricing actions (`EDIT-001`–`EDIT-018`, `CAT-001`, `PRICE-001`–`PRICE-007`), approval and team settings (`APPROVE-001`–`APPROVE-003`, `TEAM-001`–`TEAM-003`), recipient/notification/follow-up and tracking actions (`SEND-001`–`SEND-010`, `FOLLOW-001`–`FOLLOW-006`, `TRACK-001`–`TRACK-004`), signature/payment actions (`SIGN-003`–`SIGN-011`, `PAY-001`–`PAY-009`), integration actions (`CRM-001`–`CRM-004`, `ACCT-001`–`ACCT-007`, `AUTO-001`–`AUTO-005`, `HAND-001`–`HAND-002`), renewals, report delivery, migration, privacy and agent actions (`RENEW-001`–`RENEW-002`, `REPORT-002`–`REPORT-005`, `MIG-001`–`MIG-007`, `PRIV-001`, `AI-001`–`AI-004`, `AGENT-001`–`AGENT-009`).
 
-*Status:* partial. Approvals and preparers are recorded; there is no complete, searchable or exportable activity log. (`src/platter/commands.ts`, `tests/platter.test.mjs`)
+*Acceptance:* Perform every currently supported kind of action through HTTP and see each in the log with its actor, subject and server time; exact filters, literal search and inclusive bounds return the matching rows, and CSV exports those same rows. Exercise person, agent, unidentified invitation and verified client actors; confirm refused actions write nothing and secrets/payloads are absent. Search and download in the real app at 1440 and 390 pixels; member and signed-out audit access is refused. Export and restore through the public CLI and see audit rows preserved exactly. Each future capability named above inherits the same assertion before shipping.
+
+*Status:* done. Named TEAM-004 HTTP, browser and CLI archive journeys assert every current action kind and audit custody. (`src/platter/audit.ts`, `src/platter/auth-audit.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### TEAM-005 — Security review pack for procurement.
 
@@ -1232,8 +1234,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 5 | 27 | 96 | 128 |
-| All | 17 | 27 | 96 | 140 |
+| Target and push further | 6 | 26 | 96 | 128 |
+| All | 18 | 26 | 96 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1350,7 +1352,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `TEAM-001` | Roles and permissions | target | partial | `src/platter/model.ts`, `src/platter/credentials.ts`, `tests/platter.test.mjs` | Owner, member and agent only, enforced as owner-only checks in the commands; no admin, manager, sales, content editor, viewer or billing roles, no teams or collaborator sharing, and none of the rights table is enforced. |
 | `TEAM-002` | Single sign-on and SCIM provisioning | target | missing |  | No SSO or SCIM. |
 | `TEAM-003` | Multiple brands and workspaces | target | missing |  | One workspace and brand. |
-| `TEAM-004` | Audit log | target | partial | `src/platter/commands.ts`, `tests/platter.test.mjs` | Approvals and preparers are recorded; there is no complete, searchable or exportable activity log. |
+| `TEAM-004` | Audit log | target | done | `src/platter/audit.ts`, `src/platter/auth-audit.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `TEAM-005` | Security review pack for procurement | target | missing |  | No security page, questionnaire answers, DPA, subprocessor list or audit report. |
 | `MIG-001` | PandaDoc move-in | target | missing |  | No PandaDoc import. |
 | `MIG-002` | Proposify move-in | target | missing |  | No Proposify import. |

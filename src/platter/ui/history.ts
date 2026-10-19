@@ -1,6 +1,6 @@
 import { date, escape, form, hidden, money, panel, proposalPath } from './shared'
 
-function changes(before: any, after: any): string {
+export function changes(before: any, after: any): string {
  const rows: [string, unknown, unknown][] = [ ['Title', before.title, after.title], ['Scope', before.scope, after.scope], ['Client', before.client_id, after.client_id], ['Deposit percentage', before.deposit_bps / 100, after.deposit_bps / 100] ]
  const ids = new Set([...before.options, ...after.options].map((option: any) => option.id))
  for (const id of ids) {

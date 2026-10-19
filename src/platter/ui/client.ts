@@ -1,3 +1,4 @@
+import { changes } from './history'
 import { date, document, escape, field, money, optionPair, panel, type Feedback } from './shared'
 
 export function renderClient(view: any, token: string, feedback?: Feedback): Response {
@@ -7,6 +8,7 @@ export function renderClient(view: any, token: string, feedback?: Feedback): Res
   const currency = view.currency ?? 'AUD'
   const pricing = currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'
   let html = panel('Scope of work', `<p class="preserve">${escape(view.scope)}</p>`)
+  if(view.previous) html += panel('Changes since your previous offer', `<p>Revision ${escape(view.previous.revision)} compared with revision ${escape(view.revision)}</p>${changes(view.previous,view)}`)
   html += panel('Offer options', `<p>${pricing} Deposit: ${escape(Number(view.deposit_bps) / 100)}% of the chosen option.</p>${optionPair(options, view.deposit_bps, view.acceptance?.optionId, currency)}`)
   if (view.acceptance) {
     const accepted = view.acceptance

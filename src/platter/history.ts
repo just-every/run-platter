@@ -1,5 +1,6 @@
 import type { Actor } from './model'
 import { need, proposal } from './model'
+import { negotiatedView, pendingNegotiation } from './negotiation'
 
 export async function revisionHistory(db: D1Database) {
  const rows = (await db.prepare('SELECT * FROM p_revisions ORDER BY proposal_id,revision DESC').all<any>()).results
@@ -8,7 +9,8 @@ export async function revisionHistory(db: D1Database) {
 
 export async function restoreFields(db: D1Database, actor: Actor, input: Record<string, unknown>) {
  need(actor.role !== 'agent', 'A person restores revision history', 403)
- const current = await proposal(db, input.id)
+ const offer = await proposal(db, input.id)
+ const current = negotiatedView(offer, await pendingNegotiation(db, offer.id))
  need(['draft', 'approved'].includes(current.status), 'Sent and accepted proposals are frozen', 409)
  const revision = Number(input.revision)
  need(Number.isInteger(revision) && revision > 0 && revision < current.revision, 'Choose an earlier draft revision')

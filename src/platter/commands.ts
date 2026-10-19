@@ -6,6 +6,7 @@ import { need,fail,text,email,dollars,exact,commit,proposal,snapshot,secret,type
 import { queueMail,dispatchMail,proposalMail } from './mail'
 import { exportInvoice } from './invoices'
 import { restoreFields } from './history'
+import { negotiationCommand, pendingNegotiation } from './negotiation'
 
 export function proposalFields(p:Record<string,unknown>){
  const deposit=Number(p.depositPercent);need(Number.isFinite(deposit)&&Number.isInteger(deposit*100)&&deposit>0&&deposit<=100,'Deposit must be from 0.01 to 100 percent')
@@ -22,6 +23,10 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   const check=await db.prepare(`SELECT (${unused}) AS ok`).bind(id,id).first<any>();need(check?.ok,'Clients with proposal or import history must be retained. Undo an unused import first.',409)
   const portability=await createPortability({db,policy:archivePolicy});await commit(db,a,[...await portability.erasureStatements('p_clients',{id}),...await portability.invalidateTransfersStatements(),db.prepare('DELETE FROM p_clients WHERE id=?').bind(id)],true,{sql:unused,values:[id,id]});return{erased:true}
  }
+ if(name==='proposal.negotiate'||name==='proposal.revise'){
+  const current=await proposal(db,p.id)
+  if(name==='proposal.negotiate'||await pendingNegotiation(db,current.id))return negotiationCommand(env,a,name,p,current,proposalFields(p))
+ }
  if(name==='proposal.prepare'||name==='proposal.revise'){
   const f=proposalFields(p);need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(f.client_id).first(),'Client not found',404)
   const old=name==='proposal.revise'?await proposal(db,p.id):null;if(old){exact(old,p);need(['draft','approved'].includes(old.status),'Sent and accepted proposals are frozen',409)}
@@ -34,6 +39,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='invoice.export')return exportInvoice(db,a,p)
  if(name==='proposal.approve'||name==='proposal.send'){
   need(a.role==='owner','Only the owner approves prices and sends proposals',403);const old=await proposal(db,p.id);exact(old,p)
+  if(await pendingNegotiation(db,old.id))return negotiationCommand(env,a,name,p,old)
   if(name==='proposal.approve'){
    need(old.status==='draft'&&old.revision===Number(p.revision),'Approve the current draft revision',409)
    await commit(db,a,[db.prepare("UPDATE p_proposals SET status='approved',approved_by=?,approved_at=?,version=version+1 WHERE id=?").bind(a.email,at,old.id),db.prepare('INSERT INTO p_approvals(id,proposal_id,revision,actor_id,approved_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),old.id,old.revision,a.id,at)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status='draft')",values:[old.id,old.version,old.revision]});return{approved:true}

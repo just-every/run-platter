@@ -132,3 +132,43 @@ test('PRICE-008 legacy AUD agreement and new USD owner/client screens show exact
   }
  } finally {await browser?.close();await app?.close()}
 })
+
+test('NEG-001 desktop and phone negotiate, approve, send and accept the changed offer with client comparison', {timeout:120000}, async()=>{
+ let app,browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  const screenshots=process.env.PLATTER_SCREENSHOTS
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),capture=async name=>{await page.evaluate(()=>document.fonts.ready.then(()=>null));if(screenshots)await page.screenshot({path:join(screenshots,`NEG-001-${name}-${width}.png`),fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),JSON.stringify(await page.locator('main *').evaluateAll(nodes=>nodes.filter(n=>n.getBoundingClientRect().right>innerWidth).map(n=>({tag:n.tagName,cls:n.className,text:n.textContent.slice(0,100),width:n.getBoundingClientRect().width})))))}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    await page.getByRole('link',{name:'Clients',exact:true}).click();await page.locator('[name="name"]').fill('Northstar Coffee');await page.locator('[name="email"]').fill('avery@northstar.example');await page.getByRole('button',{name:'Add client'}).click()
+    await page.getByRole('link',{name:'Proposals',exact:true}).click();await page.locator('[name="clientId"]').selectOption({label:'Northstar Coffee — avery@northstar.example'})
+    for(const [name,value] of Object.entries({title:'Autumn campaign photography',scope:'One studio shoot and usage licence.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'}))await page.locator(`[name="${name}"]`).fill(value)
+    await page.getByRole('button',{name:'Prepare proposal',exact:true}).click();await page.getByRole('link',{name:'Autumn campaign photography',exact:true}).click()
+    await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click()
+    const original=await page.getByRole('link',{name:'Open client proposal',exact:true}).getAttribute('href')
+    await page.locator('[name="scope"]').fill('Two shoots with product styling and a campaign licence.');await page.locator('[name="priceOne"]').fill('2800')
+    await capture('negotiate')
+    await page.getByRole('button',{name:'Prepare negotiated revision'}).click()
+    assert.match(await page.locator('.proposal-status').innerText(),/draft.*Revision 2/is);assert.equal(await page.getByRole('button',{name:'Send approved proposal'}).count(),0)
+    await capture('draft')
+    await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();await capture('sent')
+    assert.equal((await context.request.get(app.origin+original)).status(),404)
+    await page.getByRole('link',{name:'Open client proposal',exact:true}).click()
+    assert.equal(await page.getByRole('heading',{name:'Changes since your previous offer'}).count(),1)
+    assert.match(await page.locator('del').allTextContents().then(x=>x.join(' ')),/2,400/);assert.match(await page.locator('ins').allTextContents().then(x=>x.join(' ')),/2,800/)
+    await capture('client-comparison')
+    await page.getByRole('button',{name:'Send verification code'}).click()
+    const state=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click()
+    await page.getByRole('radio',{name:/Studio essentials/}).check();await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
+    assert.equal(await page.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1);assert.match(await page.locator('main').innerText(),/\$2,800\.00 USD/);await capture('accepted')
+    const final=await(await context.request.get(app.origin+'/api/platter/state')).json();assert.equal(final.proposals[0].acceptance.revision,2)
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

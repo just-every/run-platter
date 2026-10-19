@@ -27,7 +27,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -55,6 +55,8 @@ test('PORT-001 / PORT-002 public CLI preserves business records and import custo
     const pending=await h.cmd('proposal.prepare',{...offer,title:'Pending client decision'})
     await h.cmd('proposal.approve',{id:pending.id,version:1,revision:1})
     const pendingShare=await h.cmd('proposal.send',{id:pending.id,version:2})
+    await h.cmd('proposal.negotiate',{...offer,id:pending.id,version:3,scope:'Negotiated campaign scope',priceTwo:'4600'})
+    await h.cmd('proposal.approve',{id:pending.id,version:4,revision:2})
     await h.cmd('proposal.prepare',{...offer,title:'Work in progress'})
     const csv='client_id,name,email\narchive-import,Imported studio,imported@studio.example'
     const preview=await h.cmd('import.preview',{csv})
@@ -67,7 +69,7 @@ test('PORT-001 / PORT-002 public CLI preserves business records and import custo
     assert.ok(journal.provenance.length>0)
     const business=state=>({clients:state.clients,proposals:state.proposals.map(({delivery,shareToken,...proposal})=>proposal),importJobs:state.importJobs})
     const before=business(await h.state())
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','draft','sent'])
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','approved','draft'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -84,6 +86,7 @@ test('PORT-001 / PORT-002 public CLI preserves business records and import custo
     const approvals=archived.filter(item=>item.table==='p_approvals'&&item.row.proposal_id===proposal.id)
     assert.equal(revisions.length,2)
     assert.equal(approvals.length,2)
+    assert.equal(archived.filter(item=>item.table==='p_negotiations').length,1)
     assert.ok(approvals.every(item=>item.row.actor_id===journal.job.principalId))
     h=await harness({root:restored,...identity})
     await h.state(identity.owner,401)
@@ -150,7 +153,8 @@ test('PRICE-008 public CLI restores first-release AUD bytes and new proposals an
   const after=records(await readFile(output,'utf8'))
   for(const original of legacy.filter(item=>['p_proposals','p_revisions','p_acceptances','p_invoices'].includes(item.table))){
    const restored=after.find(item=>item.table===original.table&&(item.row.id===original.row.id&&original.row.id||item.row.proposal_id===original.row.proposal_id&&item.row.revision===original.row.revision))
-   assert.ok(restored,original.table+' retained');const {currency,...unchanged}=restored.row
+   assert.ok(restored,original.table+' retained');const {currency,previous_sent_revision,...unchanged}=restored.row
+   if(original.table==='p_proposals')assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision')
    assert.equal(currency,'AUD');assert.deepEqual(unchanged,original.row,original.table+' first-release bytes and amounts unchanged')
   }
  } finally {await h?.close();await rm(temporary,{recursive:true,force:true})}

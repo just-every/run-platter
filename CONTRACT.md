@@ -526,11 +526,11 @@ The owner or an admin sets the workspace defaults (the workspace settings right 
 
 #### NEG-001 — Negotiated revisions after sending.
 
-After sending, the firm can make a new revision in answer to the client. The revision follows the approval rules and policy again (`APPROVE-001`, `APPROVE-003`); sending it retires the earlier client link, and the client sees what changed since the version they saw. Acceptance always binds the exact current revision, and every earlier version stays in history.
+After sending, the firm can make a new revision in answer to the client. The revision follows the approval rules and policy again (`APPROVE-001`, `APPROVE-003`); sending it retires the earlier client link, and the client sees what changed since the version they saw. Acceptance always binds the exact current sent revision, and every earlier version stays in history. An unsent negotiation is stored separately from the live offer: the old invitation remains usable until the approved replacement is sent. If the client accepts the live offer first, that agreement wins and the unsent negotiation cannot be sent; its saved revisions remain in history. Editing the negotiated draft creates another revision and clears its approval. The current default approval policy remains owner approval for every negotiated revision; `APPROVE-001` and `APPROVE-003` inherit this path when their rule and role capabilities ship.
 
 *Acceptance:* Send revision 1, revise the price, approve and send revision 2; the revision 1 link is refused; the client page shows the price change; acceptance records revision 2.
 
-*Status:* missing. A sent proposal cannot be revised; only a fresh invitation for the same offer exists.
+*Status:* done. Named NEG-001 HTTP, 1440/390 browser and CLI archive journeys prove pending drafts, exact approval, atomic replacement, client comparison, revision-bound acceptance and retained history. (`src/platter/negotiation.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### NEG-002 — Client-suggested text edits.
 
@@ -1216,8 +1216,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 3 | 28 | 97 | 128 |
-| All | 15 | 28 | 97 | 140 |
+| Target and push further | 4 | 28 | 96 | 128 |
+| All | 16 | 28 | 96 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1286,7 +1286,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `FOLLOW-004` | Client questions and comments | target | missing |  | No client comments. |
 | `FOLLOW-005` | Decline reasons and won or lost outcomes | target | missing |  | No decline or lost state. |
 | `FOLLOW-006` | Default reminder schedule and expiry from the workspace and templates | target | missing |  | No reminders, expiry, workspace defaults or template settings for either. |
-| `NEG-001` | Negotiated revisions after sending | target | missing |  | A sent proposal cannot be revised; only a fresh invitation for the same offer exists. |
+| `NEG-001` | Negotiated revisions after sending | target | done | `src/platter/negotiation.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `NEG-002` | Client-suggested text edits | target | missing |  | No suggestion mode. |
 | `SIGN-003` | ESIGN and UETA electronic signature | target | partial | `src/platter/signing.ts`, `tests/platter.test.mjs` | A typed name and consent are stored; no ESIGN consumer disclosure, consent withdrawal, drawn signature, initials or signature fields. |
 | `SIGN-004` | Multiple signers, signing order and countersignature | target | missing |  | One client signer only. |

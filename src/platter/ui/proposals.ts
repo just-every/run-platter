@@ -1,7 +1,7 @@
 import { historyPanel } from './history'
 import { area, date, empty, escape, field, form, hidden, money, optionPair, panel, proposalPath, statusPill } from './shared'
 
-function editor(state: any, proposal?: any): string {
+function editor(state: any, proposal?: any, negotiating = false): string {
   const options = proposal?.options ?? []
   const clients = (state.clients ?? []).map((client: any) => `<option value="${escape(client.id)}"${client.id === proposal?.client_id ? ' selected' : ''}>${escape(client.name)} — ${escape(client.email)}</option>`).join('')
   const inputs = `<label>Client<select name="clientId" required><option value="">Choose a client</option>${clients}</select></label>`
@@ -12,8 +12,8 @@ function editor(state: any, proposal?: any): string {
     + '<fieldset><legend>Option two</legend>' + field('Option label', 'optionTwo', options[1]?.label, 'required')
     + field(`Price in ${proposal?.currency ?? 'USD'}`,  'priceTwo', options[1] ? (options[1].cents / 100).toFixed(2) : '', 'required inputmode="decimal" placeholder="0.00"') + '</fieldset>'
     + field('Deposit percentage', 'depositPercent', proposal ? Number(proposal.deposit_bps) / 100 : '', 'required inputmode="decimal" placeholder="25"')
-  return form(proposal ? 'proposal.revise' : 'proposal.prepare', proposal ? proposalPath(proposal.id) : '/app',
-    (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + `<div class="editor-grid">${inputs}</div>` + `<button>${proposal ? 'Save revision' : 'Prepare proposal'}</button>`,
+  return form(negotiating ? 'proposal.negotiate' : proposal ? 'proposal.revise' : 'proposal.prepare', proposal ? proposalPath(proposal.id) : '/app',
+    (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + `<div class="editor-grid">${inputs}</div>` + `<button>${negotiating ? 'Prepare negotiated revision' : proposal ? 'Save revision' : 'Prepare proposal'}</button>`,
     proposal ? `proposal-${proposal.id}-${proposal.version}` : 'proposal-new')
 }
 export function proposalsPage(state: any): string {
@@ -30,6 +30,8 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   const frozen = p.status === 'sent' || p.status === 'accepted'
   const summary = `<p class="proposal-status">${statusPill(p.status)} · Revision ${escape(p.revision)}</p><dl><dt>Client</dt><dd>${escape(p.clientName)} · ${escape(p.clientEmail)}</dd><dt>Prepared by</dt><dd>${escape(p.preparedByName || p.prepared_by)}</dd><dt>Approved by</dt><dd>${escape(p.approvedByName || p.approved_by || 'Awaiting approval')}</dd><dt>Approved at</dt><dd>${date(p.approved_at)}</dd></dl><h3>Scope of work</h3><p class="preserve">${escape(p.scope)}</p><h3>Offered prices</h3><p>${p.currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'}</p>${optionPair(p.options ?? [], p.deposit_bps, p.acceptance?.optionId, p.currency)}<p>Deposit: ${escape(Number(p.deposit_bps) / 100)}% of the chosen option.</p>`
   let html = panel(p.title, summary)
+  if(p.negotiating) html += panel('Negotiated draft', `<p>Revision ${escape(p.sentRevision)} remains available to the client until this revision is approved and sent. If the client accepts it first, this draft cannot be sent.</p>`)
+  if(p.status === 'sent' && ['owner','member'].includes(state.actor?.role)) html += panel('Negotiate a new revision', '<p>The sent offer stays frozen. Prepare changed terms for a new approval before replacing the client invitation.</p>' + editor(state,p,true))
   if (!frozen && ['owner', 'member'].includes(state.actor?.role)) html += panel('Revise proposal', '<p>Saving a revision clears any previous approval. The owner must approve the revised offer before sending.</p>' + editor(state, p))
   if (owner && p.status === 'draft') html += panel('Approve offer', '<p>Confirm the scope and exact offered prices above before approving this revision.</p>' + form('proposal.approve', path, hidden('id', p.id) + hidden('version', p.version) + hidden('revision', p.revision) + '<button>Approve this revision</button>'))
   if (owner && p.status === 'approved') html += panel('Send to client', '<p>Sending freezes this offer. The client will verify their email before accepting one option.</p>' + form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + '<button>Send approved proposal</button>'))

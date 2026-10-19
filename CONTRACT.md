@@ -1213,9 +1213,9 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Published | 10 | 2 | 0 | 12 |
+| Published | 11 | 1 | 0 | 12 |
 | Target and push further | 0 | 31 | 97 | 128 |
-| All | 10 | 33 | 97 | 140 |
+| All | 11 | 32 | 97 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1229,7 +1229,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `IMPORT-001` | Reviewed client CSV move-in with undo | published | done | `tests/platter.test.mjs`, `src/platter/movein/index.ts` |  |
 | `ERASE-001` | Bounded client erasure | published | done | `tests/platter.test.mjs`, `tests/archive.test.mjs` |  |
 | `PORT-001` | Validated archives and restore | published | done | `tests/archive.test.mjs`, `src/platter/archive-policy.mjs` |  |
-| `MAIL-001` | Durable proposal mail with honest outcomes | published | partial | `src/platter/mail.ts`, `tests/platter.test.mjs` | Local capture is exercised by tests; the hosted claim, provider call and uncertain outcome have no test, and provider acceptance is never shown as delivery. |
+| `MAIL-001` | Durable proposal mail with honest outcomes | published | done | `src/platter/mail.ts`, `tests/mail.test.mjs` |  |
 | `SITE-001` | Public run site and documentation | published | partial | `src/site/landing.ts`, `src/site/docs.ts`, `scripts/verification/run.mjs` | The site is built in CI; no test asserts that the Run Platter action opens /run or that /docs renders without JavaScript. |
 | `EDIT-001` | Branded drag-and-drop proposal editor | target | partial | `src/platter/ui/proposals.ts`, `src/platter/commands.ts` | Only a title, scope and two-option form with fixed Platter styling; no block editor, layouts or brand kit. |
 | `EDIT-002` | Proposal templates | target | missing |  | No templates. |

@@ -26,7 +26,7 @@
     "check": "rer check",
     "deps": "rer install",
     "rer": "rer",
-    "test:platter": "node --test --test-concurrency=1 tests/platter.test.mjs tests/demo.test.mjs",
+    "test:platter": "node --test --test-concurrency=1 tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
     "test:archive": "node --test tests/archive.test.mjs"
   },
   "dependencies": {

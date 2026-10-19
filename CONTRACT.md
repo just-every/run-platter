@@ -4,6 +4,8 @@ Target edition: 17 October 2026. Platter is proposal-to-payment software for US 
 
 This is a target contract: the product Platter is being built towards, with each clause marked by how close the current code is. The first release (two GST-free AUD options, owner approval of an exact revision, mailbox-verified acceptance and one retained deposit CSV) is kept as the published clauses below; nothing it guarantees is weakened, and the AUD format is retired for new proposals by `PRICE-001` and `PRICE-008`. This documentation round changes no homepage, interface or runtime behavior. Source acquisition and command effects follow `SEED-COMMAND-CONTRACT.md`; acceptance journeys are listed in `ACCEPTANCE.md`.
 
+Historical currency terminology throughout this contract: “first-release” and “legacy” AUD refer to records and archive formats preceding the USD currency migration of 19 October 2026 (`migrations/core/0017_currency.sql`). Those historical agreements retain their original currency; new proposals use USD.
+
 ## Product target
 
 | | |

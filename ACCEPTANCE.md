@@ -212,7 +212,7 @@ Not yet supported (target clauses below): USD pricing tables, payment collection
 ### Privacy, security and portability
 
 - **PRIV-001 — Erasure across contacts, tracking and synced systems** (partial). Erase a contact who viewed two drafts and signed one agreement; their views and draft data are gone, the agreement remains with a retention note, and the receipt lists the HubSpot fake record to erase.
-- **PORT-002 — Complete product archive** (partial). Export an installation with every record kind, restore into an empty one, and re-export identical parts; no provider token appears in the archive.
+- **PORT-002 — Complete product archive** (done; `tests/archive.test.mjs`, named PORT-001 / PORT-002 CLI journey). Export an installation with every record kind, restore into an empty one, and re-export identical parts; no provider token appears in the archive. Populate clients, draft/sent/accepted proposals, revision and approval histories, an immutable acceptance, retained invoice CSV and client-import originals/journal/provenance; after restore, read the same public state, journal and CSV. Agent keys, native sessions, client invitation/verification credentials and delivery mail stay local and old credentials are refused. The future record kinds named by PORT-002 inherit this same fixture and credential-exclusion proof before shipping.
 - **SEC-001 — Provider credential custody** (missing). Connect each provider fake, inspect the database and logs for tokens in clear (none), revoke one connection and see its state change and its jobs stop; a sales member's attempt to disconnect QuickBooks Online is refused (403).
 
 ## Push further
@@ -231,4 +231,4 @@ Not yet supported (target clauses below): USD pricing tables, payment collection
 
 ## Counts
 
-140 clauses: 13 done, 30 partial, 97 missing. Published: 12 done, 0 partial, 0 missing of 12. Target and push further: 1 done, 30 partial, 97 missing of 128.
+140 clauses: 14 done, 29 partial, 97 missing. Published: 12 done, 0 partial, 0 missing of 12. Target and push further: 2 done, 29 partial, 97 missing of 128.

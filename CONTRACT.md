@@ -1087,11 +1087,11 @@ An owner handles a US privacy request (CCPA/CPRA or similar): erase a contact's 
 
 #### PORT-002 — Complete product archive.
 
-Archives and restore cover everything in the product: templates, library, catalog, media, signed PDFs and certificates, payment and invoice records, reports' source data and integration mappings, under `PORT-001`'s rules. Provider credentials never travel.
+Archives and restore cover everything in the product: templates, library, catalog, media, signed PDFs and certificates, payment and invoice records, reports' source data and integration mappings, under `PORT-001`'s rules. Provider credentials never travel. Every record kind supported today must round-trip, including clients, draft/sent/accepted proposals, revisions, approval history, immutable acceptances, retained invoice files and client-import originals, journal and provenance. `EDIT-002`, `EDIT-003`, `CAT-001`, `EDIT-006`, `EDIT-010`, `SIGN-005`, `PAY-001` to `PAY-009`, `REPORT-001` to `REPORT-005`, `CRM-001` to `CRM-004`, `AUTO-001` to `AUTO-004` and `SEC-001` inherit archive/restore coverage of their new record kinds and credential exclusion before shipping. No provider connection exists today; agent keys, native sessions, client invitations, verification state and mail stay local under `PORT-001`.
 
 *Acceptance:* Export an installation with every record kind, restore into an empty one, and re-export identical parts; no provider token appears in the archive.
 
-*Status:* partial. Archives cover clients, proposals, acceptances and CSVs, not templates, library, media, signed PDFs, payments or sync state. (`tests/archive.test.mjs`, `src/platter/archive-policy.mjs`)
+*Status:* done. Named PORT-001 / PORT-002 public CLI journey populates every current business record kind, restores identical archive parts and public state/import custody/invoice files, and proves private credentials stay local. Future record kinds inherit this proof before they ship. (`tests/archive.test.mjs`, `src/platter/archive-policy.mjs`)
 
 #### SEC-001 — Provider credential custody.
 
@@ -1214,8 +1214,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 1 | 30 | 97 | 128 |
-| All | 13 | 30 | 97 | 140 |
+| Target and push further | 2 | 29 | 97 | 128 |
+| All | 14 | 29 | 97 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1348,7 +1348,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `AI-003` | MCP server for AI assistants | target | partial | `src/platter/http.ts`, `src/platter/credentials.ts`, `tests/platter.test.mjs` | An HTTP agent key limited to preparing and revising drafts; no MCP server or tools for search, status or send requests. |
 | `AI-004` | Explainable price suggestions | target | missing |  | No price suggestions. |
 | `PRIV-001` | Erasure across contacts, tracking and synced systems | target | partial | `src/platter/commands.ts`, `tests/platter.test.mjs` | Only unused client records can be erased; no contacts, tracking data or notice to synced systems. |
-| `PORT-002` | Complete product archive | target | partial | `tests/archive.test.mjs`, `src/platter/archive-policy.mjs` | Archives cover clients, proposals, acceptances and CSVs, not templates, library, media, signed PDFs, payments or sync state. |
+| `PORT-002` | Complete product archive | target | done | `tests/archive.test.mjs`, `src/platter/archive-policy.mjs` |  |
 | `SEC-001` | Provider credential custody | target | missing |  | No provider connections yet. |
 | `AGENT-001` | Discovery call to priced draft | push-further | partial | `src/platter/http.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs` | Agents can submit drafts that the owner must approve; there is no transcript ingestion, catalog matching or citations. |
 | `AGENT-002` | Scope and price tested against delivery reality | push-further | missing |  | No delivery cost, capacity or outcome data is read. |

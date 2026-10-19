@@ -1,3 +1,4 @@
+import { businessImportPage } from './business-import'
 import { area, date, empty, escape, field, form, hidden, ownerOnly, panel, proposalPath, statusPill, type Feedback } from './shared'
 
 export function clientsPage(state: any): string {
@@ -25,11 +26,11 @@ function reviewPreview(preview: any): string {
 }
 export function importPage(state: any, feedback?: Feedback): string {
   if (state.actor?.role !== 'owner') return ownerOnly()
-  const result = feedback?.result
+  const result = feedback?.result?.businessInput?undefined:feedback?.result
   const preview = result?.preview ?? result
   const fingerprint = preview?.fingerprint ?? result?.fingerprint
   const csv = result?.csv ?? preview?.csv
-  let html = panel('Preview client CSV', '<p>Paste a CSV with client_id, name, and email columns. Review the preview before applying it.</p>' + form('import.preview', '/app/import', area('CSV content', 'csv', csv ?? '', 'required spellcheck="false"') + '<button>Preview import</button>', 'import-preview'))
+  let html = businessImportPage(state,feedback) + panel('Preview client CSV', '<p>Paste a CSV with client_id, name, and email columns. Review the preview before applying it.</p>' + form('import.preview', '/app/import', area('CSV content', 'csv', csv ?? '', 'required spellcheck="false"') + '<button>Preview import</button>', 'import-preview'))
   if (fingerprint && preview.counts) html += panel('Review import', reviewPreview(preview) + (typeof csv === 'string' && preview.canApply ? form('import.apply', '/app/import', hidden('csv', csv) + hidden('fingerprint', fingerprint) + '<p>Apply this exact reviewed CSV. Changes require a new preview.</p><button>Apply reviewed import</button>') : (preview.canApply ? '<p>Preview the CSV again to attach the reviewed source before applying.</p>' : '<p>Resolve the review notes and preview the corrected CSV before applying.</p>')))
   else if (result?.originals || result?.batches || result?.provenance) html += panel('Import journal', journalResult(result))
   else if (result?.job) html += panel('Import result', `<p>Import ${escape(result.job.state)}. ${escape(result.job.checkpoint ?? 0)} of ${escape(result.job.total ?? 0)} changes processed.</p>` + (typeof csv === 'string' && fingerprint && ['queued', 'applying', 'failed'].includes(result.job.state) ? form('import.apply', '/app/import', hidden('csv', csv) + hidden('fingerprint', fingerprint) + '<button>Resume reviewed import</button>') : ''))

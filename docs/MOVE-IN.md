@@ -1,7 +1,90 @@
-# Move in your clients
+# Move in business records
 
 Bring an existing client list into Platter with a reviewed CSV import. Open
 **Import** in your installed app as the owner.
+
+## Companies, contacts and catalog (`MIG-006`)
+
+Use **Move in companies, contacts and catalog** on Import. Choose the record
+kind and layout, paste the original CSV, then preview. The preview lists native
+record counts, retained images, original field mappings and every diagnostic.
+**Apply reviewed business import** binds the exact CSV, mapping, company
+associations and acquired image bytes. Continue in bounded passes until complete.
+The history opens the journal and downloads exact original files; undo removes
+only unchanged records and refuses dependent contacts. RER archives preserve the
+records, original CSV/mapping/image bytes, journals and undo custody.
+
+Companies, contacts and catalog items are separate native records. Company links
+use explicit source IDs or your reviewed exact label-to-ID associations. IDs and
+exact email conflicts are held for review, never merged by names or email.
+Exports with no IDs receive IDs scoped to the exact original file and row;
+changing that file creates new source identities. Prices, ranges, percentages,
+recurrence, tax flags, category paths, bundles and custom fields are imported
+metadata for review. They never calculate a charge, convert currency or certify
+an exemption. `CAT-001`, `PRICE-001`, `PRICE-003` and the full incumbent importers
+inherit these exact values when their capabilities ship.
+
+Platter contacts use these headers:
+
+```csv
+company_id,company_name,contact_id,first_name,last_name,email,title,phone,billing_address,service_address,tax_exempt
+acme,Acme,contact-1,Dana,Chen,dana@acme.example,CFO,+1 212 555 0101,12 Market St,40 Studio Rd,yes
+```
+
+Catalog CSV requires `id,name`; optional columns include `sku,price,currency,
+description,images,type,bundle_components,category,cost,billing_frequency,
+quantity,unit_name,price_type,billing_mode,min_price,max_price,terms,tax_exempt,
+optional,adjustable,tags`. All additional columns stay in `source_fields` with
+warnings. The business importer accepts up to 1,000 rows and 2,000,000 UTF-8 bytes
+per CSV. See the 200-contact and 50-item examples in `fixtures/business/`.
+
+Presets read the published PandaDoc catalog and semicolon-delimited contact
+layouts, Better Proposals products, Proposify fees, Qwilr saved quote lines and
+Ignition services. Published import layouts are not claimed to be every version
+of a vendor's export. For any differing support-provided contact or catalog
+export, keep the file unchanged and choose **Reviewed column mapping**, for
+example:
+
+```json
+{"delimiter":";","columns":{"contact_id":"Contact ID","first_name":"First Name","email":"Email","company_name":"Company"},"companyIds":{"Acme":"acme-source-id"}}
+```
+
+PandaDoc `Name,SKU,Type,SKUs_in_bundle,Category,Price,Cost,Currency,Description,
+Images,Billing_frequency` and arbitrary custom columns remain lossless. Prices
+and costs retain up to five decimal places exactly, including non-USD values;
+bundles resolve explicit SKU/quantity references in the source. Descriptions are
+retained as text, not executed HTML.
+
+Image URLs use credential-free HTTPS with no redirects. The server validates
+public DNS answers, connects only to a validated literal IP (no second hostname
+resolution), and verifies TLS for the original hostname. It accepts PNG, JPEG,
+GIF and WebP byte types, at most 5 MiB each and 20 MiB per import. An unfetched
+image blocks apply and its URL remains visible. The owner may explicitly confirm
+**Review import without unfetched images** for that exact file; those URLs stay
+marked `not-fetched`, and the confirmation is bound into the reviewed fingerprint.
+A runtime without hostname-verified TLS never bypasses validation or claims a
+fetch. The checked pinned workerd accepts a correct public hostname and refuses
+a mismatching hostname; no hosted provider account test is claimed.
+
+Layout references: [PandaDoc catalog](https://support.pandadoc.com/en/articles/9714700-import-and-export-your-catalog-via-csv),
+[PandaDoc contacts](https://support.pandadoc.com/en/articles/9715026-add-and-manage-your-contacts),
+[Better Proposals products](https://help.betterproposals.io/en/articles/10031079-import-or-update-your-product-services),
+[Proposify fees](https://legacy-support.proposify.com/hc/en-us/articles/4845995797019-Add-Fees-to-the-Pricing-Library),
+[Qwilr lines](https://help.qwilr.com/article/216-importing-line-items),
+[Ignition services](https://support.ignitionapp.com/en/articles/734852-importing-and-updating-services-in-bulk-using-a-csv-file).
+
+The public command API uses `business-import.preview` / `business-import.apply`
+with `{kind,format,csv,mapping?,omitUnfetchedImages?,fingerprint?}` and
+`business-import.journal` / `business-import.undo` with `{id}`. All require the
+current active owner, the importing owner's job identity and normal Origin
+checks. `/api/platter/business-records` reads all native records for that owner;
+`/api/platter/business-original?job=ID&name=NAME` downloads an original from its
+owner-scoped journal.
+
+## Original client CSV kit
+
+The original client kit and its old journals remain available below the new
+business importer, with their existing fingerprint and undo behavior.
 
 ## Preview and apply
 

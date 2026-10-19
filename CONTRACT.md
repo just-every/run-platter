@@ -242,7 +242,7 @@ A catalog holds services and products with name, description, SKU, unit (hour, d
 
 *Acceptance:* Import 50 items from CSV with a preview, one row with an image URL served by a file-host fake, sync items from a QuickBooks Online fake, add two items to a pricing table set to show images and see the imported image on its line in the editor, the client page and the PDF, change an item's price, and see the sent proposal unchanged and a new draft use the new price.
 
-*Status:* missing. No catalog.
+*Status:* partial. `MIG-006` imports lossless catalog metadata and image originals for review; no native catalog editing, live provider sync, pricing-table insertion or line-image rendering yet. (`src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs`)
 
 #### PRICE-001 — USD pricing tables with line items.
 
@@ -1035,9 +1035,13 @@ At move-in, proposals sent but not signed in the old tool can be reissued from P
 
 The CSV kit imports companies, contacts with titles and phone numbers, billing and service addresses, tax-exempt status and catalog items, with the preview, fingerprint, journal and undo of `IMPORT-001`. It reads the incumbents' own contact and catalog CSV layouts (including PandaDoc's catalog CSV and the contact file PandaDoc support provides) as well as Platter's.
 
-*Acceptance:* Import a CSV of 200 contacts across 60 companies with addresses and exemptions, and 50 catalog items, preview, apply and undo; import PandaDoc's catalog CSV layout unchanged and see the same items as `MIG-001`.
+Current owner-only imports use published layout presets and a reviewed delimiter/column mapper for differing or undocumented exports, leaving original files unchanged. Company associations use explicit source IDs or reviewed exact label-to-ID associations, never inferred merges. Existing IDs and exact email conflicts are held with diagnostics; exports lacking IDs get identities scoped to the exact file and row. The fingerprint binds CSV bytes, mappings, associations, acquired image bytes and any explicit omission confirmation. Original files, every source column, journals, native records and undo custody survive `PORT-002` archives. Unchanged legacy client imports and their journals remain available.
 
-*Status:* partial. Client name and email only. (`src/platter/movein/index.ts`, `tests/platter.test.mjs`)
+Catalog metadata preserves decimal strings (PandaDoc price/cost through five decimal places), currency, price type/range, recurrence, category paths, resolved SKU/quantity bundles, images and arbitrary custom fields. Unmapped columns and non-USD rows are reported, never discarded or converted. Imported metadata neither calculates charges nor certifies tax exemptions; `CAT-001`, `PRICE-001`, `PRICE-003` and `MIG-001`..`MIG-004` inherit its lossless custody when they consume these records. Image acquisition uses credential-free HTTPS, validated public A/AAAA answers, connection to the validated literal IP without another DNS resolution, hostname-verified TLS, no redirects, PNG/JPEG/GIF/WebP byte-type checks and 5 MiB per-image / 20 MiB per-import limits. Unfetched URLs are listed as metadata and block apply unless the owner explicitly confirms importing that file without them; this decision is fingerprint-bound and the records say `not-fetched`. A runtime without hostname verification never bypasses TLS or claims image acquisition; such an installation remains partial for image fetching.
+
+*Acceptance:* Import a CSV of 200 contacts across 60 companies with addresses and exemptions, and 50 catalog items, preview, apply and undo; import PandaDoc's catalog CSV layout unchanged and see the same items as `MIG-001`. Named public HTTP journeys assert original catalog/contact layouts, reviewed mappings for differing exports, titles/phones/addresses/exemptions, exact prices, bundles, recurrence/custom fields, file-host-edge image bytes, explicit image omission, conflicts, owner authority, resumable apply and dependent-record undo protection. Browser journeys at 1440 and 390 finish preview/apply/journal/undo and explicit omission; the public CLI restores records and original CSV/image bytes with working undo. A real pinned-workerd probe fetched a public PNG and rejected a mismatching TLS hostname; provider fakes establish Platter's handling, not hosted provider certification.
+
+*Status:* done. (`src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `src/platter/ui/business-import.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### MIG-007 — Move-in from exported files without API access.
 
@@ -1240,8 +1244,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 10 | 24 | 94 | 128 |
-| All | 22 | 24 | 94 | 140 |
+| Target and push further | 11 | 24 | 93 | 128 |
+| All | 23 | 24 | 93 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1275,7 +1279,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `EDIT-016` | Proposal search and folders | target | missing |  | A single proposal list; no search or folders. |
 | `EDIT-017` | Client page in the client's language | target | missing |  | The client page and mail are English only. |
 | `EDIT-018` | Client-page preview before sending | target | missing |  | The owner's proposal page lists the scope and both options before approval, but there is no preview of the client page for an unsent revision: the client page and its private link exist only once a proposal is sent. |
-| `CAT-001` | Service and product catalog | target | missing |  | No catalog. |
+| `CAT-001` | Service and product catalog | target | partial | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs` | Imported catalog metadata and images only; no catalog editing, provider sync, pricing-table insertion or line-image rendering. |
 | `PRICE-001` | USD pricing tables with line items | target | partial | `src/platter/model.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs` | Two fixed one-off option totals in USD (legacy proposals retain AUD); no line items, quantities, units or multiple tables. |
 | `PRICE-002` | Packages and optional items the client chooses | target | partial | `src/platter/signing.ts`, `tests/platter.test.mjs` | Exactly two fixed options; no add-ons, editable quantities or any number of packages. |
 | `PRICE-003` | One-off and recurring fees | target | missing |  | One-off totals only. |
@@ -1365,7 +1369,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `MIG-003` | Better Proposals move-in | target | missing |  | No Better Proposals import. |
 | `MIG-004` | Qwilr and Ignition move-in | target | missing |  | No Qwilr or Ignition import. |
 | `MIG-005` | Open proposals and payment schedules continue | target | missing |  | No in-flight migration. |
-| `MIG-006` | Clients, contacts and catalog CSV move-in | target | partial | `src/platter/movein/index.ts`, `tests/platter.test.mjs` | Client name and email only. |
+| `MIG-006` | Clients, contacts and catalog CSV move-in | target | done | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `MIG-007` | Move-in from exported files without API access | target | missing |  | No document import; only the client CSV kit exists. |
 | `MOB-001` | Team app on a phone | target | partial | `src/platter/ui/shared.ts` | The team pages have viewport and narrow-screen styling only; there is no phone journey for creating, sending or approving. |
 | `MOB-002` | iOS and Android apps with push notifications | target | missing |  | No native apps or push. |

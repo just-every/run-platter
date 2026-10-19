@@ -391,3 +391,92 @@ test('EDIT-010 / TEAM-004 defaults and arbitrary files freeze with approval, dow
  for(const action of ['vendor-document.save','attachment.upload','attachment.download','attachments.refresh'])assert.ok(audit.some(x=>x.action===action&&x.subject&&x.actor_id&&x.occurred_at),'TEAM-004 '+action)
  assert.ok(!JSON.stringify(audit).includes('studio-w9.pdf'))
 }))
+
+test('MIG-006 imports 200 contacts across 60 companies with reviewed custody, resumable apply and complete undo', {timeout:120000}, async()=>run(async h=>{
+ const {businessCsv,applyBusiness,undoBusiness}=await import('./business-import-fixture.mjs')
+ const csv=await businessCsv('platter-contacts.csv'),input={kind:'contacts',format:'platter',csv}
+ const preview=await h.cmd('business-import.preview',input)
+ assert.equal(preview.report.contacts,200);assert.equal(preview.report.companies,60);assert.equal(preview.canApply,true)
+ assert.equal((await h.state()).businessRecords.contacts.length,0,'preview writes no native records')
+ await h.cmd('business-import.apply',{...input,csv:csv.replace('Dana','Dani'),fingerprint:preview.fingerprint},h.owner,409)
+ await h.cmd('business-import.apply',{...input,mapping:{companyIds:{Acme:'other-company'}},fingerprint:preview.fingerprint},h.owner,409)
+ const {job}=await applyBusiness(h,input)
+ const data=(await h.send('/api/platter/business-records',undefined,h.owner)).value
+ assert.equal(data.companies.length,60);assert.equal(data.contacts.length,200)
+ const dana=data.contacts.find(c=>c.id==='contact-1')
+ assert.equal(dana.company_id,'company-1');assert.equal(dana.first_name,'Dana');assert.equal(dana.last_name,'Chen');assert.equal(dana.title,'Finance Manager');assert.equal(dana.phone,'+1 212 555 0100');assert.equal(dana.tax_exempt,true)
+ assert.match(dana.billing_address,/Market Street/);assert.match(dana.service_address,/Studio Road/)
+ const company=data.companies.find(c=>c.id==='company-1');assert.equal(company.tax_exempt,true);assert.equal(company.name,'Northstar Studio 1');assert.equal(company.billing_address,dana.billing_address);assert.equal(company.service_address,dana.service_address);assert.equal(dana.email,'dana.chen.1@studio1.example')
+ const replay=await h.cmd('business-import.apply',{...input,fingerprint:preview.fingerprint});assert.equal(replay.job.id,job.id);assert.equal((await h.state()).businessRecords.contacts.length,200)
+ const journal=await h.cmd('business-import.journal',{id:job.id})
+ assert.equal(journal.provenance.length,260);assert.ok(journal.batches.length>1)
+ const original=journal.originals.find(o=>o.name==='contacts.csv');assert.equal(Buffer.from(original.original.base64,'base64').toString('utf8'),csv)
+ const download=await h.mf.dispatchFetch(h.origin+'/api/platter/business-original?job='+job.id+'&name=contacts.csv',{headers:{cookie:h.owner,host:new URL(h.origin).host}})
+ assert.equal(download.status,200);assert.equal(await download.text(),csv)
+ await undoBusiness(h,job.id)
+ assert.deepEqual((await h.state()).businessRecords,{companies:[],contacts:[],catalog:[]})
+ const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+ for(const action of ['business-import.preview','business-import.apply','business-import.journal','business-import.undo'])assert.ok(audit.some(r=>r.action===action))
+}))
+
+test('MIG-006 / CAT-001 unchanged PandaDoc catalog and contact layouts preserve exact prices, packages, image bytes and explicit company associations', {timeout:120000}, async()=>{
+ const {harness}=await import('./harness.mjs'),{businessCsv,applyBusiness,undoBusiness,fileHost}=await import('./business-import-fixture.mjs'),{readFile}=await import('node:fs/promises')
+ const calls=[],h=await harness({alias:{'cloudflare:sockets':'./tests/catalog-socket-edge.ts'},outboundService:r=>fileHost(r,calls)})
+ try{
+  const input={kind:'catalog',format:'pandadoc',csv:await businessCsv('pandadoc-catalog.csv')}
+  const {preview,job}=await applyBusiness(h,input)
+  assert.equal(preview.report.catalog,50);assert.equal(preview.report.retainedImages,1)
+  assert.ok(preview.diagnostics.some(d=>d.code==='non_usd_currency'));assert.ok(preview.diagnostics.some(d=>d.code==='unmapped_source_column'))
+  const catalog=(await h.state()).businessRecords.catalog
+  assert.equal(catalog.length,50)
+  const first=catalog.find(c=>c.sku==='SKU001'),bundle=catalog.find(c=>c.sku==='SKU050')
+  assert.equal(first.price,'100.12345');assert.equal(first.cost,'50.00001');assert.equal(first.currency,'AUD');assert.equal(first.billing_frequency,'monthly');assert.deepEqual(first.category_path,['Services','Creative']);assert.equal(first.source_fields['Internal code'],'creative-1')
+  assert.equal(bundle.package,true);assert.equal(bundle.bundle_components[0].catalog_id,first.id);assert.equal(bundle.bundle_components[0].quantity,'2')
+  assert.ok(calls.length>0);assert.ok(calls.every(c=>c.address.hostname==='93.184.216.34'&&c.address.port===443&&c.tls.expectedServerHostname==='files.vendor.example'))
+  const originals=(await h.cmd('business-import.journal',{id:job.id})).originals,image=originals.find(o=>o.name===first.images[0].artifact)
+  assert.deepEqual(Buffer.from(image.original.base64,'base64'),await readFile('fixtures/business/brand.png'))
+  assert.equal(Buffer.from(originals.find(o=>o.name==='catalog.csv').original.base64,'base64').toString(),input.csv)
+  const privatePreview=await h.cmd('business-import.preview',{...input,csv:input.csv.replace('files.vendor.example','private.vendor.example')})
+  assert.equal(privatePreview.canApply,false);assert.ok(privatePreview.diagnostics.some(d=>d.code==='image_acquisition_failed'))
+  const omit={kind:'catalog',format:'platter',csv:'id,name,images\nexplicit-omission,Imported artwork,https://private.vendor.example/brand.png'}
+  const blocked=await h.cmd('business-import.preview',omit);assert.equal(blocked.canApply,false)
+  const confirmed=await applyBusiness(h,{...omit,omitUnfetchedImages:true})
+  const omitted=(await h.state()).businessRecords.catalog.find(c=>c.id==='explicit-omission')
+  assert.equal(omitted.images[0].status,'not-fetched');assert.equal(omitted.images[0].url,'https://private.vendor.example/brand.png')
+  await h.cmd('business-import.apply',{...omit,fingerprint:confirmed.preview.fingerprint},h.owner,409)
+  await undoBusiness(h,confirmed.job.id)
+  const contactInput={kind:'contacts',format:'pandadoc',csv:await businessCsv('pandadoc-contacts.csv')}
+  const missing=await h.cmd('business-import.preview',contactInput);assert.equal(missing.canApply,false);assert.ok(missing.diagnostics.some(d=>d.code==='company_id_required'))
+  const contacts=await applyBusiness(h,{...contactInput,mapping:{companyIds:{Acme:'acme-source-id'}}})
+  const dana=(await h.state()).businessRecords.contacts[0]
+  assert.equal(dana.company_id,'acme-source-id');assert.equal(dana.title,'Finance Director');assert.equal(dana.phone,'+1 212 555 0101');assert.deepEqual(dana.billing_address,{street_address:'12 Market St',city:'New York',postal_code:'10001',country:'US',state:'NY'})
+  await undoBusiness(h,contacts.job.id);await undoBusiness(h,job.id)
+ }finally{await h.close()}
+})
+
+test('MIG-006 reviewed mapper supports original incumbent CSVs and holds identity conflicts without merging', {timeout:90000},async()=>run(async h=>{
+ const {applyBusiness,undoBusiness}=await import('./business-import-fixture.mjs')
+ const layouts=[
+  ['betterproposals','"ProductID (Do not edit existing ID\'s, leave blank for new products)",Product Name,Product Code,Product Type (Optional/Choice/Normal),Price,Price Type (Amount/Percentage),Description,Recurring Type (One-off/Monthly/Quarterly/Annual),Tax Exempt (Yes/No)\nbp-1,Creative retainer,RET,Choice,12.50000,Percentage,Creative direction,Monthly,Yes',r=>{assert.equal(r.price_type,'Percentage');assert.equal(r.price,'12.50000');assert.equal(r.type,'Choice');assert.equal(r.tax_exempt,true)}],
+  ['qwilr','Description,Quantity,Cost Per Item,Unit Name,RecurringFrequency\nCreative support,2,125.00001,hour,fortnightly',r=>{assert.equal(r.quantity,'2');assert.equal(r.price,'125.00001');assert.equal(r.billing_frequency,'fortnightly')}],
+  ['ignition','#ID,Service Name,Service Description,Price Type,Billing Mode,Price,Unit Name,Min Price,Max Price,Service Terms,Service Category\nign-1,Studio,Creative direction,Range,Recurring,,hour,100.10001,200.20002,Monthly terms,Creative',r=>{assert.equal(r.min_price,'100.10001');assert.equal(r.max_price,'200.20002');assert.equal(r.terms,'Monthly terms')}],
+  ['proposify','Name,Price,Quantity,Description,Type,Optional for clients,Adjustable,Tags\nStudio hours,150.50000,3,Creative direction,Recurring,Yes,Yes,Brand',r=>{assert.equal(r.optional,'Yes');assert.equal(r.adjustable,'Yes');assert.equal(r.price,'150.50000')}],
+ ]
+ for(const [format,csv,check]of layouts){const {job}=await applyBusiness(h,{kind:'catalog',format,csv});check((await h.state()).businessRecords.catalog[0]);await undoBusiness(h,job.id)}
+ const mapped={kind:'contacts',format:'mapping',csv:'Customer Key|First|Last|Mail|Business|Business Key|Role|Telephone|Exempt\ncontact-1|Dana|Chen|dana@acme.example|Acme|acme|CFO|+1 212 555 0101|yes'.replaceAll('|','\t'),mapping:{delimiter:'\t',columns:{contact_id:'Customer Key',first_name:'First',last_name:'Last',email:'Mail',company_name:'Business',company_id:'Business Key',title:'Role',phone:'Telephone',tax_exempt:'Exempt'}}}
+ const first=await applyBusiness(h,mapped)
+ const d=(await h.state()).businessRecords.contacts[0];assert.equal(d.company_id,'acme');assert.equal(d.title,'CFO');assert.equal(d.tax_exempt,true)
+ const conflict=await h.cmd('business-import.preview',{...mapped,csv:mapped.csv.replace('contact-1','contact-2')})
+ assert.equal(conflict.canApply,false);assert.ok(conflict.diagnostics.some(d=>d.code==='existing_contact_email'))
+ // A second import explicitly links a new person to the existing company.
+ const dependent={...mapped,csv:'Customer Key\tFirst\tLast\tMail\tBusiness Key\tRole\tTelephone\tExempt\ncontact-2\tAvery\tChen\tavery@acme.example\tacme\tManager\t+1 212 555 0102\tno',mapping:{...mapped.mapping,columns:{...mapped.mapping.columns}}}
+ delete dependent.mapping.columns.company_name
+ const second=await applyBusiness(h,dependent)
+ await h.cmd('business-import.undo',{id:first.job.id},h.owner,409)
+ assert.equal((await h.state()).businessRecords.contacts.length,2,'dependent contact prevents partial company erasure')
+ await undoBusiness(h,second.job.id);await undoBusiness(h,first.job.id)
+ await h.send('/auth/invite',{email:'member@studio.example',displayName:'Colleague',role:'member',returnTo:'/app'},h.owner)
+ const member=await h.signIn('member@studio.example')
+ await h.cmd('business-import.preview',mapped,member,403)
+ assert.equal((await h.send('/api/platter/business-records',undefined,member)).status,403)
+}))

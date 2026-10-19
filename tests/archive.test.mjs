@@ -226,3 +226,30 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
   assert.ok((await h.state(cookie)).bounceNotices.find(n=>n.id===open.id).closed_at)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('MIG-006 public CLI archives imported business records, original CSV and image bytes with undo custody', {timeout:180000},async()=>{
+ const {businessCsv,applyBusiness,undoBusiness,fileHost}=await import('./business-import-fixture.mjs')
+ const temporary=await mkdtemp(join(tmpdir(),'platter-business-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
+ let h
+ try{
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  const options={alias:{'cloudflare:sockets':'./tests/catalog-socket-edge.ts'},outboundService:r=>fileHost(r)}
+  h=await harness({root:source,...options})
+  const contacts=await applyBusiness(h,{kind:'contacts',format:'platter',csv:await businessCsv('platter-contacts.csv')})
+  const catalog=await applyBusiness(h,{kind:'catalog',format:'pandadoc',csv:await businessCsv('pandadoc-catalog.csv')})
+  const before=(await h.state()).businessRecords,journal=await h.cmd('business-import.journal',{id:catalog.job.id})
+  const identity={auth:h.auth,owner:h.owner};await h.close();h=null
+  const file=join(temporary,'business.rer');await command(source,['export','--output',file,'--no-queue']);await command(restored,['import','--input',file,'--yes','--no-queue'])
+  h=await harness({root:restored,...identity,...options})
+  const cookie=await h.signIn(identity.auth.OWNER_EMAIL)
+  assert.deepEqual((await h.state(cookie)).businessRecords,before)
+  const after=await h.cmd('business-import.journal',{id:catalog.job.id},cookie)
+  assert.deepEqual(after.originals,journal.originals);assert.deepEqual(after.provenance,journal.provenance)
+  const image=before.catalog.find(c=>c.images.length).images[0]
+  const original=after.originals.find(o=>o.name===image.artifact)
+  assert.deepEqual(Buffer.from(original.original.base64,'base64'),await readFile('fixtures/business/brand.png'))
+  await undoBusiness(h,catalog.job.id,cookie);await undoBusiness(h,contacts.job.id,cookie)
+  assert.deepEqual((await h.state(cookie)).businessRecords,{companies:[],contacts:[],catalog:[]})
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

@@ -387,3 +387,61 @@ test('SEND-002 desktop and phone show provider delivery and preserve bounce noti
   }
  }finally{await browser?.close();await h?.close();await edge?.close()}
 })
+
+test('MIG-006 desktop and phone review original CSVs, finish imports, read records and journals, and undo', {timeout:180000},async()=>{
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{businessCsv,fileHost}=await import('./business-import-fixture.mjs')
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ let h,edge,browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   edge=await browserEdge()
+   h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,alias:{'cloudflare:sockets':'./tests/catalog-socket-edge.ts'},outboundService:r=>fileHost(r)})
+   edge.attach(h)
+   const context=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
+   try{
+    const [name,value]=h.owner.split('=');await context.addCookies([{name,value,url:h.origin}])
+    const page=await context.newPage(),capture=async name=>{await page.evaluate(()=>document.fonts.ready);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`MIG-006-${name}-${width}.png`),fullPage:true})}
+    await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click();await page.goto(h.origin+'/app/import')
+    await capture('empty')
+    for(const [kind,format,file]of [['contacts','platter','platter-contacts.csv'],['catalog','pandadoc','pandadoc-catalog.csv']]){
+     await page.locator('select[name=kind]').selectOption(kind);await page.locator('select[name=format]').selectOption(format);await page.locator('textarea[name=csv]').first().fill(await businessCsv(file))
+     await page.getByRole('button',{name:'Preview business CSV',exact:true}).click()
+     const review=page.locator('section').filter({has:page.getByRole('heading',{name:'Review business import',exact:true})})
+     assert.match(await review.innerText(),kind==='contacts'?/200/:/50/)
+     assert.equal((await h.state()).businessRecords[kind].length,0)
+     await capture(kind+'-preview')
+     await page.getByRole('button',{name:'Apply reviewed business import',exact:true}).click()
+     let steps=0
+     while(await page.getByRole('button',{name:'Continue reviewed business import',exact:true}).count()){assert.ok(++steps<100);await page.getByRole('button',{name:'Continue reviewed business import',exact:true}).click()}
+     assert.equal((await h.state()).businessRecords[kind].length,kind==='contacts'?200:50)
+     await capture(kind+'-applied')
+    }
+    await page.getByRole('button',{name:'Open business import journal',exact:true}).first().click()
+    const journal=page.locator('section').filter({has:page.getByRole('heading',{name:'Business import journal',exact:true})})
+    assert.ok(await journal.getByRole('link',{name:/catalog\.csv|contacts\.csv/}).count())
+    await capture('journal')
+    const data=(await h.state()).businessRecords
+    assert.equal(data.companies.length,60);assert.equal(data.contacts.find(c=>c.id==='contact-1').phone,'+1 212 555 0100');assert.equal(data.catalog.find(c=>c.sku==='SKU001').price,'100.12345')
+    for(const heading of ['Imported companies','Imported contacts','Imported catalog']){const section=page.locator('section').filter({has:page.getByRole('heading',{name:heading,exact:true})});await section.locator('summary').first().click()}
+    await capture('records')
+    let steps=0
+    while(await page.getByRole('button',{name:/^(Undo business import|Continue business import undo)$/}).count()){assert.ok(++steps<100);await page.getByRole('button',{name:/^(Undo business import|Continue business import undo)$/}).first().click()}
+    assert.deepEqual((await h.state()).businessRecords,{companies:[],contacts:[],catalog:[]});await capture('undone')
+    await page.locator('select[name=kind]').selectOption('catalog');await page.locator('select[name=format]').selectOption('platter')
+    await page.locator('textarea[name=csv]').first().fill('id,name,images\nmissing-art,Brand artwork,https://private.vendor.example/brand.png')
+    await page.getByRole('button',{name:'Preview business CSV',exact:true}).click()
+    assert.equal(await page.getByRole('button',{name:'Apply reviewed business import',exact:true}).count(),0)
+    await capture('unfetched-needs-confirmation')
+    await page.getByRole('checkbox',{name:'I confirm importing this file without unfetched images.'}).check()
+    await page.getByRole('button',{name:'Review import without unfetched images',exact:true}).click()
+    await page.getByRole('button',{name:'Apply reviewed business import',exact:true}).click()
+    assert.equal((await h.state()).businessRecords.catalog[0].images[0].status,'not-fetched');await capture('unfetched-confirmed')
+    await page.getByRole('button',{name:'Undo business import',exact:true}).click()
+    assert.equal((await h.state()).businessRecords.catalog.length,0)
+
+   }finally{await context.close();await h.close();h=null;await edge.close();edge=null}
+  }
+ }finally{await browser?.close();await h?.close();await edge?.close()}
+})

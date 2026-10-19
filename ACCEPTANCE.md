@@ -24,7 +24,7 @@ Not yet supported (target clauses below): USD pricing tables, payment collection
 ### Approval, sending and acceptance
 
 - **PROP-001 — Approval binds the exact revision** (done). Under the default policy: approve a stale revision (409), approve the current one as the owner, revise the price, try to send (409), approve the new revision and send; two approval records exist, each naming its revision. The same binding for a manager's approval under a rule is part of the `APPROVE-003` journey.
-- **PROP-002 — Sending freezes the offer** (partial). Send an approved proposal, try to revise it (409), send a fresh invitation and confirm the old link is refused and the offer unchanged.
+- **PROP-002 — Sending freezes the offer** (done; `tests/platter.test.mjs`, named PROP-002 journey). Send an approved proposal, try to revise it (409), send a fresh invitation and confirm the old link is refused and the offer unchanged.
 - **SIGN-001 — Verified-mailbox acceptance** (done). Accept before verifying (401), verify, submit a code again (401), exhaust five wrong attempts and see the right code refused, expire a code and see it refused.
 - **SIGN-002 — Immutable acceptance with an integer-cent deposit** (done). Accept with an unknown option (400), accept option two with consent, accept again with another name and option, and read back the first acceptance with total 420000 and deposit 105000 cents.
 - **INV-001 — One retained deposit invoice per acceptance** (done). Export an unaccepted proposal (409), export an accepted one twice concurrently and get one invoice, and download its CSV.

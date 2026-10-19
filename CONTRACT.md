@@ -1213,16 +1213,16 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Published | 9 | 3 | 0 | 12 |
+| Published | 10 | 2 | 0 | 12 |
 | Target and push further | 0 | 31 | 97 | 128 |
-| All | 9 | 34 | 97 | 140 |
+| All | 10 | 33 | 97 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
 | `HTTP-001` | Authorized domain dispatch | published | done | `tests/platter.test.mjs`, `src/platter/http.ts` |  |
 | `ACCESS-001` | Revocable agent keys that only draft | published | done | `tests/platter.test.mjs`, `src/platter/credentials.ts` |  |
 | `PROP-001` | Approval binds the exact revision | published | done | `tests/platter.test.mjs`, `src/platter/commands.ts` |  |
-| `PROP-002` | Sending freezes the offer | published | partial | `tests/platter.test.mjs`, `src/platter/commands.ts` | Freezing is tested; the fresh-invitation rotation is implemented but no test confirms the old link is refused. |
+| `PROP-002` | Sending freezes the offer | published | done | `tests/platter.test.mjs`, `src/platter/commands.ts` |  |
 | `SIGN-001` | Verified-mailbox acceptance | published | done | `tests/platter.test.mjs`, `src/platter/signing.ts` |  |
 | `SIGN-002` | Immutable acceptance with an integer-cent deposit | published | done | `tests/platter.test.mjs`, `src/platter/signing.ts` |  |
 | `INV-001` | One retained deposit invoice per acceptance | published | done | `tests/platter.test.mjs`, `src/platter/invoices.ts` |  |

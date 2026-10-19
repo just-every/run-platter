@@ -2,6 +2,8 @@
 
 The journeys that prove each clause of [CONTRACT.md](CONTRACT.md), with its status at commit `658ddc0` (17 October 2026). A clause is accepted only when its journey runs through a public door (HTTP route, browser at 1440 and 390 pixels, CLI, MCP server, native app or import or export file) and passes. Fakes are allowed only at paid or network edges; a provider fake proves Platter's side only, and live provider behavior is proven in the provider's sandbox or test mode. A build round works towards the `partial` and `missing` journeys and changes a status only with the passing journey cited.
 
+Historical currency terminology throughout these journeys: “first-release” and “legacy” AUD refer to records and archive formats preceding the USD currency migration of 19 October 2026 (`migrations/core/0017_currency.sql`), as defined in CONTRACT.md.
+
 ## Supported today
 
 - An owner adds a client, prepares two USD offer options (first-release proposals retain GST-free AUD) and a deposit percentage, approves the exact revision, and sends a private proposal link.

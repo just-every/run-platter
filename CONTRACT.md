@@ -546,11 +546,11 @@ After sending, the firm can make a new revision in answer to the client. The rev
 
 #### NEG-002 — Client-suggested text edits.
 
-Where the firm allows it, a client suggests edits to text sections (not prices) as tracked suggestions. The firm accepts or rejects each one; accepted suggestions form a new revision under `NEG-001`. Contract lifecycle redlining of master agreements belongs to Locket (see Neighboring products).
+Where the firm allows it, a client suggests edits to text sections (not prices) as tracked suggestions. The firm accepts or rejects each one; accepted suggestions form a new revision under `NEG-001`. Contract lifecycle redlining of master agreements belongs to Locket (see Neighboring products). Scope and terms are the text sections currently supported; a person enables each section separately on the exact sent revision, off by default. The invited client verifies their mailbox before submitting an original-text/replacement pair; the original must occur exactly once. Decisions retain the source revision, client, time, original and replacement, reviewer, decision and resulting revision. Owner/member people review; agents cannot enable or decide. Accepting an edit creates an unapproved negotiated revision without changing the live offer, and later accepted edits clear approval again. TEAM-001 inherits scoped person authority; EDIT-001 and EDIT-002 inherit this opt-in tracked-suggestion behavior for their new text sections before shipping.
 
 *Acceptance:* Allow suggestions on the terms section, suggest two edits as the client, accept one and reject one, and see revision 2 contain only the accepted edit.
 
-*Status:* missing. No suggestion mode.
+*Status:* done. Named NEG-002 HTTP, 1440/390 browser and CLI archive journeys assert opt-in, verified tracked edits, accept/reject, unchanged live offer/prices, fresh approval and revision 2 containing only the accepted edit. (`src/platter/suggestions.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 ### E-signature
 
@@ -1236,8 +1236,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 7 | 25 | 96 | 128 |
-| All | 19 | 25 | 96 | 140 |
+| Target and push further | 8 | 25 | 95 | 128 |
+| All | 20 | 25 | 95 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1307,7 +1307,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `FOLLOW-005` | Decline reasons and won or lost outcomes | target | missing |  | No decline or lost state. |
 | `FOLLOW-006` | Default reminder schedule and expiry from the workspace and templates | target | missing |  | No reminders, expiry, workspace defaults or template settings for either. |
 | `NEG-001` | Negotiated revisions after sending | target | done | `src/platter/negotiation.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
-| `NEG-002` | Client-suggested text edits | target | missing |  | No suggestion mode. |
+| `NEG-002` | Client-suggested text edits | target | done | `src/platter/suggestions.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `SIGN-003` | ESIGN and UETA electronic signature | target | partial | `src/platter/signing.ts`, `tests/platter.test.mjs` | A typed name and consent are stored; no ESIGN consumer disclosure, consent withdrawal, drawn signature, initials or signature fields. |
 | `SIGN-004` | Multiple signers, signing order and countersignature | target | missing |  | One client signer only. |
 | `SIGN-005` | Signed agreement PDF and certificate of completion | target | partial | `src/platter/signing.ts`, `src/platter/ui/client.ts`, `tests/platter.test.mjs` | An immutable accepted snapshot with signer and time; no PDF, certificate, document hash or completion email. |

@@ -272,3 +272,39 @@ test('AI-003 desktop and phone owners review MCP requests, approve/send explicit
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('NEG-002 desktop and phone client suggests two terms edits; firm accepts one, rejects one and sends revision two', {timeout:120000}, async()=>{
+ let app,browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  const screenshots=process.env.PLATTER_SCREENSHOTS;if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`NEG-002-${name}-${width}.png`),fullPage:true})}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
+    const client=await cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
+    const p=await cmd('proposal.prepare',{clientId:client.id,title:'Northstar autumn campaign',scope:'One studio shoot and usage licence.',terms:'Delivery in 14 days. Usage for one year.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'})
+    await page.goto(app.origin+'/app/proposal?id='+p.id);await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click()
+    await page.getByRole('button',{name:'Allow terms suggestions'}).click();await capture('enabled')
+    const ownerPath=app.origin+'/app/proposal?id='+p.id;await page.getByRole('link',{name:'Open client proposal',exact:true}).click();const old=page.url()
+    await page.getByRole('button',{name:'Send verification code'}).click()
+    const state=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click()
+    for(const [original,replacement] of [['14 days','21 days'],['one year','forever']]){await page.getByLabel('Existing text',{exact:true}).fill(original);await page.getByLabel('Suggested replacement',{exact:true}).fill(replacement);await page.getByRole('button',{name:'Submit text suggestion'}).click()}
+    assert.match(await page.locator('main').innerText(),/Delivery in 14 days/);await capture('client-suggestions')
+    await page.goto(ownerPath)
+    const suggestion=word=>page.locator('article').filter({has:page.locator('ins',{hasText:word})})
+    // Action forms follow each tracked article.
+    await suggestion('21 days').locator('xpath=following-sibling::form[1]').getByRole('button',{name:'Accept suggestion',exact:true}).click()
+    await suggestion('forever').locator('xpath=following-sibling::form[1]').getByRole('button',{name:'Reject suggestion',exact:true}).click()
+    assert.match(await page.locator('.proposal-status').innerText(),/draft.*Revision 2/is);assert.match(await page.locator('main').innerText(),/Delivery in 21 days\. Usage for one year\./);assert.equal(await page.getByRole('button',{name:'Send approved proposal'}).count(),0);await capture('reviewed-draft')
+    await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();await capture('sent')
+    assert.equal((await context.request.get(old)).status(),404)
+    await page.getByRole('link',{name:'Open client proposal',exact:true}).click();assert.match(await page.locator('main').innerText(),/Delivery in 21 days\. Usage for one year\./);assert.equal(await page.getByRole('heading',{name:'Changes since your previous offer'}).count(),1);await capture('client-revision-two')
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

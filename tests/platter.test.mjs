@@ -294,3 +294,43 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  for(const action of ['mcp.search_proposals','mcp.prepare_proposal','mcp.read_proposal','mcp.read_engagement','mcp.request_send','mcp.revise_proposal'])assert.ok(audit.some(row=>row.action===action&&row.actor_role==='agent'),action)
  await h.cmd('agent.revoke',{id:key.id});assert.equal((await transport('ping')).status,401)
 }))
+
+test('NEG-002 opt-in tracked terms edits accept one/reject one into revision two, preserve offer and require fresh approval',()=>run(async h=>{
+ const {client,p}=await draft(h)
+ await h.cmd('proposal.revise',{...offer,terms:'Delivery in 14 days. Usage for one year.',clientId:client.id,id:p.id,version:1})
+ await h.cmd('proposal.approve',{id:p.id,version:2,revision:2})
+ const shared=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(shared.shareUrl).pathname,cookie=await verified(h,path)
+ const input={section:'terms',revision:2,original:'14 days',replacement:'21 days'}
+ assert.equal((await h.send(path+'/action?name=suggestion.create',input,cookie)).status,409)
+ await h.cmd('suggestions.allow',{id:p.id,version:4,section:'terms',enabled:true})
+ assert.equal((await h.send(path+'/action?name=suggestion.create',input)).status,401)
+ assert.equal((await h.send(path+'/action?name=suggestion.create',{...input,section:'priceOne'},cookie)).status,400)
+ assert.equal((await h.send(path+'/action?name=suggestion.create',{...input,revision:1},cookie)).status,409)
+ assert.equal((await h.send(path+'/action?name=suggestion.create',input,cookie)).status,200)
+ assert.equal((await h.send(path+'/action?name=suggestion.create',{...input,original:'one year',replacement:'forever'},cookie)).status,200)
+ let row=(await h.state()).proposals.find(x=>x.id===p.id)
+ assert.equal(row.suggestions.length,2);assert.ok(row.suggestions.every(s=>s.client_id===client.id&&s.revision===2&&s.created_at))
+ const good=row.suggestions.find(s=>s.replacement==='21 days'),bad=row.suggestions.find(s=>s.replacement==='forever')
+ const frozen=(await h.db.prepare('SELECT snapshot FROM p_revisions WHERE proposal_id=? AND revision=2').bind(p.id).first()).snapshot
+ await h.cmd('suggestion.resolve',{id:p.id,version:row.version,suggestionId:good.id,decision:'accepted'})
+ row=(await h.state()).proposals.find(x=>x.id===p.id)
+ await h.cmd('suggestion.resolve',{id:p.id,version:row.version,suggestionId:bad.id,decision:'rejected'})
+ row=(await h.state()).proposals.find(x=>x.id===p.id)
+ assert.equal(row.revision,3);assert.equal(row.terms,'Delivery in 21 days. Usage for one year.');assert.equal(row.approved_by,null);assert.deepEqual(row.options,JSON.parse(frozen).options)
+ const live=await h.send(path,undefined,cookie);assert.match(live.text,/Delivery in 14 days/)
+ await h.cmd('proposal.send',{id:p.id,version:row.version},h.owner,409)
+ await h.cmd('proposal.approve',{id:p.id,version:row.version,revision:3})
+ row=(await h.state()).proposals.find(x=>x.id===p.id)
+ const next=await h.cmd('proposal.send',{id:p.id,version:row.version}),nextPath=new URL(next.shareUrl).pathname
+ assert.equal((await h.send(path,undefined,cookie)).status,404)
+ assert.match((await h.send(nextPath)).text,/Delivery in 21 days\. Usage for one year\./)
+ assert.equal((await h.db.prepare('SELECT snapshot FROM p_revisions WHERE proposal_id=? AND revision=2').bind(p.id).first()).snapshot,frozen)
+ // The stated acceptance journey starts from a terms-bearing first revision.
+ const q=await h.cmd('proposal.prepare',{...offer,clientId:client.id,terms:'Delivery in 14 days. Usage for one year.'})
+ await h.cmd('proposal.approve',{id:q.id,version:1,revision:1});const s=await h.cmd('proposal.send',{id:q.id,version:2}),qpath=new URL(s.shareUrl).pathname,qcookie=await verified(h,qpath)
+ await h.cmd('suggestions.allow',{id:q.id,version:3,section:'terms',enabled:true})
+ for(const edit of [input,{...input,original:'one year',replacement:'forever'}])assert.equal((await h.send(qpath+'/action?name=suggestion.create',{...edit,revision:1},qcookie)).status,200)
+ let r=(await h.state()).proposals.find(x=>x.id===q.id)
+ for(const replacement of ['21 days','forever']){await h.cmd('suggestion.resolve',{id:q.id,version:r.version,suggestionId:r.suggestions.find(x=>x.replacement===replacement).id,decision:replacement==='21 days'?'accepted':'rejected'});r=(await h.state()).proposals.find(x=>x.id===q.id)}
+ assert.equal(r.revision,2);assert.equal(r.terms,'Delivery in 21 days. Usage for one year.');assert.equal(r.suggestions.find(x=>x.replacement==='forever').decision,'rejected')
+}))

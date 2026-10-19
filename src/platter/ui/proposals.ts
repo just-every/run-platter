@@ -1,3 +1,4 @@
+import { suggestionsPanel } from './suggestions'
 import { historyPanel } from './history'
 import { pipelinePanel } from './pipeline'
 import { area, date, empty, escape, field, form, hidden, money, optionPair, panel, proposalPath, statusPill } from './shared'
@@ -7,7 +8,7 @@ function editor(state: any, proposal?: any, negotiating = false): string {
   const clients = (state.clients ?? []).map((client: any) => `<option value="${escape(client.id)}"${client.id === proposal?.client_id ? ' selected' : ''}>${escape(client.name)} — ${escape(client.email)}</option>`).join('')
   const inputs = `<label>Client<select name="clientId" required><option value="">Choose a client</option>${clients}</select></label>`
     + field('Proposal title', 'title', proposal?.title, 'required maxlength="200"')
-    + area('Scope of work', 'scope', proposal?.scope, 'required')
+    + area('Scope of work', 'scope', proposal?.scope, 'required') + area('Terms', 'terms', proposal?.terms??'')
     + '<fieldset><legend>Option one</legend>' + field('Option label', 'optionOne', options[0]?.label, 'required')
     + field(`Price in ${proposal?.currency ?? 'USD'}`,  'priceOne', options[0] ? (options[0].cents / 100).toFixed(2) : '', 'required inputmode="decimal" placeholder="0.00"') + '</fieldset>'
     + '<fieldset><legend>Option two</legend>' + field('Option label', 'optionTwo', options[1]?.label, 'required')
@@ -29,7 +30,7 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   const path = proposalPath(p.id)
   const owner = state.actor?.role === 'owner'
   const frozen = p.status === 'sent' || p.status === 'accepted'
-  const summary = `<p class="proposal-status">${statusPill(p.status)} · Revision ${escape(p.revision)}</p><dl><dt>Client</dt><dd>${escape(p.clientName)} · ${escape(p.clientEmail)}</dd><dt>Prepared by</dt><dd>${escape(p.preparedByName || p.prepared_by)}</dd><dt>Approved by</dt><dd>${escape(p.approvedByName || p.approved_by || 'Awaiting approval')}</dd><dt>Approved at</dt><dd>${date(p.approved_at)}</dd></dl><h3>Scope of work</h3><p class="preserve">${escape(p.scope)}</p><h3>Offered prices</h3><p>${p.currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'}</p>${optionPair(p.options ?? [], p.deposit_bps, p.acceptance?.optionId, p.currency)}<p>Deposit: ${escape(Number(p.deposit_bps) / 100)}% of the chosen option.</p>`
+  const summary = `<p class="proposal-status">${statusPill(p.status)} · Revision ${escape(p.revision)}</p><dl><dt>Client</dt><dd>${escape(p.clientName)} · ${escape(p.clientEmail)}</dd><dt>Prepared by</dt><dd>${escape(p.preparedByName || p.prepared_by)}</dd><dt>Approved by</dt><dd>${escape(p.approvedByName || p.approved_by || 'Awaiting approval')}</dd><dt>Approved at</dt><dd>${date(p.approved_at)}</dd></dl><h3>Scope of work</h3><p class="preserve">${escape(p.scope)}</p><h3>Terms</h3><p class="preserve">${escape(p.terms||'No additional terms.')}</p><h3>Offered prices</h3><p>${p.currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'}</p>${optionPair(p.options ?? [], p.deposit_bps, p.acceptance?.optionId, p.currency)}<p>Deposit: ${escape(Number(p.deposit_bps) / 100)}% of the chosen option.</p>`
   let html = panel(p.title, summary)
   if(p.negotiating) html += panel('Negotiated draft', `<p>Revision ${escape(p.sentRevision)} remains available to the client until this revision is approved and sent. If the client accepts it first, this draft cannot be sent.</p>`)
   if(p.status === 'sent' && ['owner','member'].includes(state.actor?.role)) html += panel('Negotiate a new revision', '<p>The sent offer stays frozen. Prepare changed terms for a new approval before replacing the client invitation.</p>' + editor(state,p,true))
@@ -40,5 +41,5 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   if (owner && p.status === 'sent') html += panel('Send a fresh invitation', '<p>This replaces any previous client link and verification session while keeping the offer frozen.</p>' + form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + '<button>Send fresh client link</button>'))
   if (p.acceptance) html += panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)} · ${escape(p.acceptance.email)}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd></dl><p>The accepted agreement is permanent.</p>`)
   if (owner && p.acceptance) html += panel('Invoice export', form('invoice.export', path, hidden('id', p.id) + '<button>Export invoice CSV</button>') + (p.invoice ? `<p>Invoice ${escape(p.invoice.number)} · Exported ${date(p.invoice.exported_at)}</p><a href="/api/platter/invoices/${encodeURIComponent(p.invoice.id)}.csv">Download deposit invoice CSV</a>` : ''))
-  return html + historyPanel(state, p, selection)
+  return html + suggestionsPanel(state,p) + historyPanel(state, p, selection)
 }

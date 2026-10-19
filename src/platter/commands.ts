@@ -5,14 +5,17 @@ import archivePolicy from './archive-policy.mjs'
 import { need,fail,text,email,dollars,exact,commit,proposal,snapshot,secret,type Actor } from './model'
 import { queueMail,dispatchMail,proposalMail } from './mail'
 import { exportInvoice } from './invoices'
+import { suggestionCommand } from './suggestions'
 import { restoreFields } from './history'
 import { negotiationCommand, pendingNegotiation } from './negotiation'
 
 export function proposalFields(p:Record<string,unknown>){
  const deposit=Number(p.depositPercent);need(Number.isFinite(deposit)&&Number.isInteger(deposit*100)&&deposit>0&&deposit<=100,'Deposit must be from 0.01 to 100 percent')
- return{client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:[{id:'one',label:text(p.optionOne,'the first option',200),cents:dollars(p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:dollars(p.priceTwo)}]}
+ const terms=p.terms??'';need(typeof terms==='string'&&terms.length<=10000,'Terms must be text up to 10000 characters')
+ return{terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:[{id:'one',label:text(p.optionOne,'the first option',200),cents:dollars(p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:dollars(p.priceTwo)}]}
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){const db=env.DB,at=Date.now()
+ if(name==='suggestions.allow'||name==='suggestion.resolve')return suggestionCommand(env,a,name,p)
  if(name==='proposal.restore')return command(env,a,'proposal.revise',await restoreFields(db,a,p))
  if(name==='client.save'){
   need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email) VALUES(?,?,?)').bind(id,text(p.name,'a client name'),email(p.email))]);return{id}
@@ -31,8 +34,8 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   const f=proposalFields(p);need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(f.client_id).first(),'Client not found',404)
   const old=name==='proposal.revise'?await proposal(db,p.id):null;if(old){exact(old,p);need(['draft','approved'].includes(old.status),'Sent and accepted proposals are frozen',409)}
   const id=old?.id??crypto.randomUUID(),revision=(old?.revision??0)+1,currency=old?.currency??'USD',row={id,...f,revision,currency};const writes:D1PreparedStatement[]=[]
-  if(old){writes.push(db.prepare("UPDATE p_proposals SET client_id=?,title=?,scope=?,version=version+1,revision=?,status='draft',deposit_bps=?,options=?,prepared_by=?,approved_by=NULL,approved_at=NULL WHERE id=?").bind(f.client_id,f.title,f.scope,revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,id),db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(id))}
-  else writes.push(db.prepare("INSERT INTO p_proposals(id,client_id,title,scope,version,revision,status,deposit_bps,options,prepared_by,created_at,currency,sales_owner_id,sales_owner_name) VALUES(?,?,?,?,1,?,'draft',?,?,?,?,?,?,?)").bind(id,f.client_id,f.title,f.scope,revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency,a.id,a.email))
+  if(old){writes.push(db.prepare("UPDATE p_proposals SET client_id=?,title=?,scope=?,terms=?,version=version+1,revision=?,status='draft',deposit_bps=?,options=?,prepared_by=?,approved_by=NULL,approved_at=NULL WHERE id=?").bind(f.client_id,f.title,f.scope,f.terms,revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,id),db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(id))}
+  else writes.push(db.prepare("INSERT INTO p_proposals(id,client_id,title,scope,version,revision,status,deposit_bps,options,prepared_by,created_at,currency,sales_owner_id,sales_owner_name,terms) VALUES(?,?,?,?,1,?,'draft',?,?,?,?,?,?,?,?)").bind(id,f.client_id,f.title,f.scope,revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency,a.id,a.email,f.terms))
   writes.push(db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,?,?,?,?,?)').bind(id,revision,JSON.stringify(snapshot(row)),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency))
   await commit(db,a,writes,false,old?{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))",values:[id,old.version]}:undefined);return{id,revision,version:(old?.version??0)+1}
  }

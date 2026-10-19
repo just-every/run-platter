@@ -27,7 +27,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -55,8 +55,15 @@ test('AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves bus
     const pending=await h.cmd('proposal.prepare',{...offer,title:'Pending client decision'})
     await h.cmd('proposal.approve',{id:pending.id,version:1,revision:1})
     const pendingShare=await h.cmd('proposal.send',{id:pending.id,version:2})
-    await h.cmd('proposal.negotiate',{...offer,id:pending.id,version:3,scope:'Negotiated campaign scope',priceTwo:'4600'})
-    await h.cmd('proposal.approve',{id:pending.id,version:4,revision:2})
+    await h.cmd('suggestions.allow',{id:pending.id,version:3,section:'scope',enabled:true})
+    const suggestPath=new URL(pendingShare.shareUrl).pathname
+    await h.send(suggestPath+'/action?name=code.request',{})
+    const suggestCode=(await h.state()).outbox.find(x=>x.subject.includes('verification code')&&x.proposal_id===pending.id).body.match(/\b\d{6}\b/)[0]
+    const suggestSession=await h.send(suggestPath+'/action?name=code.verify',{code:suggestCode})
+    assert.equal((await h.send(suggestPath+'/action?name=suggestion.create',{section:'scope',revision:1,original:'Studio photographs',replacement:'Negotiated campaign photographs'},suggestSession.cookie)).status,200)
+    const suggestion=(await h.state()).proposals.find(p=>p.id===pending.id).suggestions[0]
+    await h.cmd('suggestion.resolve',{id:pending.id,version:4,suggestionId:suggestion.id,decision:'accepted'})
+    await h.cmd('proposal.approve',{id:pending.id,version:5,revision:2})
     const work=await h.cmd('proposal.prepare',{...offer,title:'Work in progress'})
     const request=async()=>{const r=await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'request_send',arguments:{id:work.id,revision:1}}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,200);assert.ok(!r.value.result.isError);return JSON.parse(r.value.result.content[0].text).request}
     const dismissed=await request();await h.cmd('send-request.resolve',{id:dismissed.id,status:'dismissed'});await request()
@@ -95,6 +102,8 @@ test('AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves bus
     assert.equal(revisions.length,2)
     assert.equal(approvals.length,2)
     assert.equal(archived.filter(item=>item.table==='p_negotiations').length,1)
+    assert.equal(archived.filter(item=>item.table==='p_suggestions')[0].row.decision,'accepted','NEG-002 tracked decision survives CLI restore')
+    assert.equal(archived.filter(item=>item.table==='p_suggestion_sections').length,1)
     assert.ok(approvals.every(item=>item.row.actor_id===journal.job.principalId))
     h=await harness({root:restored,...identity})
     await h.state(identity.owner,401)

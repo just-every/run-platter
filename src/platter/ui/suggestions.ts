@@ -1,0 +1,18 @@
+import { area, date, escape, form, hidden, panel, proposalPath } from './shared'
+const tracked=(rows:any[])=>rows.map(s=>`<article><h3>${escape(s.section)} suggestion</h3><p>${date(s.created_at)} · Revision ${escape(s.revision)}</p><p class="preserve"><del>${escape(s.original)}</del><br><ins>${escape(s.replacement)}</ins></p><p>${escape(s.decision??'Awaiting review')}${s.resulting_revision?` · Revision ${escape(s.resulting_revision)}`:''}</p></article>`).join('')
+export function suggestionsPanel(state:any,p:any){
+ if(!['owner','member'].includes(state.actor?.role))return ''
+ const live=p.sentRevision??p.revision,path=proposalPath(p.id)
+ const controls=p.status==='sent'||p.negotiating?['scope','terms'].map(section=>{
+  const enabled=p.suggestionSections.some((s:any)=>s.revision===live&&s.section===section)
+  return form('suggestions.allow',path,hidden('id',p.id)+hidden('version',p.version)+hidden('section',section)+hidden('enabled',enabled?'no':'yes')+`<button>${enabled?'Close':'Allow'} ${section} suggestions</button>`)
+ }).join(''):''
+ const rows=(p.suggestions??[]).map((s:any)=>tracked([s])+(!s.decision&&s.revision===live&&(p.status==='sent'||p.negotiating)?form('suggestion.resolve',path,hidden('id',p.id)+hidden('version',p.version)+hidden('suggestionId',s.id)+'<button name="decision" value="accepted">Accept suggestion</button><button name="decision" value="rejected">Reject suggestion</button>'):'' )).join('')
+ return controls||rows?panel('Client text suggestions',controls+rows):''
+}
+export function clientSuggestions(view:any,publicForm:(name:string,body:string)=>string){
+ const sections=view.suggestionSections??[],rows=view.suggestions??[]
+ if(!sections.length&&!rows.length)return ''
+ const forms=view.status==='sent'&&view.verified?sections.map((s:any)=>publicForm('suggestion.create',hidden('section',s.section)+hidden('revision',view.revision)+`<h3>Suggest an edit to ${escape(s.section)}</h3>`+area('Existing text','original','', 'required')+area('Suggested replacement','replacement','', 'required')+'<button>Submit text suggestion</button>')).join(''):view.status==='sent'?'<p>Verify your email to suggest text edits.</p>':''
+ return panel('Text suggestions', '<p>Suggestions never change your offer or prices. The firm reviews each edit and sends a newly approved revision.</p>'+tracked(rows)+forms)
+}

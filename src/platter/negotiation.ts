@@ -42,7 +42,7 @@ export async function negotiationCommand(env: Bindings, actor: Actor, name: stri
  const next = JSON.parse(pending.snapshot), token = secret(), shareUrl = env.AUTH_ORIGIN + '/p/' + token
  const client = await db.prepare('SELECT email FROM p_clients WHERE id=?').bind(offer.client_id).first<any>()
  await commit(db, actor, [
-  db.prepare("UPDATE p_proposals SET title=?,scope=?,options=?,deposit_bps=?,revision=?,previous_sent_revision=?,prepared_by=?,approved_by=?,approved_at=?,version=version+1 WHERE id=?").bind(next.title, next.scope, JSON.stringify(next.options), next.deposit_bps, next.revision, offer.revision, pending.prepared_by, pending.approved_by, pending.approved_at, offer.id),
+  db.prepare("UPDATE p_proposals SET title=?,scope=?,terms=?,options=?,deposit_bps=?,revision=?,previous_sent_revision=?,prepared_by=?,approved_by=?,approved_at=?,version=version+1 WHERE id=?").bind(next.title, next.scope, next.terms??'', JSON.stringify(next.options), next.deposit_bps, next.revision, offer.revision, pending.prepared_by, pending.approved_by, pending.approved_at, offer.id),
   db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(offer.id),
   db.prepare('INSERT INTO p_shares(proposal_id,revision,token) VALUES(?,?,?)').bind(offer.id, next.revision, token),
   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(offer.id),

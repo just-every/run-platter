@@ -142,7 +142,13 @@ test('NEG-001 desktop and phone negotiate, approve, send and accept the changed 
   for(const width of [1440,390]){
    app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
    try{
-    const page=await context.newPage(),capture=async name=>{await page.evaluate(()=>document.fonts.ready.then(()=>null));if(screenshots)await page.screenshot({path:join(screenshots,`NEG-001-${name}-${width}.png`),fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),JSON.stringify(await page.locator('main *').evaluateAll(nodes=>nodes.filter(n=>n.getBoundingClientRect().right>innerWidth).map(n=>({tag:n.tagName,cls:n.className,text:n.textContent.slice(0,100),width:n.getBoundingClientRect().width})))))}
+    const page=await context.newPage(),capture=async name=>{
+     await page.waitForLoadState('load')
+     await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(null))))})
+     const geometry=await page.evaluate(()=>({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,overflow:[...document.querySelectorAll('body *')].filter(n=>n.getBoundingClientRect().right>innerWidth).map(n=>({tag:n.tagName,class:n.className,width:n.getBoundingClientRect().width}))}))
+     assert.ok(geometry.scrollWidth<=geometry.width,JSON.stringify(geometry))
+     if(screenshots)await page.screenshot({path:join(screenshots,`NEG-001-${name}-${width}.png`),fullPage:true})
+    }
     assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     await page.getByRole('link',{name:'Clients',exact:true}).click();await page.locator('[name="name"]').fill('Northstar Coffee');await page.locator('[name="email"]').fill('avery@northstar.example');await page.getByRole('button',{name:'Add client'}).click()

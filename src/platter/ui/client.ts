@@ -1,6 +1,7 @@
 import { attachmentList } from './attachments'
 import { clientSuggestions } from './suggestions'
 import { changes } from './history'
+import { acceptanceMethod } from './paper'
 import { date, document, escape, field, money, optionPair, panel, type Feedback } from './shared'
 
 export function renderClient(view: any, token: string, feedback?: Feedback): Response {
@@ -17,7 +18,7 @@ export function renderClient(view: any, token: string, feedback?: Feedback): Res
   html += panel('Offer options', `<p>${pricing} Deposit: ${escape(Number(view.deposit_bps) / 100)}% of the chosen option.</p>${optionPair(options, view.deposit_bps, view.acceptance?.optionId, currency)}`)
   if (view.acceptance) {
     const accepted = view.acceptance
-    html += panel('Proposal accepted', `<p>This agreement is complete and cannot be changed.</p><dl><dt>Accepted by</dt><dd>${escape(accepted.name)}${accepted.email ? ` · ${escape(accepted.email)}` : ''}</dd><dt>Chosen option</dt><dd>${escape(options.find((option: any) => option.id === accepted.optionId)?.label)}</dd><dt>Total</dt><dd>${money(accepted.totalCents,accepted.currency??currency)}</dd><dt>Deposit due</dt><dd>${money(accepted.depositCents,accepted.currency??currency)}</dd><dt>Accepted at</dt><dd>${date(accepted.acceptedAt)}</dd></dl>`)
+    html += panel('Proposal accepted', `<p>This agreement is complete and cannot be changed.</p><dl><dt>Accepted by</dt><dd>${escape(accepted.name)}${accepted.email && accepted.method !== 'upload' ? ` · ${escape(accepted.email)}` : ''}</dd><dt>Chosen option</dt><dd>${escape(options.find((option: any) => option.id === accepted.optionId)?.label)}</dd><dt>Total</dt><dd>${money(accepted.totalCents,accepted.currency??currency)}</dd><dt>Deposit due</dt><dd>${money(accepted.depositCents,accepted.currency??currency)}</dd><dt>Accepted at</dt><dd>${date(accepted.acceptedAt)}</dd>${acceptanceMethod(accepted)}</dl>`)
   } else if (view.status === 'accepted') {
     html += panel('Proposal accepted', '<p>This proposal has already been accepted. Its agreement cannot be changed.</p>')
   } else if (!view.verified) {

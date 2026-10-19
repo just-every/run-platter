@@ -602,9 +602,11 @@ The firm places fields the client fills at acceptance, each assigned to one reci
 
 When a client signs through their own procurement or signing system, the owner uploads the signed copy, records who signed and when, and attests to it. The agreement is marked accepted by upload, distinct from Platter e-signature, and payments and handoff proceed as for any acceptance.
 
+Until `TEAM-001` adds the admin role, only the owner records an acceptance by upload, and only for a sent proposal's current sent, approved revision; the owner chooses the one offered option the client signed, and its total and integer-cent deposit are calculated and frozen as in `SIGN-002`. The signed date is the calendar date written on the paper (`YYYY-MM-DD`, no time zone), never later than the current date in UTC+14; the acceptance time is when the owner recorded it. The owner's attestation is stored as the acceptance's consent text. Every screen labels the agreement "Accepted by upload: signed outside Platter. Platter did not verify this signature." and never shows the client's mailbox as the signer's; Platter e-signatures show their own method. The uploaded file is kept immutably with the agreement in any format the owner uploads (no format or signature check is claimed); owners and members download it, agents never do, and the client invitation page shows the accepted-by-upload record without serving the file. Recording discards a pending `NEG-001` draft as an e-signed acceptance does, a later client acceptance attempt returns the recorded acceptance, and a recorded acceptance is never replaced. Today the deposit request is the owner's deposit invoice export, which proceeds exactly as for any acceptance; `PAY-001`, `PAY-002`, `PAY-008`, `HAND-001` and `HAND-002` treat an acceptance by upload as an acceptance before they ship.
+
 *Acceptance:* Upload a client-signed PDF for a sent proposal, record signer and date, and see the agreement marked accepted by upload with the file, followed by the deposit request.
 
-*Status:* missing. No way to record acceptance signed outside Platter.
+*Status:* done. `tests/platter.test.mjs` and `tests/site.test.mjs` (named SIGN-008 journeys) record the signed copy through HTTP and at 1440 and 390 pixels, refuse members, stale versions, unsent proposals, missing attestation or file and future or invalid dates, read back the exact bytes, label the method distinctly from an e-signed acceptance, keep the file off the client page and export the $1,050.00 deposit.
 
 #### SIGN-009 — Recipient delegation of signing.
 
@@ -1244,8 +1246,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 11 | 24 | 93 | 128 |
-| All | 23 | 24 | 93 | 140 |
+| Target and push further | 12 | 24 | 92 | 128 |
+| All | 24 | 24 | 92 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1321,7 +1323,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `SIGN-005` | Signed agreement PDF and certificate of completion | target | partial | `src/platter/signing.ts`, `src/platter/ui/client.ts`, `tests/platter.test.mjs` | An immutable accepted snapshot with signer and time; no PDF, certificate, document hash or completion email. |
 | `SIGN-006` | Signer identity options | target | partial | `src/platter/signing.ts`, `tests/platter.test.mjs` | Mailbox code only; no SMS code or ID verification. |
 | `SIGN-007` | Fields collected at acceptance | target | missing |  | Only name, option and consent are collected. |
-| `SIGN-008` | Acceptance on the client's own paper | target | missing |  | No way to record acceptance signed outside Platter. |
+| `SIGN-008` | Acceptance on the client's own paper | target | done | `src/platter/paper-acceptance.ts`, `src/platter/paper-record.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs` |  |
 | `SIGN-009` | Recipient delegation of signing | target | missing |  | One fixed client signer; no delegation. |
 | `SIGN-010` | In-person signing on the firm's device | target | missing |  | Signing happens only from the client's own emailed link. |
 | `SIGN-011` | Template recipient roles, field assignment and signing order | target | missing |  | No templates, recipient roles or field assignments; one client recipient per proposal. |

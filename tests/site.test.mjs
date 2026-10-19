@@ -445,3 +445,34 @@ test('MIG-006 desktop and phone review original CSVs, finish imports, read recor
   }
  }finally{await browser?.close();await h?.close();await edge?.close()}
 })
+
+test('SIGN-008 desktop and phone record a client-signed copy as accepted by upload and export its deposit', {timeout:120000}, async()=>{
+ let app,browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  const screenshots=process.env.PLATTER_SCREENSHOTS;if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`SIGN-008-${name}-${width}.png`),fullPage:true})}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    const client=await cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),p=await cmd('proposal.prepare',{clientId:client.id,title:'Northstar autumn campaign',scope:'One studio shoot and usage licence.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'})
+    await page.goto(app.origin+'/app/proposal?id='+p.id);await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();const clientPath=await page.getByRole('link',{name:'Open client proposal',exact:true}).getAttribute('href')
+    const form=page.locator('form[action^="/app/paper-acceptance"]');assert.equal(await page.getByRole('heading',{name:'Record acceptance signed outside Platter',exact:true}).count(),1)
+    await form.getByRole('radio',{name:/Full campaign/}).check();await form.getByLabel('Signer full name').fill('Morgan Lee');await form.getByLabel('Signed date').fill('2026-10-15')
+    await form.getByLabel('Client-signed copy').setInputFiles({name:'Northstar-signed.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF client signed copy')});await capture('record-form')
+    await form.getByRole('checkbox').check()
+    await form.getByRole('button',{name:'Record accepted by upload',exact:true}).click();assert.equal(await page.getByRole('alert').count(),0)
+    assert.match(await page.getByRole('status').innerText(),/Accepted by upload/);assert.match(await page.locator('.proposal-status').innerText(),/accepted/i)
+    const accepted=page.locator('section.panel:has(h2:text-is("Client acceptance"))');assert.match(await accepted.innerText(),/Morgan Lee[\s\S]*Full campaign[\s\S]*\$4,200\.00 USD[\s\S]*\$1,050\.00 USD[\s\S]*Accepted by upload: signed outside Platter\. Platter did not verify this signature\.[\s\S]*2026-10-15/)
+    assert.doesNotMatch(await accepted.innerText(),/Morgan Lee · avery@/,'the client mailbox is not shown as the paper signer')
+    const copy=accepted.getByRole('link',{name:/Northstar-signed\.pdf/});const file=await context.request.get(app.origin+await copy.getAttribute('href'));assert.equal(file.status(),200);assert.equal((await file.body()).toString(),'%PDF client signed copy')
+    assert.equal(await page.getByRole('heading',{name:'Record acceptance signed outside Platter',exact:true}).count(),0);await capture('accepted-by-upload')
+    await page.getByRole('button',{name:'Export invoice CSV',exact:true}).click();const invoice=page.getByRole('link',{name:'Download deposit invoice CSV',exact:true});const csv=await context.request.get(app.origin+await invoice.getAttribute('href'));assert.match(await csv.text(),/1050\.00/);await capture('deposit-export')
+    await page.goto(app.origin+clientPath);assert.equal(await page.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1);assert.equal(await page.getByRole('button',{name:'Accept proposal'}).count(),0);await capture('client-accepted')
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

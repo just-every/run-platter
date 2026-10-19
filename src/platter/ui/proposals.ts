@@ -2,6 +2,7 @@ import { bounceInbox, deliveryPanel } from './delivery'
 import { proposalAttachments } from './attachments'
 import { suggestionsPanel } from './suggestions'
 import { historyPanel } from './history'
+import { acceptanceMethod, paperAcceptanceForm } from './paper'
 import { pipelinePanel } from './pipeline'
 import { area, date, empty, escape, field, form, hidden, money, optionPair, panel, proposalPath, statusPill } from './shared'
 
@@ -41,7 +42,8 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   if (owner && p.status === 'approved') html += panel('Send to client', '<p>Sending freezes this offer. The client will verify their email before accepting one option.</p>' + form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + '<button>Send approved proposal</button>'))
   if (frozen) html += panel('Shared offer', '<p>This offer is frozen. Its scope, options, and prices can no longer be revised.</p>' + (owner && p.shareToken ? `<a href="/p/${encodeURIComponent(p.shareToken)}">Open client proposal</a>` : ''))
   if (owner && p.status === 'sent') html += panel('Send a fresh invitation', '<p>This replaces any previous client link and verification session while keeping the offer frozen.</p>' + form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + '<button>Send fresh client link</button>'))
-  if (p.acceptance) html += panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)} · ${escape(p.acceptance.email)}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd></dl><p>The accepted agreement is permanent.</p>`)
+  html += paperAcceptanceForm(state, p)
+  if (p.acceptance) html += panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)}${p.acceptance.method === 'upload' ? '' : ` · ${escape(p.acceptance.email)}`}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd>${acceptanceMethod(p.acceptance, '/api/platter/attachments/' + encodeURIComponent(p.id) + '/')}</dl><p>The accepted agreement is permanent.</p>`)
   if (owner && p.acceptance) html += panel('Invoice export', form('invoice.export', path, hidden('id', p.id) + '<button>Export invoice CSV</button>') + (p.invoice ? `<p>Invoice ${escape(p.invoice.number)} · Exported ${date(p.invoice.exported_at)}</p><a href="/api/platter/invoices/${encodeURIComponent(p.invoice.id)}.csv">Download deposit invoice CSV</a>` : ''))
   return html + deliveryPanel(state,p) + suggestionsPanel(state,p) + historyPanel(state, p, selection)
 }

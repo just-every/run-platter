@@ -480,3 +480,41 @@ test('MIG-006 reviewed mapper supports original incumbent CSVs and holds identit
  await h.cmd('business-import.preview',mapped,member,403)
  assert.equal((await h.send('/api/platter/business-records',undefined,member)).status,403)
 }))
+test('SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by upload, distinct from e-signature, then exports the deposit',()=>run(async h=>{
+ const record=async(fields,bytes,cookie=h.owner)=>{
+  const form=new FormData();for(const [key,value] of Object.entries(fields))form.set(key,String(value));if(bytes)form.set('file',new File([bytes],'Northstar-signed.pdf',{type:'application/pdf'}))
+  const request=new Request(h.origin+'/app/paper-acceptance',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie},body:form});const r=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});return {status:r.status,text:await r.text()}
+ }
+ assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
+ const signed=new Uint8Array([...new TextEncoder().encode('%PDF-1.7 Northstar countersigned\n'),0,255,13,10])
+ const{p,path}=await sent(h),fields={id:p.id,version:3,optionId:'two',signer:'Morgan Lee',signedOn:'2026-10-15',attest:'yes'}
+ await h.send('/auth/invite',{email:'colleague@studio.example',displayName:'Colleague',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('colleague@studio.example')
+ let r=await record(fields,signed,member);assert.equal(r.status,403);assert.match(r.text,/Only the owner records acceptance/)
+ r=await record({...fields,version:2},signed);assert.equal(r.status,409)
+ r=await record({...fields,attest:''},signed);assert.equal(r.status,400);assert.match(r.text,/Confirm that the file is the client/)
+ r=await record(fields,undefined);assert.equal(r.status,400);assert.match(r.text,/Choose the client-signed file/)
+ r=await record({...fields,signedOn:new Date(Date.now()+3*86400000).toISOString().slice(0,10)},signed);assert.equal(r.status,400);assert.match(r.text,/cannot be in the future/)
+ r=await record({...fields,signedOn:'2026-02-30'},signed);assert.equal(r.status,400);assert.match(r.text,/YYYY-MM-DD/)
+ r=await record({...fields,optionId:'three'},signed);assert.equal(r.status,400)
+ const pending=await h.cmd('proposal.prepare',{...offer,clientId:(await h.state()).clients[0].id})
+ r=await record({...fields,id:pending.id,version:1},signed);assert.equal(r.status,409);assert.match(r.text,/only for a sent proposal/)
+ assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_acceptances').first()).n,0)
+ r=await record(fields,signed);assert.equal(r.status,200,r.text);assert.match(r.text,/Accepted by upload\. The deposit invoice is ready to export\./)
+ assert.match(r.text,/Accepted by upload: signed outside Platter\. Platter did not verify this signature\./);assert.match(r.text,/Northstar-signed\.pdf/)
+ const accepted=(await h.state()).proposals.find(x=>x.id===p.id),a=accepted.acceptance
+ assert.equal(accepted.status,'accepted');assert.equal(a.method,'upload');assert.equal(a.name,'Morgan Lee');assert.equal(a.signedOn,'2026-10-15');assert.equal(a.attestedBy,'owner@studio.example');assert.equal(a.optionId,'two');assert.equal(a.totalCents,420000);assert.equal(a.depositCents,105000);assert.equal(a.revision,1)
+ assert.match((await h.db.prepare('SELECT consent FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).consent,/did not verify the signature/)
+ const file=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+p.id+'/'+a.signedCopy.id,{headers:{cookie:h.owner}});assert.equal(file.status,200);assert.deepEqual(new Uint8Array(await file.arrayBuffer()),signed);assert.match(file.headers.get('content-disposition'),/^attachment;.*Northstar-signed\.pdf/)
+ assert.equal((await record(fields,signed)).status,409,'a recorded acceptance is never replaced')
+ const cookie=await verified(h,path)
+ r=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie);assert.equal(r.status,200);assert.match(r.text,/Accepted by upload: signed outside Platter/);assert.match(r.text,/Morgan Lee/);assert.ok(!r.text.includes('Morgan Lee · avery@'),'the client mailbox is not shown as the paper signer');assert.ok(!r.text.includes('Northstar-signed.pdf'),'the client page does not serve the uploaded copy')
+ assert.equal((await h.send(path+'/attachments/'+a.signedCopy.id)).status,404)
+ assert.equal((await h.state()).proposals.find(x=>x.id===p.id).acceptance.name,'Morgan Lee')
+ const invoice=await h.cmd('invoice.export',{id:p.id});r=await h.send('/api/platter/invoices/'+invoice.id+'.csv',undefined,h.owner);assert.equal(r.status,200);assert.match(r.text,/1050\.00/);assert.match(r.text,/Deposit: Northstar brand photography/)
+ const other=await h.cmd('proposal.prepare',{...offer,clientId:(await h.state()).clients[0].id,title:'E-signed shoot'});await h.cmd('proposal.approve',{id:other.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:other.id,version:2}),otherPath=new URL(share.shareUrl).pathname
+ await h.db.prepare("DELETE FROM p_mail WHERE subject='Your Platter verification code'").run()
+ assert.equal((await h.send(otherPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},await verified(h,otherPath))).status,200)
+ assert.equal((await h.state()).proposals.find(x=>x.id===other.id).acceptance.method,'platter')
+ assert.equal((await h.state(member)).proposals.find(x=>x.id===p.id).acceptance.signedCopy.id,a.signedCopy.id)
+ const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows;assert.ok(audit.some(x=>x.action==='acceptance.upload'&&x.subject===p.id&&x.actor_id&&x.occurred_at),'TEAM-004 acceptance.upload')
+}))

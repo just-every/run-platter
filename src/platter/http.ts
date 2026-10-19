@@ -1,6 +1,8 @@
 import { businessOriginal, businessRecords } from './business-records'
 import { deliveryWebhook } from './delivery'
 import { attachmentUpload } from './attachment-commands'
+import { paperAcceptance } from './paper-acceptance'
+import { paperFile,paperRow } from './paper-record'
 import { copyAttachments, downloadAttachment, vendorDocuments } from './attachments'
 import { proposal, snapshot } from './model'
 import { handleMcp } from './mcp'
@@ -36,10 +38,11 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   actor=await principal(request,env,isAgent)
   if(path==='/api/platter/agent/mcp')return handleMcp(request,env,actor)
   if(request.method==='POST'&&path==='/app/attachment'){need(request.headers.get('content-type')?.includes('multipart/form-data'),'Use a file upload form',415);const data=await request.formData(),result=await attachmentUpload(env.DB,actor,data);await recordAudit(env.DB,actor,data.get('kind')?'vendor-document.save':'attachment.upload',String(result.id??data.get('kind')));return renderApp(await state(env,actor),result.id?'/app/proposal?id='+encodeURIComponent(result.id):'/app/settings',{message:result.id?'Document saved. Review the revision before approving.':'Document saved. Existing revisions retain their files.'})}
+  if(request.method==='POST'&&path==='/app/paper-acceptance'){need(request.headers.get('content-type')?.includes('multipart/form-data'),'Use a file upload form',415);const result=await paperAcceptance(env.DB,actor,await request.formData());await recordAudit(env.DB,actor,'acceptance.upload',result.id);return renderApp(await state(env,actor),'/app/proposal?id='+encodeURIComponent(result.id),{message:'Accepted by upload. The deposit invoice is ready to export.'})}
   if(request.method==='GET'){
    if(path==='/api/platter/business-original')return await businessOriginal(env,actor,url.searchParams)
    if(path==='/api/platter/business-records'){need(actor.role==='owner','Only the owner reads imported business records',403);return json(await businessRecords(env.DB,actor))}
-   const attachment=path.match(/^\/api\/platter\/attachments\/([\w-]+)(?:\/([\w-]+))?$/);if(attachment){let files;if(attachment[2]){need(actor.role!=='agent','A person downloads proposal files',403);const row=await proposal(env.DB,attachment[1]);files=copyAttachments(snapshot(row).attachments)}else{need(actor.role==='owner','Only the owner reads vendor settings',403);files=await vendorDocuments(env.DB)}const file=files.find(f=>f.id===(attachment[2]??attachment[1]));need(file,'Attachment not found',404);await recordAudit(env.DB,actor,'attachment.download',file.id);return downloadAttachment(env.DB,file)}
+   const attachment=path.match(/^\/api\/platter\/attachments\/([\w-]+)(?:\/([\w-]+))?$/);if(attachment){let files;if(attachment[2]){need(actor.role!=='agent','A person downloads proposal files',403);const row=await proposal(env.DB,attachment[1]),paper=await paperRow(env.DB,row.id);files=[...copyAttachments(snapshot(row).attachments),...(paper?[paperFile(paper)]:[])]}else{need(actor.role==='owner','Only the owner reads vendor settings',403);files=await vendorDocuments(env.DB)}const file=files.find(f=>f.id===(attachment[2]??attachment[1]));need(file,'Attachment not found',404);await recordAudit(env.DB,actor,'attachment.download',file.id);return downloadAttachment(env.DB,file)}
    if(path==='/app/audit'||path==='/api/platter/audit'||path==='/api/platter/audit.csv'){const rows=await auditRows(env.DB,actor,url.searchParams);return path==='/app/audit'?document('Audit log',auditPage(rows,url.searchParams),{actor,path}):path.endsWith('.csv')?new Response(auditCsv(rows),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename=platter-audit.csv'}}):json({rows})}
    if(pages.has(path)){if(path==='/app/proposal'){const id=url.searchParams.get('id');if(id&&(await env.DB.prepare('SELECT id FROM p_proposals WHERE id=?').bind(id).first()))await recordAudit(env.DB,actor,'proposal.view',id)}return renderApp(await state(env,actor),path+url.search)}
    if(path==='/api/platter/send-requests')return json({requests:await sendRequests(env.DB,actor)})
@@ -57,7 +60,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   return path.startsWith('/app')?renderMissing():json({error:'Not found'},404)
  }catch(error){const status=Number((error as any)?.status)||500;const message=status<500?(error as Error).message:'The change could not be completed. Reload and try again.';if(status>=500)console.error(error)
   if(isClient&&context&&status!==403){const r=renderClient(await clientView(env,context),context.token,{error:message});return new Response(r.body,{status,headers:r.headers})}
-  if(path==='/app/attachment'&&actor){const response=renderApp(await state(env,actor),back,{error:message});return new Response(response.body,{status,headers:response.headers})}
+  if((path==='/app/attachment'||path==='/app/paper-acceptance')&&actor){const response=renderApp(await state(env,actor),back,{error:message});return new Response(response.body,{status,headers:response.headers})}
   if(path==='/app/action'&&actor)return renderApp(await state(env,actor),back,{error:message})
   if(pages.has(path)&&status===401)return new Response(null,{status:303,headers:{...headers,location:'/signin?returnTo='+encodeURIComponent(path+url.search)}})
   return json({error:message},status)

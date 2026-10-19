@@ -914,9 +914,11 @@ Reports show signed value, one-off and recurring (MRR and first-year value), inv
 
 Any report exports to CSV and can be emailed on a schedule to named people.
 
-*Acceptance:* Schedule the weekly win-rate report to two people and export the pipeline to CSV; the email arrives with the same figures as the screen.
+Done when every report that exists today conforms: the `REPORT-001` pipeline. `REPORT-002`, `REPORT-003` and `REPORT-004` each add CSV export and scheduled email of their report, under the same rules, before they ship. The CSV holds the rows exactly as filtered and sorted on screen (title, client, owner, status, next action, currency, value as a decimal of the integer cents, age in completed days), then one total row per currency. Until `TEAM-001` adds the admin role, only the owner exports a report or creates and stops a schedule. A schedule saves the screen's filters and sort and runs daily, or weekly on a chosen weekday, at a whole hour in the installation's time zone (an IANA name the owner sets; UTC until set); the run follows daylight saving changes, takes the first occurrence of a repeated hour and the first instant after a skipped hour, and is checked every 15 minutes, so it runs at the first check at or after its time. It goes to one to ten named people who are active people of this installation, never an outside address; naming a member is the owner's explicit share of those figures, and anyone no longer active at run time is skipped and the run says so. Each run is claimed once, so overlapping checks never send it twice, and a run missed while the Worker was down runs once at the next check. The email repeats the screen's count, per-currency totals and rows in the screen's money format, as of the run time, followed by the CSV. Its outcome is labelled honestly per recipient: captured locally (no email sent), queued, accepted by provider, or provider result uncertain and not resent; Platter never claims delivery of report email. Schedules archive with the business records; report email stays local like proposal mail.
 
-*Status:* missing. No report export.
+*Acceptance:* Schedule the weekly win-rate report to two people and export the pipeline to CSV; the email arrives with the same figures as the screen. Until `REPORT-002` ships the win-rate report, the journey schedules the weekly `REPORT-001` pipeline report, in a set installation time zone across a daylight saving change.
+
+*Status:* done. `tests/platter.test.mjs` (named REPORT-005 journey) exports the filtered pipeline CSV and matches it to the screen, refuses members, outside addresses, empty recipient lists, bad hours, filters and time zones, sets America/New_York, fires the Worker's scheduled handler before and at the time and again at the same time, and receives one email per person with the same count, totals and rows as the `/app` screen, keeps 8 a.m. New York time across the daylight saving change, skips a deactivated person and stops the schedule; `tests/site.test.mjs` exports the CSV, sets the time zone and schedules and stops a weekly report at 1440 and 390 pixels.
 
 ### Team administration
 
@@ -1246,8 +1248,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 12 | 24 | 92 | 128 |
-| All | 24 | 24 | 92 | 140 |
+| Target and push further | 13 | 24 | 91 | 128 |
+| All | 25 | 24 | 91 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1360,7 +1362,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `REPORT-002` | Win rate and sales performance | target | missing |  | No conversion reporting. |
 | `REPORT-003` | Content and pricing performance | target | missing |  | No content analytics. |
 | `REPORT-004` | Booked, billed and collected revenue | target | missing |  | No revenue reporting. |
-| `REPORT-005` | Report export and scheduled delivery | target | missing |  | No report export. |
+| `REPORT-005` | Report export and scheduled delivery | target | done | `src/platter/reports/schedules.ts`, `src/platter/reports/pipeline-csv.ts`, `src/platter/reports/zone.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs` |  |
 | `TEAM-001` | Roles and permissions | target | partial | `src/platter/model.ts`, `src/platter/credentials.ts`, `tests/platter.test.mjs` | Owner, member and agent only, enforced as owner-only checks in the commands; no admin, manager, sales, content editor, viewer or billing roles, no teams or collaborator sharing, and none of the rights table is enforced. |
 | `TEAM-002` | Single sign-on and SCIM provisioning | target | missing |  | No SSO or SCIM. |
 | `TEAM-003` | Multiple brands and workspaces | target | missing |  | One workspace and brand. |

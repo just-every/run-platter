@@ -179,7 +179,7 @@ Not yet supported (target clauses below): USD pricing tables, payment collection
 - **REPORT-002 — Win rate and sales performance** (missing). From a fixture of 100 decided proposals, see win rate, median time to sign, median time to pay, average deal value and lost-reason counts by owner, template, service, client segment and quarter, each matching the fixture's hand-computed values.
 - **REPORT-003 — Content and pricing performance** (missing). In the `REPORT-002` fixture of 100 decided proposals, template Agency retainer is used on 40 proposals of which 18 are won; package Growth is offered on 30 and chosen on 12; optional item Rush delivery is offered on 25 and chosen on 6; and library item Acme case study appears in 20 proposals, 12 won and 8 lost, with `TRACK-002` reading times whose median is 95 seconds. The report shows Agency retainer at a 45.0% win rate, Growth at 40.0% take-up, Rush delivery at 24.0% take-up, and Acme case study in 12 won and 8 lost proposals with a median reading time of 1 min 35 s; every other template, package, optional item and library item row equals the fixture's hand-computed values.
 - **REPORT-004 — Booked, billed and collected revenue** (missing). Accept and pay a fixture of agreements and see booked, invoiced, collected and overdue totals match payments and the QuickBooks Online fake.
-- **REPORT-005 — Report export and scheduled delivery** (missing). Schedule the weekly win-rate report to two people and export the pipeline to CSV; the email arrives with the same figures as the screen.
+- **REPORT-005 — Report export and scheduled delivery** (done; `tests/platter.test.mjs`, `tests/site.test.mjs`, named REPORT-005 journeys). Schedule the weekly win-rate report to two people and export the pipeline to CSV; the email arrives with the same figures as the screen. Until `REPORT-002` ships the win-rate report, the journey schedules the weekly `REPORT-001` pipeline report, in a set installation time zone across a daylight saving change.
 
 ### Team administration
 
@@ -233,4 +233,4 @@ Not yet supported (target clauses below): USD pricing tables, payment collection
 
 ## Counts
 
-140 clauses: 24 done, 24 partial, 92 missing. Published: 12 done, 0 partial, 0 missing of 12. Target and push further: 12 done, 24 partial, 92 missing of 128.
+140 clauses: 25 done, 24 partial, 91 missing. Published: 12 done, 0 partial, 0 missing of 12. Target and push further: 13 done, 24 partial, 91 missing of 128.

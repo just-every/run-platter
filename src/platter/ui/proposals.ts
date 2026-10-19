@@ -4,6 +4,7 @@ import { suggestionsPanel } from './suggestions'
 import { historyPanel } from './history'
 import { acceptanceMethod, paperAcceptanceForm } from './paper'
 import { pipelinePanel } from './pipeline'
+import { reportSchedulesPanel } from './report-schedules'
 import { area, date, empty, escape, field, form, hidden, money, optionPair, panel, proposalPath, statusPill } from './shared'
 
 function editor(state: any, proposal?: any, negotiating = false): string {
@@ -25,7 +26,7 @@ export function proposalsPage(state: any, selection = new URLSearchParams()): st
   const proposals = state.proposals ?? []
   const list = proposals.length ? `<ul class="records">${proposals.map((p: any) => `<li><a href="${escape(proposalPath(p.id))}">${escape(p.title)}</a><span>${escape(p.clientName)} · ${statusPill(p.status)}</span></li>`).join('')}</ul>` : empty('No proposals yet. Prepare your first proposal below.')
   const canPrepare = ['owner', 'member'].includes(state.actor?.role)
-  return bounceInbox(state) + (state.actor?.role === 'owner' ? pipelinePanel(proposals,selection) : panel('Your proposals', list)) + (canPrepare ? panel('Prepare a proposal', state.clients?.length ? editor(state) : '<p>Add a client before preparing a proposal.</p>' + (state.actor.role === 'owner' ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) : '')
+  return bounceInbox(state) + (state.actor?.role === 'owner' ? pipelinePanel(proposals,selection) + reportSchedulesPanel(state,selection) : panel('Your proposals', list)) + (canPrepare ? panel('Prepare a proposal', state.clients?.length ? editor(state) : '<p>Add a client before preparing a proposal.</p>' + (state.actor.role === 'owner' ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) : '')
 }
 export function proposalPage(state: any, id: string, selection = new URLSearchParams()): string | null {
   const p = state.proposals?.find((item: any) => String(item.id) === id)

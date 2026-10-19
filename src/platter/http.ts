@@ -16,6 +16,7 @@ import { command } from './commands'
 import { importCommand } from './movein'
 import { state } from './state'
 import { pipeline } from './pipeline'
+import { pipelineCsv } from './reports/pipeline-csv'
 import { clientContext,clientView,clientCommand } from './signing'
 import { renderApp,renderClient,renderMissing } from './ui'
 import { need,fail,type Actor } from './model'
@@ -46,6 +47,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    if(path==='/app/audit'||path==='/api/platter/audit'||path==='/api/platter/audit.csv'){const rows=await auditRows(env.DB,actor,url.searchParams);return path==='/app/audit'?document('Audit log',auditPage(rows,url.searchParams),{actor,path}):path.endsWith('.csv')?new Response(auditCsv(rows),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename=platter-audit.csv'}}):json({rows})}
    if(pages.has(path)){if(path==='/app/proposal'){const id=url.searchParams.get('id');if(id&&(await env.DB.prepare('SELECT id FROM p_proposals WHERE id=?').bind(id).first()))await recordAudit(env.DB,actor,'proposal.view',id)}return renderApp(await state(env,actor),path+url.search)}
    if(path==='/api/platter/send-requests')return json({requests:await sendRequests(env.DB,actor)})
+   if(path==='/api/platter/pipeline.csv'){need(actor.role==='owner','Only the owner exports the pipeline report',403);const csv=pipelineCsv(pipeline((await state(env,actor)).proposals,url.searchParams));await recordAudit(env.DB,actor,'report.export','pipeline');return new Response(csv,{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="platter-pipeline.csv"'}})}
    if(path==='/api/platter/pipeline'){need(actor.role==='owner','Only the owner views the pipeline report',403);return json(pipeline((await state(env,actor)).proposals,url.searchParams))}
    if(path==='/api/platter/state'||path==='/api/platter/agent/context')return json(await state(env,actor))
    const file=path.match(/^\/api\/platter\/invoices\/([\w-]+)\.csv$/);if(file){need(actor.role==='owner','Only the owner downloads exports',403);const row=await env.DB.prepare('SELECT csv FROM p_invoices WHERE id=?').bind(file[1]).first<any>();need(row,'Export not found',404);await recordAudit(env.DB,actor,'invoice.download',file[1]);return new Response(row.csv,{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="platter-deposit.csv"'}})}

@@ -1,5 +1,6 @@
 import { withDemo } from '@runeditrun/rer/internal/modules/demo/index.mjs'
 import { platterResponse } from './platter/http'
+import { runDueReports } from './platter/reports/schedules'
 import { seedDemo } from './demo'
 import { rejectedResponse } from './base/rejected-response'
 import start from '@tanstack/react-start/server-entry'
@@ -39,5 +40,9 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
     const lobby = await lobbyResponse(request, runtimeBindings(env), identity)
     if (lobby) return lobby
     return rejectedResponse(request, await dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request))))
+  },
+  // REPORT-005 scheduled report email, built as of the trigger's own time.
+  async scheduled(controller, env) {
+    await runDueReports(runtimeBindings(env), controller.scheduledTime)
   },
 } satisfies ExportedHandler<Bindings>, { seed: seedDemo })

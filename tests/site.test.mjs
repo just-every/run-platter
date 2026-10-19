@@ -476,3 +476,33 @@ test('SIGN-008 desktop and phone record a client-signed copy as accepted by uplo
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('REPORT-005 desktop and phone export the filtered pipeline CSV and schedule weekly email in the installation time zone', {timeout:120000}, async()=>{
+ let app,browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  const screenshots=process.env.PLATTER_SCREENSHOTS;if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`REPORT-005-${name}-${width}.png`),fullPage:true})}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    const client=await cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
+    for(const [title,price] of [['Spring catalogue','3234.56'],['Autumn campaign','4200']]){const p=await cmd('proposal.prepare',{clientId:client.id,title,scope:'One studio shoot.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:price,depositPercent:'25'});await cmd('proposal.approve',{id:p.id,version:1,revision:1});await cmd('proposal.send',{id:p.id,version:2})}
+    await page.goto(app.origin+'/app');await page.getByLabel('Status').selectOption('sent');await page.getByLabel('Sort by').selectOption('value');await page.getByLabel('Direction').selectOption('desc');await page.getByRole('button',{name:'Filter pipeline'}).click()
+    const total=await page.locator('[data-pipeline-total="USD"]').innerText();assert.equal(total,'$7,434.56 USD')
+    const href=await page.getByRole('link',{name:'Download pipeline CSV',exact:true}).getAttribute('href');const csv=await(await context.request.get(app.origin+href)).text()
+    assert.deepEqual(csv.trim().split('\r\n').map(l=>l.split(',')[0]),['Title','Autumn campaign','Spring catalogue','Total (2 proposals)']);assert.match(csv,/USD,7434\.56,/);await capture('export')
+    const panel=page.locator('section.panel:has(h2:text-is("Report export and email"))')
+    assert.equal(await panel.getByLabel('Installation time zone').inputValue(),'UTC');await panel.getByLabel('Installation time zone').fill('America/New_York');await panel.getByRole('button',{name:'Save time zone',exact:true}).click();assert.equal(await page.getByRole('alert').count(),0)
+    await panel.getByLabel('Frequency').selectOption('weekly');await panel.getByLabel('Day (weekly)').selectOption('1');await panel.getByLabel('Hour (America/New_York)').selectOption('8')
+    await panel.getByRole('checkbox',{name:/Jordan Northstar/}).check();await panel.getByRole('button',{name:'Schedule report email',exact:true}).click()
+    assert.equal(await page.getByRole('alert').count(),0)
+    const schedules=page.getByRole('list',{name:'Report schedules'});assert.match(await schedules.innerText(),/Weekly on Monday at 08:00 America\/New_York[\s\S]*status=sent&sort=value&direction=desc[\s\S]*owner@northstar\.example/);assert.match(await schedules.innerText(),/No runs yet/);await capture('scheduled')
+    await schedules.getByRole('button',{name:'Stop this schedule'}).click();assert.match(await page.locator('section.panel:has(h2:text-is("Report export and email"))').innerText(),/No report email is scheduled/);await capture('stopped')
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

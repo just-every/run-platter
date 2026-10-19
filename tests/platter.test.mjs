@@ -519,3 +519,47 @@ test('SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by uplo
  assert.equal((await h.state(member)).proposals.find(x=>x.id===p.id).acceptance.signedCopy.id,a.signedCopy.id)
  const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows;assert.ok(audit.some(x=>x.action==='acceptance.upload'&&x.subject===p.id&&x.actor_id&&x.occurred_at),'TEAM-004 acceptance.upload')
 }))
+test('REPORT-005 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures',{timeout:60000},()=>run(async h=>{
+ assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
+ await h.send('/auth/invite',{email:'colleague@studio.example',displayName:'Colleague',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('colleague@studio.example')
+ const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
+ await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Draft only'})
+ for(const [title,priceTwo] of [['Spring catalogue','3234.56'],['Autumn campaign','4200.00']]){const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title,priceTwo});await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});await h.cmd('proposal.send',{id:p.id,version:2})}
+ const filters='status=sent&sort=value&direction=desc',screen=(await h.send('/api/platter/pipeline?'+filters,undefined,h.owner)).value
+ let r=await h.send('/api/platter/pipeline.csv?'+filters,undefined,h.owner);assert.equal(r.status,200);assert.match(r.headers.get('content-disposition'),/platter-pipeline\.csv/)
+ const lines=r.text.trim().split('\r\n');assert.equal(lines[0],'Title,Client,Owner,Status,Next action,Currency,Value,Age in days')
+ assert.deepEqual(lines.slice(1,3),screen.rows.map(x=>[x.title,x.client,x.owner,x.status,'Await client decision',x.currency,(x.valueCents/100).toFixed(2),x.age].join(',')))
+ assert.deepEqual(lines.slice(1,3).map(l=>l.split(',')[0]),['Autumn campaign','Spring catalogue']);assert.equal(lines[3],'Total (2 proposals),,,,,USD,7434.56,');assert.equal(lines.length,4)
+ assert.equal((await h.send('/api/platter/pipeline.csv',undefined,member)).status,403)
+ assert.equal((await h.state()).timeZone,'UTC','schedules use UTC until the owner sets a time zone')
+ await h.cmd('report.time-zone',{timeZone:'America/New_York'},member,403);await h.cmd('report.time-zone',{timeZone:'Mars/Olympus'},h.owner,400)
+ await h.cmd('report.time-zone',{timeZone:'America/New_York'});assert.equal((await h.state()).timeZone,'America/New_York')
+ const newYork=at=>Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hourCycle:'h23',weekday:'long',hour:'numeric',minute:'numeric'}).formatToParts(at).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]))
+ const schedule={cadence:'weekly',weekday:1,hour:8,filters,recipients:['owner@studio.example','colleague@studio.example']}
+ await h.cmd('report.schedule',schedule,member,403)
+ await h.cmd('report.schedule',{...schedule,recipients:['partner@outside.example']},h.owner,400)
+ await h.cmd('report.schedule',{...schedule,recipients:[]},h.owner,400)
+ await h.cmd('report.schedule',{...schedule,hour:24},h.owner,400)
+ await h.cmd('report.schedule',{...schedule,filters:'status=lost'},h.owner,400)
+ const created=await h.cmd('report.schedule',schedule);let s=(await h.state()).reportSchedules.find(x=>x.id===created.id)
+ const next=s.nextRunAt;assert.deepEqual(newYork(next),{weekday:'Monday',hour:'08',minute:'00'});assert.ok(next>Date.now()&&next<=Date.now()+7*86400000+3600000)
+ assert.deepEqual(s.recipients,schedule.recipients);assert.equal(s.filters,filters)
+ const worker=await h.mf.getWorker(),fire=at=>worker.scheduled({scheduledTime:new Date(at),cron:'0 * * * *'})
+ await fire(s.nextRunAt-3600000);assert.equal((await h.state()).reportOutbox.length,0,'nothing runs before its time')
+ await fire(s.nextRunAt);await fire(s.nextRunAt);const outbox=(await h.state()).reportOutbox
+ assert.deepEqual(outbox.map(m=>m.recipient).sort(),['colleague@studio.example','owner@studio.example'],'one email each, never twice for the same run');assert.ok(outbox.every(m=>m.status==='local'))
+ const page=(await h.send('/app?'+filters,undefined,h.owner)).text,shown=page.match(/data-pipeline-total="USD">([^<]+)</)[1].replaceAll('&#39;',"'")
+ assert.equal(shown,'$7,434.56 USD')
+ for(const mail of outbox){
+  assert.match(mail.body,/2 proposals match\./);assert.ok(mail.body.includes(`USD total · 2 proposals: ${shown}`),mail.body)
+  for(const row of screen.rows){const age=Math.floor((s.nextRunAt-(await h.state()).proposals.find(p=>p.id===row.id).created_at)/86400000);assert.ok(mail.body.includes(`${row.title} · sent · ${page.match(new RegExp(`data-proposal-id="${row.id}"[\\s\\S]*?(\\$[\\d,.]+ USD)`))[1]} · ${row.owner} · ${row.client} · ${age} days`),mail.body)}
+  assert.ok(mail.body.includes('Total (2 proposals),,,,,USD,7434.56,'))
+ }
+ s=(await h.state()).reportSchedules.find(x=>x.id===created.id); assert.ok([7*86400000,7*86400000-3600000,7*86400000+3600000].includes(s.nextRunAt-next));assert.equal(s.runs.length,1);assert.equal(s.runs[0].count,2)
+ const gaps=[];for(let i=0;i<30&&!gaps.some(g=>g!==7*86400000);i++){const before=s.nextRunAt;await fire(before);s=(await h.state()).reportSchedules.find(x=>x.id===created.id);gaps.push(s.nextRunAt-before);assert.deepEqual(newYork(s.nextRunAt),{weekday:'Monday',hour:'08',minute:'00'},'every run stays at 8 a.m. New York time')}
+ assert.ok(gaps.some(g=>g===7*86400000+3600000||g===7*86400000-3600000),'a daylight saving change moves the UTC instant by one hour')
+ await h.db.prepare("UPDATE oa_operators SET status='inactive' WHERE email='colleague@studio.example'").run()
+ await fire(s.nextRunAt);s=(await h.state()).reportSchedules.find(x=>x.id===created.id);assert.deepEqual(s.runs[0].skipped,['no longer active']);assert.deepEqual(s.runs[0].mail.map(m=>m.recipient),['owner@studio.example'])
+ await h.cmd('report.unschedule',{id:created.id});assert.equal((await h.state()).reportSchedules.length,0)
+ const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows;for(const action of ['report.export','report.schedule','report.unschedule'])assert.ok(audit.some(x=>x.action===action&&x.actor_id&&x.occurred_at),'TEAM-004 '+action)
+}))

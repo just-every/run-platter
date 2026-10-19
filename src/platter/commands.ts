@@ -1,5 +1,6 @@
 import { businessCommand } from './business-records'
 import { deliveryCommand } from './delivery'
+import { reportCommand } from './reports/schedules'
 import { vendorDocuments } from './attachments'
 import { refreshVendorDocuments } from './attachment-commands'
 // Revision approval and immutable snapshots adapted from Glove's quote commands.
@@ -21,6 +22,7 @@ export function proposalFields(p:Record<string,unknown>){
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown){const db=env.DB,at=Date.now()
  if(name.startsWith('business-import.'))return businessCommand(env,a,name,p)
  if(name.startsWith('delivery.'))return deliveryCommand(env,a,name,p)
+ if(name.startsWith('report.'))return reportCommand(env,a,name,p)
  if(name==='attachments.refresh')return refreshVendorDocuments(db,a,p)
  if(name==='suggestions.allow'||name==='suggestion.resolve')return suggestionCommand(env,a,name,p)
  if(name==='proposal.restore'){const fields=await restoreFields(db,a,p);return command(env,a,'proposal.revise',fields,fields.restoredAttachments)}

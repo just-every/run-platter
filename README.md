@@ -2,7 +2,7 @@
 
 Proposals and quotes for a small Australian agency or studio. Prepare two priced options, approve the exact offer, let a client accept one after email verification, and keep the agreement and a once-only deposit invoice export.
 
-The first release handles **GST-free AUD offers**. It does not collect payments or calculate GST. [ACCEPTANCE.md](ACCEPTANCE.md) names the supported jobs.
+New offers use **USD**. Existing first-release offers and agreements retain their **GST-free AUD** amounts and invoice files without conversion. Platter does not collect payments or calculate sales tax. [ACCEPTANCE.md](ACCEPTANCE.md) names the supported jobs.
 
 ## Run from a fresh clone
 
@@ -27,7 +27,7 @@ The run site is live at https://run-platter.com, with the run page at https://ru
 3. Review both prices and scope, click **Approve this revision**, then **Send approved proposal**. The owner approves the exact revision; saving a draft revision clears prior approval. Sent and accepted offers are frozen.
 4. Open **Open client proposal**, preferably in another browser session. Request the email code. Locally, no external email is sent: return to the owner's proposal and read **Local development mail**, then enter the six-digit code on the client page. On a configured deployment the code goes to the client's mailbox.
 5. Choose an option, enter the client's full name, confirm acceptance, and click **Accept proposal**. The acceptance shows the agreed total and deposit.
-6. Return to the owner's proposal and click **Export invoice CSV**, then **Download deposit invoice CSV**. Repeating export returns the same invoice. Import it into your books once; Platter cannot prevent you importing a downloaded file twice. The CSV uses Xero sales-invoice columns, account code 200 and GST Free Income. Confirm these fit your books before importing.
+6. Return to the owner's proposal and click **Export invoice CSV**, then **Download deposit invoice CSV**. Repeating export returns the same invoice. Import it into your books once; Platter cannot prevent you importing a downloaded file twice. The CSV uses Xero sales-invoice columns and account code 200. Retained AUD invoices keep GST Free Income; new USD invoices use No Tax because sales tax is not calculated. Confirm these fit your books before importing.
 
 An expired or lost client verification can be replaced with **Send fresh client link** on a sent proposal. It revokes the earlier link and session without changing the offer. Client codes expire after ten minutes, permit five attempts, and have a one-minute resend interval. The invitation itself remains valid until replaced or accepted; treat it as private.
 

@@ -31,7 +31,7 @@ export async function builtSite() {
 
 // Run the compiled production entry and real static assets in Wrangler. Only
 // installation provisioning uses D1 directly; the owner claims through HTTP.
-export async function installedApp() {
+export async function installedApp(options = {}) {
   const temporary = await mkdtemp(join(tmpdir(), 'platter-site-'))
   const persist = join(temporary, 'state'), config = resolve('dist/server/wrangler.json')
   let proxy, worker
@@ -39,6 +39,17 @@ export async function installedApp() {
     proxy = await getPlatformProxy({ configPath: config, envFiles: [], persist: { path: join(persist, 'v3') }, remoteBindings: false })
     for (const file of (await readdir('migrations/core')).filter(file => file.endsWith('.sql')).sort()) {
       await proxy.env.DB.batch(unstable_splitSqlQuery(await readFile('migrations/core/' + file, 'utf8')).map(sql => proxy.env.DB.prepare(sql)))
+    }
+    if (options.businessFixture) {
+      const records = (await readFile(options.businessFixture, 'utf8')).split('\n').filter(Boolean).map(JSON.parse).filter(item => item.kind === 'part').flatMap(part => part.items).filter(item => item.kind === 'row' && item.table.startsWith('p_'))
+      // Populate genuine historical business records; the owner still claims
+      // this test installation through the normal HTTP bootstrap and setup.
+      for (const table of ['p_clients', 'p_proposals', 'p_revisions', 'p_approvals', 'p_acceptances', 'p_invoices']) {
+        for (const { row } of records.filter(item => item.table === table)) {
+          const columns = Object.keys(row)
+          await proxy.env.DB.prepare(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`).bind(...Object.values(row)).run()
+        }
+      }
     }
     await proxy.dispose(); proxy = undefined
     const reservation = createServer(), port = await listen(reservation)

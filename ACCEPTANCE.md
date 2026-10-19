@@ -4,7 +4,7 @@ The journeys that prove each clause of [CONTRACT.md](CONTRACT.md), with its stat
 
 ## Supported today
 
-- An owner adds a client, prepares two GST-free AUD offer options and a deposit percentage, approves the exact revision, and sends a private proposal link.
+- An owner adds a client, prepares two USD offer options (first-release proposals retain GST-free AUD) and a deposit percentage, approves the exact revision, and sends a private proposal link.
 - A client verifies their email with a single-use code, chooses one option and accepts with their name and consent; the agreed scope, prices and deposit remain frozen.
 - The owner exports the accepted deposit once as a retained Xero invoice CSV and can download that same export again.
 - An owner gives an agent a revocable key to prepare or revise drafts; only the owner approves prices, sends offers and exports invoices, with approval authors recorded.
@@ -73,7 +73,7 @@ Not yet supported (target clauses below): USD pricing tables, payment collection
 - **PRICE-005 — US sales tax** (missing). With owner-configured rates for Austin, Texas (state 6.25%, city 1% and transit authority 1%, 8.25% in all), quote a $1,000.00 taxable line and a $500.00 non-taxable line to an Austin client and see $82.50 tax as its own line, and the same quote to a Portland, Oregon client with $0.00 tax; give the city rate a new value with a future effective date and see the sent quote unchanged. Run the same two quotes through a Stripe Tax fake and an Avalara AvaTax fake: each fake's request carries the line tax codes and addresses, the returned tax is applied to the cent, and the AvaTax transaction is committed when the invoice is issued. Mark a client exempt with a certificate and see zero tax; sync the invoice and see the tax code in the QuickBooks Online fake.
 - **PRICE-006 — Internal cost and margin** (missing). Price a package with costs, see margin per line and total as an owner, then load the client page, PDF, client API response and webhook payload and find no cost or margin; a sales role without cost access sees none either.
 - **PRICE-007 — Payment terms and schedules on the proposal** (partial). Set a 30% deposit, two milestones and a monthly retainer on net 15 terms; as the client see the schedule with dates and amounts; accept and read the same frozen schedule back. Start a proposal from a template whose terms are a 30% deposit and a net-15 milestone: the proposal opens with those terms; change its deposit to 25% and the template still holds 30%.
-- **PRICE-008 — First-release AUD agreements stay exact** (partial). Restore a first-release archive with an accepted AUD proposal into a target build, and see the agreement, deposit and CSV byte-identical and labeled AUD while new proposals are USD.
+- **PRICE-008 — First-release AUD agreements stay exact** (done; `tests/archive.test.mjs` and `tests/site.test.mjs`, named PRICE-008 journeys). Restore a first-release archive with an accepted AUD proposal into a target build, and see the agreement, deposit and CSV byte-identical and labeled AUD while new proposals are USD. Compare each retained proposal, revision, acceptance and invoice field after re-export, allowing only the new AUD metadata; accept and export a new USD proposal without changing its integer-cent amounts. Browser journeys at 1440 and 390 show both currencies explicitly on the owner and client screens.
 
 ### Collaboration and approvals
 
@@ -231,4 +231,4 @@ Not yet supported (target clauses below): USD pricing tables, payment collection
 
 ## Counts
 
-140 clauses: 14 done, 29 partial, 97 missing. Published: 12 done, 0 partial, 0 missing of 12. Target and push further: 2 done, 29 partial, 97 missing of 128.
+140 clauses: 15 done, 28 partial, 97 missing. Published: 12 done, 0 partial, 0 missing of 12. Target and push further: 3 done, 28 partial, 97 missing of 128.

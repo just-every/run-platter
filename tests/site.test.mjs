@@ -30,6 +30,7 @@ test('SITE-001 built homepage opens run instructions, Markdown docs work without
         await page.locator('nav[aria-label="Documentation"] a[href="/docs/proposals"]').click()
         assert.equal(new URL(page.url()).pathname, '/docs/proposals')
         assert.ok(await page.locator('article').innerText())
+        await capture(page, 'docs-proposals', width)
         await page.goto(site.origin + '/docs')
         await capture(page, 'docs', width)
         assert.equal((await page.goto(app.origin)).status(), 200)
@@ -93,4 +94,41 @@ test('COLLAB-003 desktop and phone compare revisions and restore an earlier draf
    } finally { await context.close();await app.close();app=undefined }
   }
  } finally { await browser?.close();await app?.close() }
+})
+
+test('PRICE-008 legacy AUD agreement and new USD owner/client screens show exact currency at desktop and phone widths', { timeout: 120000 }, async () => {
+ let app,browser
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ try {
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp({businessFixture:'fixtures/first-release-aud.rer'})
+   const context=await browser.newContext({viewport:{width,height:900}})
+   try {
+    const page=await context.newPage(),capture=async name=>{assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`PRICE-008-${name}-${width}.png`),fullPage:true})}
+    const claimed=await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0});assert.equal(claimed.status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    await page.getByRole('link',{name:'Legacy AUD campaign agreement',exact:true}).click()
+    assert.match(await page.locator('main').innerText(),/GST-free in AUD/);assert.match(await page.locator('main').innerText(),/\$4,200\.00 AUD/);assert.match(await page.locator('main').innerText(),/\$1,050\.00 AUD/)
+    await capture('legacy-agreement')
+    const state=await (await context.request.get(app.origin+'/api/platter/state')).json()
+    const created=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name:'proposal.prepare',input:{clientId:state.clients[0].id,title:'New US brand campaign',scope:'One studio shoot with edited photographs and usage licence.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'}}});assert.equal(created.status(),200)
+    const proposal=await created.json()
+    await page.goto(app.origin+'/app/proposal?id='+proposal.id)
+    assert.match(await page.locator('main').innerText(),/USD/);assert.ok(!(await page.locator('main').innerText()).includes('GST-free'))
+    await capture('usd-draft')
+    await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click()
+    await page.getByRole('link',{name:'Open client proposal',exact:true}).click()
+    assert.match(await page.locator('main').innerText(),/\$4,200\.00 USD/);await capture('usd-invitation')
+    await page.getByRole('button',{name:'Send verification code'}).click()
+    const sent=await (await context.request.get(app.origin+'/api/platter/state')).json(),code=sent.outbox.find(message=>message.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click()
+    await page.getByRole('radio',{name:/Full campaign/}).check();await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await capture('usd-verified')
+    await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
+    assert.equal(await page.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1)
+    assert.match(await page.locator('main').innerText(),/\$4,200\.00 USD/);assert.match(await page.locator('main').innerText(),/\$1,050\.00 USD/);await capture('usd-accepted')
+   } finally {await context.close();await app.close();app=undefined}
+  }
+ } finally {await browser?.close();await app?.close()}
 })

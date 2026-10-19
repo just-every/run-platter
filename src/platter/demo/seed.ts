@@ -36,17 +36,18 @@ type Context = { ago: (days: number) => number; owner: string; ownerEmail: strin
 
 async function proposalWrites(env: Bindings, sample: SampleProposal, { ago, owner, ownerEmail, preparer }: Context): Promise<D1PreparedStatement[]> {
   const db = env.DB, pid = proposalId(sample.n), [, clientName, clientEmail] = clients.find(([n]) => n === sample.client)!
-  const offers = sample.revisions.map(r => ({ id: pid, ...proposalFields({ clientId: clientId(sample.client), title: sample.title, scope: r.scope, optionOne: r.one[0], priceOne: r.one[1], optionTwo: r.two[0], priceTwo: r.two[1], depositPercent: sample.deposit }) }))
+  // The existing studio remains a first-release AUD example when currencies ship.
+  const offers = sample.revisions.map(r => ({ id: pid, ...proposalFields({ clientId: clientId(sample.client), title: sample.title, scope: r.scope, optionOne: r.one[0], priceOne: r.one[1], optionTwo: r.two[0], priceTwo: r.two[1], depositPercent: sample.deposit }), currency: 'AUD' }))
   const revision = offers.length, current = sample.revisions[revision - 1]!, approvals = sample.approvals ?? []
   const approval = approvals.find(([r]) => r === revision), sentAt = sample.sent === undefined ? undefined : ago(sample.sent) + 25 * MINUTE
   const status = sample.accepted ? 'accepted' : sentAt ? 'sent' : approval ? 'approved' : 'draft'
   const version = revision + approvals.length + (sentAt ? 1 : 0) + (sample.accepted ? 1 : 0)
   const row = { ...offers[revision - 1]!, revision, options: JSON.stringify(offers[revision - 1]!.options), approved_by: approval ? ownerEmail : null, approved_at: approval ? ago(approval[1]) : null, clientName, clientEmail }
   const writes = [
-    db.prepare('INSERT INTO p_proposals (id, client_id, title, scope, version, revision, status, deposit_bps, options, prepared_by, approved_by, approved_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING')
-      .bind(pid, row.client_id, row.title, row.scope, version, revision, status, row.deposit_bps, row.options, preparer(current.by), row.approved_by, row.approved_at, ago(sample.revisions[0]!.at)),
-    ...offers.map((offer, i) => db.prepare('INSERT INTO p_revisions (proposal_id, revision, snapshot, prepared_by, prepared_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING')
-      .bind(pid, i + 1, JSON.stringify(snapshot({ ...offer, revision: i + 1 })), preparer(sample.revisions[i]!.by), ago(sample.revisions[i]!.at))),
+    db.prepare('INSERT INTO p_proposals (id, client_id, title, scope, version, revision, status, deposit_bps, options, prepared_by, approved_by, approved_at, created_at, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING')
+      .bind(pid, row.client_id, row.title, row.scope, version, revision, status, row.deposit_bps, row.options, preparer(current.by), row.approved_by, row.approved_at, ago(sample.revisions[0]!.at), row.currency),
+    ...offers.map((offer, i) => db.prepare('INSERT INTO p_revisions (proposal_id, revision, snapshot, prepared_by, prepared_at, currency) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING')
+      .bind(pid, i + 1, JSON.stringify(snapshot({ ...offer, revision: i + 1 })), preparer(sample.revisions[i]!.by), ago(sample.revisions[i]!.at), offer.currency)),
     ...approvals.map(([r, days], i) => db.prepare('INSERT INTO p_approvals (id, proposal_id, revision, actor_id, approved_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING').bind(id(3, sample.n * 10 + i), pid, r, owner, ago(days))),
   ]
   if (!sentAt) return writes
@@ -58,11 +59,11 @@ async function proposalWrites(env: Bindings, sample: SampleProposal, { ago, owne
   if (codeAt) writes.push(mail(2, verifiedAt ? [codeMail('', sample.title)[0], 'Verification code consumed'] : codeMail(sixDigitCode(), sample.title), codeAt))
   if (!sample.accepted) return writes
   const { option, deposit, frozen, consent } = acceptanceTerms(row, sample.accepted.option), acceptedAt = ago(sample.accepted.at)
-  const accepted = { snapshot: JSON.stringify(frozen), email: clientEmail, deposit_cents: deposit }
-  writes.push(db.prepare('INSERT INTO p_acceptances (proposal_id, revision, snapshot, name, email, option_id, total_cents, deposit_cents, accepted_at, consent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING')
-    .bind(pid, revision, accepted.snapshot, sample.accepted.name, clientEmail, option.id, option.cents, deposit, acceptedAt, consent))
+  const accepted = { snapshot: JSON.stringify(frozen), email: clientEmail, deposit_cents: deposit, currency: row.currency }
+  writes.push(db.prepare('INSERT INTO p_acceptances (proposal_id, revision, snapshot, name, email, option_id, total_cents, deposit_cents, accepted_at, consent, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING')
+    .bind(pid, revision, accepted.snapshot, sample.accepted.name, clientEmail, option.id, option.cents, deposit, acceptedAt, consent, accepted.currency))
   if (sample.exported === undefined) return writes
   const exportedAt = ago(sample.exported), { number, csv } = invoiceFile(pid, accepted, exportedAt)
-  writes.push(db.prepare('INSERT INTO p_invoices (id, proposal_id, number, csv, exported_at, exported_by) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING').bind(id(5, sample.n), pid, number, csv, exportedAt, ownerEmail))
+  writes.push(db.prepare('INSERT INTO p_invoices (id, proposal_id, number, csv, exported_at, exported_by, currency) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING').bind(id(5, sample.n), pid, number, csv, exportedAt, ownerEmail, accepted.currency))
   return writes
 }

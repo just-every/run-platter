@@ -1,6 +1,6 @@
 # Platter docs
 
-Prepare two priced options, send an approved offer, and keep your client's acceptance and deposit invoice together. Platter handles GST-free offers in Australian dollars.
+Prepare two priced options, send an approved offer, and keep your client's acceptance and deposit invoice together. New proposals use US dollars. First-release proposals and agreements retain their original GST-free Australian dollar amounts and invoice files, without conversion.
 
 ## Start here
 
@@ -16,7 +16,7 @@ These guides describe your installed Platter app. Open its own address to use **
 
 Sending freezes the scope, both options and their prices. A verified client chooses one option and accepts with their name and consent. Platter retains that agreement and can export its deposit as one invoice CSV in Xero's columns. Repeating the export returns the same invoice.
 
-Platter does not collect payments, calculate GST, generate proposal PDFs or sync directly with Xero. Check the exported CSV's account and tax settings before importing it into your books, and import each invoice only once.
+Platter does not collect payments, calculate sales tax, generate proposal PDFs or sync directly with Xero. Check the exported CSV's account and tax settings before importing it into your books, and import each invoice only once.
 
 ## Reference
 

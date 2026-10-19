@@ -114,3 +114,43 @@ test('PORT-001 / PORT-002 public CLI preserves business records and import custo
     finally { await proxy.dispose() }
   } finally { if(h)await h.close();await rm(temporary,{recursive:true,force:true}) }
 })
+
+test('PRICE-008 public CLI restores first-release AUD bytes and new proposals and acceptances use USD without conversion', { timeout: 180_000 }, async () => {
+ const temporary=await mkdtemp(join(tmpdir(),'platter-currency-')),target=join(temporary,'target')
+ let h
+ try {
+  const input=resolve('fixtures/first-release-aud.rer'),records=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(item=>item.kind==='part').flatMap(part=>part.items).filter(item=>item.kind==='row')
+  const legacy=records(await readFile(input,'utf8')),accepted=legacy.find(item=>item.table==='p_acceptances').row,invoice=legacy.find(item=>item.table==='p_invoices').row,oldProposal=legacy.find(item=>item.table==='p_proposals').row
+  const ownerEmail=legacy.find(item=>item.table==='oa_operators').row.email
+  await checkout(target)
+  await command(target,['import','--input',input,'--yes','--no-queue'])
+  h=await harness({root:target,unclaimed:true,auth:{OWNER_EMAIL:ownerEmail}})
+  const cookie=await h.signIn(ownerEmail),cmd=(name,input)=>h.cmd(name,input,cookie)
+  const restored=(await h.state(cookie)).proposals.find(p=>p.id===accepted.proposal_id)
+  assert.equal(restored.currency,'AUD');assert.equal(restored.acceptance.currency,'AUD')
+  assert.equal(restored.acceptance.totalCents,accepted.total_cents);assert.equal(restored.acceptance.depositCents,accepted.deposit_cents)
+  const retained=await cmd('invoice.export',{id:restored.id});assert.equal(retained.id,invoice.id);assert.equal(retained.currency,'AUD')
+  assert.equal((await h.send('/api/platter/invoices/'+invoice.id+'.csv',undefined,cookie)).text,invoice.csv)
+  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+  const agreement=await h.send('/app/proposal?id='+restored.id,undefined,cookie);assert.equal(agreement.status,200);assert.match(agreement.text,/GST-free in AUD/);assert.match(agreement.text,/\$4,200\.00 AUD/);assert.match(agreement.text,/\$1,050\.00 AUD/)
+  const created=await cmd('proposal.prepare',{clientId:oldProposal.client_id,title:'New USD campaign',scope:'One US campaign.',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+  await cmd('proposal.revise',{clientId:oldProposal.client_id,id:created.id,version:1,title:'New USD campaign',scope:'One US campaign and handoff.',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+  await cmd('proposal.approve',{id:created.id,version:2,revision:2})
+  const shared=await cmd('proposal.send',{id:created.id,version:3}),path=new URL(shared.shareUrl).pathname
+  let response=await h.send(path);assert.equal(response.status,200);assert.match(response.text,/USD/);assert.ok(!response.text.includes('GST-free'))
+  assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+  const code=(await h.state(cookie)).outbox.find(message=>message.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+  const verified=await h.send(path+'/action?name=code.verify',{code});assert.equal(verified.status,200)
+  response=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true},verified.cookie);assert.equal(response.status,200);assert.match(response.text,/\$4,200\.00 USD/);assert.match(response.text,/\$1,050\.00 USD/)
+  const current=(await h.state(cookie)).proposals.find(p=>p.id===created.id);assert.equal(current.currency,'USD');assert.equal(current.acceptance.currency,'USD');assert.equal(current.acceptance.totalCents,420000);assert.equal(current.acceptance.depositCents,105000)
+  const usdInvoice=await cmd('invoice.export',{id:created.id});assert.equal(usdInvoice.currency,'USD');assert.match((await h.send('/api/platter/invoices/'+usdInvoice.id+'.csv',undefined,cookie)).text,/No Tax,USD/)
+  await h.close();h=undefined
+  const output=join(temporary,'after.rer');await command(target,['export','--output',output,'--no-queue'])
+  const after=records(await readFile(output,'utf8'))
+  for(const original of legacy.filter(item=>['p_proposals','p_revisions','p_acceptances','p_invoices'].includes(item.table))){
+   const restored=after.find(item=>item.table===original.table&&(item.row.id===original.row.id&&original.row.id||item.row.proposal_id===original.row.proposal_id&&item.row.revision===original.row.revision))
+   assert.ok(restored,original.table+' retained');const {currency,...unchanged}=restored.row
+   assert.equal(currency,'AUD');assert.deepEqual(unchanged,original.row,original.table+' first-release bytes and amounts unchanged')
+  }
+ } finally {await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

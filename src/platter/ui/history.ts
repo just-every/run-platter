@@ -5,7 +5,7 @@ function changes(before: any, after: any): string {
  const ids = new Set([...before.options, ...after.options].map((option: any) => option.id))
  for (const id of ids) {
   const old = before.options.find((option: any) => option.id === id), next = after.options.find((option: any) => option.id === id)
-  rows.push([`Option ${id} label`, old?.label ?? 'Not offered', next?.label ?? 'Not offered'], [`Option ${id} price`, old ? money(old.cents) : 'Not offered', next ? money(next.cents) : 'Not offered'])
+  rows.push([`Option ${id} label`, old?.label ?? 'Not offered', next?.label ?? 'Not offered'], [`Option ${id} price`, old ? money(old.cents, before.currency ?? 'AUD') : 'Not offered', next ? money(next.cents, after.currency ?? 'AUD') : 'Not offered'])
  }
  const changed = rows.filter(([, before, after]) => before !== after)
  return changed.length ? `<dl>${changed.map(([label, before, after]) => `<dt>${escape(label)}</dt><dd class="preserve"><del>${escape(before)}</del><br><ins>${escape(after)}</ins></dd>`).join('')}</dl>` : '<p>No content or price changes.</p>'

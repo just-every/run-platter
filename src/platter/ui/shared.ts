@@ -2,7 +2,7 @@ import { fontHead } from '../../base/font-head'
 
 export type Feedback = { message?: string; error?: string; result?: any }
 export const escape = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!)
-export const money = (cents: number): string => `$${(Number(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+export const money = (cents: number, currency?: string): string => `$${(Number(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${currency ? ' ' + escape(currency) : ''}`
 export const date = (value: unknown): string => {
   if (!value) return '—'
   const parsed = new Date(typeof value==='number'?value:String(value))
@@ -44,4 +44,4 @@ export function document(title: string, contents: string, options: { actor?: any
 }
 
 export const statusPill = (value: unknown): string => `<span class="status ${['accepted', 'active'].includes(String(value).toLowerCase()) ? 'status-filled' : ''}">${escape(value)}</span>`
-export const optionPair = (options: any[], depositBps: number, chosen?: string): string => `<div class="option-pair">${options.map(option => `<div class="offer-option${option.id === chosen ? ' chosen' : ''}"><strong>${escape(option.label)}</strong><span class="option-price">${money(option.cents)}</span><span class="muted">Deposit ${money(Math.round(option.cents * depositBps / 10000))}</span></div>`).join('')}</div>`
+export const optionPair = (options: any[], depositBps: number, chosen?: string, currency?: string): string => `<div class="option-pair">${options.map(option => `<div class="offer-option${option.id === chosen ? ' chosen' : ''}"><strong>${escape(option.label)}</strong><span class="option-price">${money(option.cents,currency)}</span><span class="muted">Deposit ${money(Math.round(option.cents * depositBps / 10000),currency)}</span></div>`).join('')}</div>`

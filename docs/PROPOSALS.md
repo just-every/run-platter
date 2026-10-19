@@ -1,13 +1,13 @@
 # Proposals and acceptance
 
-Each Platter offer has a scope of work, two GST-free AUD prices and a deposit percentage. An owner approves the exact revision before sending it. Sending freezes the offer.
+Each Platter offer has a scope of work, two USD prices (or the original GST-free AUD prices on a first-release proposal) and a deposit percentage. An owner approves the exact revision before sending it. Sending freezes the offer.
 
 ## Prepare an offer
 
 1. Add the client in **Clients**, or use an existing client.
 2. Open **Proposals** and find **Prepare a proposal**.
 3. Choose the client and enter the **Proposal title** and **Scope of work**.
-4. Give each option a label and a **Price in dollars**, then enter the **Deposit percentage**.
+4. Give each option a label and a **Price in USD** (or **Price in AUD** on a first-release proposal), then enter the **Deposit percentage**.
 5. Choose **Prepare proposal**, then open the proposal from **Your proposals**.
 
 For example, a Brand photography offer can have Essentials at $2,400.00 and Campaign at $4,200.00. A 25% deposit is $600.00 for Essentials or $1,050.00 for Campaign. The client accepts one option.
@@ -48,6 +48,6 @@ For a sent proposal, the owner can choose **Send fresh client link**. This revok
 
 After acceptance, open the owner's proposal and choose **Export invoice CSV**, then **Download deposit invoice CSV**. Repeating the export returns the same retained invoice; downloading it again does not create another invoice.
 
-The CSV uses Xero sales-invoice columns, account code `200` and `GST Free Income`. Confirm these match your books before importing. Import the invoice into your accounting system once: Platter cannot prevent a downloaded file being imported twice.
+The CSV uses Xero sales-invoice columns and account code `200`. Original AUD invoices retain `GST Free Income`; new USD invoices use `No Tax`, since sales tax is not calculated. Confirm these match your books before importing. Import the invoice into your accounting system once: Platter cannot prevent a downloaded file being imported twice.
 
-This export records the deposit invoice. Platter does not collect the deposit, calculate GST or sync directly with Xero.
+This export records the deposit invoice. Platter does not collect the deposit, calculate sales tax or sync directly with Xero.

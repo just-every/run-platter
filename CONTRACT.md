@@ -248,7 +248,7 @@ A proposal has any number of pricing tables in USD, each with line items (name, 
 
 *Acceptance:* Build two tables with 12 lines, quantities and units, and see the server totals match a cent-exact fixture; send malformed quantities and prices (400); reload and see identical totals in the client page and the PDF.
 
-*Status:* partial. Two fixed one-off option totals in AUD; no line items, quantities, units or multiple tables. (`src/platter/model.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs`)
+*Status:* partial. Two fixed one-off option totals in USD (legacy proposals retain AUD); no line items, quantities, units or multiple tables. (`src/platter/model.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs`)
 
 #### PRICE-002 — Packages and optional items the client chooses.
 
@@ -300,11 +300,11 @@ Payment terms are part of the offer: a deposit as a percentage or fixed amount, 
 
 #### PRICE-008 — First-release AUD agreements stay exact.
 
-Amounts carry an explicit currency. When an installation moves to USD pricing, proposals and agreements created under the first release keep their AUD, GST-free form, totals, deposit and invoice CSV exactly, labeled with their currency, and are never converted.
+Amounts carry an explicit currency. When an installation moves to USD pricing, proposals and agreements created under the first release keep their AUD, GST-free form, totals, deposit and invoice CSV exactly, labeled with their currency, and are never converted. New proposals use USD; revising or restoring an existing proposal retains its currency. The additive migration labels first-release rows AUD without rewriting their immutable snapshot strings or retained invoice bytes, including when restored from a pre-currency archive. Currency metadata applies to proposal, revision, acceptance and invoice records. USD deposit CSVs use `No Tax` because Platter does not yet calculate sales tax (`PRICE-005`); this is not a tax-exemption determination or evidence of successful accounting import (`ACCT-005`).
 
 *Acceptance:* Restore a first-release archive with an accepted AUD proposal into a target build, and see the agreement, deposit and CSV byte-identical and labeled AUD while new proposals are USD.
 
-*Status:* partial. Accepted records are immutable and survive archives, but amounts carry no currency field and there is no migration to currency-tagged amounts. (`src/platter/signing.ts`, `tests/archive.test.mjs`)
+*Status:* done. Named PRICE-008 CLI journey restores a genuine pre-currency archive, compares all legacy proposal/revision/acceptance/invoice fields byte-exact apart from additive AUD metadata, and accepts/exports a new USD proposal; named browser journey checks legacy AUD and new USD owner/client screens at 1440 and 390. (`migrations/core/0017_currency.sql`, `tests/archive.test.mjs`, `tests/site.test.mjs`)
 
 ### Collaboration and approvals
 
@@ -702,7 +702,7 @@ The owner or an admin connects a USD Xero organization. Platter creates or match
 
 *Acceptance:* With a Xero API fake: accept a proposal with a deposit and a net-30 milestone, and see the contact and only the deposit invoice; pay by Stripe and see the payment applied; mark the milestone done and see its invoice appear dated that day; pay it in Xero and see it paid in Platter.
 
-*Status:* partial. A Xero-format AUD deposit CSV only; no API sync, USD, schedules or payments. (`src/platter/invoices.ts`, `tests/platter.test.mjs`)
+*Status:* partial. A currency-tagged Xero-format deposit CSV only; no API sync, schedules or payments. (`src/platter/invoices.ts`, `tests/platter.test.mjs`)
 
 #### ACCT-003 — Pantry invoices and payments.
 
@@ -726,7 +726,7 @@ Without a live connection, the owner exports invoices, payments and schedules as
 
 *Acceptance:* Export the deposit and two milestones in QuickBooks and Xero formats and import them into each sandbox without errors; exporting again returns the same retained files.
 
-*Status:* partial. An AUD Xero deposit CSV only; no USD QuickBooks or Xero files and no payment or schedule export. (`src/platter/invoices.ts`, `tests/platter.test.mjs`)
+*Status:* partial. A currency-tagged Xero deposit CSV only; no QuickBooks files, sandbox-verified USD imports, payment or schedule export. (`src/platter/invoices.ts`, `tests/platter.test.mjs`)
 
 #### ACCT-006 — Stripe payouts, fees and clearing in accounting.
 
@@ -1214,8 +1214,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 2 | 29 | 97 | 128 |
-| All | 14 | 29 | 97 | 140 |
+| Target and push further | 3 | 28 | 97 | 128 |
+| All | 15 | 28 | 97 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1250,14 +1250,14 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `EDIT-017` | Client page in the client's language | target | missing |  | The client page and mail are English only. |
 | `EDIT-018` | Client-page preview before sending | target | missing |  | The owner's proposal page lists the scope and both options before approval, but there is no preview of the client page for an unsent revision: the client page and its private link exist only once a proposal is sent. |
 | `CAT-001` | Service and product catalog | target | missing |  | No catalog. |
-| `PRICE-001` | USD pricing tables with line items | target | partial | `src/platter/model.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs` | Two fixed one-off option totals in AUD; no line items, quantities, units or multiple tables. |
+| `PRICE-001` | USD pricing tables with line items | target | partial | `src/platter/model.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs` | Two fixed one-off option totals in USD (legacy proposals retain AUD); no line items, quantities, units or multiple tables. |
 | `PRICE-002` | Packages and optional items the client chooses | target | partial | `src/platter/signing.ts`, `tests/platter.test.mjs` | Exactly two fixed options; no add-ons, editable quantities or any number of packages. |
 | `PRICE-003` | One-off and recurring fees | target | missing |  | One-off totals only. |
 | `PRICE-004` | Discounts | target | missing |  | No discounts. |
 | `PRICE-005` | US sales tax | target | missing |  | No tax handling beyond a fixed GST-free export. |
 | `PRICE-006` | Internal cost and margin | target | missing |  | No cost or margin. |
 | `PRICE-007` | Payment terms and schedules on the proposal | target | partial | `src/platter/commands.ts`, `src/platter/signing.ts`, `tests/platter.test.mjs` | One deposit percentage only; no fixed deposits, milestones, net terms or schedule. |
-| `PRICE-008` | First-release AUD agreements stay exact | target | partial | `src/platter/signing.ts`, `tests/archive.test.mjs` | Accepted records are immutable and survive archives, but amounts carry no currency field and there is no migration to currency-tagged amounts. |
+| `PRICE-008` | First-release AUD agreements stay exact | target | done | `migrations/core/0017_currency.sql`, `tests/archive.test.mjs`, `tests/site.test.mjs` |  |
 | `COLLAB-001` | Real-time team editing | target | partial | `src/platter/commands.ts`, `tests/platter.test.mjs` | Version-guarded saves refuse conflicting edits with 409; there is no live co-editing or presence. |
 | `COLLAB-002` | Internal comments, mentions and assignments | target | missing |  | No internal comments. |
 | `COLLAB-003` | Version history with compare and restore | target | done | `src/platter/history.ts`, `src/platter/ui/history.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs` |  |
@@ -1305,10 +1305,10 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `PAY-008` | Net-terms invoices with a pay link and overdue tracking | target | missing |  | No invoices are sent to the client; the only invoice is the owner's deposit CSV export. |
 | `PAY-009` | PayPal, Square and Authorize.net collection | target | missing |  | No payment processors are connected. |
 | `ACCT-001` | QuickBooks Online invoices and payments | target | missing |  | No QuickBooks connection. |
-| `ACCT-002` | Xero invoices and payments | target | partial | `src/platter/invoices.ts`, `tests/platter.test.mjs` | A Xero-format AUD deposit CSV only; no API sync, USD, schedules or payments. |
+| `ACCT-002` | Xero invoices and payments | target | partial | `src/platter/invoices.ts`, `tests/platter.test.mjs` | A currency-tagged Xero-format deposit CSV only; no API sync, schedules or payments. |
 | `ACCT-003` | Pantry invoices and payments | target | missing |  | No Pantry connection. |
 | `ACCT-004` | One invoice authority and reconciliation | target | partial | `src/platter/invoices.ts`, `tests/platter.test.mjs` | A unique local binding prevents duplicate exports; there is no authority choice, provider ID or payment matching. |
-| `ACCT-005` | Invoice and payment export files | target | partial | `src/platter/invoices.ts`, `tests/platter.test.mjs` | An AUD Xero deposit CSV only; no USD QuickBooks or Xero files and no payment or schedule export. |
+| `ACCT-005` | Invoice and payment export files | target | partial | `src/platter/invoices.ts`, `tests/platter.test.mjs` | A currency-tagged Xero deposit CSV only; no QuickBooks files, sandbox-verified USD imports, payment or schedule export. |
 | `ACCT-006` | Stripe payouts, fees and clearing in accounting | target | missing |  | No payment or accounting connection, so no payout or fee posting. |
 | `ACCT-007` | Invoices created on their issue day, never ahead | target | missing |  | No invoices are created for scheduled amounts; the only invoice is the owner's deposit CSV export after acceptance. |
 | `CRM-001` | HubSpot two-way deal sync | target | missing |  | No HubSpot connection. |

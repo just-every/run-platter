@@ -118,7 +118,7 @@ test('NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and im
   } finally { if(h)await h.close();await rm(temporary,{recursive:true,force:true}) }
 })
 
-test('PRICE-008 public CLI restores first-release AUD bytes and new proposals and acceptances use USD without conversion', { timeout: 180_000 }, async () => {
+test('REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new proposals and acceptances use USD without conversion', { timeout: 180_000 }, async () => {
  const temporary=await mkdtemp(join(tmpdir(),'platter-currency-')),target=join(temporary,'target')
  let h
  try {
@@ -147,14 +147,17 @@ test('PRICE-008 public CLI restores first-release AUD bytes and new proposals an
   const verified=await h.send(path+'/action?name=code.verify',{code});assert.equal(verified.status,200)
   response=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true},verified.cookie);assert.equal(response.status,200);assert.match(response.text,/\$4,200\.00 USD/);assert.match(response.text,/\$1,050\.00 USD/)
   const current=(await h.state(cookie)).proposals.find(p=>p.id===created.id);assert.equal(current.currency,'USD');assert.equal(current.acceptance.currency,'USD');assert.equal(current.acceptance.totalCents,420000);assert.equal(current.acceptance.depositCents,105000)
+  const pipeline=await h.send('/api/platter/pipeline',undefined,cookie);assert.equal(pipeline.status,200)
+  assert.equal(pipeline.value.rows.find(p=>p.id===oldProposal.id).ownerId,null);assert.equal(pipeline.value.rows.find(p=>p.id===oldProposal.id).owner,'Not recorded')
+  assert.equal(pipeline.value.totals.find(t=>t.currency==='AUD').valueCents,accepted.total_cents);assert.equal(pipeline.value.totals.find(t=>t.currency==='USD').valueCents,420000)
   const usdInvoice=await cmd('invoice.export',{id:created.id});assert.equal(usdInvoice.currency,'USD');assert.match((await h.send('/api/platter/invoices/'+usdInvoice.id+'.csv',undefined,cookie)).text,/No Tax,USD/)
   await h.close();h=undefined
   const output=join(temporary,'after.rer');await command(target,['export','--output',output,'--no-queue'])
   const after=records(await readFile(output,'utf8'))
   for(const original of legacy.filter(item=>['p_proposals','p_revisions','p_acceptances','p_invoices'].includes(item.table))){
    const restored=after.find(item=>item.table===original.table&&(item.row.id===original.row.id&&original.row.id||item.row.proposal_id===original.row.proposal_id&&item.row.revision===original.row.revision))
-   assert.ok(restored,original.table+' retained');const {currency,previous_sent_revision,...unchanged}=restored.row
-   if(original.table==='p_proposals')assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision')
+   assert.ok(restored,original.table+' retained');const {currency,previous_sent_revision,sales_owner_id,sales_owner_name,...unchanged}=restored.row
+   if(original.table==='p_proposals'){assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision');assert.equal(sales_owner_id,null);assert.equal(sales_owner_name,null,'legacy sales ownership is not inferred')}
    assert.equal(currency,'AUD');assert.deepEqual(unchanged,original.row,original.table+' first-release bytes and amounts unchanged')
   }
  } finally {await h?.close();await rm(temporary,{recursive:true,force:true})}

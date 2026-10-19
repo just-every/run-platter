@@ -338,6 +338,8 @@ Every saved revision is listed with author and time. A member compares any two r
 
 Admins set approval rules by total value, discount, margin, payment terms, edited legal terms or template, and route each to named people or an approver role (owner, admin or manager, as `APPROVE-003` sets), in sequence or in parallel. A named person must hold the owner, admin, manager or billing role; a rule naming a sales member, content editor or viewer is refused when saved (400), and a named billing user approves only the steps that name them (`TEAM-001`). A rule applies to all proposals or to chosen templates, and a step whose condition does not hold for the current revision is skipped, as with the incumbents' conditional approvals. Whether a proposal that matches no rule needs approval at all is the `APPROVE-003` policy setting. `PROP-001`'s exact-revision binding applies to every approver.
 
+Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with awaiting approval, including filters, sorting, counts and totals under its visibility rules.
+
 *Acceptance:* Set rules: over $25,000 needs a manager, a discount over 15% needs the owner. A $30,000 proposal with 20% discount needs both in order; editing after the first approval clears both. A parallel rule routes edited legal terms to a named admin (counsel) and a named billing user (finance) at once: it completes only when both approve, in either order, and one rejection stops it; a second billing user not named in the rule is refused (403), and saving a rule that names a sales member is refused (400).
 
 *Status:* partial. Owner approval on every revision; no rules by amount, discount, margin or terms, and no routing to named approvers. (`src/platter/commands.ts`, `tests/platter.test.mjs`)
@@ -353,6 +355,8 @@ An approval request reaches the approver by email, Slack, Microsoft Teams, Nook 
 #### APPROVE-003 — Who approves, who sends and what needs approval.
 
 One approval policy governs every proposal, negotiated revision (`NEG-001`), duplicate (`EDIT-012`), drafted proposal (`AI-001`), move-in reissue (`MIG-005`), public signing link (`SEND-009`) and approval made from a phone (`MOB-001`), using the roles of `TEAM-001`. **Who approves:** the owner, admins and managers, each only for an approval step whose rule names them or their role (`APPROVE-001`), and a manager only for proposals owned by their team; a billing user only for a step whose rule names them personally, such as finance approving payment terms; sales members, content editors, viewers and agent keys never approve, nor does a billing user on a step that does not name them (403, no write). **Who sends:** the owner and admins send any proposal, managers send their team's, and sales members send their own, including proposals shared with them as a collaborator (`TEAM-001`); sending includes fresh invitations (`PROP-002`), revisions (`NEG-001`), signer replacements (`SEND-007`) and withdrawal (`SEND-010`); content editors, viewers, billing users and agent keys never send (403). **What needs approval:** a proposal needs approval when an `APPROVE-001` rule matches its current revision. The owner or an admin sets "approval required for every proposal": when it is on, a proposal that matches no rule needs approval from the policy's default approver (the owner, or the admin or manager role the owner names); when it is off, a proposal that matches no rule is sent by anyone who may send it, with no approval record, as with an incumbent template that carries no approval workflow. A draft prepared or last revised by an agent key always needs approval from an approver role, whatever the setting. A new installation starts with the setting on and the owner as default approver, which is the first release's behavior (`PROP-001`). **Binding:** every approval that applies binds the exact revision (`PROP-001`); an edit clears all of them and the rules are evaluated again against the new revision. Only the owner and admins change the policy, and each change is in the audit log (`TEAM-004`).
+
+Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with awaiting approval, including filters, sorting, counts and totals under its visibility rules.
 
 *Acceptance:* With a rule "over $25,000 needs a manager" and "approval required for every proposal" off: a sales member sends a $3,000 proposal that matches no rule, and the send succeeds with no approval record and no 409. A $30,000 proposal is approved by a manager and sent by the sales member who owns it. Editing it after that approval clears the manager's approval, and its send returns 409 until a manager approves the new revision. A sales member's attempt to approve it returns 403. A $3,000 draft prepared by an agent key is refused at send (409) until a manager approves it. A content editor's send returns 403, and a sales member's send of another member's proposal returns 403. Switch "approval required for every proposal" on: the unruled $3,000 send is refused (409) until the owner approves it. A sales member's attempt to change the policy returns 403, and the owner's change appears in the audit log with actor and time. A manager's approval of a proposal whose sales owner is outside their teams returns 403. The owner names the manager role as default approver: the unruled $3,000 proposal is approved by a manager of its team and sent; the owner then names the admin role instead, and on the next unruled proposal a manager's approval returns 403 while an admin's succeeds.
 
@@ -387,6 +391,8 @@ A proposal has any number of recipients with a role: signer, client-side approve
 #### SEND-004 — Expiry and reopening.
 
 A proposal expires a set number of days after it is sent (its expiry period, copied from its template or the workspace defaults under `FOLLOW-006`), or on a date the sender picks, or never when the sender removes it; the client page shows the expiry date. When the warning is on, each unsigned signer gets the `SEND-006` expiry notice the set number of days before expiry. The sender changes the expiry before and after sending. After expiry the client sees an expired page and can ask the firm to reopen it; the owner extends or reissues. An accepted agreement never expires.
+
+Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with expired, including filters, sorting, counts and totals under its visibility rules.
 
 *Acceptance:* Send with a 7-day expiry, advance the clock and see the client page expired with a reopen request, extend it, and accept. Send another proposal on 1 March with a 14-day expiry period and the warning on 1 day before: the client page shows 15 March, each unsigned signer's expiry notice reaches the mail fake on 14 March and the signed one gets none, and on 15 March the page is expired; extending it to 22 March reopens the same links.
 
@@ -446,6 +452,8 @@ Anyone who may send a proposal under `APPROVE-003` withdraws it, with a reason, 
 
 Platter records each verified or unverified view of a client link with time, recipient, approximate location and device class, and alerts the sender on first open and on a return visit after a quiet period the owner sets (30 minutes by default). The proposal shows a view timeline.
 
+Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with viewed, including filters, sorting, counts and totals under its visibility rules.
+
 *Acceptance:* Open the proposal as two recipients on desktop and phone; the sender gets an alert and the timeline lists both views with device class and approximate location (city, region and country from the request address through an IP-location fixture: Austin, Texas, United States for the first and Portland, Oregon, United States for the second). With a 30-minute quiet period, the first recipient's return visit 10 minutes later raises no alert and a visit 45 minutes after that raises one return-visit alert.
 
 *Status:* missing. No view tracking.
@@ -488,6 +496,8 @@ Each proposal has a reminder schedule: on or off, days after sending (for exampl
 
 Every open proposal has a sales owner, a next action and a due date. Each sales owner's queue, and a manager's view of the team, lists follow-ups in one stated order. First come overdue items (due before today in the owner's time zone), oldest due date first; then items due today; then upcoming items by due date. Within the same due date, the reason ranks: bounced email (`SEND-002`), then a client question waiting (`FOLLOW-004`), then a failed or overdue payment (`PAY-005`, `PAY-008`), then expiring within 3 days (`SEND-004`), then viewed but not signed (`TRACK-001`, `TRACK-002`), then unopened. Ties within one reason sort by proposal value (one-off total plus first-year recurring value), highest first, then by earliest sent time, then by proposal number, so the order is fully determined. A follow-up stays open until the owner completes it with a logged action, the client acts, or it is dismissed with a reason; a notification alone never closes it.
 
+Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with due follow-ups, including filters, sorting, counts and totals under its visibility rules.
+
 *Acceptance:* With the clock at 10 March, seed seven proposals for one owner: A $8,000 viewed, due 9 March; B $40,000 unopened, due 10 March; C $5,000 bounced, due 10 March; D $12,000 question waiting, due 10 March; E $20,000 viewed, due 10 March; F $30,000 viewed, due 10 March; G $9,000 unopened, due 12 March. The queue reads exactly A, C, D, F, E, B, G. Completing C with a logged call removes it; B's follow-up stays open after its notification is sent; dismissing E without a reason is refused (400).
 
 *Status:* missing. No follow-up queue.
@@ -511,6 +521,8 @@ A client asks a question or comments on any section from the proposal page. The 
 #### FOLLOW-005 — Decline reasons and won or lost outcomes.
 
 A client can decline with a reason. The firm marks a proposal won or lost with a reason from its own list, and can reopen a lost one as a new revision. A decline stops signing and payment on every recipient link, and marking a proposal lost withdraws it as `SEND-010` does, with the notice off by default. Outcomes sync to the CRM (`CRM-001` to `CRM-003`) and feed reporting (`REPORT-002`).
+
+Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with declined, including filters, sorting, counts and totals under its visibility rules.
 
 *Acceptance:* Decline as the client with the reason Budget, see the proposal lost and the HubSpot deal fake moved to Closed lost; mark another sent proposal lost and see each of its recipient links show the withdrawn page; reopen the declined one as a new revision and send.
 
@@ -643,6 +655,8 @@ The accepted schedule (`PRICE-007`) is executed: milestones are charged or invoi
 #### PAY-004 — Paid, pending, failed, refunded and disputed states.
 
 Each payment shows scheduled, processing, succeeded, failed, refunded, partially refunded or disputed from signed Stripe webhooks, processed once per event ID. ACH payments stay processing until Stripe reports success, typically up to four business days. A payment is paid only on provider evidence, and the owner sees amounts due, paid and overdue per agreement.
+
+Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with paid, including filters, sorting, counts and totals under its visibility rules.
 
 *Acceptance:* Replay Stripe test events out of order and twice: the state ends correct with one record per event; an ACH payment stays processing until the success event; the agreement shows due, paid and overdue totals.
 
@@ -860,11 +874,11 @@ Before an agreement's term ends, Platter prepares a renewal from it with the sam
 
 #### REPORT-001 — Proposal pipeline dashboard.
 
-A dashboard shows proposals by status (draft, awaiting approval, sent, viewed, accepted, paid, declined, expired) with value, owner, client, age and next action, filterable and sortable by each.
+A dashboard shows proposals by status (draft, awaiting approval, sent, viewed, accepted, paid, declined, expired) with value, owner, client, age and next action, filterable and sortable by each. This obligation covers every current workflow state (draft, approved, sent and accepted); `APPROVE-001` and `APPROVE-003` inherit awaiting approval, `TRACK-001` viewed, `PAY-004` paid, `FOLLOW-005` declined and `SEND-004` expired before those capabilities ship, with the same named fixture proof. Reports are owner-only until `TEAM-001` implements its report rights matrix. A new proposal records its preparing person as its stable sales owner; an agent draft records the key owner. Later revisions never transfer ownership. Legacy rows whose sales owner was not recorded stay labelled "Not recorded", with no inference from a preparer string. Value is the highest offered option before acceptance and the exact selected total afterwards, in integer cents; currencies are totalled separately and value sorting groups by currency before amount, with no conversion. Age is the number of completed 24-hour days since creation. Next actions are approve revision, send approved offer, await client decision, export deposit invoice, or deposit invoice exported, according to the current recorded state; `FOLLOW-002` inherits due follow-ups. Numeric filters include both bounds; equal sort keys use title then proposal id. Every filter applies before counts and totals.
 
 *Acceptance:* Seed 30 proposals across statuses and owners, filter by owner and status, sort by value, and see the totals match a fixture.
 
-*Status:* partial. A plain proposal list with status; no value, owner, age or filters. (`src/platter/state.ts`, `src/platter/ui/proposals.ts`)
+*Status:* done. Named REPORT-001 public HTTP fixture of 30 proposals, 1440/390 browser journey and legacy CLI archive journey assert current states, owners, every field filter/sort, exact totals, separate currencies, authority and durable ownership. Future status capabilities inherit the same proof. (`src/platter/pipeline.ts`, `src/platter/ui/pipeline.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### REPORT-002 — Win rate and sales performance.
 
@@ -930,6 +944,8 @@ Every member has one role: owner, admin, manager, sales, content editor, viewer 
 | View and export the audit log (`TEAM-004`) | Yes | Yes | No | No | No | No | No |
 
 Template and library folders can also be limited to teams (`EDIT-002`, `EDIT-003`): such a folder is listed and used only by members of those teams, admins and the owner. On upgrade, the first release's owner stays the owner and its members become sales members in no team, so each sees only their own proposals until the owner places them in teams. Agent keys are not a role and keep the draft-only rights of `ACCESS-001`.
+
+Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with the report rights matrix, including filters, sorting, counts and totals under its visibility rules.
 
 *Acceptance:* The matrix journey runs the `TEAM-001` rights table cell by cell: for each right and each role it calls the action's public route (HTTP, and the browser where the right is a screen) and expects success with the write, or 403 with no write, and list and search routes return exactly the proposals the View row allows. These cells are also pinned by name. (1) A sales member lists and opens another sales member's proposal: it is absent from the list and opening it is refused (403); once the other member shares it with them as a collaborator it lists, opens and edits, and they send it. (2) A manager opens a proposal whose sales owner is outside their teams (403) and one whose sales owner is in their team (200). (3) A sales member's view of a pricing table in the editor, the team API and the PDF export carries no cost or margin field, while a manager's does (`PRICE-006`). (4) A content editor edits a library item (200) and sends a proposal (403). (5) A billing user refunds part of a deposit (200, and the refund reaches the Stripe fake), and a sales member's refund is refused (403, no Stripe call). (6) A sales member disconnects QuickBooks Online (403, the connection unchanged), and an admin disconnects it (200). (7) A sales member and a manager change the workspace reminder and expiry defaults (403, the defaults unchanged), and an admin changes them (200). After an upgrade from a first-release database, the former member holds the sales role and sees only their own proposals.
 
@@ -1216,8 +1232,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 4 | 28 | 96 | 128 |
-| All | 16 | 28 | 96 | 140 |
+| Target and push further | 5 | 27 | 96 | 128 |
+| All | 17 | 27 | 96 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1326,7 +1342,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `HAND-002` | Handoff to Gauge with budget and rates | target | missing |  | No Gauge handoff. |
 | `RENEW-001` | Bulk proposal creation and sending | target | missing |  | No bulk sending. |
 | `RENEW-002` | Renewal proposals from accepted agreements | target | missing |  | No renewals. |
-| `REPORT-001` | Proposal pipeline dashboard | target | partial | `src/platter/state.ts`, `src/platter/ui/proposals.ts` | A plain proposal list with status; no value, owner, age or filters. |
+| `REPORT-001` | Proposal pipeline dashboard | target | done | `src/platter/pipeline.ts`, `src/platter/ui/pipeline.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `REPORT-002` | Win rate and sales performance | target | missing |  | No conversion reporting. |
 | `REPORT-003` | Content and pricing performance | target | missing |  | No content analytics. |
 | `REPORT-004` | Booked, billed and collected revenue | target | missing |  | No revenue reporting. |

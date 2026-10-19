@@ -129,3 +129,58 @@ test('NEG-001 negotiated offer requires exact approval, preserves the live offer
  await h.cmd('proposal.send',{id:second.p.id,version:firstAccepted.version},h.owner,409)
  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_negotiations WHERE proposal_id=?').bind(second.p.id).first()).n,0)
 }))
+
+test('REPORT-001 thirty proposals filter by recorded owner/status and every field, sort and total exact values without changing ownership',()=>run(async h=>{
+ const clients=[]
+ for(const [name,email] of [['Northstar Coffee','avery@northstar.example'],['Juniper Design','sam@juniper.example']])clients.push(await h.cmd('client.save',{name,email}))
+ const people=[{email:h.auth.OWNER_EMAIL,cookie:h.owner,id:(await h.state()).actor.id}]
+ for(const email of ['morgan@studio.example','casey@studio.example']){
+  await h.send('/auth/invite',{email,displayName:email.split('@')[0],role:'member',returnTo:'/app'},h.owner)
+  const cookie=await h.signIn(email);people.push({email,cookie,id:(await h.state(cookie)).actor.id})
+ }
+ const fixture=[]
+ for(let i=0;i<30;i++){
+  const person=people[i%3],client=clients[i%2],input={...offer,clientId:client.id,title:`Campaign ${String(i+1).padStart(2,'0')}`,priceOne:String(1000+i*10),priceTwo:String(2000+i*20)}
+  const made=await h.cmd('proposal.prepare',input,person.cookie),status=['draft','approved','sent','accepted'][i%4]
+  let version=1
+  if(status!=='draft'){await h.cmd('proposal.approve',{id:made.id,version:version++,revision:1})}
+  if(['sent','accepted'].includes(status)){
+   const shared=await h.cmd('proposal.send',{id:made.id,version:version++})
+   if(status==='accepted'){
+    const path=new URL(shared.shareUrl).pathname,cookie=await verified(h,path)
+    assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
+   }
+  }
+  fixture.push({id:made.id,title:input.title,status,owner:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':status==='sent'?'await-client':'export-deposit'})
+ }
+ const aged=fixture.find(p=>p.status==='draft')
+ await h.db.prepare('UPDATE p_proposals SET created_at=? WHERE id=?').bind(Date.now()-3*86400000-3600000,aged.id).run()
+ const report=async query=>{const r=await h.send('/api/platter/pipeline'+(query?'?'+query:''),undefined,h.owner);assert.equal(r.status,200,r.text);return r.value}
+ const all=await report('sort=value&direction=desc')
+ for(const expected of fixture){const actual=all.rows.find(p=>p.id===expected.id);assert.equal(actual.status,expected.status);assert.equal(actual.ownerId,expected.owner);assert.equal(actual.clientId,expected.client);assert.equal(actual.valueCents,expected.valueCents);assert.equal(actual.nextAction,expected.nextAction);assert.equal(actual.age,expected.id===aged.id?3:0)}
+ assert.equal(all.count,30);assert.equal(all.totals[0].valueCents,fixture.reduce((n,p)=>n+p.valueCents,0));assert.equal(all.totals[0].count,30)
+ assert.deepEqual(all.rows.map(p=>p.id),fixture.toSorted((a,b)=>b.valueCents-a.valueCents||a.title.localeCompare(b.title)).map(p=>p.id))
+ const selected=fixture.filter(p=>p.owner===people[1].id&&p.status==='sent'),filtered=await report('owner='+people[1].id+'&status=sent&sort=value')
+ assert.deepEqual(filtered.rows.map(p=>p.id),selected.toSorted((a,b)=>a.valueCents-b.valueCents).map(p=>p.id));assert.equal(filtered.totals[0].valueCents,selected.reduce((n,p)=>n+p.valueCents,0))
+ for(const [query,expected] of [
+  ['client='+clients[0].id,fixture.filter(p=>p.client===clients[0].id)],
+  ['minValue=2100&maxValue=2400',fixture.filter(p=>p.valueCents>=210000&&p.valueCents<=240000)],
+  ['minAge=0&maxAge=0',fixture.filter(p=>p.id!==aged.id)],['minAge=3&maxAge=3',[aged]],['minAge=4',[]],['nextAction=approve',fixture.filter(p=>p.status==='draft')],
+ ])assert.deepEqual(new Set((await report(query)).rows.map(p=>p.id)),new Set(expected.map(p=>p.id)))
+ for(const sort of ['status','owner','client','age','nextAction']){
+  const rows=(await report('sort='+sort)).rows
+  const field=sort==='age'?'age':sort
+  for(let i=1;i<rows.length;i++)assert.ok(sort==='age'?rows[i-1][field]<=rows[i][field]:rows[i-1][field].localeCompare(rows[i][field])<=0)
+ }
+ for(const query of ['sort=invalid','status=paid','minValue=1.234','minAge=-1','minValue=20&maxValue=10'])assert.equal((await h.send('/api/platter/pipeline?'+query,undefined,h.owner)).status,400)
+ assert.equal((await h.send('/api/platter/pipeline',undefined,people[1].cookie)).status,403)
+ assert.equal((await h.send('/api/platter/pipeline')).status,401)
+ const owned=fixture.find(p=>p.status==='draft'&&p.owner===people[1].id)
+ await h.cmd('proposal.revise',{...offer,clientId:owned.client,id:owned.id,version:1},h.owner)
+ assert.equal((await report()).rows.find(p=>p.id===owned.id).ownerId,people[1].id,'later editor never becomes the sales owner')
+ const key=await h.cmd('agent.create',{label:'Campaign assistant'})
+ const agent=await h.send('/api/platter/agent/command',{name:'proposal.prepare',input:{...offer,clientId:clients[0].id}},'',{authorization:'Bearer '+key.token});assert.equal(agent.status,200)
+ assert.equal((await report()).rows.find(p=>p.id===agent.value.id).ownerId,people[0].id,'agent draft belongs to the recorded key owner')
+ const accepted=fixture.find(p=>p.status==='accepted');await h.cmd('invoice.export',{id:accepted.id})
+ assert.equal((await report()).rows.find(p=>p.id===accepted.id).nextAction,'complete')
+}))

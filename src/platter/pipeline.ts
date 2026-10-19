@@ -1,0 +1,37 @@
+import { need } from './model'
+
+export const nextActions = { approve: 'Approve revision', send: 'Send approved offer', 'await-client': 'Await client decision', 'export-deposit': 'Export deposit invoice', complete: 'Deposit invoice exported' }
+const statuses = ['draft', 'approved', 'sent', 'accepted']
+const sorts = ['status', 'value', 'owner', 'client', 'age', 'nextAction']
+function bound(params: URLSearchParams, key: string, money = false) {
+ const raw = params.get(key)
+ if (!raw) return undefined
+ need((money ? /^\d{1,8}(\.\d{1,2})?$/ : /^\d{1,8}$/).test(raw), `Invalid ${key}`)
+ return money ? Math.round(Number(raw) * 100) : Number(raw)
+}
+export function pipeline(proposals: any[], params = new URLSearchParams(), now = Date.now()) {
+ const sort = params.get('sort') || 'status', direction = params.get('direction') || 'asc'
+ need(sorts.includes(sort) && ['asc', 'desc'].includes(direction), 'Choose a pipeline sort')
+ const status = params.get('status'), nextAction = params.get('nextAction')
+ need(!status || statuses.includes(status), 'Choose a proposal status')
+ need(!nextAction || Object.hasOwn(nextActions, nextAction), 'Choose a next action')
+ const minValue = bound(params, 'minValue', true), maxValue = bound(params, 'maxValue', true), minAge = bound(params, 'minAge'), maxAge = bound(params, 'maxAge')
+ need(minValue === undefined || maxValue === undefined || minValue <= maxValue, 'Minimum value exceeds maximum')
+ need(minAge === undefined || maxAge === undefined || minAge <= maxAge, 'Minimum age exceeds maximum')
+ let rows = proposals.map(p => ({
+  id: String(p.id), title: String(p.title), status: String(p.status), currency: String(p.currency),
+  valueCents: Number(p.acceptance ? p.acceptance.totalCents : Math.max(...p.options.map((o: any) => o.cents))),
+  ownerId: p.sales_owner_id as string | null, owner: p.sales_owner_name || 'Not recorded',
+  clientId: String(p.client_id), client: String(p.clientName), age: Math.max(0, Math.floor((now - p.created_at) / 86400000)),
+  nextAction: (p.status === 'draft' ? 'approve' : p.status === 'approved' ? 'send' : p.status === 'sent' ? 'await-client' : p.invoice ? 'complete' : 'export-deposit') as keyof typeof nextActions,
+ }))
+ const owners = [...new Map(rows.map(r => [r.ownerId || 'unrecorded', { id: r.ownerId || 'unrecorded', name: r.owner }])).values()].sort((a,b) => a.name.localeCompare(b.name))
+ const clients = [...new Map(rows.map(r => [r.clientId, { id: r.clientId, name: r.client }])).values()].sort((a,b) => a.name.localeCompare(b.name))
+ rows = rows.filter(r => (!status || r.status === status) && (!params.get('owner') || (r.ownerId || 'unrecorded') === params.get('owner')) && (!params.get('client') || r.clientId === params.get('client')) && (!nextAction || r.nextAction === nextAction) && (minValue === undefined || r.valueCents >= minValue) && (maxValue === undefined || r.valueCents <= maxValue) && (minAge === undefined || r.age >= minAge) && (maxAge === undefined || r.age <= maxAge))
+ rows.sort((a,b) => {
+  const order = sort === 'value' ? a.currency.localeCompare(b.currency) || a.valueCents - b.valueCents : sort === 'age' ? a.age - b.age : String(a[sort as 'status' | 'owner' | 'client' | 'nextAction']).localeCompare(String(b[sort as 'status' | 'owner' | 'client' | 'nextAction']))
+  return order * (direction === 'asc' ? 1 : -1) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id)
+ })
+ const totals = [...new Set(rows.map(r => r.currency))].sort().map(currency => ({ currency, count: rows.filter(r => r.currency === currency).length, valueCents: rows.filter(r => r.currency === currency).reduce((sum,r) => sum + r.valueCents, 0) }))
+ return { rows, count: rows.length, totals, owners, clients, generatedAt: now }
+}

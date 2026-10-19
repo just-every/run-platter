@@ -1,4 +1,5 @@
 import { historyPanel } from './history'
+import { pipelinePanel } from './pipeline'
 import { area, date, empty, escape, field, form, hidden, money, optionPair, panel, proposalPath, statusPill } from './shared'
 
 function editor(state: any, proposal?: any, negotiating = false): string {
@@ -16,11 +17,11 @@ function editor(state: any, proposal?: any, negotiating = false): string {
     (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + `<div class="editor-grid">${inputs}</div>` + `<button>${negotiating ? 'Prepare negotiated revision' : proposal ? 'Save revision' : 'Prepare proposal'}</button>`,
     proposal ? `proposal-${proposal.id}-${proposal.version}` : 'proposal-new')
 }
-export function proposalsPage(state: any): string {
+export function proposalsPage(state: any, selection = new URLSearchParams()): string {
   const proposals = state.proposals ?? []
   const list = proposals.length ? `<ul class="records">${proposals.map((p: any) => `<li><a href="${escape(proposalPath(p.id))}">${escape(p.title)}</a><span>${escape(p.clientName)} · ${statusPill(p.status)}</span></li>`).join('')}</ul>` : empty('No proposals yet. Prepare your first proposal below.')
   const canPrepare = ['owner', 'member'].includes(state.actor?.role)
-  return panel('Your proposals', list) + (canPrepare ? panel('Prepare a proposal', state.clients?.length ? editor(state) : '<p>Add a client before preparing a proposal.</p>' + (state.actor.role === 'owner' ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) : '')
+  return (state.actor?.role === 'owner' ? pipelinePanel(proposals,selection) : panel('Your proposals', list)) + (canPrepare ? panel('Prepare a proposal', state.clients?.length ? editor(state) : '<p>Add a client before preparing a proposal.</p>' + (state.actor.role === 'owner' ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) : '')
 }
 export function proposalPage(state: any, id: string, selection = new URLSearchParams()): string | null {
   const p = state.proposals?.find((item: any) => String(item.id) === id)

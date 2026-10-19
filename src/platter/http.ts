@@ -3,6 +3,7 @@ import { principal,credentialCommand } from './credentials'
 import { command } from './commands'
 import { importCommand } from './movein'
 import { state } from './state'
+import { pipeline } from './pipeline'
 import { clientContext,clientView,clientCommand } from './signing'
 import { renderApp,renderClient,renderMissing } from './ui'
 import { need,fail,type Actor } from './model'
@@ -23,6 +24,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   actor=await principal(request,env,isAgent)
   if(request.method==='GET'){
    if(pages.has(path))return renderApp(await state(env,actor),path+url.search)
+   if(path==='/api/platter/pipeline'){need(actor.role==='owner','Only the owner views the pipeline report',403);return json(pipeline((await state(env,actor)).proposals,url.searchParams))}
    if(path==='/api/platter/state'||path==='/api/platter/agent/context')return json(await state(env,actor))
    const file=path.match(/^\/api\/platter\/invoices\/([\w-]+)\.csv$/);if(file){need(actor.role==='owner','Only the owner downloads exports',403);const row=await env.DB.prepare('SELECT csv FROM p_invoices WHERE id=?').bind(file[1]).first<any>();need(row,'Export not found',404);return new Response(row.csv,{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="platter-deposit.csv"'}})}
   }else if(['/app/action','/api/platter/command','/api/platter/agent/command'].includes(path)){

@@ -11,7 +11,7 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
   let content: string | null
   let title: string
   switch (url.pathname) {
-    case '/app': title = 'Proposals'; content = proposalsPage(state); break
+    case '/app': title = 'Proposals'; content = proposalsPage(state,url.searchParams); break
     case '/app/proposal': title = 'Proposal'; content = proposalPage(state, url.searchParams.get('id') ?? '', url.searchParams); break
     case '/app/clients': title = 'Clients'; content = clientsPage(state); break
     case '/app/import': title = 'Client import'; content = importPage(state, feedback); break

@@ -178,3 +178,36 @@ test('NEG-001 desktop and phone negotiate, approve, send and accept the changed 
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('REPORT-001 desktop and phone pipeline filters, value sort, totals and clear filters use recorded proposal data', {timeout:120000}, async()=>{
+ let app,browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  const screenshots=process.env.PLATTER_SCREENSHOTS
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),command=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200);return r.json()}
+    const capture=async name=>{await page.evaluate(()=>document.fonts.ready.then(()=>null));if(screenshots)await page.screenshot({path:join(screenshots,`REPORT-001-${name}-${width}.png`),fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const client=await command('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),fixture=[]
+    for(const [title,price,status] of [['Brand identity','2400','draft'],['Seasonal product photography','4200','approved'],['Campaign launch','6800','approved']]){
+     const made=await command('proposal.prepare',{clientId:client.id,title,scope:'Creative campaign for Northstar Coffee, including planning and a studio production day.',optionOne:'Studio essentials',priceOne:'1200',optionTwo:'Full campaign',priceTwo:price,depositPercent:'25'})
+     if(status==='approved')await command('proposal.approve',{id:made.id,version:1,revision:1})
+     fixture.push({...made,title,price,status})
+    }
+    await page.goto(app.origin+'/app')
+    assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'3');assert.match(await page.locator('[data-pipeline-total="USD"]').innerText(),/13,400\.00 USD/)
+    await capture('all')
+    await page.getByLabel('Owner',{exact:true}).selectOption({label:'owner@northstar.example'});await page.getByLabel('Status',{exact:true}).selectOption('approved');await page.getByLabel('Sort by',{exact:true}).selectOption('value');await page.getByLabel('Direction',{exact:true}).selectOption('desc');await page.getByRole('button',{name:'Filter pipeline'}).click()
+    assert.deepEqual(await page.locator('[data-proposal-id]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('data-proposal-id'))),[fixture[2].id,fixture[1].id]);assert.match(await page.locator('[data-pipeline-total="USD"]').innerText(),/11,000\.00 USD/)
+    await capture('filtered')
+    await page.getByLabel('Minimum value',{exact:true}).fill('100000');await page.getByRole('button',{name:'Filter pipeline'}).click();assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'0');await capture('empty')
+    await page.getByRole('link',{name:'Clear filters',exact:true}).click();assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'3')
+    await page.getByRole('link',{name:'Brand identity',exact:true}).click();assert.equal(await page.locator('[name="title"]').inputValue(),'Brand identity')
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

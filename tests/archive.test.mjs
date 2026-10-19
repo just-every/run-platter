@@ -175,8 +175,8 @@ test('REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new
   const after=records(await readFile(output,'utf8'))
   for(const original of legacy.filter(item=>['p_proposals','p_revisions','p_acceptances','p_invoices'].includes(item.table))){
    const restored=after.find(item=>item.table===original.table&&(item.row.id===original.row.id&&original.row.id||item.row.proposal_id===original.row.proposal_id&&item.row.revision===original.row.revision))
-   assert.ok(restored,original.table+' retained');const {currency,previous_sent_revision,sales_owner_id,sales_owner_name,...unchanged}=restored.row
-   if(original.table==='p_proposals'){assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision');assert.equal(sales_owner_id,null);assert.equal(sales_owner_name,null,'legacy sales ownership is not inferred')}
+   assert.ok(restored,original.table+' retained');const {currency,previous_sent_revision,sales_owner_id,sales_owner_name,terms,...unchanged}=restored.row
+   if(original.table==='p_proposals'){assert.equal(terms,'','legacy proposals gain no additional terms');assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision');assert.equal(sales_owner_id,null);assert.equal(sales_owner_name,null,'legacy sales ownership is not inferred')}
    assert.equal(currency,'AUD');assert.deepEqual(unchanged,original.row,original.table+' first-release bytes and amounts unchanged')
   }
  } finally {await h?.close();await rm(temporary,{recursive:true,force:true})}

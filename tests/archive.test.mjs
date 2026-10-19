@@ -119,7 +119,8 @@ test('PRICE-008 public CLI restores first-release AUD bytes and new proposals an
  const temporary=await mkdtemp(join(tmpdir(),'platter-currency-')),target=join(temporary,'target')
  let h
  try {
-  const input=resolve('fixtures/first-release-aud.rer'),records=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(item=>item.kind==='part').flatMap(part=>part.items).filter(item=>item.kind==='row')
+  const input=join(temporary,'first-release-aud.rer'),records=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(item=>item.kind==='part').flatMap(part=>part.items).filter(item=>item.kind==='row')
+  await writeFile(input,await readFile('fixtures/first-release-aud.rer'),{mode:0o600})
   const legacy=records(await readFile(input,'utf8')),accepted=legacy.find(item=>item.table==='p_acceptances').row,invoice=legacy.find(item=>item.table==='p_invoices').row,oldProposal=legacy.find(item=>item.table==='p_proposals').row
   const ownerEmail=legacy.find(item=>item.table==='oa_operators').row.email
   await checkout(target)

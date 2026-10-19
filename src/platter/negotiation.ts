@@ -40,13 +40,13 @@ export async function negotiationCommand(env: Bindings, actor: Actor, name: stri
  }
  need(pending.approved_by, 'Approve this revision before sending', 409)
  const next = JSON.parse(pending.snapshot), token = secret(), shareUrl = env.AUTH_ORIGIN + '/p/' + token
- const client = await db.prepare('SELECT email FROM p_clients WHERE id=?').bind(offer.client_id).first<any>()
+ const client = await db.prepare('SELECT COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(offer.id,offer.client_id).first<any>()
  await commit(db, actor, [
   db.prepare("UPDATE p_proposals SET title=?,scope=?,terms=?,attachments=?,options=?,deposit_bps=?,revision=?,previous_sent_revision=?,prepared_by=?,approved_by=?,approved_at=?,version=version+1 WHERE id=?").bind(next.title, next.scope, next.terms??'', JSON.stringify(next.attachments??[]), JSON.stringify(next.options), next.deposit_bps, next.revision, offer.revision, pending.prepared_by, pending.approved_by, pending.approved_at, offer.id),
   db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(offer.id),
-  db.prepare('INSERT INTO p_shares(proposal_id,revision,token) VALUES(?,?,?)').bind(offer.id, next.revision, token),
+  db.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient) VALUES(?,?,?,?)').bind(offer.id, next.revision, token,client.email),
   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(offer.id),
-  queueMail(env, offer.id, client.email, ...proposalMail(next.title, shareUrl)),
+  queueMail(env, offer.id, client.email, ...proposalMail(next.title, shareUrl),actor.id),
  ], true, guard)
  await dispatchMail(env, offer.id)
  return { shareUrl }

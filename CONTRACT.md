@@ -376,9 +376,13 @@ A member connects Gmail or Google Workspace (OAuth `gmail.send`) or Microsoft 36
 
 Each send shows queued, accepted by provider, delivered, deferred, bounced or complained from signed provider webhooks. A bounce notifies the sender and opens a follow-up (`FOLLOW-002`) to correct the address. Provider acceptance is never shown as delivery.
 
-*Acceptance:* Send three proposals through a mail provider fake that reports delivered, deferred then delivered, and hard bounce; see each state, the bounce notification and the follow-up item.
+Today this covers the installation's signed-event providers, Resend and SendGrid. Cloudflare mail displays “Delivery events unavailable with this mail transport”; no signed HTTP event intake is claimed for it. Any transport that gains signed events, including future mailbox, recipient and SMS doors (`SEND-001`, `SEND-003`, `SEND-008`), inherits this obligation before shipping. Delivery means the provider reported recipient mail-server acceptance, never human receipt. Signed callbacks must correlate the provider message (or SendGrid's signed delivery id) and exact recipient; duplicate callbacks do not repeat work, and a terminal state cannot regress to queued, accepted or deferred.
 
-*Status:* partial. Records only that the provider accepted the message or that the outcome is uncertain; no delivered, bounced, deferred or complained states. (`src/platter/mail.ts`, `src/platter/ui/proposals.ts`)
+Under today's owner-only sending policy (`APPROVE-003`), the sending owner receives a durable in-app bounce notice and a separate open address-correction follow-up. Reading the notice does not close the follow-up. Only that active owner corrects the invitation address and explicitly sends a fresh invitation, rotating the old link and verification session under `PROP-002`, without changing client identity or the frozen offer. Verification codes go to the corrected invitation address. Provider acceptance of the correction closes the follow-up; an uncertain outcome keeps it open. The owner may instead dismiss it with a logged reason. Notices and logged follow-up actions survive `PORT-002` archives; mail bodies, links, attempt history and provider receipts remain excluded under `PORT-001`.
+
+*Acceptance:* Send three proposals through the installation's mail-provider fake that reports delivered, deferred then delivered, and hard bounce; see each state, the bounce notification and the follow-up item. Signed Resend and SendGrid public HTTP journeys assert correlation, replay refusal, complaint, queued and uncertain states, owner authority, reading without closing, explicit address correction and logged dismissal. Browser journeys at 1440 and 390 exercise the delivery history and correction; a public CLI journey restores both open and resolved bounce follow-ups. These fakes prove Platter's handling, not live provider delivery.
+
+*Status:* done. (`src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### SEND-003 — Recipients, roles and sharing.
 
@@ -1236,8 +1240,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 9 | 25 | 94 | 128 |
-| All | 21 | 25 | 94 | 140 |
+| Target and push further | 10 | 24 | 94 | 128 |
+| All | 22 | 24 | 94 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1287,7 +1291,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `APPROVE-002` | Approval requests that reach the approver | target | missing |  | No approval notifications. |
 | `APPROVE-003` | Who approves, who sends and what needs approval | target | partial | `src/platter/commands.ts`, `tests/platter.test.mjs` | Only the fixed default exists: every proposal needs approval, and only the owner approves and sends (one owner-role check in the approve-and-send command); there are no admin, manager or sales roles, no approval-required setting and no default-approver choice. |
 | `SEND-001` | Send from the firm's own mailbox | target | missing |  | Mail goes only through the installation's sender. |
-| `SEND-002` | Delivery status and bounce handling | target | partial | `src/platter/mail.ts`, `src/platter/ui/proposals.ts` | Records only that the provider accepted the message or that the outcome is uncertain; no delivered, bounced, deferred or complained states. |
+| `SEND-002` | Delivery status and bounce handling | target | done | `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `SEND-003` | Recipients, roles and sharing | target | missing |  | One client recipient per proposal. |
 | `SEND-004` | Expiry and reopening | target | missing |  | Offers never expire. |
 | `SEND-005` | Completion and activity notifications | target | missing |  | No notifications to the sender. |

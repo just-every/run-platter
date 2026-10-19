@@ -1,3 +1,4 @@
+import { bounceInbox, deliveryPanel } from './delivery'
 import { proposalAttachments } from './attachments'
 import { suggestionsPanel } from './suggestions'
 import { historyPanel } from './history'
@@ -23,7 +24,7 @@ export function proposalsPage(state: any, selection = new URLSearchParams()): st
   const proposals = state.proposals ?? []
   const list = proposals.length ? `<ul class="records">${proposals.map((p: any) => `<li><a href="${escape(proposalPath(p.id))}">${escape(p.title)}</a><span>${escape(p.clientName)} · ${statusPill(p.status)}</span></li>`).join('')}</ul>` : empty('No proposals yet. Prepare your first proposal below.')
   const canPrepare = ['owner', 'member'].includes(state.actor?.role)
-  return (state.actor?.role === 'owner' ? pipelinePanel(proposals,selection) : panel('Your proposals', list)) + (canPrepare ? panel('Prepare a proposal', state.clients?.length ? editor(state) : '<p>Add a client before preparing a proposal.</p>' + (state.actor.role === 'owner' ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) : '')
+  return bounceInbox(state) + (state.actor?.role === 'owner' ? pipelinePanel(proposals,selection) : panel('Your proposals', list)) + (canPrepare ? panel('Prepare a proposal', state.clients?.length ? editor(state) : '<p>Add a client before preparing a proposal.</p>' + (state.actor.role === 'owner' ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) : '')
 }
 export function proposalPage(state: any, id: string, selection = new URLSearchParams()): string | null {
   const p = state.proposals?.find((item: any) => String(item.id) === id)
@@ -38,9 +39,9 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   if (!frozen && ['owner', 'member'].includes(state.actor?.role)) html += panel('Revise proposal', '<p>Saving a revision clears any previous approval. The owner must approve the revised offer before sending.</p>' + editor(state, p))
   if (owner && p.status === 'draft') html += panel('Approve offer', '<p>Confirm the scope and exact offered prices above before approving this revision.</p>' + form('proposal.approve', path, hidden('id', p.id) + hidden('version', p.version) + hidden('revision', p.revision) + '<button>Approve this revision</button>'))
   if (owner && p.status === 'approved') html += panel('Send to client', '<p>Sending freezes this offer. The client will verify their email before accepting one option.</p>' + form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + '<button>Send approved proposal</button>'))
-  if (frozen) html += panel('Shared offer', `<p class="muted">${escape(({local:'Captured locally',pending:'Queued',sending:'Attempt in progress',accepted:'Accepted by provider',uncertain:'Status unknown'} as Record<string,string>)[p.delivery] || 'No delivery attempt recorded')}</p>` + '<p>This offer is frozen. Its scope, options, and prices can no longer be revised.</p>' + (owner && p.shareToken ? `<a href="/p/${encodeURIComponent(p.shareToken)}">Open client proposal</a>` : ''))
+  if (frozen) html += panel('Shared offer', '<p>This offer is frozen. Its scope, options, and prices can no longer be revised.</p>' + (owner && p.shareToken ? `<a href="/p/${encodeURIComponent(p.shareToken)}">Open client proposal</a>` : ''))
   if (owner && p.status === 'sent') html += panel('Send a fresh invitation', '<p>This replaces any previous client link and verification session while keeping the offer frozen.</p>' + form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + '<button>Send fresh client link</button>'))
   if (p.acceptance) html += panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)} · ${escape(p.acceptance.email)}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd></dl><p>The accepted agreement is permanent.</p>`)
   if (owner && p.acceptance) html += panel('Invoice export', form('invoice.export', path, hidden('id', p.id) + '<button>Export invoice CSV</button>') + (p.invoice ? `<p>Invoice ${escape(p.invoice.number)} · Exported ${date(p.invoice.exported_at)}</p><a href="/api/platter/invoices/${encodeURIComponent(p.invoice.id)}.csv">Download deposit invoice CSV</a>` : ''))
-  return html + suggestionsPanel(state,p) + historyPanel(state, p, selection)
+  return html + deliveryPanel(state,p) + suggestionsPanel(state,p) + historyPanel(state, p, selection)
 }

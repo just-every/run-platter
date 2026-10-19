@@ -151,6 +151,8 @@ test('NEG-001 desktop and phone negotiate, approve, send and accept the changed 
     }
     assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    await page.goto(h.origin+'/app')
+    assert.ok((await page.locator('body').innerText()).includes('Clients'),page.url()+': '+await page.locator('body').innerText())
     await page.getByRole('link',{name:'Clients',exact:true}).click();await page.locator('[name="name"]').fill('Northstar Coffee');await page.locator('[name="email"]').fill('avery@northstar.example');await page.getByRole('button',{name:'Add client'}).click()
     await page.getByRole('link',{name:'Proposals',exact:true}).click();await page.locator('[name="clientId"]').selectOption({label:'Northstar Coffee — avery@northstar.example'})
     for(const [name,value] of Object.entries({title:'Autumn campaign photography',scope:'One studio shoot and usage licence.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'}))await page.locator(`[name="${name}"]`).fill(value)
@@ -340,4 +342,50 @@ test('EDIT-010 desktop and phone upload vendor defaults and MSA, download frozen
    }finally{await context.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}
+})
+
+test('SEND-002 desktop and phone show provider delivery and preserve bounce notice until explicit correction', {timeout:120000}, async()=>{
+ const {harness}=await import('./harness.mjs'),{resendEvents}=await import('./delivery-provider.mjs'),{browserEdge}=await import('./browser-edge.mjs')
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ let browser,h,edge
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   const events=resendEvents(),calls=[]
+   edge=await browserEdge()
+   h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'network-edge-key',MAIL_WEBHOOK_KEY:events.key},outboundService:async req=>{calls.push(await req.json());return Response.json({id:'browser-mail-'+calls.length})}})
+   edge.attach(h)
+   const context=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
+   try{
+    const [name,value]=h.owner.split('=');await context.addCookies([{name,value,url:h.origin}])
+    const page=await context.newPage(),capture=async name=>{await page.evaluate(()=>document.fonts.ready);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`SEND-002-${name}-${width}.png`),fullPage:true})}
+    await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    await page.goto(h.origin+'/app')
+    assert.ok((await page.locator('body').innerText()).includes('Clients'),page.url()+': '+await page.locator('body').innerText())
+    await page.getByRole('link',{name:'Clients',exact:true}).click()
+    await page.locator('[name="name"]').fill('Northstar Coffee');await page.locator('[name="email"]').fill('avery@northstar.example');await page.getByRole('button',{name:'Add client'}).click()
+    await page.getByRole('link',{name:'Proposals',exact:true}).click()
+    await page.locator('[name="clientId"]').selectOption({label:'Northstar Coffee — avery@northstar.example'})
+    for(const [name,value] of Object.entries({title:'Autumn brand campaign',scope:'Two studio shoots and edited product photographs.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'}))await page.locator(`[name="${name}"]`).fill(value)
+    await page.getByRole('button',{name:'Prepare proposal',exact:true}).click();await page.getByRole('link',{name:'Autumn brand campaign',exact:true}).click()
+    await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click()
+    const id=(await h.state()).proposals[0].id,proposalUrl=h.origin+'/app/proposal?id='+id
+    assert.match(await page.getByRole('list',{name:'Invitation delivery history'}).innerText(),/Accepted by provider/i);await capture('accepted')
+    assert.equal((await events.emit(h,'browser-mail-1','email.delivery_delayed',{at:Date.now()-5000})).status,200)
+    await page.goto(proposalUrl);assert.match(await page.getByRole('list',{name:'Invitation delivery history'}).innerText(),/Delivery delayed/i);await capture('deferred')
+    assert.equal((await events.emit(h,'browser-mail-1','email.delivered',{at:Date.now()-4000})).status,200)
+    await page.reload();assert.match(await page.getByRole('list',{name:'Invitation delivery history'}).innerText(),/Delivery reported/i);await capture('delivered')
+    assert.equal((await events.emit(h,'browser-mail-1','email.bounced',{at:Date.now()-3000})).status,200)
+    await page.reload();assert.match(await page.getByRole('list',{name:'Invitation delivery history'}).innerText(),/Bounced/i);await capture('bounced')
+    await page.getByRole('link',{name:'Proposals',exact:true}).click()
+    const inbox=page.getByRole('list',{name:'Sender bounce notices'})
+    assert.match(await inbox.innerText(),/Unread/);assert.match(await inbox.innerText(),/Open follow-up/);await capture('notice-open')
+    await page.getByRole('button',{name:'Mark notice as read'}).click();assert.match(await inbox.innerText(),/Open follow-up/);await capture('notice-read')
+    await page.getByLabel('Correct recipient email').fill('avery.chen@northstar.example');await page.getByRole('button',{name:'Correct address and send fresh invitation'}).click()
+    assert.deepEqual(calls.at(-1).to,['avery.chen@northstar.example']);assert.match(await inbox.innerText(),/Closed/);assert.equal(await page.getByRole('button',{name:'Close follow-up',exact:true}).count(),0);await capture('notice-corrected')
+    await page.goto(proposalUrl);assert.match(await page.getByRole('list',{name:'Invitation delivery history'}).innerText(),/avery.chen@northstar.example/);await capture('corrected-invitation')
+   }finally{await context.close();await h.close();h=null;await edge.close();edge=null}
+  }
+ }finally{await browser?.close();await h?.close();await edge?.close()}
 })

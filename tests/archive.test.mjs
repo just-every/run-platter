@@ -85,7 +85,7 @@ test('EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 pub
     assert.ok(journal.originals.length>0)
     assert.ok(journal.batches.length>0)
     assert.ok(journal.provenance.length>0)
-    const business=state=>({clients:state.clients,proposals:state.proposals.map(({delivery,shareToken,...proposal})=>proposal),importJobs:state.importJobs})
+    const business=state=>({clients:state.clients,proposals:state.proposals.map(({delivery,deliveries,shareToken,...proposal})=>proposal),importJobs:state.importJobs})
     const beforeVendorDocuments=(await h.state()).vendorDocuments
     const before=business(await h.state())
     const beforeAudit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
@@ -125,7 +125,7 @@ test('EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 pub
     assert.deepEqual((await h.send('/api/platter/send-requests',undefined,restoredOwner)).value.requests,beforeRequests)
     assert.equal((await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'ping'},'',{authorization:'Bearer '+key.token})).status,401)
     assert.deepEqual(restoredState.outbox,[])
-    assert.ok(restoredState.proposals.every(p=>!p.shareToken&&!p.delivery))
+    assert.ok(restoredState.proposals.every(p=>!p.shareToken&&!p.delivery&&p.deliveries.length===0))
     assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id},restoredOwner),journal)
     assert.equal((await h.send(invoicePath,undefined,restoredOwner)).text,invoiceCsv)
     for(const file of frozenAttachments){const r=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+proposal.id+'/'+file.id,{headers:{cookie:restoredOwner,host:new URL(h.origin).host}});assert.equal(r.status,200);assert.deepEqual(new Uint8Array(await r.arrayBuffer()),file.kind==='w9'?attachmentBytes:new TextEncoder().encode('%PDF insurance'))}
@@ -191,4 +191,38 @@ test('REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new
    assert.equal(currency,'AUD');assert.deepEqual(unchanged,original.row,original.table+' first-release bytes and amounts unchanged')
   }
  } finally {await h?.close();await rm(temporary,{recursive:true,force:true})}
+})
+
+test('SEND-002 public CLI preserves bounce follow-ups and logged action without provider events or invitation credentials', {timeout:180000}, async()=>{
+ const {resendEvents}=await import('./delivery-provider.mjs')
+ const temporary=await mkdtemp(join(tmpdir(),'platter-delivery-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
+ let h
+ try{
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  const events=resendEvents();let submitted=0
+  h=await harness({root:source,origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'network-edge-key',MAIL_WEBHOOK_KEY:events.key},outboundService:()=>Response.json({id:'archive-provider-'+(++submitted)})})
+  const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
+  const offer={clientId:client.id,title:'Brand campaign',scope:'Studio photographs and usage licence',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'}
+  const ids=[]
+  for(let i=0;i<2;i++){const p=await h.cmd('proposal.prepare',offer);ids.push(p.id);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});await h.cmd('proposal.send',{id:p.id,version:2});assert.equal((await events.emit(h,'archive-provider-'+(i+1),'email.bounced')).status,200)}
+  let notices=(await h.state()).bounceNotices
+  await h.cmd('delivery.read',{noticeId:notices[0].id})
+  await h.cmd('delivery.dismiss',{noticeId:notices[0].id,reason:'Spoke with Avery; offer paused'})
+  notices=(await h.state()).bounceNotices
+  assert.equal(notices.length,2);assert.ok(notices.some(n=>n.closed_at));assert.ok(notices.some(n=>!n.closed_at))
+  const identity={auth:h.auth,owner:h.owner};await h.close();h=null
+  const file=join(temporary,'delivery.rer');await command(source,['export','--output',file,'--no-queue'])
+  const bytes=await readFile(file,'utf8')
+  assert.ok(bytes.includes('Spoke with Avery; offer paused'))
+  assert.ok(!bytes.includes(events.key));assert.ok(!bytes.includes('archive-provider-'))
+  await command(restored,['import','--input',file,'--yes','--no-queue'])
+  h=await harness({root:restored,origin:'https://platter.example',...identity,outboundService:()=>Response.json({id:'restored-correction'})})
+  const cookie=await h.signIn(identity.auth.OWNER_EMAIL)
+  assert.deepEqual((await h.state(cookie)).bounceNotices,notices)
+  assert.ok((await h.state(cookie)).proposals.every(p=>p.deliveries.length===0&&!p.shareToken))
+  const open=notices.find(n=>!n.closed_at)
+  await h.cmd('delivery.correct',{noticeId:open.id,email:'corrected@northstar.example'},cookie)
+  assert.ok((await h.state(cookie)).bounceNotices.find(n=>n.id===open.id).closed_at)
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

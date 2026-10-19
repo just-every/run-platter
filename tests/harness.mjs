@@ -3,7 +3,7 @@ import { createServer } from 'node:net'
 import { randomBytes } from 'node:crypto'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve, extname, sep } from 'node:path'
 import { build } from 'esbuild'
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare'
 import { unstable_splitSqlQuery } from 'wrangler'
@@ -15,7 +15,12 @@ export async function harness(options = {}) {
   const socket = createServer(); await new Promise(r => socket.listen(0, '127.0.0.1', r)); const port = socket.address().port; await new Promise(r => socket.close(r))
   const dir = options.root ? join(options.root, '.wrangler/state/v3') : await mkdtemp(join(tmpdir(), 'platter-test-')), origin = options.origin ?? `http://127.0.0.1:${port}`, setup = randomBytes(32).toString('hex')
   const auth = { AUTH_LOCAL: 'true', OWNER_EMAIL: 'owner@studio.example', SESSION_SECRET: randomBytes(32).toString('hex'), SETUP_TOKEN: setup, MAIL_PROVIDER: 'development', MAIL_FROM: 'auth@studio.example', ...options.auth, AUTH_ORIGIN: origin }
-  const mf = new Miniflare({ ...convertV4MiniflareOptions({ host: '127.0.0.1', port, modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], d1Databases: { DB: 'local-foundation-only' }, bindings: auth, ...(options.origin ? { upstream: options.origin } : {}), ...(options.outboundService ? { outboundService: options.outboundService } : {}) }), resourcePersistencePath: dir })
+  const runtimeOptions = () => ({ ...convertV4MiniflareOptions({ host: '127.0.0.1', port, modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], d1Databases: { DB: 'local-foundation-only' }, bindings: auth, ...(options.origin ? { upstream: options.origin } : {}), ...(options.outboundService ? { outboundService: options.outboundService } : {}), ...(options.assetsDirectory ? { serviceBindings: { ASSETS: async request => {
+    const root=resolve(options.assetsDirectory), file=resolve(root,'.'+new URL(request.url).pathname)
+    if(!file.startsWith(root+sep))return new Response(null,{status:404})
+    try{return new Response(await readFile(file),{headers:{'content-type':({'.css':'text/css','.js':'text/javascript','.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2'})[extname(file)]??'application/octet-stream'}})}catch{return new Response(null,{status:404})}
+  } } } : {}) }), resourcePersistencePath: dir })
+  const mf = new Miniflare(runtimeOptions())
   try {
     const db = await mf.getD1Database('DB')
     if (!options.root) for (const file of (await readdir('migrations/core')).filter(f => f.endsWith('.sql')).sort()) await db.batch(unstable_splitSqlQuery(await readFile('migrations/core/' + file, 'utf8')).map(sql => db.prepare(sql)))
@@ -38,7 +43,7 @@ export async function harness(options = {}) {
       const rows = (await db.prepare('SELECT message FROM rer_mail_development_outbox ORDER BY sequence DESC').all()).results
       const message = rows.map(r => JSON.parse(r.message)).find(m => m.to.includes(email))
       assert.ok(message, 'invitation delivered to the local outbox')
-      const token = new URL(message.text.match(/http:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get('token')
+      const token = new URL(message.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get('token')
       const r = await send('/auth/confirm', { token })
       assert.equal(r.status, 303, JSON.stringify(r.value)); return r.cookie
     }

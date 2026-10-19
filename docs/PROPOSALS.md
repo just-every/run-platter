@@ -51,3 +51,24 @@ After acceptance, open the owner's proposal and choose **Export invoice CSV**, t
 The CSV uses Xero sales-invoice columns and account code `200`. Original AUD invoices retain `GST Free Income`; new USD invoices use `No Tax`, since sales tax is not calculated. Confirm these match your books before importing. Import the invoice into your accounting system once: Platter cannot prevent a downloaded file being imported twice.
 
 This export records the deposit invoice. Platter does not collect the deposit, calculate sales tax or sync directly with Xero.
+
+Delivery events and bounced invitations (`SEND-002`) use the installation's mail
+provider. For Resend or SendGrid, configure the provider's signed webhook at
+`/api/platter/mail/events` and set the Worker secret `MAIL_WEBHOOK_KEY` to the
+Resend signing secret or SendGrid verification public key. Keep the endpoint
+identity stable when rotating that key. The installation verifies signatures,
+provider message correlation and the exact recipient before retaining an event.
+Duplicate callbacks do not create duplicate notices. Provider acceptance is
+shown separately from recipient mail-server delivery, which never proves a
+person read the message. Cloudflare mail displays “Delivery events unavailable
+with this mail transport”; it has no signed HTTP event intake here.
+
+The sending owner sees a durable bounce notice and open address-correction
+follow-up in Proposals. Reading the notice leaves the task open. Correcting the
+address explicitly sends a fresh invitation, invalidates the old link and
+verification session, and keeps the frozen offer and client record unchanged.
+Verification codes use the corrected invitation address. The follow-up closes
+only when the provider accepts that correction, or the owner logs a dismissal
+reason; an uncertain sending result stays open. Business notices and logged
+resolutions travel in RER archives; mail bodies, invitation links, delivery
+attempts and provider event receipts remain installation-local.

@@ -7,6 +7,7 @@ import { queueMail,dispatchMail } from './mail'
 const cookieName='platter_client'
 export function sixDigitCode(){const limit=4294000000,v=new Uint32Array(1);do crypto.getRandomValues(v);while(v[0]>=limit);return String(v[0]%1000000).padStart(6,'0')}
 export async function clientContext(env:Bindings,token:string,request:Request){need(/^[a-f0-9]{64}$/.test(token),'Proposal invitation not found',404);const share=await env.DB.prepare('SELECT * FROM p_shares WHERE token=?').bind(token).first<any>();need(share,'Proposal invitation not found',404);const row=await env.DB.prepare('SELECT p.*,c.name AS clientName,c.email AS clientEmail FROM p_proposals p JOIN p_clients c ON c.id=p.client_id WHERE p.id=?').bind(share.proposal_id).first<any>();need(row&&share.revision===row.revision&&['sent','accepted'].includes(row.status),'This proposal has been replaced',409)
+ if(share.recipient)row.clientEmail=share.recipient
  const cookie=request.headers.get('cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith(cookieName+'='))?.slice(cookieName.length+1),verified=Boolean(cookie&&share.session_hash&&share.session_expires>Date.now()&&await hash(cookie)===share.session_hash)
  return{share,row,verified,token}
 }

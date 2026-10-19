@@ -9,7 +9,7 @@ const offer = {
 const recipient = 'avery@northstar.example'
 
 async function approved(h) {
-  const client = await h.cmd('client.save', { name: 'Northstar Coffee', email: recipient })
+  const client = (await h.state()).clients.find(c=>c.email===recipient) ?? await h.cmd('client.save', { name: 'Northstar Coffee', email: recipient })
   const proposal = await h.cmd('proposal.prepare', { ...offer, clientId: client.id })
   await h.cmd('proposal.approve', { id: proposal.id, version: 1, revision: 1 })
   return proposal.id
@@ -158,4 +158,124 @@ test('MAIL-001 hosted mail commits and claims before provider acceptance; timeou
     releaseTimeout()
     await h.close()
   }
+})
+
+// The fake is only the configured provider's outbound HTTP and signed callback.
+// Native sessions, application HTTP, D1, serializers and intake are production.
+test('SEND-002 signed provider delivery, durable sender notice and actionable address correction', { timeout: 120000 }, async () => {
+ const { createHmac, randomBytes } = await import('node:crypto')
+ const keyBytes=randomBytes(32), webhookKey='whsec_'+keyBytes.toString('base64')
+ const calls=[]
+ let h
+ h=await harness({ origin:'https://platter.example', auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'fake-network-key',MAIL_WEBHOOK_KEY:webhookKey},
+  outboundService:async request=>{calls.push(await request.json());return Response.json({id:'provider-'+calls.length})},
+ })
+ const event=async(id,type,at=Date.now(),options={})=>{
+  const body=JSON.stringify({type,created_at:new Date(at).toISOString(),data:{email_id:options.message??'provider-'+id,to:options.to??[recipient]}})
+  const eid=options.eventId??'event-'+randomBytes(8).toString('hex'),timestamp=String(Math.floor(Date.now()/1000))
+  const signature=createHmac('sha256',keyBytes).update(eid+'.'+timestamp+'.'+body).digest('base64')
+  const response=await h.mf.dispatchFetch(h.origin+'/api/platter/mail/events',{method:'POST',headers:{'content-type':'application/json','svix-id':eid,'svix-timestamp':timestamp,'svix-signature':options.bad?'v1,invalid':'v1,'+signature},body})
+  return {status:response.status,body,eid,timestamp,signature}
+ }
+ const state=async()=>h.state()
+ const page=async id=>(await h.send('/app/proposal?id='+id,undefined,h.owner)).text
+ try {
+  await finishSetup(h)
+  const ids=[]
+  for(let i=0;i<3;i++){const id=await approved(h);ids.push(id);await h.cmd('proposal.send',{id,version:2})}
+  assert.equal(calls.length,3)
+  assert.deepEqual((await state()).proposals.map(p=>p.delivery),['accepted','accepted','accepted'])
+  assert.match(await page(ids[0]),/Accepted by provider/)
+  const base=Date.now()-10000
+  assert.equal((await event(1,'email.delivered',base)).status,200)
+  assert.equal((await state()).proposals.find(p=>p.id===ids[0]).delivery,'delivered')
+  assert.match(await page(ids[0]),/Delivery reported/)
+  assert.equal((await event(2,'email.delivery_delayed',base)).status,200)
+  assert.equal((await state()).proposals.find(p=>p.id===ids[1]).delivery,'deferred')
+  assert.match(await page(ids[1]),/Delivery delayed/)
+  assert.equal((await event(2,'email.delivered',base+1000)).status,200)
+  assert.equal((await state()).proposals.find(p=>p.id===ids[1]).delivery,'delivered')
+  // Terminal delivery cannot regress on a later-arriving delay or acceptance.
+  await event(2,'email.delivery_delayed',base+2000)
+  await event(2,'email.sent',base+3000)
+  assert.equal((await state()).proposals.find(p=>p.id===ids[1]).delivery,'delivered')
+  assert.equal((await event(1,'email.complained',base+2000)).status,200)
+  assert.equal((await state()).proposals.find(p=>p.id===ids[0]).delivery,'complained')
+  assert.match(await page(ids[0]),/Spam complaint reported/)
+  assert.equal((await event(3,'email.bounced',base,{bad:true})).status,400)
+  assert.equal((await event(3,'email.bounced',base,{to:['intruder@example.com']})).status,400)
+  assert.equal((await event(3,'email.bounced',base,{message:'unrelated-message'})).status,400)
+  assert.equal((await event(3,'email.bounced',base,{to:[recipient,'intruder@example.com']})).status,400)
+  assert.equal((await state()).bounceNotices.length,0)
+  const bounce=await event(3,'email.bounced',base)
+  assert.equal(bounce.status,200)
+  const replay=await h.mf.dispatchFetch(h.origin+'/api/platter/mail/events',{method:'POST',headers:{'svix-id':bounce.eid,'svix-timestamp':bounce.timestamp,'svix-signature':'v1,'+bounce.signature},body:bounce.body})
+  assert.equal(replay.status,200);await replay.text()
+  let s=await state(),notice=s.bounceNotices[0]
+  assert.equal(s.bounceNotices.length,1);assert.equal(s.proposals.find(p=>p.id===ids[2]).delivery,'bounced')
+  assert.equal(notice.closed_at,null);assert.equal(notice.read_at,null);assert.equal(notice.recipient,recipient)
+  const inbox=await h.send('/app',undefined,h.owner)
+  assert.match(inbox.text,/Bounced invitation to avery@northstar.example/);assert.match(inbox.text,/Open follow-up/)
+  await h.cmd('delivery.read',{noticeId:notice.id})
+  notice=(await state()).bounceNotices[0];assert.ok(notice.read_at);assert.equal(notice.closed_at,null)
+  assert.equal(calls.length,3,'reading or receiving a bounce never sends mail')
+  const old=s.proposals.find(p=>p.id===ids[2]),oldPath='/p/'+old.shareToken
+  const corrected=await h.cmd('delivery.correct',{noticeId:notice.id,email:'corrected@northstar.example'})
+  assert.deepEqual(calls.at(-1).to,['corrected@northstar.example'])
+  s=await state();assert.ok(s.bounceNotices[0].closed_at);assert.match(s.bounceNotices[0].action,/corrected@northstar.example/)
+  assert.equal(s.clients.find(c=>c.id===old.client_id).email,recipient,'invitation correction does not merge or edit client identity')
+  const changed=s.proposals.find(p=>p.id===ids[2]);assert.equal(changed.revision,old.revision);assert.equal(changed.scope,old.scope);assert.deepEqual(changed.options,old.options)
+  assert.equal((await h.send(oldPath)).status,404)
+  const path=new URL(corrected.shareUrl).pathname
+  assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+  assert.deepEqual(calls.at(-1).to,['corrected@northstar.example'],'mailbox verification follows corrected invitation')
+  // Repeated callback after all user actions preserves the same workflow.
+  const again=await h.mf.dispatchFetch(h.origin+'/api/platter/mail/events',{method:'POST',headers:{'svix-id':bounce.eid,'svix-timestamp':bounce.timestamp,'svix-signature':'v1,'+bounce.signature},body:bounce.body});assert.equal(again.status,200);await again.text()
+  assert.equal((await state()).bounceNotices.length,1)
+  assert.ok((await state()).bounceNotices[0].closed_at)
+  const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+  assert.ok(audit.some(r=>r.action==='delivery.correct'))
+ }finally{await h.close()}
+})
+
+test('SEND-002 SendGrid signed correlation, queued state, uncertainty and logged dismissal', {timeout:60000}, async()=>{
+ const {generateKeyPairSync,sign,randomBytes}=await import('node:crypto')
+ const {publicKey,privateKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'})
+ const key=publicKey.export({type:'spki',format:'der'}).toString('base64'),calls=[]
+ let refuse=false
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'sendgrid',MAIL_API_KEY:'network-fake-key',MAIL_WEBHOOK_KEY:key},outboundService:async req=>{calls.push(await req.json());return new Response(null,{status:refuse?503:202,headers:{'x-message-id':'provider-'+calls.length}})}})
+ try{
+  await finishSetup(h)
+  const id=await approved(h);await h.cmd('proposal.send',{id,version:2})
+  const mailId=calls[0].custom_args.rer_delivery_id
+  const timestamp=String(Math.floor(Date.now()/1000)),body=JSON.stringify([{sg_event_id:'sg-'+randomBytes(6).toString('hex'),sg_message_id:'sg-unique-event-message',event:'bounce',timestamp:Number(timestamp),email:recipient,rer_delivery_id:mailId}])
+  const signature=sign('sha256',Buffer.from(timestamp+body),privateKey).toString('base64')
+  const response=await h.mf.dispatchFetch(h.origin+'/api/platter/mail/events',{method:'POST',headers:{'x-twilio-email-event-webhook-timestamp':timestamp,'x-twilio-email-event-webhook-signature':signature},body})
+  assert.equal(response.status,200);await response.text()
+  assert.equal((await h.state()).proposals[0].delivery,'bounced')
+  assert.equal((await h.state()).bounceNotices.length,1)
+  const noticeId=(await h.state()).bounceNotices[0].id
+  // Only this sending owner has access to the follow-up action.
+  await h.send('/auth/invite',{email:'member@studio.example',displayName:'Colleague',role:'member',returnTo:'/app'},h.owner)
+  const member=await h.signIn('member@studio.example')
+  assert.deepEqual((await h.state(member)).bounceNotices,[])
+  await h.cmd('delivery.dismiss',{noticeId,reason:'Invalid address'},member,403)
+  refuse=true
+  await h.cmd('delivery.correct',{noticeId,email:'corrected@northstar.example'})
+  let notice=(await h.state()).bounceNotices[0]
+  assert.equal(notice.closed_at,null,'unconfirmed correction never silently closes work')
+  assert.equal((await h.state()).proposals[0].delivery,'uncertain')
+  await h.cmd('delivery.dismiss',{noticeId,reason:''},h.owner,400)
+  await h.cmd('delivery.dismiss',{noticeId,reason:'Called Avery; will provide a new address next week'})
+  notice=(await h.state()).bounceNotices[0]
+  assert.ok(notice.closed_at);assert.match(notice.action,/Called Avery/)
+  await h.cmd('delivery.correct',{noticeId,email:recipient},h.owner,409)
+ }finally{await h.close()}
+ for(const provider of ['development','cloudflare']){
+  const queued=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:provider}})
+  try{await finishSetup(queued);const id=await approved(queued);await queued.cmd('proposal.send',{id,version:2});const page=(await queued.send('/app/proposal?id='+id,undefined,queued.owner)).text
+   if(provider==='development'){assert.equal((await queued.state()).proposals[0].delivery,'pending');assert.match(page,/Queued/)}
+   else assert.match(page,/Delivery events unavailable with this mail transport/i)
+  }finally{await queued.close()}
+ }
 })

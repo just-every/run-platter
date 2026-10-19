@@ -164,11 +164,11 @@ A section can be shown only when a package, optional item or variable has a give
 
 #### EDIT-010 — Attachments and vendor documents.
 
-A proposal carries attachments such as the firm's W-9, certificate of insurance, MSA or case-study PDFs. The firm stores its current W-9 and insurance certificate once and attaches them by default. Attachments are frozen with the sent revision and listed in the signed agreement package.
+A proposal carries attachments such as the firm's W-9, certificate of insurance, MSA or case-study PDFs. The firm stores its current W-9 and insurance certificate once and attaches them by default. Attachments are frozen with the sent revision and listed in the signed agreement package. Owner-only vendor settings keep immutable W-9 and insurance file versions; new proposals copy the current defaults. Owner/member people may upload arbitrary files or refresh current defaults on an unsent draft or approved proposal; either creates a new draft revision and clears approval. Existing revisions and sent offers never resolve a later default. Client links download only files in that exact sent revision, under the same invitation access as its offer; bytes are download-only and are not sent to an external provider. The immutable accepted snapshot retains file references with byte digests; the owner/client agreement package lists the same file versions, filenames and byte sizes. All original bytes and current defaults survive PORT-002 archives. SIGN-005 inherits the same list in its signed PDF package and TEAM-001 inherits scoped person authority before shipping.
 
 *Acceptance:* Upload a W-9 in settings, send a proposal, and as the client download the W-9; replace the W-9 in settings and see the sent proposal still carry the original.
 
-*Status:* missing. No attachments.
+*Status:* done. Named EDIT-010 HTTP, 1440/390 browser and CLI archive journeys prove both reusable defaults, arbitrary uploads, renewed approval, exact binary downloads, frozen replacement custody and accepted-package listing. (`src/platter/attachments.ts`, `src/platter/attachment-commands.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### EDIT-011 — Large-proposal performance budget.
 
@@ -969,7 +969,7 @@ A firm runs several brands or business units, each with its own brand kit, domai
 
 #### TEAM-004 — Audit log.
 
-Every action by people, agents and integrations (edits, approvals, sends, views, signatures, payments, refunds, setting and permission changes) is logged with actor, time and subject, searchable by admins and exportable to CSV. This applies to every capability that exists today: successful client and proposal commands, revision restore and negotiation, agent-key management, client invitation views and verification/acceptance, client-import preview/apply/journal/undo, invoice export/download, and native Base authentication, setup, settings and permission actions. The owner acts for admin until `TEAM-001` ships; search and CSV are owner-only, with other roles refused (403). Rows retain an opaque actor record id and role (agent key id for agents), action, subject record id and server epoch-millisecond time. Unverified invitation views identify an unknown person, never the named client; verified client actions identify the client record. Credentials, codes, command payloads, IP addresses, devices and invitation tokens are never copied into the log. Exact actor/action/subject filters combine with case-insensitive literal search and inclusive epoch-millisecond time bounds; CSV returns the same ordered filtered rows. Audit rows travel in the business archive. Logging starts on upgrade; earlier history is not invented. Refused actions write nothing, preserving `HTTP-001`.
+Every action by people, agents and integrations (edits, approvals, sends, views, signatures, payments, refunds, setting and permission changes) is logged with actor, time and subject, searchable by admins and exportable to CSV. This applies to every capability that exists today: successful client and proposal commands, revision restore and negotiation, tracked text suggestions and review, vendor-document settings and proposal file upload/refresh/download, agent-key management, client invitation views and verification/acceptance, client-import preview/apply/journal/undo, invoice export/download, and native Base authentication, setup, settings and permission actions. The owner acts for admin until `TEAM-001` ships; search and CSV are owner-only, with other roles refused (403). Rows retain an opaque actor record id and role (agent key id for agents), action, subject record id and server epoch-millisecond time. Unverified invitation views identify an unknown person, never the named client; verified client actions identify the client record. Credentials, codes, command payloads, IP addresses, devices and invitation tokens are never copied into the log. Exact actor/action/subject filters combine with case-insensitive literal search and inclusive epoch-millisecond time bounds; CSV returns the same ordered filtered rows. Audit rows travel in the business archive. Logging starts on upgrade; earlier history is not invented. Refused actions write nothing, preserving `HTTP-001`.
 
 Every future capability must extend this audit journey before shipping: document and pricing actions (`EDIT-001`–`EDIT-018`, `CAT-001`, `PRICE-001`–`PRICE-007`), approval and team settings (`APPROVE-001`–`APPROVE-003`, `TEAM-001`–`TEAM-003`), recipient/notification/follow-up and tracking actions (`SEND-001`–`SEND-010`, `FOLLOW-001`–`FOLLOW-006`, `TRACK-001`–`TRACK-004`), signature/payment actions (`SIGN-003`–`SIGN-011`, `PAY-001`–`PAY-009`), integration actions (`CRM-001`–`CRM-004`, `ACCT-001`–`ACCT-007`, `AUTO-001`–`AUTO-005`, `HAND-001`–`HAND-002`), renewals, report delivery, migration, privacy and agent actions (`RENEW-001`–`RENEW-002`, `REPORT-002`–`REPORT-005`, `MIG-001`–`MIG-007`, `PRIV-001`, `AI-001`–`AI-004`, `AGENT-001`–`AGENT-009`).
 
@@ -1236,8 +1236,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 8 | 25 | 95 | 128 |
-| All | 20 | 25 | 95 | 140 |
+| Target and push further | 9 | 25 | 94 | 128 |
+| All | 21 | 25 | 94 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1262,7 +1262,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `EDIT-007` | Mobile client review | target | partial | `src/platter/ui/client.ts`, `src/platter/ui/shared.ts`, `tests/platter.test.mjs` | The client page has viewport and narrow-screen styling only; there is no mobile journey, no rich blocks and no accessibility audit. |
 | `EDIT-008` | Custom domain and branded client experience | target | missing |  | Client links use the installation origin with Platter styling. |
 | `EDIT-009` | Conditional content by package | target | missing |  | No conditional content. |
-| `EDIT-010` | Attachments and vendor documents | target | missing |  | No attachments. |
+| `EDIT-010` | Attachments and vendor documents | target | done | `src/platter/attachments.ts`, `src/platter/attachment-commands.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `EDIT-011` | Large-proposal performance budget | target | missing |  | No block editor exists, so no budget is measured; no large-proposal fixture or timing journey. |
 | `EDIT-012` | Duplicate a proposal for another client | target | missing |  | No duplicate action; a proposal can only be created from blank. |
 | `EDIT-013` | Documents without pricing | target | missing |  | Every proposal requires two priced options; there is no unpriced document type. |

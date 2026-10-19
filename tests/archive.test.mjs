@@ -27,7 +27,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -39,6 +39,11 @@ test('NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI pre
     assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,200)
     const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
     const offer={clientId:client.id,title:'Campaign agreement',scope:'Studio photographs and usage licence',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'}
+    const finish=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(finish.status,303)
+    const upload=async(fields,filename,bytes)=>{const form=new FormData();for(const [key,value] of Object.entries(fields))form.set(key,String(value));form.set('file',new File([bytes],filename,{type:'application/pdf'}));const request=new Request(h.origin+'/app/attachment',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner},body:form});const r=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});assert.equal(r.status,200);assert.match(await r.text(),/Document saved/)}
+    const attachmentBytes=new Uint8Array(120000).map((_,i)=>i%256)
+    await upload({kind:'w9'},'Northstar-W9.pdf',attachmentBytes)
+    await upload({kind:'insurance'},'Northstar-insurance.pdf','%PDF insurance')
     const proposal=await h.cmd('proposal.prepare',offer)
     await h.cmd('proposal.approve',{id:proposal.id,version:1,revision:1})
     await h.cmd('proposal.revise',{...offer,id:proposal.id,version:2,scope:'Studio photographs, usage licence and delivery'})
@@ -49,6 +54,8 @@ test('NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI pre
     const verified=await h.send(path+'/action?name=code.verify',{code})
     assert.equal(verified.status,200)
     assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true},verified.cookie)).status,200)
+    const frozenAttachments=(await h.state()).proposals.find(p=>p.id===proposal.id).attachments
+    await upload({kind:'w9'},'Northstar-W9-replacement.pdf','%PDF replacement')
     const invoice=await h.cmd('invoice.export',{id:proposal.id})
     const invoicePath='/api/platter/invoices/'+invoice.id+'.csv'
     const invoiceCsv=(await h.send(invoicePath,undefined,h.owner)).text
@@ -65,7 +72,8 @@ test('NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI pre
     await h.cmd('suggestion.resolve',{id:pending.id,version:4,suggestionId:suggestion.id,decision:'accepted'})
     await h.cmd('proposal.approve',{id:pending.id,version:5,revision:2})
     const work=await h.cmd('proposal.prepare',{...offer,title:'Work in progress'})
-    const request=async()=>{const r=await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'request_send',arguments:{id:work.id,revision:1}}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,200);assert.ok(!r.value.result.isError);return JSON.parse(r.value.result.content[0].text).request}
+    await upload({id:work.id,version:1},'Northstar-case-study.pdf','%PDF case study')
+    const request=async()=>{const r=await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'request_send',arguments:{id:work.id,revision:2}}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,200);assert.ok(!r.value.result.isError);return JSON.parse(r.value.result.content[0].text).request}
     const dismissed=await request();await h.cmd('send-request.resolve',{id:dismissed.id,status:'dismissed'});await request()
     const beforeRequests=(await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests
     const csv='client_id,name,email\narchive-import,Imported studio,imported@studio.example'
@@ -78,6 +86,7 @@ test('NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI pre
     assert.ok(journal.batches.length>0)
     assert.ok(journal.provenance.length>0)
     const business=state=>({clients:state.clients,proposals:state.proposals.map(({delivery,shareToken,...proposal})=>proposal),importJobs:state.importJobs})
+    const beforeVendorDocuments=(await h.state()).vendorDocuments
     const before=business(await h.state())
     const beforeAudit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
     assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','approved','draft'])
@@ -119,6 +128,8 @@ test('NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI pre
     assert.ok(restoredState.proposals.every(p=>!p.shareToken&&!p.delivery))
     assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id},restoredOwner),journal)
     assert.equal((await h.send(invoicePath,undefined,restoredOwner)).text,invoiceCsv)
+    for(const file of frozenAttachments){const r=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+proposal.id+'/'+file.id,{headers:{cookie:restoredOwner,host:new URL(h.origin).host}});assert.equal(r.status,200);assert.deepEqual(new Uint8Array(await r.arrayBuffer()),file.kind==='w9'?attachmentBytes:new TextEncoder().encode('%PDF insurance'))}
+    assert.deepEqual(restoredState.vendorDocuments,beforeVendorDocuments,'EDIT-010 current defaults and all replaced originals survive CLI restore')
     const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})
     assert.equal(setup.status,303)
     assert.equal((await h.send('/app/proposal?id='+proposal.id,undefined,restoredOwner)).status,200)
@@ -175,8 +186,8 @@ test('REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new
   const after=records(await readFile(output,'utf8'))
   for(const original of legacy.filter(item=>['p_proposals','p_revisions','p_acceptances','p_invoices'].includes(item.table))){
    const restored=after.find(item=>item.table===original.table&&(item.row.id===original.row.id&&original.row.id||item.row.proposal_id===original.row.proposal_id&&item.row.revision===original.row.revision))
-   assert.ok(restored,original.table+' retained');const {currency,previous_sent_revision,sales_owner_id,sales_owner_name,terms,...unchanged}=restored.row
-   if(original.table==='p_proposals'){assert.equal(terms,'','legacy proposals gain no additional terms');assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision');assert.equal(sales_owner_id,null);assert.equal(sales_owner_name,null,'legacy sales ownership is not inferred')}
+   assert.ok(restored,original.table+' retained');const {currency,previous_sent_revision,sales_owner_id,sales_owner_name,terms,attachments,...unchanged}=restored.row
+   if(original.table==='p_proposals'){assert.equal(terms,'');assert.deepEqual(JSON.parse(attachments),[]);assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision');assert.equal(sales_owner_id,null);assert.equal(sales_owner_name,null,'legacy sales ownership is not inferred')}
    assert.equal(currency,'AUD');assert.deepEqual(unchanged,original.row,original.table+' first-release bytes and amounts unchanged')
   }
  } finally {await h?.close();await rm(temporary,{recursive:true,force:true})}

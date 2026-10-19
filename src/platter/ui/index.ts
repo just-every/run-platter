@@ -1,3 +1,4 @@
+import { vendorSettings } from './attachments'
 import { accessPage, clientsPage, importPage } from './admin'
 import { proposalPage, proposalsPage } from './proposals'
 import { document, escape, panel, type Feedback } from './shared'
@@ -11,6 +12,7 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
   let content: string | null
   let title: string
   switch (url.pathname) {
+    case '/app/settings': title='Vendor documents';content=vendorSettings(state);break
     case '/app': title = 'Proposals'; content = proposalsPage(state,url.searchParams); break
     case '/app/proposal': title = 'Proposal'; content = proposalPage(state, url.searchParams.get('id') ?? '', url.searchParams); break
     case '/app/clients': title = 'Clients'; content = clientsPage(state); break

@@ -295,7 +295,7 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  await h.cmd('agent.revoke',{id:key.id});assert.equal((await transport('ping')).status,401)
 }))
 
-test('NEG-002 opt-in tracked terms edits accept one/reject one into revision two, preserve offer and require fresh approval',()=>run(async h=>{
+test('NEG-002 / TEAM-004 opt-in tracked terms edits accept one/reject one into revision two, preserve offer and require fresh approval',()=>run(async h=>{
  const {client,p}=await draft(h)
  await h.cmd('proposal.revise',{...offer,terms:'Delivery in 14 days. Usage for one year.',clientId:client.id,id:p.id,version:1})
  await h.cmd('proposal.approve',{id:p.id,version:2,revision:2})
@@ -333,4 +333,61 @@ test('NEG-002 opt-in tracked terms edits accept one/reject one into revision two
  let r=(await h.state()).proposals.find(x=>x.id===q.id)
  for(const replacement of ['21 days','forever']){await h.cmd('suggestion.resolve',{id:q.id,version:r.version,suggestionId:r.suggestions.find(x=>x.replacement===replacement).id,decision:replacement==='21 days'?'accepted':'rejected'});r=(await h.state()).proposals.find(x=>x.id===q.id)}
  assert.equal(r.revision,2);assert.equal(r.terms,'Delivery in 21 days. Usage for one year.');assert.equal(r.suggestions.find(x=>x.replacement==='forever').decision,'rejected')
+ const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+ for(const action of ['suggestions.allow','suggestion.create','suggestion.resolve']){const rows=audit.filter(x=>x.action===action);assert.ok(rows.length);assert.ok(rows.every(x=>x.subject&&x.occurred_at&&x.actor_id));if(action==='suggestion.create')assert.ok(rows.every(x=>x.actor_role==='client'&&x.actor_id===client.id))}
+ assert.ok(!JSON.stringify(audit).includes('21 days'))
+}))
+
+test('EDIT-010 / TEAM-004 defaults and arbitrary files freeze with approval, download exact bytes and remain in the signed package after replacement',()=>run(async h=>{
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+ const upload=async(fields,filename,bytes,cookie=h.owner)=>{
+  const form=new FormData();for(const [key,value] of Object.entries(fields))form.set(key,String(value));form.set('file',new File([bytes],filename,{type:'application/pdf'}))
+  const request=new Request(h.origin+'/app/attachment',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie},body:form});const r=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});const body=await r.text();if(fields.kind&&cookie===h.owner)assert.ok(body.includes('Document saved.'),body);return {status:r.status,text:body}
+ }
+ const w9=new Uint8Array([37,80,68,70,0,255,13,10]),insurance=new Uint8Array(120000).map((_,i)=>i%256),msa=new TextEncoder().encode('%PDF Northstar MSA\n')
+ assert.equal((await upload({kind:'w9'},'studio-w9.pdf',w9)).status,200)
+ assert.equal((await upload({kind:'insurance'},'insurance.pdf',insurance)).status,200)
+ const {client,p}=await draft(h)
+ let row=(await h.state()).proposals.find(x=>x.id===p.id);assert.deepEqual(row.attachments.map(f=>f.kind).sort(),['insurance','w9'])
+ await h.cmd('proposal.approve',{id:p.id,version:1,revision:1})
+ assert.equal((await upload({id:p.id,version:2},'client-msa.pdf',msa)).status,200)
+ row=(await h.state()).proposals.find(x=>x.id===p.id);assert.equal(row.revision,2);assert.equal(row.approved_by,null);assert.equal(row.attachments.length,3)
+ await h.cmd('proposal.send',{id:p.id,version:row.version},h.owner,409)
+ await h.cmd('proposal.approve',{id:p.id,version:row.version,revision:2});row=(await h.state()).proposals.find(x=>x.id===p.id)
+ const shared=await h.cmd('proposal.send',{id:p.id,version:row.version}),path=new URL(shared.shareUrl).pathname
+ const before=await h.db.prepare('SELECT snapshot FROM p_revisions WHERE proposal_id=? AND revision=2').bind(p.id).first()
+ const late=await upload({id:p.id,version:row.version+1},'late.pdf',msa);assert.equal(late.status,409);assert.match(late.text,/Upload attachments before sending/)
+ assert.equal((await h.state()).proposals.find(x=>x.id===p.id).attachments.length,3)
+ assert.equal((await upload({kind:'w9'},'studio-w9-new.pdf','%PDF replacement')).status,200)
+ assert.equal((await upload({kind:'insurance'},'insurance-new.pdf','%PDF replacement insurance')).status,200)
+ for(const file of row.attachments){
+  const r=await h.mf.dispatchFetch(h.origin+path+'/attachments/'+file.id)
+  assert.equal(r.status,200);assert.match(r.headers.get('content-disposition'),/^attachment;/);assert.match(r.headers.get('content-security-policy'),/sandbox/)
+  assert.deepEqual(new Uint8Array(await r.arrayBuffer()),file.kind==='w9'?w9:file.kind==='insurance'?insurance:msa)
+ }
+ const defaults=(await h.state()).vendorDocuments
+ assert.equal((await h.send(path+'/attachments/'+defaults[0].id)).status,404)
+ const cookie=await verified(h,path)
+ assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
+ const accepted=await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
+ assert.deepEqual(JSON.parse(accepted.snapshot).attachments,row.attachments)
+ const page=await h.send(path,undefined,cookie);assert.match(page.text,/Signed agreement package attachments/);for(const file of row.attachments)assert.ok(page.text.includes(file.filename))
+ assert.equal((await h.db.prepare('SELECT snapshot FROM p_revisions WHERE proposal_id=? AND revision=2').bind(p.id).first()).snapshot,before.snapshot)
+ await h.send('/auth/invite',{email:'colleague@studio.example',displayName:'Colleague',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('colleague@studio.example')
+ const forbidden=await upload({kind:'w9'},'forbidden.pdf',msa,member);assert.equal(forbidden.status,403);assert.match(forbidden.text,/Only the owner/)
+ const q=await h.cmd('proposal.prepare',{...offer,clientId:client.id});let next=(await h.state()).proposals.find(x=>x.id===q.id)
+ assert.deepEqual(next.attachments.map(x=>x.id),defaults.map(x=>x.id))
+ await upload({kind:'w9'},'studio-w9-latest.pdf','%PDF latest default')
+ await h.cmd('attachments.refresh',{id:q.id,version:1});next=(await h.state()).proposals.find(x=>x.id===q.id);assert.equal(next.revision,2);assert.notDeepEqual(next.attachments,defaults);const refreshed=next.attachments
+ await h.cmd('proposal.restore',{id:q.id,version:2,revision:1});assert.deepEqual((await h.state()).proposals.find(x=>x.id===q.id).attachments,defaults)
+ next=(await h.state()).proposals.find(x=>x.id===q.id)
+ await h.cmd('proposal.approve',{id:q.id,version:next.version,revision:3});await h.cmd('proposal.send',{id:q.id,version:next.version+1})
+ next=(await h.state()).proposals.find(x=>x.id===q.id)
+ await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:q.id,version:next.version,scope:'A negotiated campaign.'})
+ next=(await h.state()).proposals.find(x=>x.id===q.id)
+ await h.cmd('proposal.restore',{id:q.id,version:next.version,revision:2})
+ assert.deepEqual((await h.state()).proposals.find(x=>x.id===q.id).attachments,refreshed,'COLLAB-003 restores file versions into an unapproved negotiated revision')
+ const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+ for(const action of ['vendor-document.save','attachment.upload','attachment.download','attachments.refresh'])assert.ok(audit.some(x=>x.action===action&&x.subject&&x.actor_id&&x.occurred_at),'TEAM-004 '+action)
+ assert.ok(!JSON.stringify(audit).includes('studio-w9.pdf'))
 }))

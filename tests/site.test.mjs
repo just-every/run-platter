@@ -308,3 +308,36 @@ test('NEG-002 desktop and phone client suggests two terms edits; firm accepts on
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('EDIT-010 desktop and phone upload vendor defaults and MSA, download frozen bytes, replace defaults and accept the original package', {timeout:120000}, async()=>{
+ let app,browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  const screenshots=process.env.PLATTER_SCREENSHOTS;if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`EDIT-010-${name}-${width}.png`),fullPage:true})}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    await page.getByRole('link',{name:'Vendor documents',exact:true}).click()
+    const uploadDefault=async(kind,name,text)=>{const form=page.locator(`form:has(input[name="kind"][value="${kind}"])`);await form.getByLabel('Document file').setInputFiles({name,mimeType:'application/pdf',buffer:Buffer.from(text)});await form.locator('button').click();assert.equal(await page.getByRole('alert').count(),0)}
+    await uploadDefault('w9','Northstar-W9.pdf','%PDF original W9');await uploadDefault('insurance','Northstar-insurance.pdf','%PDF original insurance');await capture('settings')
+    const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    const client=await cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),p=await cmd('proposal.prepare',{clientId:client.id,title:'Northstar autumn campaign',scope:'One studio shoot and usage licence.',terms:'Delivery within 21 days.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'})
+    await page.goto(app.origin+'/app/proposal?id='+p.id)
+    const form=page.locator('form:has(input[name="file"])');await form.getByLabel('Document file').setInputFiles({name:'Northstar-MSA.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF client MSA')});await form.getByRole('button',{name:'Attach document',exact:true}).click();assert.equal(await page.getByRole('alert').count(),0);await capture('draft-attachments')
+    assert.match(await page.locator('.proposal-status').innerText(),/draft.*Revision 2/is)
+    await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();const clientPath=await page.getByRole('link',{name:'Open client proposal',exact:true}).getAttribute('href');await capture('sent-attachments')
+    await page.getByRole('link',{name:'Vendor documents',exact:true}).click();await uploadDefault('w9','Northstar-W9-replacement.pdf','%PDF new W9');await uploadDefault('insurance','Northstar-insurance-replacement.pdf','%PDF new insurance');await capture('replacement-settings')
+    await page.goto(app.origin+clientPath)
+    for(const [filename,bytes] of [['Northstar-W9.pdf','%PDF original W9'],['Northstar-insurance.pdf','%PDF original insurance'],['Northstar-MSA.pdf','%PDF client MSA']]){const link=page.getByRole('link',{name:new RegExp(filename.replaceAll('.','\\.'))});const response=await context.request.get(app.origin+await link.getAttribute('href'));assert.equal(response.status(),200);assert.equal((await response.body()).toString(),bytes);assert.match(response.headers()['content-disposition'],/^attachment;/)}
+    assert.equal(await page.getByRole('link',{name:/replacement/}).count(),0);await capture('client-originals')
+    await page.getByRole('button',{name:'Send verification code'}).click();const state=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click();await page.getByRole('radio',{name:/Studio essentials/}).check();await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
+    assert.equal(await page.getByRole('heading',{name:'Signed agreement package attachments',exact:true}).count(),1);assert.equal(await page.getByRole('link',{name:/Northstar-W9\.pdf/}).count(),1);assert.equal(await page.getByRole('link',{name:/Northstar-MSA\.pdf/}).count(),1);await capture('accepted-package')
+    await page.goto(app.origin+'/app/proposal?id='+p.id);assert.equal(await page.getByRole('heading',{name:'Signed agreement package attachments',exact:true}).count(),1);await capture('owner-accepted-package')
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

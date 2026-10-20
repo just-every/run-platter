@@ -1,8 +1,8 @@
 import { area, date, escape, form, hidden, panel, proposalPath, statusPill } from './shared'
 import type { QuestionThread } from '../questions'
 
-function thread(question:QuestionThread,answerForm='') {
- return `<article id="question-${escape(question.id)}"><h3>${escape(question.section)} · Revision ${escape(question.revision)}</h3><p>${statusPill(question.status)} · Asked ${date(question.created_at)}</p><p class="preserve">${escape(question.text)}</p>${question.answers.map(answer=>`<article><h4>Owner answer</h4><p>${date(answer.created_at)}</p><p class="preserve">${escape(answer.text)}</p></article>`).join('')}${answerForm}</article>`
+function thread(question:QuestionThread,answerForm='',closed=false) {
+ return `<article id="question-${escape(question.id)}"><h3>${escape(question.section)} · Revision ${escape(question.revision)}</h3><p>${statusPill(closed?'closed':question.status)} · Asked ${date(question.created_at)}</p><p class="preserve">${escape(question.text)}</p>${question.answers.map(answer=>`<article><h4>Owner answer</h4><p>${date(answer.created_at)}</p><p class="preserve">${escape(answer.text)}</p></article>`).join('')}${answerForm}</article>`
 }
 
 /** Proposal history is visible to people; only the current owner receives answer controls. */
@@ -10,7 +10,7 @@ export function ownerQuestions(state:any,p:any) {
  if(!['owner','member'].includes(state.actor?.role))return ''
  const questions:QuestionThread[]=p.questions??[]
  if(!questions.length)return ''
- const rows=questions.map(q=>thread(q,state.actor.role==='owner'&&!p.activeWithdrawal?form('question.answer',proposalPath(p.id),hidden('id',p.id)+hidden('questionId',q.id)+hidden('requestId',crypto.randomUUID())+area('Answer this question','text','','required maxlength="10000"')+'<button>Send answer to client</button>')+form('question.email',proposalPath(p.id),hidden('id',p.id)+hidden('questionId',q.id)+'<button>Email me this question</button>'):'' )).join('')
+ const rows=questions.map(q=>thread(q,state.actor.role==='owner'&&!p.withdrawals?.some((w:any)=>w.revision===q.revision)?form('question.answer',proposalPath(p.id),hidden('id',p.id)+hidden('questionId',q.id)+hidden('requestId',crypto.randomUUID())+area('Answer this question','text','','required maxlength="10000"')+'<button>Send answer to client</button>')+form('question.email',proposalPath(p.id),hidden('id',p.id)+hidden('questionId',q.id)+'<button>Email me this question</button>'):'',Boolean(p.withdrawals?.some((w:any)=>w.revision===q.revision)))).join('')
  return panel('Client questions',rows)
 }
 

@@ -131,7 +131,7 @@ test('NEG-001 negotiated offer requires exact approval, preserves the live offer
  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_negotiations WHERE proposal_id=?').bind(second.p.id).first()).n,0)
 }))
 
-test('REPORT-001 / SEND-004 thirty proposals filter by recorded owner/status and every field, sort and total exact values without changing ownership',()=>run(async h=>{
+test('REPORT-001 / SEND-004 / SEND-010 thirty proposals filter by recorded owner/status and every field, sort and total exact values without changing ownership',()=>run(async h=>{
  const clients=[]
  for(const [name,email] of [['Northstar Coffee','avery@northstar.example'],['Juniper Design','sam@juniper.example']])clients.push(await h.cmd('client.save',{name,email}))
  const people=[{email:h.auth.OWNER_EMAIL,cookie:h.owner,id:(await h.state()).actor.id}]
@@ -142,18 +142,19 @@ test('REPORT-001 / SEND-004 thirty proposals filter by recorded owner/status and
  const fixture=[]
  for(let i=0;i<30;i++){
   const person=people[i%3],client=clients[i%2],input={...offer,clientId:client.id,title:`Campaign ${String(i+1).padStart(2,'0')}`,priceOne:String(1000+i*10),priceTwo:String(2000+i*20)}
-  const made=await h.cmd('proposal.prepare',input,person.cookie),status=i===2?'expired':['draft','approved','sent','accepted'][i%4]
+  const made=await h.cmd('proposal.prepare',input,person.cookie),status=i===2?'expired':i===6?'withdrawn':['draft','approved','sent','accepted'][i%4]
   let version=1
   if(status!=='draft'){await h.cmd('proposal.approve',{id:made.id,version:version++,revision:1})}
-  if(['sent','accepted','expired'].includes(status)){
+  if(['sent','accepted','expired','withdrawn'].includes(status)){
    const shared=await h.cmd('proposal.send',{id:made.id,version:version++})
+   if(status==='withdrawn')await h.cmd('proposal.withdraw',{id:made.id,version:version++,reason:'Client project cancelled',notice:false})
    if(status==='expired')await h.cmd('expiry.set',{id:made.id,version:version++,mode:'date',date:'2020-03-01'})
    if(status==='accepted'){
     const path=new URL(shared.shareUrl).pathname,cookie=await verified(h,path)
     assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
    }
   }
-  fixture.push({id:made.id,title:input.title,status,owner:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':status==='sent'?'await-client':status==='expired'?'reopen':'export-deposit'})
+  fixture.push({id:made.id,title:input.title,status,owner:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':status==='sent'?'await-client':status==='expired'?'reopen':status==='withdrawn'?'withdrawn':'export-deposit'})
  }
  const aged=fixture.find(p=>p.status==='draft')
  await h.db.prepare('UPDATE p_proposals SET created_at=? WHERE id=?').bind(Date.now()-3*86400000-3600000,aged.id).run()
@@ -166,6 +167,7 @@ test('REPORT-001 / SEND-004 thirty proposals filter by recorded owner/status and
  const selected=fixture.filter(p=>p.owner===people[1].id&&p.status==='sent'),filtered=await report('owner='+people[1].id+'&status=sent&sort=value')
  assert.deepEqual(filtered.rows.map(p=>p.id),selected.toSorted((a,b)=>a.valueCents-b.valueCents).map(p=>p.id));assert.equal(filtered.totals[0].valueCents,selected.reduce((n,p)=>n+p.valueCents,0))
  for(const [query,expected] of [
+  ['status=withdrawn',fixture.filter(p=>p.status==='withdrawn')],['nextAction=withdrawn',fixture.filter(p=>p.status==='withdrawn')],
   ['status=expired',fixture.filter(p=>p.status==='expired')],['nextAction=reopen',fixture.filter(p=>p.status==='expired')],
   ['client='+clients[0].id,fixture.filter(p=>p.client===clients[0].id)],
   ['minValue=2100&maxValue=2400',fixture.filter(p=>p.valueCents>=210000&&p.valueCents<=240000)],
@@ -713,6 +715,7 @@ test('SEND-010 withdrawal revokes every current public door, preserves history, 
  assert.equal(n.revision,2);await h.cmd('proposal.send',{id:p.id,version:6},h.owner,409)
  await h.cmd('proposal.approve',{id:p.id,version:6,revision:2});const replacement=await h.cmd('proposal.send',{id:p.id,version:7})
  const newPath=new URL(replacement.shareUrl).pathname
+ for(const name of ['question.answer','question.email'])await h.cmd(name,{id:p.id,questionId:after.questions[0].id,text:'Old thread'},h.owner,409)
  assert.equal((await h.send(path,undefined,cookie)).status,410);assert.equal((await h.send(newPath,undefined,cookie)).status,200)
  const session=await verified(h,newPath);assert.equal((await h.send(newPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},session)).status,200)
  await h.cmd('proposal.withdraw',{id:p.id,version:9,reason:'Too late'},h.owner,409)

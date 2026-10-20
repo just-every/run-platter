@@ -2,12 +2,14 @@
 import { p2 } from '../records'
 import { cursor, dots, head, line, note, ok, sparks, t } from '../parts'
 
+const NB = ' '
+
 const source = (side: 'l' | 'r', title: string, body: string, cls = '') => `<article class="card bd-src ${side}${cls ? ' ' + cls : ''}">${sparks('bd-spark')}<h3 class="serif">${title}</h3>${body}</article>`
 const kv = (rows: [string, string][]) => `<dl class="bd-kv">${rows.map(([k, v]) => `<div><dt>${t(k)}</dt><dd>${v}</dd></div>`).join('')}</dl>`
 const swatch = (name: string, hex: string) => `<span class="swatch" style="--c:${hex}" role="img" aria-label="${name}"></span>`
 
 const left = [
-  source('l', line('Template · Wedding · plated dinner · v4'), `<p>${t('blocks, payment terms (30% deposit, balance 8 days before), reminders 2, 5 and 9 days, expires 14 days after sending')}</p>`, 'tilt-l'),
+  source('l', dots(['Template', 'Wedding', `plated dinner${NB}·${NB}v4`]), `<p>${t('blocks, payment terms (30% deposit, balance 8 days before), reminders 2, 5 and 9 days, expires 14 days after sending')}</p>`, 'tilt-l'),
   source('l', 'Content library', kv([['Team', t('Hannah Brooks, chef-owner')], ['Tasting gallery', t('12 photos')], ['Terms', line('weddings v3 · locked')]])),
   source('l', 'Brand kit', `<p>${t('Magnolia & Thyme logo, fonts and colors')}</p><p class="swatches">${swatch('deep green', '#1F4A36')}${swatch('blush', '#EBC3C8')}${swatch('gold', '#C9A04A')}</p>`, 'tilt-l'),
 ]

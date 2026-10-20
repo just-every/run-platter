@@ -10,40 +10,49 @@ import { drawn } from './sign'
 const at = (x: number, y: number, w: number, extra = '') => `style="--x:${x};--y:${y};--w:${w}${extra ? ';' + extra : ''}"`
 const NB = ' '
 
-// the seven clients' drawings, at their frame on the canvas
-const vignettes: [string, number, number, number, string][] = [
+// the seven clients' drawings, at their frame on the canvas; the two bottom corners are 12ui outpaints whose hibiscus runs
+// past the canvas edges and fades into the page (class "fade")
+const vignettes: [string, number, number, number, string, string?][] = [
   ['v-north', 17, 76, 231, 'Northpoint Property Mgmt’s front desk: Tom Becker hands a printed proposal across the counter.'],
   ['v-dental', 17, 405, 275, 'Lakeside Dental’s reception: Dr. Alvarez and Kim Russo read the proposal between patients.'],
-  ['v-bakery', 0, 682, 451, 'Sweet Ridge Bakery’s counter: Maya Delgado reads her proposal beside the pastry case, hibiscus in front.'],
+  ['v-bakery', -239, 682, 693, 'Sweet Ridge Bakery’s counter: Maya Delgado reads her proposal beside the pastry case, hibiscus in front.', 'fade fade-l'],
   ['v-cafe', 1233, 99, 303, 'Honeysuckle Café: Grace Ferreira and a colleague read the proposal at a sidewalk table.'],
   ['v-park', 1248, 398, 275, 'Ellie Novak reads the June Park proposal by the river, the Portland skyline behind.'],
-  ['v-office', 1080, 679, 456, 'A client signs at a sunny office desk, hibiscus in front.'],
+  ['v-office', 1080, 679, 698, 'A client signs at a sunny office desk, hibiscus in front.', 'fade fade-r'],
+  // the potted foliage peeking above the Magnolia & Thyme and June Park cards, redrawn whole by 12ui
+  ['f-left', 292, 365, 198, '', 'leaf'],
+  ['f-right', 1064, 365, 192, '', 'leaf'],
 ]
 // HTML cards on the drawing: where they sit, their accent and their lines
 type Tag = { id: string; x: number; y: number; w: number; tone: 'rose' | 'sage' | 'butter' | 'plain'; lines: string[] }
 const tags: Tag[] = [
   { id: 'opened', x: 128, y: 236, w: 148, tone: 'plain', lines: ['Opened Mon Oct 12', 'Dallas, TX · phone', '3 min on pricing'] },
-  { id: 'northpoint', x: 32, y: 304, w: 262, tone: 'rose', lines: ['Evergreen Digital →', 'Northpoint Property Mgmt', `setup ${p4.setup} + ${p4.monthly}/mo × 12`, `first year ${p4.firstYear}`] },
+  { id: 'northpoint', x: 32, y: 304, w: 262, tone: 'rose', lines: ['Evergreen Digital →', 'Northpoint Property Mgmt', `setup ${p4.setup} | + ${p4.monthly}/mo × 12`, `first year ${p4.firstYear}`] },
   { id: 'lakeside', x: 32, y: 592, w: 254, tone: 'sage', lines: ['Lakeside Dental', 'Dr. Alvarez, then Office Mgr Kim', 'signed in order Wed Oct 14 ✓'] },
   { id: 'followup', x: 52, y: 845, w: 264, tone: 'butter', lines: ['Follow-up Thu Oct 8:', '‘you spent time on the retainer option’', '→ signed Mon Oct 12 ✓'] },
   { id: 'bounced', x: 1258, y: 318, w: 248, tone: 'rose', lines: [`Bounced: ${mail.bounced}`, `→ resent to ${mail.tom}`, 'Tue Oct 6 → opened ✓'] },
   { id: 'junepark', x: 1255, y: 571, w: 262, tone: 'butter', lines: ['June Park Photography', '2 min on pricing', 'drone add-on asked → rev 2 Thu Oct 15', '→ signed Fri Oct 16 ✓'] },
 ]
-// a card's lines; a mailbox may break after its @ where the card is narrow
-const tagLines = (g: Tag) => g.lines.map((l, i) => `<span${i === 0 && !['opened', 'followup', 'bounced'].includes(g.id) ? ' class="b"' : ''}>${t(l).replace(/@/g, '@<wbr>')}</span>`).join('')
+// a card's lines; a mailbox may break after its @ and a long line at its " | " where the card is narrow
+const tagLines = (g: Tag) => g.lines.map((l, i) => `<span${i === 0 && !['opened', 'followup', 'bounced'].includes(g.id) ? ' class="b"' : ''}>${l.split(' | ').map(t).join(' ').replace(/@/g, '@<wbr>')}</span>`).join('')
 const tagHtml = (g: Tag) => `<p class="hx-tag ${g.tone} hx-${g.id}${g.x > 768 ? ' end' : ''}" ${at(g.x, g.y, g.w)}>${tagLines(g)}</p>`
 
 // the firms' own proposals, fanned at the edges of Fernhill's
-type Fan = { firm: FirmId; name: string; kind: string; thumb: string; x: number; y: number; w: number; r: number; lines: string[] }
+type Fan = { firm: FirmId; name: string; kind: string; thumb: string; x: number; y: number; w: number; r: number; lines: string[]; beside?: number }
 const fans: Fan[] = [
   { firm: 'magnolia', name: 'Magnolia & Thyme', kind: 'Catering', thumb: 't-catering', x: 326, y: 436, w: 206, r: -8.5, lines: ['Wedding Package', `${p2.guests} guests × ${p2.perGuest}`, `<b>= ${p2.total}</b>`, '30% deposit', `<b>${p2.deposit}</b> paid ✓`] },
   { firm: 'northlight', name: 'Northlight', kind: 'Video', thumb: 't-video', x: 340, y: 708, w: 190, r: -7, lines: [`Shoot day ${p5.shoot}`, `+ 3 edits × ${p5.edit}`, `<b>= ${p5.total}</b>`, 'signed Tue Oct 13'] },
   { firm: 'junepark', name: 'June Park', kind: 'Photography', thumb: 't-photo', x: 1004, y: 438, w: 206, r: 7, lines: ['Wedding collection', p7.rev1, 'Drone add-on', p7.drone, `<b>= ${p7.total}</b>`, 'signed Fri Oct 16'] },
-  { firm: 'brightwire', name: 'Brightwire IT', kind: '', thumb: 't-server', x: 1018, y: 708, w: 208, r: 7, lines: ['Server setup', p6.priced, `${p6.deposit} deposit`, 'card declined Mon Oct 19', '→ ACH settled Thu Oct 22 ✓'] },
+  { firm: 'brightwire', name: 'Brightwire IT', kind: '', thumb: 't-server', x: 1010, y: 708, w: 230, r: 7, lines: ['Server setup', p6.priced, `${p6.deposit} deposit`, 'card declined Mon Oct 19', '→ ACH settled Thu Oct 22 ✓'], beside: 2 },
 ]
 // a line with one bold figure in it
 const rich = (l: string) => l.split(/(<b>.*?<\/b>)/).map(seg => seg.startsWith('<b>') ? `<b>${t(seg.slice(3, -4))}</b>` : t(seg)).join('')
-const fanHtml = (f: Fan) => `<article class="hx-fan hx-${f.firm}" ${at(f.x, f.y, f.w, `--r:${f.r}deg`)}><header>${firmMark(f.firm, 40)}<p><span class="serif">${t(f.name)}</span>${f.kind ? `<span class="kind">${f.kind}</span>` : ''}</p></header>${plate(f.thumb, '', '(min-width: 2200px) 250px, (min-width: 1280px) 12vw, 40vw', 'hx-thumb')}<p class="hx-fan-lines">${f.lines.map(l => `<span>${rich(l)}</span>`).join('')}</p></article>`
+const fanLines = (lines: string[]) => `<p class="hx-fan-lines">${lines.map(l => `<span>${rich(l)}</span>`).join('')}</p>`
+const fanHtml = (f: Fan) => {
+  const thumb = plate(f.thumb, '', f.beside ? '(min-width: 2200px) 80px, (min-width: 1280px) 4vw, 64px' : '(min-width: 2200px) 250px, (min-width: 1280px) 12vw, 40vw', 'hx-thumb')
+  const body = f.beside ? `<div class="hx-beside">${thumb}${fanLines(f.lines.slice(0, f.beside))}</div>${fanLines(f.lines.slice(f.beside))}` : `${thumb}${fanLines(f.lines)}`
+  return `<article class="hx-fan hx-${f.firm}${f.beside ? ' beside' : ''}" ${at(f.x, f.y, f.w, `--r:${f.r}deg`)}><header>${firmMark(f.firm, 40)}<p><span class="serif">${t(f.name)}</span>${f.kind ? `<span class="kind">${f.kind}</span>` : ''}</p></header>${body}</article>`
+}
 
 const tier = (name: string, price: string, lines: string[], picked = false) => `<div class="hx-tier${picked ? ' picked' : ''}"><p class="hx-tier-name">${name}</p><p class="hx-tier-price">${price}</p><ul>${lines.map(l => `<li>${t(l)}</li>`).join('')}</ul></div>`
 const addon = (name: string, price: string, on = false) => `<li class="${on ? 'on' : ''}"><span class="box" aria-hidden="true">${on ? check : ''}</span><span>${t(name)}</span><span class="num">${t(price)}</span></li>`
@@ -79,13 +88,14 @@ const tiles: [string, string[], string][] = [
   ['v-dental', ['lakeside'], 'Lakeside Dental’s reception.'], ['v-park', ['junepark'], 'Ellie Novak reads by the river.'],
   ['v-bakery-s', ['followup'], 'Sweet Ridge Bakery’s counter.'],
 ]
-const tileHtml = ([img, ids, alt]: [string, string[], string]) => `<li class="hx-tile">${plate(img, alt, '(max-width: 760px) 46vw, 30vw')}${ids.map(id => { const g = tags.find(x => x.id === id)!; return `<p class="hx-tag ${g.tone}">${tagLines(g)}</p>` }).join('')}</li>`
+const sign = (cls: string, pos = '') => `<p class="hx-sign-np ${cls}" ${pos} aria-hidden="true"><span>NORTHPOINT</span><span>Property Mgmt</span></p>`
+const tileHtml = ([img, ids, alt]: [string, string[], string]) => `<li class="hx-tile"><div class="hx-tile-art">${plate(img, alt, '(max-width: 760px) 46vw, 30vw')}${img === 'v-north' ? sign('on-tile') : ''}</div>${ids.map(id => { const g = tags.find(x => x.id === id)!; return `<p class="hx-tag ${g.tone}">${tagLines(g)}</p>` }).join('')}</li>`
 
 export const heroSection = (): string => `<section class="hero" aria-label="Platter">
 <div class="hx-canvas">
 ${copy}
-<div class="hx-art" aria-hidden="false">${vignettes.map(([name, x, y, w, alt]) => `<div class="hx-v" ${at(x, y, w)}>${plate(name, alt, `(min-width: 2200px) ${Math.round(w * 2200 / 1536)}px, ${(w / 15.36).toFixed(2)}vw`, '', name === 'v-cafe' || name === 'v-north')}</div>`).join('')}
-<p class="hx-sign-np" ${at(132, 128, 84)} aria-hidden="true"><span>NORTHPOINT</span><span>Property Mgmt</span></p>
+<div class="hx-art" aria-hidden="false">${vignettes.map(([name, x, y, w, alt, cls]) => `<div class="hx-v${cls ? ' ' + cls : ''}" ${at(x, y, w)}>${plate(name, alt, `(min-width: 2200px) ${Math.round(w * 2200 / 1536)}px, ${(w / 15.36).toFixed(2)}vw`, '', name === 'v-cafe' || name === 'v-north')}</div>`).join('')}
+${sign('on-canvas', at(132, 128, 84))}
 ${links}${sparks('hx-spark-1')}${sparks('hx-spark-2')}${sparks('hx-spark-3')}${sparks('hx-spark-4')}
 ${tags.map(tagHtml).join('')}</div>
 <div class="hx-fans">${fans.map(fanHtml).join('')}</div>

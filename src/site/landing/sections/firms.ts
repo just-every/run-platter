@@ -22,7 +22,7 @@ function stage(st: Stage, i: number, row: Row): string {
   const back = i === 2
   const label = st.open ? '<span class="trk-date">—</span>'
     : back ? `<span class="trk-tag">${t(st.tag!)}</span><span class="trk-date">${t(st.date)}</span>`
-    : i === 0 && st.tag ? `<span class="trk-date">${t(st.date)} ·</span><span class="trk-sub">${t(st.tag)}</span>`
+    : i === 0 && st.tag ? `<span class="trk-date">${t(st.date)}</span><span class="trk-sub">${t(st.tag)}</span>`
     : `<span class="trk-date">${t(st.date)}</span>`
   const short = st.open ? '—' : t(st.short)
   return `<li class="trk-stage${back ? ' back' : ''}">${dot(st)}<span class="trk-long">${label}</span><span class="trk-short${back && !st.open ? ' hl' : ''}">${short}</span>${row.extra === 'priya' && back ? cursor('Priya', 'client', 'client', 'trk-cursor') : ''}</li>`
@@ -36,7 +36,7 @@ const rowHtml = (row: Row) => {
   const payLine = row.declined
     ? `<p class="fr-pay"><span class="pill red">${t('Declined Oct 19')}</span><span class="pill sage">${t('ACH settled Oct 22')}${' '}✓</span></p>`
     : `<p class="fr-pay">${t(row.payShort)}${' '}✓</p>`
-  return `<li class="fr-row card-m">${firmMark(row.firm, 52)}<div class="fr-name"><h3>${t(f.name)} <span class="fr-arrow">→</span> <span class="fr-client">${t(row.client)}</span></h3><p class="fr-place">${t(row.place ?? f.place)}</p></div><ol class="trk" aria-label="${f.name} to ${row.client}: sent ${row.stages[0].date}, signed ${row.stages[3].date}, first payment ${row.payDate}">${row.stages.map((st, i) => stage(st, i, row)).join('')}${payment(row)}</ol>${payLine}</li>`
+  return `<li class="fr-row card-m">${firmMark(row.firm, 52)}<div class="fr-name"><h3><span class="fr-firm">${t(f.name)}</span>${' '}<span class="fr-arrow">→</span> <span class="fr-client">${t(row.client)}</span></h3><p class="fr-place">${t(row.place ?? f.place)}</p></div><ol class="trk" aria-label="${f.name} to ${row.client}: sent ${row.stages[0].date}, signed ${row.stages[3].date}, first payment ${row.payDate}">${row.stages.map((st, i) => stage(st, i, row)).join('')}${payment(row)}</ol>${payLine}</li>`
 }
 const STAGES = ['Sent', 'Read', 'Back and forth', 'Signed', 'First payment']
 
@@ -49,5 +49,5 @@ ${sparks('fr-sparks')}
 <p class="fr-legend">${dots(STAGES)}</p>
 <ol class="fr-rows">${rows.map(rowHtml).join('\n')}</ol>
 </div>
-<p class="fr-total pill sage big"><span>${t('7 of 7 signed by Fri Oct 16')}${' '}✓</span><span class="fr-sep" aria-hidden="true">·</span><span>${t('7 of 7 first payments in by Thu Oct 22')}${' '}✓</span></p>
+<p class="fr-total pill sage big">${dots([`${t('7 of 7 signed by Fri Oct 16')} ✓`, `${t('7 of 7 first payments in by Thu Oct 22')} ✓`], '', true)}</p>
 </section>`

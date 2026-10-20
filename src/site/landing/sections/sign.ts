@@ -15,7 +15,7 @@ export const signSection = (): string => `<section id="sign" class="sec sign">
 <ol class="sg-ladder"><li class="card-s"><span class="sg-n">1</span>${line('Dr. Elena Alvarez · signer · 12:35 pm ✓')}</li><li class="card-s"><span class="sg-n">2</span>${line('Kim Russo, office manager · signer · 4:46 pm ✓')}</li></ol>
 <p class="sg-order">Kim could sign only after Dr. Alvarez</p>
 <ul class="sg-chips"><li class="pill sage">${line('4:46 pm · signed PDF and certificate emailed to Dr. Alvarez, Kim Russo and Owen Brady ✓')}</li><li class="pill sage">${line('Filed to Google Drive · Clients / Lakeside Dental ✓')}</li><li class="pill sage">${line(`Salesforce · Lakeside Dental, Server setup · Closed Won ${p6.priced} ✓`)}</li></ul></div>
-<article class="sg-cert" aria-label="Certificate of completion"><div class="ct-inner"><h3 class="serif ct-title">Certificate of completion</h3>
+<article class="sg-cert" aria-label="Certificate of completion"><div class="ct-inner"><h3 class="serif ct-title">Certificate of completion</h3>
 <p>${line('Brightwire IT → Lakeside Dental · Server setup · rev 1')}</p><p>${t('Completed Wed Oct 14, 4:46 pm ET')}</p><p>${t('Document SHA-256 9b2e…4f70')}</p>
 ${signer('Dr. Elena Alvarez', ['Verified by mailbox code 12:33 pm', 'Read the electronic records disclosure and consented 12:34 pm', 'Drawn signature 12:35 pm', 'Laconia, NH · iPhone, Safari'], drawn(elena, 'Drawn signature: Elena Alvarez', 'ct-sig'))}
 <p class="ct-note">${note('signed between patients')}<svg class="hand-arrow" viewBox="0 0 60 30" aria-hidden="true"><path d="M58 6C42 18 24 22 4 22M12 14l-8 8 9 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></p>

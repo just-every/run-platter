@@ -1,7 +1,9 @@
 /* 10 · the interlude vignette with its one set-type tag */
 .interlude{width:var(--wrap);margin:96px auto 0}
 .il-scene{position:relative;max-width:1320px;margin:0 auto}
-.il-tag{position:absolute;right:6%;bottom:3%;padding:12px 18px;font-size:16px;max-width:min(560px,60%)}
+.il-tag .dl{margin-right:.95em}
+@media (min-width:1180px){.il-tag .dl{flex-wrap:nowrap}}
+.il-tag{position:absolute;right:6%;bottom:3%;padding:12px calc(18px - .95em) 12px 18px;font-size:16px;max-width:min(720px,72%)}
 @media (max-width:760px){.interlude{margin-top:56px}.il-scene .plate{width:auto;margin:0 -16px}.il-tag{position:static;max-width:none;margin-top:12px;font-size:15px}}
 /* 11 · the tall signed agreement, the copy and the change order */
 .change{display:grid;grid-template-columns:minmax(0,.86fr) minmax(0,1fr);column-gap:56px;align-items:start}
@@ -10,7 +12,8 @@
 .ch-line+.ch-line{margin-top:28px}
 @media (min-width:1361px){.ch-line:first-of-type{white-space:nowrap}}
 .ch-agreement hr{border:0;border-top:1px solid #DDDAE1;margin:36px 0}
-.ringed{display:inline-block;position:relative;padding:3px 12px 2px;margin:-3px 4px -2px}
+.nw{white-space:nowrap}
+.ringed{display:inline;position:relative;padding:3px 12px 2px;margin:0 4px;anchor-name:--edits}
 .ringed::after{content:"";position:absolute;inset:0;border:2.5px solid var(--mulberry);border-radius:50%;transform:rotate(-4deg)}
 .ch-sign{margin-top:120px;border-top:1.5px solid var(--ink);position:relative;padding-top:10px;font-family:var(--sans);font-size:17px;color:#55555F}
 .ch-sig{position:absolute;left:-6px;bottom:calc(100% + 2px);width:min(370px,92%);height:auto;color:#15151C}
@@ -18,6 +21,12 @@
 .ch-asks{list-style:none;margin:0;padding:0;display:grid;gap:14px;font-size:15px}
 .ch-asks li{padding:10px 16px;width:fit-content;max-width:92%;position:relative}
 .ch-asks li:nth-child(2){margin-left:72px}
+/* Maya's request is tied back to the ringed "3 edits" it goes beyond (page-11), from the ring to the request card */
+.ch-asks li:first-child{anchor-name:--ask}
+.ch-tie{position:absolute;left:anchor(--edits right);top:anchor(--edits bottom);right:calc(anchor(--ask left) + 10px);bottom:anchor(--ask center);pointer-events:none}
+.ch-tie svg{display:block;width:100%;height:100%;overflow:visible}
+.ch-tie path{fill:none;stroke:var(--mulberry);stroke-width:2.2;stroke-dasharray:.1 7;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.ch-asks li:first-child::before{content:"";position:absolute;right:100%;top:50%;margin:-6px 2px 0 0;border:6px solid transparent;border-left:8px solid var(--mulberry);border-right:0}
 .ch-asks li:first-child::after{content:"";position:absolute;left:40px;top:100%;height:16px;border-left:2px dotted var(--mulberry)}
 .ch-co{margin-top:28px;padding:26px 30px 24px;font-size:17px;line-height:1.5}
 .ch-co::before{content:"";position:absolute;left:300px;bottom:100%;height:28px;border-left:2px dotted var(--mulberry)}
@@ -35,11 +44,17 @@
 .ch-cursor{right:22px;bottom:12px}
 .change .sec-foot{grid-column:1/-1;margin-top:48px}
 @media (max-width:1300px){.change{column-gap:40px}.ch-agreement{padding:52px 36px 40px;font-size:20px}.ch-co h3.serif{font-size:34px}}
+/* stacked: the head, then the agreement it starts from, then the request, the task and CO-1 */
 @media (max-width:1180px){
-  .change{grid-template-columns:minmax(0,1fr);row-gap:48px}
+  .change{grid-template-columns:minmax(0,1fr);row-gap:0}
+  .ch-right{display:contents}
+  .ch-right .sec-head{order:1;margin-bottom:40px}
   .ch-agreement{order:2;max-width:620px;width:100%;justify-self:center}
-  .ch-right{order:1}
-  .change .sec-foot{order:3;margin-top:0}
+  .ch-asks{order:3;margin-top:44px;justify-self:center;width:min(620px,100%)}
+  .ch-co{order:4}
+  .ch-tie{display:none}
+  .ch-asks li:first-child::before{right:auto;left:40px;top:auto;bottom:100%;margin:0 0 4px -1px;height:30px;border:0;border-left:2px dotted var(--mulberry)}
+  .change .sec-foot{order:5;margin-top:48px}
   .ch-foot{flex-direction:column;align-items:stretch}
   .ch-note{align-self:flex-end;margin:0}
   .ch-co{padding-bottom:56px}

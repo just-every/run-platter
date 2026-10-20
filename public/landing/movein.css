@@ -4,6 +4,7 @@
 .mv-lights{display:flex;gap:7px;margin-bottom:14px}.mv-lights i{width:12px;height:12px;border-radius:50%;background:#5A5A63}
 .mv-term pre{margin:0;white-space:pre-wrap;word-break:normal;overflow-wrap:normal;font:500 14px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
 .mv-prompt{color:#9A9AA6}
+.mv-arg{white-space:nowrap}
 .mv-ready{color:#7FD08A}
 .mv-spread{--row:44px;--tok:50px;--gap:150px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:var(--gap);margin-top:52px;position:relative}
 .mv-doc{grid-column:1;grid-row:1;background:#F7F7F9;border:1px solid #DCDAE0;border-radius:8px;box-shadow:0 6px 20px rgb(28 28 36 / .08);position:relative}
@@ -41,7 +42,15 @@
 @media (max-width:1180px){
   .mv-top{grid-template-columns:minmax(0,1fr);gap:0}
   .mv-term{max-width:620px}
-  .mv-spread{grid-template-columns:minmax(0,1fr);row-gap:28px;max-width:640px}
+  .mv-spread{--gap:72px}
+  .mv-table{font-size:15px}
+  .mv-tpl .mv-table td{white-space:nowrap}
+  .mv-linked{display:none}
+  .mv-sticky{margin:490px -12px 0 0}
+}
+/* the spread stacks, centred, once two cards no longer fit side by side */
+@media (max-width:900px){
+  .mv-spread{grid-template-columns:minmax(0,1fr);row-gap:28px;max-width:640px;margin-inline:auto}
   .mv-doc{grid-row:1}.mv-tpl{grid-column:1;grid-row:2}
   .mv-doc .mv-tokens li::after,.mv-doc .mv-tokens li::before,.mv-doc .mv-table tr td:last-child::after,.field::before,.mv-tpl tr td:first-child::before{display:none}
   .mv-sticky{grid-row:3;grid-column:1;margin:-44px 0 0 0}

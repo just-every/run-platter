@@ -65,6 +65,12 @@
   .bd-src::after,.bd-src::before{display:none}
   .bd-sticky{margin:0;justify-self:end;align-self:start;grid-column:1/-1;grid-row:1;margin-top:330px;margin-right:max(0px,calc(50% - 320px))}
 }
+/* phones: the date line and the deposit pill set one phrase per line, centred, with no separator at a line's start */
+@media (max-width:480px){
+  .bd-when .dl,.bd-dep .dl{flex-direction:column;align-items:center}
+  .bd-when .dl>span,.bd-dep .dl>span{padding-left:0}
+  .bd-when .dl>span::before,.bd-dep .dl>span::before{content:none}
+}
 @media (max-width:760px){
   .bd-anatomy{grid-template-columns:1fr}
   .bd-col.l{grid-column:1;grid-row:3}.bd-col.r{grid-column:1;grid-row:4}
@@ -75,8 +81,6 @@
   .stepper{grid-template-columns:34px 58px 34px}
   .bd-cursor{left:186px;top:8px}
   .bd-range{padding-left:66px}
-  .bd-dep{justify-content:flex-start}
-  .bd-dep .dl{justify-content:flex-start}
   .bd-strip{justify-content:flex-start;gap:8px}
   .bd-strip .pill{font-size:14px;padding:7px 14px}
   .bd-nav{font-size:13px}

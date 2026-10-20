@@ -1,5 +1,6 @@
 // 12 · Moving in: Fernhill Design Studio, Sat Oct 3. A PandaDoc Word download becomes an editable Platter template.
 import run from '../../run.json'
+import { escape } from '../../../platter/ui/shared'
 import { check, head, line, note, t } from '../parts'
 
 const rows: [string, string, string][] = [
@@ -11,7 +12,7 @@ const tickCell = `<span class="ok-ic" aria-label="linked">${check}</span>`
 
 export const moveInSection = (): string => `<section id="move-in" class="sec movein">
 <div class="mv-top">${head(['Moving in', 'Fernhill Design Studio', 'Sat Oct 3'], 'Your PandaDoc templates,', 'now editable pages.', t('Ben downloaded his templates from PandaDoc as Word files. Platter made them editable, turned the tokens into fields and matched the quote rows to his catalog.'))}
-<figure class="mv-term" aria-label="Run Platter yourself"><span class="mv-lights" aria-hidden="true"><i></i><i></i><i></i></span><pre><code><span class="mv-prompt">$</span> ${run.clone}
+<figure class="mv-term" aria-label="Run Platter yourself"><span class="mv-lights" aria-hidden="true"><i></i><i></i><i></i></span><pre><code><span class="mv-prompt">$</span> ${run.clone.split(' ').map(arg => `<span class="mv-arg">${escape(arg)}</span>`).join(' ')}
 <span class="mv-ready">✓ Platter is ready</span></code></pre></figure></div>
 <div class="mv-spread">
 <article class="mv-doc" aria-label="Word download from PandaDoc"><p class="mv-file">${line('Brand refresh · Good / Better / Best.docx')}</p>

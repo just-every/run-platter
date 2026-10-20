@@ -20,10 +20,8 @@
 .bk-in>p{margin-top:14px}
 .bk-out{padding:0 0 18px 24px}
 .bk-out ul{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:18px}
-.bk-out li{display:flex;justify-content:space-between;align-items:start;gap:14px}
-.bk-out li{min-width:0;flex-wrap:wrap;column-gap:14px}
-.bk-out li>span:first-child{flex:1 1 9em}
-.bk-out li>.num{flex:none;margin-left:auto}
+/* each amount on its label's first line */
+.bk-out li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:14px}
 .bk-inv{margin-top:14px;padding:12px 14px;background:#F7F6F9;font-size:15px}
 .bk-bal{display:flex;align-items:center;gap:22px;margin-top:14px}
 .bk-bal .serif{font-size:24px;font-weight:700}

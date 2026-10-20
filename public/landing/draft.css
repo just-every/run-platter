@@ -2,6 +2,7 @@
 .dr-flow{display:grid;grid-template-columns:minmax(0,1fr) 68px minmax(0,1.04fr) 68px minmax(0,1fr);align-items:start;margin-top:64px}
 .draft .card{padding:26px 26px 24px;font-size:14.5px;line-height:1.45}
 .draft h3.serif{font-size:25px;line-height:1.2;margin:0}
+.draft h3.serif,.draft h4.serif{text-wrap:balance}
 .draft .sub{margin-top:6px;font-size:15px}
 .dr-zoom{margin-top:18px}
 .dr-quotes{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:12px}

@@ -6,7 +6,8 @@ const hl = (text: string) => `<mark>${t(text)}</mark>`
 const change = (from: string, to: string) => `<li>${t(from)}${' '}→ ${hl(to)}</li>`
 const arrow = '<span class="rv-arrow" aria-hidden="true"></span>'
 const comment = (tag: string, who: string, init: string, when: string, body: string, cls = '') => `<article class="card rv-c ${cls}"><span class="pill grey rv-tag">${tag}</span><div class="rv-msg">${initials(init, cls === 'client' ? 'rose' : 'lilac')}<div><p class="rv-who">${line(`${who} · ${when}`)}</p><p>${t(body)}</p></div></div></article>`
-const signed = (text: string) => `<p class="rv-signed card-s">${sparks('rv-spark')}<span class="tick big" aria-hidden="true">${check}</span><span>${line(text)}</span></p>`
+// the signed chip wraps between whole phrases only, two lines at desktop widths
+const signed = (text: string) => `<p class="rv-signed card-s">${sparks('rv-spark')}<span class="tick big" aria-hidden="true">${check}</span><span>${line(text, '', true)}</span></p>`
 
 const fernhill = `<div class="rv-row"><h3 class="serif rv-title">${line('Fernhill Design Studio → Bluebonnet Café · Austin, TX')}</h3><div class="rv-steps">
 ${comment('Timeline', 'Rosa Mendez', 'RM', 'Wed Oct 7, 9:12 am CT', 'Could the boards be up by Oct 30? We relaunch the fall menu Mon Nov 2. And we’ll need two.', 'client')}${arrow}

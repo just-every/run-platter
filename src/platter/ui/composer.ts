@@ -52,7 +52,8 @@ export function preparedLine(state: any, p: any): string {
   const by = String(p.prepared_by ?? '')
   const key = by.startsWith('agent:') ? (state.agentKeys ?? []).find((k: any) => `agent:${k.id}` === by) : undefined
   const agent = by.startsWith('agent:') || p.preparedByName === 'Agent'
-  const who = agent ? `<strong>${escape(key?.label ?? 'Agent')}</strong> (agent)` : `<strong>${escape(p.preparedByName || by)}</strong>`
+  const person = (state.reportPeople ?? []).find((x: any) => x.email === (p.preparedByName || by))?.name
+  const who = agent ? `<strong>${escape(key?.label ?? 'Agent')}</strong> (agent)` : `<strong>${escape(person || p.preparedByName || by)}</strong>`
   const next = p.status === 'draft' ? (agent ? ' · a person approves before it is sent' : ' · awaiting approval') : ''
   return `<p class="agent-line">${agent ? '<img src="/brand/mark-32.svg" width="26" height="26" alt="">' : '<span class="person-dot" aria-hidden="true"></span>'}<span>${who} prepared revision ${escape(p.revision)}${revision ? ` · ${date(revision.prepared_at)}` : ''}${next}</span></p>`
 }

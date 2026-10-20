@@ -14,13 +14,13 @@ export function renderClient(view: any, token: string, feedback?: Feedback): Res
   const currency = view.currency ?? 'AUD'
   const pricing = currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'
   let html = panel('Scope of work', `<p class="preserve">${escape(view.scope)}</p>`)
+  html += panel('Offer options', `<p>${pricing} Deposit: ${escape(Number(view.deposit_bps) / 100)}% of the chosen option.</p>${optionPair(options, view.deposit_bps, view.acceptance?.optionId, currency)}`)
   html += panel('Terms',`<p class="preserve">${escape(view.terms||'No additional terms.')}</p>`)
   html += panel(view.status==='accepted'?'Signed agreement package attachments':'Proposal attachments',attachmentList(view.attachments??[],`/p/${encodeURIComponent(token)}/attachments/`))
   html += clientExpiryPanel(view,publicForm)
   html += clientQuestions(view,publicForm)
   if(!view.expiry?.expired) html += clientSuggestions(view,publicForm)
   if(view.previous) html += panel('Changes since your previous offer', `<p>Revision ${escape(view.previous.revision)} compared with revision ${escape(view.revision)}</p>${changes(view.previous,view)}`)
-  html += panel('Offer options', `<p>${pricing} Deposit: ${escape(Number(view.deposit_bps) / 100)}% of the chosen option.</p>${optionPair(options, view.deposit_bps, view.acceptance?.optionId, currency)}`)
   if (view.acceptance) {
     const accepted = view.acceptance
     html += panel('Proposal accepted', `<p>This agreement is complete and cannot be changed.</p><dl><dt>Accepted by</dt><dd>${escape(accepted.name)}${accepted.email && accepted.method !== 'upload' ? ` · ${escape(accepted.email)}` : ''}</dd><dt>Chosen option</dt><dd>${escape(options.find((option: any) => option.id === accepted.optionId)?.label)}</dd><dt>Total</dt><dd>${money(accepted.totalCents,accepted.currency??currency)}</dd><dt>Deposit due</dt><dd>${money(accepted.depositCents,accepted.currency??currency)}</dd><dt>Accepted at</dt><dd>${date(accepted.acceptedAt)}</dd>${acceptanceMethod(accepted)}</dl>`)
@@ -31,5 +31,5 @@ export function renderClient(view: any, token: string, feedback?: Feedback): Res
   } else if (!view.expiry?.expired) {
     html += panel('Accept this proposal', '<p>Your email is verified. Choose one option and confirm your acceptance below.</p>' + publicForm('accept', `<fieldset><legend>Choose one option</legend>${options.map((option: any) => `<label class="choice option-choice"><input type="radio" name="optionId" value="${escape(option.id)}" required><span>${escape(option.label)} — ${money(option.cents,currency)}<br><span class="muted">Deposit due: ${money(Math.round(option.cents * view.deposit_bps / 10000),currency)}</span></span></label>`).join('')}</fieldset>` + field('Your full name', 'name', '', 'required autocomplete="name"') + '<label class="choice"><input type="checkbox" name="consent" value="yes" required><span>I accept the scope of work, chosen option, total price, and deposit shown above.</span></label><p>Acceptance is permanent. Check your chosen option before continuing.</p><button>Accept proposal</button>' + (view.pdfDownloadsEnabled ? `<p>Choose an option above to download the unsigned revision.</p><button formnovalidate formaction="/p/${encodeURIComponent(token)}/download.pdf">Download unsigned proposal PDF</button>` : '')))
   }
-  return document(view.title, html, { client: true, feedback })
+  return document(view.title, html, { client: true, feedback, eyebrow: `<p class="eyebrow">Proposal · Revision ${escape(view.revision)}${view.status === 'accepted' ? ' · accepted' : ''}</p>` })
 }

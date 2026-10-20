@@ -54,7 +54,7 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   const pricing = p.currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'
   const sum = receiptSum(p.options ?? [], Number(p.deposit_bps), p.currency, p.acceptance?.optionId)
   const negotiated = p.negotiating ? `<div class="band caution" role="note"><p><strong>Negotiated draft.</strong> ${p.withdrawals?.some((w: any) => w.revision === p.sentRevision) ? 'The previous offer remains withdrawn.' : 'Revision ' + escape(p.sentRevision) + ' remains available to the client until'} this revision is approved and sent. If the client accepts it first, this draft cannot be sent.</p></div>` : ''
-  let html = withdrawalPanel(state, p) + preparedLine(state, p)
+  let html = preparedLine(state, p)
   if (!frozen && person) {
     const actions = `<button form="composer-${escape(p.id)}" class="secondary">Save revision</button>`
       + (owner && p.status === 'draft' ? form('proposal.approve', path, hidden('id', p.id) + hidden('version', p.version) + hidden('revision', p.revision) + '<button>Approve this revision</button>') : '')
@@ -67,7 +67,7 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
     const note = frozen ? `${pricing} This offer is frozen. Its scope, options, and prices can no longer be revised.${fresh ? ' A fresh invitation replaces any previous client link and verification session while keeping the offer frozen.' : ''}` : pricing
     html += `<div class="composer-page frozen">${offerCards(p)}${notices(feedback)}${receipt(sum, fresh + share, note)}</div>`
   }
-  const dossier: string[] = [panel('Offer record', people(state, p)), proposalAttachments(state, p), p.status === 'withdrawn' ? '' : pdfPanel(state, p), expiryPanel(state, p)]
+  const dossier: string[] = [withdrawalPanel(state, p), panel('Offer record', people(state, p)), proposalAttachments(state, p), p.status === 'withdrawn' ? '' : pdfPanel(state, p), expiryPanel(state, p)]
   if (['sent', 'expired', 'withdrawn'].includes(p.status) && person) dossier.push(`<section class="panel wide"><h2>Negotiate a new revision</h2><p>The sent offer stays frozen. Prepare changed terms for a new approval before replacing the client invitation.</p>${composerForm(state, p, 'negotiate', `negotiate-${p.id}`, 'Prepare negotiated revision')}</section>`)
   dossier.push(paperAcceptanceForm(state, p))
   if (p.acceptance) dossier.push(panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)}${p.acceptance.method === 'upload' ? '' : ` · ${escape(p.acceptance.email)}`}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd>${acceptanceMethod(p.acceptance, '/api/platter/attachments/' + encodeURIComponent(p.id) + '/')}</dl><p>The accepted agreement is permanent.</p>`))

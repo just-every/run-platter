@@ -44,6 +44,7 @@ export async function followupJourney(h, {offer, verified}) {
   assert.equal(all.timeZone, 'UTC')
   assert.deepEqual(all.rows.map(row => row.title), ['A', 'C', 'D', 'B', 'F', 'E', 'G'], 'untracked engagement has one shared rank; value breaks ties')
   assert.equal(all.count, 7)
+  for(const [title,period] of [['A','overdue'],['B','today'],['G','upcoming']])assert.equal(all.rows.find(r=>r.title===title).period,period)
   assert.equal(all.totals.find(total => total.currency === 'USD').valueCents, 12400000)
   for (const row of all.rows) {
     assert.equal(row.ownerId, owner.id)
@@ -64,8 +65,10 @@ export async function followupJourney(h, {offer, verified}) {
   await h.cmd('followup.schedule', {id: fixture.G.id, action: 'Call', dueDate: '2027-02-30'}, h.owner, 400)
   assert.equal((await queue()).count, 7, 'invalid closure and scheduling leave the queue unchanged')
 
+  const invitationsBefore=(await current(fixture.B.id)).deliveries
   const beforeNotice = (await h.state()).outbox.map(mail => mail.id)
   await h.cmd('followup.notify', {id: fixture.B.id})
+  assert.deepEqual((await current(fixture.B.id)).deliveries,invitationsBefore,'a sales-owner notice creates no client invitation or sender-correction authority')
   const newMail = (await h.state()).outbox.filter(mail => !beforeNotice.includes(mail.id))
   assert.ok(newMail.some(mail => mail.recipient === owner.email), 'notification reaches the sales owner')
   assert.ok((await queue()).rows.some(row => row.id === fixture.B.id), 'a notification never closes the follow-up')
@@ -89,6 +92,7 @@ export async function followupJourney(h, {offer, verified}) {
   await h.cmd('expiry.set',{id:fixture.G.id,version:(await current(fixture.G.id)).version,mode:'date',date:'2027-03-12'})
   await h.cmd('followup.schedule',{id:fixture.G.id,action:'Review expiry',dueDate:'2027-03-10'})
   assert.equal((await queue()).rows.find(r=>r.id===fixture.G.id).reason,'expiring')
+  for(const [date,reason] of [['2027-03-13','expiring'],['2027-03-14','unavailable'],['2027-03-10','unavailable'],['2027-03-12','expiring']]){await h.cmd('expiry.set',{id:fixture.G.id,version:(await current(fixture.G.id)).version,mode:'date',date});assert.equal((await queue()).rows.find(r=>r.id===fixture.G.id).reason,reason)}
   const matching=(await queue()).rows.filter(r=>r.dueDate==='2027-03-10')
   assert.deepEqual(matching.map(r=>r.title),['D','G','B','F'],'expiry ranks after questions and before unknown engagement')
   await h.cmd('report.time-zone',{timeZone:'Pacific/Honolulu'})
@@ -130,6 +134,8 @@ export async function followupJourney(h, {offer, verified}) {
     tied.push(p.id)
   }
   assert.deepEqual((await queue()).rows.filter(r=>tied.includes(r.id)).map(r=>r.id),[tied[0],...tied.slice(1).sort()],'earliest first send wins, then stable id')
+  await h.db.prepare('UPDATE p_expiry SET sent_at=NULL WHERE proposal_id=?').bind(tied[0]).run()
+  assert.deepEqual((await queue()).rows.filter(r=>tied.includes(r.id)).map(r=>r.id),[...tied.slice(1).sort(),tied[0]],'legacy missing sent time sorts last without invented history')
   await h.db.prepare('UPDATE p_expiry_clock SET observed_at=? WHERE singleton=1').bind(Date.parse('2027-03-11T01:00:00Z')).run()
   await h.cmd('report.time-zone',{timeZone:'Pacific/Honolulu'});assert.equal((await queue()).today,'2027-03-10')
   await h.cmd('report.time-zone',{timeZone:'UTC'});assert.equal((await queue()).today,'2027-03-11')

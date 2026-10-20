@@ -13,7 +13,7 @@ export async function followupCommand(env:Bindings,a:Actor,name:string,input:Rec
   need(current,'This follow-up is closed',409)
   const owner=await db.prepare("SELECT email FROM oa_operators WHERE id=? AND status='active'").bind(p.sales_owner_id).first<{email:string}>()
   need(owner,'Assign an active sales owner first',409)
-  await commit(db,a,[queueMail(env,p.id,owner.email,'Sales follow-up: '+p.title,`${current.action}\nDue: ${current.dueDate}\n${current.engagement}`,a.id)],true)
+  await commit(db,a,[queueMail(env,p.id,owner.email,'Sales follow-up: '+p.title,`${current.action}\nDue: ${current.dueDate}\n${current.engagement}`)],true)
   await dispatchMail(env,p.id);return {id:p.id,notificationQueued:true}
  }
  need(['followup.schedule','followup.complete','followup.dismiss'].includes(name),'Unknown follow-up action',404)

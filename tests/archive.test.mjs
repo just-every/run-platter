@@ -240,7 +240,7 @@ test('PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND
   } finally { if(h)await h.close();await rm(temporary,{recursive:true,force:true}) }
 })
 
-test('EDIT-012 / REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new proposals and acceptances use USD without conversion', { timeout: 180_000 }, async () => {
+test('PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new proposals and acceptances use USD without conversion', { timeout: 180_000 }, async () => {
  const temporary=await mkdtemp(join(tmpdir(),'platter-currency-')),target=join(temporary,'target')
  let h
  try {
@@ -274,6 +274,10 @@ test('EDIT-012 / REPORT-001 / PRICE-008 public CLI restores first-release AUD by
   assert.equal(pipeline.value.totals.find(t=>t.currency==='AUD').valueCents,accepted.total_cents);assert.equal(pipeline.value.totals.find(t=>t.currency==='USD').valueCents,420000)
   const usdInvoice=await cmd('invoice.export',{id:created.id});assert.equal(usdInvoice.currency,'USD');assert.match((await h.send('/api/platter/invoices/'+usdInvoice.id+'.csv',undefined,cookie)).text,/No Tax,USD/)
   const audCopy=await cmd('proposal.duplicate',{id:restored.id,version:restored.version}),copied=(await h.state(cookie)).proposals.find(p=>p.id===audCopy.id)
+  const {packageFixture}=await import('./packages-fixture.mjs')
+  await h.cmd('proposal.revise',{id:audCopy.id,version:1,packages:packageFixture()},cookie,409)
+  assert.deepEqual((await h.state(cookie)).proposals.find(p=>p.id===audCopy.id).options,copied.options,'PRICE-002 cannot rewrite historical AUD pricing into the new package form')
+
   assert.equal(copied.currency,'AUD');assert.deepEqual(copied.options,restored.options);assert.equal(copied.deposit_bps,restored.deposit_bps);assert.equal(copied.acceptance,undefined);assert.equal(copied.status,'draft')
   await h.close();h=undefined
   const output=join(temporary,'after.rer');await command(target,['export','--output',output,'--no-queue'])

@@ -26,6 +26,119 @@ async function finishSetup(h) {
 
 const mailRows = async h => (await h.db.prepare('SELECT * FROM p_mail ORDER BY created_at, id').all()).results
 
+test('FOLLOW-004 verified client questions, native answers and one-use authenticated owner email replies', {timeout:120000}, async()=>{
+ const {createHmac,createHash,randomBytes}=await import('node:crypto')
+ const keyBytes=Buffer.from(Array.from({length:32},(_,i)=>i)),sent=[],received=new Map(),fetches=[]
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'fake-reply-network-key',MAIL_WEBHOOK_KEY:'whsec_'+keyBytes.toString('base64'),QUESTION_REPLY_DOMAIN:'replies.example.com'},
+  outboundService:async request=>{
+   const url=new URL(request.url)
+   assert.equal(url.origin,'https://api.resend.com','only the configured provider may be contacted')
+   if(request.method==='GET'){
+    assert.match(url.pathname,/^\/emails\/receiving\/[a-zA-Z0-9_-]+$/)
+    assert.equal(request.headers.get('authorization'),'Bearer fake-reply-network-key')
+    fetches.push(url.pathname)
+    const email=received.get(url.pathname.split('/').at(-1))
+    assert.ok(email,'received-message fetch uses the signed provider identity')
+    return Response.json(email)
+   }
+   assert.equal(request.method,'POST');assert.equal(url.pathname,'/emails')
+   sent.push(await request.json());return Response.json({id:'provider-'+sent.length})
+  },
+ })
+ const callback=async(message,options={})=>{
+  received.set(message.id,message)
+  const body=JSON.stringify({type:'email.received',created_at:new Date().toISOString(),data:{email_id:message.id}})
+  const eid='reply-'+randomBytes(8).toString('hex'),timestamp=String(Math.floor(Date.now()/1000))
+  const signature=createHmac('sha256',keyBytes).update(eid+'.'+timestamp+'.'+body).digest('base64')
+  const headers={'content-type':'application/json','svix-id':eid,'svix-timestamp':timestamp,'svix-signature':'v1,'+(options.bad?Buffer.alloc(32).toString('base64'):signature)}
+  const deliver=async()=>{const response=await h.mf.dispatchFetch(h.origin+'/api/platter/question-replies',{method:'POST',headers,body});return {status:response.status,text:await response.text()}}
+  return {...await deliver(),deliver}
+ }
+ const inbound=(replyTo,overrides={})=>({id:'received-'+randomBytes(8).toString('hex'),from:'Jordan Venue <OWNER@STUDIO.EXAMPLE>',to:[replyTo],subject:'Re: Client question',text:'Yes, those usage rights are included.',html:null,headers:{},attachments:[],...overrides})
+ const keys=async()=>(await h.db.prepare('SELECT * FROM p_question_reply_keys ORDER BY id').all()).results
+ const answers=async()=>(await h.db.prepare('SELECT * FROM p_question_answers ORDER BY created_at,id').all()).results
+ const queue=async()=>{const r=await h.send('/api/platter/questions',undefined,h.owner);assert.equal(r.status,200,r.text);return r.value.questions}
+ try{
+  await finishSetup(h)
+  const id=await approved(h),{shareUrl}=await h.cmd('proposal.send',{id,version:2}),path=new URL(shareUrl).pathname
+  const ask=(section,text,cookie)=>h.send(path+'/action?name=question.create',{revision:1,section,text},cookie)
+  assert.equal((await ask('pricing','Does that cover usage rights?')).status,401)
+  assert.equal((await h.send('/api/platter/questions')).status,401)
+  assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+  const code=sent.at(-1).text.match(/\b\d{6}\b/)?.[0];assert.ok(code)
+  const verification=await h.send(path+'/action?name=code.verify',{code});assert.equal(verification.status,200,verification.text)
+  const cookie=verification.cookie;assert.ok(cookie)
+  assert.equal((await ask('unsupported','Should not create a question',cookie)).status,400)
+  assert.equal((await ask('pricing','Does that cover usage rights?',cookie)).status,200)
+  const question=(await queue()).find(q=>q.text==='Does that cover usage rights?');assert.ok(question)
+  const notice=sent.at(-1),replyTo=notice.reply_to,token=replyTo.split('@')[0]
+  assert.deepEqual(notice.to,[h.auth.OWNER_EMAIL]);assert.equal(replyTo.split('@')[1],'replies.example.com')
+  const key=(await keys()).find(k=>k.question_id===question.id)
+  assert.equal(key.keyhash,createHash('sha256').update(token).digest('hex'))
+  assert.ok(!JSON.stringify(await keys()).includes(token),'key custody retains only the capability hash')
+  const transport=(await mailRows(h)).find(row=>row.reply_to)
+  assert.ok(transport.reply_to&&!transport.reply_to.includes(token),'outbound Reply-To is sealed at rest')
+  const before={sent:sent.length,fetches:fetches.length,keys:await keys(),answers:await answers()}
+  assert.equal((await callback(inbound(replyTo),{bad:true})).status,401)
+  assert.equal(fetches.length,before.fetches,'invalid signature cannot hydrate a provider message')
+  assert.deepEqual(await keys(),before.keys);assert.deepEqual(await answers(),before.answers);assert.equal(sent.length,before.sent)
+  assert.equal((await callback(inbound(replyTo,{from:'Jordan Venue <intruder@studio.example>'}))).status,403)
+  assert.equal((await callback(inbound(randomBytes(32).toString('hex')+'@replies.example.com'))).status,409,'the owner From alone is insufficient')
+  assert.equal((await callback(inbound(replyTo,{text:'Quoted private reply address: '+replyTo}))).status,422)
+  assert.equal((await callback(inbound(replyTo,{text:null,html:'<p>HTML alone is not an answer</p>'}))).status,422)
+  assert.equal((await callback(inbound(replyTo,{attachments:[{id:'attachment-1',filename:'note.txt',content_type:'text/plain',size:1,content_disposition:'attachment',download_url:'https://arbitrary.invalid/file'}]}))).status,422)
+  assert.deepEqual(await keys(),before.keys);assert.deepEqual(await answers(),before.answers);assert.equal(sent.length,before.sent)
+  const answer='  Yes, those usage rights are included.\n\n> Does that cover usage rights?\n'
+  const accepted=await callback(inbound(replyTo,{text:answer}));assert.equal(accepted.status,201,accepted.text)
+  assert.equal(sent.length,before.sent+1);assert.deepEqual(sent.at(-1).to,[recipient]);assert.ok(sent.at(-1).text.includes(answer))
+  assert.equal((await answers())[0].text,answer,'the complete plaintext, including quoted text, is retained')
+  assert.equal((await answers())[0].source,'email');assert.ok((await keys()).find(k=>k.id===key.id).used_at)
+  assert.equal((await accepted.deliver()).status,409,'the exact signed webhook replay is refused')
+  assert.equal(sent.length,before.sent+1);assert.equal((await answers()).length,1)
+  assert.ok(!(await queue()).some(q=>q.id===question.id),'an answered thread leaves the owner open queue')
+
+  assert.equal((await ask('scope','Can we shoot on Tuesday?',cookie)).status,200)
+  const appQuestion=(await queue()).find(q=>q.section==='scope'),firstAddress=sent.at(-1).reply_to
+  await h.cmd('question.email',{id,questionId:appQuestion.id});const secondAddress=sent.at(-1).reply_to
+  assert.notEqual(secondAddress,firstAddress)
+  const beforeRefusals=sent.length
+  assert.equal((await callback(inbound(firstAddress))).status,409,'re-notice revokes the previous unspent address')
+  const secondHash=createHash('sha256').update(secondAddress.split('@')[0]).digest('hex')
+  await h.db.prepare('UPDATE p_question_reply_keys SET expires_at=? WHERE keyhash=?').bind(Date.now()-1,secondHash).run()
+  assert.equal((await callback(inbound(secondAddress))).status,409,'expired reply authority cannot answer')
+  assert.equal(sent.length,beforeRefusals);assert.equal((await answers()).length,1)
+  await h.cmd('question.email',{id,questionId:appQuestion.id});const currentAddress=sent.at(-1).reply_to
+  const owner=await h.db.prepare('SELECT id,email,version FROM oa_operators WHERE email=?').bind(h.auth.OWNER_EMAIL).first()
+  // No HTTP clock or identity bypass exists; change the real authority fixture directly.
+  await h.db.prepare('UPDATE oa_operators SET email=?,version=version+1 WHERE id=?').bind('replacement@studio.example',owner.id).run()
+  try{assert.equal((await callback(inbound(currentAddress))).status,403,'a changed owner invalidates previously issued authority')}
+  finally{await h.db.prepare('UPDATE oa_operators SET email=?,version=? WHERE id=?').bind(owner.email,owner.version,owner.id).run()}
+  await h.send('/auth/invite',{email:'question-member@studio.example',displayName:'Colleague',role:'member',returnTo:'/app'},h.owner)
+  const member=await h.signIn('question-member@studio.example')
+  assert.equal((await h.send('/api/platter/questions',undefined,member)).status,403)
+  await h.cmd('question.answer',{id,questionId:appQuestion.id,text:'Tuesday works.',requestId:'member-attempt'},member,403)
+  const agent=await h.cmd('agent.create',{label:'Question boundary'})
+  assert.equal((await h.send('/api/platter/agent/command',{name:'question.answer',input:{id,questionId:appQuestion.id,text:'Unauthorized'}},'',{authorization:'Bearer '+agent.token})).status,403)
+  await h.cmd('question.answer',{id,questionId:appQuestion.id,text:'Tuesday works.',requestId:'tuesday-answer'})
+  const afterAppAnswer=sent.length
+  await h.cmd('question.answer',{id,questionId:appQuestion.id,text:'Tuesday works.',requestId:'tuesday-answer'})
+  assert.equal((await answers()).length,2,'a repeated app request does not append another answer')
+  assert.equal(sent.length,afterAppAnswer,'a repeated app request does not notify the client twice')
+  assert.equal((await ask('terms','Can we archive the signed terms?',cookie)).status,200)
+  const history=await h.send(path,undefined,cookie);assert.equal(history.status,200)
+  assert.match(history.text,/usage rights are included/);assert.match(history.text,/Tuesday works/)
+  const acceptedPage=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)
+  assert.equal(acceptedPage.status,200,acceptedPage.text)
+  const retained=await h.send(path,undefined,cookie);assert.match(retained.text,/usage rights are included/);assert.match(retained.text,/Tuesday works/)
+  const publicViews=[JSON.stringify(await h.state()),JSON.stringify(await queue()),retained.text,(await h.send('/api/platter/audit',undefined,h.owner)).text]
+  const custody=JSON.stringify({keys:await keys(),mail:await mailRows(h)})
+  for(const address of sent.map(mail=>mail.reply_to).filter(Boolean)){
+   assert.ok(!custody.includes(address.split('@')[0]),'reply credentials are never stored in plaintext')
+   for(const view of publicViews)assert.ok(!view.includes(address.split('@')[0]),'reply credentials never enter public history or state')
+  }
+ }finally{await h.close()}
+})
+
 test('MAIL-001 local proposal and verification mail are captured without provider contact', async () => {
   let calls = 0
   const h = await harness({ outboundService: () => { calls++; return new Response(null, { status: 502 }) } })
@@ -49,6 +162,10 @@ test('MAIL-001 local proposal and verification mail are captured without provide
     const verified = await h.send(path + '/action?name=code.verify', { code })
     assert.equal(verified.status, 200, verified.text)
     assert.ok(verified.cookie)
+    const question=await h.send(path+'/action?name=question.create',{revision:1,section:'scope',text:'Can we schedule the shoot next week?'},verified.cookie)
+    assert.equal(question.status,200,question.text)
+    const questionNotice=(await mailRows(h)).find(row=>row.body.includes('Can we schedule the shoot next week?'))
+    assert.ok(questionNotice);assert.equal(questionNotice.reply_to,null)
     assert.equal(calls, 0, 'local mail never contacts an external sender')
   } finally { await h.close() }
 })

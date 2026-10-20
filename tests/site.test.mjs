@@ -579,3 +579,30 @@ test('SEND-004 expired offer requests reopening and owner extends same links at 
   }
  } finally {await browser?.close();await app?.close()}
 })
+
+test('FOLLOW-004 invited client asks exact sent sections; owner queue answers and agreement retains threads on desktop and phone', {timeout:120000}, async()=>{
+ let app,browser;const screenshots=process.env.PLATTER_SCREENSHOTS
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`FOLLOW-004-${name}-${width}.png`),fullPage:true})}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    const client=await cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),made=await cmd('proposal.prepare',{clientId:client.id,title:'Autumn campaign photography',scope:'Two studio shoots and edited photographs for the autumn launch.',terms:'Delivery within ten business days after client review.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'})
+    await page.goto(app.origin+'/app/proposal?id='+made.id);await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();await page.getByRole('link',{name:'Open client proposal',exact:true}).click();const clientUrl=page.url()
+    assert.equal(await page.getByRole('button',{name:'Send question to owner'}).count(),0);await page.getByRole('button',{name:'Send verification code'}).click()
+    const state=await (await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click();await capture('client-ready')
+    for(const [section,body] of [['scope','Does the campaign include close-up product photographs?'],['pricing','Is the deposit included in the full campaign price?'],['terms','Can the review meeting happen on a Friday?']]){await page.getByLabel('Question about').selectOption(section);await page.getByLabel('Your question',{exact:true}).fill(body);await page.getByRole('button',{name:'Send question to owner'}).click()}
+    await capture('client-questions');await page.goto(app.origin+'/app');const queue=page.locator('section').filter({has:page.getByRole('heading',{name:'Open client questions',exact:true})});assert.equal(await queue.getByRole('link',{name:'Autumn campaign photography'}).count(),3);await capture('owner-queue')
+    await queue.getByRole('link',{name:'Autumn campaign photography'}).first().click();await page.getByLabel('Answer this question').first().fill('Yes. The two shoots include close-up product photographs and full campaign usage.');await page.getByRole('button',{name:'Send answer to client'}).first().click();assert.match(await page.locator('main').innerText(),/include close-up product photographs and full campaign usage/);await capture('owner-answer')
+    await page.goto(clientUrl);assert.match(await page.locator('main').innerText(),/include close-up product photographs and full campaign usage/);await capture('client-answer')
+    await page.getByRole('radio',{name:/Full campaign/}).check();await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click();assert.equal(await page.getByRole('heading',{name:'Agreement question history',exact:true}).count(),1);assert.equal(await page.getByRole('button',{name:'Send question to owner'}).count(),0);assert.match(await page.locator('main').innerText(),/review meeting happen on a Friday/);await capture('agreement-history')
+    const final=await (await context.request.get(app.origin+'/api/platter/state')).json();assert.equal(final.proposals.find(p=>p.id===made.id).questions.length,3);assert.equal(final.openQuestions.length,2);assert.equal(final.outbox.filter(m=>m.subject.startsWith('Answer to your question:')).length,1)
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

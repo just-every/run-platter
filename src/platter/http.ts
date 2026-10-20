@@ -1,3 +1,5 @@
+import { openQuestions } from './questions'
+import { questionReplyResponse } from './question-replies'
 import { clientPdf } from './documents/client-pdf'
 import { businessOriginal, businessRecords } from './business-records'
 import { deliveryWebhook } from './delivery'
@@ -29,13 +31,14 @@ export async function platterResponse(request:Request,original:Bindings):Promise
  let actor:Actor|undefined;const requestedBack=new URL(url.searchParams.get('returnTo')||'/app',env.AUTH_ORIGIN);const back=requestedBack.origin===env.AUTH_ORIGIN&&pages.has(requestedBack.pathname)?requestedBack.pathname+requestedBack.search:'/app';let context:any
  try{
   need(url.origin===env.AUTH_ORIGIN&&(!request.headers.has('host')||request.headers.get('host')===url.host),'Wrong application origin',403);need(['GET','POST'].includes(request.method),'Method not allowed',405)
+  if(path==='/api/platter/question-replies')return await questionReplyResponse(request,env)
   if(path==='/api/platter/mail/events')return await deliveryWebhook(request,env)
   if(request.method==='POST'&&!isAgent)need(request.headers.get('origin')===env.AUTH_ORIGIN&&request.headers.get('sec-fetch-site')!=='cross-site','Cross-site request refused',403)
   if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/action|\/download\.pdf|\/attachments\/([\w-]+))?$/);need(match,'Invitation not found',404);context=await clientContext(env,match[1],request)
    if(match[2]==='/download.pdf'){const input=request.method==='POST'?await body(request):Object.fromEntries(url.searchParams);return await clientPdf(env,context,String(input.optionId??''))}
    if(request.method==='GET'&&match[3]){const file=copyAttachments(snapshot(context.row).attachments).find(f=>f.id===match[3]);need(file,'Attachment not found',404);await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},'attachment.download',context.row.id);return downloadAttachment(env.DB,file)}
    if(request.method==='GET'&&!match[2]){await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},'proposal.view',context.row.id);return renderClient(await clientView(env,context),match[1])}
-   if(request.method==='POST'&&match[2]==='/action'){const result=await clientCommand(env,context,url.searchParams.get('name')??'',await body(request));await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},url.searchParams.get('name')==='accept'?'proposal.accept':String(url.searchParams.get('name')),context.row.id);const cookie=(result as any).cookie;const response=renderClient(await clientView(env,await clientContext(env,match[1],cookie?new Request(request.url,{headers:{cookie:cookie.split(';')[0]}}):request)),match[1],{message:(result as any).message??'Saved.'});if(cookie)response.headers.set('set-cookie',cookie);return response}
+   if(request.method==='POST'&&match[2]==='/action'){const result=await clientCommand(env,context,url.searchParams.get('name')??'',await body(request));if(url.searchParams.get('name')!=='question.create')await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},url.searchParams.get('name')==='accept'?'proposal.accept':String(url.searchParams.get('name')),context.row.id);const cookie=(result as any).cookie;const response=renderClient(await clientView(env,await clientContext(env,match[1],cookie?new Request(request.url,{headers:{cookie:cookie.split(';')[0]}}):request)),match[1],{message:(result as any).message??'Saved.'});if(cookie)response.headers.set('set-cookie',cookie);return response}
    fail('Not found',404)
   }
   actor=await principal(request,env,isAgent)
@@ -48,6 +51,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    const attachment=path.match(/^\/api\/platter\/attachments\/([\w-]+)(?:\/([\w-]+))?$/);if(attachment){let files;if(attachment[2]){need(actor.role!=='agent','A person downloads proposal files',403);const row=await proposal(env.DB,attachment[1]),paper=await paperRow(env.DB,row.id);files=[...copyAttachments(snapshot(row).attachments),...(paper?[paperFile(paper)]:[])]}else{need(actor.role==='owner','Only the owner reads vendor settings',403);files=await vendorDocuments(env.DB)}const file=files.find(f=>f.id===(attachment[2]??attachment[1]));need(file,'Attachment not found',404);await recordAudit(env.DB,actor,'attachment.download',file.id);return downloadAttachment(env.DB,file)}
    if(path==='/app/audit'||path==='/api/platter/audit'||path==='/api/platter/audit.csv'){const rows=await auditRows(env.DB,actor,url.searchParams);return path==='/app/audit'?document('Audit log',auditPage(rows,url.searchParams),{actor,path}):path.endsWith('.csv')?new Response(auditCsv(rows),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename=platter-audit.csv'}}):json({rows})}
    if(pages.has(path)){if(path==='/app/proposal'){const id=url.searchParams.get('id');if(id&&(await env.DB.prepare('SELECT id FROM p_proposals WHERE id=?').bind(id).first()))await recordAudit(env.DB,actor,'proposal.view',id)}return renderApp(await state(env,actor),path+url.search)}
+   if(path==='/api/platter/questions')return json({questions:await openQuestions(env.DB,actor)})
    if(path==='/api/platter/send-requests')return json({requests:await sendRequests(env.DB,actor)})
    if(path==='/api/platter/pipeline.csv'){need(actor.role==='owner','Only the owner exports the pipeline report',403);const csv=pipelineCsv(pipeline((await state(env,actor)).proposals,url.searchParams));await recordAudit(env.DB,actor,'report.export','pipeline');return new Response(csv,{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="platter-pipeline.csv"'}})}
    if(path==='/api/platter/pipeline'){need(actor.role==='owner','Only the owner views the pipeline report',403);return json(pipeline((await state(env,actor)).proposals,url.searchParams))}
@@ -57,7 +61,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    const p=await body(request,path==='/app/action'&&url.searchParams.get('name')?.startsWith('business-import.')?6_200_000:150000),name=path==='/app/action'?url.searchParams.get('name')??'':String(p.name??''),input=path==='/app/action'?p:p.input as Record<string,unknown>;need(input&&typeof input==='object'&&!Array.isArray(input),'Provide an input object')
    if(isAgent)need(['proposal.prepare','proposal.revise'].includes(name),'Agents only prepare proposal drafts',403)
    let result=name==='send-request.resolve'?await resolveSendRequest(env.DB,actor,input):name.startsWith('agent.')?await credentialCommand(env.DB,actor,name,input):name.startsWith('import.')?await importCommand(env.DB,actor,name,input):await command(env,actor,name,input)
-   const subject=String((result as any)?.job?.id??(result as any)?.id??input.id??'clients');await recordAudit(env.DB,actor,name,subject)
+   const subject=String((result as any)?.job?.id??(result as any)?.id??input.id??'clients');if(!name.startsWith('question.'))await recordAudit(env.DB,actor,name,subject)
    if(path==='/app/action'){if(name.startsWith('business-import.'))result={...result as any,businessInput:input};if(['import.preview','import.apply'].includes(name))result={...result as any,csv:input.csv};const returnPath=back==='/app/proposal'?back+'?id='+encodeURIComponent(String(input.id??(result as any)?.id??'')):back;return renderApp(await state(env,actor),returnPath,{message:'Saved.',result})}
    return json(result)
   }

@@ -1,3 +1,4 @@
+import { ownerQuestions, openQuestionsPanel } from './questions'
 import { expiryPanel } from './expiry'
 import { pdfPanel } from './client-pdf'
 import { bounceInbox, deliveryPanel } from './delivery'
@@ -28,7 +29,7 @@ export function proposalsPage(state: any, selection = new URLSearchParams()): st
   const proposals = state.proposals ?? []
   const list = proposals.length ? `<ul class="records">${proposals.map((p: any) => `<li><a href="${escape(proposalPath(p.id))}">${escape(p.title)}</a><span>${escape(p.clientName)} · ${statusPill(p.status)}</span></li>`).join('')}</ul>` : empty('No proposals yet. Prepare your first proposal below.')
   const canPrepare = ['owner', 'member'].includes(state.actor?.role)
-  return bounceInbox(state) + (state.actor?.role === 'owner' ? pipelinePanel(proposals,selection) + reportSchedulesPanel(state,selection) : panel('Your proposals', list)) + (canPrepare ? panel('Prepare a proposal', state.clients?.length ? editor(state) : '<p>Add a client before preparing a proposal.</p>' + (state.actor.role === 'owner' ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) : '')
+  return openQuestionsPanel(state) + bounceInbox(state) + (state.actor?.role === 'owner' ? pipelinePanel(proposals,selection) + reportSchedulesPanel(state,selection) : panel('Your proposals', list)) + (canPrepare ? panel('Prepare a proposal', state.clients?.length ? editor(state) : '<p>Add a client before preparing a proposal.</p>' + (state.actor.role === 'owner' ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) : '')
 }
 export function proposalPage(state: any, id: string, selection = new URLSearchParams()): string | null {
   const p = state.proposals?.find((item: any) => String(item.id) === id)
@@ -48,5 +49,5 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   html += paperAcceptanceForm(state, p)
   if (p.acceptance) html += panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)}${p.acceptance.method === 'upload' ? '' : ` · ${escape(p.acceptance.email)}`}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd>${acceptanceMethod(p.acceptance, '/api/platter/attachments/' + encodeURIComponent(p.id) + '/')}</dl><p>The accepted agreement is permanent.</p>`)
   if (owner && p.acceptance) html += panel('Invoice export', form('invoice.export', path, hidden('id', p.id) + '<button>Export invoice CSV</button>') + (p.invoice ? `<p>Invoice ${escape(p.invoice.number)} · Exported ${date(p.invoice.exported_at)}</p><a href="/api/platter/invoices/${encodeURIComponent(p.invoice.id)}.csv">Download deposit invoice CSV</a>` : ''))
-  return html + deliveryPanel(state,p) + suggestionsPanel(state,p) + historyPanel(state, p, selection)
+  return html + ownerQuestions(state,p) + deliveryPanel(state,p) + suggestionsPanel(state,p) + historyPanel(state, p, selection)
 }

@@ -131,7 +131,7 @@ test('NEG-001 negotiated offer requires exact approval, preserves the live offer
  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_negotiations WHERE proposal_id=?').bind(second.p.id).first()).n,0)
 }))
 
-test('REPORT-001 / SEND-004 thirty proposals filter by recorded owner/status and every field, sort and total exact values without changing ownership',()=>run(async h=>{
+test('REPORT-001 / SEND-004 / SEND-010 thirty proposals filter by recorded owner/status and every field, sort and total exact values without changing ownership',()=>run(async h=>{
  const clients=[]
  for(const [name,email] of [['Northstar Coffee','avery@northstar.example'],['Juniper Design','sam@juniper.example']])clients.push(await h.cmd('client.save',{name,email}))
  const people=[{email:h.auth.OWNER_EMAIL,cookie:h.owner,id:(await h.state()).actor.id}]
@@ -142,18 +142,19 @@ test('REPORT-001 / SEND-004 thirty proposals filter by recorded owner/status and
  const fixture=[]
  for(let i=0;i<30;i++){
   const person=people[i%3],client=clients[i%2],input={...offer,clientId:client.id,title:`Campaign ${String(i+1).padStart(2,'0')}`,priceOne:String(1000+i*10),priceTwo:String(2000+i*20)}
-  const made=await h.cmd('proposal.prepare',input,person.cookie),status=i===2?'expired':['draft','approved','sent','accepted'][i%4]
+  const made=await h.cmd('proposal.prepare',input,person.cookie),status=i===2?'expired':i===6?'withdrawn':['draft','approved','sent','accepted'][i%4]
   let version=1
   if(status!=='draft'){await h.cmd('proposal.approve',{id:made.id,version:version++,revision:1})}
-  if(['sent','accepted','expired'].includes(status)){
+  if(['sent','accepted','expired','withdrawn'].includes(status)){
    const shared=await h.cmd('proposal.send',{id:made.id,version:version++})
+   if(status==='withdrawn')await h.cmd('proposal.withdraw',{id:made.id,version:version++,reason:'Client project cancelled',notice:false})
    if(status==='expired')await h.cmd('expiry.set',{id:made.id,version:version++,mode:'date',date:'2020-03-01'})
    if(status==='accepted'){
     const path=new URL(shared.shareUrl).pathname,cookie=await verified(h,path)
     assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
    }
   }
-  fixture.push({id:made.id,title:input.title,status,owner:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':status==='sent'?'await-client':status==='expired'?'reopen':'export-deposit'})
+  fixture.push({id:made.id,title:input.title,status,owner:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':status==='sent'?'await-client':status==='expired'?'reopen':status==='withdrawn'?'withdrawn':'export-deposit'})
  }
  const aged=fixture.find(p=>p.status==='draft')
  await h.db.prepare('UPDATE p_proposals SET created_at=? WHERE id=?').bind(Date.now()-3*86400000-3600000,aged.id).run()
@@ -166,6 +167,7 @@ test('REPORT-001 / SEND-004 thirty proposals filter by recorded owner/status and
  const selected=fixture.filter(p=>p.owner===people[1].id&&p.status==='sent'),filtered=await report('owner='+people[1].id+'&status=sent&sort=value')
  assert.deepEqual(filtered.rows.map(p=>p.id),selected.toSorted((a,b)=>a.valueCents-b.valueCents).map(p=>p.id));assert.equal(filtered.totals[0].valueCents,selected.reduce((n,p)=>n+p.valueCents,0))
  for(const [query,expected] of [
+  ['status=withdrawn',fixture.filter(p=>p.status==='withdrawn')],['nextAction=withdrawn',fixture.filter(p=>p.status==='withdrawn')],
   ['status=expired',fixture.filter(p=>p.status==='expired')],['nextAction=reopen',fixture.filter(p=>p.status==='expired')],
   ['client='+clients[0].id,fixture.filter(p=>p.client===clients[0].id)],
   ['minValue=2100&maxValue=2400',fixture.filter(p=>p.valueCents>=210000&&p.valueCents<=240000)],
@@ -240,9 +242,9 @@ test('TEAM-004 current person, agent, invitation, signature, native, import and 
  ]){
   assert.deepEqual((await h.send('/api/platter/audit?'+query,undefined,h.owner)).value.rows,expected)
   const exported=await h.send('/api/platter/audit.csv?'+query,undefined,h.owner);assert.equal(exported.status,200)
-  const fields=['id','actor_id','actor_role','action','subject','occurred_at']
+  const fields=['id','actor_id','actor_role','action','subject','occurred_at','reason']
   const decoded=exported.text.trim().split('\r\n').slice(1).map(line=>line.slice(1,-1).split('","'))
-  assert.deepEqual(decoded,expected.map(r=>fields.map(f=>String(r[f]))))
+  assert.deepEqual(decoded,expected.map(r=>fields.map(f=>String(r[f]??''))))
  }
  assert.ok(rows.some(r=>r.action==='native.auth.operator.role'&&r.subject===memberId&&r.actor_id===who))
  const serialized=JSON.stringify(rows)
@@ -680,4 +682,83 @@ test('SEND-004 / TEAM-004 calendar expiry warns unsigned only, supports same-lin
  historical=(await h.state()).proposals.find(p=>p.id===legacy.id);assert.equal(historical.expiry.deadlineAt,at('2027-04-08T04:00:00Z'));assert.equal(historical.expiry.sentAt,null,'fresh invitation does not invent the original send time')
  const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
  for(const action of ['expiry.set','expiry.remove','expiry.reopen','expiry.warning'])assert.ok(audit.some(a=>a.action===action&&a.subject&&a.actor_id&&a.occurred_at),action+' is audited')
+}))
+
+
+test('SEND-010 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval',()=>run(async h=>{
+ const {p,path}=await sent(h),cookie=await verified(h,path)
+ await h.send('/auth/invite',{email:'sales@studio.example',displayName:'Sales colleague',role:'member',returnTo:'/app'},h.owner)
+ const member=await h.signIn('sales@studio.example')
+ await h.cmd('proposal.withdraw',{id:p.id,version:3,reason:'Sent to wrong client'},member,403)
+ await h.cmd('proposal.withdraw',{id:p.id,version:3,reason:''},h.owner,400)
+ await h.cmd('expiry.set',{id:p.id,version:3,mode:'days',days:14,warningDays:1})
+ await h.send(path+'/action?name=question.create',{revision:1,section:'scope',text:'When can you begin?'},cookie)
+ const before=(await h.state()).proposals.find(x=>x.id===p.id)
+ await h.cmd('proposal.withdraw',{id:p.id,version:4,reason:'Sent to the wrong client'})
+ for(const suffix of ['', '/action?name=accept','/action?name=code.request','/action?name=code.verify','/action?name=question.create','/action?name=suggestion.create','/action?name=expiry.reopen','/download.pdf?optionId=one','/attachments/any-file']){
+  const r=await h.send(path+suffix,suffix.includes('/action')?{name:'Avery',optionId:'one',consent:true,code:'123456'}:undefined,cookie)
+  assert.equal(r.status,410,r.text);assert.match(r.text,/Proposal withdrawn/);assert.match(r.text,/owner@studio.example/)
+  for(const secret of [offer.title,offer.scope,offer.optionOne,'2400','When can you begin?'])assert.ok(!r.text.includes(secret),'withdrawn response reveals none of the proposal')
+ }
+ const after=(await h.state()).proposals.find(x=>x.id===p.id)
+ assert.equal(after.status,'withdrawn');assert.deepEqual(after.options,before.options);assert.equal(after.withdrawals[0].reason,'Sent to the wrong client');assert.equal(after.withdrawals[0].actor_email,h.auth.OWNER_EMAIL);assert.ok(after.withdrawals[0].withdrawn_at>0)
+ assert.equal((await h.state()).outbox.filter(m=>m.proposal_id===p.id&&m.subject.startsWith('Proposal withdrawn:')).length,1)
+ assert.equal((await h.send('/api/platter/questions',undefined,h.owner)).value.questions.length,0)
+ for(const [name,input] of [['proposal.send',{}],['proposal.revise',{...offer,clientId:before.client_id}],['expiry.remove',{}],['pdf.downloads',{enabled:false}],['suggestions.allow',{section:'scope',enabled:true}],['question.answer',{questionId:after.questions[0].id,text:'Tomorrow'}],['question.email',{questionId:after.questions[0].id}]])await h.cmd(name,{...input,id:p.id,version:5},h.owner,409)
+ const audit=(await h.send('/api/platter/audit?action=proposal.withdraw',undefined,h.owner)).value.rows
+ assert.equal(audit.length,1);assert.equal(audit[0].reason,'Sent to the wrong client');assert.equal(audit[0].actor_id,(await h.state()).actor.id);assert.equal(audit[0].occurred_at,after.withdrawals[0].withdrawn_at)
+ await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+13*86400000),cron:'*/15 * * * *'})
+ assert.equal((await h.state()).outbox.filter(m=>m.proposal_id===p.id&&m.subject.startsWith('Expiry warning:')).length,0,'withdrawal cancels the current scheduled warning')
+ const report=(await h.send('/api/platter/pipeline?status=withdrawn&sort=value',undefined,h.owner)).value
+ assert.equal(report.count,1);assert.equal(report.rows[0].id,p.id);assert.equal(report.rows[0].nextAction,'withdrawn');assert.equal(report.totals[0].valueCents,420000)
+ const n=await h.cmd('proposal.negotiate',{...offer,clientId:before.client_id,id:p.id,version:5,scope:'Corrected client offer'})
+ assert.equal(n.revision,2);await h.cmd('proposal.send',{id:p.id,version:6},h.owner,409)
+ await h.cmd('proposal.approve',{id:p.id,version:6,revision:2});const replacement=await h.cmd('proposal.send',{id:p.id,version:7})
+ const newPath=new URL(replacement.shareUrl).pathname
+ for(const name of ['question.answer','question.email'])await h.cmd(name,{id:p.id,questionId:after.questions[0].id,text:'Old thread'},h.owner,409)
+ assert.equal((await h.send(path,undefined,cookie)).status,410);assert.equal((await h.send(newPath,undefined,cookie)).status,200)
+ const session=await verified(h,newPath);assert.equal((await h.send(newPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},session)).status,200)
+ await h.cmd('proposal.withdraw',{id:p.id,version:9,reason:'Too late'},h.owner,409)
+ const secondProposal=await h.cmd('proposal.prepare',{...offer,clientId:before.client_id,title:'Cancelled campaign'});await h.cmd('proposal.approve',{id:secondProposal.id,version:1,revision:1});const secondShare=await h.cmd('proposal.send',{id:secondProposal.id,version:2});const second={p:secondProposal,path:new URL(secondShare.shareUrl).pathname},mailBefore=(await h.state()).outbox.length
+ await h.cmd('proposal.withdraw',{id:second.p.id,version:3,reason:'Deal cancelled',notice:false})
+ assert.equal((await h.state()).outbox.length,mailBefore);assert.equal((await h.send(second.path)).status,410)
+}))
+
+
+test('EDIT-012 duplicate accepted content into an independent member-owned draft for another client without changing the source',()=>run(async h=>{
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+ const {client,p}=await draft(h),beta=await h.cmd('client.save',{name:'Beta Co',email:'contact@beta.example'})
+ const form=new FormData();form.set('id',p.id);form.set('version','1');form.set('file',new File(['%PDF exact retained source bytes'],'statement.pdf',{type:'application/pdf'}))
+ const uploadRequest=new Request(h.origin+'/app/attachment',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:form});const uploaded=await h.mf.dispatchFetch(uploadRequest.url,{method:'POST',headers:uploadRequest.headers,body:await uploadRequest.arrayBuffer()});assert.equal(uploaded.status,200);assert.match(await uploaded.text(),/Document saved/)
+ const get=async id=>(await h.state()).proposals.find(p=>p.id===id)
+ await h.cmd('pdf.downloads',{id:p.id,version:2,enabled:false});await h.cmd('expiry.set',{id:p.id,version:3,mode:'days',days:14,warningDays:1})
+ await h.cmd('proposal.approve',{id:p.id,version:4,revision:2});const share=await h.cmd('proposal.send',{id:p.id,version:5}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+ assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
+ await h.cmd('invoice.export',{id:p.id})
+ await h.send('/auth/invite',{email:'sales@studio.example',displayName:'Morgan Sales',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('sales@studio.example'),actor=(await h.state(member)).actor
+ const before=await get(p.id),accepted=(await h.send(path,undefined,cookie)).text
+ await h.cmd('proposal.duplicate',{id:p.id,version:1,clientId:beta.id},member,409)
+ const copy=await h.cmd('proposal.duplicate',{id:p.id,version:before.version,clientId:beta.id},member),after=await get(copy.id)
+ assert.notEqual(copy.id,p.id);assert.equal(after.status,'draft');assert.equal(after.revision,1);assert.equal(after.version,1);assert.equal(after.client_id,beta.id);assert.equal(after.clientName,'Beta Co');assert.equal(after.clientEmail,'contact@beta.example');assert.equal(after.sales_owner_id,actor.id);assert.equal(after.prepared_by,actor.email)
+ for(const field of ['scope','terms','options','currency','deposit_bps','attachments','pdfDownloadsEnabled'])assert.deepEqual(after[field],before[field],field+' copied exactly')
+ assert.equal(after.expiry.mode,'days');assert.equal(after.expiry.days,14);assert.equal(after.expiry.warningDays,1);assert.equal(after.expiry.sentAt,null);assert.equal(after.expiry.deadlineAt,null);assert.equal(after.expiry.date,null);assert.equal(after.expiry.warningSentAt,null)
+ assert.equal(after.approved_by,null);assert.equal(after.approved_at,null);assert.equal(after.acceptance,undefined);assert.equal(after.invoice,undefined);assert.equal(after.shareToken,undefined);assert.deepEqual(after.questions,[]);assert.deepEqual(after.suggestions,[]);assert.deepEqual(after.deliveries,[]);assert.deepEqual(after.pdfDownloads,[]);assert.deepEqual(after.withdrawals,[])
+ assert.ok(!(await h.state()).outbox.some(m=>m.proposal_id===copy.id));assert.equal((await h.send('/api/platter/audit?subject='+copy.id,undefined,h.owner)).value.rows.filter(r=>r.action==='proposal.view').length,0)
+ const file=await h.send('/api/platter/attachments/'+copy.id+'/'+after.attachments[0].id,undefined,member);assert.equal(file.text,'%PDF exact retained source bytes')
+ await h.cmd('proposal.send',{id:copy.id,version:1},h.owner,409);await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1},member,403);await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1});await h.cmd('proposal.send',{id:copy.id,version:2})
+ assert.deepEqual(await get(p.id),before);assert.equal((await h.send(path,undefined,cookie)).text,accepted,'source accepted agreement remains byte-identical')
+ const same=await h.cmd('proposal.duplicate',{id:p.id,version:before.version});assert.equal((await get(same.id)).client_id,client.id)
+ const states=['draft','approved','sent','expired','withdrawn']
+ for(const status of states){
+  const source=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Source '+status})
+  if(status!=='draft')await h.cmd('proposal.approve',{id:source.id,version:1,revision:1})
+  if(['sent','expired','withdrawn'].includes(status))await h.cmd('proposal.send',{id:source.id,version:2})
+  if(status==='expired')await h.cmd('expiry.set',{id:source.id,version:3,mode:'date',date:'2020-01-01'})
+  if(status==='withdrawn')await h.cmd('proposal.withdraw',{id:source.id,version:3,reason:'Cancelled',notice:false})
+  const old=await get(source.id);assert.equal(old.status,status)
+  const next=await h.cmd('proposal.duplicate',{id:source.id,version:old.version});const copied=await get(next.id);assert.equal(copied.status,'draft');for(const field of ['mode','days','date','warningDays'])assert.deepEqual(copied.expiry[field],old.expiry[field],'expiry '+field+' copied from '+status);assert.deepEqual(await get(source.id),old)
+ }
+ const draftSource=await get(same.id);await h.cmd('proposal.approve',{id:same.id,version:draftSource.version,revision:1});await h.cmd('proposal.send',{id:same.id,version:2});await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:same.id,version:3,scope:'Unsent negotiated scope'})
+ const negotiated=await h.cmd('proposal.duplicate',{id:same.id,version:4});assert.equal((await get(negotiated.id)).scope,'Unsent negotiated scope')
+ const key=await h.cmd('agent.create',{label:'Draft only'});assert.equal((await h.send('/api/platter/agent/command',{name:'proposal.duplicate',input:{id:p.id,version:before.version}},'',{authorization:'Bearer '+key.token})).status,403)
 }))

@@ -50,7 +50,8 @@ async function activeOwner(db:D1Database,a:Actor) {
 /** The temporary owner-only queue; TEAM-001/FOLLOW-002 can inherit this public function. */
 export async function openQuestions(db:D1Database,a:Actor) {
  await activeOwner(db,a)
- return (await questionState(db)).questions.filter(q=>q.status==='open')
+ const withdrawn=(await db.prepare('SELECT proposal_id,revision FROM p_withdrawals').all<any>()).results
+ return (await questionState(db)).questions.filter(q=>q.status==='open'&&!withdrawn.some(w=>w.proposal_id===q.proposal_id&&w.revision===q.revision))
 }
 
 /** A current sent revision remains discussable while its acceptance is expired. */
@@ -93,9 +94,11 @@ export async function recordAnswer(env:Bindings,a:Actor,input:AnswerInput,hook?:
  need(source!=='email'||hook,'Authenticated inbound authorization is required',403)
  const sourceId=input.sourceId===undefined?await hash(`${a.id}\n${id}\n${questionId}\n${body}`):text(input.sourceId,'a message identity',500)
  const sourceKey=await hash(`${source}\n${sourceId}`),answerId=crypto.randomUUID(),at=await currentTime(db)
+ need(!(await db.prepare('SELECT w.id FROM p_withdrawals w JOIN p_proposals p ON p.id=w.proposal_id AND p.revision=w.revision WHERE p.id=?').bind(id).first()),'Withdrawn proposals are read-only',409)
  const question=await db.prepare('SELECT q.*,p.title FROM p_questions q JOIN p_proposals p ON p.id=q.proposal_id WHERE q.id=? AND q.proposal_id=?').bind(questionId,id).first<any>()
  need(question,'Question not found on this proposal',404)
- const guard={sql:"EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND email=? AND version=? AND role='owner' AND status='active') AND EXISTS(SELECT 1 FROM p_questions WHERE id=? AND proposal_id=? AND revision=? AND client_id=? AND client_email=?)",values:[owner.id,owner.email,owner.version,questionId,id,question.revision,question.client_id,question.client_email]}
+ need(!(await db.prepare('SELECT id FROM p_withdrawals WHERE proposal_id=? AND revision=?').bind(id,question.revision).first()),'Withdrawn revisions are read-only',409)
+ const guard={sql:"NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=? AND revision=?) AND EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND email=? AND version=? AND role='owner' AND status='active') AND EXISTS(SELECT 1 FROM p_questions WHERE id=? AND proposal_id=? AND revision=? AND client_id=? AND client_email=?)",values:[id,question.revision,owner.id,owner.email,owner.version,questionId,id,question.revision,question.client_id,question.client_email]}
  if(hook){guard.sql+=' AND ('+hook.guard.sql+')';guard.values.push(...hook.guard.values)}
  const prior=await db.prepare('SELECT id,question_id,text,owner_id FROM p_question_answers WHERE source_key=?').bind(sourceKey).first<any>()
  if(prior){need(source!=='email','This reply has already been recorded',409);need(prior.question_id===questionId&&prior.owner_id===a.id&&prior.text===body,'This message identity has already been used',409);await commit(db,a,[],true,guard);return {id,questionId,answerId:prior.id,replayed:true}}
@@ -118,9 +121,11 @@ export async function questionCommand(env:Bindings,a:Actor,name:string,input:Rec
  need(name==='question.answer'||name==='question.email','Unknown question action',404)
  if(name==='question.email'){
   const db=env.DB,owner=await activeOwner(db,a),id=text(input.id,'a proposal'),questionId=text(input.questionId,'a question')
-  const question=await db.prepare('SELECT q.*,p.title FROM p_questions q JOIN p_proposals p ON p.id=q.proposal_id WHERE q.id=? AND q.proposal_id=?').bind(questionId,id).first<any>()
+  need(!(await db.prepare('SELECT w.id FROM p_withdrawals w JOIN p_proposals p ON p.id=w.proposal_id AND p.revision=w.revision WHERE p.id=?').bind(id).first()),'Withdrawn proposals are read-only',409)
+ const question=await db.prepare('SELECT q.*,p.title FROM p_questions q JOIN p_proposals p ON p.id=q.proposal_id WHERE q.id=? AND q.proposal_id=?').bind(questionId,id).first<any>()
   need(question,'Question not found on this proposal',404)
-  await commit(db,a,[...await prepareReplyNotice(env,owner,question),audit(db,a.id,'owner','question.email',questionId,Date.now())],true)
+ need(!(await db.prepare('SELECT id FROM p_withdrawals WHERE proposal_id=? AND revision=?').bind(id,question.revision).first()),'Withdrawn revisions are read-only',409)
+  await commit(db,a,[...await prepareReplyNotice(env,owner,question),audit(db,a.id,'owner','question.email',questionId,Date.now())],true,{sql:'NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=? AND revision=?)',values:[id,question.revision]})
   await dispatchMail(env,id)
   return {id,questionId,message:'Question notice queued for your owner mailbox.'}
  }

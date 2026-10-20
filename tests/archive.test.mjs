@@ -27,7 +27,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -121,6 +121,12 @@ test('FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 
     await h.close();h=null
     h=await harness({root:source,origin:sourceOrigin,...localIdentity})
     const business=state=>({clients:state.clients,proposals:state.proposals.map(({delivery,deliveries,shareToken,...proposal})=>proposal),importJobs:state.importJobs})
+    const withdrawn=await h.cmd('proposal.prepare',{...offer,title:'Withdrawn offer'})
+    await h.cmd('proposal.approve',{id:withdrawn.id,version:1,revision:1});const withdrawnShare=await h.cmd('proposal.send',{id:withdrawn.id,version:2})
+    await h.cmd('proposal.withdraw',{id:withdrawn.id,version:3,reason:'Sent to the wrong client'})
+    const withdrawalHistory=(await h.state()).proposals.find(p=>p.id===withdrawn.id).withdrawals
+    const duplicate=await h.cmd('proposal.duplicate',{id:work.id,version:4})
+    const duplicateBefore=(await h.state()).proposals.find(p=>p.id===duplicate.id)
     const beforeVendorDocuments=(await h.state()).vendorDocuments
     const before=business(await h.state())
     const acceptedThread=before.proposals.find(p=>p.id===proposal.id).questions
@@ -130,8 +136,8 @@ test('FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 
     assert.equal(acceptedThread[0].answers[0].text,'Yes, delivery is included in the campaign price.')
     assert.equal(openThread.length,1)
     assert.equal(openThread[0].answers.length,0)
-    const beforeAudit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','approved','draft'])
+    const beforeAudit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows.map(({reason,...row})=>row)
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','approved','draft','draft','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -139,7 +145,7 @@ test('FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 
     const bytes=await readFile(old,'utf8')
     assert.ok(bytes.includes('Temporary joiner'))
     for(const excluded of [replyKey,replyAddress,createHash('sha256').update(replyKey).digest('hex'),productionOwner.split('=')[1]])assert.ok(!bytes.includes(excluded),'FOLLOW-004 reply capability, hosted session and transport stay local')
-    for(const excluded of ['Excluded secret','token_hash',key.token,createHash('sha256').update(key.token).digest('hex'),new URL(shared.shareUrl).pathname.slice(3),new URL(pendingShare.shareUrl).pathname.slice(3),verified.cookie.split('=')[1],identity.owner.split('=')[1]])assert.ok(!bytes.includes(excluded),'credentials and private invitations stay local')
+    for(const excluded of ['Excluded secret','token_hash',key.token,createHash('sha256').update(key.token).digest('hex'),new URL(withdrawnShare.shareUrl).pathname.slice(3),new URL(shared.shareUrl).pathname.slice(3),new URL(pendingShare.shareUrl).pathname.slice(3),verified.cookie.split('=')[1],identity.owner.split('=')[1]])assert.ok(!bytes.includes(excluded),'credentials and private invitations stay local')
     await command(restored,['import','--input',old,'--yes','--no-queue'])
     await command(restored,['export','--output',again,'--no-queue'])
     const rows=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part')
@@ -170,6 +176,11 @@ test('FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 
     assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).questions,acceptedThread,'FOLLOW-004 agreement thread survives public CLI restore exactly')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===pending.id).questions,openThread,'FOLLOW-004 unanswered question survives public CLI restore exactly')
     assert.equal((await h.db.prepare('SELECT COUNT(*) AS count FROM p_question_reply_keys').first()).count,0,'restoring business threads never restores email reply authority')
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===withdrawn.id).withdrawals,withdrawalHistory,'SEND-010 history survives CLI restore without invitation authority')
+    assert.equal(restoredState.proposals.find(p=>p.id===withdrawn.id).status,'withdrawn')
+    await h.cmd('proposal.send',{id:withdrawn.id,version:4},restoredOwner,409)
+    assert.equal(archived.filter(item=>item.table==='p_withdrawn_links').length,0)
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===duplicate.id),duplicateBefore,'EDIT-012 copied content, files and delivery configuration survive CLI restore exactly')
     assert.deepEqual(restoredState.agentKeys,[])
     assert.deepEqual((await h.send('/api/platter/send-requests',undefined,restoredOwner)).value.requests,beforeRequests)
     assert.equal((await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'ping'},'',{authorization:'Bearer '+key.token})).status,401)
@@ -201,7 +212,7 @@ test('FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 
   } finally { if(h)await h.close();await rm(temporary,{recursive:true,force:true}) }
 })
 
-test('REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new proposals and acceptances use USD without conversion', { timeout: 180_000 }, async () => {
+test('EDIT-012 / REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new proposals and acceptances use USD without conversion', { timeout: 180_000 }, async () => {
  const temporary=await mkdtemp(join(tmpdir(),'platter-currency-')),target=join(temporary,'target')
  let h
  try {
@@ -234,6 +245,8 @@ test('REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new
   assert.equal(pipeline.value.rows.find(p=>p.id===oldProposal.id).ownerId,null);assert.equal(pipeline.value.rows.find(p=>p.id===oldProposal.id).owner,'Not recorded')
   assert.equal(pipeline.value.totals.find(t=>t.currency==='AUD').valueCents,accepted.total_cents);assert.equal(pipeline.value.totals.find(t=>t.currency==='USD').valueCents,420000)
   const usdInvoice=await cmd('invoice.export',{id:created.id});assert.equal(usdInvoice.currency,'USD');assert.match((await h.send('/api/platter/invoices/'+usdInvoice.id+'.csv',undefined,cookie)).text,/No Tax,USD/)
+  const audCopy=await cmd('proposal.duplicate',{id:restored.id,version:restored.version}),copied=(await h.state(cookie)).proposals.find(p=>p.id===audCopy.id)
+  assert.equal(copied.currency,'AUD');assert.deepEqual(copied.options,restored.options);assert.equal(copied.deposit_bps,restored.deposit_bps);assert.equal(copied.acceptance,undefined);assert.equal(copied.status,'draft')
   await h.close();h=undefined
   const output=join(temporary,'after.rer');await command(target,['export','--output',output,'--no-queue'])
   const after=records(await readFile(output,'utf8'))

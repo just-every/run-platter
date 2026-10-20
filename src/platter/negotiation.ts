@@ -13,7 +13,7 @@ export function negotiatedView(offer: any, pending: any) {
 export async function negotiationCommand(env: Bindings, actor: Actor, name: string, input: Record<string, unknown>, offer: any, fields?: any) {
  const db = env.DB, at = await currentTime(env.DB), pending = await pendingNegotiation(db, offer.id)
  exact(offer, input)
- need(offer.status === 'sent', 'Only an unsigned sent offer can be negotiated', 409)
+ need(['sent','withdrawn'].includes(offer.status), 'Only an unsigned sent offer can be negotiated', 409)
  const guard = { sql: "EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status='sent')", values: [offer.id, offer.version] }
  if (name === 'proposal.negotiate' || name === 'proposal.revise') {
   need(actor.role !== 'agent', 'A person starts or edits a negotiated revision', 403)

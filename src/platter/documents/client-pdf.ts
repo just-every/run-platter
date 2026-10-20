@@ -15,7 +15,7 @@ export const pdfEnabled = async (db: D1Database, id: string) => (await db.prepar
 export async function pdfCommand(env: Bindings, actor: Actor, input: Record<string, unknown>) {
  need(actor.role === 'owner', 'Only the owner changes client PDF downloads', 403)
  const row = await proposal(env.DB, input.id); exact(row, input)
- need(row.status !== 'accepted', 'The accepted agreement is permanent', 409)
+ need(['draft','approved','sent'].includes(row.status), 'The accepted agreement is permanent', 409)
  need([true, false, 'yes', 'no'].includes(input.enabled as any), 'Choose whether client PDF downloads are allowed')
  const enabled = input.enabled === true || input.enabled === 'yes'
  await commit(env.DB, actor, [env.DB.prepare('INSERT INTO p_pdf_settings(proposal_id,enabled) VALUES(?,?) ON CONFLICT(proposal_id) DO UPDATE SET enabled=excluded.enabled').bind(row.id, enabled ? 1 : 0), env.DB.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id)], true, { sql: "EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status<>'accepted')", values: [row.id, row.version] })

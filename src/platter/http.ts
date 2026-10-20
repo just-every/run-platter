@@ -1,3 +1,4 @@
+import { withdrawnPage } from './ui/withdrawal'
 import { openQuestions } from './questions'
 import { questionReplyResponse } from './question-replies'
 import { clientPdf } from './documents/client-pdf'
@@ -34,7 +35,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   if(path==='/api/platter/question-replies')return await questionReplyResponse(request,env)
   if(path==='/api/platter/mail/events')return await deliveryWebhook(request,env)
   if(request.method==='POST'&&!isAgent)need(request.headers.get('origin')===env.AUTH_ORIGIN&&request.headers.get('sec-fetch-site')!=='cross-site','Cross-site request refused',403)
-  if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/action|\/download\.pdf|\/attachments\/([\w-]+))?$/);need(match,'Invitation not found',404);context=await clientContext(env,match[1],request)
+  if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/action|\/download\.pdf|\/attachments\/([\w-]+))?$/);need(match,'Invitation not found',404);const withdrawn=await env.DB.prepare('SELECT contact_email FROM p_withdrawn_links WHERE token=?').bind(match[1]).first<{contact_email:string}>();if(withdrawn)return withdrawnPage(withdrawn.contact_email);context=await clientContext(env,match[1],request)
    if(match[2]==='/download.pdf'){const input=request.method==='POST'?await body(request):Object.fromEntries(url.searchParams);return await clientPdf(env,context,String(input.optionId??''))}
    if(request.method==='GET'&&match[3]){const file=copyAttachments(snapshot(context.row).attachments).find(f=>f.id===match[3]);need(file,'Attachment not found',404);await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},'attachment.download',context.row.id);return downloadAttachment(env.DB,file)}
    if(request.method==='GET'&&!match[2]){await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},'proposal.view',context.row.id);return renderClient(await clientView(env,context),match[1])}
@@ -61,8 +62,8 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    const p=await body(request,path==='/app/action'&&url.searchParams.get('name')?.startsWith('business-import.')?6_200_000:150000),name=path==='/app/action'?url.searchParams.get('name')??'':String(p.name??''),input=path==='/app/action'?p:p.input as Record<string,unknown>;need(input&&typeof input==='object'&&!Array.isArray(input),'Provide an input object')
    if(isAgent)need(['proposal.prepare','proposal.revise'].includes(name),'Agents only prepare proposal drafts',403)
    let result=name==='send-request.resolve'?await resolveSendRequest(env.DB,actor,input):name.startsWith('agent.')?await credentialCommand(env.DB,actor,name,input):name.startsWith('import.')?await importCommand(env.DB,actor,name,input):await command(env,actor,name,input)
-   const subject=String((result as any)?.job?.id??(result as any)?.id??input.id??'clients');if(!name.startsWith('question.'))await recordAudit(env.DB,actor,name,subject)
-   if(path==='/app/action'){if(name.startsWith('business-import.'))result={...result as any,businessInput:input};if(['import.preview','import.apply'].includes(name))result={...result as any,csv:input.csv};const returnPath=back==='/app/proposal'?back+'?id='+encodeURIComponent(String(input.id??(result as any)?.id??'')):back;return renderApp(await state(env,actor),returnPath,{message:'Saved.',result})}
+   const subject=String((result as any)?.job?.id??(result as any)?.id??input.id??'clients');if(!name.startsWith('question.')&&name!=='proposal.withdraw')await recordAudit(env.DB,actor,name,subject)
+   if(path==='/app/action'){if(name==='proposal.duplicate')return new Response(null,{status:303,headers:{...headers,location:'/app/proposal?id='+encodeURIComponent(String((result as any).id))}});if(name.startsWith('business-import.'))result={...result as any,businessInput:input};if(['import.preview','import.apply'].includes(name))result={...result as any,csv:input.csv};const returnPath=back==='/app/proposal'?back+'?id='+encodeURIComponent(String(input.id??(result as any)?.id??'')):back;return renderApp(await state(env,actor),returnPath,{message:'Saved.',result})}
    return json(result)
   }
   return path.startsWith('/app')?renderMissing():json({error:'Not found'},404)

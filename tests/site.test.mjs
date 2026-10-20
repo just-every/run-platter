@@ -788,7 +788,7 @@ test('EDIT-009 desktop and phone configure, preview, select, download and accept
     const p=await command('proposal.prepare',fields)
     const capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`EDIT-009-${name}-${width}.png`),fullPage:true})}
     await page.goto(app.origin+'/app/proposal?id='+p.id)
-    await page.getByLabel('Terms visibility',{exact:true}).selectOption('two')
+    await capture('editor-before');await page.locator('select[name=termsOption]').selectOption('two')
     await page.getByRole('button',{name:'Save revision',exact:true}).click();await capture('editor')
     for(const optionId of ['one','two']){
      await page.goto(app.origin+`/app/preview/client?id=${p.id}&revision=2&optionId=${optionId}`)

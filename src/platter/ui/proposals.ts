@@ -10,46 +10,68 @@ import { historyPanel } from './history'
 import { acceptanceMethod, paperAcceptanceForm } from './paper'
 import { pipelinePanel } from './pipeline'
 import { reportSchedulesPanel } from './report-schedules'
-import { area, date, empty, escape, field, form, hidden, money, optionPair, panel, proposalPath, statusPill } from './shared'
+import { composerForm, composerShelf, preparedLine, receipt, receiptSum } from './composer'
+import { date, empty, escape, form, hidden, money, notices, panel, proposalPath, statusPill, type Feedback } from './shared'
 
-function editor(state: any, proposal?: any, negotiating = false): string {
-  const options = proposal?.options ?? []
-  const clients = (state.clients ?? []).map((client: any) => `<option value="${escape(client.id)}"${client.id === proposal?.client_id ? ' selected' : ''}>${escape(client.name)} — ${escape(client.email)}</option>`).join('')
-  const inputs = `<label>Client<select name="clientId" required><option value="">Choose a client</option>${clients}</select></label>`
-    + field('Proposal title', 'title', proposal?.title, 'required maxlength="200"')
-    + area('Scope of work', 'scope', proposal?.scope, 'required') + area('Terms', 'terms', proposal?.terms??'')
-    + '<fieldset><legend>Option one</legend>' + field('Option label', 'optionOne', options[0]?.label, 'required')
-    + field(`Price in ${proposal?.currency ?? 'USD'}`,  'priceOne', options[0] ? (options[0].cents / 100).toFixed(2) : '', 'required inputmode="decimal" placeholder="0.00"') + '</fieldset>'
-    + '<fieldset><legend>Option two</legend>' + field('Option label', 'optionTwo', options[1]?.label, 'required')
-    + field(`Price in ${proposal?.currency ?? 'USD'}`,  'priceTwo', options[1] ? (options[1].cents / 100).toFixed(2) : '', 'required inputmode="decimal" placeholder="0.00"') + '</fieldset>'
-    + field('Deposit percentage', 'depositPercent', proposal ? Number(proposal.deposit_bps) / 100 : '', 'required inputmode="decimal" placeholder="25"')
-  return form(negotiating ? 'proposal.negotiate' : proposal ? 'proposal.revise' : 'proposal.prepare', proposal ? proposalPath(proposal.id) : '/app',
-    (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + `<div class="editor-grid">${inputs}</div>` + `<button>${negotiating ? 'Prepare negotiated revision' : proposal ? 'Save revision' : 'Prepare proposal'}</button>`,
-    proposal ? `proposal-${proposal.id}-${proposal.version}` : 'proposal-new')
-}
 export function proposalsPage(state: any, selection = new URLSearchParams()): string {
   const proposals = state.proposals ?? []
   const list = proposals.length ? `<ul class="records">${proposals.map((p: any) => `<li><a href="${escape(proposalPath(p.id))}">${escape(p.title)}</a><span>${escape(p.clientName)} · ${statusPill(p.status)}</span></li>`).join('')}</ul>` : empty('No proposals yet. Prepare your first proposal below.')
   const canPrepare = ['owner', 'member'].includes(state.actor?.role)
-  return openQuestionsPanel(state) + bounceInbox(state) + (state.actor?.role === 'owner' ? pipelinePanel(proposals,selection) + reportSchedulesPanel(state,selection) : panel('Your proposals', list)) + (canPrepare ? panel('Prepare a proposal', state.clients?.length ? editor(state) : '<p>Add a client before preparing a proposal.</p>' + (state.actor.role === 'owner' ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) : '')
+  const owner = state.actor?.role === 'owner'
+  const exceptions = openQuestionsPanel(state) + bounceInbox(state)
+  const prepare = canPrepare ? `<section class="prepare" aria-labelledby="prepare-title"><h2 id="prepare-title">Prepare a proposal</h2>` + (state.clients?.length
+    ? composerShelf(state) + composerForm(state, undefined, 'prepare', 'composer-new') + receipt('<p class="receipt-sum muted">The client chooses one of the two options and pays the deposit percentage of it.</p>', '<button form="composer-new">Prepare proposal</button>')
+    : '<p>Add a client before preparing a proposal.</p>' + (owner ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) + '</section>' : ''
+  return (exceptions ? `<div class="exceptions">${exceptions}</div>` : '') + (owner ? pipelinePanel(proposals, selection) + reportSchedulesPanel(state, selection) : panel('Your proposals', list)) + prepare
 }
-export function proposalPage(state: any, id: string, selection = new URLSearchParams()): string | null {
+
+/** The tracked-caps line over the heading: stage, status, revision and client. */
+export function proposalEyebrow(state: any, id: string): string {
+  const p = state.proposals?.find((item: any) => String(item.id) === id)
+  if (!p) return ''
+  const editable = ['draft', 'approved'].includes(p.status) && ['owner', 'member'].includes(state.actor?.role)
+  return `<p class="eyebrow proposal-status">${editable ? 'Compose · ' : ''}${escape(p.status)} · Revision ${escape(p.revision)} · To ${escape(p.clientName)}${p.negotiating ? ` · Revision ${escape(p.sentRevision)} still with the client` : ''}</p>`
+}
+
+function offerCards(p: any): string {
+  const chosen = p.acceptance?.optionId
+  const card = (o: any, i: number) => `<article class="tier${(chosen ? o.id === chosen : i === 1) ? ' raised' : ''}"><p class="tier-legend">${i ? 'Option two' : 'Option one'}${o.id === chosen ? ' · chosen' : ''}</p><h2 class="tier-title">${escape(o.label)}</h2><p class="tier-amount">${money(o.cents, p.currency)}</p><dl class="tier-lines"><dt>Deposit at acceptance</dt><dd>${money(Math.round(o.cents * p.deposit_bps / 10000), p.currency)}</dd><dt>Balance after the deposit</dt><dd>${money(o.cents - Math.round(o.cents * p.deposit_bps / 10000), p.currency)}</dd></dl><p class="chip sage"><span class="tick" aria-hidden="true"></span>${escape(Number(p.deposit_bps) / 100)}% deposit${o.id === chosen ? ` · chosen by ${escape(p.acceptance.name)}` : ''}</p></article>`
+  return `<div class="tiers">${(p.options ?? []).map(card).join('')}<article class="tier scope-tier"><h2 class="tier-legend">Scope of work</h2><p class="preserve">${escape(p.scope)}</p><h2 class="tier-legend">Terms</h2><p class="preserve">${escape(p.terms || 'No additional terms.')}</p></article></div>`
+}
+
+function people(state: any, p: any): string {
+  const name = (email: unknown) => (state.reportPeople ?? []).find((person: any) => person.email === email)?.name || email
+  return `<dl class="offer-people"><dt>Client</dt><dd>${escape(p.clientName)} · ${escape(p.clientEmail)}</dd><dt>Prepared by</dt><dd>${escape(p.preparedByName === 'Agent' ? 'Agent' : name(p.preparedByName || p.prepared_by))}</dd><dt>Approved by</dt><dd>${escape(p.approvedByName || p.approved_by || 'Awaiting approval')}</dd><dt>Approved at</dt><dd>${date(p.approved_at)}</dd></dl>`
+}
+
+export function proposalPage(state: any, id: string, selection = new URLSearchParams(), feedback?: Feedback): string | null {
   const p = state.proposals?.find((item: any) => String(item.id) === id)
   if (!p) return null
   const path = proposalPath(p.id)
   const owner = state.actor?.role === 'owner'
+  const person = ['owner', 'member'].includes(state.actor?.role)
   const frozen = p.status === 'sent' || p.status === 'accepted' || p.status === 'expired' || p.status === 'withdrawn'
-  const summary = `<p class="proposal-status">${statusPill(p.status)} · Revision ${escape(p.revision)}</p><dl><dt>Client</dt><dd>${escape(p.clientName)} · ${escape(p.clientEmail)}</dd><dt>Prepared by</dt><dd>${escape(p.preparedByName || p.prepared_by)}</dd><dt>Approved by</dt><dd>${escape(p.approvedByName || p.approved_by || 'Awaiting approval')}</dd><dt>Approved at</dt><dd>${date(p.approved_at)}</dd></dl><h3>Scope of work</h3><p class="preserve">${escape(p.scope)}</p><h3>Terms</h3><p class="preserve">${escape(p.terms||'No additional terms.')}</p><h3>Offered prices</h3><p>${p.currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'}</p>${optionPair(p.options ?? [], p.deposit_bps, p.acceptance?.optionId, p.currency)}<p>Deposit: ${escape(Number(p.deposit_bps) / 100)}% of the chosen option.</p>`
-  let html = withdrawalPanel(state,p) + panel(p.title, summary) + proposalAttachments(state,p) + (p.status==='withdrawn'?'':pdfPanel(state,p)) + expiryPanel(state,p)
-  if(p.negotiating) html += panel('Negotiated draft', `<p>${p.withdrawals?.some((w:any)=>w.revision===p.sentRevision)?'The previous offer remains withdrawn.':'Revision '+escape(p.sentRevision)+' remains available to the client until'} this revision is approved and sent. If the client accepts it first, this draft cannot be sent.</p>`)
-  if(['sent','expired','withdrawn'].includes(p.status) && ['owner','member'].includes(state.actor?.role)) html += panel('Negotiate a new revision', '<p>The sent offer stays frozen. Prepare changed terms for a new approval before replacing the client invitation.</p>' + editor(state,p,true))
-  if (!frozen && ['owner', 'member'].includes(state.actor?.role)) html += panel('Revise proposal', '<p>Saving a revision clears any previous approval. The owner must approve the revised offer before sending.</p>' + editor(state, p))
-  if (owner && p.status === 'draft') html += panel('Approve offer', '<p>Confirm the scope and exact offered prices above before approving this revision.</p>' + form('proposal.approve', path, hidden('id', p.id) + hidden('version', p.version) + hidden('revision', p.revision) + '<button>Approve this revision</button>'))
-  if (owner && p.status === 'approved') html += panel('Send to client', '<p>Sending freezes this offer. The client will verify their email before accepting one option.</p>' + form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + '<button>Send approved proposal</button>'))
-  if (frozen) html += panel('Shared offer', '<p>This offer is frozen. Its scope, options, and prices can no longer be revised.</p>' + (owner && p.shareToken ? `<a href="/p/${encodeURIComponent(p.shareToken)}">Open client proposal</a>` : ''))
-  if (owner && ['sent','expired'].includes(p.status)) html += panel('Send a fresh invitation', '<p>This replaces any previous client link and verification session while keeping the offer frozen.</p>' + form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + '<button>Send fresh client link</button>'))
-  html += paperAcceptanceForm(state, p)
-  if (p.acceptance) html += panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)}${p.acceptance.method === 'upload' ? '' : ` · ${escape(p.acceptance.email)}`}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd>${acceptanceMethod(p.acceptance, '/api/platter/attachments/' + encodeURIComponent(p.id) + '/')}</dl><p>The accepted agreement is permanent.</p>`)
-  if (owner && p.acceptance) html += panel('Invoice export', form('invoice.export', path, hidden('id', p.id) + '<button>Export invoice CSV</button>') + (p.invoice ? `<p>Invoice ${escape(p.invoice.number)} · Exported ${date(p.invoice.exported_at)}</p><a href="/api/platter/invoices/${encodeURIComponent(p.invoice.id)}.csv">Download deposit invoice CSV</a>` : ''))
-  return html + duplicatePanel(state,p) + ownerQuestions(state,p) + deliveryPanel(state,p) + (p.status==='withdrawn'?'':suggestionsPanel(state,p)) + historyPanel(state, p, selection)
+  const pricing = p.currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'
+  const sum = receiptSum(p.options ?? [], Number(p.deposit_bps), p.currency, p.acceptance?.optionId)
+  const negotiated = p.negotiating ? `<div class="band caution" role="note"><p><strong>Negotiated draft.</strong> ${p.withdrawals?.some((w: any) => w.revision === p.sentRevision) ? 'The previous offer remains withdrawn.' : 'Revision ' + escape(p.sentRevision) + ' remains available to the client until'} this revision is approved and sent. If the client accepts it first, this draft cannot be sent.</p></div>` : ''
+  let html = withdrawalPanel(state, p) + preparedLine(state, p)
+  if (!frozen && person) {
+    const actions = `<button form="composer-${escape(p.id)}" class="secondary">Save revision</button>`
+      + (owner && p.status === 'draft' ? form('proposal.approve', path, hidden('id', p.id) + hidden('version', p.version) + hidden('revision', p.revision) + '<button>Approve this revision</button>') : '')
+      + (owner && p.status === 'approved' ? form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + '<button>Send approved proposal</button>') : '')
+    const note = p.status === 'approved' ? `Approved by ${escape(p.approvedByName || p.approved_by)} · ${date(p.approved_at)}. Sending freezes this offer; saving a revision clears the approval.` : owner ? 'Confirm the scope and exact offered prices before approving this revision. Saving a revision clears any previous approval.' : 'Saving a revision clears any previous approval. The owner approves the offer before it is sent.'
+    html += `<div class="composer-page">${composerShelf(state)}${composerForm(state, p, 'revise', `composer-${p.id}`)}${negotiated}${notices(feedback)}${receipt(sum, actions, note)}</div>`
+  } else {
+    const share = owner && p.shareToken && frozen ? `<a class="button-link" href="/p/${encodeURIComponent(p.shareToken)}">Open client proposal</a>` : ''
+    const fresh = owner && ['sent', 'expired'].includes(p.status) ? form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + '<button class="secondary">Send fresh client link</button>') : ''
+    const note = frozen ? `${pricing} This offer is frozen. Its scope, options, and prices can no longer be revised.${fresh ? ' A fresh invitation replaces any previous client link and verification session while keeping the offer frozen.' : ''}` : pricing
+    html += `<div class="composer-page frozen">${offerCards(p)}${notices(feedback)}${receipt(sum, fresh + share, note)}</div>`
+  }
+  const dossier: string[] = [panel('Offer record', people(state, p)), proposalAttachments(state, p), p.status === 'withdrawn' ? '' : pdfPanel(state, p), expiryPanel(state, p)]
+  if (['sent', 'expired', 'withdrawn'].includes(p.status) && person) dossier.push(`<section class="panel wide"><h2>Negotiate a new revision</h2><p>The sent offer stays frozen. Prepare changed terms for a new approval before replacing the client invitation.</p>${composerForm(state, p, 'negotiate', `negotiate-${p.id}`, 'Prepare negotiated revision')}</section>`)
+  dossier.push(paperAcceptanceForm(state, p))
+  if (p.acceptance) dossier.push(panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)}${p.acceptance.method === 'upload' ? '' : ` · ${escape(p.acceptance.email)}`}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd>${acceptanceMethod(p.acceptance, '/api/platter/attachments/' + encodeURIComponent(p.id) + '/')}</dl><p>The accepted agreement is permanent.</p>`))
+  if (owner && p.acceptance) dossier.push(panel('Invoice export', form('invoice.export', path, hidden('id', p.id) + '<button>Export invoice CSV</button>') + (p.invoice ? `<p>Invoice ${escape(p.invoice.number)} · Exported ${date(p.invoice.exported_at)}</p><a href="/api/platter/invoices/${encodeURIComponent(p.invoice.id)}.csv">Download deposit invoice CSV</a>` : '')))
+  dossier.push(duplicatePanel(state, p), ownerQuestions(state, p), deliveryPanel(state, p), p.status === 'withdrawn' ? '' : suggestionsPanel(state, p), historyPanel(state, p, selection))
+  return html + `<div class="dossier">${dossier.join('')}</div>`
 }

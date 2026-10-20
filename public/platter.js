@@ -32,3 +32,39 @@
     }
   } catch { /* Browser storage restrictions do not change submission behavior. */ }
 })();
+
+// Live tier columns: each option's deposit and the receipt follow the typed prices and percentage.
+// The server prices acceptance itself; this only mirrors what the saved revision will show.
+(() => {
+  const cents = value => /^\d{1,7}(\.\d{1,2})?$/.test(value.trim()) ? Math.round(Number(value) * 100) : null;
+  const show = value => value === null ? '—' : '$' + (value / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  for (const form of document.querySelectorAll('form.composer')) {
+    const page = form.closest('.composer-page');
+    const update = () => {
+      const percent = Number(form.elements.depositPercent?.value);
+      const valid = Number.isFinite(percent) && percent > 0 && percent <= 100;
+      for (const [id, name] of [['one', 'priceOne'], ['two', 'priceTwo']]) {
+        const price = cents(form.elements[name]?.value ?? '');
+        const deposit = price === null || !valid ? null : Math.round(price * percent * 100 / 10000);
+        const lines = form.querySelector(`[data-lines-for="${name}"]`);
+        if (lines) {
+          lines.querySelector('[data-line="deposit"]').textContent = show(deposit);
+          lines.querySelector('[data-line="balance"]').textContent = show(deposit === null ? null : price - deposit);
+        }
+        const tierPercent = form.querySelector(`[data-tier="${id}"] [data-line="percent"]`);
+        if (tierPercent && valid) tierPercent.textContent = String(percent);
+        if (!page) continue;
+        const sum = page.querySelector(`[data-sum-price="${id}"]`), part = page.querySelector(`[data-sum-deposit="${id}"]`);
+        if (sum) sum.textContent = show(price);
+        if (part) part.textContent = show(deposit);
+        const label = sum?.previousElementSibling;
+        const typed = form.elements[name === 'priceOne' ? 'optionOne' : 'optionTwo']?.value.trim();
+        if (label && typed) label.textContent = typed;
+      }
+      const shown = page?.querySelector('[data-sum-percent]');
+      if (shown && valid) shown.textContent = String(percent);
+    };
+    form.addEventListener('input', update);
+    update();
+  }
+})();

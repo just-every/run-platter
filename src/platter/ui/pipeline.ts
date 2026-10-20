@@ -1,16 +1,27 @@
 import { nextActions, pipeline } from '../pipeline'
 import { empty, escape, field, money, panel, proposalPath, statusPill } from './shared'
 
+// The proposal line: each proposal on one dotted track through the stages Platter records.
+const stages = ['Prepared', 'Approved', 'Sent', 'Accepted', 'Deposit exported']
+const reached: Record<string, number> = { draft: 0, approved: 1, sent: 2, expired: 2, withdrawn: 2, accepted: 3 }
+
+function track(row: any): string {
+  const at = row.nextAction === 'complete' ? 4 : reached[row.status] ?? 0
+  const stalled = ['expired', 'withdrawn'].includes(row.status)
+  return `<ol class="track${stalled ? ' stalled' : ''}" aria-label="Progress">${stages.map((stage, i) => `<li class="${i < at ? 'done' : i === at ? 'now' : ''}"><span>${stage}</span></li>`).join('')}</ol>`
+}
+
 export function pipelinePanel(proposals: any[], params: URLSearchParams) {
  const report = pipeline(proposals, params)
  const select = (label: string, key: string, choices: { id: string; name: string }[]) => `<label>${label}<select name="${key}" aria-label="${label}"><option value="">All</option>${choices.map(c => `<option value="${escape(c.id)}"${params.get(key) === c.id ? ' selected' : ''}>${escape(c.name)}</option>`).join('')}</select></label>`
- const filters = `<form method="get" action="/app"><div class="editor-grid">`
+ const filters = `<form method="get" action="/app" class="filters"><div class="filter-grid">`
   + select('Owner', 'owner', report.owners) + select('Status', 'status', ['draft','approved','sent','accepted','expired','withdrawn'].map(id => ({id,name:id})))
   + select('Client', 'client', report.clients) + select('Next action', 'nextAction', Object.entries(nextActions).map(([id,name]) => ({id,name})))
+  + `<label>Sort by<select name="sort" aria-label="Sort by">${['status','value','owner','client','age','nextAction'].map(id => `<option value="${id}"${(params.get('sort') || 'status') === id ? ' selected' : ''}>${escape(id === 'nextAction' ? 'Next action' : id)}</option>`).join('')}</select></label>`
   + field('Minimum value', 'minValue', params.get('minValue'), 'inputmode="decimal"') + field('Maximum value', 'maxValue', params.get('maxValue'), 'inputmode="decimal"')
   + field('Minimum age in days', 'minAge', params.get('minAge'), 'type="number" min="0"') + field('Maximum age in days', 'maxAge', params.get('maxAge'), 'type="number" min="0"')
-  + `<label>Sort by<select name="sort" aria-label="Sort by">${['status','value','owner','client','age','nextAction'].map(id => `<option value="${id}"${(params.get('sort') || 'status') === id ? ' selected' : ''}>${escape(id === 'nextAction' ? 'Next action' : id)}</option>`).join('')}</select></label><label>Direction<select name="direction" aria-label="Direction"><option value="asc"${params.get('direction') !== 'desc' ? ' selected' : ''}>Ascending</option><option value="desc"${params.get('direction') === 'desc' ? ' selected' : ''}>Descending</option></select></label></div><button>Filter pipeline</button><a href="/app">Clear filters</a></form>`
- const totals = `<p data-pipeline-count="${report.count}">${report.count} proposals match.</p><dl>${report.totals.map(t => `<dt>${escape(t.currency)} total · ${t.count} proposals</dt><dd data-pipeline-total="${escape(t.currency)}">${money(t.valueCents,t.currency)}</dd>`).join('')}</dl>`
- const rows = report.rows.length ? `<ul class="records" aria-label="Pipeline proposals">${report.rows.map(p => `<li data-proposal-id="${escape(p.id)}"><article><h3><a href="${escape(proposalPath(p.id))}">${escape(p.title)}</a></h3><p>${statusPill(p.status)} · ${money(p.valueCents,p.currency)}</p><dl><dt>Owner</dt><dd>${escape(p.owner)}</dd><dt>Client</dt><dd>${escape(p.client)}</dd><dt>Age</dt><dd>${p.age} days</dd><dt>Next action</dt><dd>${escape(nextActions[p.nextAction])}</dd></dl></article></li>`).join('')}</ul>` : empty('No proposals match these filters.')
- return panel('Proposal pipeline', '<p>Unaccepted value is the highest offered option; accepted value is the chosen option. Currencies total separately. Age counts completed 24-hour days since creation. Next action reflects the recorded workflow.</p>' + filters + totals + rows)
+  + `<label>Direction<select name="direction" aria-label="Direction"><option value="asc"${params.get('direction') !== 'desc' ? ' selected' : ''}>Ascending</option><option value="desc"${params.get('direction') === 'desc' ? ' selected' : ''}>Descending</option></select></label></div><div class="filter-actions"><button class="secondary">Filter pipeline</button><a href="/app">Clear filters</a></div></form>`
+ const totals = `<div class="line-totals"><p data-pipeline-count="${report.count}">${report.count} proposals match.</p><dl>${report.totals.map(t => `<dt>${escape(t.currency)} total · ${t.count} proposals</dt><dd data-pipeline-total="${escape(t.currency)}">${money(t.valueCents,t.currency)}</dd>`).join('')}</dl></div>`
+ const rows = report.rows.length ? `<ul class="line" aria-label="Pipeline proposals">${report.rows.map(p => `<li data-proposal-id="${escape(p.id)}"><article class="line-row"><div class="line-head"><h3><a href="${escape(proposalPath(p.id))}">${escape(p.title)}</a></h3><p class="line-value">${money(p.valueCents,p.currency)} ${statusPill(p.status)}</p></div>${track(p)}<dl class="line-facts"><dt>Owner</dt><dd>${escape(p.owner)}</dd><dt>Client</dt><dd>${escape(p.client)}</dd><dt>Age</dt><dd>${p.age} days</dd><dt>Next action</dt><dd>${escape(nextActions[p.nextAction])}</dd></dl></article></li>`).join('')}</ul>` : empty('No proposals match these filters.')
+ return panel('Proposal pipeline', '<p class="muted">Unaccepted value is the highest offered option; accepted value is the chosen option. Currencies total separately. Age counts completed 24-hour days since creation. Next action reflects the recorded workflow.</p>' + filters + totals + rows)
 }

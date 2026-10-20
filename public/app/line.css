@@ -1,0 +1,38 @@
+/* The proposal line: filters as a quiet strip, then each proposal on its dotted track of recorded stages. */
+.filters{margin:14px 0 18px;padding:14px 16px;border:1px solid var(--pl-rule);border-radius:var(--pl-radius);background:var(--pl-wash);gap:12px}
+.filter-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px 12px}
+.filter-grid label{font-size:13px}
+.filter-grid input,.filter-grid select{min-height:38px;padding-top:6px;padding-bottom:6px;font-size:15px}
+.filter-actions{display:flex;align-items:center;gap:18px}
+.filter-actions button{min-height:38px;padding:7px 18px}
+.line-totals{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 28px;margin:0 0 6px}
+.line-totals p{margin:0;font-weight:600}
+.line-totals dl{display:flex;flex-wrap:wrap;gap:4px 12px;margin:0}
+.line-totals dd{font:800 20px/1.2 var(--pl-sans)}
+.line{list-style:none;margin:0;padding:0}
+.line>li{border-bottom:1px solid var(--pl-rule)}.line>li:last-child{border-bottom:0}
+.line-row{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.6fr) minmax(0,1.15fr);align-items:center;gap:10px 28px;padding:16px 0}
+.line-head h3{margin:0;font:750 20px/1.25 var(--pl-serif);letter-spacing:-.01em}
+.line-head h3 a{text-decoration:none}.line-head h3 a:hover{text-decoration:underline}
+.line-value{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:4px 0 0;font-weight:700;font-size:16px}
+.track{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.track li{position:relative;display:grid;justify-items:center;gap:6px;padding-top:20px;font-size:12px;color:var(--pl-muted);text-align:center}
+.track li::before{content:"";position:absolute;top:4px;left:50%;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--pl-surface);border:1.5px solid #BDBAC6;z-index:1}
+.track li+li::after{content:"";position:absolute;top:9px;right:50%;width:100%;border-top:2px dotted #CFCCD6}
+.track li.done::before{background:var(--pl-sage);border-color:var(--pl-sage)}
+.track li.done+li::after,.track li.done+li.done::after{border-top-color:var(--pl-mulberry)}
+.track li.now::before{width:16px;height:16px;top:2px;margin-left:-8px;background:var(--pl-butter);border:2px solid var(--pl-ink)}
+.track li.now{color:var(--pl-ink);font-weight:650}
+.track.stalled li.now::before{background:var(--pl-red-wash);border-color:var(--pl-red)}
+.line-facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;margin:0;font-size:14px}
+.line-facts dt{font-size:13px}
+@media(max-width:1100px){.filter-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.line-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.track{grid-column:1/-1;grid-row:2}}
+@media(max-width:600px){
+ .filters{padding:12px}
+ .filter-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px}
+ .line-row{grid-template-columns:1fr;gap:10px}
+ .track{grid-row:auto}
+ .track li{font-size:11px}
+ .line-facts{grid-template-columns:auto minmax(0,1fr)}
+ .line-facts dd{margin:0}
+}

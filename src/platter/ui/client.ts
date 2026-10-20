@@ -4,7 +4,8 @@ import { attachmentList } from './attachments'
 import { clientSuggestions } from './suggestions'
 import { changes } from './history'
 import { acceptanceMethod } from './paper'
-import { date, document, escape, field, money, optionPair, panel, type Feedback } from './shared'
+import { date, escape, field, money, optionPair, panel, type Feedback } from './shared'
+import { document } from './shell'
 
 export function renderClient(view: any, token: string, feedback?: Feedback): Response {
   const endpoint = `/p/${encodeURIComponent(token)}/action?name=`

@@ -1,49 +1,73 @@
 @import url('/fonts/fonts.css');
+/* Platter's tokens, defined once: the owner-picked tier composer's crisp white, ink, mulberry actions,
+   butter highlight, sage done states and one soft red for failures. Every other stylesheet reads these. */
 :root {
-  --pl-paper: #F8F6F1;
+  --pl-page: #FFFFFF;
   --pl-surface: #FFFFFF;
-  --pl-porcelain: #F2F0EC;
-  --pl-ink: #1F2121;
-  --pl-muted: #5B6062;
-  --pl-rule: #DCD9D3;
-  --pl-glaze: #8CBBBA;
-  --pl-glaze-soft: #BBDFDA;
-  --pl-glaze-wash: #ECF6F3;
-  --pl-shadow-card: 0 1px 2px rgb(31 33 33 / .06), 0 8px 24px rgb(31 33 33 / .06);
-  --pl-shadow-plate: 0 18px 40px rgb(80 70 55 / .18);
-  --rer-font-body: 'Rethink Sans', system-ui, sans-serif;
-  --rer-font-heading: var(--rer-font-body);
-  --rer-page: var(--pl-paper);
+  --pl-wash: #F6F6F8;
+  --pl-ink: #1C1C24;
+  --pl-ink-soft: #3B3B46;
+  --pl-muted: #5C5C68;
+  --pl-rule: #E4E2E7;
+  --pl-field: #ABA8B4;
+  --pl-mulberry: #961756;
+  --pl-mulberry-deep: #7C144A;
+  --pl-hibiscus: #E92D5E;
+  --pl-peacock: #06699C;
+  --pl-butter: #FFD45A;
+  --pl-butter-edge: #F3C53A;
+  --pl-butter-wash: #FFF7D9;
+  --pl-sage: #739873;
+  --pl-sage-ink: #2E5A33;
+  --pl-sage-wash: #E5F0E1;
+  --pl-red: #B8173F;
+  --pl-red-edge: #F4A7B7;
+  --pl-red-wash: #FDE9ED;
+  --pl-grad: linear-gradient(90deg, #7C144A 0%, #A9165A 26%, #D9255C 50%, #E8503F 74%, #E2711D 100%);
+  --pl-serif: 'Source Serif 4', Georgia, serif;
+  --pl-sans: 'Inter', system-ui, sans-serif;
+  --pl-hand: 'Kalam', 'Comic Sans MS', cursive;
+  --pl-radius: 8px;
+  --pl-shadow-card: 0 1px 2px rgb(28 28 36 / .05), 0 6px 18px rgb(28 28 36 / .05);
+  --pl-shadow-lift: 0 2px 4px rgb(28 28 36 / .06), 0 18px 36px rgb(120 92 10 / .14);
+  --pl-focus: 0 0 0 3px rgb(150 23 86 / .22);
+  --rer-font-body: var(--pl-sans);
+  --rer-font-heading: var(--pl-serif);
+  --rer-wordmark-weight: 800;
+  --rer-wordmark-tracking: -.035em;
+  --rer-page: var(--pl-page);
   --rer-surface: var(--pl-surface);
   --rer-text: var(--pl-ink);
   --rer-muted: var(--pl-muted);
-  --rer-border: #8A8F90;
+  --rer-border: var(--pl-field);
   --rer-accent: var(--pl-ink);
   --rer-accent-text: var(--pl-surface);
-  --rer-focus: var(--pl-ink);
+  --rer-focus: var(--pl-mulberry);
   --rer-link: var(--pl-ink);
-  --rer-radius: 16px;
-  --rer-button-radius: 999px;
-  --rer-logo: url('/brand/mark.svg');
+  --rer-radius: var(--pl-radius);
+  --rer-button-radius: var(--pl-radius);
+  --rer-logo: url('/brand/mark-32.svg');
 }
-/* Base owns the forms; this edition supplies their porcelain setting. */
-.rer-themed.rer-themed body{position:relative;isolation:isolate;display:grid;place-items:center;min-height:100vh;padding:100px 16px;font-size:17px}
-.rer-themed body::before{content:"";position:absolute;z-index:-1;pointer-events:none;width:min(1000px,96vw);height:560px;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;background:var(--pl-porcelain);border:14px solid white;box-shadow:inset 0 0 0 6px var(--pl-glaze),inset 0 20px 30px rgb(80 70 55 / .1),var(--pl-shadow-plate)}
-.rer-themed.rer-themed main{width:100%;max-width:480px;margin:0;padding:28px;border:1px solid var(--pl-rule);box-shadow:var(--pl-shadow-card)}
-.rer-themed.rer-themed h1{font-size:44px;line-height:1.1;letter-spacing:-.025em;font-weight:600;text-wrap:initial;text-align:center}
-.rer-themed.rer-themed button{border-radius:999px;min-height:44px;font-weight:600}
-.rer-themed.rer-themed input:not([type=checkbox]):not([type=hidden]){border-radius:10px;border-color:var(--rer-border);background:var(--pl-surface);color:var(--pl-ink)}
-.rer-themed.rer-themed .rer-brand,.rer-themed.rer-themed .brand{display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:600;color:var(--pl-ink);margin-bottom:28px}
-.rer-themed.rer-themed :focus-visible{outline-color:var(--pl-ink)}
+/* Base's first-run and sign-in documents: the app's white page, one hairline card, the serif heading and quiet fields. */
+.rer-themed.rer-themed body{padding:72px 16px;font-size:16px;background:var(--pl-page)}
+.rer-themed.rer-themed main{max-width:460px;padding:32px;border:1px solid var(--pl-rule);border-radius:12px;box-shadow:var(--pl-shadow-card)}
+.rer-themed.rer-themed main::before{content:"";display:block;height:4px;margin:-32px -32px 28px;border-radius:12px 12px 0 0;background:var(--pl-grad)}
+.rer-themed.rer-themed h1{font-family:var(--pl-serif);font-weight:800;font-size:40px;line-height:1.08;letter-spacing:-.03em}
+.rer-themed.rer-themed .rer-brand,.rer-themed.rer-themed .brand{display:flex;align-items:center;gap:10px;font:800 26px/1 var(--pl-serif);letter-spacing:-.035em;color:var(--pl-ink);margin-bottom:24px}
+.rer-themed.rer-themed label:not(:has(input[type=checkbox])){font-weight:500;font-size:15px}
+.rer-themed.rer-themed input:not([type=checkbox]):not([type=hidden]){border-radius:var(--pl-radius);border:1px solid var(--pl-field);background:var(--pl-surface);color:var(--pl-ink);min-height:44px}
+.rer-themed.rer-themed input:not([type=checkbox]):not([type=hidden]):focus{outline:none;border-color:var(--pl-mulberry);box-shadow:var(--pl-focus)}
+.rer-themed.rer-themed input[type=checkbox]{accent-color:var(--pl-ink)}
+.rer-themed.rer-themed button{border-radius:var(--pl-radius);min-height:46px;font-weight:600;background:var(--pl-ink)}
+.rer-themed.rer-themed :focus-visible{outline-color:var(--pl-mulberry)}
+.rer-themed.rer-themed main>p:not(.rer-brand){text-align:left}
 @media(max-width:600px){
-  .rer-themed.rer-themed body{padding:72px 16px;font-size:16px}
-  .rer-themed body::before{width:360px;max-width:calc(100vw - 16px);height:560px;border-width:10px}
-  .rer-themed.rer-themed main{padding:20px;max-width:358px}
-  .rer-themed.rer-themed h1{font-size:34px}
+  .rer-themed.rer-themed body{padding:32px 16px}
+  .rer-themed.rer-themed main{padding:24px 20px}
+  .rer-themed.rer-themed main::before{margin:-24px -20px 22px}
+  .rer-themed.rer-themed h1{font-size:32px}
   .rer-themed.rer-themed dl{grid-template-columns:1fr;gap:0}
   .rer-themed.rer-themed dd{margin-bottom:12px}
 }
-/* The shared Run page uses the same small glaze fills as Platter's app. */
-.step .num{background:var(--pl-glaze-soft);color:var(--pl-ink)}
-.rer-themed.rer-themed main>p:not(.rer-brand){text-align:center}
-.rer-themed.rer-themed label:not(:has(input[type=checkbox])){font-weight:500}
+/* The shared Run page's step numbers. */
+.step .num{background:var(--pl-butter);color:var(--pl-ink)}

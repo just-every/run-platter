@@ -13,7 +13,7 @@ import { handleMcp } from './mcp'
 import { sendRequests, resolveSendRequest } from './send-requests'
 import { auditRows, auditCsv, recordAudit } from './audit'
 import { auditPage } from './ui/audit'
-import { document } from './ui/shared'
+import { document } from './ui/shell'
 import { runtimeBindings,type Bindings } from '../auth.server'
 import { principal,credentialCommand } from './credentials'
 import { command } from './commands'
@@ -50,7 +50,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    if(path==='/api/platter/business-original')return await businessOriginal(env,actor,url.searchParams)
    if(path==='/api/platter/business-records'){need(actor.role==='owner','Only the owner reads imported business records',403);return json(await businessRecords(env.DB,actor))}
    const attachment=path.match(/^\/api\/platter\/attachments\/([\w-]+)(?:\/([\w-]+))?$/);if(attachment){let files;if(attachment[2]){need(actor.role!=='agent','A person downloads proposal files',403);const row=await proposal(env.DB,attachment[1]),paper=await paperRow(env.DB,row.id);files=[...copyAttachments(snapshot(row).attachments),...(paper?[paperFile(paper)]:[])]}else{need(actor.role==='owner','Only the owner reads vendor settings',403);files=await vendorDocuments(env.DB)}const file=files.find(f=>f.id===(attachment[2]??attachment[1]));need(file,'Attachment not found',404);await recordAudit(env.DB,actor,'attachment.download',file.id);return downloadAttachment(env.DB,file)}
-   if(path==='/app/audit'||path==='/api/platter/audit'||path==='/api/platter/audit.csv'){const rows=await auditRows(env.DB,actor,url.searchParams);return path==='/app/audit'?document('Audit log',auditPage(rows,url.searchParams),{actor,path}):path.endsWith('.csv')?new Response(auditCsv(rows),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename=platter-audit.csv'}}):json({rows})}
+   if(path==='/app/audit'||path==='/api/platter/audit'||path==='/api/platter/audit.csv'){const rows=await auditRows(env.DB,actor,url.searchParams);return path==='/app/audit'?document('Audit log',auditPage(rows,url.searchParams),{actor,path,eyebrow:'<p class="eyebrow">Audit · who did what, and when</p>'}):path.endsWith('.csv')?new Response(auditCsv(rows),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename=platter-audit.csv'}}):json({rows})}
    if(pages.has(path)){if(path==='/app/proposal'){const id=url.searchParams.get('id');if(id&&(await env.DB.prepare('SELECT id FROM p_proposals WHERE id=?').bind(id).first()))await recordAudit(env.DB,actor,'proposal.view',id)}return renderApp(await state(env,actor),path+url.search)}
    if(path==='/api/platter/questions')return json({questions:await openQuestions(env.DB,actor)})
    if(path==='/api/platter/send-requests')return json({requests:await sendRequests(env.DB,actor)})

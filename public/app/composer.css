@@ -87,3 +87,7 @@
  .receipt-actions button,.receipt-actions .button-link{min-height:44px;padding:10px 12px;font-size:14px}
  .prepare>h2{font-size:30px}
 }
+@media(max-width:600px){.details-row>label{padding:8px 10px}.details-row select{font-size:14px}}
+.money-field:has(input.invalid){color:var(--pl-red)}
+.tier-price input.invalid{border-color:var(--pl-red-edge);background:var(--pl-red-wash)}
+.receipt-sum .invalid{color:var(--pl-red);background:var(--pl-red-wash);border-radius:4px;padding:0 4px}

@@ -45,6 +45,8 @@
       const valid = Number.isFinite(percent) && percent > 0 && percent <= 100;
       for (const [id, name] of [['one', 'priceOne'], ['two', 'priceTwo']]) {
         const price = cents(form.elements[name]?.value ?? '');
+        const field = form.elements[name];
+        if (field) field.classList.toggle('invalid', field.value.trim() !== '' && price === null);
         const deposit = price === null || !valid ? null : Math.round(price * percent * 100 / 10000);
         const lines = form.querySelector(`[data-lines-for="${name}"]`);
         if (lines) {
@@ -55,7 +57,7 @@
         if (tierPercent && valid) tierPercent.textContent = String(percent);
         if (!page) continue;
         const sum = page.querySelector(`[data-sum-price="${id}"]`), part = page.querySelector(`[data-sum-deposit="${id}"]`);
-        if (sum) sum.textContent = show(price);
+        if (sum) { sum.textContent = show(price); sum.classList.toggle('invalid', price === null); }
         if (part) part.textContent = show(deposit);
         const label = sum?.previousElementSibling;
         const typed = form.elements[name === 'priceOne' ? 'optionOne' : 'optionTwo']?.value.trim();

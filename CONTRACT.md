@@ -1057,7 +1057,9 @@ Catalog metadata preserves decimal strings (PandaDoc price/cost through five dec
 
 *Acceptance:* Import a CSV of 200 contacts across 60 companies with addresses and exemptions, and 50 catalog items, preview, apply and undo; import PandaDoc's catalog CSV layout unchanged and see the same items as `MIG-001`. Named public HTTP journeys assert original catalog/contact layouts, reviewed mappings for differing exports, titles/phones/addresses/exemptions, exact prices, bundles, recurrence/custom fields, file-host-edge image bytes, explicit image omission, conflicts, owner authority, resumable apply and dependent-record undo protection. Browser journeys at 1440 and 390 finish preview/apply/journal/undo and explicit omission; the public CLI restores records and original CSV/image bytes with working undo. A real pinned-workerd probe fetched a public PNG and rejected a mismatching TLS hostname; provider fakes establish Platter's handling, not hosted provider certification.
 
-*Status:* done. (`src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `src/platter/ui/business-import.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
+*Status:* partial. (`src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `src/platter/ui/business-import.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
+
+The DoH-checked, literal-IP-pinned path with original-hostname startTls, redirect refusal and explicit acquisition failure is proven in local pinned workerd, including a negative TLS probe. Cloudflare edge behavior is not yet proven (workerd #6903). No bypass or fallback is used; the owner can still explicitly apply without images. Gap: image URLs fetched through Base's egress relay.
 
 #### MIG-007 — Move-in from exported files without API access.
 
@@ -1260,8 +1262,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 14 | 24 | 90 | 128 |
-| All | 26 | 24 | 90 | 140 |
+| Target and push further | 13 | 25 | 90 | 128 |
+| All | 25 | 25 | 90 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1385,7 +1387,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `MIG-003` | Better Proposals move-in | target | missing |  | No Better Proposals import. |
 | `MIG-004` | Qwilr and Ignition move-in | target | missing |  | No Qwilr or Ignition import. |
 | `MIG-005` | Open proposals and payment schedules continue | target | missing |  | No in-flight migration. |
-| `MIG-006` | Clients, contacts and catalog CSV move-in | target | done | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
+| `MIG-006` | Clients, contacts and catalog CSV move-in | target | partial | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | image URLs fetched through Base\'s egress relay |
 | `MIG-007` | Move-in from exported files without API access | target | missing |  | No document import; only the client CSV kit exists. |
 | `MOB-001` | Team app on a phone | target | partial | `src/platter/ui/shared.ts` | The team pages have viewport and narrow-screen styling only; there is no phone journey for creating, sending or approving. |
 | `MOB-002` | iOS and Android apps with push notifications | target | missing |  | No native apps or push. |

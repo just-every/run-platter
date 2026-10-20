@@ -1,3 +1,4 @@
+import { selectedSummary } from './packages'
 import { pricingTables } from './pricing'
 import { followupQueuePanel, followupPanel } from './followup'
 import { duplicatePanel } from './duplicate'
@@ -78,8 +79,9 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   const itemised = pricingTables(p.options ?? [], p.currency)
   const dossier: string[] = [followupPanel(state, p), withdrawalPanel(state, p), itemised ? `<section class="panel wide"><h2>Itemised pricing</h2>${itemised}</section>` : '', panel('Offer record', people(state, p)), proposalAttachments(state, p), p.status === 'withdrawn' ? '' : pdfPanel(state, p), expiryPanel(state, p)]
   if (['sent', 'expired', 'withdrawn'].includes(p.status) && person) dossier.push(`<section class="panel wide"><h2>Negotiate a new revision</h2><p>The sent offer stays frozen. Prepare changed terms for a new approval before replacing the client invitation.</p>${composerForm(state, p, 'negotiate', `negotiate-${p.id}`, 'Prepare negotiated revision')}</section>`)
-  dossier.push(paperAcceptanceForm(state, p))
+  dossier.push(paperAcceptanceForm(state, p, selection))
   if (p.acceptance) dossier.push(panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)}${p.acceptance.method === 'upload' ? '' : ` · ${escape(p.acceptance.email)}`}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd>${acceptanceMethod(p.acceptance, '/api/platter/attachments/' + encodeURIComponent(p.id) + '/')}</dl><p>The accepted agreement is permanent.</p>`))
+  if (p.acceptance?.selection) dossier.push(selectedSummary(p.acceptance.selection, p.currency))
   if (owner && p.acceptance) dossier.push(panel('Invoice export', form('invoice.export', path, hidden('id', p.id) + '<button>Export invoice CSV</button>') + (p.invoice ? `<p>Invoice ${escape(p.invoice.number)} · Exported ${date(p.invoice.exported_at)}</p><a href="/api/platter/invoices/${encodeURIComponent(p.invoice.id)}.csv">Download deposit invoice CSV</a>` : '')))
   dossier.push(duplicatePanel(state, p), ownerQuestions(state, p), deliveryPanel(state, p), p.status === 'withdrawn' ? '' : suggestionsPanel(state, p), historyPanel(state, p, selection))
   return html + `<div class="dossier">${dossier.join('')}</div>`

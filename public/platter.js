@@ -49,32 +49,29 @@
     const update = () => {
       const percent = Number(form.elements.depositPercent?.value);
       const valid = Number.isFinite(percent) && percent > 0 && percent <= 100;
-      for (const [id, name] of [['one', 'priceOne'], ['two', 'priceTwo']]) {
-        const price = cents(form.elements[name]?.value ?? '');
-        const field = form.elements[name];
-        if (field) field.classList.toggle('invalid', field.value.trim() !== '' && price === null);
-        const figure = form.querySelector(`[data-figure-for="${name}"]`);
-        if (figure && field) figure.textContent = price === null ? field.value.trim() : show(price);
+      for (const tier of form.querySelectorAll('.tier[data-tier]')) {
+        const id = tier.dataset.tier, field = tier.querySelector('.tier-price input');
+        if (!field) continue;
+        const price = cents(field.value);
+        field.classList.toggle('invalid', field.value.trim() !== '' && price === null);
+        const figure = tier.querySelector('.money-figure');
+        if (figure) figure.textContent = price === null ? field.value.trim() : show(price);
         const deposit = price === null || !valid ? null : Math.round(price * percent * 100 / 10000);
-        const lines = form.querySelector(`[data-lines-for="${name}"]`);
-        if (lines) {
-          lines.querySelector('[data-line="deposit"]').textContent = show(deposit);
-          lines.querySelector('[data-line="balance"]').textContent = show(deposit === null ? null : price - deposit);
-        }
-        const tierPercent = form.querySelector(`[data-tier="${id}"] [data-line="percent"]`);
-        if (tierPercent && valid) tierPercent.textContent = String(percent);
-        if (!page) continue;
+        tier.querySelector('[data-line="deposit"]').textContent = show(deposit);
+        tier.querySelector('[data-line="balance"]').textContent = show(deposit === null ? null : price - deposit);
+        if (valid) tier.querySelector('[data-line="percent"]').textContent = String(percent);
+        if (!page || !id) continue;
         const sum = page.querySelector(`[data-sum-price="${id}"]`), part = page.querySelector(`[data-sum-deposit="${id}"]`);
         if (sum) { sum.textContent = show(price); sum.classList.toggle('invalid', price === null); }
         if (part) part.textContent = show(deposit);
-        const label = sum?.previousElementSibling;
-        const typed = form.elements[name === 'priceOne' ? 'optionOne' : 'optionTwo']?.value.trim();
+        const label = sum?.previousElementSibling, typed = tier.querySelector('.tier-name input')?.value.trim();
         if (label && typed) label.textContent = typed;
       }
       const shown = page?.querySelector('[data-sum-percent]');
       if (shown && valid) shown.textContent = String(percent);
     };
     form.addEventListener('input', update);
+    form.addEventListener('click', () => requestAnimationFrame(update));
     update();
   }
 })();

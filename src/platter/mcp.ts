@@ -17,14 +17,14 @@ const fields = {
  optionOne: string, priceOne: { type: ['string', 'number'] },
  optionTwo: string, priceTwo: { type: ['string', 'number'] },
 }
-const schema = (properties: Record<string, any>, required: string[] = []) => ({ type: 'object', properties, required, additionalProperties: false })
-const draftRequired=Object.keys(fields)
-const draftingFields={...fields,pricingTables:{type:'array',items:{type:'object',description:'Tables with optionId one/two, name, and lines: name, description, quantity (positive decimal up to 3 places), unit, unitPrice (USD up to 2 places), group. Server rounds each extended line half up to cents and recomputes totals.'}}}
+const schema = (properties: Record<string, any>, required: string[] = []) => ({ type: 'object', properties, required, additionalProperties: false, ...(Object.hasOwn(properties,'packages')?{anyOf:[{required:['packages']},{required:['optionOne','priceOne','optionTwo','priceTwo']}]}:{}) })
+const draftRequired=['clientId','title','scope','depositPercent']
+const draftingFields={...fields,packages:{type:'array',minItems:1,items:{type:'object',description:'Package id, label, price, optionalItems: id, label, unitPrice, min, max, quantity and editable. Prices and optional-item totals are always calculated by the server.'}},pricingTables:{type:'array',items:{type:'object',description:'Tables with an offered package optionId, name, and lines: name, description, quantity (positive decimal up to 3 places), unit, unitPrice (USD up to 2 places), group. Server rounds each extended line half up to cents and recomputes totals.'}}}
 const tools = [
  { name: 'search_proposals', description: 'Search current proposals by title, scope or client. Includes matching existing clients for preparing a draft; at most 100 results of each kind.', inputSchema: schema({ query: { type: 'string', maxLength: 200 }, status: { type: 'string', enum: ['draft', 'approved', 'sent', 'accepted'] }, limit: { type: 'integer', minimum: 1, maximum: 100 } }) },
  { name: 'read_proposal', description: 'Read a current proposal, revision, version, approval and recorded delivery/acceptance status. No invitation credentials are returned.', inputSchema: schema({ id: string }, ['id']) },
  { name: 'read_engagement', description: 'Read recorded delivery and acceptance status. View tracking and section reading analytics are unavailable; delivery acceptance does not prove reading.', inputSchema: schema({ id: string }, ['id']) },
- { name: 'prepare_proposal', description: 'Prepare a structured two-option draft for an existing client. Templates are unavailable. The owner must review, approve and send it.', inputSchema: schema(draftingFields, draftRequired) },
+ { name: 'prepare_proposal', description: 'Prepare a structured package draft (or a legacy two-option draft) for an existing client. Templates are unavailable. The owner must review, approve and send it.', inputSchema: schema(draftingFields, draftRequired) },
  { name: 'revise_proposal', description: 'Revise the current draft or approved proposal using its version. This creates a draft revision and clears approval. Sent and accepted offers cannot be edited by an agent.', inputSchema: schema({ ...draftingFields, id: string, version: integer }, [...draftRequired, 'id', 'version']) },
  { name: 'request_send', description: 'Queue the exact current draft or approved revision for its key owner to review. Repeating an active request returns that request. This never approves or sends mail.', inputSchema: schema({ id: string, revision: integer }, ['id', 'revision']) },
 ]

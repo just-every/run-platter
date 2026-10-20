@@ -1,4 +1,4 @@
-import { pricedOptions, pricingInput, tableInputs } from './pricing'
+import { pricedOptions, pricingInput, tableInputs, packageInputs, editablePackages } from './pricing'
 import { sectionConditions } from './conditional'
 import { followupCommand } from './followup/commands'
 import { duplicateProposal } from './duplicate'
@@ -27,7 +27,9 @@ export function proposalFields(p:Record<string,unknown>){
  const price=(id:string,value:unknown)=>tables.some(t=>t&&t.optionId===id)?1:dollars(value,id==='one'?'priceOne':'priceTwo')
  const deposit=Number(p.depositPercent);need(Number.isFinite(deposit)&&Number.isInteger(deposit*100)&&deposit>0&&deposit<=100,'Deposit must be from 0.01 to 100 percent')
  const terms=p.terms??'';need(typeof terms==='string'&&terms.length<=10000,'Terms must be text up to 10000 characters')
- return{section_conditions:sectionConditions(p.sectionConditions??Object.fromEntries(['scope','terms'].filter(k=>p[k+'Option']).map(k=>[k,p[k+'Option']]))),terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:pricedOptions([{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)}
+ const options=p.packages===undefined?null:packageInputs(p.packages,tables)
+ const conditions=sectionConditions(p.sectionConditions??Object.fromEntries(['scope','terms'].filter(k=>p[k+'Option']).map(k=>[k,p[k+'Option']])),options??[{id:'one'},{id:'two'}])
+ return{section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)}
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown){const db=env.DB,at=await currentTime(env.DB)
  if(name.startsWith('followup.'))return followupCommand(env,a,name,p)
@@ -54,6 +56,8 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='proposal.negotiate'||name==='proposal.revise'){
   const current=await proposal(db,p.id)
   if(p.pricingTables!==undefined&&tableInputs(p.pricingTables).length)need(current.currency==='USD','Historical AUD proposals keep their original pricing form',409)
+  if(p.packages!==undefined&&current.currency!=='USD'){const requested=packageInputs(p.packages,[]);need(requested.length===2&&requested.every((o:any,i:number)=>o.id===['one','two'][i]&&!o.optionalItems?.length),'Historical AUD proposals keep their original pricing form',409)}
+  if(p.packages===undefined){const pending=await pendingNegotiation(db,current.id);const content=pending?JSON.parse(pending.snapshot):current;const options=typeof content.options==='string'?JSON.parse(content.options):content.options;if(options.length!==2||options.some((o:any,i:number)=>o.id!==['one','two'][i]||o.optionalItems?.length))p={...p,packages:editablePackages(options).map(o=>{const suffix=o.id==='one'?'One':o.id==='two'?'Two':null;return suffix?{...o,...(p['option'+suffix]!==undefined?{label:p['option'+suffix]}:{}),...(p['price'+suffix]!==undefined?{price:p['price'+suffix]}:{})}:o})}}
   if(p.pricingTables===undefined){const pending=await pendingNegotiation(db,current.id);const content=pending?JSON.parse(pending.snapshot):current;p={...p,pricingTables:pricingInput(typeof content.options==='string'?JSON.parse(content.options):content.options)}}
   if(p.sectionConditions===undefined&&p.scopeOption===undefined&&p.termsOption===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,sectionConditions:pending?JSON.parse(pending.snapshot).section_conditions??{}:current.section_conditions}}
   if(p.terms===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,terms:pending?JSON.parse(pending.snapshot).terms??'':current.terms}}

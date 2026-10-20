@@ -28,7 +28,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -120,7 +120,7 @@ test('PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLO
     assert.ok(replyKey,'the provider receives the generated reply key')
     assert.ok((await h.db.prepare('SELECT COUNT(*) AS count FROM p_question_reply_keys').first()).count>0,'a reply capability exists before export')
     await h.close();h=null
-    h=await harness({root:source,origin:sourceOrigin,...localIdentity})
+    h=await harness({root:source,origin:sourceOrigin,assetsDirectory:'public',...localIdentity})
     const business=state=>({clients:state.clients,proposals:state.proposals.map(({delivery,deliveries,shareToken,...proposal})=>proposal),importJobs:state.importJobs})
     const withdrawn=await h.cmd('proposal.prepare',{...offer,title:'Withdrawn offer'})
     await h.cmd('proposal.approve',{id:withdrawn.id,version:1,revision:1});const withdrawnShare=await h.cmd('proposal.send',{id:withdrawn.id,version:2})
@@ -135,6 +135,28 @@ test('PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLO
     await h.cmd('followup.complete',{id:duplicate.id,action:'Reviewed scope with Avery by phone'})
     const followupsBefore=(await h.state()).followups.rows.map(({sentAt,...r})=>r)
     const actionsBefore=(await h.state()).followupActions
+    const {packageFixture,packageSelection:packageItems,packageExpected}=await import('./packages-fixture.mjs')
+    const packages=await h.cmd('proposal.prepare',{...offer,title:'Archived package choices',packages:packageFixture()})
+    await h.cmd('proposal.approve',{id:packages.id,version:1,revision:1});const packageShare=await h.cmd('proposal.send',{id:packages.id,version:2}),packagePath=new URL(packageShare.shareUrl).pathname
+    await h.send(packagePath+'/action?name=code.request',{})
+    const packageCode=(await h.state()).outbox.find(x=>x.proposal_id===packages.id&&x.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    const packageVerified=await h.send(packagePath+'/action?name=code.verify',{code:packageCode})
+    const packagePdf=await h.mf.dispatchFetch(h.origin+packagePath+'/download.pdf?optionId=two&items='+encodeURIComponent(JSON.stringify(packageItems)),{headers:{host:new URL(h.origin).host,cookie:packageVerified.cookie}});assert.equal(packagePdf.status,200);await packagePdf.arrayBuffer()
+    assert.equal((await h.send(packagePath+'/action?name=accept',{name:'Avery Chen',optionId:'two',items:packageItems,consent:true},packageVerified.cookie)).status,200)
+    const packagesBefore=(await h.state()).proposals.find(x=>x.id===packages.id)
+    assert.equal(packagesBefore.acceptance.totalCents,packageExpected.totalCents);assert.equal(packagesBefore.acceptance.depositCents,packageExpected.depositCents)
+    // PRICE-002 / SIGN-008: uploaded-paper choices and original file are product records too.
+    const paper=await h.cmd('proposal.prepare',{...offer,title:'Archived signed-copy package',packages:packageFixture()})
+    await h.cmd('proposal.approve',{id:paper.id,version:1,revision:1});await h.cmd('proposal.send',{id:paper.id,version:2})
+    const paperBytes=new TextEncoder().encode('%PDF Growth plus Rush delivery quantity four'),paperForm=new FormData()
+    for(const [key,value]of Object.entries({id:paper.id,version:3,optionId:'two',items:JSON.stringify(packageItems),signer:'Morgan Lee',signedOn:'2026-10-15',attest:'yes'}))paperForm.set(key,String(value))
+    paperForm.set('file',new File([paperBytes],'archived-package-signed.pdf',{type:'application/pdf'}))
+    const paperRequest=new Request(h.origin+'/app/paper-acceptance',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner},body:paperForm})
+    const paperResponse=await h.mf.dispatchFetch(paperRequest.url,{method:'POST',headers:paperRequest.headers,body:await paperRequest.arrayBuffer()});assert.equal(paperResponse.status,200,await paperResponse.text())
+    const paperBefore=(await h.state()).proposals.find(x=>x.id===paper.id)
+    assert.equal(paperBefore.acceptance.method,'upload');assert.equal(paperBefore.acceptance.totalCents,packageExpected.totalCents);assert.equal(paperBefore.acceptance.depositCents,packageExpected.depositCents);assert.equal(paperBefore.acceptance.selection.items[0].quantity,4)
+    const paperInvoice=await h.cmd('invoice.export',{id:paper.id}),paperInvoicePath='/api/platter/invoices/'+paperInvoice.id+'.csv',paperCsv=(await h.send(paperInvoicePath,undefined,h.owner)).text
+    assert.match(paperCsv,/575\.25/)
     const beforeVendorDocuments=(await h.state()).vendorDocuments
     const before=business(await h.state())
     const acceptedThread=before.proposals.find(p=>p.id===proposal.id).questions
@@ -146,7 +168,7 @@ test('PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLO
     assert.equal(openThread[0].answers.length,0)
     const beforeAudit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows.map(({reason,...row})=>row)
     assert.ok(beforeAudit.some(row=>row.action==='proposal.preview'&&row.subject===duplicate.id&&row.actor_role==='owner'),'EDIT-018 / TEAM-004 preview action is retained without payload or invitation authority')
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','approved','draft','draft','withdrawn'])
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -194,6 +216,13 @@ test('PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLO
     assert.deepEqual(restoredState.proposals.find(p=>p.id===duplicate.id),duplicateBefore,'EDIT-012 copied content, files and delivery configuration survive CLI restore exactly')
     assert.equal(restoredState.proposals.find(p=>p.id===work.id).options[0].cents,pricingExpected.grandCents,'PRICE-001 server totals survive public CLI restore')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===work.id).options, before.proposals.find(p=>p.id===work.id).options,'PRICE-001 all table, line, quantity, unit, group and subtotal fields survive public CLI restore exactly')
+    assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).acceptance,packagesBefore.acceptance,'PRICE-002 immutable selected quantities and totals survive public CLI restore')
+    assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).options,packagesBefore.options,'PRICE-002 package definitions and bounded optional items survive public CLI restore')
+    assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).pdfDownloads,packagesBefore.pdfDownloads,'PRICE-002 selected PDF timeline survives public CLI restore')
+    assert.deepEqual(restoredState.proposals.find(x=>x.id===paper.id).acceptance,paperBefore.acceptance,'PRICE-002 / SIGN-008 selected upload, attestation and file metadata survive public CLI restore')
+    assert.equal((await h.send(paperInvoicePath,undefined,restoredOwner)).text,paperCsv,'PRICE-002 selected deposit invoice survives restore byte-identically')
+    const paperFile=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+paper.id+'/'+paperBefore.acceptance.signedCopy.id,{headers:{host:new URL(h.origin).host,cookie:restoredOwner}});assert.equal(paperFile.status,200);assert.deepEqual(new Uint8Array(await paperFile.arrayBuffer()),paperBytes,'SIGN-008 original signed copy survives restore byte-identically')
+
     assert.deepEqual(restoredState.agentKeys,[])
     assert.deepEqual((await h.send('/api/platter/send-requests',undefined,restoredOwner)).value.requests,beforeRequests)
     assert.equal((await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'ping'},'',{authorization:'Bearer '+key.token})).status,401)
@@ -210,6 +239,7 @@ test('PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLO
     const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})
     assert.equal(setup.status,303)
     assert.equal((await h.send('/app/proposal?id='+proposal.id,undefined,restoredOwner)).status,200)
+    const paperPage=await h.send('/app/proposal?id='+paper.id,undefined,restoredOwner);assert.equal(paperPage.status,200);assert.match(paperPage.text,/2,301\.00/);assert.match(paperPage.text,/575\.25/);assert.match(paperPage.text,/Rush delivery/)
     const standard=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=one`,undefined,restoredOwner),premium=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=two`,undefined,restoredOwner)
     assert.match(standard.text,/403\.89/);assert.match(standard.text,/Project services/);assert.equal(standard.status,200);assert.equal(premium.status,200);assert.ok(!standard.text.includes('Premium timeline: four weeks.'));assert.ok(premium.text.includes('Premium timeline: four weeks.'),'EDIT-009 restored conditions remain functional')
     await h.close();h=null
@@ -227,7 +257,7 @@ test('PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLO
   } finally { if(h)await h.close();await rm(temporary,{recursive:true,force:true}) }
 })
 
-test('EDIT-012 / REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new proposals and acceptances use USD without conversion', { timeout: 180_000 }, async () => {
+test('PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new proposals and acceptances use USD without conversion', { timeout: 180_000 }, async () => {
  const temporary=await mkdtemp(join(tmpdir(),'platter-currency-')),target=join(temporary,'target')
  let h
  try {
@@ -261,6 +291,10 @@ test('EDIT-012 / REPORT-001 / PRICE-008 public CLI restores first-release AUD by
   assert.equal(pipeline.value.totals.find(t=>t.currency==='AUD').valueCents,accepted.total_cents);assert.equal(pipeline.value.totals.find(t=>t.currency==='USD').valueCents,420000)
   const usdInvoice=await cmd('invoice.export',{id:created.id});assert.equal(usdInvoice.currency,'USD');assert.match((await h.send('/api/platter/invoices/'+usdInvoice.id+'.csv',undefined,cookie)).text,/No Tax,USD/)
   const audCopy=await cmd('proposal.duplicate',{id:restored.id,version:restored.version}),copied=(await h.state(cookie)).proposals.find(p=>p.id===audCopy.id)
+  const {packageFixture}=await import('./packages-fixture.mjs')
+  await h.cmd('proposal.revise',{id:audCopy.id,version:1,packages:packageFixture()},cookie,409)
+  assert.deepEqual((await h.state(cookie)).proposals.find(p=>p.id===audCopy.id).options,copied.options,'PRICE-002 cannot rewrite historical AUD pricing into the new package form')
+
   assert.equal(copied.currency,'AUD');assert.deepEqual(copied.options,restored.options);assert.equal(copied.deposit_bps,restored.deposit_bps);assert.equal(copied.acceptance,undefined);assert.equal(copied.status,'draft')
   await h.close();h=undefined
   const output=join(temporary,'after.rer');await command(target,['export','--output',output,'--no-queue'])

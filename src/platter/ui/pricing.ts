@@ -25,14 +25,9 @@ export function pricingEditor(options: any[]): string {
   return `<div data-pricing-editor>${hidden('pricingTables', JSON.stringify(tables))}
     <div hidden data-pricing-enhancement><fieldset disabled data-pricing-controls><legend>Pricing tables</legend>
     <p>Add tables for itemised pricing. A package with tables uses their combined total. Totals are calculated when you save.</p>
-    ${['one', 'two'].map((id, index) => {
-      const option = options.find(item => item.id === id)
-      return `<fieldset data-pricing-option="${id}"><legend>${escape(option?.label || `Option ${index + 1}`)}</legend>
-        <p data-pricing-derived hidden>The package price is calculated from its pricing tables.</p>
-        <div data-pricing-tables>${(option?.tables ?? []).map(tableEditor).join('')}</div>
-        <button type="button" class="secondary" data-pricing-action="add-table">Add table</button></fieldset>`
-    }).join('')}
+    ${(options.length?options:[{id:'one'},{id:'two'}]).map((option:any,index:number)=>`<fieldset data-pricing-option="${escape(option.id)}"><legend>${escape(option.label||`Option ${index+1}`)}</legend><p data-pricing-derived hidden>The package price is calculated from its pricing tables.</p><div data-pricing-tables>${(option.tables??[]).map(tableEditor).join('')}</div><button type="button" class="secondary" data-pricing-action="add-table">Add table</button></fieldset>`).join('')}
     <p class="muted" data-pricing-status role="status" aria-live="polite"></p></fieldset></div>
+    <template data-pricing-option-template><fieldset data-pricing-option=""><legend>Package</legend><p data-pricing-derived hidden>The package price is calculated from its pricing tables.</p><div data-pricing-tables></div><button type="button" class="secondary" data-pricing-action="add-table">Add table</button></fieldset></template>
     <template data-pricing-table-template>${tableEditor({ lines: [{}] })}</template>
     <template data-pricing-line-template>${lineEditor()}</template>
     <script src="/pricing.js" defer></script></div>`

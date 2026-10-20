@@ -14,7 +14,7 @@
     const syncPrices = () => {
       for (const option of editor.querySelectorAll('[data-pricing-option]')) {
         const hasTables = Boolean(option.querySelector('[data-pricing-table]'));
-        const price = form.elements.namedItem(option.dataset.pricingOption === 'one' ? 'priceOne' : 'priceTwo');
+        const price = form.querySelector(`[data-package-id="${option.dataset.pricingOption}"] [data-package-field=price]`);
         if (price) price.readOnly = hasTables;
         option.querySelector('[data-pricing-derived]').hidden = !hasTables;
       }

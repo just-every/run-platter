@@ -1,27 +1,33 @@
 import { catalogShelf } from './catalog-shelf'
+import { editablePackages } from '../pricing'
+import { optionalEditor } from './packages'
 import { pricingEditor } from './pricing'
 import { sectionConditions } from '../conditional'
 import { area, date, escape, field, form, hidden, money, proposalPath, type Feedback } from './shared'
 
-// The tier composer (owner pick A): the offer's two priced options as live columns beside the scope they share,
+// The tier composer (owner pick A): the offer's priced packages as live columns beside the scope they share,
 // the proposal's details under them, and a receipt that sums what the client will choose between.
 export type ComposerMode = 'prepare' | 'revise' | 'negotiate'
 
-const dollars = (option: any) => option ? (option.cents / 100).toFixed(2) : ''
 const depositOf = (option: any, bps: number, currency?: string) => option ? money(Math.round(option.cents * bps / 10000), currency === 'AUD' ? currency : undefined) : '—'
 
 // The tier figure is set as text over its field ("$4,200.00"); focusing the field shows the editable value.
-const figure = (option: any) => option ? money(option.cents) : ''
+const figure = (option: any) => option?.cents ? money(option.cents) : ''
+const ordinal = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight']
 
-function tier(n: 'One' | 'Two', option: any, currency: string, bps: number | undefined, raised: boolean, formId: string): string {
-  const label = n === 'One' ? 'Option one' : 'Option two'
-  const deposit = option && bps !== undefined ? Math.round(option.cents * bps / 10000) : undefined
+/** One priced column. With packages (USD) it is also a package: its own optional items and package actions. */
+function tier(option: any, index: number, currency: string, bps: number | undefined, raised: boolean, formId: string, packages: boolean): string {
+  const id = option?.id ?? '', suffix = id === 'one' ? 'One' : id === 'two' ? 'Two' : ''
+  const legend = index < 0 ? 'New package' : `Option ${ordinal[index] ?? index + 1}`
+  const deposit = option?.cents && bps !== undefined ? Math.round(option.cents * bps / 10000) : undefined
   const shown = (cents?: number) => cents === undefined ? '—' : money(cents, currency === 'AUD' ? currency : undefined)
-  return `<fieldset class="tier${raised ? ' raised' : ''}" data-tier="${n.toLowerCase()}"><legend>${label}</legend>`
-    + `<label class="tier-name">Option label<input name="option${n}" value="${escape(option?.label)}" required maxlength="200" autocomplete="off"></label>`
-    + `<label class="tier-price">Price in ${escape(currency)}<span class="money-field"><span class="money-sign" aria-hidden="true">$</span><input id="${escape(formId)}-price${n}" name="price${n}" value="${dollars(option)}" required inputmode="decimal" placeholder="0.00" autocomplete="off"><span class="money-figure" aria-hidden="true" data-figure-for="price${n}">${figure(option)}</span></span></label>`
-    + `<dl class="tier-lines" data-lines-for="price${n}"><dt>Deposit at acceptance</dt><dd data-line="deposit">${shown(deposit)}</dd><dt>Balance after the deposit</dt><dd data-line="balance">${shown(deposit === undefined ? undefined : option.cents - deposit)}</dd></dl>`
-    + `<p class="chip sage tier-deposit"><span class="tick" aria-hidden="true"></span><span><output data-line="percent">${bps === undefined ? '—' : escape(bps / 100)}</output>% deposit</span></p></fieldset>`
+  const named = (field: string) => `${suffix ? ` name="${field}${suffix}"` : ''}${packages ? ` data-package-field="${field === 'option' ? 'label' : 'price'}"` : ''}`
+  const extras = packages ? `<div class="tier-extras" data-optional-items>${(option?.optionalItems ?? []).map(optionalEditor).join('')}</div><div class="tier-actions"><button type="button" class="quiet" data-package-action="add-item">Add optional item</button><button type="button" class="quiet" data-package-action="remove-package">Remove package</button></div>` : ''
+  return `<fieldset class="tier${raised ? ' raised' : ''}" data-tier="${escape(id)}"${packages ? ` data-package-id="${escape(id)}"` : ''}><legend>${legend}</legend>`
+    + `<label class="tier-name">Option label<input${named('option')} value="${escape(option?.label)}" required maxlength="200" autocomplete="off"></label>`
+    + `<label class="tier-price">Price in ${escape(currency)}<span class="money-field"><span class="money-sign" aria-hidden="true">$</span><input${suffix ? ` id="${escape(formId)}-price${suffix}"` : ''}${named('price')} value="${escape(option?.price ?? '')}" required inputmode="decimal" placeholder="0.00" autocomplete="off"><span class="money-figure" aria-hidden="true">${figure(option)}</span></span></label>`
+    + `<dl class="tier-lines"><dt>Deposit at acceptance</dt><dd data-line="deposit">${shown(deposit)}</dd><dt>Balance after the deposit</dt><dd data-line="balance">${shown(deposit === undefined ? undefined : option.cents - deposit)}</dd></dl>`
+    + `<p class="chip sage tier-deposit"><span class="tick" aria-hidden="true"></span><span><output data-line="percent">${bps === undefined ? '—' : escape(bps / 100)}</output>% deposit</span></p>${extras}</fieldset>`
 }
 
 export function composerForm(state: any, proposal: any, mode: ComposerMode, id: string, inlineButton?: string): string {
@@ -33,9 +39,16 @@ export function composerForm(state: any, proposal: any, mode: ComposerMode, id: 
   const clients = list.map((client: any) => `<option value="${escape(client.id)}" data-email="${escape(client.email)}"${client.id === proposal?.client_id ? ' selected' : ''}>${escape(client.name)}${shared(client.name) ? ` — ${escape(client.email)}` : ''}</option>`).join('')
   const chosen = list.find((c: any) => c.id === proposal?.client_id)
   const conditions = sectionConditions(proposal?.section_conditions)
-  const visibility = (section: 'scope' | 'terms') => `<label class="visibility">${section === 'scope' ? 'Scope' : 'Terms'} visibility<select name="${section}Option"><option value="">Every option</option>${['one', 'two'].map((id, i) => `<option value="${id}"${conditions[section] === id ? ' selected' : ''}>Only ${escape(options[i]?.label ?? ('option ' + id))}</option>`).join('')}</select></label>`
-  const tiers = `<div class="tiers">${tier('One', options[0], currency, bps, false, id)}${tier('Two', options[1], currency, bps, true, id)}`
-    + `<div class="tier scope-tier">${area('Scope of work', 'scope', proposal?.scope, 'required rows="5"')}${area('Terms', 'terms', proposal?.terms ?? '', 'rows="2"')}<div class="visibility-row">${visibility('scope')}${visibility('terms')}</div></div></div>`
+  const packages = currency === 'USD'
+  const shown = (packages ? (options.length ? editablePackages(options).map((o, i) => ({ ...o, cents: options[i].cents })) : [{ id: 'one' }, { id: 'two' }]) : [0, 1].map(i => options[i] ? { ...options[i], price: (options[i].cents / 100).toFixed(2) } : { id: ['one', 'two'][i] }))
+  const visibility = (section: 'scope' | 'terms') => `<label class="visibility">${section === 'scope' ? 'Scope' : 'Terms'} visibility<select name="${section}Option"><option value="">Every option</option>${shown.map((o: any) => `<option value="${escape(o.id)}"${conditions[section] === o.id ? ' selected' : ''}>Only ${escape(o.label || 'option ' + o.id)}</option>`).join('')}</select></label>`
+  const columns = shown.map((o: any, i: number) => tier(o, i, currency, bps, i === Math.min(1, shown.length - 1), id, packages)).join('')
+    + `<div class="tier scope-tier">${area('Scope of work', 'scope', proposal?.scope, 'required rows="5"')}${area('Terms', 'terms', proposal?.terms ?? '', 'rows="2"')}<div class="visibility-row">${visibility('scope')}${visibility('terms')}</div></div>`
+  // Main's packages editor (packages.js) works on these columns: it adds and removes packages and their optional items.
+  const tiers = packages ? `<div data-packages-editor><input type="hidden" data-packages-payload><div class="tiers" data-packages>${columns}</div>`
+    + `<div class="packages-foot"><button type="button" class="quiet" data-package-action="add-package">Add package</button><p class="muted">Offer one or more packages. Optional items start unselected; the client can add them and review the server total before accepting.</p><p class="muted" role="status" data-packages-status></p></div>`
+    + `<template data-package-template>${tier(undefined, -1, currency, bps, false, id, true)}</template><template data-optional-template>${optionalEditor()}</template><script src="/packages.js" defer></script></div>`
+    : `<div class="tiers">${columns}</div>`
   const details = `<div class="details-row"><label>Client<select name="clientId" required><option value="">Choose a client</option>${clients}</select><span class="field-note" data-client-email>${escape(chosen?.email ?? '')}</span></label>`
     + field('Proposal title', 'title', proposal?.title, 'required maxlength="200"')
     + field('Deposit percentage', 'depositPercent', proposal ? Number(proposal.deposit_bps) / 100 : '', 'required inputmode="decimal" placeholder="25"') + '</div>'

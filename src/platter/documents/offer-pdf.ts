@@ -1,3 +1,4 @@
+import { offerSelection } from '../selection'
 import { selectedContent } from '../conditional'
 import { need } from '../model'
 import { PdfText } from './pdf-text'
@@ -9,10 +10,10 @@ function amount(cents: number, currency: string) {
 }
 
 /** Render the current offer only. Caller owns authorization and revision selection. */
-export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Array | ArrayBuffer)[] = []): Promise<Uint8Array> {
+export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Array | ArrayBuffer)[] = [], items: unknown = []): Promise<Uint8Array> {
  const options = typeof view.options === 'string' ? JSON.parse(view.options) : view.options
  need(Array.isArray(options), 'Offer options are missing')
- const selected = options.find((option: any) => option.id === optionId)
+ const selection = offerSelection(options,view.deposit_bps,optionId,items), selected = selection.option
  need(selected, 'Choose one offered option')
  view = selectedContent(view,optionId)
  const revision = Number(view.revision)
@@ -41,6 +42,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  pdf.text(`Selected option: ${selected.label}`, 13)
  pdf.text(`Selected option total: ${amount(selected.cents, currency)}`)
  pdf.text(`Deposit due: ${amount(deposit(selected.cents), currency)}`)
+ if(selection.items.length){pdf.heading('Selected optional items');for(const item of selection.items)pdf.text(`${item.label}: ${item.quantity} x ${amount(item.unitCents,currency)} = ${amount(item.totalCents,currency)}`)}
 
  if(!view.hiddenSections.includes('scope')) { pdf.heading('Scope of work'); pdf.text(String(view.scope ?? '')) }
  if(!view.hiddenSections.includes('terms')) { pdf.heading('Terms'); pdf.text(view.terms ? String(view.terms) : 'No additional terms.') }

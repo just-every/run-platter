@@ -25,7 +25,7 @@ export async function paperAcceptance(db: D1Database, a: Actor, form: FormData) 
  need(file instanceof File && file.size > 0, 'Choose the client-signed file')
  need(file.size <= 10 * 1024 * 1024, 'The signed copy must be 10 MB or smaller', 413)
  const at = Date.now(), signer = text(form.get('signer'), "the signer's full name", 200), date = signedOn(form.get('signedOn'), at)
- const { option, deposit, frozen } = acceptanceTerms(row, form.get('optionId'))
+ const { option, deposit, frozen } = acceptanceTerms(row, form.get('optionId'), Object.fromEntries(form))
  const prepared = await prepareAttachment(db, { filename: file.name, mediaType: file.type, bytes: await file.arrayBuffer() })
  await commit(db, a, [
   ...prepared.writes,

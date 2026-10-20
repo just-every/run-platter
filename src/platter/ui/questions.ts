@@ -10,7 +10,7 @@ export function ownerQuestions(state:any,p:any) {
  if(!['owner','member'].includes(state.actor?.role))return ''
  const questions:QuestionThread[]=p.questions??[]
  if(!questions.length)return ''
- const rows=questions.map(q=>thread(q,state.actor.role==='owner'?form('question.answer',proposalPath(p.id),hidden('id',p.id)+hidden('questionId',q.id)+hidden('requestId',crypto.randomUUID())+area('Answer this question','text','','required maxlength="10000"')+'<button>Send answer to client</button>')+form('question.email',proposalPath(p.id),hidden('id',p.id)+hidden('questionId',q.id)+'<button>Email me this question</button>'):'' )).join('')
+ const rows=questions.map(q=>thread(q,state.actor.role==='owner'&&!p.activeWithdrawal?form('question.answer',proposalPath(p.id),hidden('id',p.id)+hidden('questionId',q.id)+hidden('requestId',crypto.randomUUID())+area('Answer this question','text','','required maxlength="10000"')+'<button>Send answer to client</button>')+form('question.email',proposalPath(p.id),hidden('id',p.id)+hidden('questionId',q.id)+'<button>Email me this question</button>'):'' )).join('')
  return panel('Client questions',rows)
 }
 

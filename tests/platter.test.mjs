@@ -240,9 +240,9 @@ test('TEAM-004 current person, agent, invitation, signature, native, import and 
  ]){
   assert.deepEqual((await h.send('/api/platter/audit?'+query,undefined,h.owner)).value.rows,expected)
   const exported=await h.send('/api/platter/audit.csv?'+query,undefined,h.owner);assert.equal(exported.status,200)
-  const fields=['id','actor_id','actor_role','action','subject','occurred_at']
+  const fields=['id','actor_id','actor_role','action','subject','occurred_at','reason']
   const decoded=exported.text.trim().split('\r\n').slice(1).map(line=>line.slice(1,-1).split('","'))
-  assert.deepEqual(decoded,expected.map(r=>fields.map(f=>String(r[f]))))
+  assert.deepEqual(decoded,expected.map(r=>fields.map(f=>String(r[f]??''))))
  }
  assert.ok(rows.some(r=>r.action==='native.auth.operator.role'&&r.subject===memberId&&r.actor_id===who))
  const serialized=JSON.stringify(rows)

@@ -29,7 +29,9 @@ const tags: Tag[] = [
   { id: 'bounced', x: 1258, y: 318, w: 248, tone: 'rose', lines: [`Bounced: ${mail.bounced}`, `→ resent to ${mail.tom}`, 'Tue Oct 6 → opened ✓'] },
   { id: 'junepark', x: 1255, y: 571, w: 262, tone: 'butter', lines: ['June Park Photography', '2 min on pricing', 'drone add-on asked → rev 2 Thu Oct 15', '→ signed Fri Oct 16 ✓'] },
 ]
-const tagHtml = (g: Tag) => `<p class="hx-tag ${g.tone} hx-${g.id}${g.x > 768 ? ' end' : ''}" ${at(g.x, g.y, g.w)}>${g.lines.map((l, i) => `<span${i === 0 && g.id !== 'opened' && g.id !== 'followup' && g.id !== 'bounced' ? ' class="b"' : ''}>${t(l)}</span>`).join('')}</p>`
+// a card's lines; a mailbox may break after its @ where the card is narrow
+const tagLines = (g: Tag) => g.lines.map((l, i) => `<span${i === 0 && !['opened', 'followup', 'bounced'].includes(g.id) ? ' class="b"' : ''}>${t(l).replace(/@/g, '@<wbr>')}</span>`).join('')
+const tagHtml = (g: Tag) => `<p class="hx-tag ${g.tone} hx-${g.id}${g.x > 768 ? ' end' : ''}" ${at(g.x, g.y, g.w)}>${tagLines(g)}</p>`
 
 // the firms' own proposals, fanned at the edges of Fernhill's
 type Fan = { firm: FirmId; name: string; kind: string; thumb: string; x: number; y: number; w: number; r: number; lines: string[] }
@@ -77,7 +79,7 @@ const tiles: [string, string[], string][] = [
   ['v-dental', ['lakeside'], 'Lakeside Dental’s reception.'], ['v-park', ['junepark'], 'Ellie Novak reads by the river.'],
   ['v-bakery-s', ['followup'], 'Sweet Ridge Bakery’s counter.'],
 ]
-const tileHtml = ([img, ids, alt]: [string, string[], string]) => `<li class="hx-tile">${plate(img, alt, '(max-width: 760px) 46vw, 30vw')}${ids.map(id => { const g = tags.find(x => x.id === id)!; return `<p class="hx-tag ${g.tone}">${g.lines.map((l, i) => `<span${i === 0 && !['opened', 'followup', 'bounced'].includes(id) ? ' class="b"' : ''}>${t(l)}</span>`).join('')}</p>` }).join('')}</li>`
+const tileHtml = ([img, ids, alt]: [string, string[], string]) => `<li class="hx-tile">${plate(img, alt, '(max-width: 760px) 46vw, 30vw')}${ids.map(id => { const g = tags.find(x => x.id === id)!; return `<p class="hx-tag ${g.tone}">${tagLines(g)}</p>` }).join('')}</li>`
 
 export const heroSection = (): string => `<section class="hero" aria-label="Platter">
 <div class="hx-canvas">

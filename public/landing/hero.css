@@ -1,6 +1,6 @@
 /* 01 · the hero on the approved image's canvas: --u is one canvas pixel (the canvas is 1536 wide, from y 56) */
 .hero{position:relative;padding-bottom:8px}
-.hx-canvas{--u:calc(100cqw / 1536);--min:11px;position:relative;width:min(100%,2200px);margin:0 auto;aspect-ratio:1536/968;container-type:inline-size}
+.hx-canvas{--u:calc(100cqw / 1536);--min:11px;position:relative;width:min(100%,2200px);margin:0 auto;aspect-ratio:1536/1040;container-type:inline-size}
 .hx-canvas [style*="--x"]{position:absolute;left:calc(var(--x) * var(--u));top:calc((var(--y) - 56) * var(--u));width:calc(var(--w) * var(--u))}
 .hx-copy{position:absolute;inset:calc(26 * var(--u)) 0 auto;text-align:center;z-index:5;pointer-events:none}
 .hx-copy>*{pointer-events:auto}
@@ -27,7 +27,7 @@
 .hx-canvas .hx-tag.end{left:auto;right:calc((1536 - var(--x) - var(--w)) * var(--u))}
 .hx-tag .b{font-weight:600}
 .hx-tag.rose{border-color:#E9AFC6}.hx-tag.sage{border-color:#AFCBA6}.hx-tag.butter{border-color:#F0CD5E}
-.hx-tag{overflow-wrap:anywhere}
+.hx-tag{overflow-wrap:break-word}
 .hx-canvas .sparks{color:var(--butter);z-index:2}
 .hx-spark-1{left:calc(206 * var(--u));top:calc(16 * var(--u));width:calc(56 * var(--u));height:calc(56 * var(--u));transform:rotate(-30deg)}
 .hx-spark-2{left:calc(1306 * var(--u));top:calc(28 * var(--u));width:calc(56 * var(--u));height:calc(56 * var(--u));transform:rotate(40deg)}

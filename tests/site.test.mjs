@@ -107,7 +107,7 @@ test('PRICE-008 legacy AUD agreement and new USD owner/client screens show exact
    app=await installedApp({businessFixture:'fixtures/first-release-aud.rer'})
    const context=await browser.newContext({viewport:{width,height:900}})
    try {
-    const page=await context.newPage(),capture=async name=>{assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`PRICE-008-${name}-${width}.png`),fullPage:true})}
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`PRICE-008-${name}-${width}.png`),fullPage:true})}
     const claimed=await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0});assert.equal(claimed.status(),303)
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     await page.getByRole('link',{name:'Legacy AUD campaign agreement',exact:true}).click()
@@ -623,7 +623,7 @@ test('SEND-010 desktop and phone withdraw, inspect revoked offer and audit, then
    app=await installedApp()
    const context=await browser.newContext({viewport:{width,height:900}})
    try{
-    const page=await context.newPage(),capture=async name=>{assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`SEND-010-${name}-${width}.png`),fullPage:true})}
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`SEND-010-${name}-${width}.png`),fullPage:true})}
     assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     await page.getByRole('link',{name:'Clients',exact:true}).click();await page.locator('[name="name"]').fill('Northstar Coffee');await page.locator('[name="email"]').fill('avery@northstar.example');await page.getByRole('button',{name:'Add client'}).click()
@@ -631,8 +631,11 @@ test('SEND-010 desktop and phone withdraw, inspect revoked offer and audit, then
     for(const [name,value]of Object.entries({title:'Brand photography',scope:'Studio photography and campaign usage.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'}))await page.locator(`[name="${name}"]`).fill(value)
     await page.getByRole('button',{name:'Prepare proposal',exact:true}).click();await page.getByRole('link',{name:'Brand photography',exact:true}).click();await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click()
     const original=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals[0],oldPath='/p/'+original.shareToken
+    const ownerUrl=page.url();await page.goto(app.origin+oldPath);await page.getByRole('button',{name:'Send verification code'}).click()
+    const mailState=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=mailState.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click();await page.getByLabel('Your question').fill('Can we start the studio shoot next month?');await page.getByRole('button',{name:'Send question to owner'}).click();await page.goto(ownerUrl)
     await capture('send');await page.getByLabel('Withdrawal reason').fill('Sent to the wrong client');await page.getByRole('button',{name:'Withdraw proposal',exact:true}).click()
-    assert.match(await page.locator('.proposal-status').innerText(),/withdrawn/);assert.match(await page.locator('main').innerText(),/Sent to the wrong client/);await capture('withdrawn')
+    assert.match(await page.locator('.proposal-status').innerText(),/withdrawn/i);assert.match(await page.locator('main').innerText(),/Sent to the wrong client/);assert.match(await page.locator('main').innerText(),/Can we start the studio shoot next month/);assert.equal(await page.getByRole('button',{name:'Send answer to client'}).count(),0);await capture('withdrawn')
     const proposalUrl=page.url()
     assert.equal((await page.goto(app.origin+oldPath)).status(),410);assert.equal(await page.getByRole('heading',{name:'Proposal withdrawn',exact:true}).count(),1);assert.equal(await page.getByRole('link',{name:'owner@northstar.example'}).count(),1);assert.ok(!(await page.locator('main').innerText()).includes('Studio photography'));await capture('revoked')
     await page.goto(app.origin+'/app/audit?action=proposal.withdraw');assert.match(await page.locator('main').innerText(),/Sent to the wrong client/);await capture('audit')

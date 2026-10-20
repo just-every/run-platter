@@ -246,7 +246,11 @@ Before a revision is sent, anyone who may view the proposal under `TEAM-001`, in
 
 *Acceptance:* Build a draft with three packages (Basic, Standard and Premium), an optional item, a client-editable quantity limited to 1 to 10, a timeline section shown only for Premium, sales tax, a 30% deposit and two signers, each with their own fields. Open the preview at 1440 and 390 pixels: both widths render the client page under the preview banner naming revision 1. Choose Premium, add the optional item and set the quantity to 4: the totals, tax, deposit and payment schedule update and the Premium timeline section appears; after approval and sending, the same choices on the client page show the same amounts to the cent and the same sections. Setting the quantity to 11 in the preview is refused, as on the client page. View as signer 2: only signer 2's fields show, and sign, accept and pay requests from the preview are refused (403). Afterwards the revision number and approvals are unchanged, and the proposal timeline, the tracking store, the reminder schedule, the mail fake and the SMS fake hold nothing from the preview. Submit the draft for approval: the manager named on the pending step opens the preview from the link in the approval request (`APPROVE-002`) and sees revision 1. A member outside the proposal's team is refused (403). Requesting the preview route without a member session, including from the client's verified session after sending, returns 401 with none of the proposal.
 
-*Status:* missing. The owner's proposal page lists the scope and both options before approval, but there is no preview of the client page for an unsent revision: the client page and its private link exist only once a proposal is sent.
+Current-capability obligation: every capability available today conforms: scope, terms, two fixed USD or historical AUD options with nearest-cent deposits, attachments, PDF controls, questions and opt-in text suggestions on the exact unsent draft or negotiated revision. Preview uses existing owner/member visibility; it grants no client invitation authority. EDIT-001/EDIT-005 inherit added content, PRICE-002/PRICE-005/PRICE-007 expanded selections, quantities, tax and schedules, EDIT-009 conditional sections, EDIT-004 variables, SEND-003/SIGN-011 recipient roles and fields, EDIT-017 language, TEAM-001 scoped member visibility, APPROVE-001/APPROVE-002/APPROVE-003 pending approver access and exact revision links, and TRACK-001–TRACK-003/FOLLOW-001/SEND-008 the absence of preview analytics, reminders and texts. FOLLOW-005, SIGN-003/SIGN-004/SIGN-007 and PAY-001/PAY-003/PAY-008 inherit disabled decline, signature and payment controls and direct-request refusals. Each must extend this same named journey before shipping; all full-target acceptance cases above remain mandatory then. Every later content, provider, record kind or public door inherits these preview obligations before shipping.
+
+*Acceptance (current capabilities):* Named EDIT-018 public HTTP and built browser journeys at 1440 and 390 open exact draft, approved and negotiated revisions as owner/member, switch the client viewport, select both fixed options through the same server calculation as acceptance, compare actual sent content and accepted total/deposit, refuse invalid selections and stale revisions, and show disabled client submissions with direct preview requests refused (403). Signed-out and client-only sessions receive 401 with no content. Preview interactions preserve the complete public business state, including revision, approval, mail, expiry and client authority; TEAM-004 records only the member preview action, actor, subject and server time. Refusals add no audit row, and PORT-002 preserves the preview audit through the public CLI.
+
+*Status:* done. Named public HTTP and compiled desktop/phone journeys assert all current capabilities; full-target cases are inherited by the clauses above. (`src/platter/preview.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 ### Catalog and pricing
 
@@ -1281,7 +1285,7 @@ What Platter does not do, and how a US buyer gets it:
 - **Filing sales tax.** Platter calculates and shows sales tax and records exemption certificates (`PRICE-005`); registering, filing and remitting returns stays with Stripe Tax, Avalara or the firm's accountant.
 - **Notarization and qualified trust services.** Platter provides ESIGN and UETA signatures with SMS and ID verification options (`SIGN-003`, `SIGN-006`). Remote online notarization goes through a notary platform such as Proof, and documents that require wet signatures by law (such as some real-estate and family-law instruments) are out of scope.
 - **Legal advice.** Platter records consent, intent and audit evidence; whether a given agreement is enforceable is for the firm's counsel.
-- **The full CRM, ledger, signing, CLM, billing and delivery products.** These are separate products with their own buyers (see Neighboring products). Platter syncs with them and never becomes them.
+- **The full CRM, ledger, signing, CLM, billing and delivery products.** Work and project management also has its separate sibling [Pegboard](https://github.com/just-every/run-pegboard). These are separate products with their own buyers (see Neighboring products). Platter syncs with them and never becomes them.
 - **Currencies and tax regimes outside the US.** New proposals are USD with US sales tax. First-release AUD agreements remain exact (`PRICE-008`); other currencies and VAT or GST are outside this target.
 - **Live provider proof.** Local journeys use fakes at provider edges. Hosting, mail delivery, Stripe, CRM and accounting connections require the installer's own accounts and are proven in each provider's sandbox before a release claims them.
 
@@ -1310,8 +1314,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 17 | 25 | 86 | 128 |
-| All | 29 | 25 | 86 | 140 |
+| Target and push further | 18 | 25 | 85 | 128 |
+| All | 30 | 25 | 85 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1344,7 +1348,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `EDIT-015` | Locked template sections | target | missing |  | No templates, so no section locks. |
 | `EDIT-016` | Proposal search and folders | target | missing |  | A single proposal list; no search or folders. |
 | `EDIT-017` | Client page in the client's language | target | missing |  | The client page and mail are English only. |
-| `EDIT-018` | Client-page preview before sending | target | missing |  | The owner's proposal page lists the scope and both options before approval, but there is no preview of the client page for an unsent revision: the client page and its private link exist only once a proposal is sent. |
+| `EDIT-018` | Client-page preview before sending | target | done | `src/platter/preview.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `CAT-001` | Service and product catalog | target | partial | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs` | Imported catalog metadata and images only; no catalog editing, provider sync, pricing-table insertion or line-image rendering. |
 | `PRICE-001` | USD pricing tables with line items | target | partial | `src/platter/model.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs` | Two fixed one-off option totals in USD (legacy proposals retain AUD); no line items, quantities, units or multiple tables. |
 | `PRICE-002` | Packages and optional items the client chooses | target | partial | `src/platter/signing.ts`, `tests/platter.test.mjs` | Exactly two fixed options; no add-ons, editable quantities or any number of packages. |

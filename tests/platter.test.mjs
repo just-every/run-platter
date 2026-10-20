@@ -762,3 +762,57 @@ test('EDIT-012 duplicate accepted content into an independent member-owned draft
  const negotiated=await h.cmd('proposal.duplicate',{id:same.id,version:4});assert.equal((await get(negotiated.id)).scope,'Unsent negotiated scope')
  const key=await h.cmd('agent.create',{label:'Draft only'});assert.equal((await h.send('/api/platter/agent/command',{name:'proposal.duplicate',input:{id:p.id,version:before.version}},'',{authorization:'Bearer '+key.token})).status,403)
 }))
+
+test('EDIT-018 member-only exact-revision previews share selection math and never change business state',()=>run(async h=>{
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+ const {p,client}=await draft(h)
+ const upload=new FormData();upload.set('id',p.id);upload.set('version','1');upload.set('file',new File(['%PDF preview attachment'],'campaign.pdf',{type:'application/pdf'}))
+ const uploadRequest=new Request(h.origin+'/app/attachment',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:upload});const uploaded=await h.mf.dispatchFetch(uploadRequest.url,{method:'POST',headers:uploadRequest.headers,body:await uploadRequest.arrayBuffer()});assert.equal(uploaded.status,200);assert.match(await uploaded.text(),/Document saved/)
+ await h.cmd('expiry.set',{id:p.id,version:2,mode:'days',days:14,warningDays:1})
+ await h.send('/auth/invite',{email:'previewer@studio.example',displayName:'Previewer',role:'member',returnTo:'/app'},h.owner)
+ const member=await h.signIn('previewer@studio.example')
+ const key=await h.cmd('agent.create',{label:'Preview boundary'})
+ const url=`/app/preview?id=${p.id}&revision=2`,inner=url.replace('/app/preview?','/app/preview/client?')
+ const unchanged=()=>h.state(),audit=async()=>(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+ const initialAudit=await audit(),before=await unchanged()
+ for(const cookie of [h.owner,member]){
+  for(const width of [1440,390]){
+   const wrapper=await h.send(url+`&width=${width}`,undefined,cookie);assert.equal(wrapper.status,200);assert.match(wrapper.text,new RegExp(`width="${width}"`));assert.match(wrapper.text,/Viewing as Northstar Coffee/)
+   for(const [optionId,total,deposit] of [['one','2,400.00','600.00'],['two','4,200.00','1,050.00']]){
+    const r=await h.send(inner+`&width=${width}&optionId=${optionId}`,undefined,cookie)
+    assert.equal(r.status,200,r.text);assert.match(r.text,/One studio shoot, edited photographs, and usage licence/);assert.match(r.text,/campaign.pdf/);assert.match(r.text,/Expires 14 calendar days after sending/)
+    assert.ok(r.text.includes(`aria-label="Selected total">$${total} USD`));assert.ok(r.text.includes(`aria-label="Selected deposit">$${deposit} USD`))
+    assert.match(r.text,/<fieldset disabled>/);assert.ok(!r.text.includes('/p/'));assert.match(r.headers.get('content-security-policy'),/frame-ancestors 'self'/)
+   }
+  }
+ }
+ const viewedAudit=await audit(),previewRows=viewedAudit.filter(row=>row.action==='proposal.preview')
+ assert.equal(previewRows.length,12);for(const row of previewRows){assert.equal(row.subject,p.id);assert.ok(row.actor_id);assert.ok(['owner','member'].includes(row.actor_role));assert.ok(Number.isFinite(row.occurred_at))}
+ assert.deepEqual(viewedAudit.filter(row=>row.action!=='proposal.preview'),initialAudit)
+ for(const path of [url,inner]){
+  assert.equal((await h.send(path)).status,401)
+  assert.equal((await h.send(path,undefined,'',{authorization:'Bearer '+key.token})).status,401)
+  for(const name of ['accept','pay','decline','question.create','suggestion.create','code.request','code.verify'])assert.equal((await h.send(path.split('?')[0]+'/action?'+path.split('?')[1]+'&name='+name,{name,optionId:'two',consent:true},h.owner)).status,403)
+ }
+ assert.equal((await h.send(inner+'&optionId=unknown',undefined,h.owner)).status,400)
+ assert.equal((await h.send(inner+'&width=500',undefined,h.owner)).status,400)
+ assert.equal((await h.send(inner.replace('revision=2','revision=3'),undefined,h.owner)).status,409)
+ assert.deepEqual(await unchanged(),before);assert.deepEqual(await audit(),viewedAudit)
+ const attachment=before.proposals.find(row=>row.id===p.id).attachments[0]
+ const download=await h.send(`/app/preview/client/attachments/${attachment.id}?id=${p.id}&revision=2`,undefined,member);assert.equal(download.status,200);assert.equal(download.text,'%PDF preview attachment');assert.deepEqual(await unchanged(),before)
+ assert.equal((await h.send(`/app/preview/client/attachments/${attachment.id}?id=${p.id}&revision=1`,undefined,member)).status,409)
+ await h.cmd('proposal.approve',{id:p.id,version:3,revision:2})
+ const approved=await unchanged();assert.equal((await h.send(inner,undefined,member)).status,200);assert.deepEqual(await unchanged(),approved)
+ const sentOffer=await h.cmd('proposal.send',{id:p.id,version:4}),path=new URL(sentOffer.shareUrl).pathname
+ const cookie=await verified(h,path)
+ assert.equal((await h.send(inner,undefined,cookie)).status,401)
+ assert.equal((await h.send(inner,undefined,h.owner)).status,409)
+ await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:p.id,version:5,scope:'New negotiated scope for preview.',priceTwo:'4300.03',depositPercent:'33.33'})
+ const negotiationUrl=inner.replace('revision=2','revision=3')+'&optionId=two',pendingBefore=await unchanged()
+ const pending=await h.send(negotiationUrl,undefined,member);assert.equal(pending.status,200);assert.match(pending.text,/New negotiated scope for preview/);assert.match(pending.text,/Changes since your previous offer/);assert.match(pending.text,/Selected total">\$4,300.03 USD/);assert.match(pending.text,/Selected deposit">\$1,433.20 USD/)
+ assert.deepEqual(await unchanged(),pendingBefore)
+ const old=await h.send(path,undefined,cookie);assert.match(old.text,/One studio shoot/);assert.ok(!old.text.includes('New negotiated scope'))
+ await h.cmd('proposal.approve',{id:p.id,version:6,revision:3});const next=await h.cmd('proposal.send',{id:p.id,version:7}),nextPath=new URL(next.shareUrl).pathname,nextCookie=await verified(h,nextPath)
+ await h.send(nextPath+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true},nextCookie)
+ const final=(await h.state()).proposals.find(row=>row.id===p.id);assert.equal(final.acceptance.totalCents,430003);assert.equal(final.acceptance.depositCents,143320);assert.equal(final.scope,'New negotiated scope for preview.')
+}))

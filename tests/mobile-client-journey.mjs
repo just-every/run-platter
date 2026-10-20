@@ -16,8 +16,8 @@ async function tabTo(page, target) {
 }
 async function activate(page, role, name) {
  await tabTo(page, page.getByRole(role, { name, exact: true }))
- await page.keyboard.press(role === 'checkbox' ? 'Space' : 'Enter')
- await page.waitForLoadState('load')
+ if (role === 'checkbox') await page.keyboard.press('Space')
+ else await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.keyboard.press('Enter')])
 }
 async function type(page, label, text) {
  await tabTo(page, page.getByLabel(label, { exact: true }))
@@ -62,7 +62,10 @@ export async function mobileClientJourney() {
     assert.equal(await page.locator('main').evaluate(n => n === document.activeElement), true)
     // Review Premium before verification: every subsequent form must keep it.
     await tabTo(page, page.getByLabel('Review sections for'))
-    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Space')
+    await page.keyboard.press('End')
+    await page.keyboard.press('Enter')
+    assert.equal(await page.getByLabel('Review sections for').inputValue(), 'two')
     await activate(page, 'button', 'Review package')
     assert.match(await page.locator('main').innerText(), /Premium delivery includes/)
     await activate(page, 'button', 'Send verification code')

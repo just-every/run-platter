@@ -732,3 +732,35 @@ test('EDIT-018 desktop and phone preview exact client content, switch widths and
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting', {timeout:120000}, async()=>{
+ let app,browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  const screenshots=process.env.PLATTER_SCREENSHOTS
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),command=async(name,input)=>{const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
+    const capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`FOLLOW-002-${name}-${width}.png`),fullPage:true})}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const client=await command('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
+    const made=await command('proposal.prepare',{clientId:client.id,title:'Spring campaign photography',scope:'Two production days and a campaign usage licence for Northstar Coffee.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Complete campaign',priceTwo:'6800',depositPercent:'25'})
+    await page.goto(app.origin+'/app/proposal?id='+made.id)
+    await page.getByLabel('Next action',{exact:true}).fill('Call Avery about the production dates');await page.getByLabel('Due date',{exact:true}).fill('2020-03-10');await page.getByRole('button',{name:'Save sales follow-up',exact:true}).click()
+    assert.match(await page.locator('main').innerText(),/Call Avery about the production dates/);await capture('scheduled')
+    await page.getByRole('button',{name:'Notify sales owner',exact:true}).click();assert.equal(await page.getByRole('button',{name:'Complete sales follow-up',exact:true}).count(),1)
+    await page.goto(app.origin+'/app');assert.equal(await page.locator('[data-followup-id]').count(),1)
+    await page.getByLabel('Due follow-up',{exact:true}).selectOption('yes');await page.getByLabel('Sort by',{exact:true}).selectOption('dueDate');await page.getByRole('button',{name:'Filter pipeline'}).click()
+    assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'1');assert.match(await page.locator('[data-pipeline-total="USD"]').innerText(),/6,800\.00 USD/);await capture('queue-and-pipeline')
+    await page.getByRole('link',{name:'Follow up: Spring campaign photography',exact:true}).click();await page.getByLabel('Logged action',{exact:true}).fill('Called Avery and agreed on the production dates.');await page.getByRole('button',{name:'Complete sales follow-up',exact:true}).click()
+    assert.match(await page.locator('main').innerText(),/Sales follow-up closed/);assert.match(await page.locator('main').innerText(),/Called Avery and agreed/);await capture('completed')
+    await page.getByLabel('Next action',{exact:true}).fill('Confirm the location');await page.getByLabel('Due date',{exact:true}).fill('2027-03-11');await page.getByRole('button',{name:'Save sales follow-up',exact:true}).click()
+    await page.getByLabel('Dismissal reason',{exact:true}).fill('Avery confirmed the location by email.');await page.getByRole('button',{name:'Dismiss sales follow-up',exact:true}).click();assert.match(await page.locator('main').innerText(),/Sales follow-up closed/);await capture('dismissed')
+    await page.goto(app.origin+'/app');assert.equal(await page.locator('[data-followup-id]').count(),0)
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

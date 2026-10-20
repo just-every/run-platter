@@ -1,3 +1,4 @@
+import { pricingTables } from './pricing'
 import { sectionConditions } from '../conditional'
 import { previewBanner, previewSelection } from './preview'
 import { offerSelection } from '../selection'
@@ -25,7 +26,7 @@ export function renderClient(view: any, token: string, feedback?: Feedback): Res
   html += clientQuestions(view,publicForm)
   if(!view.expiry?.expired) html += clientSuggestions(view,publicForm)
   if(view.previous) html += panel('Changes since your previous offer', `<p>Revision ${escape(view.previous.revision)} compared with revision ${escape(view.revision)}</p>${changes(view.previous,view)}`)
-  html += panel('Offer options', `<p>${pricing} Deposit: ${escape(Number(view.deposit_bps) / 100)}% of the chosen option.</p>${optionPair(options, view.deposit_bps, view.acceptance?.optionId, currency)}`)
+  html += panel('Offer options', `<p>${pricing} Deposit: ${escape(Number(view.deposit_bps) / 100)}% of the chosen option.</p>${optionPair(options, view.deposit_bps, view.acceptance?.optionId, currency)}${pricingTables(options,currency)}`)
   if(view.preview)html+=previewSelection(view)
   else if(conditional&&view.status!=='accepted')html+=panel('Choose your package',`<form method="get" action="/p/${encodeURIComponent(token)}"><label>Review sections for<select name="optionId">${options.map((o:any)=>`<option value="${escape(o.id)}"${o.id===selectedId?' selected':''}>${escape(o.label)}</option>`).join('')}</select></label><button>Review package</button></form><p>Scope and terms above match this selection. Review them before accepting.</p>`)
   if (view.acceptance) {

@@ -872,3 +872,50 @@ test('EDIT-009 conditional sections match selected preview, client, PDF and immu
  const changes=await h.send(`/app/proposal?id=${next.id}&from=1&to=2`,undefined,h.owner);assert.match(changes.text,/scope visibility/);assert.match(changes.text,/terms visibility/)
  }finally{await h.close()}
 })
+
+test('PRICE-001 / COLLAB-003 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / PROP-001 / TEAM-004 tables recompute twelve grouped lines, preserve every carrier and refuse malformed prices and quantities',async()=>{const h=await harness({assetsDirectory:'public'});try{
+ const {pricingFixture,pricingExpected:expected}=await import('./pricing-fixture.mjs')
+ const tables=pricingFixture(),client=await h.cmd('client.save',{name:'Northstar tables',email:'tables@studio.example'})
+ const input={...offer,clientId:client.id,pricingTables:tables,priceOne:'9999999',terms:'Premium only',sectionConditions:{terms:'two'}}
+ const p=await h.cmd('proposal.prepare',input)
+ const current=async()=> (await h.state()).proposals.find(x=>x.id===p.id)
+ let row=await current();assert.equal(row.currency,'USD');assert.equal(row.options[0].cents,expected.grandCents)
+ assert.deepEqual(row.options[0].tables.map(t=>t.subtotalCents),expected.tableCents)
+ assert.deepEqual(row.options[0].tables.map(t=>t.groups.map(g=>g.subtotalCents)),expected.groupCents)
+ for(let t=0;t<2;t++)for(let i=0;i<6;i++){
+  const line=row.options[0].tables[t].lines[i],source=tables[t].lines[i]
+  for(const field of ['name','description','quantity','unit','unitPrice','group'])assert.equal(line[field],source[field])
+  assert.equal(line.lineTotalCents,source.expected)
+ }
+ const before=await h.state()
+ for(const [field,values] of [['quantity',['0','-1','1.0001','NaN','Infinity','1e2','1000001',{},null]],['unitPrice',['0','-1','1.001','NaN','1e2','10000001',{},null]]])for(const value of values){
+  const bad=pricingFixture();bad[0].lines[0][field]=value
+  await h.cmd('proposal.prepare',{...input,pricingTables:bad},h.owner,400)
+ }
+ for(const bad of ['invalid',{},[{optionId:'missing',name:'Bad',lines:tables[0].lines}],[{optionId:'one',name:'Empty',lines:[]} ]])await h.cmd('proposal.prepare',{...input,pricingTables:bad},h.owner,400)
+ assert.deepEqual((await h.state()).proposals,before.proposals,'bad inputs write no proposals')
+ const changed=pricingFixture();changed[0].lines[0].description='Revised description at the same price'
+ await h.cmd('proposal.revise',{...input,id:p.id,version:1,pricingTables:changed})
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+ let response=await h.send(`/app/proposal?id=${p.id}&from=1&to=2`,undefined,h.owner);assert.match(response.text,/Revised description at the same price/);assert.match(response.text,/<del>[^]*Agreed discovery service/)
+ await h.cmd('proposal.restore',{id:p.id,version:2,revision:1})
+ row=await current();assert.deepEqual(row.options[0].tables,before.proposals[0].options[0].tables)
+ const copied=await h.cmd('proposal.duplicate',{id:p.id,version:3});assert.deepEqual((await h.state()).proposals.find(x=>x.id===copied.id).options,row.options)
+ response=await h.send(`/app/preview/client?id=${p.id}&revision=3&optionId=one`,undefined,h.owner);assert.equal(response.status,200);assert.match(response.text,/403\.89/);assert.match(response.text,/Project services/);assert.doesNotMatch(response.text,/Premium only/)
+ await h.cmd('proposal.approve',{id:p.id,version:3,revision:3});const share=await h.cmd('proposal.send',{id:p.id,version:4}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+ for(let reload=0;reload<2;reload++){response=await h.send(path+'?optionId=one',undefined,cookie);assert.match(response.text,/403\.89/);for(const table of tables)for(const line of table.lines)assert.ok(response.text.includes(line.description))}
+ const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId=one',{headers:{host:new URL(h.origin).host,cookie}});assert.equal(pdf.status,200)
+ const pages=await pdfPages(await pdf.arrayBuffer()),content=pages.join(' ')
+ for(const table of tables)for(const line of table.lines){assert.ok(content.includes(line.description));assert.ok(content.includes(line.quantity+' '+line.unit))}
+ for(const value of ['403.89','330.03','73.86','100.97'])assert.ok(content.includes(value))
+ for(const page of pages)assert.match(page,/Not signed, revision 3/)
+ await h.cmd('proposal.negotiate',{...input,id:p.id,version:5,pricingTables:changed})
+ assert.deepEqual((await current()).options[0].tables[0].lines[0].description,changed[0].lines[0].description)
+ response=await h.send(path,undefined,cookie);assert.match(response.text,/Agreed discovery service/);assert.doesNotMatch(response.text,/Revised description at the same price/)
+ response=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie);assert.equal(response.status,200)
+ const accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
+ assert.equal(accepted.total_cents,expected.grandCents);assert.equal(accepted.deposit_cents,expected.depositCents);assert.deepEqual(JSON.parse(accepted.snapshot).options[0].tables,before.proposals[0].options[0].tables)
+ await h.cmd('proposal.revise',{...input,id:p.id,version:7},h.owner,409)
+ const audit=(await h.send('/api/platter/audit?subject='+p.id,undefined,h.owner)).value.rows
+ assert.ok(audit.some(r=>r.kind==='proposal.prepare'||r.action==='proposal.prepare'))
+}finally{await h.close()}})

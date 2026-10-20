@@ -18,12 +18,14 @@ const fields = {
  optionTwo: string, priceTwo: { type: ['string', 'number'] },
 }
 const schema = (properties: Record<string, any>, required: string[] = []) => ({ type: 'object', properties, required, additionalProperties: false })
+const draftRequired=Object.keys(fields)
+const draftingFields={...fields,pricingTables:{type:'array',items:{type:'object',description:'Tables with optionId one/two, name, and lines: name, description, quantity (positive decimal up to 3 places), unit, unitPrice (USD up to 2 places), group. Server rounds each extended line half up to cents and recomputes totals.'}}}
 const tools = [
  { name: 'search_proposals', description: 'Search current proposals by title, scope or client. Includes matching existing clients for preparing a draft; at most 100 results of each kind.', inputSchema: schema({ query: { type: 'string', maxLength: 200 }, status: { type: 'string', enum: ['draft', 'approved', 'sent', 'accepted'] }, limit: { type: 'integer', minimum: 1, maximum: 100 } }) },
  { name: 'read_proposal', description: 'Read a current proposal, revision, version, approval and recorded delivery/acceptance status. No invitation credentials are returned.', inputSchema: schema({ id: string }, ['id']) },
  { name: 'read_engagement', description: 'Read recorded delivery and acceptance status. View tracking and section reading analytics are unavailable; delivery acceptance does not prove reading.', inputSchema: schema({ id: string }, ['id']) },
- { name: 'prepare_proposal', description: 'Prepare a structured two-option draft for an existing client. Templates are unavailable. The owner must review, approve and send it.', inputSchema: schema(fields, Object.keys(fields)) },
- { name: 'revise_proposal', description: 'Revise the current draft or approved proposal using its version. This creates a draft revision and clears approval. Sent and accepted offers cannot be edited by an agent.', inputSchema: schema({ ...fields, id: string, version: integer }, [...Object.keys(fields), 'id', 'version']) },
+ { name: 'prepare_proposal', description: 'Prepare a structured two-option draft for an existing client. Templates are unavailable. The owner must review, approve and send it.', inputSchema: schema(draftingFields, draftRequired) },
+ { name: 'revise_proposal', description: 'Revise the current draft or approved proposal using its version. This creates a draft revision and clears approval. Sent and accepted offers cannot be edited by an agent.', inputSchema: schema({ ...draftingFields, id: string, version: integer }, [...draftRequired, 'id', 'version']) },
  { name: 'request_send', description: 'Queue the exact current draft or approved revision for its key owner to review. Repeating an active request returns that request. This never approves or sends mail.', inputSchema: schema({ id: string, revision: integer }, ['id', 'revision']) },
 ]
 
@@ -33,7 +35,7 @@ function validArguments(input: unknown, definition: ReturnType<typeof schema>) {
  need(definition.required.every(key => Object.hasOwn(input, key)), 'Missing required tool argument')
  for (const [key, value] of Object.entries(input)) {
   const s = definition.properties[key], types = Array.isArray(s.type) ? s.type : [s.type]
-  need(types.some((type: string) => type === 'integer' ? Number.isSafeInteger(value) : type === 'number' ? typeof value === 'number' && Number.isFinite(value) : typeof value === type), `Invalid ${key}`)
+  need(types.some((type: string) => type === 'array' ? Array.isArray(value) : type === 'integer' ? Number.isSafeInteger(value) : type === 'number' ? typeof value === 'number' && Number.isFinite(value) : typeof value === type), `Invalid ${key}`)
   if (typeof value === 'string') need(value.length >= (s.minLength ?? 0) && value.length <= (s.maxLength ?? 10000) && (!s.minLength || value.trim().length > 0), `Invalid ${key}`)
   if (typeof value === 'number') need(value >= (s.minimum ?? -Infinity) && value <= (s.maximum ?? Infinity) && (s.exclusiveMinimum === undefined || value > s.exclusiveMinimum), `Invalid ${key}`)
   if (s.enum) need(s.enum.includes(value), `Invalid ${key}`)

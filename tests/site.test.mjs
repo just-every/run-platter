@@ -818,3 +818,7 @@ test('EDIT-007 desktop and phone client verifies, chooses, comments and accepts 
  const { mobileClientJourney } = await import('./mobile-client-journey.mjs')
  await mobileClientJourney()
 })
+
+test('PRICE-001 / COLLAB-003 / EDIT-014 / EDIT-018 desktop and phone create grouped line tables, edit and restore, preview, send, download and accept identical server totals', {timeout:180000}, async()=>{
+ const {pricingJourney}=await import('./pricing-journey.mjs');await pricingJourney()
+})

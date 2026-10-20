@@ -268,9 +268,11 @@ A catalog holds services and products with name, description, SKU, unit (hour, d
 
 A proposal has any number of pricing tables in USD, each with line items (name, description, quantity, unit, unit price), groups, subtotals and a grand total. All arithmetic is in integer cents with stated rounding, and totals are recomputed on the server. This replaces the first release's two GST-free AUD options for every new proposal; existing records keep their form under `PRICE-008`.
 
+Each current package may carry any number of tables; its grand total is the sum of their subtotals. A package without tables keeps its explicitly entered fixed USD total. Quantities are positive thousandths of a named unit (0.001 to 1,000,000), unit prices are positive USD amounts with at most two decimal places, and each quantity × unit-price line rounds half up to the nearest cent before group, table and package summation. A package is between $0.01 and $10,000,000. Submitted subtotals and grand totals never override server arithmetic. Existing historical AUD proposals keep their original form. Tables, descriptions, quantities, units, prices, group subtotals and totals travel unchanged through exact-revision approval/send, member preview, comparison/restoration, duplication, negotiated drafts, the client page, selected unsigned PDF, acceptance and PORT-002 archives. PRICE-002 inherits additional packages and optional quantities; EDIT-001/EDIT-005 and SIGN-005 inherit their added document/PDF carriers before shipping.
+
 *Acceptance:* Build two tables with 12 lines, quantities and units, and see the server totals match a cent-exact fixture; send malformed quantities and prices (400); reload and see identical totals in the client page and the PDF.
 
-*Status:* partial. Two fixed one-off option totals in USD (legacy proposals retain AUD); no line items, quantities, units or multiple tables. (`src/platter/model.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs`)
+*Status:* done. Named PRICE-001 public HTTP, built-browser journeys at 1440/390 and public CLI archive/restore assertions cover twelve lines in two grouped tables, exact rounding and totals, invalid-input refusals, every current content carrier and frozen acceptance. (`src/platter/pricing.ts`, `src/platter/ui/pricing.ts`, `tests/platter.test.mjs`, `tests/pricing-journey.mjs`, `tests/archive.test.mjs`)
 
 #### PRICE-002 — Packages and optional items the client chooses.
 
@@ -1384,8 +1386,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 20 | 25 | 83 | 128 |
-| All | 32 | 25 | 83 | 140 |
+| Target and push further | 21 | 24 | 83 | 128 |
+| All | 33 | 24 | 83 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1420,7 +1422,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `EDIT-017` | Client page in the client's language | target | missing |  | The client page and mail are English only. |
 | `EDIT-018` | Client-page preview before sending | target | done | `src/platter/preview.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `CAT-001` | Service and product catalog | target | partial | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs` | Imported catalog metadata and images only; no catalog editing, provider sync, pricing-table insertion or line-image rendering. |
-| `PRICE-001` | USD pricing tables with line items | target | partial | `src/platter/model.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs` | Two fixed one-off option totals in USD (legacy proposals retain AUD); no line items, quantities, units or multiple tables. |
+| `PRICE-001` | USD pricing tables with line items | target | done | `src/platter/pricing.ts`, `src/platter/ui/pricing.ts`, `tests/platter.test.mjs`, `tests/pricing-journey.mjs`, `tests/archive.test.mjs` |  |
 | `PRICE-002` | Packages and optional items the client chooses | target | partial | `src/platter/signing.ts`, `tests/platter.test.mjs` | Exactly two fixed options; no add-ons, editable quantities or any number of packages. |
 | `PRICE-003` | One-off and recurring fees | target | missing |  | One-off totals only. |
 | `PRICE-004` | Discounts | target | missing |  | No discounts. |

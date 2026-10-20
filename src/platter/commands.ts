@@ -1,3 +1,4 @@
+import { pricedOptions, pricingInput, tableInputs } from './pricing'
 import { sectionConditions } from './conditional'
 import { followupCommand } from './followup/commands'
 import { duplicateProposal } from './duplicate'
@@ -22,9 +23,11 @@ import { restoreFields } from './history'
 import { negotiationCommand, pendingNegotiation } from './negotiation'
 
 export function proposalFields(p:Record<string,unknown>){
+ const tables=tableInputs(p.pricingTables)
+ const price=(id:string,value:unknown)=>tables.some(t=>t&&t.optionId===id)?1:dollars(value)
  const deposit=Number(p.depositPercent);need(Number.isFinite(deposit)&&Number.isInteger(deposit*100)&&deposit>0&&deposit<=100,'Deposit must be from 0.01 to 100 percent')
  const terms=p.terms??'';need(typeof terms==='string'&&terms.length<=10000,'Terms must be text up to 10000 characters')
- return{section_conditions:sectionConditions(p.sectionConditions??Object.fromEntries(['scope','terms'].filter(k=>p[k+'Option']).map(k=>[k,p[k+'Option']]))),terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:[{id:'one',label:text(p.optionOne,'the first option',200),cents:dollars(p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:dollars(p.priceTwo)}]}
+ return{section_conditions:sectionConditions(p.sectionConditions??Object.fromEntries(['scope','terms'].filter(k=>p[k+'Option']).map(k=>[k,p[k+'Option']]))),terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:pricedOptions([{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)}
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown){const db=env.DB,at=await currentTime(env.DB)
  if(name.startsWith('followup.'))return followupCommand(env,a,name,p)
@@ -50,6 +53,8 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  }
  if(name==='proposal.negotiate'||name==='proposal.revise'){
   const current=await proposal(db,p.id)
+  if(p.pricingTables!==undefined&&tableInputs(p.pricingTables).length)need(current.currency==='USD','Historical AUD proposals keep their original pricing form',409)
+  if(p.pricingTables===undefined){const pending=await pendingNegotiation(db,current.id);const content=pending?JSON.parse(pending.snapshot):current;p={...p,pricingTables:pricingInput(typeof content.options==='string'?JSON.parse(content.options):content.options)}}
   if(p.sectionConditions===undefined&&p.scopeOption===undefined&&p.termsOption===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,sectionConditions:pending?JSON.parse(pending.snapshot).section_conditions??{}:current.section_conditions}}
   if(p.terms===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,terms:pending?JSON.parse(pending.snapshot).terms??'':current.terms}}
   if(name==='proposal.negotiate'||await pendingNegotiation(db,current.id))return negotiationCommand(env,a,name,p,current,{...proposalFields(p),...(restoredAttachments!==undefined?{attachments:restoredAttachments}:{})})

@@ -618,6 +618,7 @@ test('EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and 
 
 
 test('SEND-004 / TEAM-004 calendar expiry warns unsigned only, supports same-link reopening and reissue, and never expires accepted agreements', {timeout:60000}, ()=>run(async h=>{
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303);await setup.text()
  const worker=await h.mf.getWorker(),fire=async at=>worker.scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'}),at=value=>Date.parse(value)
  await fire(at('2027-03-01T15:00:00Z'))
  await h.cmd('report.time-zone',{timeZone:'America/New_York'})

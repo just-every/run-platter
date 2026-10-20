@@ -78,6 +78,13 @@ test('SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / P
     const pdf=await h.mf.dispatchFetch(h.origin+suggestPath+'/download.pdf?optionId=two',{headers:{cookie:suggestSession.cookie,host:new URL(h.origin).host}});assert.equal(pdf.status,200);assert.equal(pdf.headers.get('content-type'),'application/pdf');await pdf.arrayBuffer()
     await h.cmd('pdf.downloads',{id:work.id,version:2,enabled:false})
     await h.cmd('expiry.set',{id:work.id,version:3,mode:'days',days:14,warningDays:1})
+    let live=(await h.state()).proposals.find(p=>p.id===pending.id)
+    await h.cmd('expiry.set',{id:pending.id,version:live.version,mode:'date',date:'2020-01-01'})
+    assert.equal((await h.send(suggestPath+'/action?name=expiry.reopen',{},suggestSession.cookie)).status,200)
+    live=(await h.state()).proposals.find(p=>p.id===pending.id)
+    await h.cmd('expiry.set',{id:pending.id,version:live.version,mode:'date',date:'2099-01-01',warningDays:1})
+    const beforeReopen=(await h.state()).proposals.find(p=>p.id===pending.id).expiry.reopenRequests
+    assert.equal(beforeReopen.length,1)
     const expiryRequests=(await h.state()).proposals.find(p=>p.id===work.id).expiry
     const beforeRequests=(await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests
     const csv='client_id,name,email\narchive-import,Imported studio,imported@studio.example'
@@ -134,6 +141,7 @@ test('SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / P
     assert.equal((await h.send(invoicePath,undefined,restoredOwner)).text,invoiceCsv)
     for(const file of frozenAttachments){const r=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+proposal.id+'/'+file.id,{headers:{cookie:restoredOwner,host:new URL(h.origin).host}});assert.equal(r.status,200);assert.deepEqual(new Uint8Array(await r.arrayBuffer()),file.kind==='w9'?attachmentBytes:new TextEncoder().encode('%PDF insurance'))}
     assert.equal(restoredState.proposals.find(p=>p.id===pending.id).pdfDownloads.length,1,'EDIT-014 download timeline survives CLI restore')
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===pending.id).expiry.reopenRequests,beforeReopen,'SEND-004 reopen request and resolution survive CLI restore')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===work.id).expiry,expiryRequests,'SEND-004 per-proposal expiry settings survive CLI restore')
     assert.equal(restoredState.proposals.find(p=>p.id===work.id).pdfDownloadsEnabled,false,'EDIT-014 per-proposal PDF policy survives CLI restore')
     assert.deepEqual(restoredState.vendorDocuments,beforeVendorDocuments,'EDIT-010 current defaults and all replaced originals survive CLI restore')

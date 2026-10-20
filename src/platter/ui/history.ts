@@ -12,7 +12,7 @@ export function changes(before: any, after: any): string {
  const fileRefs=(value:any)=>typeof value==='string'?JSON.parse(value):value??[]
  const files=(value:any)=>fileRefs(value).map((f:any)=>`${f.filename} (${f.size} bytes)`).join('\n')||'No attachments'
  if(JSON.stringify(fileRefs(before.attachments))!==JSON.stringify(fileRefs(after.attachments)))rows.push(['Attachments',files(before.attachments),files(after.attachments)+(files(before.attachments)===files(after.attachments)?' (new file version)':'')])
- const changed = rows.filter(([, before, after]) => before !== after)
+ const changed = rows.filter(([label, before, value]) => before !== value && !after.hiddenSections?.includes(label.toLowerCase()))
  return changed.length ? `<dl>${changed.map(([label, before, after]) => `<dt>${escape(label)}</dt><dd class="preserve"><del>${escape(before)}</del><br><ins>${escape(after)}</ins></dd>`).join('')}</dl>` : '<p>No content or price changes.</p>'
 }
 

@@ -1,5 +1,6 @@
 import { withDemo } from '@runeditrun/rer/internal/modules/demo/index.mjs'
 import { platterResponse } from './platter/http'
+import { runExpiry } from './platter/expiry'
 import { runDueReports } from './platter/reports/schedules'
 import { seedDemo } from './demo'
 import { rejectedResponse } from './base/rejected-response'
@@ -43,6 +44,7 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
   },
   // REPORT-005 scheduled report email, built as of the trigger's own time.
   async scheduled(controller, env) {
+    await runExpiry(runtimeBindings(env), controller.scheduledTime)
     await runDueReports(runtimeBindings(env), controller.scheduledTime)
   },
 } satisfies ExportedHandler<Bindings>, { seed: seedDemo })

@@ -5,7 +5,7 @@ export function pipelinePanel(proposals: any[], params: URLSearchParams) {
  const report = pipeline(proposals, params)
  const select = (label: string, key: string, choices: { id: string; name: string }[]) => `<label>${label}<select name="${key}" aria-label="${label}"><option value="">All</option>${choices.map(c => `<option value="${escape(c.id)}"${params.get(key) === c.id ? ' selected' : ''}>${escape(c.name)}</option>`).join('')}</select></label>`
  const filters = `<form method="get" action="/app"><div class="editor-grid">`
-  + select('Owner', 'owner', report.owners) + select('Status', 'status', ['draft','approved','sent','accepted'].map(id => ({id,name:id})))
+  + select('Owner', 'owner', report.owners) + select('Status', 'status', ['draft','approved','sent','accepted','expired'].map(id => ({id,name:id})))
   + select('Client', 'client', report.clients) + select('Next action', 'nextAction', Object.entries(nextActions).map(([id,name]) => ({id,name})))
   + field('Minimum value', 'minValue', params.get('minValue'), 'inputmode="decimal"') + field('Maximum value', 'maxValue', params.get('maxValue'), 'inputmode="decimal"')
   + field('Minimum age in days', 'minAge', params.get('minAge'), 'type="number" min="0"') + field('Maximum age in days', 'maxAge', params.get('maxAge'), 'type="number" min="0"')

@@ -131,7 +131,7 @@ test('NEG-001 negotiated offer requires exact approval, preserves the live offer
  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_negotiations WHERE proposal_id=?').bind(second.p.id).first()).n,0)
 }))
 
-test('REPORT-001 thirty proposals filter by recorded owner/status and every field, sort and total exact values without changing ownership',()=>run(async h=>{
+test('REPORT-001 / SEND-004 thirty proposals filter by recorded owner/status and every field, sort and total exact values without changing ownership',()=>run(async h=>{
  const clients=[]
  for(const [name,email] of [['Northstar Coffee','avery@northstar.example'],['Juniper Design','sam@juniper.example']])clients.push(await h.cmd('client.save',{name,email}))
  const people=[{email:h.auth.OWNER_EMAIL,cookie:h.owner,id:(await h.state()).actor.id}]
@@ -142,17 +142,18 @@ test('REPORT-001 thirty proposals filter by recorded owner/status and every fiel
  const fixture=[]
  for(let i=0;i<30;i++){
   const person=people[i%3],client=clients[i%2],input={...offer,clientId:client.id,title:`Campaign ${String(i+1).padStart(2,'0')}`,priceOne:String(1000+i*10),priceTwo:String(2000+i*20)}
-  const made=await h.cmd('proposal.prepare',input,person.cookie),status=['draft','approved','sent','accepted'][i%4]
+  const made=await h.cmd('proposal.prepare',input,person.cookie),status=i===2?'expired':['draft','approved','sent','accepted'][i%4]
   let version=1
   if(status!=='draft'){await h.cmd('proposal.approve',{id:made.id,version:version++,revision:1})}
-  if(['sent','accepted'].includes(status)){
+  if(['sent','accepted','expired'].includes(status)){
    const shared=await h.cmd('proposal.send',{id:made.id,version:version++})
+   if(status==='expired')await h.cmd('expiry.set',{id:made.id,version:version++,mode:'date',date:'2020-03-01'})
    if(status==='accepted'){
     const path=new URL(shared.shareUrl).pathname,cookie=await verified(h,path)
     assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
    }
   }
-  fixture.push({id:made.id,title:input.title,status,owner:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':status==='sent'?'await-client':'export-deposit'})
+  fixture.push({id:made.id,title:input.title,status,owner:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':status==='sent'?'await-client':status==='expired'?'reopen':'export-deposit'})
  }
  const aged=fixture.find(p=>p.status==='draft')
  await h.db.prepare('UPDATE p_proposals SET created_at=? WHERE id=?').bind(Date.now()-3*86400000-3600000,aged.id).run()
@@ -161,9 +162,11 @@ test('REPORT-001 thirty proposals filter by recorded owner/status and every fiel
  for(const expected of fixture){const actual=all.rows.find(p=>p.id===expected.id);assert.equal(actual.status,expected.status);assert.equal(actual.ownerId,expected.owner);assert.equal(actual.clientId,expected.client);assert.equal(actual.valueCents,expected.valueCents);assert.equal(actual.nextAction,expected.nextAction);assert.equal(actual.age,expected.id===aged.id?3:0)}
  assert.equal(all.count,30);assert.equal(all.totals[0].valueCents,fixture.reduce((n,p)=>n+p.valueCents,0));assert.equal(all.totals[0].count,30)
  assert.deepEqual(all.rows.map(p=>p.id),fixture.toSorted((a,b)=>b.valueCents-a.valueCents||a.title.localeCompare(b.title)).map(p=>p.id))
+ const expired=await report('status=expired&sort=value');assert.equal(expired.count,1);assert.equal(expired.totals[0].count,1);assert.equal(expired.totals[0].valueCents,fixture.find(p=>p.status==='expired').valueCents)
  const selected=fixture.filter(p=>p.owner===people[1].id&&p.status==='sent'),filtered=await report('owner='+people[1].id+'&status=sent&sort=value')
  assert.deepEqual(filtered.rows.map(p=>p.id),selected.toSorted((a,b)=>a.valueCents-b.valueCents).map(p=>p.id));assert.equal(filtered.totals[0].valueCents,selected.reduce((n,p)=>n+p.valueCents,0))
  for(const [query,expected] of [
+  ['status=expired',fixture.filter(p=>p.status==='expired')],['nextAction=reopen',fixture.filter(p=>p.status==='expired')],
   ['client='+clients[0].id,fixture.filter(p=>p.client===clients[0].id)],
   ['minValue=2100&maxValue=2400',fixture.filter(p=>p.valueCents>=210000&&p.valueCents<=240000)],
   ['minAge=0&maxAge=0',fixture.filter(p=>p.id!==aged.id)],['minAge=3&maxAge=3',[aged]],['minAge=4',[]],['nextAction=approve',fixture.filter(p=>p.status==='draft')],
@@ -612,3 +615,57 @@ test('EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and 
   assert.ok(audit.some(r=>r.action==='pdf.downloads'&&r.actor_role==='owner'))
  } finally { await h.close() }
 })
+
+
+test('SEND-004 / TEAM-004 calendar expiry warns unsigned only, supports same-link reopening and reissue, and never expires accepted agreements', {timeout:60000}, ()=>run(async h=>{
+ const worker=await h.mf.getWorker(),fire=async at=>worker.scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'}),at=value=>Date.parse(value)
+ await fire(at('2027-03-01T15:00:00Z'))
+ await h.cmd('report.time-zone',{timeZone:'America/New_York'})
+ const {client}=await draft(h)
+ const make=async(title,days,warningDays='')=>{const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title});await h.cmd('expiry.set',{id:p.id,version:1,mode:'days',days,warningDays});await h.cmd('proposal.approve',{id:p.id,version:2,revision:1});const shared=await h.cmd('proposal.send',{id:p.id,version:3});return {...p,path:new URL(shared.shareUrl).pathname}}
+ const seven=await make('Seven day campaign',7),fourteen=await make('Fourteen day campaign',14,1),signed=await make('Already agreed campaign',14,1),moved=await make('Extended before warning',14,1)
+ let row=(await h.state()).proposals.find(p=>p.id===seven.id);assert.equal(row.expiry.date,'2027-03-08');assert.equal(row.expiry.deadlineAt,at('2027-03-08T05:00:00Z'))
+ assert.match((await h.send(seven.path)).text,/2027-03-08.*America\/New_York/)
+ const signedCookie=await verified(h,signed.path);assert.equal((await h.send(signed.path+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true},signedCookie)).status,200)
+ const accepted=await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(signed.id).first()
+ row=(await h.state()).proposals.find(p=>p.id===moved.id);await h.cmd('expiry.set',{id:moved.id,version:row.version,mode:'date',date:'2027-03-22',warningDays:1})
+ assert.equal((await h.state()).proposals.find(p=>p.id===fourteen.id).expiry.deadlineAt,at('2027-03-15T04:00:00Z'),'DST changes the UTC midnight')
+ await fire(at('2027-03-08T04:59:59Z'));assert.equal((await h.state()).proposals.find(p=>p.id===seven.id).status,'sent')
+ await fire(at('2027-03-08T05:00:00Z'));assert.equal((await h.state()).proposals.find(p=>p.id===seven.id).status,'expired')
+ let page=await h.send(seven.path);assert.match(page.text,/This proposal has expired/);assert.ok(!page.text.includes('<button>Accept proposal</button>'))
+ assert.equal((await h.send(seven.path+'/action?name=expiry.reopen',{})).status,401)
+ const cookie=await verified(h,seven.path)
+ assert.equal((await h.send(seven.path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,409)
+ assert.equal((await h.send(seven.path+'/action?name=expiry.reopen',{},cookie)).status,200);assert.equal((await h.send(seven.path+'/action?name=expiry.reopen',{},cookie)).status,200)
+ row=(await h.state()).proposals.find(p=>p.id===seven.id);assert.equal(row.expiry.reopenRequests.length,1)
+ await h.cmd('expiry.set',{id:seven.id,version:row.version,mode:'date',date:'2027-03-12'})
+ assert.equal((await h.send(seven.path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200,'same invitation/session reopens')
+ assert.equal((await h.state()).proposals.find(p=>p.id===seven.id).expiry.reopenRequests[0].resolution,'extended')
+ await fire(at('2027-03-14T03:59:59Z'));assert.equal((await h.state()).outbox.filter(m=>m.subject.startsWith('Expiry warning:')).length,0)
+ await fire(at('2027-03-14T04:00:00Z'));await fire(at('2027-03-14T04:00:00Z'))
+ let mail=(await h.state()).outbox.filter(m=>m.subject.startsWith('Expiry warning:'));assert.equal(mail.length,1);assert.equal(mail[0].proposal_id,fourteen.id);assert.equal(mail[0].recipient,'avery@northstar.example');assert.match(mail[0].body,/2027-03-15.*America\/New_York/);assert.equal(mail[0].status,'local')
+ await fire(at('2027-03-15T04:00:00Z'));row=(await h.state()).proposals.find(p=>p.id===fourteen.id);assert.equal(row.status,'expired')
+ const lateCookie=await verified(h,fourteen.path);assert.equal((await h.send(fourteen.path+'/action?name=expiry.reopen',{},lateCookie)).status,200)
+ await h.cmd('expiry.set',{id:fourteen.id,version:row.version,mode:'date',date:'2027-03-22',warningDays:1})
+ assert.equal((await h.send(fourteen.path,undefined,lateCookie)).status,200);assert.equal((await h.state()).proposals.find(p=>p.id===fourteen.id).status,'sent')
+ row=(await h.state()).proposals.find(p=>p.id===fourteen.id)
+ const fresh=await h.cmd('proposal.send',{id:fourteen.id,version:row.version});assert.equal((await h.state()).proposals.find(p=>p.id===fourteen.id).expiry.date,'2027-03-22','fresh invitation preserves expiry')
+ assert.equal((await h.send(fourteen.path)).status,404)
+ await fire(at('2027-03-21T04:00:00Z'));mail=(await h.state()).outbox.filter(m=>m.subject.startsWith('Expiry warning:'));assert.equal(mail.length,2);assert.ok(mail.some(m=>m.proposal_id===moved.id));assert.equal(mail.filter(m=>m.proposal_id===fourteen.id).length,1,'extension does not repeat warning for same revision')
+ await fire(at('2027-03-22T04:00:00Z'))
+ row=(await h.state()).proposals.find(p=>p.id===fourteen.id);assert.equal(row.status,'expired')
+ await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:fourteen.id,version:row.version,scope:'Reissued campaign with revised scope.'})
+ row=(await h.state()).proposals.find(p=>p.id===fourteen.id);await h.cmd('expiry.set',{id:fourteen.id,version:row.version,mode:'days',days:7});row=(await h.state()).proposals.find(p=>p.id===fourteen.id)
+ await h.cmd('proposal.approve',{id:fourteen.id,version:row.version,revision:row.revision});row=(await h.state()).proposals.find(p=>p.id===fourteen.id)
+ const reissued=await h.cmd('proposal.send',{id:fourteen.id,version:row.version}),newPath=new URL(reissued.shareUrl).pathname
+ row=(await h.state()).proposals.find(p=>p.id===fourteen.id);assert.equal(row.revision,2);assert.equal(row.expiry.date,'2027-03-29');assert.equal(row.status,'sent');assert.equal(row.expiry.reopenRequests[0].resolution,'extended');assert.equal((await h.send(new URL(fresh.shareUrl).pathname)).status,404)
+ const reissuedCookie=await verified(h,newPath);assert.equal((await h.send(newPath+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true},reissuedCookie)).status,200)
+ const noExpiry=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'No deadline'});await h.cmd('expiry.set',{id:noExpiry.id,version:1,mode:'days',days:7});await h.cmd('expiry.remove',{id:noExpiry.id,version:2});assert.equal((await h.state()).proposals.find(p=>p.id===noExpiry.id).expiry.mode,'never')
+ await h.cmd('expiry.set',{id:noExpiry.id,version:3,mode:'date',date:'2027-02-30'},h.owner,400)
+ await h.cmd('expiry.set',{id:signed.id,version:(await h.state()).proposals.find(p=>p.id===signed.id).version,mode:'days',days:1},h.owner,409)
+ await h.send('/auth/invite',{email:'expiry-member@studio.example',displayName:'Colleague',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('expiry-member@studio.example')
+ await h.cmd('expiry.set',{id:noExpiry.id,version:3,mode:'days',days:1},member,403)
+ await fire(at('2027-04-01T04:00:00Z'));assert.equal((await h.state()).proposals.find(p=>p.id===signed.id).status,'accepted');assert.deepEqual(await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(signed.id).first(),accepted)
+ const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+ for(const action of ['expiry.set','expiry.remove','expiry.reopen','expiry.warning'])assert.ok(audit.some(a=>a.action===action&&a.subject&&a.actor_id&&a.occurred_at),action+' is audited')
+}))

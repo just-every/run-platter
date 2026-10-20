@@ -542,3 +542,32 @@ test('EDIT-014 client selects and downloads revision 2 at desktop and phone; own
   }
  } finally { await browser?.close();await app?.close() }
 })
+
+
+test('SEND-004 expired offer requests reopening and owner extends same links at desktop and phone', {timeout:120000}, async()=>{
+ let app,browser;const screenshots=process.env.PLATTER_SCREENSHOTS
+ try {
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp({scheduled:true});const context=await browser.newContext({viewport:{width,height:900}})
+   try {
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`SEND-004-${name}-${width}.png`),fullPage:true})}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    await app.fireCron(Date.parse('2027-03-01T15:00:00Z'));await cmd('report.time-zone',{timeZone:'America/New_York'})
+    const client=await cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),made=await cmd('proposal.prepare',{clientId:client.id,title:'Spring campaign offer',scope:'Two studio shoots and edited campaign photographs.',terms:'Delivery after client review.',optionOne:'Studio',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'})
+    await page.goto(app.origin+'/app/proposal?id='+made.id);await page.getByLabel('Expiry type').selectOption('days');await page.getByLabel('Expiry period in calendar days').fill('7');await page.getByLabel('Warning lead days (leave blank for no warning)').fill('1');await page.getByRole('button',{name:'Save expiry',exact:true}).click();await capture('configured')
+    await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();await page.getByRole('link',{name:'Open client proposal',exact:true}).click();const clientUrl=page.url()
+    assert.match(await page.locator('main').innerText(),/2027-03-08.*America\/New_York/);await capture('client-live')
+    await app.fireCron(Date.parse('2027-03-08T05:00:00Z'));await page.reload();assert.equal(await page.getByRole('heading',{name:'This proposal has expired',exact:true}).count(),1);assert.equal(await page.getByRole('button',{name:'Accept proposal',exact:true}).count(),0);await capture('client-expired')
+    await page.getByRole('button',{name:'Send verification code'}).click();const state=await (await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click();await page.getByRole('button',{name:'Request reopening',exact:true}).click();assert.match(await page.locator('main').innerText(),/request to reopen.*saved/is);await capture('requested')
+    await page.goto(app.origin+'/app?status=expired');assert.match(await page.locator('main').innerText(),/1 proposals match/);await capture('pipeline-expired')
+    await page.getByRole('link',{name:'Spring campaign offer',exact:true}).click();assert.match(await page.locator('main').innerText(),/Waiting for your response/);await page.getByLabel('Expiry type').selectOption('date');await page.getByLabel('Expiry date in installation time').fill('2027-03-15');await page.getByRole('button',{name:'Save expiry',exact:true}).click();await capture('owner-reopened')
+    await page.goto(clientUrl);assert.equal(await page.getByRole('heading',{name:'This proposal has expired',exact:true}).count(),0);await page.getByRole('radio',{name:/Full campaign/}).check();await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click();assert.equal(await page.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1);await capture('accepted')
+    await app.fireCron(Date.parse('2027-04-01T04:00:00Z'));await page.reload();assert.equal(await page.getByRole('heading',{name:'This proposal has expired',exact:true}).count(),0);assert.equal((await (await context.request.get(app.origin+'/api/platter/state')).json()).proposals.find(p=>p.id===made.id).status,'accepted')
+   } finally {await context.close();await app.close();app=undefined}
+  }
+ } finally {await browser?.close();await app?.close()}
+})

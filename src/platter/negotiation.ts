@@ -1,3 +1,4 @@
+import { expirySendStatements, currentTime } from './expiry'
 import type { Bindings } from '../auth.server'
 import { commit, exact, need, secret, snapshot, type Actor } from './model'
 import { dispatchMail, proposalMail, queueMail } from './mail'
@@ -10,7 +11,7 @@ export function negotiatedView(offer: any, pending: any) {
 }
 
 export async function negotiationCommand(env: Bindings, actor: Actor, name: string, input: Record<string, unknown>, offer: any, fields?: any) {
- const db = env.DB, at = Date.now(), pending = await pendingNegotiation(db, offer.id)
+ const db = env.DB, at = await currentTime(env.DB), pending = await pendingNegotiation(db, offer.id)
  exact(offer, input)
  need(offer.status === 'sent', 'Only an unsigned sent offer can be negotiated', 409)
  const guard = { sql: "EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status='sent')", values: [offer.id, offer.version] }
@@ -46,6 +47,7 @@ export async function negotiationCommand(env: Bindings, actor: Actor, name: stri
   db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(offer.id),
   db.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient) VALUES(?,?,?,?)').bind(offer.id, next.revision, token,client.email),
   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(offer.id),
+  ...await expirySendStatements(db,offer.id,actor.id,at,true),
   queueMail(env, offer.id, client.email, ...proposalMail(next.title, shareUrl),actor.id),
  ], true, guard)
  await dispatchMail(env, offer.id)

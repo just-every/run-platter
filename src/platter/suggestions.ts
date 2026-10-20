@@ -1,3 +1,4 @@
+import { expiryOpenSql, currentTime } from './expiry'
 import type { Bindings } from '../auth.server'
 import { commit, exact, need, proposal, snapshot, text, type Actor } from './model'
 import { pendingNegotiation } from './negotiation'
@@ -15,9 +16,9 @@ export async function suggest(env:Bindings,c:any,input:Record<string,unknown>){
  const original=text(input.original,'the existing text',10000),replacement=text(input.replacement,'suggested text',10000)
  need(original!==replacement,'Suggest different text')
  replace(c.row[section]??'',original,replacement)
- const id=crypto.randomUUID(),at=Date.now(),db=env.DB
+ const id=crypto.randomUUID(),at=await currentTime(env.DB),db=env.DB
  try{await db.batch([
-  db.prepare("INSERT INTO p_guard(ok) VALUES(EXISTS(SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id JOIN p_suggestion_sections e ON e.proposal_id=p.id AND e.revision=p.revision WHERE s.token=? AND s.session_hash=? AND s.session_expires>? AND p.status='sent' AND p.revision=? AND e.section=?))").bind(c.token,c.share.session_hash,at,c.row.revision,section),
+  db.prepare(`INSERT INTO p_guard(ok) VALUES(EXISTS(SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id JOIN p_suggestion_sections e ON e.proposal_id=p.id AND e.revision=p.revision WHERE s.token=? AND s.session_hash=? AND s.session_expires>? AND p.status='sent' AND p.revision=? AND e.section=? AND ${expiryOpenSql('p')}))`).bind(c.token,c.share.session_hash,at,c.row.revision,section,at),
   db.prepare('INSERT INTO p_suggestions(id,proposal_id,revision,section,original,replacement,client_id,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(id,c.row.id,c.row.revision,section,original,replacement,c.row.client_id,at),db.prepare('DELETE FROM p_guard')
  ])}catch(e){if(String(e).includes('CHECK constraint'))need(false,'Suggestions are closed or the offer changed',409);throw e}
  return {message:'Suggestion recorded. The firm must review it; your offer is unchanged.'}

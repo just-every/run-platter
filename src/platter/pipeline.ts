@@ -1,7 +1,7 @@
 import { need } from './model'
 
-export const nextActions = { approve: 'Approve revision', send: 'Send approved offer', 'await-client': 'Await client decision', 'export-deposit': 'Export deposit invoice', complete: 'Deposit invoice exported' }
-const statuses = ['draft', 'approved', 'sent', 'accepted']
+export const nextActions = { approve: 'Approve revision', send: 'Send approved offer', 'await-client': 'Await client decision', 'export-deposit': 'Export deposit invoice', complete: 'Deposit invoice exported', reopen: 'Review expiry or reopening' }
+const statuses = ['draft', 'approved', 'sent', 'accepted', 'expired']
 const sorts = ['status', 'value', 'owner', 'client', 'age', 'nextAction']
 function bound(params: URLSearchParams, key: string, money = false) {
  const raw = params.get(key)
@@ -19,11 +19,11 @@ export function pipeline(proposals: any[], params = new URLSearchParams(), now =
  need(minValue === undefined || maxValue === undefined || minValue <= maxValue, 'Minimum value exceeds maximum')
  need(minAge === undefined || maxAge === undefined || minAge <= maxAge, 'Minimum age exceeds maximum')
  let rows = proposals.map(p => ({
-  id: String(p.id), title: String(p.title), status: String(p.status), currency: String(p.currency),
+  id: String(p.id), title: String(p.title), status: String(p.pipelineStatus ?? p.status), currency: String(p.currency),
   valueCents: Number(p.acceptance ? p.acceptance.totalCents : Math.max(...p.options.map((o: any) => o.cents))),
   ownerId: p.sales_owner_id as string | null, owner: p.sales_owner_name || 'Not recorded',
   clientId: String(p.client_id), client: String(p.clientName), age: Math.max(0, Math.floor((now - p.created_at) / 86400000)),
-  nextAction: (p.status === 'draft' ? 'approve' : p.status === 'approved' ? 'send' : p.status === 'sent' ? 'await-client' : p.invoice ? 'complete' : 'export-deposit') as keyof typeof nextActions,
+  nextAction: (p.pipelineStatus === 'expired' || p.status === 'expired' ? 'reopen' : p.status === 'draft' ? 'approve' : p.status === 'approved' ? 'send' : p.status === 'sent' ? 'await-client' : p.invoice ? 'complete' : 'export-deposit') as keyof typeof nextActions,
  }))
  const owners = [...new Map(rows.map(r => [r.ownerId || 'unrecorded', { id: r.ownerId || 'unrecorded', name: r.owner }])).values()].sort((a,b) => a.name.localeCompare(b.name))
  const clients = [...new Map(rows.map(r => [r.clientId, { id: r.clientId, name: r.client }])).values()].sort((a,b) => a.name.localeCompare(b.name))

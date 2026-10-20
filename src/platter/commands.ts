@@ -1,3 +1,4 @@
+import { expiryCommand, expirySendStatements, currentTime } from './expiry'
 import { pdfCommand } from './documents/client-pdf'
 import { businessCommand } from './business-records'
 import { deliveryCommand } from './delivery'
@@ -20,7 +21,8 @@ export function proposalFields(p:Record<string,unknown>){
  const terms=p.terms??'';need(typeof terms==='string'&&terms.length<=10000,'Terms must be text up to 10000 characters')
  return{terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:[{id:'one',label:text(p.optionOne,'the first option',200),cents:dollars(p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:dollars(p.priceTwo)}]}
 }
-export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown){const db=env.DB,at=Date.now()
+export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown){const db=env.DB,at=await currentTime(env.DB)
+ if(name.startsWith('expiry.'))return expiryCommand(env,a,name,p)
  if(name==='pdf.downloads')return pdfCommand(env,a,p)
  if(name.startsWith('business-import.'))return businessCommand(env,a,name,p)
  if(name.startsWith('delivery.'))return deliveryCommand(env,a,name,p)
@@ -60,7 +62,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
    await commit(db,a,[db.prepare("UPDATE p_proposals SET status='approved',approved_by=?,approved_at=?,version=version+1 WHERE id=?").bind(a.email,at,old.id),db.prepare('INSERT INTO p_approvals(id,proposal_id,revision,actor_id,approved_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),old.id,old.revision,a.id,at)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status='draft')",values:[old.id,old.version,old.revision]});return{approved:true}
   }
   need(['approved','sent'].includes(old.status),'Approve this revision before sending',409);const token=secret(),client=await db.prepare('SELECT c.*,COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(old.id,old.client_id).first<any>(),shareUrl=env.AUTH_ORIGIN+'/p/'+token
-  await commit(db,a,[db.prepare("UPDATE p_proposals SET status='sent',version=version+1 WHERE id=?").bind(old.id),db.prepare('INSERT INTO p_shares(proposal_id,revision,token) VALUES(?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET token=excluded.token,revision=excluded.revision,code_hash=NULL,code_expires=NULL,code_attempts=0,code_generation=0,code_sent_at=NULL,session_hash=NULL,session_expires=NULL').bind(old.id,old.revision,token),queueMail(env,old.id,client.email,...proposalMail(old.title,shareUrl),a.id)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('approved','sent'))",values:[old.id,old.version]});await dispatchMail(env,old.id);return{shareUrl}
+  await commit(db,a,[db.prepare("UPDATE p_proposals SET status='sent',version=version+1 WHERE id=?").bind(old.id),db.prepare('INSERT INTO p_shares(proposal_id,revision,token) VALUES(?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET token=excluded.token,revision=excluded.revision,code_hash=NULL,code_expires=NULL,code_attempts=0,code_generation=0,code_sent_at=NULL,session_hash=NULL,session_expires=NULL').bind(old.id,old.revision,token),...await expirySendStatements(db,old.id,a.id,at),queueMail(env,old.id,client.email,...proposalMail(old.title,shareUrl),a.id)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('approved','sent'))",values:[old.id,old.version]});await dispatchMail(env,old.id);return{shareUrl}
  }
  fail('Unknown command',404)
 }

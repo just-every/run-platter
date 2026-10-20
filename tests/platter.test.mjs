@@ -723,6 +723,8 @@ test('SEND-010 / FOLLOW-002 withdrawal revokes every current public door, preser
  assert.equal(report.count,1);assert.equal(report.rows[0].id,p.id);assert.equal(report.rows[0].nextAction,'withdrawn');assert.equal(report.totals[0].valueCents,420000)
  const n=await h.cmd('proposal.negotiate',{...offer,clientId:before.client_id,id:p.id,version:5,scope:'Corrected client offer'})
  assert.ok((await h.send('/api/platter/followups',undefined,h.owner)).value.rows.some(r=>r.id===p.id&&r.revision===2),'new negotiated revision has a new sales action')
+ await h.cmd('followup.schedule',{id:p.id,action:'Review corrected offer with client',dueDate:'2027-03-11'})
+ assert.equal((await h.send('/api/platter/followups',undefined,h.owner)).value.rows.find(r=>r.id===p.id).action,'Review corrected offer with client','a negotiated draft keeps an actionable sales follow-up before resend')
  assert.equal(n.revision,2);await h.cmd('proposal.send',{id:p.id,version:6},h.owner,409)
  await h.cmd('proposal.approve',{id:p.id,version:6,revision:2});const replacement=await h.cmd('proposal.send',{id:p.id,version:7})
  const newPath=new URL(replacement.shareUrl).pathname

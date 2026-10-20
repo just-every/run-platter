@@ -613,7 +613,7 @@ test('FOLLOW-004 invited client asks exact sent sections; owner queue answers an
 })
 
 
-test('SEND-010 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision', {timeout:180000}, async()=>{
+test('SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision', {timeout:180000}, async()=>{
  let browser,app
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
@@ -640,7 +640,12 @@ test('SEND-010 desktop and phone withdraw, inspect revoked offer and audit, then
     assert.equal((await page.goto(app.origin+oldPath)).status(),410);assert.equal(await page.getByRole('heading',{name:'Proposal withdrawn',exact:true}).count(),1);assert.equal(await page.getByRole('link',{name:'owner@northstar.example'}).count(),1);assert.ok(!(await page.locator('main').innerText()).includes('Studio photography'));await capture('revoked')
     await page.goto(app.origin+'/app/audit?action=proposal.withdraw');assert.match(await page.locator('main').innerText(),/Sent to the wrong client/);await capture('audit')
     await page.goto(app.origin+'/app?status=withdrawn');assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'1');await capture('pipeline')
-    await page.goto(proposalUrl);await page.getByRole('button',{name:'Prepare negotiated revision'}).click();await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();assert.equal(await page.getByRole('button',{name:'Send answer to client'}).count(),0);await capture('reissued')
+    await page.goto(proposalUrl);await page.getByRole('button',{name:'Prepare negotiated revision'}).click()
+    await page.getByLabel('Next action',{exact:true}).fill('Call Avery about the corrected offer');await page.getByLabel('Due date',{exact:true}).fill('2027-03-11');await page.getByRole('button',{name:'Save sales follow-up',exact:true}).click()
+    assert.equal(await page.getByLabel('Next action',{exact:true}).inputValue(),'Call Avery about the corrected offer')
+    const salesScreenshots=process.env.PLATTER_SALES_SCREENSHOTS
+    if(salesScreenshots){await mkdir(salesScreenshots,{recursive:true});await page.locator('section.panel').filter({has:page.getByRole('heading',{name:'Next sales action',exact:true})}).screenshot({path:join(salesScreenshots,`FOLLOW-002-negotiated-${width}.png`)})}
+    await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();assert.equal(await page.getByRole('button',{name:'Send answer to client'}).count(),0);await capture('reissued')
     assert.equal((await context.request.get(app.origin+oldPath)).status(),410)
     await page.getByRole('link',{name:'Open client proposal',exact:true}).click();assert.equal(await page.getByRole('heading',{name:'Verify your email',exact:true}).count(),1);await capture('new-offer')
    }finally{await context.close();await app.close();app=undefined}

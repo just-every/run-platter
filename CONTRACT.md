@@ -398,6 +398,8 @@ Under today's owner-only sending policy (`APPROVE-003`), the sending owner recei
 
 A proposal has any number of recipients with a role: signer, client-side approver, viewer or CC. A proposal created from a template starts with the template's role slots, fields and order (`SIGN-011`), and sending is refused (409) while a signer, approver or countersigner slot is unfilled. Each recipient has their own link and verification. Before sending, the sender previews the client page as each recipient (`EDIT-018`). The firm can also share by link (with verification) or embed the proposal on its site. Removing a recipient revokes their link, and withdrawing the proposal revokes every link at once (`SEND-010`). Replacing a signer on a sent proposal is `SEND-007`, and a signer delegating is `SIGN-009`.
 
+Every recipient role and shared link extends SEND-010 revocation and its named all-recipient 410, notice and no-content assertions before shipping.
+
 *Acceptance:* Add a signer, a CFO approver and a viewer; each opens their own link; the viewer cannot sign; remove the viewer and see their link refused.
 
 *Status:* missing. One client recipient per proposal.
@@ -430,6 +432,8 @@ Every send, reminder (`FOLLOW-001`), fresh invitation (`PROP-002`), revision sen
 
 Editable expiry notices extend SEND-004’s named unsigned-warning, exact-date and one-claim assertions before shipping.
 
+Add an editable withdrawal notice template to SEND-010, with its exact subject/body and per-recipient assertions before shipping.
+
 *Acceptance:* Save a template with subject "Proposal for {client.company}" and a body starting "Hi {client.first_name},"; send with it to Dana at Acme: the mail fake and the timeline both hold the subject "Proposal for Acme" and the body "Hi Dana," exactly. Edit the text of the scheduled second reminder: the first reminder in the mail fake carries the template text and the second carries the edited text. Send with an unfilled variable (refused, naming it); as a member edit a locked template's text (refused). On an unapproved draft, send a test to me: the mail fake holds exactly one message, to the member's own address, with the subject "[Test] Proposal for Acme"; its link opens the preview with the member's session and returns 401 without one; the proposal is still an unapproved draft at the same revision, with no tracking record, no reminder scheduled and no client link; a request that names another address for the test is refused (400), and the eleventh test that day is refused (429).
 
 *Status:* missing. Proposal mail has a fixed subject ("Your proposal:" and the title) and a fixed body, set in src/platter/commands.ts; no editing, templates or timeline copy.
@@ -438,6 +442,8 @@ Editable expiry notices extend SEND-004’s named unsigned-warning, exact-date a
 
 When the client says someone else signs ("our COO signs, not me"), the sender replaces a recipient who has not signed on a sent proposal, with a reason. The offer, its revision and its approvals are unchanged and no re-approval is needed. The replaced recipient's link and verification session are revoked at once; the new signer gets their own link and identity check (`SIGN-001`, `SIGN-006`), the same place in the signing order (`SIGN-004`) and the message of `SEND-006`. The replacement (who, by whom, when and why) is on the timeline and in the certificate of completion (`SIGN-005`). A recipient who has signed can never be replaced, and nothing is replaced on an accepted agreement.
 
+Replacing a recipient preserves SEND-010 revocation: withdrawal leaves replaced and current invitation links refused; extend its named assertions before shipping.
+
 *Acceptance:* Send revision 2 with the client CEO as signer and replace the CEO with the COO: the proposal is still revision 2 with its original approval and no new approval request; the CEO's link is refused; the COO verifies and signs; the certificate lists the replacement with reason and time. On another proposal sign as the CEO, then try to replace the CEO (409).
 
 *Status:* missing. One client recipient fixed at sending; a fresh invitation (`PROP-002`) rotates the link but cannot change who receives it.
@@ -445,6 +451,8 @@ When the client says someone else signs ("our COO signs, not me"), the sender re
 #### SEND-008 — Sending and reminders by text message.
 
 A sender delivers the proposal link, reminders and completion notices by text message to a US mobile number through Twilio, alongside or instead of email. Texts go from a registered A2P 10DLC number or toll-free number, record the recipient's consent, honor STOP and HELP under carrier rules and the TCPA, respect the quiet hours of `FOLLOW-001`, and appear on the timeline with their delivery status.
+
+SMS reminders are cancelled atomically by SEND-010 withdrawal; extend its named clock-advance and recipient-notice assertions before shipping.
 
 *Acceptance:* With a Twilio fake: send a proposal by text and see the message with its link on the timeline with the delivery callback state; reply STOP and see later reminders by text suppressed while email reminders continue; a text reminder due at 6 am in the recipient's time zone waits until quiet hours end.
 
@@ -462,9 +470,13 @@ A template can be published as a reusable public link or site embed, like PandaD
 
 Anyone who may send a proposal under `APPROVE-003` withdraws it, with a reason, when it was sent in error or the deal is off. Withdrawal revokes every recipient's link and verification session at once (signers, approvers, viewers and CC, and links shared under `SEND-003`), cancels scheduled reminders by email and text (`FOLLOW-001`, `SEND-008`), voids its unpaid payment links (`PAY-001`) and closes its follow-ups (`FOLLOW-002`). A recipient opening a revoked link sees a withdrawn page with the firm's contact details and none of the proposal. Each recipient gets a notice using the `SEND-006` withdrawal template unless the sender turns the notice off. A proposal one signer has already signed can still be withdrawn before the agreement completes; that signer is told, and their signature stays in history marked void. A completed agreement is never withdrawn (409); it ends under its own terms. A withdrawn proposal is read-only, and the firm sends it again only as a new revision (`NEG-001`) under the approval policy, with new links. The withdrawal (who, when and why) is on the timeline and in the audit log (`TEAM-004`), and marking a proposal lost (`FOLLOW-005`) withdraws it the same way.
 
+Current capability boundary (ct, 20 October 2026): DONE covers the current single invited mailbox and owner-only sending policy. The owner withdraws with a non-empty reason, with notice on unless explicitly turned off. The withdrawn offer is read-only; old invitation, verification, PDF and attachment doors return a proposal-free 410 page with the withdrawing firm's contact address. Open client questions and bounce follow-ups close, expiry warnings stop, and the actor, time and reason remain in proposal history and the audit log. A new NEG-001 revision requires approval before reissue; old withdrawn links remain refused. SEND-003 and SEND-007 inherit revocation of every current or replaced recipient and sharing link; FOLLOW-001 and SEND-008 inherit cancellation of email/text reminders; PAY-001 inherits voiding unpaid payment links; FOLLOW-002 inherits follow-up closure; SIGN-004 inherits notification and retained void signatures after partial signing; FOLLOW-005 inherits the same withdrawal with notice off by default for a lost outcome; SEND-006 inherits the editable withdrawal notice template. Each capability must extend the named SEND-010 public-door assertions before it ships.
+
 *Acceptance:* Send a proposal to a signer, a CFO approver, a viewer and a CC, with reminders scheduled and a deposit payment link, and withdraw it with the reason "Sent to the wrong client": all four links show the withdrawn page with none of the proposal and the client API returns 410 for each; no reminder goes when the clock passes its time; the payment link is refused; the mail fake holds one withdrawal notice per recipient; the timeline and audit log record actor, time and reason. A sales member's withdrawal of another member's proposal is refused (403). Withdraw a two-signer proposal after the first signer signed: the second signer's link is refused and the first signature shows as void. Withdrawing an accepted agreement is refused (409). Revise the withdrawn proposal into revision 2, approve and send it: its new links work and the revision 1 links stay refused.
 
-*Status:* missing. A sent proposal can only be re-invited (`PROP-002`); there is no withdrawal that revokes its links.
+*Acceptance (current capabilities):* Current-capability acceptance: send to the one invited signer, verify, ask a question, set an expiry warning, and withdraw with "Sent to the wrong client". Every old client door returns 410 with no proposal content; the notice is captured once, questions leave the open queue, and the clock produces no warning. Timeline and audit retain actor, time and reason; pipeline filters/counts/totals include withdrawn. A member cannot withdraw (403), withdrawn mutations are refused (409), notice off sends no mail, and an accepted agreement cannot be withdrawn (409). Prepare revision 2, require approval, reissue and accept it; revision 1 stays 410. At 1440 and 390 use the send, withdrawal, revoked-client, audit, pipeline and revision-reissue screens. Public CLI restore preserves withdrawal history and the read-only state without invitation authority. The multi-recipient, partial-signature, reminder, payment-link and templated-notice cases above are mandatory before their named capabilities ship.
+
+*Status:* done. Named SEND-010 HTTP, built desktop/phone and public CLI journeys assert every current obligation. Future capabilities inherit the full cases above. (`src/platter/withdrawal.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 ### Engagement tracking
 
@@ -510,6 +522,8 @@ The client page discloses that views are measured. Platter uses no third-party t
 
 Each proposal has a reminder schedule: on or off, days after sending (for example 2, 5 and 9), days before expiry (for example 3) and a cap. It is copied from the proposal's template or the workspace defaults when the proposal is created (`FOLLOW-006`), and the sender changes it before and after sending. Scheduled reminders go to each unsigned recipient in the recipient's time zone outside quiet hours (8 pm to 8 am by default; the owner sets them). A reminder due inside quiet hours waits until they end. Reminders stop on acceptance, decline, expiry or the recipient's opt-out, and never exceed the cap the owner sets. Each reminder carries the subject and message of `SEND-006`, and every reminder is on the timeline. Whether scheduled reminders are on or off, anyone who may send the proposal under `APPROVE-003` sends a reminder by hand at any time to any unsigned recipient, with the editable `SEND-006` reminder message; a manual email reminder goes at once, a manual text reminder waits for quiet hours to end (`SEND-008`), each is on the timeline, manual reminders do not count toward the cap, and each recipient gets at most one manual reminder per calendar day in their time zone (a second is refused, 429).
 
+SEND-010 withdrawal cancels all scheduled email and text reminders; extend its named clock-advance assertions before shipping.
+
 *Acceptance:* Send to a recipient in Pacific time with reminders at 2, 5 and 9 days, quiet hours 8 pm to 8 am and a cap of 2, and advance the clock: two reminders arrive, each between 8 am and 8 pm Pacific (one due at 6 am Pacific arrives at 8 am), and the 9-day reminder is not sent because of the cap; on another proposal, accept after the first reminder and see no second; opt out and see none. On a sent proposal with two unsigned recipients and reminders off, send a manual reminder to the first with an edited message: exactly one reminder, with the edited text, reaches the mail fake and the timeline; a second manual reminder to the first the same day is refused (429), one to the second recipient goes, and one to the first the next day goes. A proposal created with no reminder settings of its own carries the `FOLLOW-006` defaults, as that journey checks.
 
 *Status:* missing. No reminders.
@@ -519,6 +533,8 @@ Each proposal has a reminder schedule: on or off, days after sending (for exampl
 Every open proposal has a sales owner, a next action and a due date. Each sales owner's queue, and a manager's view of the team, lists follow-ups in one stated order. First come overdue items (due before today in the owner's time zone), oldest due date first; then items due today; then upcoming items by due date. Within the same due date, the reason ranks: bounced email (`SEND-002`), then a client question waiting (`FOLLOW-004`), then a failed or overdue payment (`PAY-005`, `PAY-008`), then expiring within 3 days (`SEND-004`), then viewed but not signed (`TRACK-001`, `TRACK-002`), then unopened. Ties within one reason sort by proposal value (one-off total plus first-year recurring value), highest first, then by earliest sent time, then by proposal number, so the order is fully determined. A follow-up stays open until the owner completes it with a logged action, the client acts, or it is dismissed with a reason; a notification alone never closes it.
 
 Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with due follow-ups, including filters, sorting, counts and totals under its visibility rules.
+
+SEND-010 withdrawal closes every open follow-up; extend its named queue assertions before shipping.
 
 *Acceptance:* With the clock at 10 March, seed seven proposals for one owner: A $8,000 viewed, due 9 March; B $40,000 unopened, due 10 March; C $5,000 bounced, due 10 March; D $12,000 question waiting, due 10 March; E $20,000 viewed, due 10 March; F $30,000 viewed, due 10 March; G $9,000 unopened, due 12 March. The queue reads exactly A, C, D, F, E, B, G. Completing C with a logged call removes it; B's follow-up stays open after its notification is sent; dismissing E without a reason is refused (400).
 
@@ -549,6 +565,8 @@ Email replies use a configured Resend receiving domain and signed email.received
 A client can decline with a reason. The firm marks a proposal won or lost with a reason from its own list, and can reopen a lost one as a new revision. A decline stops signing and payment on every recipient link, and marking a proposal lost withdraws it as `SEND-010` does, with the notice off by default. Outcomes sync to the CRM (`CRM-001` to `CRM-003`) and feed reporting (`REPORT-002`).
 
 Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with declined, including filters, sorting, counts and totals under its visibility rules.
+
+Marking lost invokes SEND-010 withdrawal with recipient notice off by default; extend its named revocation and notice-off assertions before shipping.
 
 *Acceptance:* Decline as the client with the reason Budget, see the proposal lost and the HubSpot deal fake moved to Closed lost; mark another sent proposal lost and see each of its recipient links show the withdrawn page; reopen the declined one as a new revision and send.
 
@@ -595,6 +613,8 @@ Signing meets the federal ESIGN Act and state UETA: each signer is shown the ele
 A proposal can require several signers on the client side and a countersignature from the firm, in a set order or in parallel groups. A template sets the order and groups for its roles, and they are copied into each proposal created from it (`SIGN-011`); changing the template later never changes a proposal's order. Each signer verifies separately; the agreement completes when the last required signature lands, and each party is told. A signer can be replaced by the sender (`SEND-007`) or, where allowed, delegate (`SIGN-009`) without changing the order.
 
 Before shipping, multiple signers extend SEND-004’s named warning journey so every unsigned signer receives the warning and each signed signer receives none.
+
+SEND-010 withdrawal before completion notifies every signer, revokes remaining links and retains prior signatures marked void; extend its named partial-signature assertions before shipping.
 
 *Acceptance:* Require client CEO then CFO, then the firm's owner; the CFO cannot sign before the CEO; after all three the agreement is complete and each party gets the completion email. On another proposal, put two client signers in one parallel group followed by the firm's countersignature: the two sign in either order, the firm cannot countersign before both have signed, and the agreement completes after the countersignature.
 
@@ -663,6 +683,8 @@ A template (`EDIT-002`) holds recipient roles, each with a name the firm chooses
 #### PAY-001 — Stripe card and ACH collection in the proposal.
 
 The owner or an admin (`TEAM-001`) connects the firm's own Stripe account. The client pays inside the proposal by card, Apple Pay, Google Pay or ACH bank debit, with bank verification through Stripe Financial Connections or micro-deposits. The ACH debit authorization text is shown and stored with the agreement. Card and bank numbers never touch Platter. The methods a proposal offers are copied when it is created from its template (`EDIT-002`), or from the workspace's default methods when the template sets none, and the sender changes them per proposal before sending; the owner or an admin sets the workspace defaults and whether to pass through a fee where allowed.
+
+SEND-010 withdrawal voids all unpaid payment links; extend its named refused-payment-link assertions before shipping.
 
 *Acceptance:* In Stripe test mode, connect an account, accept and pay a deposit by test card, by Apple Pay and Google Pay test wallets, and by test ACH; see the authorization text retained; inspect the database and logs for card or bank numbers (none). Turn on a 3% card fee after confirming it is allowed: the card total shows the fee as its own line, ACH shows none, and a client whose billing state the firm marked as not allowing surcharges sees no fee. With workspace default methods of card, wallets and ACH, a template offering card and ACH only starts a proposal whose client page offers card and ACH and no wallets, and a blank proposal offers all three; turning ACH off on that one proposal leaves the template unchanged.
 
@@ -906,7 +928,7 @@ Before an agreement's term ends, Platter prepares a renewal from it with the sam
 
 #### REPORT-001 — Proposal pipeline dashboard.
 
-A dashboard shows proposals by status (draft, awaiting approval, sent, viewed, accepted, paid, declined, expired) with value, owner, client, age and next action, filterable and sortable by each. This obligation covers every current workflow state (draft, approved, sent and accepted); `APPROVE-001` and `APPROVE-003` inherit awaiting approval, `TRACK-001` viewed, `PAY-004` paid, `FOLLOW-005` declined and `SEND-004` expired before those capabilities ship, with the same named fixture proof. Reports are owner-only until `TEAM-001` implements its report rights matrix. A new proposal records its preparing person as its stable sales owner; an agent draft records the key owner. Later revisions never transfer ownership. Legacy rows whose sales owner was not recorded stay labelled "Not recorded", with no inference from a preparer string. Value is the highest offered option before acceptance and the exact selected total afterwards, in integer cents; currencies are totalled separately and value sorting groups by currency before amount, with no conversion. Age is the number of completed 24-hour days since creation. Next actions are approve revision, send approved offer, await client decision, export deposit invoice, or deposit invoice exported, according to the current recorded state; `FOLLOW-002` inherits due follow-ups. Numeric filters include both bounds; equal sort keys use title then proposal id. Every filter applies before counts and totals.
+A dashboard shows proposals by status (draft, awaiting approval, sent, viewed, accepted, paid, declined, expired) with value, owner, client, age and next action, filterable and sortable by each. This obligation covers every current workflow state (draft, approved, sent, accepted and withdrawn); `APPROVE-001` and `APPROVE-003` inherit awaiting approval, `TRACK-001` viewed, `PAY-004` paid, `FOLLOW-005` declined and `SEND-004` expired before those capabilities ship, with the same named fixture proof. Reports are owner-only until `TEAM-001` implements its report rights matrix. A new proposal records its preparing person as its stable sales owner; an agent draft records the key owner. Later revisions never transfer ownership. Legacy rows whose sales owner was not recorded stay labelled "Not recorded", with no inference from a preparer string. Value is the highest offered option before acceptance and the exact selected total afterwards, in integer cents; currencies are totalled separately and value sorting groups by currency before amount, with no conversion. Age is the number of completed 24-hour days since creation. Next actions are approve revision, send approved offer, await client decision, export deposit invoice, deposit invoice exported, or prepare a new revision for a withdrawn offer, according to the current recorded state; `FOLLOW-002` inherits due follow-ups. Numeric filters include both bounds; equal sort keys use title then proposal id. Every filter applies before counts and totals.
 
 *Acceptance:* Seed 30 proposals across statuses and owners, filter by owner and status, sort by value, and see the totals match a fixture.
 
@@ -1276,8 +1298,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 15 | 25 | 88 | 128 |
-| All | 27 | 25 | 88 | 140 |
+| Target and push further | 16 | 25 | 87 | 128 |
+| All | 28 | 25 | 87 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1335,7 +1357,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `SEND-007` | Replace an unsigned signer on a sent proposal | target | missing |  | One client recipient fixed at sending; a fresh invitation (`PROP-002`) rotates the link but cannot change who receives it. |
 | `SEND-008` | Sending and reminders by text message | target | missing |  | Email only; no SMS. |
 | `SEND-009` | Reusable public signing link | target | missing |  | Every proposal has one invited recipient; there is no public link or embeddable form. |
-| `SEND-010` | Withdraw a sent proposal | target | missing |  | A sent proposal can only be re-invited (`PROP-002`); there is no withdrawal that revokes its links. |
+| `SEND-010` | Withdraw a sent proposal | target | done | `src/platter/withdrawal.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `TRACK-001` | View tracking and live open alerts | target | missing |  | No view tracking. |
 | `TRACK-002` | Section-level reading analytics | target | missing |  | No reading analytics. |
 | `TRACK-003` | Forwarded stakeholder identification | target | missing |  | No forwarding detection. |

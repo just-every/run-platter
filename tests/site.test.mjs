@@ -802,7 +802,7 @@ test('EDIT-009 desktop and phone configure, preview, select, download and accept
      await page.goto(app.origin+path);await page.getByRole('button',{name:'Send verification code'}).click()
      const mailState=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=mailState.outbox.find(m=>m.proposal_id===id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
      await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click()
-     await page.getByLabel('Review sections for').selectOption(selection);await page.getByRole('button',{name:'Review package',exact:true}).click()
+     await page.getByLabel('Review sections for').selectOption(selection);await page.getByRole('button',{name:'Review package',exact:true}).click();assert.equal(new URL(page.url()).pathname,path);assert.equal(await page.getByText('Could not complete this action',{exact:true}).count(),0)
      assert.equal((await page.locator('main').innerText()).includes(fields.terms),selection==='two');await capture('client-'+selection)
      const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download unsigned proposal PDF',exact:true}).click();const pdf=await download
      const text=(await pdfPages(await readFile(await pdf.path()))).join(' ');assert.equal(text.includes(fields.terms),selection==='two');assert.ok(text.includes(fields.scope))

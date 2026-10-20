@@ -536,9 +536,13 @@ The sender (the proposal's sales owner, and its watchers under `SEND-005`) is to
 
 A client asks a question or comments on any section from the proposal page. The firm answers in the same thread, by email reply or from the app; the client is notified. Open questions show on the proposal and in the queue until answered, and the thread is kept with the agreement.
 
-*Acceptance:* As the client comment on pricing; the sender answers from the app; the client gets the answer; the question leaves the queue; the agreement package lists the thread.
+Every capability available today conforms. The mailbox-verified invited client comments on scope, pricing or terms on the exact current sent revision. The active owner answers from the app, and answers queue a notification to that question's verified client mailbox. Questions and answers retain their revision and remain in the agreement and PORT-002 archive. Until FOLLOW-002 supplies the follow-up queue, the owner-only open-question queue is on Proposals; an answer removes its question. Agents cannot answer. EDIT-001/EDIT-002 inherit added sections, TEAM-001 inherits scoped person roles and FOLLOW-002 inherits the question queue before shipping, each extending this same named journey.
 
-*Status:* missing. No client comments.
+Email replies use a configured Resend receiving domain and signed email.received webhook, followed by fetching the real received message from Resend. The notice goes only to the active owner mailbox and carries a per-thread, one-use opaque Reply-To capability, valid for seven days. Acceptance requires the provider signature, the capability and the exact current active-owner From mailbox together. Capabilities are hashed at rest, sealed in queued transport, excluded from archives and never returned in app state. Expired, replayed, rotated and wrong-owner replies are refused. Re-noticing rotates the capability, and an app answer spends outstanding capabilities. The full plain-text reply, including quoted text, becomes the answer; a body containing a reply capability is refused. Attachments are refused. Other mail transports and unconfigured installations honestly instruct the owner to answer in the app; SEND-001 inherits additional authenticated inbound providers before shipping.
+
+*Acceptance:* As the verified client comment on pricing; the owner answers from the app; the client receives the exact answer; the question leaves the queue; the accepted agreement lists the thread. Repeat scope and terms, refusing unverified, stale-revision and invalid-section writes. Assert member queue and agent answer refusal. Through signed Resend HTTP intake and a real adapter at its network edge, assert exact thread/owner resolution, client notification, invalid signature, wrong sender, expiry, rotation, owner change and replay refusal with no second answer or notification. Exercise owner/client/queue/agreement at 1440 and 390. Export and restore answered and open threads through the public CLI, excluding genuine issued reply capabilities.
+
+*Status:* done. Named FOLLOW-004 HTTP, signed-mail, desktop/phone and CLI journeys cover every current section, owner answer doors, notification, queue removal, agreement history and credential-free custody. (`src/platter/questions.ts`, `src/platter/question-replies.ts`, `src/platter/ui/questions.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### FOLLOW-005 — Decline reasons and won or lost outcomes.
 
@@ -1339,7 +1343,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `FOLLOW-001` | Scheduled reminders to unsigned recipients | target | missing |  | No reminders. |
 | `FOLLOW-002` | Next-action follow-up queue by sales owner | target | missing |  | No follow-up queue. |
 | `FOLLOW-003` | Expiry and renewal notifications | target | missing |  | No expiry or renewal notices. |
-| `FOLLOW-004` | Client questions and comments | target | missing |  | No client comments. |
+| `FOLLOW-004` | Client questions and comments | target | done | `src/platter/questions.ts`, `src/platter/question-replies.ts`, `src/platter/ui/questions.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `FOLLOW-005` | Decline reasons and won or lost outcomes | target | missing |  | No decline or lost state. |
 | `FOLLOW-006` | Default reminder schedule and expiry from the workspace and templates | target | missing |  | No reminders, expiry, workspace defaults or template settings for either. |
 | `NEG-001` | Negotiated revisions after sending | target | done | `src/platter/negotiation.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |

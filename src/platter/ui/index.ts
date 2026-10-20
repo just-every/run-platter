@@ -15,7 +15,7 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
   const url = new URL(path, 'https://platter.invalid')
   const zone = state.timeZone ?? 'UTC'
   // A refused composer save is shown in the composer's own band, not over the page.
-  const composerRefusal = feedback?.error && /^price(One|Two)$/.test(feedback.field ?? '') ? feedback : undefined
+  const composerRefusal = feedback?.error && /^package:/.test(feedback.field ?? '') ? feedback : undefined
   return inZone(zone, () => {
     let content: string | null
     let title: string

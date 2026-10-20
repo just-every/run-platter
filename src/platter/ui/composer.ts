@@ -25,7 +25,7 @@ function tier(option: any, index: number, currency: string, bps: number | undefi
   const extras = packages ? `<div class="tier-extras" data-optional-items>${(option?.optionalItems ?? []).map(optionalEditor).join('')}</div><div class="tier-actions"><button type="button" class="quiet" data-package-action="add-item">Add optional item</button><button type="button" class="quiet" data-package-action="remove-package">Remove package</button></div>` : ''
   return `<fieldset class="tier${raised ? ' raised' : ''}" data-tier="${escape(id)}"${packages ? ` data-package-id="${escape(id)}"` : ''}><legend>${legend}</legend>`
     + `<label class="tier-name">Option label<input${named('option')} value="${escape(option?.label)}" required maxlength="200" autocomplete="off"></label>`
-    + `<label class="tier-price">Price in ${escape(currency)}<span class="money-field"><span class="money-sign" aria-hidden="true">$</span><input${suffix ? ` id="${escape(formId)}-price${suffix}"` : ''}${named('price')} value="${escape(option?.price ?? '')}" required inputmode="decimal" placeholder="0.00" autocomplete="off"><span class="money-figure" aria-hidden="true">${figure(option)}</span></span></label>`
+    + `<label class="tier-price">Price in ${escape(currency)}<span class="money-field"><span class="money-sign" aria-hidden="true">$</span><input${id ? ` id="${escape(formId)}-price-${escape(id)}"` : ''}${named('price')} value="${escape(option?.price ?? '')}" required inputmode="decimal" placeholder="0.00" autocomplete="off"><span class="money-figure" aria-hidden="true">${figure(option)}</span></span></label>`
     + `<dl class="tier-lines"><dt>Deposit at acceptance</dt><dd data-line="deposit">${shown(deposit)}</dd><dt>Balance after the deposit</dt><dd data-line="balance">${shown(deposit === undefined ? undefined : option.cents - deposit)}</dd></dl>`
     + `<p class="chip sage tier-deposit"><span class="tick" aria-hidden="true"></span><span><output data-line="percent">${bps === undefined ? '—' : escape(bps / 100)}</output>% deposit</span></p>${extras}</fieldset>`
 }
@@ -99,14 +99,19 @@ function readable(value: string): number | undefined {
 export function exceptionBand(state: any, p: any, feedback: Feedback | undefined, formId: string): string | undefined {
   if (!feedback?.error) return undefined
   const input = feedback.input ?? {}
-  const price = /^price(One|Two)$/.exec(feedback.field ?? '')
-  if (price) {
-    const n = price[1] as 'One' | 'Two', typed = String(input['price' + n] ?? ''), label = String(input['option' + n] ?? '').trim() || (n === 'One' ? 'Option one' : 'Option two')
-    const cents = readable(typed), target = `${formId}-price${n}`
+  // The refused package: from the packages the composer posted, or the two named fields of a plain post.
+  const refused = /^package:(.+)$/.exec(feedback.field ?? '')?.[1]
+  if (refused) {
+    let posted: any[] = []
+    try { posted = typeof input.packages === 'string' ? JSON.parse(input.packages) : Array.isArray(input.packages) ? input.packages : [] } catch { posted = [] }
+    const at = posted.findIndex((x: any) => x?.id === refused), suffix = refused === 'one' ? 'One' : refused === 'two' ? 'Two' : ''
+    const typed = String(at >= 0 ? posted[at].price ?? '' : input['price' + suffix] ?? ''), named = String(at >= 0 ? posted[at].label ?? '' : input['option' + suffix] ?? '').trim()
+    const index = at >= 0 ? at : ['one', 'two'].indexOf(refused), label = named || `Option ${ordinal[index] ?? index + 1}`
+    const cents = readable(typed), target = `${formId}-price-${refused}`
     const fix = cents === undefined
       ? `<button type="button" class="secondary" data-fix-field="${escape(target)}" hidden>Edit the ${escape(label)} price</button>`
       : `<button type="button" data-fix-field="${escape(target)}" data-fix-value="${(cents / 100).toFixed(2)}" hidden>Use ${money(cents)}</button>`
-    return `<div class="band error" role="alert" data-refused="price${n}"><p><strong>${escape(label)} · price ${escape(typed || '(empty)')} is not a price Platter can read.</strong> Nothing was saved${p ? `; revision ${escape(p.revision)} stays as it was` : ''}. ${priceRule}</p><div class="band-actions">${fix}</div></div>`
+    return `<div class="band error" role="alert" data-refused="package:${escape(refused)}"><p><strong>${escape(label)} · price ${escape(typed || '(empty)')} is not a price Platter can read.</strong> Nothing was saved${p ? `; revision ${escape(p.revision)} stays as it was` : ''}. ${priceRule}</p><div class="band-actions">${fix}</div></div>`
   }
   // A save from this composer that lost to a newer version; other refusals keep their own notice.
   if (feedback.status === 409 && p && ['proposal.revise', 'proposal.negotiate'].includes(feedback.command ?? '')) {

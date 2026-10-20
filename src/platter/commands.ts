@@ -24,7 +24,7 @@ import { negotiationCommand, pendingNegotiation } from './negotiation'
 
 export function proposalFields(p:Record<string,unknown>){
  const tables=tableInputs(p.pricingTables)
- const price=(id:string,value:unknown)=>tables.some(t=>t&&t.optionId===id)?1:dollars(value,id==='one'?'priceOne':'priceTwo')
+ const price=(id:string,value:unknown)=>tables.some(t=>t&&t.optionId===id)?1:dollars(value,'package:'+id)
  const deposit=Number(p.depositPercent);need(Number.isFinite(deposit)&&Number.isInteger(deposit*100)&&deposit>0&&deposit<=100,'Deposit must be from 0.01 to 100 percent')
  const terms=p.terms??'';need(typeof terms==='string'&&terms.length<=10000,'Terms must be text up to 10000 characters')
  const options=p.packages===undefined?null:packageInputs(p.packages,tables)

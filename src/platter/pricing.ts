@@ -89,7 +89,7 @@ export function packageInputs(input: unknown, tables: any[]) {
    need(typeof extra.editable === 'boolean', 'Choose whether quantity is client-editable')
    return { id, label: text(extra.label, 'an optional-item name'), unitCents: dollars(extra.unitPrice), min, max, quantity, editable: extra.editable }
   })
-  return { id, label: text(item.label, 'a package name'), cents: tables.some(t => t?.optionId === id) ? 1 : dollars(item.price), ...(optionalItems.length ? { optionalItems } : {}) }
+  return { id, label: text(item.label, 'a package name'), cents: tables.some(t => t?.optionId === id) ? 1 : dollars(item.price, 'package:' + id), ...(optionalItems.length ? { optionalItems } : {}) }
  })
 }
 

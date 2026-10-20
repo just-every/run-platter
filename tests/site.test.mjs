@@ -813,3 +813,8 @@ test('EDIT-009 desktop and phone configure, preview, select, download and accept
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('EDIT-007 desktop and phone client verifies, chooses, comments and accepts by keyboard with WCAG 2.2 AA axe scans', {timeout:180000}, async()=>{
+ const { mobileClientJourney } = await import('./mobile-client-journey.mjs')
+ await mobileClientJourney()
+})

@@ -152,7 +152,7 @@ The client reads, chooses options, comments, signs and pays on a phone as well a
 
 *Acceptance:* A browser journey at 390 pixels opens an invitation, verifies the mailbox, changes an optional item, comments, signs and pays with a Stripe test card; an axe scan reports no WCAG 2.2 AA violations and a keyboard-only run completes the same journey.
 
-*Status:* partial. The client page has viewport and narrow-screen styling only; there is no mobile journey, no rich blocks and no accessibility audit. (`src/platter/ui/client.ts`, `src/platter/ui/shared.ts`, `tests/platter.test.mjs`)
+*Status:* partial. Named EDIT-007 built-browser journeys at 1440 and 390 pixels complete invitation, mailbox verification, conditional package selection, comments and immutable acceptance with keyboard-only client interaction and axe WCAG 2.2 AA scans at every step. Verification, comments and refusal pages preserve the reviewed conditional package, and submission feedback receives keyboard focus. Gap: optional-item selection (PRICE-002), Stripe test-card payment (PAY-001/PAY-002), and assistive-technology verification of the complete rich-content/payment journey remain; this slice does not establish full WCAG conformity. (`src/platter/ui/client.ts`, `src/platter/ui/shared.ts`, `tests/site.test.mjs`, `tests/mobile-client-journey.mjs`)
 
 #### EDIT-008 — Custom domain and branded client experience.
 
@@ -164,11 +164,11 @@ An owner serves client links from their own domain, such as `proposals.example.c
 
 #### EDIT-009 — Conditional content by package.
 
-A section can be shown only when a package, optional item or variable has a given value, so choosing the Premium package shows its deliverables and timeline. The accepted agreement and PDF contain exactly what the client saw for their selection. Members check each selection's sections before sending in the `EDIT-018` preview.
+A section can be shown only when a package, optional item or variable has a given value, so choosing the Premium package shows its deliverables and timeline. The accepted agreement and PDF contain exactly what the client saw for their selection. Today this applies to the scope and terms sections and the two offered packages, including the selected unsigned client PDF (`EDIT-014`). Each future capability inherits the same conditional visibility and exact-selection assertions before shipping: `EDIT-001` added sections, `PRICE-002` optional items and expanded packages, `EDIT-004` variables, `EDIT-005` added PDF carriers and `SIGN-005` signed agreement PDFs. Unconditional legacy content remains visible for every selection. Members check each selection's sections before sending in the `EDIT-018` preview.
 
 *Acceptance:* Make a timeline section depend on the Premium package, accept the Standard package and see the section absent from the agreement and PDF, then accept Premium on another copy and see it present.
 
-*Status:* missing. No conditional content.
+*Status:* done. Current scope and terms can each depend on either offered option. Named EDIT-009 public HTTP/browser/PDF and CLI journeys cover selection, preview, agreement freezing and custody. (`src/platter/conditional.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### EDIT-010 — Attachments and vendor documents.
 
@@ -228,6 +228,8 @@ Template owners lock sections such as legal terms, warranties and payment terms.
 
 Members search every proposal, template and agreement they may view under `TEAM-001` by title, client, contact, owner, status, amount, date and the full text of the content, including uploaded PDFs, and file proposals in folders with team access rules. Results and folders respect permissions on the server.
 
+When proposal numbering ships, extend FOLLOW-002 with proposal-number tie-breaking after value and sent time, replacing its stable-id interim tie-break and extending the named journey.
+
 *Acceptance:* Seed 500 proposals; search a phrase that appears only in the body of two proposals and one uploaded PDF and get exactly those three within one second; file proposals in a team folder and see a member outside the team find none of them by search or by folder.
 
 *Status:* missing. A single proposal list; no search or folders.
@@ -283,6 +285,8 @@ Expanded package, optional-item and quantity choices extend EDIT-014’s selecte
 #### PRICE-003 — One-off and recurring fees.
 
 Line items can be one-off or recurring (weekly, monthly, quarterly or annual) with a term and start date. The proposal shows one-off total, recurring amount per interval and first-year value separately. Recurring lines drive the payment schedule (`PAY-003`) and renewal date (`RENEW-002`).
+
+Before shipping, extend FOLLOW-002 value ordering with one-off total plus first-year recurring value, retaining exact currency labels and separate totals.
 
 *Acceptance:* Add a $2,500 one-off setup and a $1,200 monthly retainer for 12 months; the client page shows one-off $2,500, $1,200 a month and first-year value $16,900; acceptance creates a matching schedule.
 
@@ -500,6 +504,8 @@ Before this capability ships, it extends the `REPORT-001` dashboard and its name
 
 The engagement timeline inherits EDIT-014’s successful PDF-download events and identical named assertions before shipping.
 
+FOLLOW-002 inherits real viewed/unopened queue reasons and the original seven-proposal A, C, D, F, E, B, G ordering before tracking ships; extend its named public-door journey.
+
 *Acceptance:* Open the proposal as two recipients on desktop and phone; the sender gets an alert and the timeline lists both views with device class and approximate location (city, region and country from the request address through an IP-location fixture: Austin, Texas, United States for the first and Portland, Oregon, United States for the second). With a 30-minute quiet period, the first recipient's return visit 10 minutes later raises no alert and a visit 45 minutes after that raises one return-visit alert.
 
 *Status:* missing. No view tracking.
@@ -507,6 +513,8 @@ The engagement timeline inherits EDIT-014’s successful PDF-download events and
 #### TRACK-002 — Section-level reading analytics.
 
 For each view, Platter measures time spent on each section and on pricing, which packages and items were toggled, and which attachments were opened, and summarizes engagement per recipient.
+
+FOLLOW-002 inherits section-engagement queue reasons and its original seven-proposal ordering before shipping; extend its named journey.
 
 *Acceptance:* Run a scripted client session spending 40 seconds on pricing and 5 on the case study; the analytics show those times within 2 seconds and the toggled options.
 
@@ -544,13 +552,19 @@ SEND-010 withdrawal cancels all scheduled email and text reminders; extend its n
 
 Every open proposal has a sales owner, a next action and a due date. Each sales owner's queue, and a manager's view of the team, lists follow-ups in one stated order. First come overdue items (due before today in the owner's time zone), oldest due date first; then items due today; then upcoming items by due date. Within the same due date, the reason ranks: bounced email (`SEND-002`), then a client question waiting (`FOLLOW-004`), then a failed or overdue payment (`PAY-005`, `PAY-008`), then expiring within 3 days (`SEND-004`), then viewed but not signed (`TRACK-001`, `TRACK-002`), then unopened. Ties within one reason sort by proposal value (one-off total plus first-year recurring value), highest first, then by earliest sent time, then by proposal number, so the order is fully determined. A follow-up stays open until the owner completes it with a logged action, the client acts, or it is dismissed with a reason; a notification alone never closes it.
 
-Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with due follow-ups, including filters, sorting, counts and totals under its visibility rules.
+This capability extends the `REPORT-001` dashboard and its named public-door fixture with due follow-ups, including filters, sorting, counts and totals under its visibility rules.
 
 SEND-010 withdrawal closes every open follow-up; extend its named queue assertions before shipping.
 
-*Acceptance:* With the clock at 10 March, seed seven proposals for one owner: A $8,000 viewed, due 9 March; B $40,000 unopened, due 10 March; C $5,000 bounced, due 10 March; D $12,000 question waiting, due 10 March; E $20,000 viewed, due 10 March; F $30,000 viewed, due 10 March; G $9,000 unopened, due 12 March. The queue reads exactly A, C, D, F, E, B, G. Completing C with a logged call removes it; B's follow-up stays open after its notification is sent; dismissing E without a reason is refused (400).
+*Acceptance (inherited by TRACK-001 and TRACK-002):* With the clock at 10 March, seed seven proposals for one owner: A $8,000 viewed, due 9 March; B $40,000 unopened, due 10 March; C $5,000 bounced, due 10 March; D $12,000 question waiting, due 10 March; E $20,000 viewed, due 10 March; F $30,000 viewed, due 10 March; G $9,000 unopened, due 12 March. The queue reads exactly A, C, D, F, E, B, G. Completing C with a logged call removes it; B's follow-up stays open after its notification is sent; dismissing E without a reason is refused (400).
 
-*Status:* missing. No follow-up queue.
+Every capability available today conforms. Sales actions use REPORT-001's recorded, stable sales owner, retaining its honest "Not recorded" legacy label without inferring an identity. The owner sees and filters the queue until TEAM-001 adds sales and manager team scopes. Each open draft, approved or sent proposal starts with its workflow next action and a due date equal to its creation day in the installation time zone; an explicit schedule saves a calendar date, reopens the sales action and retains the action history. A new revision starts a new action. Acceptance and SEND-010 withdrawal close the sales action. Completing or dismissing it retains who, when and the logged action or required reason; notification alone leaves it open. General completion never resolves SEND-002 corrections or FOLLOW-004 question threads: the sending owner retains correction authority, and unanswered questions remain in their question inbox until answered.
+
+Until personal zones exist, due dates and "today" use the installation's IANA time zone. Until tracking exists, every engagement label reads "Engagement unavailable" and all such proposals share one reason rank, without inferred unopened/viewed states. Current reasons are bounce, waiting question, future expiry deadlines from today through three calendar days ahead inclusive, then unavailable engagement. Equal-date/reason ties use the highest current one-off option in integer cents (face amounts, no exchange conversion), then earliest recorded first-send time (missing last), then stable proposal id until proposal numbers exist. Totals stay separate by currency. TEAM-001 inherits personal zones, sales and manager team visibility; TRACK-001/TRACK-002 inherit viewed/unopened reasons and the original seven-proposal ordering above; PAY-005/PAY-008 inherit failed/overdue payment reasons and closure; FOLLOW-005 inherits declined/lost closure; PRICE-003 inherits first-year recurring valuation; EDIT-016 inherits proposal-number ties when numbering ships. Each extends this named journey before shipping. REPORT-001 now includes inclusive due-today/overdue filtering, due-date sorting, counts, totals and saved-report/CSV output. PORT-002 retains schedules, resolutions and action history without mail or invitation authority.
+
+*Acceptance (current capabilities):* With the clock at 10 March, create the same seven amounts and due dates above, using a real bounce business record for C and a verified question for D. With engagement unavailable the exact order is A, C, D, B, F, E, G; the original viewed/unopened order is inherited above. Complete C with a logged call and retain its separate bounce correction; notify B and retain its open action; refuse a reason-free dismissal of E (400). Assert default actions, owner filtering, exact totals, expiry precedence, time-zone dates, deterministic sent-time/id ties, explicit reopening, acceptance and withdrawal closure, member/agent refusal, and logged actor/time/action custody. Extend REPORT-001's 30-proposal fixture with due filters, next action, sorting, counts and totals; exercise real screens at 1440/390 and restore open/completed actions through the public CLI.
+
+*Status:* done. Named FOLLOW-002 HTTP, REPORT-001 fixture, built desktop/phone and public CLI journeys assert current queue reasons, dates, ordering, reporting, authority and durable lifecycle. Named future clauses inherit their new capabilities before shipping. (`src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### FOLLOW-003 — Expiry and renewal notifications.
 
@@ -579,6 +593,8 @@ A client can decline with a reason. The firm marks a proposal won or lost with a
 Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with declined, including filters, sorting, counts and totals under its visibility rules.
 
 Marking lost invokes SEND-010 withdrawal with recipient notice off by default; extend its named revocation and notice-off assertions before shipping.
+
+Before shipping, extend FOLLOW-002 with declined/lost closure and the named queue assertions, retaining SEND-010 revocation semantics.
 
 *Acceptance:* Decline as the client with the reason Budget, see the proposal lost and the HubSpot deal fake moved to Closed lost; mark another sent proposal lost and see each of its recipient links show the withdrawn page; reopen the declined one as a new revision and send.
 
@@ -736,6 +752,8 @@ Before this capability ships, it extends the `REPORT-001` dashboard and its name
 
 When a payment fails, the client and firm are told with the reason; Platter retries on an owner-set schedule only where the client's authorization allows it, and stops a retry once the amount is paid by any route. Each attempt is on the timeline.
 
+Before shipping, extend FOLLOW-002 with failed-payment reasons, prescribed reason precedence and client-payment closure in its named queue journey.
+
 *Acceptance:* Fail a milestone charge; both parties are notified; a retry runs after the set delay; pay by check (`PAY-007`) before the next retry and see it canceled.
 
 *Status:* missing. No retries or notices.
@@ -759,6 +777,8 @@ US clients often pay by check, wire or ACH credit. Invoices show remittance deta
 #### PAY-008 — Net-terms invoices with a pay link and overdue tracking.
 
 When a scheduled amount is on net terms (net 15, net 30 or a custom number of days), Platter issues an invoice when its date arrives or its milestone is marked done, with its due date counted from that issue day and never created earlier (`ACCT-007`): an email to the billing contact (`SIGN-007`) with the invoice number, amount, due date, a PDF invoice and a pay link, using the invoice template of `SEND-006`. The pay link opens a page where the client pays by card or ACH (`PAY-001`, `PAY-009`) or reads remittance details for check and wire (`PAY-007`). An unpaid invoice is due through its due date and turns overdue the next day in the firm's time zone: it counts in the agreement's overdue total (`PAY-004`), opens a follow-up in the owner's queue (`FOLLOW-002`) and sends overdue reminders on the owner's schedule. A payment from the link is processing until the provider reports success and paid only on that evidence. When the accounting system is the invoice authority (`ACCT-004`), the invoice sent is the one in QuickBooks Online, Xero or Pantry, never a second one.
+
+Before shipping, extend FOLLOW-002 with overdue-payment reasons, prescribed reason precedence and paid-event closure in its named queue journey.
 
 *Acceptance:* Accept a proposal with a $6,000.00 milestone on net 30 and mark it done on 1 March: the mail fake holds one invoice email with amount $6,000.00, due date 31 March, a PDF and a pay link. On 31 March it is due, not overdue. Advance to 1 April: it is overdue in the agreement's `PAY-004` totals and in the owner's `FOLLOW-002` queue, and an overdue reminder is sent. Pay by Stripe test ACH from the link: it shows processing, then paid after the success event, the follow-up closes, and exactly one invoice exists locally and in the QuickBooks Online fake.
 
@@ -1018,6 +1038,8 @@ Every member has one role: owner, admin, manager, sales, content editor, viewer 
 Template and library folders can also be limited to teams (`EDIT-002`, `EDIT-003`): such a folder is listed and used only by members of those teams, admins and the owner. On upgrade, the first release's owner stays the owner and its members become sales members in no team, so each sees only their own proposals until the owner places them in teams. Agent keys are not a role and keep the draft-only rights of `ACCESS-001`.
 
 Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with the report rights matrix, including filters, sorting, counts and totals under its visibility rules.
+
+Before shipping, extend FOLLOW-002 with personal time zones, sales-owner queues and manager access only to people in one of their teams, in its named journey.
 
 *Acceptance:* The matrix journey runs the `TEAM-001` rights table cell by cell: for each right and each role it calls the action's public route (HTTP, and the browser where the right is a screen) and expects success with the write, or 403 with no write, and list and search routes return exactly the proposals the View row allows. These cells are also pinned by name. (1) A sales member lists and opens another sales member's proposal: it is absent from the list and opening it is refused (403); once the other member shares it with them as a collaborator it lists, opens and edits, and they send it. (2) A manager opens a proposal whose sales owner is outside their teams (403) and one whose sales owner is in their team (200). (3) A sales member's view of a pricing table in the editor, the team API and the PDF export carries no cost or margin field, while a manager's does (`PRICE-006`). (4) A content editor edits a library item (200) and sends a proposal (403). (5) A billing user refunds part of a deposit (200, and the refund reaches the Stripe fake), and a sales member's refund is refused (403, no Stripe call). (6) A sales member disconnects QuickBooks Online (403, the connection unchanged), and an admin disconnects it (200). (7) A sales member and a manager change the workspace reminder and expiry defaults (403, the defaults unchanged), and an admin changes them (200). After an upgrade from a first-release database, the former member holds the sales role and sees only their own proposals.
 
@@ -1362,8 +1384,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 18 | 25 | 85 | 128 |
-| All | 30 | 25 | 85 | 140 |
+| Target and push further | 20 | 25 | 83 | 128 |
+| All | 32 | 25 | 83 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1385,9 +1407,9 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `EDIT-004` | Variables from client, deal and CRM records | target | missing |  | No variables or merge fields. |
 | `EDIT-005` | Word and PDF import and export | target | missing |  | No import or export of documents. |
 | `EDIT-006` | Embedded rich media | target | missing |  | No media blocks. |
-| `EDIT-007` | Mobile client review | target | partial | `src/platter/ui/client.ts`, `src/platter/ui/shared.ts`, `tests/platter.test.mjs` | The client page has viewport and narrow-screen styling only; there is no mobile journey, no rich blocks and no accessibility audit. |
+| `EDIT-007` | Mobile client review | target | partial | `src/platter/ui/client.ts`, `src/platter/ui/shared.ts`, `tests/site.test.mjs`, `tests/mobile-client-journey.mjs` | Named EDIT-007 built-browser journeys at 1440 and 390 pixels complete invitation, mailbox verification, conditional package selection, comments and immutable acceptance with keyboard-only client interaction and axe WCAG 2.2 AA scans at every step. Verification, comments and refusal pages preserve the reviewed conditional package, and submission feedback receives keyboard focus. Gap: optional-item selection (PRICE-002), Stripe test-card payment (PAY-001/PAY-002), and assistive-technology verification of the complete rich-content/payment journey remain; this slice does not establish full WCAG conformity. |
 | `EDIT-008` | Custom domain and branded client experience | target | missing |  | Client links use the installation origin with Platter styling. |
-| `EDIT-009` | Conditional content by package | target | missing |  | No conditional content. |
+| `EDIT-009` | Conditional content by package | target | done | `src/platter/conditional.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Current scope/terms, options, preview, selected PDF and accepted snapshot; future carriers inherit before shipping. |
 | `EDIT-010` | Attachments and vendor documents | target | done | `src/platter/attachments.ts`, `src/platter/attachment-commands.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `EDIT-011` | Large-proposal performance budget | target | missing |  | No block editor exists, so no budget is measured; no large-proposal fixture or timing journey. |
 | `EDIT-012` | Duplicate a proposal for another client | target | done | `src/platter/duplicate.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
@@ -1427,7 +1449,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `TRACK-003` | Forwarded stakeholder identification | target | missing |  | No forwarding detection. |
 | `TRACK-004` | Tracking disclosure and privacy limits | target | missing |  | No tracking, so no disclosure or retention controls. |
 | `FOLLOW-001` | Scheduled reminders to unsigned recipients | target | missing |  | No reminders. |
-| `FOLLOW-002` | Next-action follow-up queue by sales owner | target | missing |  | No follow-up queue. |
+| `FOLLOW-002` | Next-action follow-up queue by sales owner | target | done | `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `FOLLOW-003` | Expiry and renewal notifications | target | missing |  | No expiry or renewal notices. |
 | `FOLLOW-004` | Client questions and comments | target | done | `src/platter/questions.ts`, `src/platter/question-replies.ts`, `src/platter/ui/questions.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `FOLLOW-005` | Decline reasons and won or lost outcomes | target | missing |  | No decline or lost state. |

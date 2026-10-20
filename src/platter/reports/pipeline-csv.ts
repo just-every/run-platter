@@ -7,9 +7,9 @@ const shown = (cents: number, currency: string) => `$${(cents / 100).toLocaleStr
 
 /** REPORT-005: the pipeline exactly as filtered and sorted on screen, then per-currency totals. */
 export function pipelineCsv(report: Report) {
- const lines = [['Title', 'Client', 'Owner', 'Status', 'Next action', 'Currency', 'Value', 'Age in days']]
- for (const r of report.rows) lines.push([r.title, r.client, r.owner, r.status, nextActions[r.nextAction as keyof typeof nextActions], r.currency, decimal(r.valueCents), String(r.age)])
- for (const t of report.totals) lines.push([`Total (${t.count} proposals)`, '', '', '', '', t.currency, decimal(t.valueCents), ''])
+ const lines = [['Title', 'Client', 'Owner', 'Status', 'Next action', 'Currency', 'Value', 'Age in days','Follow-up due']]
+ for (const r of report.rows) lines.push([r.title, r.client, r.owner, r.status, nextActions[r.nextAction as keyof typeof nextActions], r.currency, decimal(r.valueCents), String(r.age),r.dueDate??''])
+ for (const t of report.totals) lines.push([`Total (${t.count} proposals)`, '', '', '', '', t.currency, decimal(t.valueCents), '', ''])
  return lines.map(line => line.map(cell).join(',')).join('\r\n') + '\r\n'
 }
 

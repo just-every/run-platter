@@ -16,6 +16,7 @@ export async function withdraw(env:Bindings,a:Actor,input:Record<string,unknown>
   db.prepare('INSERT INTO p_withdrawals(id,proposal_id,revision,actor_id,actor_email,withdrawn_at,reason,notice) VALUES(?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),row.id,row.revision,a.id,a.email,at,reason,notice?1:0),
   ...shares.map(s=>db.prepare('INSERT INTO p_withdrawn_links(token,contact_email) VALUES(?,?)').bind(s.token,a.email)),
   db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(row.id),
+  db.prepare("UPDATE p_followups SET closed_at=?,resolution='Proposal withdrawn',updated_at=? WHERE proposal_id=? AND closed_at IS NULL").bind(at,at,row.id),
   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),
   db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id),
   db.prepare('UPDATE p_question_reply_keys SET used_at=? WHERE question_id IN (SELECT id FROM p_questions WHERE proposal_id=?) AND used_at IS NULL').bind(at,row.id),

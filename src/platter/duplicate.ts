@@ -18,13 +18,14 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
  const id = crypto.randomUUID(), at = await currentTime(db)
  const attachments = copyAttachments(typeof displayed.attachments === 'string' ? JSON.parse(displayed.attachments) : displayed.attachments)
  const options = typeof displayed.options === 'string' ? JSON.parse(displayed.options) : displayed.options
- const row = { id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '',
+ const row = { id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '', section_conditions: displayed.section_conditions??{},
   revision: 1, deposit_bps: displayed.deposit_bps, options, currency: displayed.currency, attachments }
  await commit(db, a, [
   db.prepare(`INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,
    prepared_by,created_at,currency,sales_owner_id,sales_owner_name,attachments)
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
    .bind(id, clientId, title, row.scope, row.terms, row.deposit_bps, JSON.stringify(options), a.email, at, row.currency, a.id, a.email, JSON.stringify(attachments)),
+  db.prepare('UPDATE p_proposals SET section_conditions=? WHERE id=?').bind(typeof row.section_conditions==='string'?row.section_conditions:JSON.stringify(row.section_conditions),id),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)')
    .bind(id, JSON.stringify(snapshot(row)), a.email, at, row.currency),
   db.prepare('INSERT INTO p_pdf_settings(proposal_id,enabled) SELECT ?,enabled FROM p_pdf_settings WHERE proposal_id=?')

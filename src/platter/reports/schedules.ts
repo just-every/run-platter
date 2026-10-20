@@ -10,7 +10,7 @@ import { activePeople, installationZone } from './report-state'
 import { nextRun, validZone } from './zone'
 
 // REPORT-005: owner-named people receive a report at an hour in the installation's time zone; each run is claimed once.
-const filterKeys = ['owner', 'status', 'client', 'nextAction', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
+const filterKeys = ['owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
 
 /** Keep only the pipeline's own filters, in a fixed order, after the pipeline validates them. */
 export function savedFilters(value: unknown) {
@@ -66,7 +66,8 @@ export async function runDueReports(env: Bindings, at: number) {
   const owner = await db.prepare("SELECT id,email FROM oa_operators WHERE id=? AND role='owner' AND status='active'").bind(s.owner_id).first<any>()
   const runId = crypto.randomUUID(), people = await activePeople(db), ids: string[] = JSON.parse(s.recipients)
   const to = owner ? people.filter(p => ids.includes(p.id)) : [], skipped = owner ? ids.filter(id => !to.some(p => p.id === id)).map(() => 'no longer active') : ['schedule owner is no longer an active owner']
-  const report = owner ? pipeline((await state(env, { id: owner.id, email: owner.email, role: 'owner' })).proposals, new URLSearchParams(s.filters), at) : { rows: [], count: 0 }
+  const snapshot=owner?await state(env,{id:owner.id,email:owner.email,role:'owner'}):null
+  const report = snapshot ? pipeline(snapshot.proposals,new URLSearchParams(s.filters),at,snapshot.followups) : { rows: [], count: 0 }
   const writes = [db.prepare('INSERT INTO p_report_runs(id,schedule_id,ran_at,row_count,skipped) VALUES(?,?,?,?,?)').bind(runId, s.id, at, report.count, JSON.stringify(skipped))]
   if (owner) {
    const [subject, body] = pipelineMail(report as any, s.filters)

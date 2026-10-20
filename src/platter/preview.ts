@@ -1,3 +1,4 @@
+import { selectedContent } from './conditional'
 import type { Bindings } from '../auth.server'
 import { copyAttachments, downloadAttachment } from './attachments'
 import { need, snapshot } from './model'
@@ -27,7 +28,7 @@ export async function previewResponse(request:Request,env:Bindings) {
  const query=new URLSearchParams({id:row.id,revision:String(row.revision),width,optionId})
  if(url.pathname==='/app/preview')return previewFrame(row,width,optionId,query)
  const expiry=await expiryFor(env.DB,row)
- const view={...content,...await suggestionState(env.DB,row.id,row.revision),status:'sent',verified:true,clientEmail:row.clientEmail,preview:{query:query.toString(),recipient:row.clientName,selection},previous:pending?snapshot(original):undefined,pdfDownloadsEnabled:await pdfEnabled(env.DB,row.id),expiry:{...expiry,date:expiry.mode==='days'?null:expiry.date,expired:false,sentAt:null,deadlineAt:null,reopenRequests:[]}}
+ const view={...selectedContent(content,optionId),selectedOptionId:optionId,...await suggestionState(env.DB,row.id,row.revision),status:'sent',verified:true,clientEmail:row.clientEmail,preview:{query:query.toString(),recipient:row.clientName,selection},previous:pending?selectedContent(snapshot(original),optionId):undefined,pdfDownloadsEnabled:await pdfEnabled(env.DB,row.id),expiry:{...expiry,date:expiry.mode==='days'?null:expiry.date,expired:false,sentAt:null,deadlineAt:null,reopenRequests:[]}}
  const response=renderClient(view,'')
  // Only this member-only document may be framed by its own authenticated wrapper.
  response.headers.set('Content-Security-Policy',response.headers.get('Content-Security-Policy')!.replace("frame-ancestors 'none'","frame-ancestors 'self'"))

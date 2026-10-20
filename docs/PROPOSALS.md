@@ -72,3 +72,9 @@ only when the provider accepts that correction, or the owner logs a dismissal
 reason; an uncertain sending result stays open. Business notices and logged
 resolutions travel in RER archives; mail bodies, invitation links, delivery
 attempts and provider event receipts remain installation-local.
+
+## Client questions
+
+After verifying their mailbox, the invited client can ask about scope, pricing or terms on the sent revision. The owner sees open questions on Proposals and the proposal, answers in the thread, and the client receives a notification. Questions and answers remain with the accepted agreement and portable archive.
+
+The owner can also answer a question by email when Resend receiving is configured. Set `QUESTION_REPLY_DOMAIN` to the installation's Resend receiving domain, set `MAIL_WEBHOOK_KEY` to its signing secret, and direct signed `email.received` events to `/api/platter/question-replies`. Use the existing Resend `MAIL_API_KEY` with access to fetch received messages. Other transports use app answers. **Email me this question** sends a fresh notice to the active owner mailbox and replaces the prior private reply address. Reply from that exact mailbox within seven days, in plain text without attachments. The complete reply is retained as the answer, including quoted text; remove any quoted private reply address. Each private address works once. An app answer also spends outstanding addresses. Provider acceptance of a notification does not prove recipient delivery.

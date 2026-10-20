@@ -769,3 +769,47 @@ test('FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reope
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('EDIT-009 desktop and phone configure, preview, select, download and accept conditional package sections', {timeout:120000}, async()=>{
+ let app,browser
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage()
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const command=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    const client=await command('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
+    const fields={clientId:client.id,title:'Northstar autumn campaign',scope:'Brand strategy, a studio shoot and edited campaign photographs.',terms:'Premium timeline: strategy in week one, delivery in week four.',optionOne:'Standard',priceOne:'2400',optionTwo:'Premium',priceTwo:'4200',depositPercent:'25'}
+    const p=await command('proposal.prepare',fields)
+    const capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`EDIT-009-${name}-${width}.png`),fullPage:true})}
+    await page.goto(app.origin+'/app/proposal?id='+p.id)
+    await page.getByLabel('Terms visibility',{exact:true}).selectOption('two')
+    await page.getByRole('button',{name:'Save revision',exact:true}).click();await capture('editor')
+    for(const optionId of ['one','two']){
+     await page.goto(app.origin+`/app/preview/client?id=${p.id}&revision=2&optionId=${optionId}`)
+     assert.equal((await page.locator('main').innerText()).includes(fields.terms),optionId==='two');await capture('preview-'+optionId)
+    }
+    await page.goto(app.origin+'/app/proposal?id='+p.id);await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click()
+    const state=await(await context.request.get(app.origin+'/api/platter/state')).json(),source=state.proposals.find(r=>r.id===p.id)
+    const copy=await command('proposal.duplicate',{id:p.id,version:source.version});await command('proposal.approve',{id:copy.id,version:1,revision:1});await command('proposal.send',{id:copy.id,version:2})
+    for(const [id,selection] of [[p.id,'one'],[copy.id,'two']]){
+     const data=await(await context.request.get(app.origin+'/api/platter/state')).json(),row=data.proposals.find(r=>r.id===id),path='/p/'+row.shareToken
+     await page.goto(app.origin+path);await page.getByRole('button',{name:'Send verification code'}).click()
+     const mailState=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=mailState.outbox.find(m=>m.proposal_id===id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+     await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click()
+     await page.getByLabel('Review sections for').selectOption(selection);await page.getByRole('button',{name:'Review package',exact:true}).click()
+     assert.equal((await page.locator('main').innerText()).includes(fields.terms),selection==='two');await capture('client-'+selection)
+     const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download unsigned proposal PDF',exact:true}).click();const pdf=await download
+     const text=(await pdfPages(await readFile(await pdf.path()))).join(' ');assert.equal(text.includes(fields.terms),selection==='two');assert.ok(text.includes(fields.scope))
+     await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
+     assert.match(await page.locator('main').innerText(),/This agreement is complete/);assert.equal((await page.locator('main').innerText()).includes(fields.terms),selection==='two');await capture('accepted-'+selection)
+    }
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

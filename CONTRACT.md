@@ -164,11 +164,11 @@ An owner serves client links from their own domain, such as `proposals.example.c
 
 #### EDIT-009 — Conditional content by package.
 
-A section can be shown only when a package, optional item or variable has a given value, so choosing the Premium package shows its deliverables and timeline. The accepted agreement and PDF contain exactly what the client saw for their selection. Members check each selection's sections before sending in the `EDIT-018` preview.
+A section can be shown only when a package, optional item or variable has a given value, so choosing the Premium package shows its deliverables and timeline. The accepted agreement and PDF contain exactly what the client saw for their selection. Today this applies to the scope and terms sections and the two offered packages, including the selected unsigned client PDF (`EDIT-014`). Each future capability inherits the same conditional visibility and exact-selection assertions before shipping: `EDIT-001` added sections, `PRICE-002` optional items and expanded packages, `EDIT-004` variables, `EDIT-005` added PDF carriers and `SIGN-005` signed agreement PDFs. Unconditional legacy content remains visible for every selection. Members check each selection's sections before sending in the `EDIT-018` preview.
 
 *Acceptance:* Make a timeline section depend on the Premium package, accept the Standard package and see the section absent from the agreement and PDF, then accept Premium on another copy and see it present.
 
-*Status:* missing. No conditional content.
+*Status:* done. Current scope and terms can each depend on either offered option. Named EDIT-009 public HTTP/browser/PDF and CLI journeys cover selection, preview, agreement freezing and custody. (`src/platter/conditional.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### EDIT-010 — Attachments and vendor documents.
 
@@ -1336,8 +1336,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 19 | 25 | 84 | 128 |
-| All | 31 | 25 | 84 | 140 |
+| Target and push further | 20 | 25 | 83 | 128 |
+| All | 32 | 25 | 83 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1361,7 +1361,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `EDIT-006` | Embedded rich media | target | missing |  | No media blocks. |
 | `EDIT-007` | Mobile client review | target | partial | `src/platter/ui/client.ts`, `src/platter/ui/shared.ts`, `tests/platter.test.mjs` | The client page has viewport and narrow-screen styling only; there is no mobile journey, no rich blocks and no accessibility audit. |
 | `EDIT-008` | Custom domain and branded client experience | target | missing |  | Client links use the installation origin with Platter styling. |
-| `EDIT-009` | Conditional content by package | target | missing |  | No conditional content. |
+| `EDIT-009` | Conditional content by package | target | done | `src/platter/conditional.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Current scope/terms, options, preview, selected PDF and accepted snapshot; future carriers inherit before shipping. |
 | `EDIT-010` | Attachments and vendor documents | target | done | `src/platter/attachments.ts`, `src/platter/attachment-commands.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `EDIT-011` | Large-proposal performance budget | target | missing |  | No block editor exists, so no budget is measured; no large-proposal fixture or timing journey. |
 | `EDIT-012` | Duplicate a proposal for another client | target | done | `src/platter/duplicate.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |

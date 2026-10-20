@@ -1,7 +1,9 @@
+import { sectionConditions } from '../conditional'
 import { date, escape, form, hidden, money, panel, proposalPath } from './shared'
 
 export function changes(before: any, after: any): string {
  const rows: [string, unknown, unknown][] = [ ['Title', before.title, after.title], ['Scope', before.scope, after.scope], ['Terms',before.terms??'',after.terms??''], ['Client', before.client_id, after.client_id], ['Deposit percentage', before.deposit_bps / 100, after.deposit_bps / 100] ]
+ for(const section of ['scope','terms'] as const)rows.push([section+' visibility',sectionConditions(before.section_conditions)[section]??'Every option',sectionConditions(after.section_conditions)[section]??'Every option'])
  const ids = new Set([...before.options, ...after.options].map((option: any) => option.id))
  for (const id of ids) {
   const old = before.options.find((option: any) => option.id === id), next = after.options.find((option: any) => option.id === id)

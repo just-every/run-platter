@@ -1,3 +1,4 @@
+import { sectionConditions } from '../conditional'
 import { followupQueuePanel, followupPanel } from './followup'
 import { duplicatePanel } from './duplicate'
 import { withdrawalPanel } from './withdrawal'
@@ -15,10 +16,12 @@ import { area, date, empty, escape, field, form, hidden, money, optionPair, pane
 
 function editor(state: any, proposal?: any, negotiating = false): string {
   const options = proposal?.options ?? []
+  const conditions=sectionConditions(proposal?.section_conditions)
+  const condition=(section:'scope'|'terms')=>`<label>${section==='scope'?'Scope':'Terms'} visibility<select name="${section}Option"><option value="">Every option</option>${['one','two'].map((id,i)=>`<option value="${id}"${conditions[section]===id?' selected':''}>Only ${escape(options[i]?.label??('option '+id))}</option>`).join('')}</select></label>`
   const clients = (state.clients ?? []).map((client: any) => `<option value="${escape(client.id)}"${client.id === proposal?.client_id ? ' selected' : ''}>${escape(client.name)} — ${escape(client.email)}</option>`).join('')
   const inputs = `<label>Client<select name="clientId" required><option value="">Choose a client</option>${clients}</select></label>`
     + field('Proposal title', 'title', proposal?.title, 'required maxlength="200"')
-    + area('Scope of work', 'scope', proposal?.scope, 'required') + area('Terms', 'terms', proposal?.terms??'')
+    + area('Scope of work', 'scope', proposal?.scope, 'required') + condition('scope') + area('Terms', 'terms', proposal?.terms??'') + condition('terms')
     + '<fieldset><legend>Option one</legend>' + field('Option label', 'optionOne', options[0]?.label, 'required')
     + field(`Price in ${proposal?.currency ?? 'USD'}`,  'priceOne', options[0] ? (options[0].cents / 100).toFixed(2) : '', 'required inputmode="decimal" placeholder="0.00"') + '</fieldset>'
     + '<fieldset><legend>Option two</legend>' + field('Option label', 'optionTwo', options[1]?.label, 'required')

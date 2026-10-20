@@ -831,3 +831,44 @@ test('EDIT-018 member-only exact-revision previews share selection math and neve
 }))
 
 test('FOLLOW-002 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal',()=>run(h=>followupJourney(h,{offer,verified})))
+
+test('EDIT-009 conditional sections match selected preview, client, PDF and immutable agreement; revisions, copies and negotiations retain rules',async()=>{
+ const h=await harness({assetsDirectory:'public'});try{
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+ const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
+ const fields={...offer,clientId:client.id,optionOne:'Standard',optionTwo:'Premium',terms:'Premium timeline: strategy in week one, delivery in week four.',sectionConditions:{terms:'two'}}
+ for(const invalid of [{terms:'missing'},{price:'two'},{scope:'one',terms:1}])await h.cmd('proposal.prepare',{...fields,sectionConditions:invalid},h.owner,400)
+ const original=await h.cmd('proposal.prepare',fields)
+ const copy=await h.cmd('proposal.duplicate',{id:original.id,version:1})
+ await h.cmd('proposal.revise',{...fields,id:copy.id,version:1,sectionConditions:{scope:'one'}})
+ await h.cmd('proposal.restore',{id:copy.id,version:2,revision:1})
+ assert.deepEqual((await h.state()).revisions.find(r=>r.proposal_id===copy.id&&r.revision===3).snapshot.section_conditions,{terms:'two'})
+ for(const [p,optionId] of [[original,'one'],[copy,'two']]){
+  const current=(await h.state()).proposals.find(r=>r.id===p.id)
+  for(const id of ['one','two']){
+   const preview=await h.send(`/app/preview/client?id=${p.id}&revision=${current.revision}&optionId=${id}`,undefined,h.owner)
+   assert.equal(preview.status,200);assert.equal(preview.text.includes(fields.terms),id==='two')
+  }
+  await h.cmd('proposal.approve',{id:p.id,version:current.version,revision:current.revision})
+  const share=await h.cmd('proposal.send',{id:p.id,version:current.version+1}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+  for(const id of ['one','two']){
+   const page=await h.send(path+'?optionId='+id,undefined,cookie);assert.equal(page.status,200);assert.equal(page.text.includes(fields.terms),id==='two')
+   const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId='+id,{headers:{host:new URL(h.origin).host,cookie}});assert.equal(pdf.status,200)
+   const text=(await pdfPages(await pdf.arrayBuffer())).join(' ');assert.equal(text.includes(fields.terms),id==='two');assert.ok(text.includes(offer.scope))
+  }
+  const accepted=await h.send(path+'/action?name=accept',{optionId,name:'Avery Chen',consent:true},cookie);assert.equal(accepted.status,200);assert.equal(accepted.text.includes(fields.terms),optionId==='two')
+  const row=await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first(),frozen=JSON.parse(row.snapshot)
+  assert.equal(frozen.terms??'',optionId==='two'?fields.terms:'');assert.equal(frozen.scope,offer.scope)
+  assert.ok(!row.snapshot.includes('section_conditions'));assert.equal(row.snapshot.includes(fields.terms),optionId==='two')
+  assert.equal((await h.send(path+'?optionId='+(optionId==='one'?'two':'one'),undefined,cookie)).text.includes(fields.terms),optionId==='two','accepted selection cannot change through a query')
+  await h.cmd('proposal.revise',{...fields,id:p.id,version:current.version+3},h.owner,409)
+ }
+ const next=await h.cmd('proposal.prepare',fields);await h.cmd('proposal.approve',{id:next.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:next.id,version:2})
+ await h.cmd('proposal.negotiate',{...fields,id:next.id,version:3,sectionConditions:{scope:'two',terms:'one'}})
+ await h.cmd('proposal.approve',{id:next.id,version:4,revision:2});const replacement=await h.cmd('proposal.send',{id:next.id,version:5})
+ assert.equal((await h.send(new URL(share.shareUrl).pathname)).status,404)
+ const premium=await h.send(new URL(replacement.shareUrl).pathname+'?optionId=two');assert.ok(premium.text.includes(offer.scope));assert.ok(!premium.text.includes(fields.terms))
+ const standard=await h.send(new URL(replacement.shareUrl).pathname+'?optionId=one');assert.ok(!standard.text.includes(offer.scope));assert.ok(standard.text.includes(fields.terms))
+ const changes=await h.send(`/app/proposal?id=${next.id}&from=1&to=2`,undefined,h.owner);assert.match(changes.text,/scope visibility/);assert.match(changes.text,/terms visibility/)
+ }finally{await h.close()}
+})

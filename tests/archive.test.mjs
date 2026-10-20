@@ -222,7 +222,6 @@ test('PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND
     assert.deepEqual(restoredState.proposals.find(x=>x.id===paper.id).acceptance,paperBefore.acceptance,'PRICE-002 / SIGN-008 selected upload, attestation and file metadata survive public CLI restore')
     assert.equal((await h.send(paperInvoicePath,undefined,restoredOwner)).text,paperCsv,'PRICE-002 selected deposit invoice survives restore byte-identically')
     const paperFile=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+paper.id+'/'+paperBefore.acceptance.signedCopy.id,{headers:{host:new URL(h.origin).host,cookie:restoredOwner}});assert.equal(paperFile.status,200);assert.deepEqual(new Uint8Array(await paperFile.arrayBuffer()),paperBytes,'SIGN-008 original signed copy survives restore byte-identically')
-    const paperPage=await h.send('/app/proposal?id='+paper.id,undefined,restoredOwner);assert.equal(paperPage.status,200);assert.match(paperPage.text,/2,301\.00/);assert.match(paperPage.text,/575\.25/);assert.match(paperPage.text,/Rush delivery/)
 
     assert.deepEqual(restoredState.agentKeys,[])
     assert.deepEqual((await h.send('/api/platter/send-requests',undefined,restoredOwner)).value.requests,beforeRequests)
@@ -240,6 +239,7 @@ test('PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND
     const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})
     assert.equal(setup.status,303)
     assert.equal((await h.send('/app/proposal?id='+proposal.id,undefined,restoredOwner)).status,200)
+    const paperPage=await h.send('/app/proposal?id='+paper.id,undefined,restoredOwner);assert.equal(paperPage.status,200);assert.match(paperPage.text,/2,301\.00/);assert.match(paperPage.text,/575\.25/);assert.match(paperPage.text,/Rush delivery/)
     const standard=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=one`,undefined,restoredOwner),premium=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=two`,undefined,restoredOwner)
     assert.match(standard.text,/403\.89/);assert.match(standard.text,/Project services/);assert.equal(standard.status,200);assert.equal(premium.status,200);assert.ok(!standard.text.includes('Premium timeline: four weeks.'));assert.ok(premium.text.includes('Premium timeline: four weeks.'),'EDIT-009 restored conditions remain functional')
     await h.close();h=null

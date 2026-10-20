@@ -611,3 +611,36 @@ test('FOLLOW-004 invited client asks exact sent sections; owner queue answers an
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+
+test('SEND-010 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision', {timeout:180000}, async()=>{
+ let browser,app
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp()
+   const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),capture=async name=>{assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`SEND-010-${name}-${width}.png`),fullPage:true})}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    await page.getByRole('link',{name:'Clients',exact:true}).click();await page.locator('[name="name"]').fill('Northstar Coffee');await page.locator('[name="email"]').fill('avery@northstar.example');await page.getByRole('button',{name:'Add client'}).click()
+    await page.getByRole('link',{name:'Proposals',exact:true}).click();await page.locator('[name="clientId"]').selectOption({label:'Northstar Coffee — avery@northstar.example'})
+    for(const [name,value]of Object.entries({title:'Brand photography',scope:'Studio photography and campaign usage.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'}))await page.locator(`[name="${name}"]`).fill(value)
+    await page.getByRole('button',{name:'Prepare proposal',exact:true}).click();await page.getByRole('link',{name:'Brand photography',exact:true}).click();await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click()
+    const original=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals[0],oldPath='/p/'+original.shareToken
+    await capture('send');await page.getByLabel('Withdrawal reason').fill('Sent to the wrong client');await page.getByRole('button',{name:'Withdraw proposal',exact:true}).click()
+    assert.match(await page.locator('.proposal-status').innerText(),/withdrawn/);assert.match(await page.locator('main').innerText(),/Sent to the wrong client/);await capture('withdrawn')
+    const proposalUrl=page.url()
+    assert.equal((await page.goto(app.origin+oldPath)).status(),410);assert.equal(await page.getByRole('heading',{name:'Proposal withdrawn',exact:true}).count(),1);assert.equal(await page.getByRole('link',{name:'owner@northstar.example'}).count(),1);assert.ok(!(await page.locator('main').innerText()).includes('Studio photography'));await capture('revoked')
+    await page.goto(app.origin+'/app/audit?action=proposal.withdraw');assert.match(await page.locator('main').innerText(),/Sent to the wrong client/);await capture('audit')
+    await page.goto(app.origin+'/app?status=withdrawn');assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'1');await capture('pipeline')
+    await page.goto(proposalUrl);await page.getByRole('button',{name:'Prepare negotiated revision'}).click();await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();await capture('reissued')
+    assert.equal((await context.request.get(app.origin+oldPath)).status(),410)
+    await page.getByRole('link',{name:'Open client proposal',exact:true}).click();assert.equal(await page.getByRole('heading',{name:'Verify your email',exact:true}).count(),1);await capture('new-offer')
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

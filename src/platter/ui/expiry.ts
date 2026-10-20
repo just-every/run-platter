@@ -8,6 +8,7 @@ export function expiryLabel(expiry: any): string {
 
 export function expiryPanel(state: any, p: any): string {
  const expiry = p.expiry ?? { mode: 'never' }
+ if (p.status === 'withdrawn') return ''
  if (p.status === 'accepted') return panel('Expiry', '<p>Accepted agreements never expire.</p>')
  let html = `<p${expiry.expired ? ' role="status"' : ''}>${expiry.expired ? '<strong>This offer has expired.</strong> ' : ''}${expiryLabel(expiry)}</p>`
  if (state.actor?.role !== 'owner') return panel('Expiry', html)

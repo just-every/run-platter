@@ -62,8 +62,7 @@ export async function mobileClientJourney() {
     assert.equal(await page.locator('main').evaluate(n => n === document.activeElement), true)
     // Review Premium before verification: every subsequent form must keep it.
     await tabTo(page, page.getByLabel('Review sections for'))
-    await page.keyboard.press('ArrowDown')
-    await page.keyboard.press('ArrowDown')
+    await page.keyboard.type('Full campaign')
     await page.keyboard.press('Enter')
     assert.equal(await page.getByLabel('Review sections for').inputValue(), 'two')
     await activate(page, 'button', 'Review package')

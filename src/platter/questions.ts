@@ -52,8 +52,8 @@ export async function openQuestions(db:D1Database,a:Actor) {
  return (await questionState(db)).questions.filter(q=>q.status==='open')
 }
 
-/** Parent supplies expiryOpenSql('p') and its currentTime binding in extraGuard. */
-export async function createQuestion(env:Bindings,c:ClientContext,input:Record<string,unknown>,extraGuard?:QuestionGuard) {
+/** A current sent revision remains discussable while its acceptance is expired. */
+export async function createQuestion(env:Bindings,c:ClientContext,input:Record<string,unknown>) {
  need(c.verified&&c.share.session_hash,'Verify your email before asking a question',401)
  need(c.row.status==='sent','Ask questions on the current sent proposal',409)
  need(Number(input.revision)===c.row.revision,'This offer changed. Reload before asking.',409)
@@ -63,10 +63,10 @@ export async function createQuestion(env:Bindings,c:ClientContext,input:Record<s
  const owners=(await db.prepare("SELECT id,email,version FROM oa_operators WHERE role='owner' AND status='active' ORDER BY id").all<{id:string;email:string;version:number}>()).results
  need(owners.length,'An active owner is required to receive questions',409)
  // Commit binds the exact invitation, verified session, client, sent revision, and notified owner mailboxes.
- const guard=`EXISTS(SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id JOIN p_clients c ON c.id=p.client_id WHERE s.token=? AND s.proposal_id=? AND s.revision=p.revision AND p.revision=? AND p.client_id=? AND lower(COALESCE(s.recipient,c.email))=lower(?) AND s.session_hash=? AND s.session_expires>? AND p.status='sent'${extraGuard?' AND ('+extraGuard.sql+')':''})`
+ const guard=`EXISTS(SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id JOIN p_clients c ON c.id=p.client_id WHERE s.token=? AND s.proposal_id=? AND s.revision=p.revision AND p.revision=? AND p.client_id=? AND lower(COALESCE(s.recipient,c.email))=lower(?) AND s.session_hash=? AND s.session_expires>? AND p.status='sent')`
  const ownerChecks=owners.map(()=>"EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND email=? AND version=? AND role='owner' AND status='active')").join(' AND ')
  try { await db.batch([
-  db.prepare(`INSERT INTO p_guard(ok) VALUES((${guard}) AND (${ownerChecks}))`).bind(c.token,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,c.share.session_hash,at,...(extraGuard?.values??[]),...owners.flatMap(o=>[o.id,o.email,o.version])),
+  db.prepare(`INSERT INTO p_guard(ok) VALUES((${guard}) AND (${ownerChecks}))`).bind(c.token,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,c.share.session_hash,at,...owners.flatMap(o=>[o.id,o.email,o.version])),
   db.prepare('INSERT INTO p_questions(id,proposal_id,revision,client_id,client_email,section,text,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(id,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,section,body,at),
   ...(await Promise.all(owners.map(owner=>prepareReplyNotice(env,owner,{id,proposal_id:c.row.id,revision:c.row.revision,section,text:body,title:c.row.title})))).flat(),
   audit(db,c.row.client_id,'client','question.create',id,at),

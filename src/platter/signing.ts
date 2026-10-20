@@ -22,7 +22,7 @@ export function acceptanceTerms(row:any,optionId:unknown){const option=JSON.pars
 export const acceptanceView=(a:any)=>({name:a.name,email:a.email,optionId:a.option_id,totalCents:a.total_cents,depositCents:a.deposit_cents,acceptedAt:a.accepted_at,revision:a.revision,currency:a.currency??'AUD'})
 async function atomic(env:Bindings,c:any,writes:D1PreparedStatement[],condition:string,values:any[],completed=false){try{await env.DB.batch([env.DB.prepare(`INSERT INTO p_guard(ok) VALUES((EXISTS(SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id WHERE s.token=? AND s.revision=p.revision AND p.status IN (${completed?"'sent','accepted'":"'sent'"}) AND ${condition})))`).bind(c.token,...values),...writes,env.DB.prepare('DELETE FROM p_guard')])}catch(e){if(String(e).includes('CHECK constraint')||String(e).includes('UNIQUE constraint'))fail('The proposal or verification changed. Reload before continuing.',409);throw e}}
 export async function clientCommand(env:Bindings,c:Awaited<ReturnType<typeof clientContext>>,name:string,p:Record<string,unknown>){const{row,share}=c,db=env.DB,at=await currentTime(env.DB)
- if(name==='question.create')return createQuestion(env,c,p,{sql:expiryOpenSql('p'),values:[at]})
+ if(name==='question.create')return createQuestion(env,c,p)
  if(name==='expiry.reopen')return requestReopen(env,c)
  if(name==='suggestion.create'){need(!c.expiry.expired,'This proposal has expired',409);return suggest(env,c,p)}
  if(name==='code.request'){

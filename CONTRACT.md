@@ -1387,7 +1387,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `MIG-003` | Better Proposals move-in | target | missing |  | No Better Proposals import. |
 | `MIG-004` | Qwilr and Ignition move-in | target | missing |  | No Qwilr or Ignition import. |
 | `MIG-005` | Open proposals and payment schedules continue | target | missing |  | No in-flight migration. |
-| `MIG-006` | Clients, contacts and catalog CSV move-in | target | partial | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | image URLs fetched through Base\'s egress relay |
+| `MIG-006` | Clients, contacts and catalog CSV move-in | target | partial | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | image URLs fetched through Base's egress relay |
 | `MIG-007` | Move-in from exported files without API access | target | missing |  | No document import; only the client CSV kit exists. |
 | `MOB-001` | Team app on a phone | target | partial | `src/platter/ui/shared.ts` | The team pages have viewport and narrow-screen styling only; there is no phone journey for creating, sending or approving. |
 | `MOB-002` | iOS and Android apps with push notifications | target | missing |  | No native apps or push. |

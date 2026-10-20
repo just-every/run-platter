@@ -666,6 +666,16 @@ test('SEND-004 / TEAM-004 calendar expiry warns unsigned only, supports same-lin
  await h.send('/auth/invite',{email:'expiry-member@studio.example',displayName:'Colleague',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('expiry-member@studio.example')
  await h.cmd('expiry.set',{id:noExpiry.id,version:3,mode:'days',days:1},member,403)
  await fire(at('2027-04-01T04:00:00Z'));assert.equal((await h.state()).proposals.find(p=>p.id===signed.id).status,'accepted');assert.deepEqual(await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(signed.id).first(),accepted)
+ // Historical sent-offer fixture: the old schema had no expiry/send-time record.
+ const legacy=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Legacy offer without send-time custody'})
+ await h.cmd('proposal.approve',{id:legacy.id,version:1,revision:1});await h.cmd('proposal.send',{id:legacy.id,version:2})
+ await h.db.prepare('DELETE FROM p_expiry WHERE proposal_id=?').bind(legacy.id).run()
+ await h.cmd('expiry.set',{id:legacy.id,version:3,mode:'days',days:7},h.owner,409)
+ assert.equal((await h.state()).proposals.find(p=>p.id===legacy.id).expiry.sentAt,null)
+ await h.cmd('expiry.set',{id:legacy.id,version:3,mode:'date',date:'2027-04-08'})
+ let historical=(await h.state()).proposals.find(p=>p.id===legacy.id);assert.equal(historical.expiry.date,'2027-04-08');assert.equal(historical.expiry.deadlineAt,at('2027-04-08T04:00:00Z'));assert.equal(historical.expiry.sentAt,null)
+ await h.cmd('proposal.send',{id:legacy.id,version:historical.version})
+ historical=(await h.state()).proposals.find(p=>p.id===legacy.id);assert.equal(historical.expiry.deadlineAt,at('2027-04-08T04:00:00Z'));assert.equal(historical.expiry.sentAt,null,'fresh invitation does not invent the original send time')
  const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
  for(const action of ['expiry.set','expiry.remove','expiry.reopen','expiry.warning'])assert.ok(audit.some(a=>a.action===action&&a.subject&&a.actor_id&&a.occurred_at),action+' is audited')
 }))

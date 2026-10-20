@@ -1,0 +1,38 @@
+/* 06 · two rows, comment → reply → rev 2 (changes in butter) → signed */
+.rv-row{margin-top:64px}
+.rv-row+.rv-row{margin-top:56px}
+.rv-title{font-size:28px;line-height:1.2;margin:0 0 18px}
+.rv-sent{margin:-4px 0 18px;font-size:15px;padding:7px 16px}
+.rv-steps{display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(0,.78fr) 40px minmax(0,1.3fr) 40px minmax(0,.84fr);align-items:center}
+.rv-c{padding:18px 20px;font-size:16px;line-height:1.45;align-self:stretch;display:flex;flex-direction:column;justify-content:center}
+.rv-tag{align-self:flex-start;margin-bottom:12px;font-size:15px;padding:4px 12px}
+.rv-msg{display:grid;grid-template-columns:40px minmax(0,1fr);gap:14px;align-items:start}
+.rv-who{font-size:15px;color:#55555F;margin-bottom:4px}
+.rv-who .dl>span:first-child{color:var(--ink);font-weight:600}
+.rv-reply{position:relative}
+.rv-cursor{left:96px;bottom:-34px}
+.rv-rev{padding:18px 20px 16px;font-size:15px}
+.rv-rev mark{white-space:nowrap}
+.rv-rev h4.serif{font-size:21px;margin:0 0 8px}
+.rv-rev ul{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.rv-rev mark{font-weight:600}
+.rv-rev .meta{margin-top:10px}
+.rv-arrow{height:12px;background:radial-gradient(circle,var(--mulberry) 1.3px,transparent 1.6px) 4px 50%/7px 12px repeat-x;position:relative;margin:0 6px}
+.rv-arrow::after{content:"";position:absolute;right:-6px;top:0;border:6px solid transparent;border-left:8px solid var(--mulberry);border-right:0}
+.rv-signed{position:relative;display:flex;align-items:center;gap:14px;padding:18px 18px;background:var(--sage-wash);border-color:#D6E4D2;color:var(--sage-ink);font-size:16px;line-height:1.45}
+.rv-signed .tick.big{background:#3F6B45}
+.rv-spark{right:-6px;top:-34px;width:34px;height:34px}
+@media (max-width:1300px){.rv-steps{grid-template-columns:minmax(0,1fr) 34px minmax(0,.86fr) 34px minmax(0,1.2fr) 34px minmax(0,.84fr)}.rv-c,.rv-rev,.rv-signed{font-size:15px}.rv-rev{padding:16px}}
+/* stacked: comment and reply side by side, then rev 2 and the signed chip */
+@media (max-width:1180px){
+  .rv-steps{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+  .rv-arrow{display:none}
+  .rv-cursor{bottom:-30px}
+}
+@media (max-width:760px){
+  .rv-row{margin-top:40px}
+  .rv-title{font-size:22px}
+  .rv-steps{grid-template-columns:minmax(0,1fr);gap:14px}
+  .rv-reply{margin-bottom:22px}
+  .rv-sent{border-radius:12px}
+}

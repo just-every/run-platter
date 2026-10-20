@@ -1,0 +1,72 @@
+/* 05 · two client columns mirrored around the agent's follow-up queue; one reading scale for all six bars */
+.sd-grid{--gap:32px;display:grid;grid-template-columns:minmax(0,1.14fr) minmax(0,.52fr) minmax(0,.94fr);grid-template-rows:auto auto auto auto;column-gap:var(--gap);margin-top:52px}
+.sd-col-head{grid-row:1;font-size:22px;white-space:nowrap;line-height:1.25;margin:0 0 14px;position:relative}
+.sd-col-head.n{grid-column:1}.sd-col-head.h{grid-column:3}
+.sd-spark-l{left:-46px;top:-20px;transform:scaleX(-1)}.sd-spark-r{right:-40px;top:-14px}
+.sd-client{grid-row:2/5;display:grid;grid-template-rows:subgrid;padding:24px 26px 22px;font-size:15px;line-height:1.45}
+.sd-n{grid-column:1}.sd-h{grid-column:3}
+.sd-client h3.serif{font-size:25px;line-height:1.25;margin:0}
+.sd-client .sub{margin-top:6px}
+.sd-a{padding-bottom:22px}
+.dlv{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:7px;font-size:14px;color:#3B3B46}
+.dlv li{display:grid;grid-template-columns:18px minmax(0,1fr);align-items:start;gap:6px}
+.dlv-arrow{color:#55555F;font-size:14px;line-height:1.45}
+.dlv-body,.dlv li .pill{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:.95em}
+.dlv-when{white-space:nowrap}
+.dlv .dl,.dlv .dl-i{flex:1 1 0;min-width:min(14em,100%)}
+.dlv li .pill{width:fit-content}
+.dlv li .pill .dl{flex:0 1 auto;min-width:0}
+.dlv li.bounce{color:#6A6A75;background:#F3F2F5;border-radius:8px;padding:4px 8px;margin-left:-8px}
+.dlv li.opened .pill{padding:4px 12px;font-size:14px}
+.rd{margin-top:22px}
+.rd h4{font:700 16px/1.3 var(--sans);margin:0 0 10px;color:var(--ink)}
+.rd ul{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.rd li{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.4fr) 40px;align-items:center;gap:14px;font-size:15px}
+.rd-bar{width:100%;height:10px;display:block}
+.rd-bar .track{fill:#EDECEF}.rd-bar .fill{fill:var(--mulberry)}
+.rd-time{text-align:right;font-variant-numeric:tabular-nums;color:#3B3B46}
+.sd-note{grid-row:2;align-self:start;padding:18px 20px;font-size:16px;line-height:1.5;position:relative}
+.sd-note .meta{margin-top:8px}
+.sd-cursor{right:12px;bottom:-14px}
+.sd-chips{grid-row:3;display:grid;gap:10px;padding-top:18px;align-content:start}
+.sd-chips .pill{border-radius:12px;padding:8px 14px}
+/* the agent: its head sits on the bars' row, its queue faces the two notes it drafted */
+.sd-agent{display:contents}
+.sd-agent-head{grid-column:2;grid-row:2;align-self:end;background:#fff;border:1px solid var(--card-line);border-bottom:0;border-radius:14px 14px 0 0;padding:22px 22px 6px;font-size:16px;line-height:1.45;box-shadow:0 -6px 20px rgb(28 28 36 / .05)}
+.sd-agent-head h3.serif{font-size:30px;line-height:1.2;margin:6px 0 14px}
+.sd-agent-head p+p{margin-top:8px}
+.sd-queue{grid-column:2;grid-row:3;align-self:start;list-style:none;margin:0;padding:6px 16px 18px;background:#fff;border:1px solid var(--card-line);border-top:0;border-radius:0 0 14px 14px;box-shadow:0 14px 24px rgb(28 28 36 / .07);display:grid;gap:12px}
+.sd-queue li{position:relative;display:grid;gap:4px;background:#FDEEF3;border:1px solid #F6D3DE;border-radius:10px;padding:10px 12px;font-size:15px}
+.sd-queue li::before{content:"";position:absolute;top:22px;width:calc(var(--gap) + 44px);border-top:2px dotted var(--mulberry)}
+.sd-queue li.tom::before{right:100%}
+.sd-queue li.grace::before{left:100%}
+.sd-queue li::after{content:"";position:absolute;top:17px;border:6px solid transparent}
+.sd-queue li.tom::after{right:calc(100% + var(--gap) + 40px);border-right:8px solid var(--mulberry);border-left:0}
+.sd-queue li.grace::after{left:calc(100% + var(--gap) + 40px);border-left:8px solid var(--mulberry);border-right:0}
+@media (max-width:1300px){.sd-grid{--gap:26px;grid-template-columns:minmax(0,1.12fr) minmax(0,.56fr) minmax(0,.94fr)}.sd-col-head{white-space:normal}.sd-client{padding:22px 20px}.sd-agent-head h3.serif{font-size:26px}.rd li{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) 40px;gap:10px}.sd-col-head{font-size:23px}}
+/* below the desktop: the agent card first, then the two client columns (one on phones), no connectors */
+@media (max-width:1180px){
+  .sd-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none;gap:20px}
+  .sd-agent{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-column:1/-1;grid-row:1;gap:0 24px;background:#fff;border:1px solid var(--card-line);border-radius:14px;box-shadow:var(--card-shadow);padding:20px 22px}
+  .sd-agent-head,.sd-queue{grid-row:auto;grid-column:auto;border:0;box-shadow:none;border-radius:0;padding:0;align-self:start;background:none}
+  .sd-queue li::before,.sd-queue li::after{display:none}
+  .sd-col-head{grid-row:2;margin:16px 0 0}
+  .sd-col-head.h{grid-column:2}
+  .sd-client{grid-row:3;grid-template-rows:none;display:block}
+  .sd-h{grid-column:2}
+  .sd-chips{padding-top:16px}
+  .sd-note{margin-top:0}
+  .sd-spark-l,.sd-spark-r{display:none}
+}
+@media (max-width:760px){
+  .sd-grid{grid-template-columns:minmax(0,1fr);margin-top:32px}
+  .sd-agent{grid-template-columns:1fr;gap:14px}
+  .sd-grid .sd-col-head{font:700 19px/1.3 var(--sans);letter-spacing:0;margin:20px 0 0;white-space:normal}
+  .sd-col-head.n{grid-row:2}.sd-n{grid-row:3}
+  .sd-col-head.h{grid-column:1;grid-row:4}.sd-h{grid-column:1;grid-row:5}
+  .sd-client{padding:18px 16px}
+  .sd-client h3.serif{font-size:22px}
+  .rd li{grid-template-columns:1fr 40px;gap:4px 10px}
+  .rd-bar{grid-column:1/-1;grid-row:2}
+  .rd-what{grid-column:1}.rd-time{grid-column:2;grid-row:1}
+}

@@ -15,6 +15,6 @@ export function sitePages({ contract }: Partial<SiteContext> = {}): SiteBuild {
       ...docsPages(),
       { path: '/404', html: siteNotFoundHtml(identity, data, contract) },
     ],
-    assets: ['rer-theme.css', 'site.css', 'landing.css', 'docs.css', 'fonts', 'brand'],
+    assets: ['rer-theme.css', 'site.css', 'docs.css', 'fonts', 'brand', 'landing', 'favicon.ico'],
   }
 }

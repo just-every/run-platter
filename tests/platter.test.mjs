@@ -756,7 +756,7 @@ test('EDIT-012 duplicate accepted content into an independent member-owned draft
   if(status==='expired')await h.cmd('expiry.set',{id:source.id,version:3,mode:'date',date:'2020-01-01'})
   if(status==='withdrawn')await h.cmd('proposal.withdraw',{id:source.id,version:3,reason:'Cancelled',notice:false})
   const old=await get(source.id);assert.equal(old.status,status)
-  const next=await h.cmd('proposal.duplicate',{id:source.id,version:old.version});assert.equal((await get(next.id)).status,'draft');assert.deepEqual(await get(source.id),old)
+  const next=await h.cmd('proposal.duplicate',{id:source.id,version:old.version});const copied=await get(next.id);assert.equal(copied.status,'draft');for(const field of ['mode','days','date','warningDays'])assert.deepEqual(copied.expiry[field],old.expiry[field],'expiry '+field+' copied from '+status);assert.deepEqual(await get(source.id),old)
  }
  const draftSource=await get(same.id);await h.cmd('proposal.approve',{id:same.id,version:draftSource.version,revision:1});await h.cmd('proposal.send',{id:same.id,version:2});await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:same.id,version:3,scope:'Unsent negotiated scope'})
  const negotiated=await h.cmd('proposal.duplicate',{id:same.id,version:4});assert.equal((await get(negotiated.id)).scope,'Unsent negotiated scope')

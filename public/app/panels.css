@@ -24,10 +24,12 @@ del{color:var(--pl-red);text-decoration-thickness:1px}ins{background:var(--pl-bu
 .json{white-space:pre-wrap;overflow-wrap:anywhere;max-height:32rem;overflow:auto;font-size:13px;padding:12px;background:var(--pl-wash);border-radius:6px}
 code{font-size:.92em}
 details summary{cursor:pointer;font-weight:600}
-.exceptions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px;margin:0 0 6px}
+.exceptions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px;align-items:start;margin:0 0 6px}
 .exceptions>.panel{margin:0 0 18px}
 .exceptions .panel:has([aria-label="Sender bounce notices"]){border-color:var(--pl-red-edge);background:linear-gradient(var(--pl-red-wash),var(--pl-surface) 120px)}
 .exceptions .panel:has([aria-label="Sender bounce notices"])>h2{color:var(--pl-red)}
+.exceptions [aria-label="Sender bounce notices"] button{background:var(--pl-mulberry);border-color:var(--pl-mulberry)}
+.exceptions [aria-label="Sender bounce notices"] button:hover{background:var(--pl-mulberry-deep)}
 .dossier{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start;margin-top:36px}
 .dossier>.panel{margin:0}
 .dossier>.wide,.dossier>.panel:has(.records li:nth-child(3)){grid-column:1/-1}

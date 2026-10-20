@@ -18,6 +18,10 @@ export interface SampleProposal {
   codeRequested?: number
   accepted?: { at: number; option: 'one' | 'two'; name: string }
   exported?: number
+  /** The provider reported the first invitation bounced, this many days ago. */
+  bounced?: number
+  /** A question the client asked on the sent revision. */
+  question?: { at: number; section: 'scope' | 'pricing' | 'terms'; text: string }
 }
 
 export const member = { n: 1, email: 'ana@fernhilldesign.example', name: 'Ana Reyes', joined: 140 }
@@ -74,8 +78,8 @@ export const proposals: SampleProposal[] = [
   { n: 7, client: 6, title: 'Rio Verde Taqueria · menu redesign', deposit: '25', revisions: [{ at: 9, by: 'agent', one: ['Menu design', '1500.00'], two: ['Menu design and menu boards', '2700.00'], scope: `A new menu for the East Cesar Chavez taqueria.\n\n${lines('Menu layout, English and Spanish', 'Photography direction for 8 plates', 'Menu boards option adds: 2 printed and installed menu boards')}` }], approvals: [[1, 8]], sent: 8, accepted: { at: 3, option: 'two', name: 'Marisol Vega' } },
   { n: 8, client: 5, title: 'Cedar & Sage Florals · storefront window vinyl', deposit: '30', revisions: [{ at: 6, by: 'owner', one: ['Front window', '800.00'], two: ['Front and side windows', '1350.00'], scope: `Window graphics for the Burnet Road shop.\n\n${lines('Front window vinyl with hours and logo', 'Installation before Saturday opening', 'Side window option adds: a frosted privacy band with florals')}` }], approvals: [[1, 5]], sent: 5, accepted: { at: 2, option: 'one', name: 'June Alvarez' } },
   // Sent: waiting on the client.
-  { n: 9, client: 4, title: 'Barton Creek Yoga · class schedule and social kit', deposit: '30', revisions: [{ at: 4, by: 'owner', one: ['Schedule posters', '640.00'], two: ['Posters and social templates', '1140.00'], scope: `Fall class schedule for the studio.\n\n${lines('11 x 17 and 18 x 24 poster layouts', '200 printed 11 x 17 posters', 'Social option adds: 6 square posts and story templates')}` }], approvals: [[1, 4]], sent: 4, codeRequested: 1 },
-  { n: 10, client: 8, title: 'Moonlight Tower Records · in-store graphics', deposit: '30', revisions: [{ at: 8, by: 'member', one: ['Interior graphics', '2400.00'], two: ['Interior graphics and window vinyl', '3200.00'], scope: `Graphics for the record store's new listening room.\n\n${lines('Genre wall headers and bin cards', 'Listening room mural, 14 ft', 'Window option adds: front window vinyl for the Saturday sale')}` }], approvals: [[1, 7]], sent: 7 },
+  { n: 9, client: 4, title: 'Barton Creek Yoga · class schedule and social kit', deposit: '30', revisions: [{ at: 4, by: 'owner', one: ['Schedule posters', '640.00'], two: ['Posters and social templates', '1140.00'], scope: `Fall class schedule for the studio.\n\n${lines('11 x 17 and 18 x 24 poster layouts', '200 printed 11 x 17 posters', 'Social option adds: 6 square posts and story templates')}` }], approvals: [[1, 4]], sent: 4, codeRequested: 1, question: { at: 0.8, section: 'pricing', text: 'Could the social templates cover our winter schedule too, or would that be a separate proposal?' } },
+  { n: 10, client: 8, title: 'Moonlight Tower Records · in-store graphics', deposit: '30', revisions: [{ at: 8, by: 'member', one: ['Interior graphics', '2400.00'], two: ['Interior graphics and window vinyl', '3200.00'], scope: `Graphics for the record store's new listening room.\n\n${lines('Genre wall headers and bin cards', 'Listening room mural, 14 ft', 'Window option adds: front window vinyl for the Saturday sale')}` }], approvals: [[1, 7]], sent: 7, bounced: 6.9 },
   { n: 11, client: 9, title: 'Zilker Bike Co. · catalog layout', deposit: '50', revisions: [
     { at: 16, by: 'owner', one: ['Catalog layout', '980.00'], two: ['Layout and product photography', '1650.00'], scope: `The 2027 bike catalog.\n\n${lines('24-page layout, print and web', 'Photography option adds: studio shots of 18 bikes')}` },
     { at: 14, by: 'owner', one: ['Catalog layout', '1080.00'], two: ['Layout and product photography', '1750.00'], scope: `The 2027 bike catalog.\n\n${lines('28-page layout, print and web', 'Photography option adds: studio shots of 18 bikes')}` },

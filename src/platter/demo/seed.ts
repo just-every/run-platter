@@ -10,6 +10,7 @@ import { invoiceFile } from '../invoices'
 import { proposalMail } from '../mail'
 import { hash, secret, snapshot } from '../model'
 import { businessImportCommand } from '../movein/business-import'
+import { reportBounces } from './bounces.mjs'
 import { catalogCsv, clients, keys, member, owner as persona, proposals, type Preparer, type SampleProposal } from './studio'
 
 const DAY = 86400000, MINUTE = 60000
@@ -33,6 +34,7 @@ export async function seedStudio(env: Bindings, ownerEmail: string, now: Date): 
   // Each proposal's events keep their order but fall at its own time of day.
   for (const sample of proposals) writes.push(...await proposalWrites(env, sample, { ago: days => ago(days) - (sample.n * 53 % 240) * MINUTE, owner: owner.id, ownerEmail, preparer }))
   await db.batch(writes)
+  await reportBounces(env, proposals.filter(sample => sample.bounced !== undefined).map(sample => ({ mailId: id(4, sample.n * 10 + 1), recipient: clients.find(([n]) => n === sample.client)![2], at: ago(sample.bounced!) })))
   await importCatalog(db, { id: owner.id, email: ownerEmail, role: 'owner' })
 }
 
@@ -59,18 +61,20 @@ async function proposalWrites(env: Bindings, sample: SampleProposal, { ago, owne
   const version = revision + approvals.length + (sentAt ? 1 : 0) + (sample.accepted ? 1 : 0)
   const row = { ...offers[revision - 1]!, revision, options: JSON.stringify(offers[revision - 1]!.options), approved_by: approval ? ownerEmail : null, approved_at: approval ? ago(approval[1]) : null, clientName, clientEmail }
   const writes = [
-    db.prepare('INSERT INTO p_proposals (id, client_id, title, scope, terms, version, revision, status, deposit_bps, options, prepared_by, approved_by, approved_at, created_at, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING')
-      .bind(pid, row.client_id, row.title, row.scope, row.terms, version, revision, status, row.deposit_bps, row.options, preparer(current.by), row.approved_by, row.approved_at, ago(sample.revisions[0]!.at), row.currency),
+    db.prepare('INSERT INTO p_proposals (id, client_id, title, scope, terms, version, revision, status, deposit_bps, options, prepared_by, approved_by, approved_at, created_at, currency, sales_owner_id, sales_owner_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING')
+      .bind(pid, row.client_id, row.title, row.scope, row.terms, version, revision, status, row.deposit_bps, row.options, preparer(current.by), row.approved_by, row.approved_at, ago(sample.revisions[0]!.at), row.currency, sample.revisions[0]!.by === 'member' ? memberId : owner, sample.revisions[0]!.by === 'member' ? member.name : persona.name),
     ...offers.map((offer, i) => db.prepare('INSERT INTO p_revisions (proposal_id, revision, snapshot, prepared_by, prepared_at, currency) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING')
       .bind(pid, i + 1, JSON.stringify(snapshot({ ...offer, revision: i + 1 })), preparer(sample.revisions[i]!.by), ago(sample.revisions[i]!.at), offer.currency)),
     ...approvals.map(([r, days], i) => db.prepare('INSERT INTO p_approvals (id, proposal_id, revision, actor_id, approved_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING').bind(id(3, sample.n * 10 + i), pid, r, owner, ago(days))),
   ]
   if (!sentAt) return writes
-  const token = secret(), mail = (n: number, [subject, body]: [string, string], at: number) => db.prepare("INSERT INTO p_mail (id, proposal_id, recipient, subject, body, status, created_at) VALUES (?, ?, ?, ?, ?, 'accepted', ?) ON CONFLICT DO NOTHING").bind(id(4, sample.n * 10 + n), pid, clientEmail, subject, body, at)
+  const token = secret(), mail = (n: number, [subject, body]: [string, string], at: number) => db.prepare("INSERT INTO p_mail (id, proposal_id, recipient, subject, body, status, created_at, sender_id, provider, provider_message_id) VALUES (?, ?, ?, ?, ?, 'accepted', ?, ?, ?, ?) ON CONFLICT DO NOTHING")
+    .bind(id(4, sample.n * 10 + n), pid, clientEmail, subject, body, at, n === 1 ? owner : null, n === 1 && sample.bounced !== undefined ? 'resend' : null, n === 1 && sample.bounced !== undefined ? `demo-${pid}` : null)
   const verifiedAt = sample.accepted ? ago(sample.accepted.at) - 6 * MINUTE : undefined, codeAt = verifiedAt ? verifiedAt - 3 * MINUTE : sample.codeRequested === undefined ? undefined : ago(sample.codeRequested)
   writes.push(db.prepare('INSERT INTO p_shares (proposal_id, revision, token, code_hash, code_expires, code_attempts, code_generation, code_sent_at, session_hash, session_expires) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?) ON CONFLICT DO NOTHING')
     .bind(pid, revision, token, codeAt && !verifiedAt ? await hash(secret()) : null, codeAt && !verifiedAt ? codeAt + 10 * MINUTE : null, codeAt ? 1 : 0, codeAt ?? null, verifiedAt ? await hash(secret()) : null, verifiedAt ? verifiedAt + DAY : null))
   writes.push(mail(1, proposalMail(sample.title, `${env.AUTH_ORIGIN}/p/${token}`), sentAt))
+  if (sample.question) writes.push(db.prepare('INSERT INTO p_questions (id, proposal_id, revision, client_id, client_email, section, text, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING').bind(id(8, sample.n), pid, revision, row.client_id, clientEmail, sample.question.section, sample.question.text, ago(sample.question.at)))
   if (codeAt) writes.push(mail(2, verifiedAt ? [codeMail('', sample.title)[0], 'Verification code consumed'] : codeMail(sixDigitCode(), sample.title), codeAt))
   if (!sample.accepted) return writes
   const { option, deposit, frozen, consent } = acceptanceTerms(row, sample.accepted.option), acceptedAt = ago(sample.accepted.at)

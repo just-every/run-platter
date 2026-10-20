@@ -18,7 +18,8 @@ export function proposalsPage(state: any, selection = new URLSearchParams()): st
   const list = proposals.length ? `<ul class="records">${proposals.map((p: any) => `<li><a href="${escape(proposalPath(p.id))}">${escape(p.title)}</a><span>${escape(p.clientName)} · ${statusPill(p.status)}</span></li>`).join('')}</ul>` : empty('No proposals yet. Prepare your first proposal below.')
   const canPrepare = ['owner', 'member'].includes(state.actor?.role)
   const owner = state.actor?.role === 'owner'
-  const exceptions = openQuestionsPanel(state) + bounceInbox(state)
+  // Exceptions appear only when there is one, above the line they interrupt (owner pick A).
+  const exceptions = (state.openQuestions?.length ? openQuestionsPanel(state) : '') + (state.bounceNotices?.length ? bounceInbox(state) : '')
   const prepare = canPrepare ? `<section class="prepare" aria-labelledby="prepare-title"><h2 id="prepare-title">Prepare a proposal</h2>` + (state.clients?.length
     ? composerShelf(state) + composerForm(state, undefined, 'prepare', 'composer-new') + receipt('<p class="receipt-sum muted">The client chooses one of the two options and pays the deposit percentage of it.</p>', '<button form="composer-new">Prepare proposal</button>')
     : '<p>Add a client before preparing a proposal.</p>' + (owner ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) + '</section>' : ''

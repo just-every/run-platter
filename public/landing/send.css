@@ -20,11 +20,11 @@
 .dlv li.bounce{color:#6A6A75;background:#F3F2F5;border-radius:8px;padding:4px 8px;margin-left:-8px}
 .dlv li.opened .pill{padding:4px 12px;font-size:14px}
 .rd{margin-top:22px}
-.rd h4{font:700 16px/1.3 var(--sans);margin:0 0 10px;color:var(--ink)}
+.rd h4{font:700 16px/1.3 var(--pl-sans);margin:0 0 10px;color:var(--pl-ink)}
 .rd ul{list-style:none;margin:0;padding:0;display:grid;gap:12px}
 .rd li{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.15fr) 40px;align-items:center;gap:14px;font-size:15px}
 .rd-bar{width:100%;height:10px;display:block}
-.rd-bar .track{fill:#EDECEF}.rd-bar .fill{fill:var(--mulberry)}
+.rd-bar .track{fill:#EDECEF}.rd-bar .fill{fill:var(--pl-site-mulberry)}
 .rd-time{text-align:right;font-variant-numeric:tabular-nums;color:#3B3B46}
 .sd-note{padding:18px 20px;font-size:16px;line-height:1.5;position:relative}
 .sd-note .meta{margin-top:8px}
@@ -41,15 +41,15 @@
 /* each queue row is tied to the note it drafted: a stub out of the row, a run down (or up) the gutter, a stub into the note */
 .sd-queue li.tom{anchor-name:--tom}.sd-queue li.grace{anchor-name:--grace}
 .tom-note{anchor-name:--tomnote}.grace-note{anchor-name:--gracenote}
-.sd-queue li::before,.sd-note::before{content:"";position:absolute;top:22px;border-top:2px dotted var(--mulberry)}
+.sd-queue li::before,.sd-note::before{content:"";position:absolute;top:22px;border-top:2px dotted var(--pl-site-mulberry)}
 .sd-queue li::before{width:calc(17px + var(--gap) / 2)}
 .sd-queue li.tom::before{right:100%}.sd-queue li.grace::before{left:100%}
 .sd-note::before{top:27px;width:calc(var(--pad) + 1px + var(--gap) / 2)}
 .tom-note::before{left:100%}.grace-note::before{right:100%}
 .sd-note::after{content:"";position:absolute;top:22px;border:6px solid transparent}
-.tom-note::after{left:calc(100% + 1px);border-right:8px solid var(--mulberry);border-left:0}
-.grace-note::after{right:calc(100% + 1px);border-left:8px solid var(--mulberry);border-right:0}
-.sd-tie{position:absolute;width:0;border-left:2px dotted var(--mulberry);pointer-events:none}
+.tom-note::after{left:calc(100% + 1px);border-right:8px solid var(--pl-site-mulberry);border-left:0}
+.grace-note::after{right:calc(100% + 1px);border-left:8px solid var(--pl-site-mulberry);border-right:0}
+.sd-tie{position:absolute;width:0;border-left:2px dotted var(--pl-site-mulberry);pointer-events:none}
 .sd-tie.tom{left:calc(anchor(--tom left) - 18px - var(--gap) / 2);top:min(calc(anchor(--tom top) + 22px),calc(anchor(--tomnote top) + 27px));bottom:min(calc(anchor(--tom top) - 24px),calc(anchor(--tomnote top) - 29px))}
 .sd-tie.grace{left:calc(anchor(--grace right) + 16px + var(--gap) / 2);top:min(calc(anchor(--grace top) + 22px),calc(anchor(--gracenote top) + 27px));bottom:min(calc(anchor(--grace top) - 24px),calc(anchor(--gracenote top) - 29px))}
 /* the column-head sparks stay inside the window once the margin is narrower than they are */
@@ -71,7 +71,7 @@
 @media (max-width:760px){
   .sd-grid{grid-template-columns:minmax(0,1fr);margin-top:32px}
   .sd-agent{grid-template-columns:1fr;gap:14px}
-  .sd-grid .sd-col-head{font:700 19px/1.3 var(--sans);letter-spacing:0;margin:20px 0 0;white-space:normal}
+  .sd-grid .sd-col-head{font:700 19px/1.3 var(--pl-sans);letter-spacing:0;margin:20px 0 0;white-space:normal}
   .sd-col-head.n{grid-row:2}.sd-n{grid-row:3}
   .sd-col-head.h{grid-column:1;grid-row:4}.sd-h{grid-column:1;grid-row:5}
   .sd-client{padding:18px 16px}

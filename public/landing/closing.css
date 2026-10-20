@@ -16,7 +16,7 @@
 .cl-free{margin-top:14px;font-size:18px;color:#3B3B46}
 .cl-actions{display:flex;justify-content:center;align-items:center;gap:32px;margin-top:22px}
 .cl-actions .cta{font-size:19px;min-height:50px;padding:0 34px}
-.cl-docs{color:var(--mulberry);font-size:18px;text-decoration-thickness:1.5px}
+.cl-docs{color:var(--pl-site-mulberry);font-size:18px;text-decoration-thickness:1.5px}
 @media (max-width:1180px){
   .cl-cards{padding:0;margin-top:12px;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
   .cl-card{padding:14px 16px;font-size:15px;gap:12px}

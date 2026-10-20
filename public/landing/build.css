@@ -3,11 +3,11 @@
 .bd-col{display:grid;gap:44px;padding-top:36px;grid-row:1}
 .bd-col.l{grid-column:1}.bd-page{grid-column:2;grid-row:1}.bd-col.r{grid-column:3}
 .bd-src{padding:22px 24px 20px;font-size:15px;line-height:1.5;color:#3B3B46}
-.bd-src h3.serif{font-size:21px;color:var(--ink);margin:0 0 8px}
-.bd-src::after{content:"";position:absolute;top:50%;width:56px;height:8px;background:radial-gradient(circle,var(--mulberry) 1.2px,transparent 1.5px) 0 50%/6px 8px repeat-x}
+.bd-src h3.serif{font-size:21px;color:var(--pl-ink);margin:0 0 8px}
+.bd-src::after{content:"";position:absolute;top:50%;width:56px;height:8px;background:radial-gradient(circle,var(--pl-site-mulberry) 1.2px,transparent 1.5px) 0 50%/6px 8px repeat-x}
 .bd-src.l::after{left:100%}
 .bd-src.r::after{right:100%}
-.bd-src::before{content:"";position:absolute;top:calc(50% + 1px);width:7px;height:7px;border-radius:50%;background:var(--mulberry)}
+.bd-src::before{content:"";position:absolute;top:calc(50% + 1px);width:7px;height:7px;border-radius:50%;background:var(--pl-site-mulberry)}
 .bd-src.l::before{left:calc(100% + 52px)}
 .bd-src.r::before{right:calc(100% + 52px)}
 .bd-spark{width:24px;height:24px;top:-18px}
@@ -15,16 +15,16 @@
 .bd-src.r .bd-spark{right:-14px}
 .bd-kv{display:grid;gap:6px;margin:0}
 .bd-kv>div{display:flex;flex-wrap:wrap;gap:0 10px}
-.bd-kv dt{color:var(--ink);font-weight:500}
+.bd-kv dt{color:var(--pl-ink);font-weight:500}
 .bd-kv dd{margin:0;min-width:0}
 .swatches{display:flex;gap:14px;margin-top:14px}
 .swatch{width:42px;height:42px;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgb(0 0 0 / .08)}
 .struck{text-decoration:line-through;color:#7A7A85}
-.hl-block{margin-top:10px;background:var(--butter-wash);border-radius:8px;padding:10px 14px;color:var(--ink)}
+.hl-block{margin-top:10px;background:var(--pl-site-butter-wash);border-radius:8px;padding:10px 14px;color:var(--pl-ink)}
 .bd-page{padding:30px 32px 22px;font-size:15px;line-height:1.45;border-color:#E3E0E6;box-shadow:0 2px 4px rgb(28 28 36 / .05),0 22px 48px rgb(28 28 36 / .10)}
-.bd-brand{font-family:var(--serif);font-variation-settings:'opsz' 60;font-weight:700;font-size:38px;line-height:1.1;color:#1F4A36;text-align:center;letter-spacing:-.02em;padding-bottom:16px;border-bottom:1px solid #E5E3E8}
+.bd-brand{font-family:var(--pl-serif);font-variation-settings:'opsz' 60;font-weight:700;font-size:38px;line-height:1.1;color:#1F4A36;text-align:center;letter-spacing:-.02em;padding-bottom:16px;border-bottom:1px solid #E5E3E8}
 .bd-brand-spark{width:26px;height:26px;right:64px;top:20px}
-.bd-title{font-family:var(--serif);font-variation-settings:'opsz' 32;font-weight:650;font-size:25px;text-align:center;margin:16px 0 2px}
+.bd-title{font-family:var(--pl-serif);font-variation-settings:'opsz' 32;font-weight:650;font-size:25px;text-align:center;margin:16px 0 2px}
 .bd-when{display:flex;justify-content:center;color:#55555F}
 .bd-when .dl,.bd-dep .dl{justify-content:center;margin-left:0;clip-path:none}
 .bd-when .dl>span:first-child,.bd-dep .dl>span:first-child{padding-left:0}
@@ -33,7 +33,7 @@
 .bd-nav .dl{justify-content:space-between;margin-left:-.7em;clip-path:inset(-4px -4px -4px .7em)}
 .bd-nav .dl>span::before{width:.7em}
 .bd-pkg{position:relative;padding:18px 0 16px;border-bottom:1px solid #E5E3E8}
-.bd-pkg h4{font-family:var(--serif);font-variation-settings:'opsz' 24;font-weight:650;font-size:18px;margin:0}
+.bd-pkg h4{font-family:var(--pl-serif);font-variation-settings:'opsz' 24;font-weight:650;font-size:18px;margin:0}
 .bd-step{display:flex;align-items:center;gap:16px;margin-top:14px;flex-wrap:wrap;position:relative}
 .stepper{display:inline-grid;grid-template-columns:40px 72px 40px;border:1px solid #CFCCD4;border-radius:8px;overflow:hidden;font-size:17px;text-align:center;line-height:40px}
 .stepper span{color:#3B3B46}
@@ -46,7 +46,7 @@
 .bd-opts li{display:flex;align-items:center;gap:12px}
 .box{width:20px;height:20px;border:1.5px solid #8C8C96;border-radius:4px;flex:none}
 .bd-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #E5E3E8}
-.bd-row.total{font-family:var(--serif);font-variation-settings:'opsz' 32;font-weight:700;font-size:21px;border:0}
+.bd-row.total{font-family:var(--pl-serif);font-variation-settings:'opsz' 32;font-weight:700;font-size:21px;border:0}
 .bd-dep{width:100%;justify-content:center;border-radius:10px;padding:10px 14px;font-size:15px}
 .bd-dep .dl{flex:0 1 auto}
 .bd-bal{text-align:center;color:#3B3B46;margin-top:10px}

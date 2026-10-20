@@ -24,7 +24,7 @@ import { negotiationCommand, pendingNegotiation } from './negotiation'
 
 export function proposalFields(p:Record<string,unknown>){
  const tables=tableInputs(p.pricingTables)
- const price=(id:string,value:unknown)=>tables.some(t=>t&&t.optionId===id)?1:dollars(value)
+ const price=(id:string,value:unknown)=>tables.some(t=>t&&t.optionId===id)?1:dollars(value,id==='one'?'priceOne':'priceTwo')
  const deposit=Number(p.depositPercent);need(Number.isFinite(deposit)&&Number.isInteger(deposit*100)&&deposit>0&&deposit<=100,'Deposit must be from 0.01 to 100 percent')
  const terms=p.terms??'';need(typeof terms==='string'&&terms.length<=10000,'Terms must be text up to 10000 characters')
  return{section_conditions:sectionConditions(p.sectionConditions??Object.fromEntries(['scope','terms'].filter(k=>p[k+'Option']).map(k=>[k,p[k+'Option']]))),terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:pricedOptions([{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)}

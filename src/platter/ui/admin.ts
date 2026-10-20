@@ -1,12 +1,6 @@
 import { businessImportPage } from './business-import'
 import { area, date, empty, escape, field, form, hidden, ownerOnly, panel, proposalPath, statusPill, type Feedback } from './shared'
 
-export function clientsPage(state: any): string {
-  if (state.actor?.role !== 'owner') return ownerOnly()
-  const clients = state.clients ?? []
-  const list = clients.length ? clients.map((client: any) => panel(client.name, `<p>${escape(client.email)}</p>` + form('client.erase', '/app/clients', hidden('id', client.id) + `<p>Only clients without proposal or import history can be erased. Type <strong>${escape(client.name)}</strong> to confirm.</p>` + field('Confirm client name', 'confirmName', '', 'required autocomplete="off"') + '<button class="danger">Erase unused client</button>'))).join('') : empty('No clients have been added.')
-  return panel('Add a client', form('client.save', '/app/clients', field('Client name', 'name', '', 'required autocomplete="organization"') + field('Client email', 'email', '', 'type="email" required autocomplete="email"') + '<button>Add client</button>', 'client-new'), 'slim-form') + (clients.length ? `<div class="client-grid">${list}</div>` : list)
-}
 export function accessPage(state: any): string {
   if (state.actor?.role !== 'owner') return ownerOnly()
   const keys = state.agentKeys ?? []

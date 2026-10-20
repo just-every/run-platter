@@ -66,7 +66,7 @@
 .rer-themed.rer-themed label:not(:has(input[type=checkbox])){font-weight:500;font-size:15px}
 .rer-themed.rer-themed input:not([type=checkbox]):not([type=hidden]){border-radius:var(--pl-radius);border:1px solid var(--pl-field);background:var(--pl-surface);color:var(--pl-ink);min-height:44px}
 .rer-themed.rer-themed input:not([type=checkbox]):not([type=hidden]):focus{outline:none;border-color:var(--pl-mulberry);box-shadow:var(--pl-focus)}
-.rer-themed.rer-themed input[type=checkbox]{accent-color:var(--pl-ink)}
+.rer-themed.rer-themed input[type=checkbox]{width:24px;height:24px;margin:0;accent-color:var(--pl-ink)}
 .rer-themed.rer-themed button{border-radius:var(--pl-radius);min-height:46px;font-weight:600;background:var(--pl-ink)}
 .rer-themed.rer-themed :focus-visible{outline-color:var(--pl-mulberry)}
 .rer-themed.rer-themed main>p:not(.rer-brand){text-align:left}

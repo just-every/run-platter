@@ -1,7 +1,7 @@
-export type Feedback = { message?: string; error?: string; result?: any }
+export type Feedback = { message?: string; error?: string; result?: any; status?: number; field?: string; input?: Record<string, unknown> }
 export const escape = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!)
 export const money = (cents: number, currency?: string): string => `$${(Number(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${currency ? ' ' + escape(currency) : ''}`
-// Times read in the installation's time zone while a page renders (renderApp sets it; client pages stay UTC).
+// Times read in the installation's time zone while a page renders (renderApp and renderClient set it).
 let zone = 'UTC'
 export function inZone<T>(name: string | undefined, render: () => T): T {
   const previous = zone

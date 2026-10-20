@@ -3,6 +3,8 @@
 .agent-line img{flex:none;width:34px;height:34px}.agent-line strong{color:var(--pl-ink-soft);font-weight:600}
 .person-dot{flex:none;width:12px;height:12px;margin:0 7px;border-radius:50%;background:var(--pl-butter);box-shadow:0 0 0 2px var(--pl-ink)}
 .shelf-title{margin:0 0 8px;font:700 16px/1.3 var(--pl-sans);letter-spacing:.09em;color:var(--pl-ink)}
+summary.shelf-title{list-style:none;cursor:default;min-height:28px;display:flex;align-items:center;gap:6px}summary.shelf-title::-webkit-details-marker{display:none}
+.shelf-count{display:none;font-weight:500;color:var(--pl-muted);letter-spacing:0}
 .shelf{margin:0 0 22px}
 .shelf-row{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:10px}
 .tile{display:grid;justify-items:center;align-content:start;gap:5px;min-height:144px;padding:12px 8px 10px;border:1px solid var(--pl-rule);border-radius:6px;background:var(--pl-surface);text-align:center;transition:transform .15s,box-shadow .15s}
@@ -21,7 +23,7 @@
 .tier legend+*{clear:both}
 .tier.raised{background:linear-gradient(135deg,var(--pl-butter-wash),var(--pl-surface) 180%);border-color:var(--pl-butter-edge);box-shadow:var(--pl-shadow-card);transform:translateY(-10px)}
 .tier.raised .tier-legend,.tier.raised legend{color:#7A5A00}
-.tier-name,.tier-price{gap:2px;font-size:13px;color:var(--pl-muted)}
+.tier-name,.tier-price{gap:2px;font-size:12px;font-weight:400;letter-spacing:.01em;color:var(--pl-muted)}
 .tier-name input{min-height:0;padding:2px 6px;margin-left:-7px;width:calc(100% + 7px);border-color:transparent;background:transparent;font:900 40px/1.05 var(--pl-serif);font-variation-settings:'opsz' 60;letter-spacing:-.03em;color:var(--pl-ink)}
 .tier-price input{min-height:0;padding:2px 6px;margin-left:-7px;width:calc(100% + 7px);border-color:transparent;background:transparent;font:800 26px/1.25 var(--pl-sans);letter-spacing:-.01em;color:var(--pl-ink)}
 .tier-name input:hover,.tier-price input:hover{border-color:var(--pl-field)}
@@ -30,8 +32,14 @@
 .tier .chip{margin-top:auto}
 .tier-deposit output{font-weight:600}
 /* The input's own intrinsic width must never set the column's minimum (it differs by platform font metrics). */
-.money-field{display:flex;align-items:baseline;gap:2px;min-width:0;font:800 26px/1.25 var(--pl-sans);color:var(--pl-ink)}
-.money-field input{flex:1 1 0;min-width:0;width:0;margin-left:0;padding-left:2px}
+.money-field{position:relative;display:flex;align-items:baseline;gap:0;min-width:0;font:800 26px/1.25 var(--pl-sans);color:var(--pl-ink)}
+.money-field input{flex:1 1 0;min-width:0;width:0;margin-left:0;padding-left:1px}
+.money-figure{position:absolute;inset:0 0 0 0;display:flex;align-items:center;padding:2px 0 2px 1px;pointer-events:none;white-space:nowrap;overflow:hidden;font:inherit;font-variant-numeric:tabular-nums}
+.money-field:not(:focus-within):not(:has(input:placeholder-shown)) .money-sign{visibility:hidden}
+.money-field:not(:focus-within):not(:has(input:placeholder-shown)) input{color:transparent}
+.money-field:focus-within .money-figure,.money-figure:empty,.money-field:has(input:placeholder-shown) .money-figure{visibility:hidden}
+.money-field:has(input.invalid) .money-figure{color:var(--pl-red)}
+.money-field:has(input[readonly]) .money-figure{color:var(--pl-ink-soft)}
 .tier-name,.tier-price{min-width:0}
 .tier-name input{min-width:0}
 .tier-lines{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0;margin:4px 0 6px;font-size:15px}
@@ -73,6 +81,11 @@
 }
 @media(max-width:600px){
  .agent-line{font-size:15px;align-items:flex-start;gap:10px}
+ .shelf{margin-bottom:16px}
+ summary.shelf-title{display:flex;align-items:center;gap:6px;min-height:44px;margin:0;padding:0 14px;border:1px solid var(--pl-rule);border-radius:var(--pl-radius);cursor:pointer;list-style:none}
+ summary.shelf-title::after{content:"";width:7px;height:7px;margin-left:auto;border:solid var(--pl-muted);border-width:0 2px 2px 0;transform:translateY(-2px) rotate(45deg)}
+ details.shelf[open] summary.shelf-title{margin-bottom:10px}details.shelf[open] summary.shelf-title::after{transform:translateY(2px) rotate(-135deg)}
+ .shelf-count{display:inline}
  .shelf-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
  .tile{min-height:0;grid-template-columns:30px minmax(0,1fr);justify-items:start;text-align:left;gap:2px 10px;padding:10px}
  .tile .glyph{grid-row:span 3;width:30px;height:30px}
@@ -82,15 +95,34 @@
  .tier-name input,.tier-title{font-size:30px}
  .tier-price input,.tier-amount,.money-field{font-size:22px}
  .receipt{margin:16px -16px 0;padding:10px 16px 12px;gap:8px}
- .receipt-sum{flex-basis:100%;font-size:15px;line-height:1.4}.receipt-sum .serif{font-size:17px}
- .receipt-note{font-size:12px;line-height:1.4}
- .receipt-actions{width:100%;margin:0;gap:8px;flex-wrap:nowrap}
- .receipt-actions>*{flex:1 1 0;min-width:0}
+ .receipt-sum{flex-basis:100%;font-size:14px;line-height:1.45}.receipt-sum .serif{font-size:16px}
+ .receipt-sum .currency-note,.composer-page:not(.frozen) .receipt-note{display:none}
+ .receipt-actions{width:100%;margin:0;gap:8px;flex-wrap:wrap}
+ .receipt-actions>*{flex:1 0 auto;width:auto;min-width:0}
+ .receipt-actions button,.receipt-actions .button-link{white-space:nowrap}
  .receipt-actions form button{width:100%}
- .receipt-actions button,.receipt-actions .button-link{min-height:44px;padding:10px 12px;font-size:14px}
+ .receipt-actions button,.receipt-actions .button-link{min-height:44px;padding:8px 10px;font-size:14px}
  .prepare>h2{font-size:30px}
 }
 @media(max-width:600px){.details-row>label{padding:8px 10px}.details-row select{font-size:14px}}
 .money-field:has(input.invalid){color:var(--pl-red)}
 .tier-price input.invalid{border-color:var(--pl-red-edge);background:var(--pl-red-wash)}
 .receipt-sum .invalid{color:var(--pl-red);background:var(--pl-red-wash);border-radius:4px;padding:0 4px}
+/* The exception band's own actions: the fix sits beside what it fixes. */
+.band-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}.band-actions:empty{display:none}
+.band-actions button,.band-actions .button-link{min-height:40px;padding:8px 18px;font-size:14px}
+.band.error{color:#8E1232}.band.error strong{color:var(--pl-red)}
+.band.error::before{content:"!";position:absolute;left:18px;top:13px;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--pl-red);color:#fff;font:800 16px/1 var(--pl-sans)}
+/* Main's pricing tables and per-option sections, in the composer's own quiet fields. */
+.visibility-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.scope-tier .visibility{gap:3px;font:400 12px/1.3 var(--pl-sans);letter-spacing:.01em;text-transform:none}
+.scope-tier .visibility select{min-height:34px;padding-top:4px;padding-bottom:4px;font-size:14px}
+.itemised{margin-top:16px}
+.itemised [data-pricing-controls]{gap:14px;padding:16px 18px}
+.itemised [data-pricing-controls]>legend{font:700 16px/1.3 var(--pl-sans);letter-spacing:.09em;color:var(--pl-ink)}
+.itemised [data-pricing-option]{gap:12px}
+.itemised [data-pricing-table]{background:var(--pl-wash)}
+.itemised [data-pricing-line]{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));align-items:end;background:var(--pl-surface)}
+.itemised [data-pricing-line]>legend,.itemised [data-pricing-line]>label:has(textarea){grid-column:1/-1}
+.itemised [data-pricing-line]>button{justify-self:start}
+[data-pricing-display]{margin:12px 0}[data-pricing-display] .records>li{display:block}

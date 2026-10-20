@@ -27,3 +27,11 @@ export function auditCsv(rows: any[]) {
  const cell = (value: unknown) => '"' + String(value ?? '').replace(/^[=+@-]/, "'" + '$&').replaceAll('"', '""') + '"'
  return [columns.join(','), ...rows.map(row => columns.map(column => cell(row[column])).join(','))].join('\r\n') + '\r\n'
 }
+/** What the audit page names each id by: proposal titles, client names, people and agent key labels. */
+export async function auditNames(db: D1Database) {
+ const [proposals, clients, people, keys] = await Promise.all([
+  db.prepare('SELECT id,title AS name FROM p_proposals').all<any>(), db.prepare('SELECT id,name FROM p_clients').all<any>(),
+  db.prepare("SELECT id,COALESCE(NULLIF(display_name,''),email) AS name FROM oa_operators").all<any>(), db.prepare('SELECT id,label AS name FROM p_agent_keys').all<any>()])
+ const map = (r: { results: any[] }) => new Map<string, string>(r.results.map(x => [String(x.id), String(x.name)]))
+ return { proposals: map(proposals), clients: map(clients), people: map(people), keys: map(keys) }
+}

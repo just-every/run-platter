@@ -8,10 +8,14 @@ import { attachmentList } from './attachments'
 import { clientSuggestions } from './suggestions'
 import { changes } from './history'
 import { acceptanceMethod } from './paper'
-import { date, escape, field, money, optionPair, panel, type Feedback } from './shared'
+import { date, escape, field, inZone, money, optionPair, panel, type Feedback } from './shared'
 import { document } from './shell'
 
+// The client reads every time in the installation's zone, the same as the owner sees the same event.
 export function renderClient(view: any, token: string, feedback?: Feedback): Response {
+  return inZone(view.timeZone, () => clientDocument(view, token, feedback))
+}
+function clientDocument(view: any, token: string, feedback?: Feedback): Response {
   const selectedId = view.acceptance?.optionId ?? view.preview?.selection.option.id ?? view.selectedOptionId ?? 'one'
   const endpoint = view.preview ? '/app/preview/client/action?name=' : `/p/${encodeURIComponent(token)}/action?name=`
   const publicForm = (name: string, body: string): string => `<form method="post" action="${endpoint}${name}&amp;optionId=${encodeURIComponent(selectedId)}">${view.preview ? `<fieldset disabled>${body}</fieldset>` : body}</form>`

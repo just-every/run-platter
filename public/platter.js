@@ -36,7 +36,13 @@
 // Live tier columns: each option's deposit and the receipt follow the typed prices and percentage.
 // The server prices acceptance itself; this only mirrors what the saved revision will show.
 (() => {
-  const cents = value => /^\d{1,7}(\.\d{1,2})?$/.test(value.trim()) ? Math.round(Number(value) * 100) : null;
+  // The server's own rule: up to two decimals, written plain or with US thousands commas and a leading $.
+  const cents = value => {
+    const written = value.trim(), plain = /^\$?\s*\d{1,3}(,\d{3}){1,2}(\.\d{1,2})?$/.test(written) ? written.replace(/[$,\s]/g, '') : written.replace(/^\$\s*/, '');
+    if (!/^\d{1,8}(\.\d{1,2})?$/.test(plain)) return null;
+    const amount = Math.round(Number(plain) * 100);
+    return amount > 0 && amount <= 1000000000 ? amount : null;
+  };
   const show = value => value === null ? '—' : '$' + (value / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   for (const form of document.querySelectorAll('form.composer')) {
     const page = form.closest('.composer-page');
@@ -47,6 +53,8 @@
         const price = cents(form.elements[name]?.value ?? '');
         const field = form.elements[name];
         if (field) field.classList.toggle('invalid', field.value.trim() !== '' && price === null);
+        const figure = form.querySelector(`[data-figure-for="${name}"]`);
+        if (figure && field) figure.textContent = price === null ? field.value.trim() : show(price);
         const deposit = price === null || !valid ? null : Math.round(price * percent * 100 / 10000);
         const lines = form.querySelector(`[data-lines-for="${name}"]`);
         if (lines) {
@@ -86,4 +94,26 @@
   };
   new ResizeObserver(resize).observe(viewport);
   resize();
+})();
+
+// The client's email under its select; the band's inline fix; the catalog shelf folded on phones.
+(() => {
+  for (const select of document.querySelectorAll('form.composer select[name="clientId"]')) {
+    const note = select.parentElement.querySelector('[data-client-email]');
+    if (note) select.addEventListener('change', () => { note.textContent = select.selectedOptions[0]?.dataset.email ?? ''; });
+  }
+  for (const button of document.querySelectorAll('[data-fix-field]')) {
+    const field = document.getElementById(button.dataset.fixField);
+    if (!field) continue;
+    button.hidden = false;
+    button.addEventListener('click', () => {
+      if (button.dataset.fixValue !== undefined) {
+        field.value = button.dataset.fixValue;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      field.focus();
+      field.select();
+    });
+  }
+  if (window.matchMedia('(max-width: 600px)').matches) for (const shelf of document.querySelectorAll('details.shelf[open]')) shelf.open = false;
 })();

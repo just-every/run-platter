@@ -85,8 +85,9 @@ export interface AnswerInput {
  * One identity can record one answer; a replay cannot send a second notification.
  */
 export async function recordAnswer(env:Bindings,a:Actor,input:AnswerInput,hook?:{guard:QuestionGuard;writes:D1PreparedStatement[]}) {
- const db=env.DB,owner=await activeOwner(db,a),id=text(input.id,'a proposal'),questionId=text(input.questionId,'a question'),body=text(input.text,'your answer',10000)
+ const db=env.DB,owner=await activeOwner(db,a),id=text(input.id,'a proposal'),questionId=text(input.questionId,'a question'),normalizedBody=text(input.text,'your answer',10000)
  const source=input.source??'app';need(source==='app'||source==='email','Unknown answer source')
+ const body=source==='email'?input.text as string:normalizedBody
  need(source!=='email'||input.sourceId!==undefined,'Authenticated inbound message identity is required')
  need(source!=='email'||hook,'Authenticated inbound authorization is required',403)
  const sourceId=input.sourceId===undefined?await hash(`${a.id}\n${id}\n${questionId}\n${body}`):text(input.sourceId,'a message identity',500)

@@ -26,11 +26,12 @@ const safeLink = (value: unknown): string | null => {
   const href = String(value ?? '')
   return /^\/(?!\/)/.test(href) || /^https?:\/\//i.test(href) ? href : null
 }
-export function notices(feedback?: Feedback): string {
+export function notices(feedback?: Feedback, focus = false): string {
   if (!feedback) return ''
+  const focusTarget = focus ? ' tabindex="-1" autofocus' : ''
   const result = feedback.result
-  let html = feedback.error ? `<div class="notice error" role="alert"><strong>Could not complete this action</strong><p>${escape(feedback.error)}</p></div>` : ''
-  if (feedback.message) html += `<p class="notice" role="status">${escape(feedback.message)}</p>`
+  let html = feedback.error ? `<div class="notice error" role="alert"${focusTarget}><strong>Could not complete this action</strong><p>${escape(feedback.error)}</p></div>` : ''
+  if (feedback.message) html += `<p class="notice" role="status"${feedback.error ? '' : focusTarget}>${escape(feedback.message)}</p>`
   for (const key of ['shareUrl', 'inviteUrl']) {
     const link = result && safeLink(result[key])
     if (link) html += `<div class="notice"><p>${key === 'shareUrl' ? 'Client proposal link' : 'Invitation link'}</p><a class="wrap" href="${escape(link)}">${escape(link)}</a></div>`

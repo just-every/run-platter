@@ -1,0 +1,88 @@
+/* 04 · the client page upright between six labelled sources; leader lines from each source to the page */
+.bd-anatomy{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,520px) minmax(0,1fr);gap:0 56px;margin-top:56px;align-items:start}
+.bd-col{display:grid;gap:44px;padding-top:36px;grid-row:1}
+.bd-col.l{grid-column:1}.bd-page{grid-column:2;grid-row:1}.bd-col.r{grid-column:3}
+.bd-src{padding:22px 24px 20px;font-size:15px;line-height:1.5;color:#3B3B46}
+.bd-src h3.serif{font-size:21px;color:var(--ink);margin:0 0 8px}
+.bd-src::after{content:"";position:absolute;top:50%;width:56px;height:8px;background:radial-gradient(circle,var(--mulberry) 1.2px,transparent 1.5px) 0 50%/6px 8px repeat-x}
+.bd-src.l::after{left:100%}
+.bd-src.r::after{right:100%}
+.bd-src::before{content:"";position:absolute;top:calc(50% + 1px);width:7px;height:7px;border-radius:50%;background:var(--mulberry)}
+.bd-src.l::before{left:calc(100% + 52px)}
+.bd-src.r::before{right:calc(100% + 52px)}
+.bd-spark{width:24px;height:24px;top:-18px}
+.bd-src.l .bd-spark{left:-14px;transform:scaleX(-1)}
+.bd-src.r .bd-spark{right:-14px}
+.bd-kv{display:grid;gap:6px;margin:0}
+.bd-kv>div{display:flex;flex-wrap:wrap;gap:0 10px}
+.bd-kv dt{color:var(--ink);font-weight:500}
+.bd-kv dd{margin:0;min-width:0}
+.swatches{display:flex;gap:14px;margin-top:14px}
+.swatch{width:42px;height:42px;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgb(0 0 0 / .08)}
+.struck{text-decoration:line-through;color:#7A7A85}
+.hl-block{margin-top:10px;background:var(--butter-wash);border-radius:8px;padding:10px 14px;color:var(--ink)}
+.bd-page{padding:30px 32px 22px;font-size:15px;line-height:1.45;border-color:#E3E0E6;box-shadow:0 2px 4px rgb(28 28 36 / .05),0 22px 48px rgb(28 28 36 / .10)}
+.bd-brand{font-family:var(--serif);font-variation-settings:'opsz' 60;font-weight:700;font-size:38px;line-height:1.1;color:#1F4A36;text-align:center;letter-spacing:-.02em;padding-bottom:16px;border-bottom:1px solid #E5E3E8}
+.bd-brand-spark{width:26px;height:26px;right:64px;top:20px}
+.bd-title{font-family:var(--serif);font-variation-settings:'opsz' 32;font-weight:650;font-size:25px;text-align:center;margin:16px 0 2px}
+.bd-when{display:flex;justify-content:center;color:#55555F}
+.bd-when .dl,.bd-dep .dl{justify-content:center;margin-left:0;clip-path:none}
+.bd-when .dl>span:first-child,.bd-dep .dl>span:first-child{padding-left:0}
+.bd-when .dl>span:first-child::before,.bd-dep .dl>span:first-child::before{content:none}
+.bd-nav{border-top:1px solid #E5E3E8;border-bottom:1px solid #E5E3E8;margin:14px 0 0;padding:9px 0;font-size:13.5px;color:#3B3B46}
+.bd-nav .dl{justify-content:space-between;margin-left:-.7em;clip-path:inset(-4px -4px -4px .7em)}
+.bd-nav .dl>span::before{width:.7em}
+.bd-pkg{position:relative;padding:18px 0 16px;border-bottom:1px solid #E5E3E8}
+.bd-pkg h4{font-family:var(--serif);font-variation-settings:'opsz' 24;font-weight:650;font-size:18px;margin:0}
+.bd-step{display:flex;align-items:center;gap:16px;margin-top:14px;flex-wrap:wrap;position:relative}
+.stepper{display:inline-grid;grid-template-columns:40px 72px 40px;border:1px solid #CFCCD4;border-radius:8px;overflow:hidden;font-size:17px;text-align:center;line-height:40px}
+.stepper span{color:#3B3B46}
+.stepper b{border-inline:1px solid #CFCCD4;font-weight:600}
+.bd-range{flex-basis:100%;color:#6A6A75;font-size:13px;padding-left:72px}
+.bd-cursor{left:206px;top:30px}
+.bd-sticky{grid-column:2;grid-row:1;align-self:start;justify-self:end;margin:268px -50px 0 0;transform:rotate(-6deg);width:9.2em;z-index:4;position:relative}
+.bd-sticky .hand{display:block;text-align:center}
+.bd-opts{list-style:none;margin:0;padding:14px 0;display:grid;gap:10px;border-bottom:1px solid #E5E3E8}
+.bd-opts li{display:flex;align-items:center;gap:12px}
+.box{width:20px;height:20px;border:1.5px solid #8C8C96;border-radius:4px;flex:none}
+.bd-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #E5E3E8}
+.bd-row.total{font-family:var(--serif);font-variation-settings:'opsz' 32;font-weight:700;font-size:21px;border:0}
+.bd-dep{width:100%;justify-content:center;border-radius:10px;padding:10px 14px;font-size:15px}
+.bd-dep .dl{flex:0 1 auto}
+.bd-bal{text-align:center;color:#3B3B46;margin-top:10px}
+.bd-foot{border-top:1px solid #E5E3E8;margin-top:14px;padding-top:12px;text-align:center;color:#5C5C68;font-size:13px}
+.bd-strip{list-style:none;padding:0;margin:44px 0 0;display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.bd-strip{gap:10px;flex-wrap:nowrap}
+.bd-strip .pill{font-size:14px;padding:8px 14px;white-space:nowrap}
+@media (max-width:1400px){.bd-strip{flex-wrap:wrap}}
+@media (max-width:1280px){.bd-anatomy{grid-template-columns:minmax(0,1fr) minmax(0,480px) minmax(0,1fr);gap:0 44px}.bd-src::after{width:44px}.bd-src.l::before{left:calc(100% + 40px)}.bd-src.r::before{right:calc(100% + 40px)}.bd-sticky{margin-right:-40px}}
+/* below the desktop: the page first, its six sources in two columns under it */
+@media (max-width:1180px){
+  .bd-anatomy{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:40px}
+  .bd-page{grid-column:1/-1;grid-row:1;width:min(560px,100%);justify-self:center;margin-bottom:12px}
+  .bd-col{padding:0;gap:20px;grid-row:2}
+  .bd-col.l{grid-column:1}.bd-col.r{grid-column:2}
+  .bd-src::after,.bd-src::before{display:none}
+  .bd-sticky{margin:0;justify-self:end;align-self:start;grid-column:1/-1;grid-row:1;margin-top:330px;margin-right:max(0px,calc(50% - 320px))}
+}
+/* phones: the date line and the deposit pill set one phrase per line, centred, with no separator at a line's start */
+@media (max-width:480px){
+  .bd-when .dl,.bd-dep .dl{flex-direction:column;align-items:center}
+  .bd-when .dl>span,.bd-dep .dl>span{padding-left:0}
+  .bd-when .dl>span::before,.bd-dep .dl>span::before{content:none}
+}
+@media (max-width:760px){
+  .bd-anatomy{grid-template-columns:1fr}
+  .bd-col.l{grid-column:1;grid-row:3}.bd-col.r{grid-column:1;grid-row:4}
+  .bd-page{padding:22px 18px 18px}
+  .bd-brand{font-size:32px}
+  .bd-title{font-size:23px}
+  .bd-sticky{grid-row:2;grid-column:1;justify-self:end;margin:-30px 10px 0 0;transform:rotate(-3deg)}
+  .stepper{grid-template-columns:34px 58px 34px}
+  .bd-cursor{left:186px;top:8px}
+  .bd-range{padding-left:66px}
+  .bd-strip{justify-content:flex-start;gap:8px}
+  .bd-strip .pill{font-size:14px;padding:7px 14px}
+  .bd-nav{font-size:13px}
+  .bd-nav .dl{justify-content:flex-start}
+}

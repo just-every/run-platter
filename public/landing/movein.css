@@ -1,0 +1,69 @@
+/* 12 · copy and the terminal over the before-and-after spread */
+.mv-top{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.86fr);gap:48px;align-items:start}
+.mv-term{margin:34px 0 0;background:#17171D;color:#E9E9EE;border-radius:14px;padding:18px 24px 22px;transform:rotate(1.4deg);box-shadow:0 18px 40px rgb(28 28 36 / .22)}
+.mv-lights{display:flex;gap:7px;margin-bottom:14px}.mv-lights i{width:12px;height:12px;border-radius:50%;background:#5A5A63}
+.mv-term pre{margin:0;white-space:pre-wrap;word-break:normal;overflow-wrap:normal;font:500 14px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
+.mv-prompt{color:#9A9AA6}
+.mv-arg{white-space:nowrap}
+.mv-ready{color:#7FD08A}
+.mv-spread{--row:44px;--tok:50px;--gap:150px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:var(--gap);margin-top:52px;position:relative}
+.mv-doc{grid-column:1;grid-row:1;background:#F7F7F9;border:1px solid #DCDAE0;border-radius:8px;box-shadow:0 6px 20px rgb(28 28 36 / .08);position:relative}
+.mv-tpl{grid-column:2;grid-row:1;position:relative;z-index:2;border-radius:14px}
+.mv-file{height:52px;display:flex;align-items:center;padding:0 26px;font-size:16px;color:#55555F;border-bottom:1px solid #E1DFE4}
+.mv-doc .mv-file{background:#EEEDF1;border-radius:8px 8px 0 0;font-size:17px}
+.mv-tpl .mv-file{border-bottom:0}
+.mv-tokens{list-style:none;margin:0;padding:14px 26px 10px;display:grid}
+.mv-tokens li{height:var(--tok);display:flex;align-items:center;gap:12px;font-size:17px;position:relative}
+.mv-doc .mv-tokens li::after{content:"";flex:1;align-self:center;margin-left:-12px;border-top:1.5px solid var(--mulberry)}
+.mv-doc .mv-tokens li::before{content:"";position:absolute;left:100%;top:50%;width:calc(26px + var(--gap) + 26px);border-top:1.5px solid var(--mulberry)}
+.tok{background:#FFE9A8;border-radius:4px;padding:3px 8px;position:relative}
+.field{display:inline-block;border:1.5px solid #E6A9C0;background:#FDF1F5;color:var(--mulberry);border-radius:6px;padding:4px 14px;font:600 16px/1.4 var(--sans);position:relative}
+.field::before,.mv-tpl tr td:first-child::before{content:"";position:absolute;left:-36px;top:50%;width:7px;height:7px;border-radius:50%;background:var(--mulberry);transform:translateY(-50%)}
+.field::before{left:-34px}
+.mv-table{width:calc(100% - 52px);margin:10px 26px 26px;border-collapse:collapse;font-size:16px}
+.mv-table td{height:var(--row);border:1px solid #D4D2D9;padding:0 14px;position:relative}
+.mv-doc .mv-table td{background:#fff}
+.mv-doc .mv-table tr td:last-child::after{content:"";position:absolute;left:100%;top:50%;width:calc(26px + var(--gap) + 26px);border-top:1.5px solid var(--mulberry)}
+.mv-tpl .mv-table{border-collapse:separate;border-spacing:0;border:1px solid #E1DFE4;border-radius:8px;overflow:visible}
+.mv-tpl .mv-table td{border:0;border-bottom:1px solid #EAE8ED}
+.mv-tpl .mv-table tr:last-child td{border-bottom:0}
+.mv-tpl .mv-table td+td{border-left:1px solid #EAE8ED}
+.mv-tpl tr td:first-child::before{left:-31px}
+.nomatch td:nth-child(2),.nomatch td:nth-child(3){color:#7A7A85}
+.ok-ic{color:#3F8A4A;display:inline-flex;vertical-align:middle}.ok-ic .ic{width:18px;height:18px}
+.mv-linked{color:#3F8A4A;margin-left:6px}
+.mv-sticky{grid-column:2;grid-row:1;align-self:start;justify-self:end;margin:262px -34px 0 0;transform:rotate(-5deg);z-index:3;width:9em;position:relative}
+.mv-sticky .hand{font-size:18px;display:block}
+.mv-chips{list-style:none;padding:0;margin:34px 0 0;display:flex;flex-wrap:wrap;gap:14px}
+.mv-chips .pill{font-size:16px;padding:10px 18px;border-radius:12px}
+.mv-also{margin-top:20px;color:#55555F;font-size:16px;line-height:1.7}
+@media (max-width:1400px){.mv-sticky{margin-right:-8px}}
+@media (max-width:1300px){.mv-spread{--gap:110px}}
+@media (max-width:1180px){
+  .mv-top{grid-template-columns:minmax(0,1fr);gap:0}
+  .mv-term{max-width:620px}
+  .mv-spread{--gap:72px}
+  .mv-table{font-size:15px}
+  .mv-tpl .mv-table td{white-space:nowrap}
+  .mv-linked{display:none}
+  .mv-sticky{margin:490px -12px 0 0}
+}
+/* the spread stacks, centred, once two cards no longer fit side by side */
+@media (max-width:900px){
+  .mv-spread{grid-template-columns:minmax(0,1fr);row-gap:28px;max-width:640px;margin-inline:auto}
+  .mv-doc{grid-row:1}.mv-tpl{grid-column:1;grid-row:2}
+  .mv-doc .mv-tokens li::after,.mv-doc .mv-tokens li::before,.mv-doc .mv-table tr td:last-child::after,.field::before,.mv-tpl tr td:first-child::before{display:none}
+  .mv-sticky{grid-row:3;grid-column:1;margin:-44px 0 0 0}
+}
+@media (max-width:760px){
+  .mv-term{transform:none;padding:16px 16px 18px}
+  .mv-term pre{font-size:13px}
+  .mv-file{padding:0 16px;font-size:15px}
+  .mv-tokens{padding:10px 16px 6px}
+  .mv-tokens li{font-size:16px}
+  .mv-table{width:calc(100% - 32px);margin:8px 16px 20px;font-size:15px}
+  .mv-table td{padding:0 10px}
+  .mv-linked{display:none}
+  .mv-sticky{margin:-40px 8px 0 0}
+  .mv-chips .pill{font-size:15px}
+}

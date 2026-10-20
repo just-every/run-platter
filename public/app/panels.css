@@ -54,3 +54,6 @@ details summary{cursor:pointer;font-weight:600}
 }
 .agent-key-form form{grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:18px}
 @media(max-width:600px){.agent-key-form form{grid-template-columns:1fr}}
+
+.preview-viewport{position:relative;max-width:100%;overflow:auto}
+.preview-viewport iframe{display:block;border:0;max-width:none;transform-origin:top left}

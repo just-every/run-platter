@@ -1,0 +1,37 @@
+/* 13 · the storefront vignette, three firm cards across its fading foot, a centred close */
+.closing{width:var(--wrap);margin:96px auto 0;text-align:center}
+.cl-scene{position:relative;max-width:1400px;margin:0 auto;container-type:inline-size;--u:calc(100cqw / 1536)}
+.cl-cards{list-style:none;margin:calc(-12 * var(--u)) 0 0;padding:0 calc(190 * var(--u));display:grid;grid-template-columns:1.12fr 1fr 1.36fr;gap:calc(12 * var(--u));position:relative;z-index:1;text-align:left}
+.cl-card{display:flex;align-items:center;gap:calc(14 * var(--u));padding:calc(16 * var(--u)) calc(20 * var(--u));font-size:max(14px,calc(16 * var(--u)));line-height:1.4}
+.cl-card:nth-child(1){transform:rotate(-.6deg)}.cl-card:nth-child(3){transform:rotate(.6deg)}
+.cl-card b,.cl-card .b{font-weight:600}
+.cl-card .firm-mark{width:max(32px,calc(44 * var(--u)));height:max(32px,calc(44 * var(--u)))}
+.cl-card .tick.big{background:#86A983}
+.cl-marks{display:flex;gap:4px;flex:none}
+.cl-marks .firm-mark{width:max(30px,calc(40 * var(--u)));height:max(30px,calc(40 * var(--u)))}
+.cl-card .dl>span:first-child{font-weight:600}
+.cl-copy{margin-top:40px}
+.cl-copy .display{font-size:68px}
+.cl-copy .display .grad{margin-inline:auto}
+.cl-free{margin-top:14px;font-size:18px;color:#3B3B46}
+.cl-actions{display:flex;justify-content:center;align-items:center;gap:32px;margin-top:22px}
+.cl-actions .cta{font-size:19px;min-height:50px;padding:0 34px}
+.cl-docs{color:var(--mulberry);font-size:18px;text-decoration-thickness:1.5px}
+@media (max-width:1180px){
+  .cl-cards{padding:0;margin-top:12px;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .cl-card{padding:14px 16px;font-size:15px;gap:12px}
+  .cl-card:nth-child(n){transform:none}
+  .cl-copy .display{font-size:56px}
+}
+@media (max-width:1000px){.cl-cards{grid-template-columns:minmax(0,1fr);max-width:520px;margin-inline:auto}}
+@media (max-width:760px){
+  .closing{margin-top:64px;text-align:left}
+  .cl-scene{overflow:hidden;margin:0 -16px}
+  .cl-scene .plate{width:170%;margin-left:-38%}
+  .cl-cards{margin:12px 16px 0}
+  .cl-copy .display{font-size:40px}
+  .cl-copy .display .grad{margin-inline:0}
+  .cl-actions{flex-direction:column;align-items:stretch;gap:18px}
+  .cl-docs{align-self:center}
+  .cl-free{font-size:17px}
+}

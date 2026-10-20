@@ -1,0 +1,51 @@
+/* 03 · the call, the cited draft and the Gauge check, joined by citation connectors */
+.dr-flow{display:grid;grid-template-columns:minmax(0,1fr) 68px minmax(0,1.04fr) 68px minmax(0,1fr);align-items:start;margin-top:64px}
+.draft .card{padding:26px 26px 24px;font-size:14.5px;line-height:1.45}
+.draft h3.serif{font-size:25px;line-height:1.2;margin:0}
+.draft h3.serif,.draft h4.serif{text-wrap:balance}
+.draft .sub{margin-top:6px;font-size:15px}
+.dr-zoom{margin-top:18px}
+.dr-quotes{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:12px}
+.dr-quotes li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;background:var(--butter-wash);border-radius:10px;padding:13px 15px;font-size:15px}
+.dr-quotes .mono{font-size:13px;color:#3B3B46;padding-top:2px}
+.dr-link{align-self:center;display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:40px}
+.dr-link::after{content:"";width:100%;height:12px;background:radial-gradient(circle,var(--mulberry) 1.3px,transparent 1.6px) 0 50%/7px 12px repeat-x;-webkit-mask:linear-gradient(90deg,#000 80%,transparent 0);mask:linear-gradient(90deg,#000 80%,transparent 0)}
+.dr-link::before{content:"";order:2;align-self:flex-end;margin-top:-17px;width:0;height:0;border:6px solid transparent;border-left:8px solid var(--mulberry);border-right:0}
+.cite{display:inline-block;border:1.5px solid var(--mulberry);color:var(--mulberry);border-radius:6px;padding:0 6px;font:600 13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+.dr-link .cite{font-size:14px;background:#fff}
+.dr-draft h4.serif{font-size:19px;margin:20px 0 8px}
+.dr-lines{list-style:none;padding:0;margin:0;display:grid;gap:10px;font-size:15px}
+.dr-total{font-weight:700;font-size:18px;margin-top:14px}
+.dr-out{margin-top:16px;background:#F3F2F5;border-radius:10px;padding:10px 14px}
+.dr-terms{margin-top:16px;color:#5C5C68;font-size:14px}
+.dr-gauge{margin-top:18px}
+.dr-gauge .sub{font-size:15px}
+.gauge-bar{margin:22px 0 0;position:relative;padding-bottom:22px}
+.gauge-bar figcaption{display:flex;flex-wrap:wrap;gap:0 .35em;font-size:15px;margin-bottom:8px}
+.gauge-bar svg{display:block;width:100%;height:14px;overflow:visible}
+.gauge-bar .track{fill:#EDECEF}
+.gauge-bar.amber .fill{fill:var(--amber)}
+.gauge-bar.sage .fill{fill:#9DBB97}
+.gauge-bar .floor{stroke:#1C1C24;stroke-width:1.4;stroke-dasharray:2 2;vector-effect:non-scaling-stroke}
+.floor-label{position:absolute;bottom:0;transform:translateX(-50%);font-size:13px;color:#55555F;white-space:nowrap}
+.dr-free{margin-top:18px;font-size:15px}
+.dr-log{margin-top:8px;color:#55555F;font-size:14px}
+.dr-gauge{padding-bottom:58px!important}
+.dr-sparks{right:150px;bottom:30px;width:28px;height:28px}
+.dr-cursor{right:18px;bottom:12px}
+@media (max-width:1300px){.dr-flow{grid-template-columns:minmax(0,1fr) 52px minmax(0,1.04fr) 52px minmax(0,1fr)}.draft .card{padding:24px 22px}.draft h3.serif{font-size:23px}.dr-quotes li{font-size:15px}.dr-lines{font-size:15px}}
+/* stacked: the desk's 390 plan, each card whole, the connectors turning downward */
+@media (max-width:1180px){
+  .dr-flow{grid-template-columns:minmax(0,640px);justify-content:center;margin-top:44px}
+  .dr-zoom,.dr-gauge{margin-top:0}
+  .dr-link{flex-direction:row;margin:0;justify-content:center;height:64px}
+  .dr-link::after{width:12px;height:42px;background:radial-gradient(circle,var(--mulberry) 1.3px,transparent 1.6px) 50% 0/12px 7px repeat-y;-webkit-mask:none;mask:none;order:-1}
+  .dr-link::before{display:none}
+}
+@media (max-width:760px){
+  .dr-flow{grid-template-columns:minmax(0,1fr);margin-top:32px}
+  .draft .card{padding:20px 18px}
+  .draft h3.serif{font-size:22px}
+  .dr-draft h3.serif{font-size:28px}
+  .dr-quotes li{grid-template-columns:1fr;gap:2px;font-size:15px}
+}

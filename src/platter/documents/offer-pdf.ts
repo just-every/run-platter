@@ -1,3 +1,4 @@
+import { selectedContent } from '../conditional'
 import { need } from '../model'
 import { PdfText } from './pdf-text'
 
@@ -13,6 +14,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  need(Array.isArray(options), 'Offer options are missing')
  const selected = options.find((option: any) => option.id === optionId)
  need(selected, 'Choose one offered option')
+ view = selectedContent(view,optionId)
  const revision = Number(view.revision)
  const depositBps = Number(view.deposit_bps)
  need(Number.isSafeInteger(revision) && revision > 0, 'Invalid proposal revision')
@@ -40,10 +42,8 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  pdf.text(`Selected option total: ${amount(selected.cents, currency)}`)
  pdf.text(`Deposit due: ${amount(deposit(selected.cents), currency)}`)
 
- pdf.heading('Scope of work')
- pdf.text(String(view.scope ?? ''))
- pdf.heading('Terms')
- pdf.text(view.terms ? String(view.terms) : 'No additional terms.')
+ if(!view.hiddenSections.includes('scope')) { pdf.heading('Scope of work'); pdf.text(String(view.scope ?? '')) }
+ if(!view.hiddenSections.includes('terms')) { pdf.heading('Terms'); pdf.text(view.terms ? String(view.terms) : 'No additional terms.') }
 
  pdf.heading('Offer options')
  pdf.text(currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.')
@@ -53,6 +53,13 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   pdf.text(`${option.id === optionId ? 'Selected option' : 'Option'}: ${option.label}`, 12)
   pdf.text(`Total: ${amount(option.cents, currency)}`)
   pdf.text(`Deposit due: ${amount(deposit(option.cents), currency)}`)
+  for(const table of option.tables??[]){
+   pdf.heading(table.name)
+   for(const line of table.lines){pdf.text(`${line.group ? line.group+': ' : ''}${line.name}`,12);if(line.description)pdf.text(line.description);pdf.text(`${line.quantity} ${line.unit} x ${amount(Number(line.unitPrice.replace('.','')),currency)} = ${amount(line.lineTotalCents,currency)}`)}
+   for(const group of table.groups)pdf.text(`${group.name||'Ungrouped'} subtotal: ${amount(group.subtotalCents,currency)}`)
+   pdf.text(`Table subtotal: ${amount(table.subtotalCents,currency)}`,12)
+  }
+  if(option.tables?.length)pdf.text(`Package grand total: ${amount(option.cents,currency)}`,13)
  }
 
  pdf.heading('Proposal attachments')

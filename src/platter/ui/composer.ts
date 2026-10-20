@@ -1,4 +1,6 @@
 import { catalogShelf } from './catalog-shelf'
+import { pricingEditor } from './pricing'
+import { sectionConditions } from '../conditional'
 import { area, date, escape, field, form, hidden, money, proposalPath } from './shared'
 
 // The tier composer (owner pick A): the offer's two priced options as live columns beside the scope they share,
@@ -24,13 +26,15 @@ export function composerForm(state: any, proposal: any, mode: ComposerMode, id: 
   const currency = proposal?.currency ?? 'USD'
   const bps = proposal ? Number(proposal.deposit_bps) : undefined
   const clients = (state.clients ?? []).map((client: any) => `<option value="${escape(client.id)}"${client.id === proposal?.client_id ? ' selected' : ''}>${escape(client.name)} — ${escape(client.email)}</option>`).join('')
+  const conditions = sectionConditions(proposal?.section_conditions)
+  const visibility = (section: 'scope' | 'terms') => `<label class="visibility">${section === 'scope' ? 'Scope' : 'Terms'} visibility<select name="${section}Option"><option value="">Every option</option>${['one', 'two'].map((id, i) => `<option value="${id}"${conditions[section] === id ? ' selected' : ''}>Only ${escape(options[i]?.label ?? ('option ' + id))}</option>`).join('')}</select></label>`
   const tiers = `<div class="tiers">${tier('One', options[0], currency, bps, false)}${tier('Two', options[1], currency, bps, true)}`
-    + `<div class="tier scope-tier">${area('Scope of work', 'scope', proposal?.scope, 'required rows="6"')}${area('Terms', 'terms', proposal?.terms ?? '', 'rows="2"')}</div></div>`
+    + `<div class="tier scope-tier">${area('Scope of work', 'scope', proposal?.scope, 'required rows="6"')}${visibility('scope')}${area('Terms', 'terms', proposal?.terms ?? '', 'rows="2"')}${visibility('terms')}</div></div>`
   const details = `<div class="details-row"><label>Client<select name="clientId" required><option value="">Choose a client</option>${clients}</select></label>`
     + field('Proposal title', 'title', proposal?.title, 'required maxlength="200"')
     + field('Deposit percentage', 'depositPercent', proposal ? Number(proposal.deposit_bps) / 100 : '', 'required inputmode="decimal" placeholder="25"') + '</div>'
   const command = mode === 'negotiate' ? 'proposal.negotiate' : mode === 'revise' ? 'proposal.revise' : 'proposal.prepare'
-  const body = (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + tiers + `<h2 class="shelf-title">Details</h2>` + details + (inlineButton ? `<div class="composer-actions"><button>${inlineButton}</button></div>` : '')
+  const body = (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + tiers + `<h2 class="shelf-title">Details</h2>` + details + (currency === 'USD' ? `<div class="itemised">${pricingEditor(options)}</div>` : '') + (inlineButton ? `<div class="composer-actions"><button>${inlineButton}</button></div>` : '')
   return form(command, proposal ? proposalPath(proposal.id) : '/app', body, proposal ? `proposal-${proposal.id}-${proposal.version}` : 'proposal-new')
     .replace('<form ', `<form id="${escape(id)}" class="composer" `)
 }

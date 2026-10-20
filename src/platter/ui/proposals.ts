@@ -1,3 +1,5 @@
+import { pricingTables } from './pricing'
+import { followupQueuePanel, followupPanel } from './followup'
 import { duplicatePanel } from './duplicate'
 import { withdrawalPanel } from './withdrawal'
 import { ownerQuestions, openQuestionsPanel } from './questions'
@@ -23,7 +25,7 @@ export function proposalsPage(state: any, selection = new URLSearchParams()): st
   const prepare = canPrepare ? `<section class="prepare" aria-labelledby="prepare-title"><h2 id="prepare-title">Prepare a proposal</h2>` + (state.clients?.length
     ? composerShelf(state) + composerForm(state, undefined, 'prepare', 'composer-new') + receipt('<p class="receipt-sum muted">The client chooses one of the two options and pays the deposit percentage of it.</p>', '<button form="composer-new">Prepare proposal</button>')
     : '<p>Add a client before preparing a proposal.</p>' + (owner ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) + '</section>' : ''
-  return (exceptions ? `<div class="exceptions">${exceptions}</div>` : '') + (owner ? pipelinePanel(proposals, selection) + reportSchedulesPanel(state, selection) : panel('Your proposals', list)) + prepare
+  return (exceptions ? `<div class="exceptions">${exceptions}</div>` : '') + followupQueuePanel(state, selection.get('owner')) + (owner ? pipelinePanel(proposals, selection, state.followups) + reportSchedulesPanel(state, selection) : panel('Your proposals', list)) + prepare
 }
 
 /** The tracked-caps line over the heading: stage, status, revision and client. */
@@ -57,7 +59,7 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   const negotiated = p.negotiating ? `<div class="band caution" role="note"><p><strong>Negotiated draft.</strong> ${p.withdrawals?.some((w: any) => w.revision === p.sentRevision) ? 'The previous offer remains withdrawn.' : 'Revision ' + escape(p.sentRevision) + ' remains available to the client until'} this revision is approved and sent. If the client accepts it first, this draft cannot be sent.</p></div>` : ''
   let html = preparedLine(state, p)
   if (!frozen && person) {
-    const actions = `<button form="composer-${escape(p.id)}" class="secondary">Save revision</button>`
+    const actions = `<a class="button-link secondary" href="/app/preview?id=${encodeURIComponent(p.id)}&amp;revision=${encodeURIComponent(p.revision)}">Preview client page</a><button form="composer-${escape(p.id)}" class="secondary">Save revision</button>`
       + (owner && p.status === 'draft' ? form('proposal.approve', path, hidden('id', p.id) + hidden('version', p.version) + hidden('revision', p.revision) + '<button>Approve this revision</button>') : '')
       + (owner && p.status === 'approved' ? form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + '<button>Send approved proposal</button>') : '')
     const note = p.status === 'approved' ? `Approved by ${escape(p.approvedByName || p.approved_by)} · ${date(p.approved_at)}. Sending freezes this offer; saving a revision clears the approval.` : owner ? 'Confirm the scope and exact offered prices before approving this revision. Saving a revision clears any previous approval.' : 'Saving a revision clears any previous approval. The owner approves the offer before it is sent.'
@@ -68,7 +70,8 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
     const note = frozen ? `${pricing} This offer is frozen. Its scope, options, and prices can no longer be revised.${fresh ? ' A fresh invitation replaces any previous client link and verification session while keeping the offer frozen.' : ''}` : pricing
     html += `<div class="composer-page frozen">${offerCards(p)}${notices(feedback)}${receipt(sum, fresh + share, note)}</div>`
   }
-  const dossier: string[] = [withdrawalPanel(state, p), panel('Offer record', people(state, p)), proposalAttachments(state, p), p.status === 'withdrawn' ? '' : pdfPanel(state, p), expiryPanel(state, p)]
+  const itemised = pricingTables(p.options ?? [], p.currency)
+  const dossier: string[] = [followupPanel(state, p), withdrawalPanel(state, p), itemised ? `<section class="panel wide"><h2>Itemised pricing</h2>${itemised}</section>` : '', panel('Offer record', people(state, p)), proposalAttachments(state, p), p.status === 'withdrawn' ? '' : pdfPanel(state, p), expiryPanel(state, p)]
   if (['sent', 'expired', 'withdrawn'].includes(p.status) && person) dossier.push(`<section class="panel wide"><h2>Negotiate a new revision</h2><p>The sent offer stays frozen. Prepare changed terms for a new approval before replacing the client invitation.</p>${composerForm(state, p, 'negotiate', `negotiate-${p.id}`, 'Prepare negotiated revision')}</section>`)
   dossier.push(paperAcceptanceForm(state, p))
   if (p.acceptance) dossier.push(panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)}${p.acceptance.method === 'upload' ? '' : ` · ${escape(p.acceptance.email)}`}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd>${acceptanceMethod(p.acceptance, '/api/platter/attachments/' + encodeURIComponent(p.id) + '/')}</dl><p>The accepted agreement is permanent.</p>`))

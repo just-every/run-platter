@@ -1,16 +1,19 @@
+import { sectionConditions } from '../conditional'
 import { date, escape, form, hidden, money, panel, proposalPath } from './shared'
 
 export function changes(before: any, after: any): string {
  const rows: [string, unknown, unknown][] = [ ['Title', before.title, after.title], ['Scope', before.scope, after.scope], ['Terms',before.terms??'',after.terms??''], ['Client', before.client_id, after.client_id], ['Deposit percentage', before.deposit_bps / 100, after.deposit_bps / 100] ]
+ for(const section of ['scope','terms'] as const)rows.push([section+' visibility',sectionConditions(before.section_conditions)[section]??'Every option',sectionConditions(after.section_conditions)[section]??'Every option'])
  const ids = new Set([...before.options, ...after.options].map((option: any) => option.id))
  for (const id of ids) {
   const old = before.options.find((option: any) => option.id === id), next = after.options.find((option: any) => option.id === id)
+  if(JSON.stringify(old?.tables??[])!==JSON.stringify(next?.tables??[])){const detail=(o:any)=>(o?.tables??[]).map((t:any)=>t.name+'\n'+t.lines.map((l:any)=>`${l.group}: ${l.name} — ${l.description} — ${l.quantity} ${l.unit} × ${l.unitPrice} = ${money(l.lineTotalCents,after.currency)}`).join('\n')).join('\n')||'No pricing tables';rows.push([`Option ${id} pricing tables`,detail(old),detail(next)])}
   rows.push([`Option ${id} label`, old?.label ?? 'Not offered', next?.label ?? 'Not offered'], [`Option ${id} price`, old ? money(old.cents, before.currency ?? 'AUD') : 'Not offered', next ? money(next.cents, after.currency ?? 'AUD') : 'Not offered'])
  }
  const fileRefs=(value:any)=>typeof value==='string'?JSON.parse(value):value??[]
  const files=(value:any)=>fileRefs(value).map((f:any)=>`${f.filename} (${f.size} bytes)`).join('\n')||'No attachments'
  if(JSON.stringify(fileRefs(before.attachments))!==JSON.stringify(fileRefs(after.attachments)))rows.push(['Attachments',files(before.attachments),files(after.attachments)+(files(before.attachments)===files(after.attachments)?' (new file version)':'')])
- const changed = rows.filter(([, before, after]) => before !== after)
+ const changed = rows.filter(([label, before, value]) => before !== value && !after.hiddenSections?.includes(label.toLowerCase()))
  return changed.length ? `<dl>${changed.map(([label, before, after]) => `<dt>${escape(label)}</dt><dd class="preserve"><del>${escape(before)}</del><br><ins>${escape(after)}</ins></dd>`).join('')}</dl>` : '<p>No content or price changes.</p>'
 }
 

@@ -1,3 +1,4 @@
+import { pricingInput } from './pricing'
 import type { Actor } from './model'
 import { need, proposal } from './model'
 import { negotiatedView, pendingNegotiation } from './negotiation'
@@ -17,5 +18,5 @@ export async function restoreFields(db: D1Database, actor: Actor, input: Record<
  const source = await db.prepare('SELECT snapshot FROM p_revisions WHERE proposal_id=? AND revision=?').bind(current.id, revision).first<any>()
  need(source, 'Revision not found', 404)
  const saved = JSON.parse(source.snapshot)
- return { ...input, clientId: saved.client_id, title: saved.title, scope: saved.scope, terms:saved.terms??'', restoredAttachments:saved.attachments??[], depositPercent: String(saved.deposit_bps / 100), optionOne: saved.options[0].label, priceOne: (saved.options[0].cents / 100).toFixed(2), optionTwo: saved.options[1].label, priceTwo: (saved.options[1].cents / 100).toFixed(2) }
+ return { ...input, pricingTables:pricingInput(saved.options), clientId: saved.client_id, title: saved.title, scope: saved.scope, terms:saved.terms??'', sectionConditions:saved.section_conditions??{}, restoredAttachments:saved.attachments??[], depositPercent: String(saved.deposit_bps / 100), optionOne: saved.options[0].label, priceOne: (saved.options[0].cents / 100).toFixed(2), optionTwo: saved.options[1].label, priceTwo: (saved.options[1].cents / 100).toFixed(2) }
 }

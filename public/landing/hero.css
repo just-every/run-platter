@@ -1,0 +1,200 @@
+/* 01 · the hero on the approved image's canvas: --u is one canvas pixel (the canvas is 1536 wide, from y 56) */
+.hero{position:relative;padding-bottom:8px}
+.hx-canvas{--u:calc(100cqw / 1536);--min:11.5px;position:relative;width:min(100%,2200px);margin:0 auto;aspect-ratio:1536/1040;container-type:inline-size}
+.hx-canvas [style*="--x"]{position:absolute;left:calc(var(--x) * var(--u));top:calc((var(--y) - 56) * var(--u));width:calc(var(--w) * var(--u))}
+.hx-copy{position:absolute;inset:calc(26 * var(--u)) 0 auto;text-align:center;z-index:5;pointer-events:none}
+.hx-copy>*{pointer-events:auto}
+.hx-h1{font-family:var(--serif);font-weight:800;font-variation-settings:'opsz' 60;font-size:calc(82 * var(--u));line-height:1.2;letter-spacing:-.03em;white-space:nowrap;margin:0;width:fit-content;margin-inline:auto;padding-bottom:.06em}
+.hx-h1 .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hx-sub{width:fit-content;font:400 max(15px,calc(20.5 * var(--u)))/1.5 var(--sans);color:#33333D;max-width:calc(990 * var(--u));margin:calc(12 * var(--u)) auto 0}
+.hx-alt{width:fit-content;margin-inline:auto;font:400 max(15px,calc(20.5 * var(--u)))/1.4 var(--sans);color:#24242C;margin-top:calc(11 * var(--u))}
+.hx-alt b{font-weight:700}
+.hx-actions{display:flex;flex-direction:column;align-items:center;margin:calc(13 * var(--u)) auto 0;width:fit-content}
+.cta{display:inline-flex;align-items:center;justify-content:center;min-height:max(44px,calc(48 * var(--u)));padding:0 calc(58 * var(--u));border-radius:999px;background:var(--ink);color:#fff;text-decoration:none;font:500 max(17px,calc(23 * var(--u)))/1 var(--sans);box-shadow:0 6px 16px rgb(28 28 36 / .18)}
+.cta:hover{background:#000}
+.hx-links-row{display:flex;gap:calc(40 * var(--u));margin-top:calc(8 * var(--u));font-size:max(15px,calc(16.5 * var(--u)))}
+.hx-links-row a{color:var(--mulberry);text-decoration-thickness:1px}
+/* the drawing and its cards */
+.hx-art{position:absolute;inset:0;z-index:0}
+.hx-v{z-index:0}
+.hx-v .plate img{width:100%}
+/* the two bottom corners run past the canvas and fade into the page: never a straight edge through the hibiscus */
+.hx-v.fade .plate img{-webkit-mask-image:var(--mx),linear-gradient(to bottom,#000 78%,transparent 99%);mask-image:var(--mx),linear-gradient(to bottom,#000 78%,transparent 99%);-webkit-mask-composite:source-in;mask-composite:intersect}
+.hx-v.leaf{z-index:auto}
+.hx-v.leaf img{mix-blend-mode:multiply}
+.hx-v.fade-l{--mx:linear-gradient(to right,transparent 1%,#000 16%,#000 92%,transparent 99.5%)}
+.hx-v.fade-r{--mx:linear-gradient(to right,transparent .5%,#000 8%,#000 84%,transparent 99%)}
+.hx-links{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
+.hx-sign-np.on-tile{display:none}
+.hx-sign-np{z-index:1;white-space:nowrap;width:max-content!important;display:flex;flex-direction:column;font-family:var(--serif);font-variation-settings:'opsz' 24;color:#26262E;line-height:1.2;letter-spacing:-.01em}
+.hx-sign-np span:first-child{font-size:max(var(--min),calc(19 * var(--u)));font-weight:650;letter-spacing:-.03em}
+.hx-sign-np span:last-child{font-size:max(var(--min),calc(13 * var(--u)));font-family:var(--sans);margin-top:calc(2 * var(--u))}
+.hx-tag{z-index:3;width:max-content!important;max-width:calc(350 * var(--u));background:#fff;border:1.5px solid #D9D6DE;border-radius:calc(9 * var(--u));padding:calc(7 * var(--u)) calc(13 * var(--u));font-size:max(var(--min),calc(14 * var(--u)));line-height:1.35;color:#24242C;box-shadow:0 2px 8px rgb(28 28 36 / .07);margin:0}
+.hx-tag span{display:block;white-space:nowrap}
+.hx-canvas .hx-tag.end{left:auto;right:calc((1536 - var(--x) - var(--w)) * var(--u))}
+.hx-tag .b{font-weight:600}
+.hx-tag.rose{border-color:#E9AFC6}.hx-tag.sage{border-color:#AFCBA6}.hx-tag.butter{border-color:#F0CD5E}
+.hx-tag{overflow-wrap:break-word}
+.hx-canvas .sparks{color:var(--butter);z-index:2}
+.hx-spark-1{left:calc(206 * var(--u));top:calc(16 * var(--u));width:calc(56 * var(--u));height:calc(56 * var(--u));transform:rotate(-30deg)}
+.hx-spark-2{left:calc(1306 * var(--u));top:calc(28 * var(--u));width:calc(56 * var(--u));height:calc(56 * var(--u));transform:rotate(40deg)}
+.hx-spark-3{left:calc(500 * var(--u));top:calc(286 * var(--u));width:calc(64 * var(--u));height:calc(64 * var(--u));transform:rotate(-20deg)}
+.hx-spark-4{left:calc(974 * var(--u));top:calc(282 * var(--u));width:calc(64 * var(--u));height:calc(64 * var(--u));transform:rotate(25deg)}
+/* the firms' proposals, fanned */
+.hx-fans{position:absolute;inset:0;z-index:2;pointer-events:none}
+.hx-fan{transform:rotate(var(--r));transform-origin:50% 50%;background:#fff;border:1.5px solid #3A3A44;border-radius:calc(8 * var(--u));padding:calc(14 * var(--u)) calc(16 * var(--u)) calc(16 * var(--u));box-shadow:0 8px 20px rgb(28 28 36 / .12);font-size:max(var(--min),calc(13 * var(--u)));line-height:1.35;color:#24242C;pointer-events:auto}
+.hx-fan header{display:flex;align-items:center;gap:calc(6 * var(--u))}
+.hx-fan .firm-mark{width:calc(28 * var(--u));height:calc(28 * var(--u))}
+.hx-fan header p{display:flex;flex-direction:column;min-width:0}
+.hx-fan header .serif{white-space:nowrap;font-size:max(12px,calc(15 * var(--u)));line-height:1.2;font-weight:650}
+.hx-fan .kind{font:600 max(var(--min),calc(10 * var(--u)))/1.3 var(--sans);letter-spacing:.01em;text-transform:uppercase;color:#3B3B46;margin-top:calc(3 * var(--u))}
+.hx-thumb{margin:calc(10 * var(--u)) 0 calc(8 * var(--u))}
+.hx-thumb img{border-radius:calc(3 * var(--u))}
+.hx-fan-lines span{display:block}
+.hx-magnolia,.hx-northlight{padding-right:calc(34 * var(--u));padding-left:calc(12 * var(--u))}
+.hx-junepark,.hx-brightwire{padding-left:calc(52 * var(--u));padding-right:calc(10 * var(--u))}
+.hx-brightwire{padding-left:calc(48 * var(--u));padding-right:calc(12 * var(--u))}
+.hx-beside{display:flex;align-items:center;gap:calc(10 * var(--u));margin:calc(10 * var(--u)) 0 calc(6 * var(--u))}
+.hx-beside .hx-thumb{margin:0;width:calc(46 * var(--u));flex:none}
+.hx-fan.beside .hx-fan-lines span{white-space:nowrap}
+.hx-fan-lines b{font-size:1.15em}
+.hx-brightwire .hx-fan-lines span:nth-child(-n+2){font-weight:500}
+/* Fernhill's proposal */
+.hx-proposal{z-index:4;background:#fff;border:1.5px solid #34343E;border-radius:calc(10 * var(--u));padding:calc(24 * var(--u)) calc(30 * var(--u)) calc(18 * var(--u));box-shadow:0 18px 44px rgb(28 28 36 / .16);font-size:max(var(--min),calc(13 * var(--u)));line-height:1.4;color:#24242C}
+/* clear of Try the demo and Read the docs by 16 px or more at every desktop width (the links grow to 15 px at 1280) */
+/* below about 1450 px the card grows to 490 px so the sum line and the add-on prices keep their lines at the 11.5 px floor;
+   the four fanned cards step aside by the same amount */
+.hx-canvas{--grow:max(0px,490px - 540 * var(--u))}
+.hx-canvas .hx-proposal{top:calc((394 - 56) * var(--u) + 16px + 10 * var(--u));left:calc(500 * var(--u) - var(--grow) / 2);width:calc(540 * var(--u) + var(--grow))}
+@media (min-width:1280px){.hx-fans .hx-magnolia,.hx-fans .hx-northlight{margin-left:calc(var(--grow) / -2)}.hx-fans .hx-junepark,.hx-fans .hx-brightwire{margin-left:calc(var(--grow) / 2)}}
+.hx-p-head{display:flex;align-items:flex-start;gap:calc(12 * var(--u))}
+.hx-p-head .firm-mark{width:calc(44 * var(--u));height:calc(44 * var(--u));margin-top:calc(2 * var(--u))}
+.hx-p-head h2{font-size:max(15px,calc(22 * var(--u)));line-height:1.2;margin:0}
+.hx-p-to{font-size:max(var(--min),calc(13.5 * var(--u)));margin-top:calc(3 * var(--u))}
+.hx-p-rev{font-size:max(var(--min),calc(12.5 * var(--u)));color:#55555F}
+.hx-picked{position:absolute;z-index:3;left:calc(336 * var(--u));top:calc(22 * var(--u));display:flex;flex-direction:column;align-items:flex-start;transform:rotate(-12deg)}
+.hx-picked .hand{font-size:max(14px,calc(26 * var(--u)));width:5.6em;text-align:center}
+.hx-picked .hand-arrow{width:calc(40 * var(--u));height:calc(40 * var(--u));margin:calc(-2 * var(--u)) 0 0 calc(-26 * var(--u))}
+.hx-rosa{right:calc(-84 * var(--u));top:calc(-46 * var(--u))}
+.hx-ben{left:calc(512 * var(--u));top:calc(482 * var(--u))}
+.hx-proposal .cursor-pill{font-size:max(12px,calc(15 * var(--u)));padding:calc(4 * var(--u)) calc(12 * var(--u))}
+.hx-proposal .cursor-arrow{width:max(16px,calc(24 * var(--u)));height:max(18px,calc(26 * var(--u)))}
+.hx-proposal .cursor-pill{margin-top:calc(14 * var(--u))}
+.hx-sign{position:relative}
+.hx-spark-ben{right:calc(-46 * var(--u));top:calc(-8 * var(--u));width:calc(36 * var(--u));height:calc(36 * var(--u));transform:rotate(80deg)}
+.hx-tiers{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:calc(20 * var(--u));border:1.5px solid #CFCCD5;border-radius:calc(6 * var(--u))}
+.hx-tier{padding:calc(14 * var(--u)) calc(9 * var(--u)) calc(16 * var(--u));min-width:0}
+.hx-tier li{white-space:nowrap;letter-spacing:-.01em}
+.hx-tier.picked{background:#FFF4C4}
+.hx-tier-name{text-align:center;font:600 max(14px,calc(18 * var(--u)))/1.2 var(--sans)}
+.hx-tier-price{text-align:center;font-size:max(13px,calc(16 * var(--u)));font-variant-numeric:tabular-nums;margin-top:calc(3 * var(--u));padding-bottom:calc(12 * var(--u));border-bottom:1px solid #E1DFE4;position:relative}
+.hx-tier.picked .hx-tier-name,.hx-tier.picked .hx-tier-price{font-weight:700;position:relative}
+.hx-tier.picked .hx-tier-price::after{content:"";position:absolute;left:4%;right:4%;top:calc(-34 * var(--u));bottom:calc(4 * var(--u));border:max(2px,calc(2.6 * var(--u))) solid var(--hibiscus-ink);border-radius:50%;transform:rotate(-3deg);pointer-events:none}
+.hx-tier ul{list-style:none;margin:calc(12 * var(--u)) 0 0;padding:0 0 0 calc(10 * var(--u))}
+.hx-sum{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:calc(12 * var(--u));margin-top:calc(16 * var(--u))}
+.hx-addons ul{list-style:none;padding:0;margin:calc(8 * var(--u)) 0 0;display:grid;gap:calc(6 * var(--u))}
+.hx-addons li{white-space:nowrap;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:calc(6 * var(--u));align-items:center;font-size:max(var(--min),calc(12 * var(--u)))}
+.hx-addons .box{width:calc(15 * var(--u));height:calc(15 * var(--u));min-width:11px;min-height:11px;display:grid;place-items:center;border-radius:3px}
+.hx-addons .on .box{background:var(--mulberry);border-color:var(--mulberry);color:#fff}
+.hx-addons .on .box .ic{width:80%;height:80%}
+.hx-total{text-align:right;border-left:1px solid #E1DFE4;padding-left:calc(10 * var(--u));min-width:0}
+.hx-tax{display:flex;justify-content:space-between;gap:8px;font-size:max(var(--min),calc(12 * var(--u)))}
+.hx-eq{white-space:nowrap}
+.hx-eq{font-size:max(var(--min),calc(11.5 * var(--u)));color:#3B3B46;margin-top:calc(14 * var(--u))}
+.hx-big{font:700 max(20px,calc(25 * var(--u)))/1.15 var(--sans);font-variant-numeric:tabular-nums;margin-top:calc(4 * var(--u))}
+.hx-total .b{font-weight:700}
+.hx-sign{display:flex;align-items:center;justify-content:space-between;gap:calc(14 * var(--u));margin-top:calc(16 * var(--u));border:1px solid #D9D6DE;border-radius:calc(6 * var(--u));padding:calc(8 * var(--u)) calc(14 * var(--u)) calc(8 * var(--u)) calc(20 * var(--u));box-shadow:0 2px 6px rgb(28 28 36 / .06)}
+.hx-sig{min-width:0}
+.hx-sig-svg{display:block;width:calc(210 * var(--u));min-width:120px;height:auto;color:#15151C}
+.hx-sig p{font-size:max(var(--min),calc(10.5 * var(--u)));color:#55555F;margin:calc(5 * var(--u)) 0 0 calc(34 * var(--u));line-height:1.3}
+.hx-pay{display:inline-flex;align-items:center;justify-content:center;background:#7C144A;color:#fff;border-radius:calc(8 * var(--u));font:500 max(14px,calc(19 * var(--u)))/1 var(--sans);padding:calc(16 * var(--u)) calc(36 * var(--u));flex:none}
+.hx-story{margin-top:calc(14 * var(--u));font-size:max(var(--min),calc(12.5 * var(--u)))}
+.hx-books{display:flex;gap:calc(16 * var(--u));margin-top:calc(14 * var(--u));padding-top:calc(12 * var(--u));border-top:1px solid #E1DFE4;font-size:max(var(--min),calc(12 * var(--u)));flex-wrap:wrap}
+.hx-books span+span{border-left:1px solid #D9D6DE;padding-left:calc(16 * var(--u))}
+.hx-tiles{display:none}
+
+/* below 1280: copy first, then Fernhill's proposal, the four firms' proposals, the clients' drawings with their cards */
+@media (max-width:1279px){
+  .hx-canvas{--u:1.04px;aspect-ratio:auto;container-type:normal;width:var(--wrap);padding-top:48px}
+  .hx-canvas [style*="--x"]{position:relative;left:auto;top:auto;width:auto}
+  .hx-copy{position:static}
+  .hx-h1{font-size:68px;white-space:normal;text-wrap:balance;line-height:1.06}
+  .hx-h1 span{display:block;padding-block:.08em;margin-block:-.08em}
+  .hx-h1 .grad{width:fit-content;margin-inline:auto}
+  .hx-sub{font-size:19px;max-width:760px;margin-top:18px}
+  .hx-alt{font-size:18px;margin-top:14px}
+  .hx-actions{margin-top:22px}
+  .cta{font-size:19px;padding:0 44px;min-height:50px}
+  .hx-links-row{gap:32px;margin-top:14px;font-size:16px}
+  .hx-art{display:none}
+  .hx-canvas .hx-proposal{left:auto;top:auto;width:min(580px,100%)}
+  .hx-proposal{margin:48px auto 0}
+  .hx-fans{position:static;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin-top:40px;order:3}
+  .hx-canvas{display:flex;flex-direction:column}
+  .hx-proposal{order:2}
+  .hx-fan{transform:rotate(calc(var(--r) / 3))}
+  .hx-ben{left:auto;right:8px;top:auto;bottom:-46px}
+  .hx-proposal{margin-bottom:40px}
+  .hx-rosa{left:10px;right:auto;top:auto;bottom:-16px}
+  .hx-fan:nth-child(n){padding:16px}
+  .hx-fan-lines span,.hx-fan header .serif,.hx-fan.beside .hx-fan-lines span{white-space:normal}
+  .hx-fan .kind{letter-spacing:.1em}
+  .hx-fan .hx-thumb img{width:auto;max-width:100%;max-height:96px}
+  .hx-tier li{white-space:normal}
+  .hx-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;list-style:none;padding:0;width:var(--wrap);margin:36px auto 0}
+  .hx-tile{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-content:start}
+  .hx-tile-art{position:relative;container-type:inline-size}
+  .hx-sign-np.on-tile{display:flex;position:absolute;left:38%;top:14%;margin:0}
+  .hx-sign-np.on-tile span:first-child{font-size:max(13px,8.2cqw)}
+  .hx-sign-np.on-tile span:last-child{font-size:max(13px,5.6cqw);margin-top:1px}
+  .hx-tile .plate img{border-radius:8px}
+  .hx-tile .hx-tag span{white-space:normal}
+  .hx-tile .hx-tag{max-width:none;width:auto!important;position:static;font-size:15px;padding:10px 14px;border-radius:10px}
+}
+/* tablets: Fernhill's proposal between the four firms' proposals, two a side */
+@media (min-width:901px) and (max-width:1279px){
+  .hx-canvas{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,560px) minmax(0,1fr);column-gap:24px;align-items:start}
+  .hx-copy{grid-column:1/-1;grid-row:1}
+  .hx-proposal{grid-column:2;grid-row:2;width:100%;margin-top:44px}
+  .hx-fans{display:contents}
+  .hx-fan{grid-row:2;max-width:236px;width:100%;margin-top:96px;z-index:3}
+  .hx-magnolia{grid-column:1;justify-self:end;margin-right:-34px}
+  .hx-junepark{grid-column:3;justify-self:start;margin-left:-34px}
+  .hx-northlight,.hx-brightwire{align-self:end;margin-bottom:60px}
+  .hx-northlight{grid-column:1;justify-self:end;margin-right:-34px}
+  .hx-brightwire{grid-column:3;justify-self:start;margin-left:-34px}
+  .hx-canvas .hx-proposal{z-index:4}
+}
+@media (max-width:900px){.hx-fans{grid-template-columns:repeat(2,minmax(0,1fr))}.hx-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){
+  .hx-canvas{--u:calc((100vw - 32px) / 540);--min:13px;padding-top:32px}
+  .hx-h1{font-size:44px;line-height:1.05}
+  .hx-sub{font-size:17px}
+  .hx-alt{font-size:16px}
+  .cta{width:100%}
+  .hx-proposal{margin-top:36px;padding:16px 14px 14px}
+  .hx-tiers{grid-template-columns:minmax(0,1fr) minmax(0,1.12fr) minmax(0,1fr)}
+  .hx-tier{padding:12px 8px}
+  .hx-tier ul{padding:0}
+  .hx-sum{grid-template-columns:minmax(0,1fr);gap:12px;margin-top:26px}
+  .hx-books{flex-direction:column;gap:4px}
+  .hx-books span+span{border-left:0;padding-left:0}
+  .hx-total{border-left:0;border-top:1px solid #E1DFE4;padding:10px 0 0}
+  .hx-sign{flex-wrap:wrap;padding:8px 12px}
+  .hx-pay{padding:12px 20px}
+  .hx-picked{position:static;transform:rotate(-4deg);margin:2px 0 -4px auto;width:fit-content}
+  .hx-picked .hand{font-size:19px;width:auto}
+  .hx-picked .hand-arrow{display:none}
+  .hx-spark-ben{display:none}
+  .hx-fans{gap:12px;margin-top:44px}
+  .hx-fan,.hx-fan:nth-child(n){transform:none;padding:12px 10px}
+  .hx-fan .firm-mark{width:34px;height:34px}
+  .hx-fan header{flex-direction:column;align-items:flex-start;gap:4px}
+  .hx-tiles{gap:16px 12px;margin-top:28px}
+  .hx-tile .hx-tag{font-size:13px;padding:8px 10px}
+  .hx-proposal .cursor-pill{font-size:13px}
+  .hx-fan header .serif{font-size:13px}
+}
+@media (max-width:400px){
+  .hx-tile .hx-tag{padding:8px 7px}
+}

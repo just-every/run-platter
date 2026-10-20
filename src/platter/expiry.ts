@@ -27,11 +27,14 @@ export async function expiryFor(db: D1Database, row: any, at?: number) {
 export async function expirySendStatements(db: D1Database, id: string, ownerId: string, at: number, revision = false) {
  const saved = await db.prepare('SELECT * FROM p_expiry WHERE proposal_id=?').bind(id).first<any>()
  if (saved?.sent_at != null && !revision) return []
+ const current = await proposal(db,id)
+ const sentAt = !revision && current.status === 'sent' ? saved?.sent_at ?? null : at
  const zone = await installationZone(db), mode = saved?.mode ?? 'never', days = saved?.period_days ?? null
- const { expiresOn, deadlineAt } = expiryDeadline(mode, days, saved?.expires_on ?? null, at, zone)
+ const deadline = expiryDeadline(mode, days, saved?.expires_on ?? null, sentAt, zone)
+ const expiresOn = deadline.expiresOn, deadlineAt = mode === 'date' && expiresOn ? startOfDate(expiresOn,zone) : deadline.deadlineAt
  const writes = [db.prepare(`INSERT INTO p_expiry(proposal_id,mode,period_days,expires_on,time_zone,sent_at,deadline_at,warning_days,owner_id)
  VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET expires_on=excluded.expires_on,time_zone=excluded.time_zone,sent_at=excluded.sent_at,deadline_at=excluded.deadline_at,owner_id=excluded.owner_id,warning_sent_at=NULL`)
-  .bind(id, mode, days, expiresOn, zone, at, deadlineAt, saved?.warning_days ?? null, ownerId)]
+  .bind(id, mode, days, expiresOn, zone, sentAt, deadlineAt, saved?.warning_days ?? null, ownerId)]
  if (revision) writes.push(db.prepare("UPDATE p_reopen_requests SET resolved_at=?,resolution='reissued' WHERE proposal_id=? AND resolved_at IS NULL").bind(at, id))
  return writes
 }
@@ -52,8 +55,10 @@ export async function expiryCommand(env: Bindings, a: Actor, name: string, p: Re
  const explicitDate = mode === 'date' ? calendarDate(p.date) : null
  const warningDays = mode === 'never' || p.warningDays === '' || p.warningDays == null ? null : integer(p.warningDays, 'warning lead days', 1)
  const previous = await db.prepare('SELECT * FROM p_expiry WHERE proposal_id=?').bind(row.id).first<any>()
- const sentAt = previous?.sent_at ?? (row.status === 'sent' ? row.created_at : null), zone = await installationZone(db)
- const { expiresOn, deadlineAt } = expiryDeadline(mode, days, explicitDate, sentAt, zone)
+ const sentAt = previous?.sent_at ?? null, zone = await installationZone(db)
+ need(mode !== 'days' || row.status !== 'sent' || sentAt !== null,'This legacy offer has no recorded send time. Choose an expiry date or send a negotiated revision.',409)
+ const deadline = expiryDeadline(mode, days, explicitDate, sentAt, zone)
+ const expiresOn = deadline.expiresOn, deadlineAt = mode === 'date' && row.status === 'sent' ? startOfDate(expiresOn!,zone) : deadline.deadlineAt
  const writes = [db.prepare(`INSERT INTO p_expiry(proposal_id,mode,period_days,expires_on,time_zone,sent_at,deadline_at,warning_days,owner_id)
  VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET mode=excluded.mode,period_days=excluded.period_days,expires_on=excluded.expires_on,time_zone=excluded.time_zone,sent_at=excluded.sent_at,deadline_at=excluded.deadline_at,warning_days=excluded.warning_days,owner_id=excluded.owner_id`)
   .bind(row.id, mode, days, expiresOn, zone, sentAt, deadlineAt, warningDays, a.id),

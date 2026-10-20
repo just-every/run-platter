@@ -15,11 +15,7 @@ CREATE TABLE p_expiry (
     OR (mode='days' AND period_days IS NOT NULL)
     OR (mode='date' AND period_days IS NULL AND expires_on IS NOT NULL))
 );
--- Existing offers had no expiry; retain their original send time when known.
-INSERT INTO p_expiry(proposal_id,mode,sent_at,owner_id)
- SELECT p.id,'never',COALESCE((SELECT MIN(m.created_at) FROM p_mail m WHERE m.proposal_id=p.id),p.created_at),
- (SELECT id FROM oa_operators o WHERE o.email=p.approved_by AND o.role='owner' LIMIT 1)
- FROM p_proposals p WHERE p.status IN ('sent','accepted');
+-- Older offers remain without expiry metadata; do not invent a send timestamp.
 CREATE INDEX p_expiry_due ON p_expiry(deadline_at) WHERE deadline_at IS NOT NULL;
 CREATE TABLE p_reopen_requests (
  id TEXT PRIMARY KEY,

@@ -108,7 +108,7 @@ test('FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 
     // Resend's network edge is replaced; no credential is inserted into D1.
     const localIdentity={auth:h.auth,owner:h.owner},sourceOrigin=h.origin,submittedMail=[]
     await h.close();h=null
-    h=await harness({root:source,origin:sourceOrigin,...localIdentity,auth:{...localIdentity.auth,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'archive-question-network-edge',MAIL_WEBHOOK_KEY:'archive-question-webhook-edge',QUESTION_REPLY_DOMAIN:'replies.example.com'},outboundService:async request=>{submittedMail.push(await request.json());return Response.json({id:'archive-question-mail-'+submittedMail.length})}})
+    h=await harness({root:source,origin:sourceOrigin.replace('http:','https:'),...localIdentity,auth:{...localIdentity.auth,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'archive-question-network-edge',MAIL_WEBHOOK_KEY:'archive-question-webhook-edge',QUESTION_REPLY_DOMAIN:'replies.example.com'},outboundService:async request=>{submittedMail.push(await request.json());return Response.json({id:'archive-question-mail-'+submittedMail.length})}})
     await h.cmd('question.email',{id:pending.id,questionId:unresolvedQuestion.id})
     const replyAddress=submittedMail.find(message=>message.reply_to)?.reply_to
     assert.equal(typeof replyAddress,'string','FOLLOW-004 sends an actual provider Reply-To capability')

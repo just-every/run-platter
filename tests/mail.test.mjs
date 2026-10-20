@@ -69,6 +69,8 @@ test('FOLLOW-004 verified client questions, native answers and one-use authentic
   const verification=await h.send(path+'/action?name=code.verify',{code});assert.equal(verification.status,200,verification.text)
   const cookie=verification.cookie;assert.ok(cookie)
   assert.equal((await ask('unsupported','Should not create a question',cookie)).status,400)
+  assert.equal((await h.send(path+'/action?name=question.create',{revision:0,section:'pricing',text:'Stale offer question'},cookie)).status,409)
+  assert.equal((await queue()).length,0,'refused questions have no write')
   assert.equal((await ask('pricing','Does that cover usage rights?',cookie)).status,200)
   const question=(await queue()).find(q=>q.text==='Does that cover usage rights?');assert.ok(question)
   const notice=sent.at(-1),replyTo=notice.reply_to,token=replyTo.split('@')[0]

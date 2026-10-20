@@ -16,8 +16,9 @@ export async function browserEdge() {
     const chunks=[];for await(const chunk of req)chunks.push(chunk)
     const response=await worker.mf.dispatchFetch(origin+req.url,{method:req.method,headers:req.headers,...(['GET','HEAD'].includes(req.method)?{}:{body:Buffer.concat(chunks)}),redirect:'manual'})
     const headers=Object.fromEntries(response.headers);delete headers['transfer-encoding'];delete headers['content-length'];delete headers['content-encoding']
-    res.writeHead(response.status,headers);res.end(Buffer.from(await response.arrayBuffer()))
-   }catch{res.writeHead(500);res.end('Worker transport failed')}
+    const bytes=Buffer.from(await response.arrayBuffer())
+    if(!res.destroyed){res.writeHead(response.status,headers);res.end(bytes)}
+   }catch{if(res.headersSent)res.destroy();else if(!res.destroyed)res.writeHead(500).end('Worker transport failed')}
   })
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
   const origin='https://127.0.0.1:'+server.address().port

@@ -43,7 +43,7 @@ export async function questionReplyResponse(request:Request,env:Bindings):Promis
   try {
    const response=await fetch('https://api.resend.com/emails/receiving/'+encodeURIComponent(signedEmailId),{
     method:'GET',headers:{Authorization:'Bearer '+env.MAIL_API_KEY,Accept:'application/json'},
-    redirect:'error',signal:AbortSignal.timeout(10000),
+    redirect:'manual',signal:AbortSignal.timeout(10000),
    })
    need(response.ok,'Received message could not be fetched',502)
    email=json(await boundedBytes(response))

@@ -10,12 +10,12 @@ import { acceptanceMethod } from './paper'
 import { date, document, escape, field, money, optionPair, panel, type Feedback } from './shared'
 
 export function renderClient(view: any, token: string, feedback?: Feedback): Response {
+  const selectedId = view.acceptance?.optionId ?? view.preview?.selection.option.id ?? view.selectedOptionId ?? 'one'
   const endpoint = view.preview ? '/app/preview/client/action?name=' : `/p/${encodeURIComponent(token)}/action?name=`
-  const publicForm = (name: string, body: string): string => `<form method="post" action="${endpoint}${name}">${view.preview ? `<fieldset disabled>${body}</fieldset>` : body}</form>`
+  const publicForm = (name: string, body: string): string => `<form method="post" action="${endpoint}${name}&amp;optionId=${encodeURIComponent(selectedId)}">${view.preview ? `<fieldset disabled>${body}</fieldset>` : body}</form>`
   const options = view.options ?? []
   const currency = view.currency ?? 'AUD'
   const conditional=Object.keys(sectionConditions(view.section_conditions)).length>0
-  const selectedId=view.acceptance?.optionId??view.preview?.selection.option.id??view.selectedOptionId??'one'
   const pricing = currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'
   let html = view.preview ? previewBanner(view) : ''
   if(!view.hiddenSections?.includes('scope')) html += panel('Scope of work', `<p class="preserve">${escape(view.scope)}</p>`)

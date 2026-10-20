@@ -8,7 +8,7 @@
 .ch-agreement{background:#fff;border:1px solid var(--card-line);border-radius:6px;box-shadow:0 2px 6px rgb(28 28 36 / .06),0 24px 50px rgb(28 28 36 / .10);transform:rotate(-1.2deg);padding:64px 40px 48px;font-family:var(--serif);font-variation-settings:'opsz' 24;font-size:20.5px;line-height:1.4;color:var(--ink);margin-top:8px}
 .ch-agreement h3.serif{font-size:38px;font-variation-settings:'opsz' 60;font-weight:700;margin:0 0 28px;padding-bottom:26px;border-bottom:1px solid #DDDAE1;line-height:1.2}
 .ch-line+.ch-line{margin-top:28px}
-@media (min-width:1301px){.ch-line:first-of-type{white-space:nowrap}}
+@media (min-width:1361px){.ch-line:first-of-type{white-space:nowrap}}
 .ch-agreement hr{border:0;border-top:1px solid #DDDAE1;margin:36px 0}
 .ringed{display:inline-block;position:relative;padding:3px 12px 2px;margin:-3px 4px -2px}
 .ringed::after{content:"";position:absolute;inset:0;border:2.5px solid var(--mulberry);border-radius:50%;transform:rotate(-4deg)}

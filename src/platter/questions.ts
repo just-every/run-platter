@@ -1,3 +1,4 @@
+import { currentTime } from './expiry-time'
 import type { Bindings } from '../auth.server'
 import { commit, fail, hash, need, text, type Actor } from './model'
 import { dispatchMail, queueMail } from './mail'
@@ -59,11 +60,11 @@ export async function createQuestion(env:Bindings,c:ClientContext,input:Record<s
  need(Number(input.revision)===c.row.revision,'This offer changed. Reload before asking.',409)
  const section=String(input.section)
  need(['scope','pricing','terms'].includes(section),'Choose scope, pricing, or terms')
- const body=text(input.text,'your question',10000),id=crypto.randomUUID(),at=Date.now(),db=env.DB
+ const body=text(input.text,'your question',10000),id=crypto.randomUUID(),db=env.DB,at=await currentTime(db)
  const owners=(await db.prepare("SELECT id,email,version FROM oa_operators WHERE role='owner' AND status='active' ORDER BY id").all<{id:string;email:string;version:number}>()).results
  need(owners.length,'An active owner is required to receive questions',409)
  // Commit binds the exact invitation, verified session, client, sent revision, and notified owner mailboxes.
- const guard=`EXISTS(SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id JOIN p_clients c ON c.id=p.client_id WHERE s.token=? AND s.proposal_id=? AND s.revision=p.revision AND p.revision=? AND p.client_id=? AND lower(COALESCE(s.recipient,c.email))=lower(?) AND s.session_hash=? AND s.session_expires>? AND p.status='sent')`
+ const guard=`EXISTS(SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id JOIN p_clients c ON c.id=p.client_id WHERE s.token=? AND s.proposal_id=? AND s.revision=p.revision AND p.revision=? AND p.client_id=? AND lower(COALESCE(s.recipient,c.email))=lower(?) AND s.session_hash=? AND s.session_expires>MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0)) AND p.status='sent')`
  const ownerChecks=owners.map(()=>"EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND email=? AND version=? AND role='owner' AND status='active')").join(' AND ')
  try { await db.batch([
   db.prepare(`INSERT INTO p_guard(ok) VALUES((${guard}) AND (${ownerChecks}))`).bind(c.token,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,c.share.session_hash,at,...owners.flatMap(o=>[o.id,o.email,o.version])),
@@ -91,7 +92,7 @@ export async function recordAnswer(env:Bindings,a:Actor,input:AnswerInput,hook?:
  need(source!=='email'||input.sourceId!==undefined,'Authenticated inbound message identity is required')
  need(source!=='email'||hook,'Authenticated inbound authorization is required',403)
  const sourceId=input.sourceId===undefined?await hash(`${a.id}\n${id}\n${questionId}\n${body}`):text(input.sourceId,'a message identity',500)
- const sourceKey=await hash(`${source}\n${sourceId}`),answerId=crypto.randomUUID(),at=Date.now()
+ const sourceKey=await hash(`${source}\n${sourceId}`),answerId=crypto.randomUUID(),at=await currentTime(db)
  const question=await db.prepare('SELECT q.*,p.title FROM p_questions q JOIN p_proposals p ON p.id=q.proposal_id WHERE q.id=? AND q.proposal_id=?').bind(questionId,id).first<any>()
  need(question,'Question not found on this proposal',404)
  const guard={sql:"EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND email=? AND version=? AND role='owner' AND status='active') AND EXISTS(SELECT 1 FROM p_questions WHERE id=? AND proposal_id=? AND revision=? AND client_id=? AND client_email=?)",values:[owner.id,owner.email,owner.version,questionId,id,question.revision,question.client_id,question.client_email]}

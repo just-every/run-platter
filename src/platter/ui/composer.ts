@@ -95,7 +95,8 @@ export function exceptionBand(state: any, p: any, feedback: Feedback | undefined
       : `<button type="button" data-fix-field="${escape(target)}" data-fix-value="${(cents / 100).toFixed(2)}" hidden>Use ${money(cents)}</button>`
     return `<div class="band error" role="alert" data-refused="price${n}"><p><strong>${escape(label)} · price ${escape(typed || '(empty)')} is not a price Platter can read.</strong> Nothing was saved${p ? `; revision ${escape(p.revision)} stays as it was` : ''}. ${priceRule}</p><div class="band-actions">${fix}</div></div>`
   }
-  if (feedback.status === 409 && p) {
+  // A save from this composer that lost to a newer version; other refusals keep their own notice.
+  if (feedback.status === 409 && p && ['proposal.revise', 'proposal.negotiate'].includes(feedback.command ?? '')) {
     return `<div class="band error" role="alert" data-refused="conflict"><p><strong>This proposal changed while you were editing.</strong> It is now revision ${escape(p.revision)}, ${escape(p.status)}; your changes were not saved.</p><div class="band-actions"><a class="button-link" href="${escape(proposalPath(p.id))}">Reload revision ${escape(p.revision)}</a></div></div>`
   }
   return undefined

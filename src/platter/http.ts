@@ -76,7 +76,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
  }catch(error){const status=Number((error as any)?.status)||500;const message=status<500?(error as Error).message:'The change could not be completed. Reload and try again.';if(status>=500)console.error(error)
   if(isClient&&context&&status!==403){const r=renderClient(await clientView(env,context),context.token,{error:message});return new Response(r.body,{status,headers:r.headers})}
   if((path==='/app/attachment'||path==='/app/paper-acceptance')&&actor){const response=renderApp(await state(env,actor),back,{error:message});return new Response(response.body,{status,headers:response.headers})}
-  if(path==='/app/action'&&actor)return renderApp(await state(env,actor),back,{error:message,status,field:(error as any)?.field,input:submitted})
+  if(path==='/app/action'&&actor)return renderApp(await state(env,actor),back,{error:message,status,field:(error as any)?.field,command:url.searchParams.get('name')??undefined,input:submitted})
   if(pages.has(path)&&status===401)return new Response(null,{status:303,headers:{...headers,location:'/signin?returnTo='+encodeURIComponent(path+url.search)}})
   return json({error:message},status)
  }

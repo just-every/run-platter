@@ -35,8 +35,8 @@ export async function seedStudio(env: Bindings, ownerEmail: string, now: Date): 
   for (const [n, name, email] of clients) writes.push(db.prepare('INSERT INTO p_clients (id, name, email) VALUES (?, ?, ?) ON CONFLICT DO NOTHING').bind(clientId(n), name, email))
   // The audit log carries the same history the records do, as the real commands would have written it.
   const audit = auditRow(db)
-  writes.push(audit(1, owner.id, 'owner', 'native.auth.bootstrap', owner.id, ago(150)), audit(2, owner.id, 'owner', 'native.setup', owner.id, ago(150) + MINUTE),
-    audit(3, owner.id, 'owner', 'report.time-zone', 'clients', ago(150) + 2 * MINUTE), audit(4, owner.id, 'owner', 'native.auth.invite', memberId, ago(member.joined)))
+  writes.push(audit(1, owner.id, 'owner', 'native.auth.bootstrap', owner.id, ago(150 + 6 * MINUTES)), audit(2, owner.id, 'owner', 'native.setup', owner.id, ago(150 + 3 * MINUTES)),
+    audit(3, owner.id, 'owner', 'report.time-zone', 'clients', ago(150)), audit(4, owner.id, 'owner', 'native.auth.invite', memberId, ago(member.joined)))
   for (const key of keys) {
     writes.push(audit(10 + key.n * 2, owner.id, 'owner', 'agent.create', keyId(key.n), ago(key.created)))
     if (key.revoked !== undefined) writes.push(audit(11 + key.n * 2, owner.id, 'owner', 'agent.revoke', keyId(key.n), ago(key.revoked)))
@@ -47,7 +47,7 @@ export async function seedStudio(env: Bindings, ownerEmail: string, now: Date): 
   await db.batch(writes)
   await reportBounces(env, proposals.filter(sample => sample.bounced !== undefined).map(sample => ({ mailId: id(4, sample.n * 10 + 1), recipient: clients.find(([n]) => n === sample.client)![2], at: ago(sample.bounced!) })))
   await importCatalog(db, { id: owner.id, email: ownerEmail, role: 'owner' })
-  await db.batch([audit(5, owner.id, 'owner', 'business-import.preview', 'catalog', ago(0) - 2 * MINUTE), audit(6, owner.id, 'owner', 'business-import.apply', 'catalog', ago(0) - MINUTE)])
+  await db.batch([audit(5, owner.id, 'owner', 'business-import.preview', 'catalog', ago(149 + 6 * MINUTES)), audit(6, owner.id, 'owner', 'business-import.apply', 'catalog', ago(149))])
 }
 
 const auditRow = (db: D1Database) => (n: number, actorId: string, role: string, action: string, subject: string, at: number) =>

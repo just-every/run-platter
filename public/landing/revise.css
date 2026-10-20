@@ -4,10 +4,11 @@
 .rv-title{font-size:28px;line-height:1.2;margin:0 0 18px}
 .rv-sent{margin:-4px 0 18px;font-size:15px;padding:7px 16px}
 /* the four steps take a little more than the page column (as page-06 does), so the rev rows and the signed chips keep their lines */
-.rv-steps{display:grid;grid-template-columns:minmax(0,.86fr) 24px minmax(0,.72fr) 24px minmax(0,1.5fr) 24px minmax(0,1.52fr);align-items:center;margin-inline:calc(50% - min(700px,50vw - 24px))}
-.rv-reply .rv-msg>div{display:contents}
-.rv-reply .rv-who{align-self:center;margin:0}
-.rv-reply .rv-msg>div>p:last-child{grid-column:1/-1}
+.rv-steps{display:grid;grid-template-columns:minmax(0,.98fr) 24px minmax(0,.72fr) 24px minmax(0,1.5fr) 24px minmax(0,1.4fr);align-items:center;margin-right:calc(0px - min(120px,50vw - 50% - 24px))}
+/* the avatar sits beside the name; the message runs the card's full width under them */
+.rv-msg>div{display:contents}
+.rv-who{align-self:center;margin:0}
+.rv-msg>div>p:last-child{grid-column:1/-1}
 .rv-c{padding:18px 20px;font-size:16px;line-height:1.45;align-self:stretch;display:flex;flex-direction:column;justify-content:center}
 .rv-tag{align-self:flex-start;margin-bottom:12px;font-size:15px;padding:4px 12px}
 .rv-msg{display:grid;grid-template-columns:40px minmax(0,1fr);gap:14px;align-items:start}
@@ -27,7 +28,7 @@
 .rv-signed .tick.big{background:#3F6B45;width:34px;height:34px}
 .rv-signed{font-size:14.5px}
 .rv-spark{right:-6px;top:-34px;width:34px;height:34px}
-@media (max-width:1380px){.rv-steps{grid-template-columns:minmax(0,.84fr) 24px minmax(0,.7fr) 24px minmax(0,1.4fr) 24px minmax(0,1.62fr)}.rv-c{font-size:15px}.rv-reply{font-size:14.5px}.rv-c,.rv-rev{padding:16px}.rv-arrow{margin:0 3px}}
+@media (max-width:1439px){.rv-steps{grid-template-columns:minmax(0,.86fr) 24px minmax(0,.72fr) 24px minmax(0,1.32fr) 24px minmax(0,1.62fr)}.rv-reply{padding-inline:14px}.rv-c{font-size:15px}.rv-reply{font-size:14.5px}.rv-c,.rv-rev{padding:16px}.rv-arrow{margin:0 3px}}
 /* stacked: comment and reply side by side, then rev 2 and the signed chip */
 @media (max-width:1260px){
   .rv-steps{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;margin-inline:0}

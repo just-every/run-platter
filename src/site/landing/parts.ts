@@ -19,6 +19,7 @@ export function glue(text: string): string {
     .replace(/([\p{L}\d])–([\p{L}\d])/gu, `$1${WJ}–${WJ}$2`)
     .replace(/([\p{L}\d])-(\p{L})/gu, `$1${NBH}$2`)
     .replace(/(–\u2060\p{L}+) wedding\b/gu, `$1${NB}wedding`)
+    .replace(/\b(am|pm) (ET|CT|MT|PT)\b/g, `$1${NB}$2`)
     .replace(/^([+×=→]) /, `$1${NB}`)
     .replace(/, ([A-Z]{2})\b/g, `,${NB}$1`)
 }

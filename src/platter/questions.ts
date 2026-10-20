@@ -123,7 +123,7 @@ export async function questionCommand(env:Bindings,a:Actor,name:string,input:Rec
   need(!(await db.prepare('SELECT w.id FROM p_withdrawals w JOIN p_proposals p ON p.id=w.proposal_id AND p.revision=w.revision WHERE p.id=?').bind(id).first()),'Withdrawn proposals are read-only',409)
  const question=await db.prepare('SELECT q.*,p.title FROM p_questions q JOIN p_proposals p ON p.id=q.proposal_id WHERE q.id=? AND q.proposal_id=?').bind(questionId,id).first<any>()
   need(question,'Question not found on this proposal',404)
-  await commit(db,a,[...await prepareReplyNotice(env,owner,question),audit(db,a.id,'owner','question.email',questionId,Date.now())],true)
+  await commit(db,a,[...await prepareReplyNotice(env,owner,question),audit(db,a.id,'owner','question.email',questionId,Date.now())],true,{sql:'NOT EXISTS(SELECT 1 FROM p_withdrawals w JOIN p_proposals p ON p.id=w.proposal_id AND p.revision=w.revision WHERE p.id=?)',values:[id]})
   await dispatchMail(env,id)
   return {id,questionId,message:'Question notice queued for your owner mailbox.'}
  }

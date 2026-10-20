@@ -1355,7 +1355,7 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 | 04 Build | "Views of this page are measured." on the client page | TRACK-004 | contract, not yet in code |  |
 | 05 Send | Delivery status, bounce shown, resent to the right address | SEND-002 | code | `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.test.mjs` |
 | 05 Send | Reading time per section | TRACK-002 | contract, not yet in code |  |
-| 05 Send | The agent drafts follow-ups from what each client read; Alicia sends | AGENT-004, FOLLOW-002 | contract, not yet in code |  |
+| 05 Send | The agent drafts follow-ups from what each client read; Alicia sends | AGENT-004, FOLLOW-002 | partly | `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts` (follow-up queue by sales owner, FOLLOW-002 done); drafts from reading data: contract |
 | 05 Send | The resend uses the address on Tom's HubSpot contact | CRM-001 | contract, not yet in code |  |
 | 05 Send | Retainers: $1,200.00/mo × 12, $650.00/mo × 6 | PRICE-003, PAY-003 | contract, not yet in code |  |
 | 06 Revise | Clients ask on the page; the firm replies | FOLLOW-004 | code | `src/platter/questions.ts`, `src/platter/question-replies.ts`, `tests/mail.test.mjs` |

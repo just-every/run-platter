@@ -823,6 +823,6 @@ test('PRICE-001 / COLLAB-003 / EDIT-014 / EDIT-018 desktop and phone create grou
  const {pricingJourney}=await import('./pricing-journey.mjs');await pricingJourney()
 })
 
-test('PRICE-002 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit three packages, review optional quantities, download and accept the exact selection', {timeout:180000}, async()=>{
+test('PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads', {timeout:180000}, async()=>{
  const {packagesJourney}=await import('./packages-journey.mjs');await packagesJourney()
 })

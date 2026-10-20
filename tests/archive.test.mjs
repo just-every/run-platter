@@ -145,6 +145,18 @@ test('PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND
     assert.equal((await h.send(packagePath+'/action?name=accept',{name:'Avery Chen',optionId:'two',items:packageItems,consent:true},packageVerified.cookie)).status,200)
     const packagesBefore=(await h.state()).proposals.find(x=>x.id===packages.id)
     assert.equal(packagesBefore.acceptance.totalCents,packageExpected.totalCents);assert.equal(packagesBefore.acceptance.depositCents,packageExpected.depositCents)
+    // PRICE-002 / SIGN-008: uploaded-paper choices and original file are product records too.
+    const paper=await h.cmd('proposal.prepare',{...offer,title:'Archived signed-copy package',packages:packageFixture()})
+    await h.cmd('proposal.approve',{id:paper.id,version:1,revision:1});await h.cmd('proposal.send',{id:paper.id,version:2})
+    const paperBytes=new TextEncoder().encode('%PDF Growth plus Rush delivery quantity four'),paperForm=new FormData()
+    for(const [key,value]of Object.entries({id:paper.id,version:3,optionId:'two',items:JSON.stringify(packageItems),signer:'Morgan Lee',signedOn:'2026-10-15',attest:'yes'}))paperForm.set(key,String(value))
+    paperForm.set('file',new File([paperBytes],'archived-package-signed.pdf',{type:'application/pdf'}))
+    const paperRequest=new Request(h.origin+'/app/paper-acceptance',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner},body:paperForm})
+    const paperResponse=await h.mf.dispatchFetch(paperRequest.url,{method:'POST',headers:paperRequest.headers,body:await paperRequest.arrayBuffer()});assert.equal(paperResponse.status,200,await paperResponse.text())
+    const paperBefore=(await h.state()).proposals.find(x=>x.id===paper.id)
+    assert.equal(paperBefore.acceptance.method,'upload');assert.equal(paperBefore.acceptance.totalCents,packageExpected.totalCents);assert.equal(paperBefore.acceptance.depositCents,packageExpected.depositCents);assert.equal(paperBefore.acceptance.selection.items[0].quantity,4)
+    const paperInvoice=await h.cmd('invoice.export',{id:paper.id}),paperInvoicePath='/api/platter/invoices/'+paperInvoice.id+'.csv',paperCsv=(await h.send(paperInvoicePath,undefined,h.owner)).text
+    assert.match(paperCsv,/575\.25/)
     const beforeVendorDocuments=(await h.state()).vendorDocuments
     const before=business(await h.state())
     const acceptedThread=before.proposals.find(p=>p.id===proposal.id).questions
@@ -156,7 +168,7 @@ test('PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND
     assert.equal(openThread[0].answers.length,0)
     const beforeAudit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows.map(({reason,...row})=>row)
     assert.ok(beforeAudit.some(row=>row.action==='proposal.preview'&&row.subject===duplicate.id&&row.actor_role==='owner'),'EDIT-018 / TEAM-004 preview action is retained without payload or invitation authority')
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','approved','draft','draft','withdrawn'])
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -207,6 +219,11 @@ test('PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND
     assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).acceptance,packagesBefore.acceptance,'PRICE-002 immutable selected quantities and totals survive public CLI restore')
     assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).options,packagesBefore.options,'PRICE-002 package definitions and bounded optional items survive public CLI restore')
     assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).pdfDownloads,packagesBefore.pdfDownloads,'PRICE-002 selected PDF timeline survives public CLI restore')
+    assert.deepEqual(restoredState.proposals.find(x=>x.id===paper.id).acceptance,paperBefore.acceptance,'PRICE-002 / SIGN-008 selected upload, attestation and file metadata survive public CLI restore')
+    assert.equal((await h.send(paperInvoicePath,undefined,restoredOwner)).text,paperCsv,'PRICE-002 selected deposit invoice survives restore byte-identically')
+    const paperFile=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+paper.id+'/'+paperBefore.acceptance.signedCopy.id,{headers:{host:new URL(h.origin).host,cookie:restoredOwner}});assert.equal(paperFile.status,200);assert.deepEqual(new Uint8Array(await paperFile.arrayBuffer()),paperBytes,'SIGN-008 original signed copy survives restore byte-identically')
+    const paperPage=await h.send('/app/proposal?id='+paper.id,undefined,restoredOwner);assert.equal(paperPage.status,200);assert.match(paperPage.text,/2,301\.00/);assert.match(paperPage.text,/575\.25/);assert.match(paperPage.text,/Rush delivery/)
+
     assert.deepEqual(restoredState.agentKeys,[])
     assert.deepEqual((await h.send('/api/platter/send-requests',undefined,restoredOwner)).value.requests,beforeRequests)
     assert.equal((await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'ping'},'',{authorization:'Bearer '+key.token})).status,401)

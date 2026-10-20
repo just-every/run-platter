@@ -65,6 +65,30 @@ export async function packagesJourney() {
    assert.match(await clientPage.locator('main').innerText(),/This agreement is complete/);assert.match(await clientPage.getByLabel('Selected total').innerText(),/2,301\.00/);await capture(clientPage,'accepted')
    const final=await(await context.request.get(app.origin+'/api/platter/state')).json(),agreement=final.proposals.find(x=>x.id===p.id).acceptance
    assert.equal(agreement.totalCents,230100);assert.equal(agreement.depositCents,57525);assert.equal(agreement.selection.items[0].quantity,4)
+   // PRICE-002 / SIGN-008: record the same selection when the client signs elsewhere.
+   const {packageFixture}=await import('./packages-fixture.mjs')
+   const paper=await cmd('proposal.prepare',{clientId:client.id,title:'Northstar signed-copy choices',scope:'Signed outside Platter.',depositPercent:25,packages:packageFixture()})
+   await cmd('proposal.approve',{id:paper.id,version:1,revision:1});await cmd('proposal.send',{id:paper.id,version:2})
+   await page.goto(app.origin+'/app/proposal?id='+paper.id)
+   const paperPanel=page.locator('#paper-acceptance'),review=paperPanel.locator('form').filter({has:page.getByRole('button',{name:'Review signed-copy selection',exact:true})})
+   await paperPanel.getByLabel('Package recorded from signed copy').selectOption('two');await paperPanel.getByRole('button',{name:'Choose signed package',exact:true}).click()
+   await review.getByRole('checkbox',{name:/Add Rush delivery/}).check();await review.getByLabel('Quantity for Rush delivery').fill('4');await review.getByRole('button',{name:'Review signed-copy selection',exact:true}).click()
+   assert.match(await paperPanel.getByLabel('Selected total').innerText(),/2,301\.00/);assert.match(await paperPanel.getByLabel('Selected deposit').innerText(),/575\.25/);await capture(page,'upload-selection')
+   await paperPanel.getByLabel('Package recorded from signed copy').selectOption('one');await paperPanel.getByRole('button',{name:'Choose signed package',exact:true}).click()
+   assert.equal(await review.getByRole('checkbox',{name:/Add Rush delivery/}).isChecked(),false);assert.match(await paperPanel.getByLabel('Selected total').innerText(),/1,000\.00/)
+   await paperPanel.getByLabel('Package recorded from signed copy').selectOption('two');await paperPanel.getByRole('button',{name:'Choose signed package',exact:true}).click()
+   await review.getByRole('checkbox',{name:/Add Rush delivery/}).check();await review.getByLabel('Quantity for Rush delivery').fill('11');assert.equal(await review.getByLabel('Quantity for Rush delivery').evaluate(x=>x.validity.rangeOverflow),true)
+   await review.getByLabel('Quantity for Rush delivery').fill('4');await review.getByRole('button',{name:'Review signed-copy selection',exact:true}).click()
+   const upload=paperPanel.locator('form[enctype="multipart/form-data"]')
+   await upload.getByLabel('Signer full name').fill('Morgan Lee');await upload.getByLabel('Signed date').fill('2026-10-15')
+   await upload.getByLabel('Client-signed copy').setInputFiles({name:'packages-signed.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF Growth with Rush delivery quantity four')});await upload.getByRole('checkbox').check();await capture(page,'upload-form')
+   await upload.getByRole('button',{name:'Record accepted by upload',exact:true}).click()
+   assert.equal(await page.getByRole('alert').count(),0);assert.match(await page.getByRole('status').innerText(),/Accepted by upload/);assert.match(await page.getByLabel('Selected total').innerText(),/2,301\.00/);assert.match(await page.getByLabel('Selected deposit').innerText(),/575\.25/)
+   const paperState=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals.find(x=>x.id===paper.id)
+   assert.equal(paperState.acceptance.method,'upload');assert.equal(paperState.acceptance.selection.items[0].quantity,4);assert.equal(paperState.acceptance.totalCents,230100);assert.equal(paperState.acceptance.depositCents,57525)
+   await capture(page,'upload-accepted');await page.getByRole('button',{name:'Export invoice CSV',exact:true}).click()
+   const invoice=await context.request.get(app.origin+await page.getByRole('link',{name:'Download deposit invoice CSV',exact:true}).getAttribute('href'));assert.equal(invoice.status(),200);assert.match(await invoice.text(),/575\.25/);await capture(page,'upload-invoice')
+
   }finally{await clientContext?.close();await context.close();await app.close()}
  }}finally{await browser.close()}
 }

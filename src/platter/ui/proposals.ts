@@ -1,3 +1,4 @@
+import { duplicatePanel } from './duplicate'
 import { withdrawalPanel } from './withdrawal'
 import { ownerQuestions, openQuestionsPanel } from './questions'
 import { expiryPanel } from './expiry'
@@ -50,5 +51,5 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   html += paperAcceptanceForm(state, p)
   if (p.acceptance) html += panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)}${p.acceptance.method === 'upload' ? '' : ` · ${escape(p.acceptance.email)}`}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd>${acceptanceMethod(p.acceptance, '/api/platter/attachments/' + encodeURIComponent(p.id) + '/')}</dl><p>The accepted agreement is permanent.</p>`)
   if (owner && p.acceptance) html += panel('Invoice export', form('invoice.export', path, hidden('id', p.id) + '<button>Export invoice CSV</button>') + (p.invoice ? `<p>Invoice ${escape(p.invoice.number)} · Exported ${date(p.invoice.exported_at)}</p><a href="/api/platter/invoices/${encodeURIComponent(p.invoice.id)}.csv">Download deposit invoice CSV</a>` : ''))
-  return html + ownerQuestions(state,p) + deliveryPanel(state,p) + (p.status==='withdrawn'?'':suggestionsPanel(state,p)) + historyPanel(state, p, selection)
+  return html + duplicatePanel(state,p) + ownerQuestions(state,p) + deliveryPanel(state,p) + (p.status==='withdrawn'?'':suggestionsPanel(state,p)) + historyPanel(state, p, selection)
 }

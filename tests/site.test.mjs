@@ -647,3 +647,33 @@ test('SEND-010 desktop and phone withdraw, inspect revoked offer and audit, then
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+
+test('EDIT-012 desktop and phone duplicate an accepted agreement for Beta Co and approve its separate draft', {timeout:180000},async()=>{
+ let app,browser
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`EDIT-012-${name}-${width}.png`),fullPage:true})}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    const client=await cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),beta=await cmd('client.save',{name:'Beta Co',email:'contact@beta.example'})
+    const source=await cmd('proposal.prepare',{title:'Brand photography',clientId:client.id,scope:'Studio photography and campaign usage.',terms:'Delivery within two weeks.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'})
+    await cmd('proposal.approve',{id:source.id,version:1,revision:1});const invitation=await cmd('proposal.send',{id:source.id,version:2})
+    await page.goto(invitation.shareUrl);await page.getByRole('button',{name:'Send verification code'}).click();const state=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click();await page.getByRole('radio',{name:/Studio essentials/}).check();await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
+    assert.equal(await page.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1);await capture('source-client')
+    await page.goto(app.origin+'/app/proposal?id='+source.id);await page.getByLabel('Copy for client').selectOption(beta.id);await capture('source')
+    await page.getByRole('button',{name:'Duplicate proposal',exact:true}).click();assert.notEqual(new URL(page.url()).searchParams.get('id'),source.id)
+    assert.equal(await page.getByRole('heading',{level:1}).innerText(),'Brand photography (copy)');assert.match(await page.locator('.proposal-status').innerText(),/draft.*Revision 1/i);assert.match(await page.locator('main').innerText(),/Beta Co/);assert.equal(await page.locator('textarea[name="scope"]').inputValue(),'Studio photography and campaign usage.');assert.equal(await page.locator('[name="priceOne"]').inputValue(),'2400.00');await capture('copy')
+    const copyId=new URL(page.url()).searchParams.get('id');const beforeApproval=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name:'proposal.send',input:{id:copyId,version:1}}});assert.equal(beforeApproval.status(),409)
+    await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();await capture('sent-copy')
+    const final=await(await context.request.get(app.origin+'/api/platter/state')).json();assert.equal(final.proposals.find(p=>p.id===source.id).status,'accepted');assert.equal(final.proposals.find(p=>p.id===copyId).status,'sent');assert.equal(final.proposals.find(p=>p.id===source.id).acceptance.name,'Avery Chen')
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

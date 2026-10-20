@@ -1,3 +1,4 @@
+import { duplicateProposal } from './duplicate'
 import { withdraw } from './withdrawal'
 import { questionCommand } from './questions'
 import { expiryCommand, expirySendStatements, currentTime } from './expiry'
@@ -24,6 +25,7 @@ export function proposalFields(p:Record<string,unknown>){
  return{terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:[{id:'one',label:text(p.optionOne,'the first option',200),cents:dollars(p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:dollars(p.priceTwo)}]}
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown){const db=env.DB,at=await currentTime(env.DB)
+ if(name==='proposal.duplicate')return duplicateProposal(env,a,p)
  if(name==='proposal.withdraw')return withdraw(env,a,p)
  if(name.startsWith('question.'))return questionCommand(env,a,name,p)
  if(name.startsWith('expiry.'))return expiryCommand(env,a,name,p)

@@ -29,8 +29,11 @@
 .tier-amount{margin:0;font:800 26px/1.25 var(--pl-sans);letter-spacing:-.01em}
 .tier .chip{margin-top:auto}
 .tier-deposit output{font-weight:600}
-.money-field{display:flex;align-items:baseline;gap:2px;font:800 26px/1.25 var(--pl-sans);color:var(--pl-ink)}
-.money-field input{flex:1;min-width:0;margin-left:0;width:auto;padding-left:2px}
+/* The input's own intrinsic width must never set the column's minimum (it differs by platform font metrics). */
+.money-field{display:flex;align-items:baseline;gap:2px;min-width:0;font:800 26px/1.25 var(--pl-sans);color:var(--pl-ink)}
+.money-field input{flex:1 1 0;min-width:0;width:0;margin-left:0;padding-left:2px}
+.tier-name,.tier-price{min-width:0}
+.tier-name input{min-width:0}
 .tier-lines{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0;margin:4px 0 6px;font-size:15px}
 .tier-lines dt,.tier-lines dd{padding:9px 0;border-top:1px solid var(--pl-rule)}
 .tier-lines dt{color:var(--pl-ink-soft);font-size:15px}

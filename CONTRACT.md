@@ -408,9 +408,13 @@ A proposal expires a set number of days after it is sent (its expiry period, cop
 
 Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with expired, including filters, sorting, counts and totals under its visibility rules.
 
+Every capability available today conforms. The owner sets calendar days, an explicit YYYY-MM-DD date, or no expiry on a draft or sent offer. The installation time zone is UTC until set; the zone is copied at expiry configuration and first send, and an existing deadline keeps its stored zone until changed. The deadline is the start of the expiry date, with calendar-day arithmetic and daylight saving honored. A fresh invitation keeps its first-send date and expiry; an approved negotiated revision sent under NEG-001 starts the period again. A fixed, honestly labeled automatic warning is queued once for the current unsigned signer at the start of its warning date; uncertain provider attempts are never resent blindly. Accepted agreements never expire. Verified clients request reopening; the owner extends/removes expiry on the same links or approves and sends a new negotiated revision. Requests, settings and warning facts survive PORT-002 without credentials or transport mail. TEAM-004 audits configuration, requests and warnings.
+
+`FOLLOW-006` inherits workspace/template defaults, `SEND-006` editable expiry notices and `SIGN-004` every unsigned recipient, each extending this same named calendar, warning and reopening journey before shipping.
+
 *Acceptance:* Send with a 7-day expiry, advance the clock and see the client page expired with a reopen request, extend it, and accept. Send another proposal on 1 March with a 14-day expiry period and the warning on 1 day before: the client page shows 15 March, each unsigned signer's expiry notice reaches the mail fake on 14 March and the signed one gets none, and on 15 March the page is expired; extending it to 22 March reopens the same links.
 
-*Status:* missing. Offers never expire.
+*Status:* done. Named SEND-004 and REPORT-001 HTTP/Worker, 1440/390 browser and CLI archive journeys assert calendar days and explicit dates, exact DST boundaries, one warning only for unsigned offers, same-link extension and accepted immutability, negotiated reissue, owner-only controls, expired reporting and custody. (`src/platter/expiry.ts`, `src/platter/expiry-time.ts`, `src/platter/ui/expiry.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### SEND-005 — Completion and activity notifications.
 
@@ -423,6 +427,8 @@ The sender and watchers are notified when a proposal is first viewed, commented 
 #### SEND-006 — Editable subject, message and shared email templates.
 
 Every send, reminder (`FOLLOW-001`), fresh invitation (`PROP-002`), revision send (`NEG-001`), signer replacement (`SEND-007`) and net-terms invoice (`PAY-008`) shows the email before it goes, with an editable subject and personal message. Admins keep shared email templates per event (send, reminder, expiry notice, invoice, completion) with variables from `EDIT-004` such as `{client.first_name}`, `{client.company}`, `{proposal.title}`, `{sender.name}` and `{proposal.expires_on}`; they set the default template per event and per proposal template, and can lock a template so members pick it but do not edit it. A variable with no value blocks the send as in `EDIT-004`. A scheduled reminder uses the template the sender chose, and the sender can edit its text before it goes. The exact subject and body sent, after filling, are kept on the proposal timeline with recipient and time and in the agreement package. The verification code email (`SIGN-001`) keeps fixed wording. Before sending, anyone who may edit or send the proposal sends a test to themselves: the filled subject, prefixed "[Test]", and body go only to the member's own sign-in address, never to a recipient, and the message's proposal link opens the `EDIT-018` preview under a member session instead of a client link. A test send needs no approval, freezes nothing, creates no revision, records no view, schedules no reminder, is never put in the agreement package, and is listed on the proposal timeline as a test send; it is limited to 10 per member per proposal per day (429).
+
+Editable expiry notices extend SEND-004’s named unsigned-warning, exact-date and one-claim assertions before shipping.
 
 *Acceptance:* Save a template with subject "Proposal for {client.company}" and a body starting "Hi {client.first_name},"; send with it to Dana at Acme: the mail fake and the timeline both hold the subject "Proposal for Acme" and the body "Hi Dana," exactly. Edit the text of the scheduled second reminder: the first reminder in the mail fake carries the template text and the second carries the edited text. Send with an unfilled variable (refused, naming it); as a member edit a locked template's text (refused). On an unapproved draft, send a test to me: the mail fake holds exactly one message, to the member's own address, with the subject "[Test] Proposal for Acme"; its link opens the preview with the member's session and returns 401 without one; the proposal is still an unapproved draft at the same revision, with no tracking record, no reminder scheduled and no client link; a request that names another address for the test is refused (400), and the eleventh test that day is refused (429).
 
@@ -548,6 +554,8 @@ Before this capability ships, it extends the `REPORT-001` dashboard and its name
 
 The owner or an admin sets the workspace defaults (the workspace settings right of `TEAM-001`): a reminder schedule (on or off, days after sending, days before expiry and the cap of `FOLLOW-001`) and an expiry period in days counted from sending, with an optional warning to unsigned signers a set number of days before expiry (`SEND-004`). A fresh installation starts with reminders on at 2, 5 and 9 days after sending and 3 days before expiry with a cap of 3, and an expiry period of 60 days with the warning on 1 day before; a workspace upgraded from the first release gets the same defaults for proposals created after the upgrade. A template (`EDIT-002`) can set its own reminder schedule, expiry period and warning, each overriding the workspace default, or leave either to follow the workspace. Every new proposal copies these settings when it is created: from its template where the template sets them, otherwise from the workspace. That holds whether a member starts it from a template or from blank (`EDIT-002`), creates it in bulk (`RENEW-001`), a visitor submits a public link (`SEND-009`, where the expiry counts from the submission) or it is drafted (`AI-001`); a duplicate (`EDIT-012`) takes the source proposal's settings. Because the settings are copied, a later change to the template or to the workspace defaults never alters a proposal already created. The send screen shows the reminder dates and expiry date the proposal will get, and the sender changes either before sending; anyone who may send the proposal under `APPROVE-003` changes them on a sent proposal, and a changed expiry keeps the reopen rules of `SEND-004`. These are delivery settings, not offer terms: changing them creates no revision and needs no new approval. Every change, with who made it, is on the timeline.
 
+Before shipping, workspace and template expiry defaults extend SEND-004’s named calendar, warning and reopening assertions.
+
 *Acceptance:* Set the workspace defaults to reminders at 3 and 7 days after sending and expiry after 30 days. Create a template that overrides them with reminders at 2, 5 and 9 days and expiry after 14 days. Create one proposal from the template and one from blank and send both on 1 March: the template proposal carries reminders on 3, 6 and 10 March and expires on 15 March, and the blank proposal carries reminders on 4 and 8 March and expires on 31 March, as the send screen showed before sending and the mail fake confirms as the clock advances. Change the template's reminders to 4 days: the proposal already created keeps 2, 5 and 9, and a new proposal from the template gets 4. Change the workspace expiry to 45 days: the blank proposal still expires on 31 March. On the sent template proposal, turn reminders off and send a manual reminder (`FOLLOW-001`): exactly one reminder reaches the mail fake and the timeline, and a second manual reminder to the same recipient the same day is refused (429). Extend the template proposal's expiry to 22 March and confirm no new revision or approval is created. A proposal duplicated from the template proposal (`EDIT-012`), a bulk-created proposal (`RENEW-001`), a public-link submission (`SEND-009`) and a drafted proposal (`AI-001`) from the same template each carry the template's 2, 5 and 9 days and 14-day expiry. A sales member's and a manager's change to the workspace defaults are refused (403, the defaults unchanged), and an admin's change is saved; a sales member's change to a shared template's expiry is refused (403).
 
 *Status:* missing. No reminders, expiry, workspace defaults or template settings for either.
@@ -581,6 +589,8 @@ Signing meets the federal ESIGN Act and state UETA: each signer is shown the ele
 #### SIGN-004 — Multiple signers, signing order and countersignature.
 
 A proposal can require several signers on the client side and a countersignature from the firm, in a set order or in parallel groups. A template sets the order and groups for its roles, and they are copied into each proposal created from it (`SIGN-011`); changing the template later never changes a proposal's order. Each signer verifies separately; the agreement completes when the last required signature lands, and each party is told. A signer can be replaced by the sender (`SEND-007`) or, where allowed, delegate (`SIGN-009`) without changing the order.
+
+Before shipping, multiple signers extend SEND-004’s named warning journey so every unsigned signer receives the warning and each signed signer receives none.
 
 *Acceptance:* Require client CEO then CFO, then the firm's owner; the CFO cannot sign before the CEO; after all three the agreement is complete and each party gets the completion email. On another proposal, put two client signers in one parallel group followed by the firm's countersignature: the two sign in either order, the firm cannot countersign before both have signed, and the agreement completes after the countersignature.
 
@@ -1262,8 +1272,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 13 | 25 | 90 | 128 |
-| All | 25 | 25 | 90 | 140 |
+| Target and push further | 14 | 25 | 89 | 128 |
+| All | 26 | 25 | 89 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1315,7 +1325,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `SEND-001` | Send from the firm's own mailbox | target | missing |  | Mail goes only through the installation's sender. |
 | `SEND-002` | Delivery status and bounce handling | target | done | `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `SEND-003` | Recipients, roles and sharing | target | missing |  | One client recipient per proposal. |
-| `SEND-004` | Expiry and reopening | target | missing |  | Offers never expire. |
+| `SEND-004` | Expiry and reopening | target | done | `src/platter/expiry.ts`, `src/platter/expiry-time.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `SEND-005` | Completion and activity notifications | target | missing |  | No notifications to the sender. |
 | `SEND-006` | Editable subject, message and shared email templates | target | missing |  | Proposal mail has a fixed subject ("Your proposal:" and the title) and a fixed body, set in src/platter/commands.ts; no editing, templates or timeline copy. |
 | `SEND-007` | Replace an unsigned signer on a sent proposal | target | missing |  | One client recipient fixed at sending; a fresh invitation (`PROP-002`) rotates the link but cannot change who receives it. |

@@ -567,6 +567,14 @@ test('SEND-004 expired offer requests reopening and owner extends same links at 
     await page.getByRole('link',{name:'Spring campaign offer',exact:true}).click();assert.match(await page.locator('main').innerText(),/Waiting for your response/);await page.getByLabel('Expiry type').selectOption('date');await page.getByLabel('Expiry date in installation time').fill('2027-03-15');await page.getByRole('button',{name:'Save expiry',exact:true}).click();await capture('owner-reopened')
     await page.goto(clientUrl);assert.equal(await page.getByRole('heading',{name:'This proposal has expired',exact:true}).count(),0);await page.getByRole('radio',{name:/Full campaign/}).check();await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click();assert.equal(await page.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1);await capture('accepted')
     await app.fireCron(Date.parse('2027-04-01T04:00:00Z'));await page.reload();assert.equal(await page.getByRole('heading',{name:'This proposal has expired',exact:true}).count(),0);assert.equal((await (await context.request.get(app.origin+'/api/platter/state')).json()).proposals.find(p=>p.id===made.id).status,'accepted')
+    const legacy=await cmd('proposal.prepare',{clientId:client.id,title:'Legacy Northstar offer',scope:'An earlier studio campaign.',optionOne:'Studio',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'})
+    await cmd('proposal.approve',{id:legacy.id,version:1,revision:1});await cmd('proposal.send',{id:legacy.id,version:2})
+    // Provision a historical schema fixture, then exercise all controls through the built page.
+    await app.db.prepare('DELETE FROM p_expiry WHERE proposal_id=?').bind(legacy.id).run()
+    await page.goto(app.origin+'/app/proposal?id='+legacy.id);assert.match(await page.locator('main').innerText(),/No original send time is recorded/);await capture('legacy-unknown-send')
+    await page.getByLabel('Expiry type').selectOption('days');await page.getByLabel('Expiry period in calendar days').fill('7');await page.getByRole('button',{name:'Save expiry',exact:true}).click();assert.match(await page.locator('main').innerText(),/no recorded send time/)
+    await page.getByLabel('Expiry type').selectOption('date');await page.getByLabel('Expiry date in installation time').fill('2027-04-08');await page.getByRole('button',{name:'Save expiry',exact:true}).click();await capture('legacy-explicit-date')
+
    } finally {await context.close();await app.close();app=undefined}
   }
  } finally {await browser?.close();await app?.close()}

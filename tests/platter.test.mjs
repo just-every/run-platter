@@ -672,6 +672,7 @@ test('SEND-004 / TEAM-004 calendar expiry warns unsigned only, supports same-lin
  await h.db.prepare('DELETE FROM p_expiry WHERE proposal_id=?').bind(legacy.id).run()
  await h.cmd('expiry.set',{id:legacy.id,version:3,mode:'days',days:7},h.owner,409)
  assert.equal((await h.state()).proposals.find(p=>p.id===legacy.id).expiry.sentAt,null)
+ assert.match((await h.send('/app/proposal?id='+legacy.id,undefined,h.owner)).text,/No original send time is recorded/)
  await h.cmd('expiry.set',{id:legacy.id,version:3,mode:'date',date:'2027-04-08'})
  let historical=(await h.state()).proposals.find(p=>p.id===legacy.id);assert.equal(historical.expiry.date,'2027-04-08');assert.equal(historical.expiry.deadlineAt,at('2027-04-08T04:00:00Z'));assert.equal(historical.expiry.sentAt,null)
  await h.cmd('proposal.send',{id:legacy.id,version:historical.version})

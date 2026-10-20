@@ -33,7 +33,7 @@ export async function builtSite() {
 // Run the compiled production entry and real static assets in Wrangler. Only
 // installation provisioning uses D1 directly; the owner claims through HTTP.
 export async function installedApp(options = {}) {
-  if(options.scheduled){const h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',unclaimed:true,auth:{OWNER_EMAIL:'owner@northstar.example'}});return {origin:h.origin,token:h.auth.SETUP_TOKEN,fireCron:async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'}),close:h.close}}
+  if(options.scheduled){const h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',unclaimed:true,auth:{OWNER_EMAIL:'owner@northstar.example'}});return {origin:h.origin,token:h.auth.SETUP_TOKEN,db:h.db,fireCron:async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'}),close:h.close}}
   const temporary = await mkdtemp(join(tmpdir(), 'platter-site-'))
   const persist = join(temporary, 'state'), config = resolve('dist/server/wrangler.json')
   let proxy, worker

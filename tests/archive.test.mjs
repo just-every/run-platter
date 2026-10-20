@@ -120,7 +120,7 @@ test('PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND
     assert.ok(replyKey,'the provider receives the generated reply key')
     assert.ok((await h.db.prepare('SELECT COUNT(*) AS count FROM p_question_reply_keys').first()).count>0,'a reply capability exists before export')
     await h.close();h=null
-    h=await harness({root:source,origin:sourceOrigin,...localIdentity})
+    h=await harness({root:source,origin:sourceOrigin,assetsDirectory:'public',...localIdentity})
     const business=state=>({clients:state.clients,proposals:state.proposals.map(({delivery,deliveries,shareToken,...proposal})=>proposal),importJobs:state.importJobs})
     const withdrawn=await h.cmd('proposal.prepare',{...offer,title:'Withdrawn offer'})
     await h.cmd('proposal.approve',{id:withdrawn.id,version:1,revision:1});const withdrawnShare=await h.cmd('proposal.send',{id:withdrawn.id,version:2})

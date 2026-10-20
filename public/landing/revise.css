@@ -2,6 +2,10 @@
 .rv-row{margin-top:64px}
 .rv-row+.rv-row{margin-top:56px}
 .rv-title{font-size:28px;line-height:1.2;margin:0 0 18px}
+/* the large title keeps its hidden separator zone inside the page margin */
+.rv-title .dl{margin-left:-.6em;clip-path:inset(-4px -4px -4px .6em)}
+.rv-title .dl>span{padding-left:.6em}
+.rv-title .dl>span::before{width:.6em}
 .rv-sent{margin:-4px 0 18px;font-size:15px;padding:7px 16px}
 /* the four steps take a little more than the page column (as page-06 does), so the rev rows and the signed chips keep their lines */
 .rv-steps{display:grid;grid-template-columns:minmax(0,.98fr) 24px minmax(0,.72fr) 24px minmax(0,1.5fr) 24px minmax(0,1.4fr);align-items:center;margin-right:calc(0px - min(120px,50vw - 50% - 24px))}

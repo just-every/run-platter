@@ -23,7 +23,7 @@
   .cl-card:nth-child(n){transform:none}
   .cl-copy .display{font-size:56px}
 }
-@media (max-width:860px){.cl-cards{grid-template-columns:minmax(0,1fr);max-width:520px;margin-inline:auto}}
+@media (max-width:1000px){.cl-cards{grid-template-columns:minmax(0,1fr);max-width:520px;margin-inline:auto}}
 @media (max-width:760px){
   .closing{margin-top:64px;text-align:left}
   .cl-scene{overflow:hidden;margin:0 -16px}

@@ -36,8 +36,8 @@ export async function packagesJourney() {
    await page.reload();assert.equal(await page.locator('[data-package-id]').count(),3);assert.equal(await page.locator('[data-optional-item]').count(),2);await capture(page,'saved')
    await page.getByRole('link',{name:'Preview client page',exact:true}).click()
    if(width===390){await page.getByLabel('Preview width').selectOption('390');await page.getByRole('button',{name:'Change preview width'}).click()}
-   const frame=page.frameLocator('iframe');await frame.getByLabel('Choose one option',{exact:true}).selectOption('two');await frame.getByRole('button',{name:'Update preview selection'}).click()
-   await frame.getByRole('checkbox',{name:/Add Rush delivery/}).check();await frame.getByLabel('Quantity for Rush delivery').fill('4');await frame.getByRole('button',{name:'Update preview selection'}).click()
+   const frame=page.frameLocator('iframe'),updatePreview=async()=>{const navigating=page.waitForEvent('framenavigated',{predicate:f=>f.url().includes('/app/preview/client?')});await frame.getByRole('button',{name:'Update preview selection'}).click();await(await navigating).waitForLoadState('load')};await frame.getByLabel('Choose one option',{exact:true}).selectOption('two');await updatePreview()
+   await frame.getByRole('checkbox',{name:/Add Rush delivery/}).check();await frame.getByLabel('Quantity for Rush delivery').fill('4');await updatePreview()
    assert.match(await frame.getByLabel('Selected total').innerText(),/2,301\.00/);assert.match(await frame.getByLabel('Selected deposit').innerText(),/575\.25/);assert.ok(!(await frame.locator('main').innerText()).includes('Complete package includes priority support.'));await capture(page,'preview')
    const unchanged=await(await context.request.get(app.origin+'/api/platter/state')).json();assert.equal(unchanged.proposals.find(x=>x.id===p.id).version,1);assert.equal(unchanged.outbox.length,0)
    await page.goto(app.origin+'/app/proposal?id='+p.id);await page.getByRole('button',{name:'Approve this revision',exact:true}).click();await page.getByRole('button',{name:'Send approved proposal',exact:true}).click()

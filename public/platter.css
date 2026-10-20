@@ -1,6 +1,0 @@
-/* Platter's app (owner pick A, the tier composer). Tokens live in /rer-theme.css; each part has its own file. */
-@import url('/app/shell.css');
-@import url('/app/forms.css');
-@import url('/app/panels.css');
-@import url('/app/composer.css');
-@import url('/app/line.css');

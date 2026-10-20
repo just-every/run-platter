@@ -27,10 +27,9 @@ function editor(state: any, proposal?: any, negotiating = false): string {
     + field(`Price in ${proposal?.currency ?? 'USD'}`,  'priceOne', options[0] ? (options[0].cents / 100).toFixed(2) : '', 'required inputmode="decimal" placeholder="0.00"') + '</fieldset>'
     + '<fieldset><legend>Option two</legend>' + field('Option label', 'optionTwo', options[1]?.label, 'required')
     + field(`Price in ${proposal?.currency ?? 'USD'}`,  'priceTwo', options[1] ? (options[1].cents / 100).toFixed(2) : '', 'required inputmode="decimal" placeholder="0.00"') + '</fieldset>'
-    + ((proposal?.currency??'USD')==='USD'?pricingEditor(options):'')
     + field('Deposit percentage', 'depositPercent', proposal ? Number(proposal.deposit_bps) / 100 : '', 'required inputmode="decimal" placeholder="25"')
   return form(negotiating ? 'proposal.negotiate' : proposal ? 'proposal.revise' : 'proposal.prepare', proposal ? proposalPath(proposal.id) : '/app',
-    (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + `<div class="editor-grid">${inputs}</div>` + `<button>${negotiating ? 'Prepare negotiated revision' : proposal ? 'Save revision' : 'Prepare proposal'}</button>`,
+    (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + `<div class="editor-grid">${inputs}</div>` + ((proposal?.currency??'USD')==='USD'?pricingEditor(options):'') + `<button>${negotiating ? 'Prepare negotiated revision' : proposal ? 'Save revision' : 'Prepare proposal'}</button>`,
     proposal ? `proposal-${proposal.id}-${proposal.version}` : 'proposal-new')
 }
 export function proposalsPage(state: any, selection = new URLSearchParams()): string {

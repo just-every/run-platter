@@ -887,19 +887,23 @@ test('PRICE-001 / COLLAB-003 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / PROP-
   for(const field of ['name','description','quantity','unit','unitPrice','group'])assert.equal(line[field],source[field])
   assert.equal(line.lineTotalCents,source.expected)
  }
+ const key=await h.cmd('agent.create',{label:'PRICE-001 table assistant'})
+ const rpc=await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'prepare_proposal',arguments:{clientId:client.id,title:'Agent table draft',scope:'Source-defined services',depositPercent:25,optionOne:'Project',priceOne:'1',optionTwo:'Campaign',priceTwo:'4200',pricingTables:tables}}},'',{authorization:'Bearer '+key.token})
+ assert.equal(rpc.status,200);assert.ok(!rpc.value.result.isError,JSON.stringify(rpc.value));const agentDraft=JSON.parse(rpc.value.result.content[0].text);assert.equal((await h.state()).proposals.find(x=>x.id===agentDraft.id).options[0].cents,expected.grandCents)
  const before=await h.state()
  for(const [field,values] of [['quantity',['0','-1','1.0001','NaN','Infinity','1e2','1000001',{},null]],['unitPrice',['0','-1','1.001','NaN','1e2','10000001',{},null]]])for(const value of values){
   const bad=pricingFixture();bad[0].lines[0][field]=value
   await h.cmd('proposal.prepare',{...input,pricingTables:bad},h.owner,400)
  }
  for(const bad of ['invalid',{},[{optionId:'missing',name:'Bad',lines:tables[0].lines}],[{optionId:'one',name:'Empty',lines:[]} ]])await h.cmd('proposal.prepare',{...input,pricingTables:bad},h.owner,400)
+ const overflow=pricingFixture();overflow[0].lines[0].quantity='1000000';overflow[0].lines[0].unitPrice='10000000';await h.cmd('proposal.prepare',{...input,pricingTables:overflow},h.owner,400)
  assert.deepEqual((await h.state()).proposals,before.proposals,'bad inputs write no proposals')
  const changed=pricingFixture();changed[0].lines[0].description='Revised description at the same price'
  await h.cmd('proposal.revise',{...input,id:p.id,version:1,pricingTables:changed})
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
  let response=await h.send(`/app/proposal?id=${p.id}&from=1&to=2`,undefined,h.owner);assert.match(response.text,/Revised description at the same price/);assert.match(response.text,/<del>[^]*Agreed discovery service/)
  await h.cmd('proposal.restore',{id:p.id,version:2,revision:1})
- row=await current();assert.deepEqual(row.options[0].tables,before.proposals[0].options[0].tables)
+ row=await current();assert.deepEqual(row.options[0].tables,before.proposals.find(x=>x.id===p.id).options[0].tables)
  const copied=await h.cmd('proposal.duplicate',{id:p.id,version:3});assert.deepEqual((await h.state()).proposals.find(x=>x.id===copied.id).options,row.options)
  response=await h.send(`/app/preview/client?id=${p.id}&revision=3&optionId=one`,undefined,h.owner);assert.equal(response.status,200);assert.match(response.text,/403\.89/);assert.match(response.text,/Project services/);assert.doesNotMatch(response.text,/Premium only/)
  await h.cmd('proposal.approve',{id:p.id,version:3,revision:3});const share=await h.cmd('proposal.send',{id:p.id,version:4}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
@@ -914,7 +918,7 @@ test('PRICE-001 / COLLAB-003 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / PROP-
  response=await h.send(path,undefined,cookie);assert.match(response.text,/Agreed discovery service/);assert.doesNotMatch(response.text,/Revised description at the same price/)
  response=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie);assert.equal(response.status,200)
  const accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
- assert.equal(accepted.total_cents,expected.grandCents);assert.equal(accepted.deposit_cents,expected.depositCents);assert.deepEqual(JSON.parse(accepted.snapshot).options[0].tables,before.proposals[0].options[0].tables)
+ assert.equal(accepted.total_cents,expected.grandCents);assert.equal(accepted.deposit_cents,expected.depositCents);assert.deepEqual(JSON.parse(accepted.snapshot).options[0].tables,before.proposals.find(x=>x.id===p.id).options[0].tables)
  await h.cmd('proposal.revise',{...input,id:p.id,version:7},h.owner,409)
  const audit=(await h.send('/api/platter/audit?subject='+p.id,undefined,h.owner)).value.rows
  assert.ok(audit.some(r=>r.kind==='proposal.prepare'||r.action==='proposal.prepare'))

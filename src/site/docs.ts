@@ -56,6 +56,9 @@ function inline(value: string, source: string): string {
   return result + escape(value.slice(from))
 }
 
+// A heading never strands its last word: a short final pair of words stays on one line.
+const keepLastPair = (html: string): string => html.replace(/ ([^\s<>]+ [^\s<>]+)$/, (whole, pair: string) => pair.length <= 20 ? ` ${pair.replace(' ', '\u00a0')}` : whole)
+
 function renderMarkdown(content: string, source: string): string {
   const lines = content.replace(/\r\n?/g, '\n').split('\n')
   const result: string[] = []
@@ -82,7 +85,7 @@ function renderMarkdown(content: string, source: string): string {
       const count = slugs.get(base) ?? 0
       slugs.set(base, count + 1)
       const id = count ? `${base}-${count}` : base
-      result.push(`<h${title[1].length} id="${escape(id)}">${inline(title[2], source)}</h${title[1].length}>`)
+      result.push(`<h${title[1].length} id="${escape(id)}">${keepLastPair(inline(title[2], source))}</h${title[1].length}>`)
       i++; continue
     }
     if (i + 1 < lines.length && line.includes('|') && tableRule(lines[i + 1])) {

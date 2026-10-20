@@ -1,3 +1,4 @@
+import { selectionItems, offerSelection } from '../selection'
 import type { Bindings } from '../../auth.server'
 import { commit, exact, fail, need, proposal, type Actor } from '../model'
 import { offerPdf } from './offer-pdf'
@@ -23,15 +24,16 @@ export async function pdfCommand(env: Bindings, actor: Actor, input: Record<stri
 }
 
 /** The invitation, sent revision and download setting are rechecked atomically after rendering. */
-export async function clientPdf(env: Bindings, context: any, optionId: string) {
+export async function clientPdf(env: Bindings, context: any, optionId: string, input: Record<string,any> = {}) {
  need(context.verified, 'Verify your email before downloading the proposal PDF', 401)
  need(context.row.status === 'sent', 'Unsigned downloads are only available before acceptance', 409)
  need(await pdfEnabled(env.DB, context.row.id), 'Client PDF downloads are disabled for this proposal', 403)
- const bytes = await offerPdf(context.row, optionId, await pdfFonts(env)), at = Date.now()
+ const items=selectionItems(input),selection=offerSelection(JSON.parse(context.row.options),context.row.deposit_bps,optionId,items)
+ const bytes = await offerPdf(context.row, optionId, await pdfFonts(env),items), at = Date.now()
  try {
   await env.DB.batch([
    env.DB.prepare("INSERT INTO p_guard(ok) VALUES(EXISTS(SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id WHERE s.token=? AND s.session_hash=? AND s.session_expires>? AND s.revision=p.revision AND p.revision=? AND p.status='sent' AND NOT EXISTS(SELECT 1 FROM p_pdf_settings d WHERE d.proposal_id=p.id AND d.enabled=0)))").bind(context.token, context.share.session_hash, at, context.row.revision),
-   env.DB.prepare('INSERT INTO p_pdf_downloads(id,proposal_id,revision,option_id,client_id,downloaded_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(), context.row.id, context.row.revision, optionId, context.row.client_id, at),
+   env.DB.prepare('INSERT INTO p_pdf_downloads(id,proposal_id,revision,option_id,client_id,downloaded_at,selection) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(), context.row.id, context.row.revision, optionId, context.row.client_id, at, JSON.stringify(selection.items)),
    env.DB.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(), context.row.client_id, 'client', 'proposal.pdf.download', context.row.id, at),
    env.DB.prepare('DELETE FROM p_guard'),
   ])

@@ -63,3 +63,34 @@ export function pricingInput(options: any[]) {
   lines: table.lines.map(({ name, description, quantity, unit, unitPrice, group }) => ({ name, description, quantity, unit, unitPrice, group })),
  })))
 }
+
+/** Native package input; historical two-option commands remain valid. */
+export function packageInputs(input: unknown, tables: any[]) {
+ let packages: any = input
+ if (typeof packages === 'string') { try { packages = JSON.parse(packages) } catch { need(false, 'Invalid packages') } }
+ need(Array.isArray(packages) && packages.length > 0, 'Offer at least one package')
+ const ids = new Set<string>()
+ return packages.map((item: any) => {
+  need(object(item), 'Invalid package')
+  const id = text(item.id, 'a package id', 80)
+  need(/^[a-zA-Z0-9_-]+$/.test(id) && !ids.has(id), 'Package ids must be unique letters, numbers, hyphens or underscores')
+  ids.add(id)
+  const optional = item.optionalItems ?? []
+  need(Array.isArray(optional), 'Optional items must be a list')
+  const itemIds = new Set<string>()
+  const optionalItems = optional.map((extra: any) => {
+   need(object(extra), 'Invalid optional item')
+   const id = text(extra.id, 'an optional-item id', 80)
+   need(/^[a-zA-Z0-9_-]+$/.test(id) && !itemIds.has(id), 'Optional-item ids must be unique letters, numbers, hyphens or underscores')
+   itemIds.add(id)
+   const integer = (value: unknown) => { need(/^\d+$/.test(String(value)), 'Quantity limits must be positive whole numbers'); const n = Number(value); need(Number.isSafeInteger(n) && n >= 1 && n <= 1000000, 'Quantity limits must be from 1 to 1,000,000'); return n }
+   const min = integer(extra.min), max = integer(extra.max), quantity = integer(extra.quantity)
+   need(min <= quantity && quantity <= max, 'Default quantity must be within its minimum and maximum')
+   need(typeof extra.editable === 'boolean', 'Choose whether quantity is client-editable')
+   return { id, label: text(extra.label, 'an optional-item name'), unitCents: dollars(extra.unitPrice), min, max, quantity, editable: extra.editable }
+  })
+  return { id, label: text(item.label, 'a package name'), cents: tables.some(t => t?.optionId === id) ? 1 : dollars(item.price), ...(optionalItems.length ? { optionalItems } : {}) }
+ })
+}
+
+export const editablePackages = (options: any[]) => options.map(option => ({ id: option.id, label: option.label, price: (option.cents / 100).toFixed(2), optionalItems: (option.optionalItems ?? []).map((item: any) => ({ ...item, unitPrice: (item.unitCents / 100).toFixed(2) })) }))

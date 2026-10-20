@@ -8,6 +8,7 @@ export function changes(before: any, after: any): string {
  for (const id of ids) {
   const old = before.options.find((option: any) => option.id === id), next = after.options.find((option: any) => option.id === id)
   if(JSON.stringify(old?.tables??[])!==JSON.stringify(next?.tables??[])){const detail=(o:any)=>(o?.tables??[]).map((t:any)=>t.name+'\n'+t.lines.map((l:any)=>`${l.group}: ${l.name} — ${l.description} — ${l.quantity} ${l.unit} × ${l.unitPrice} = ${money(l.lineTotalCents,after.currency)}`).join('\n')).join('\n')||'No pricing tables';rows.push([`Option ${id} pricing tables`,detail(old),detail(next)])}
+  if(JSON.stringify(old?.optionalItems??[])!==JSON.stringify(next?.optionalItems??[])){const detail=(o:any)=>(o?.optionalItems??[]).map((x:any)=>`${x.label}: ${money(x.unitCents,after.currency)} × ${x.quantity} (${x.min}–${x.max}, ${x.editable?'client-editable':'fixed'})`).join('\n')||'No optional items';rows.push([`Option ${id} optional items`,detail(old),detail(next)])}
   rows.push([`Option ${id} label`, old?.label ?? 'Not offered', next?.label ?? 'Not offered'], [`Option ${id} price`, old ? money(old.cents, before.currency ?? 'AUD') : 'Not offered', next ? money(next.cents, after.currency ?? 'AUD') : 'Not offered'])
  }
  const fileRefs=(value:any)=>typeof value==='string'?JSON.parse(value):value??[]

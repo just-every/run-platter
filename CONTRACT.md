@@ -282,7 +282,7 @@ Expanded package, optional-item and quantity choices extend EDIT-014’s selecte
 
 *Acceptance:* Offer three packages and two optional items with an editable quantity between 1 and 10; as the client choose the middle package, add one item and set quantity 4; the server totals, agreement and PDF all show that selection; quantity 11 is refused.
 
-*Status:* partial. Exactly two fixed options; no add-ons, editable quantities or any number of packages. (`src/platter/signing.ts`, `tests/platter.test.mjs`)
+*Status:* partial. Native proposals offer one or more packages and optional items with fixed or client-editable whole-number quantities. The sender sets inclusive minimum/maximum bounds and a default (1 to 1,000,000); optional items start unselected. Server totals add each selected quantity × integer-cent unit price to the package base and round the percentage deposit to the nearest cent, with a $10,000,000 selected-total bound. Named PRICE-002 HTTP, 1440/390 browser and public CLI archive journeys cover three packages, two optional items, middle-package selection with quantity four, quantity-eleven refusal, selected unsigned PDF and immutable agreement, conditional sections, preview, comparison/restoration, duplication and negotiated-offer custody. Gap: selection-adjusted tax and payment schedules (`PRICE-005`, `PRICE-007`) and selecting optional items when recording a client-signed upload remain. (`src/platter/pricing.ts`, `src/platter/selection.ts`, `src/platter/ui/packages.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/packages-journey.mjs`, `tests/archive.test.mjs`)
 
 #### PRICE-003 — One-off and recurring fees.
 
@@ -1423,7 +1423,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `EDIT-018` | Client-page preview before sending | target | done | `src/platter/preview.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `CAT-001` | Service and product catalog | target | partial | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs` | Imported catalog metadata and images only; no catalog editing, provider sync, pricing-table insertion or line-image rendering. |
 | `PRICE-001` | USD pricing tables with line items | target | done | `src/platter/pricing.ts`, `src/platter/ui/pricing.ts`, `tests/platter.test.mjs`, `tests/pricing-journey.mjs`, `tests/archive.test.mjs` |  |
-| `PRICE-002` | Packages and optional items the client chooses | target | partial | `src/platter/signing.ts`, `tests/platter.test.mjs` | Exactly two fixed options; no add-ons, editable quantities or any number of packages. |
+| `PRICE-002` | Packages and optional items the client chooses | target | partial | `src/platter/selection.ts`, `src/platter/ui/packages.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/packages-journey.mjs`, `tests/archive.test.mjs` | Arbitrary packages and bounded optional quantities now share server preview/client/PDF/acceptance calculations and archive custody. Gap: selection-adjusted tax/payment schedules (PRICE-005/PRICE-007) and client-signed-upload optional-item selection. |
 | `PRICE-003` | One-off and recurring fees | target | missing |  | One-off totals only. |
 | `PRICE-004` | Discounts | target | missing |  | No discounts. |
 | `PRICE-005` | US sales tax | target | missing |  | No tax handling beyond a fixed GST-free export. |

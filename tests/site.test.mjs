@@ -822,3 +822,7 @@ test('EDIT-007 desktop and phone client verifies, chooses, comments and accepts 
 test('PRICE-001 / COLLAB-003 / EDIT-014 / EDIT-018 desktop and phone create grouped line tables, edit and restore, preview, send, download and accept identical server totals', {timeout:180000}, async()=>{
  const {pricingJourney}=await import('./pricing-journey.mjs');await pricingJourney()
 })
+
+test('PRICE-002 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit three packages, review optional quantities, download and accept the exact selection', {timeout:180000}, async()=>{
+ const {packagesJourney}=await import('./packages-journey.mjs');await packagesJourney()
+})

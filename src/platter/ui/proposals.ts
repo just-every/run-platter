@@ -1,3 +1,4 @@
+import { packagesEditor } from './packages'
 import { pricingEditor, pricingTables } from './pricing'
 import { sectionConditions } from '../conditional'
 import { followupQueuePanel, followupPanel } from './followup'
@@ -18,15 +19,12 @@ import { area, date, empty, escape, field, form, hidden, money, optionPair, pane
 function editor(state: any, proposal?: any, negotiating = false): string {
   const options = proposal?.options ?? []
   const conditions=sectionConditions(proposal?.section_conditions)
-  const condition=(section:'scope'|'terms')=>`<label>${section==='scope'?'Scope':'Terms'} visibility<select name="${section}Option"><option value="">Every option</option>${['one','two'].map((id,i)=>`<option value="${id}"${conditions[section]===id?' selected':''}>Only ${escape(options[i]?.label??('option '+id))}</option>`).join('')}</select></label>`
+  const condition=(section:'scope'|'terms')=>`<label>${section==='scope'?'Scope':'Terms'} visibility<select name="${section}Option"><option value="">Every option</option>${(options.length?options:[{id:'one'},{id:'two'}]).map((option:any,i:number)=>{const id=option.id;return `<option value="${id}"${conditions[section]===id?' selected':''}>Only ${escape(options[i]?.label??('option '+id))}</option>`}).join('')}</select></label>`
   const clients = (state.clients ?? []).map((client: any) => `<option value="${escape(client.id)}"${client.id === proposal?.client_id ? ' selected' : ''}>${escape(client.name)} — ${escape(client.email)}</option>`).join('')
   const inputs = `<label>Client<select name="clientId" required><option value="">Choose a client</option>${clients}</select></label>`
     + field('Proposal title', 'title', proposal?.title, 'required maxlength="200"')
     + area('Scope of work', 'scope', proposal?.scope, 'required') + condition('scope') + area('Terms', 'terms', proposal?.terms??'') + condition('terms')
-    + '<fieldset><legend>Option one</legend>' + field('Option label', 'optionOne', options[0]?.label, 'required')
-    + field(`Price in ${proposal?.currency ?? 'USD'}`,  'priceOne', options[0] ? (options[0].cents / 100).toFixed(2) : '', 'required inputmode="decimal" placeholder="0.00"') + '</fieldset>'
-    + '<fieldset><legend>Option two</legend>' + field('Option label', 'optionTwo', options[1]?.label, 'required')
-    + field(`Price in ${proposal?.currency ?? 'USD'}`,  'priceTwo', options[1] ? (options[1].cents / 100).toFixed(2) : '', 'required inputmode="decimal" placeholder="0.00"') + '</fieldset>'
+    + ((proposal?.currency??'USD')==='USD'?packagesEditor(options):'<fieldset><legend>Option one</legend>'+field('Option label','optionOne',options[0]?.label,'required')+field('Price in AUD','priceOne',(options[0]?.cents/100).toFixed(2),'required')+'</fieldset><fieldset><legend>Option two</legend>'+field('Option label','optionTwo',options[1]?.label,'required')+field('Price in AUD','priceTwo',(options[1]?.cents/100).toFixed(2),'required')+'</fieldset>')
     + field('Deposit percentage', 'depositPercent', proposal ? Number(proposal.deposit_bps) / 100 : '', 'required inputmode="decimal" placeholder="25"')
   return form(negotiating ? 'proposal.negotiate' : proposal ? 'proposal.revise' : 'proposal.prepare', proposal ? proposalPath(proposal.id) : '/app',
     (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + `<div class="editor-grid">${inputs}</div>` + ((proposal?.currency??'USD')==='USD'?pricingEditor(options):'') + `<button>${negotiating ? 'Prepare negotiated revision' : proposal ? 'Save revision' : 'Prepare proposal'}</button>`,

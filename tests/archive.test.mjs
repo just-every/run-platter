@@ -28,7 +28,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -135,6 +135,16 @@ test('PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLO
     await h.cmd('followup.complete',{id:duplicate.id,action:'Reviewed scope with Avery by phone'})
     const followupsBefore=(await h.state()).followups.rows.map(({sentAt,...r})=>r)
     const actionsBefore=(await h.state()).followupActions
+    const {packageFixture,packageSelection:packageItems,packageExpected}=await import('./packages-fixture.mjs')
+    const packages=await h.cmd('proposal.prepare',{...offer,title:'Archived package choices',packages:packageFixture()})
+    await h.cmd('proposal.approve',{id:packages.id,version:1,revision:1});const packageShare=await h.cmd('proposal.send',{id:packages.id,version:2}),packagePath=new URL(packageShare.shareUrl).pathname
+    await h.send(packagePath+'/action?name=code.request',{})
+    const packageCode=(await h.state()).outbox.find(x=>x.proposal_id===packages.id&&x.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    const packageVerified=await h.send(packagePath+'/action?name=code.verify',{code:packageCode})
+    const packagePdf=await h.mf.dispatchFetch(h.origin+packagePath+'/download.pdf?optionId=two&items='+encodeURIComponent(JSON.stringify(packageItems)),{headers:{host:new URL(h.origin).host,cookie:packageVerified.cookie}});assert.equal(packagePdf.status,200);await packagePdf.arrayBuffer()
+    assert.equal((await h.send(packagePath+'/action?name=accept',{name:'Avery Chen',optionId:'two',items:packageItems,consent:true},packageVerified.cookie)).status,200)
+    const packagesBefore=(await h.state()).proposals.find(x=>x.id===packages.id)
+    assert.equal(packagesBefore.acceptance.totalCents,packageExpected.totalCents);assert.equal(packagesBefore.acceptance.depositCents,packageExpected.depositCents)
     const beforeVendorDocuments=(await h.state()).vendorDocuments
     const before=business(await h.state())
     const acceptedThread=before.proposals.find(p=>p.id===proposal.id).questions
@@ -146,7 +156,7 @@ test('PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLO
     assert.equal(openThread[0].answers.length,0)
     const beforeAudit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows.map(({reason,...row})=>row)
     assert.ok(beforeAudit.some(row=>row.action==='proposal.preview'&&row.subject===duplicate.id&&row.actor_role==='owner'),'EDIT-018 / TEAM-004 preview action is retained without payload or invitation authority')
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','approved','draft','draft','withdrawn'])
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','approved','draft','draft','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -194,6 +204,9 @@ test('PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLO
     assert.deepEqual(restoredState.proposals.find(p=>p.id===duplicate.id),duplicateBefore,'EDIT-012 copied content, files and delivery configuration survive CLI restore exactly')
     assert.equal(restoredState.proposals.find(p=>p.id===work.id).options[0].cents,pricingExpected.grandCents,'PRICE-001 server totals survive public CLI restore')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===work.id).options, before.proposals.find(p=>p.id===work.id).options,'PRICE-001 all table, line, quantity, unit, group and subtotal fields survive public CLI restore exactly')
+    assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).acceptance,packagesBefore.acceptance,'PRICE-002 immutable selected quantities and totals survive public CLI restore')
+    assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).options,packagesBefore.options,'PRICE-002 package definitions and bounded optional items survive public CLI restore')
+    assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).pdfDownloads,packagesBefore.pdfDownloads,'PRICE-002 selected PDF timeline survives public CLI restore')
     assert.deepEqual(restoredState.agentKeys,[])
     assert.deepEqual((await h.send('/api/platter/send-requests',undefined,restoredOwner)).value.requests,beforeRequests)
     assert.equal((await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'ping'},'',{authorization:'Bearer '+key.token})).status,401)

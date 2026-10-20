@@ -923,3 +923,53 @@ test('PRICE-001 / COLLAB-003 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / PROP-
  const audit=(await h.send('/api/platter/audit?subject='+p.id,undefined,h.owner)).value.rows
  assert.ok(audit.some(r=>r.kind==='proposal.prepare'||r.action==='proposal.prepare'))
 }finally{await h.close()}})
+
+test('PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-002 arbitrary packages and bounded optional quantities share server totals and immutable selection',async()=>{
+ const h=await harness({assetsDirectory:'public'});try{
+  const {packageFixture,packageSelection:items,packageExpected:expected}=await import('./packages-fixture.mjs')
+  const client=await h.cmd('client.save',{name:'Package client',email:'packages@studio.example'})
+  const input={...offer,clientId:client.id,packages:packageFixture(),terms:'Complete package only',sectionConditions:{terms:'three'}}
+  const p=await h.cmd('proposal.prepare',input),current=async()=> (await h.state()).proposals.find(x=>x.id===p.id)
+  let row=await current();assert.equal(row.options.length,3);assert.equal(row.options[1].optionalItems[0].unitCents,7525)
+  const before=await h.state()
+  for(const change of [p=>p[1].optionalItems[0].max=0,p=>p[1].optionalItems[0].min=11,p=>p[1].id='one',p=>p[1].optionalItems[0].unitPrice='1.001',p=>p[1].optionalItems.push({...p[1].optionalItems[0]})]){
+   const packages=packageFixture();change(packages);await h.cmd('proposal.prepare',{...input,packages},h.owner,400)
+  }
+  await h.cmd('proposal.prepare',{...input,packages:[]},h.owner,400)
+  assert.deepEqual((await h.state()).proposals,before.proposals)
+  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+  const query='&optionId=two&items='+encodeURIComponent(JSON.stringify(items)),preview=`/app/preview/client?id=${p.id}&revision=1${query}`
+  let r=await h.send(preview,undefined,h.owner);assert.equal(r.status,200,r.text);assert.match(r.text,/2,301\.00/);assert.match(r.text,/575\.25/);assert.doesNotMatch(r.text,/Complete package only/)
+  assert.deepEqual((await current()).options,row.options);assert.equal((await current()).version,1);assert.deepEqual((await h.state()).outbox,before.outbox)
+  for(const optionId of ['one','two','three']){r=await h.send(`/app/preview/client?id=${p.id}&revision=1&optionId=${optionId}`,undefined,h.owner);assert.equal(r.status,200);assert.equal(r.text.includes('Complete package only'),optionId==='three')}
+  r=await h.send(preview.replace('quantity%22%3A4','quantity%22%3A11'),undefined,h.owner);assert.equal(r.status,400)
+  const changed=packageFixture();changed[1].optionalItems[0].unitPrice='80'
+  await h.cmd('proposal.revise',{...input,id:p.id,version:1,packages:changed})
+  r=await h.send(`/app/proposal?id=${p.id}&from=1&to=2`,undefined,h.owner);assert.match(r.text,/optional items/);assert.match(r.text,/80\.00/)
+  await h.cmd('proposal.restore',{id:p.id,version:2,revision:1});row=await current();assert.deepEqual(row.options,before.proposals.find(x=>x.id===p.id).options)
+  const copy=await h.cmd('proposal.duplicate',{id:p.id,version:3});assert.deepEqual((await h.state()).proposals.find(x=>x.id===copy.id).options,row.options)
+  // A single package is valid too; no fixed two-package limit remains.
+  const single=await h.cmd('proposal.prepare',{...input,packages:[packageFixture()[0]],sectionConditions:{}});assert.equal((await h.state()).proposals.find(x=>x.id===single.id).options.length,1)
+  await h.cmd('proposal.approve',{id:p.id,version:3,revision:3});const share=await h.cmd('proposal.send',{id:p.id,version:4}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+  const offerBefore=await current()
+  for(const invalid of [[{id:'rush',quantity:11}],[{id:'rush',quantity:0}],[{id:'rush',quantity:'1.5'}],[{id:'unknown',quantity:1}],[{id:'rush',quantity:1},{id:'rush',quantity:1}],[{id:'training',quantity:2}],{},null]){
+   const q='?optionId=two&items='+encodeURIComponent(JSON.stringify(invalid))
+   assert.equal((await h.send(path+q,undefined,cookie)).status,400)
+   const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf'+q,{headers:{host:new URL(h.origin).host,cookie}});assert.equal(pdf.status,400)
+   assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',items:invalid,consent:true},cookie)).status,400)
+  }
+  assert.deepEqual(await current(),offerBefore,'refused selections write nothing')
+  r=await h.send(path+'?optionId=two&items='+encodeURIComponent(JSON.stringify(items)),undefined,cookie);assert.equal(r.status,200);assert.match(r.text,/2,301\.00/);assert.match(r.text,/575\.25/)
+  const removed=await h.send(path+'?optionId=two',undefined,cookie);assert.match(removed.text,/2,000\.00/)
+  const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId=two&items='+encodeURIComponent(JSON.stringify(items)),{headers:{host:new URL(h.origin).host,cookie}});assert.equal(pdf.status,200)
+  const pages=await pdfPages(await pdf.arrayBuffer());for(const page of pages)assert.match(page,/Not signed, revision 3/)
+  const pdfText=pages.join(' ');for(const text of ['2,301.00','575.25','Rush delivery: 4 x USD 75.25 = USD 301.00'])assert.ok(pdfText.includes(text),pdfText);assert.ok(!pdfText.includes('Complete package only'))
+  const downloads=(await current()).pdfDownloads;assert.deepEqual(JSON.parse(downloads[0].selection).map(x=>({id:x.id,quantity:x.quantity})),items)
+  await h.cmd('proposal.negotiate',{...input,id:p.id,version:5,packages:changed})
+  r=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',items,consent:true,totalCents:1,depositCents:1},cookie);assert.equal(r.status,200,r.text)
+  const accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first(),snapshot=JSON.parse(accepted.snapshot)
+  assert.equal(accepted.total_cents,expected.totalCents);assert.equal(accepted.deposit_cents,expected.depositCents);assert.equal(snapshot.selection.optionId,'two');assert.equal(snapshot.selection.items[0].quantity,4);assert.equal(snapshot.selection.items[0].totalCents,30100);assert.ok(!snapshot.terms);assert.deepEqual(snapshot.options,row.options)
+  await h.send(path+'/action?name=accept',{name:'Another signer',optionId:'one',items:[],consent:true},cookie);assert.deepEqual(await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first(),accepted)
+  r=await h.send(path,undefined,cookie);assert.match(r.text,/2,301\.00/);assert.match(r.text,/Rush delivery/)
+ }finally{await h.close()}
+})

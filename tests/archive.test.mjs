@@ -27,7 +27,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -127,6 +127,7 @@ test('EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-00
     const withdrawalHistory=(await h.state()).proposals.find(p=>p.id===withdrawn.id).withdrawals
     const duplicate=await h.cmd('proposal.duplicate',{id:work.id,version:4})
     const duplicateBefore=(await h.state()).proposals.find(p=>p.id===duplicate.id)
+    const clientPreview=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=two`,undefined,h.owner);assert.equal(clientPreview.status,200);assert.match(clientPreview.text,/Preview only/)
     const beforeVendorDocuments=(await h.state()).vendorDocuments
     const before=business(await h.state())
     const acceptedThread=before.proposals.find(p=>p.id===proposal.id).questions
@@ -137,6 +138,7 @@ test('EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-00
     assert.equal(openThread.length,1)
     assert.equal(openThread[0].answers.length,0)
     const beforeAudit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows.map(({reason,...row})=>row)
+    assert.ok(beforeAudit.some(row=>row.action==='proposal.preview'&&row.subject===duplicate.id&&row.actor_role==='owner'),'EDIT-018 / TEAM-004 preview action is retained without payload or invitation authority')
     assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','approved','draft','draft','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null

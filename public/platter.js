@@ -32,3 +32,20 @@
     }
   } catch { /* Browser storage restrictions do not change submission behavior. */ }
 })();
+
+// Keep a true client viewport while fitting the preview canvas to its member page.
+(() => {
+  const frame = document.querySelector('.preview-viewport iframe');
+  if (!frame) return;
+  const viewport = frame.parentElement;
+  const resize = () => {
+    const scale = Math.min(1, viewport.clientWidth / Number(frame.getAttribute('width')));
+    frame.style.transform = `scale(${scale})`;
+    frame.style.position = 'absolute';
+    frame.style.top = '0';
+    frame.style.left = '0';
+    viewport.style.height = `${Number(frame.getAttribute('height')) * scale}px`;
+  };
+  new ResizeObserver(resize).observe(viewport);
+  resize();
+})();

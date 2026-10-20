@@ -32,3 +32,6 @@ dl{display:grid;grid-template-columns:minmax(120px,1fr) minmax(0,3fr);gap:8px 16
 header>span.muted{margin-left:auto}
 .actions{align-items:center}form[data-draft="agent-new"]{grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:20px}
 @media(max-width:600px){form[data-draft="agent-new"]{grid-template-columns:1fr}.records .actions{justify-content:space-between}}
+
+.preview-viewport { position: relative; max-width: 100%; overflow: auto; }
+.preview-viewport iframe { display: block; border: 0; max-width: none; transform-origin: top left; }

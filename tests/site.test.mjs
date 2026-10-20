@@ -677,3 +677,58 @@ test('EDIT-012 desktop and phone duplicate an accepted agreement for Beta Co and
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('EDIT-018 desktop and phone preview exact client content, switch widths and select without sending', {timeout:120000}, async()=>{
+ let app,browser
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp({businessFixture:'fixtures/first-release-aud.rer'});const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage()
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const command=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    const client=(await(await context.request.get(app.origin+'/api/platter/state')).json()).clients[0]
+    const draft={clientId:client.id,title:'Autumn campaign photography',scope:'Two studio shoots, edited photographs, and a campaign usage licence.',terms:'Delivery within four weeks of approval.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4300.03',depositPercent:'33.33'}
+    const p=await command('proposal.prepare',draft)
+    const capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`EDIT-018-${name}-${width}.png`),fullPage:true})}
+    await page.goto(app.origin+'/app/proposal?id='+p.id);await capture('editor')
+    const before=await(await context.request.get(app.origin+'/api/platter/state')).json()
+    await page.getByRole('link',{name:'Preview client page',exact:true}).click();await capture('desktop-wrapper')
+    const frame=page.frameLocator('iframe[title="Client-page preview"]')
+    assert.ok(await page.locator('iframe').evaluate(element=>element.getBoundingClientRect().right<=innerWidth),'EDIT-018 scaled canvas fits the member viewport without clipping client content')
+    assert.equal(await frame.locator('body').evaluate(()=>innerWidth),1440)
+    assert.match(await frame.locator('main').innerText(),/Revision 1 · Viewing as Northstar Coffee/)
+    await frame.getByLabel('Choose one option',{exact:true}).selectOption('two');await Promise.all([page.waitForEvent('framenavigated',{predicate:f=>f.url().includes('/app/preview/client?')&&new URL(f.url()).searchParams.get('optionId')==='two'}),frame.getByRole('button',{name:'Update preview selection'}).click()])
+    assert.equal(await frame.getByLabel('Selected total').innerText(),'$4,300.03 USD');assert.equal(await frame.getByLabel('Selected deposit').innerText(),'$1,433.20 USD')
+    for(const label of ['Accept proposal','Send question to owner','Download unsigned proposal PDF'])assert.equal(await frame.getByRole('button',{name:label,exact:true}).isDisabled(),true)
+    assert.equal((await context.request.post(app.origin+`/app/preview/client/action?id=${p.id}&revision=1&name=accept`,{headers:{origin:app.origin},data:{optionId:'two',consent:true}})).status(),403)
+    await page.getByLabel('Preview width').selectOption('390');await page.getByRole('button',{name:'Change preview width'}).click()
+    assert.equal(await frame.locator('body').evaluate(()=>innerWidth),390)
+    await frame.getByLabel('Choose one option',{exact:true}).selectOption('two');await Promise.all([page.waitForEvent('framenavigated',{predicate:f=>f.url().includes('/app/preview/client?')&&new URL(f.url()).searchParams.get('optionId')==='two'}),frame.getByRole('button',{name:'Update preview selection'}).click()])
+    assert.ok(await frame.locator('body').evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+    await capture('phone-wrapper')
+    const inner=await frame.locator('body').innerText();assert.match(inner,/Two studio shoots/);assert.match(inner,/Delivery within four weeks/)
+    if(screenshots)await page.locator('iframe').screenshot({path:join(screenshots,`EDIT-018-phone-client-${width}.png`)})
+    const previewPage=await context.newPage();try{await previewPage.goto(app.origin+`/app/preview/client?id=${p.id}&revision=1&optionId=two`);if(screenshots)await previewPage.screenshot({path:join(screenshots,`EDIT-018-client-preview-${width}.png`),fullPage:true})}finally{await previewPage.close()}
+    assert.deepEqual(await(await context.request.get(app.origin+'/api/platter/state')).json(),before)
+    const anonymous=await browser.newContext();try{assert.equal((await anonymous.request.get(app.origin+`/app/preview/client?id=${p.id}&revision=1`)).status(),401)}finally{await anonymous.close()}
+    await page.getByRole('link',{name:'Back to editor',exact:true}).click();await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();await page.getByRole('link',{name:'Open client proposal',exact:true}).click()
+    await page.getByRole('button',{name:'Send verification code'}).click()
+    const sent=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=sent.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click()
+    assert.equal(await page.getByRole('heading',{name:'Preview',exact:true}).count(),0);await capture('actual-client')
+    assert.match(await page.locator('main').innerText(),/Two studio shoots/);assert.match(await page.locator('main').innerText(),/Delivery within four weeks/)
+    await page.getByRole('radio',{name:/Full campaign/}).check();await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
+    assert.match(await page.locator('main').innerText(),/\$4,300\.03 USD/);assert.match(await page.locator('main').innerText(),/\$1,433\.20 USD/);await capture('actual-accepted')
+    const legacy=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals.find(row=>row.currency==='AUD')
+    const copied=await command('proposal.duplicate',{id:legacy.id,version:legacy.version,clientId:client.id})
+    await page.goto(app.origin+`/app/preview/client?id=${copied.id}&revision=1&optionId=two`)
+    assert.match(await page.locator('main').innerText(),/GST-free in AUD/);assert.match(await page.getByLabel('Selected total').innerText(),/AUD/);await capture('legacy-aud-preview')
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

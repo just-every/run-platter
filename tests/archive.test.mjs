@@ -109,7 +109,10 @@ test('FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 
     const localIdentity={auth:h.auth,owner:h.owner},sourceOrigin=h.origin,submittedMail=[]
     await h.close();h=null
     h=await harness({root:source,origin:sourceOrigin.replace('http:','https:'),...localIdentity,auth:{...localIdentity.auth,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'archive-question-network-edge',MAIL_WEBHOOK_KEY:'archive-question-webhook-edge',QUESTION_REPLY_DOMAIN:'replies.example.com'},outboundService:async request=>{submittedMail.push(await request.json());return Response.json({id:'archive-question-mail-'+submittedMail.length})}})
-    await h.cmd('question.email',{id:pending.id,questionId:unresolvedQuestion.id})
+    // The native hosted cookie differs from the local cookie. Sign in through
+    // Base's magic-link/confirmation doors and its captured auth-mail edge.
+    const productionOwner=await h.signIn(localIdentity.auth.OWNER_EMAIL)
+    await h.cmd('question.email',{id:pending.id,questionId:unresolvedQuestion.id},productionOwner)
     const replyAddress=submittedMail.find(message=>message.reply_to)?.reply_to
     assert.equal(typeof replyAddress,'string','FOLLOW-004 sends an actual provider Reply-To capability')
     const replyKey=replyAddress.match(/([a-f0-9]{64})@replies\.example\.com$/)?.[1]
@@ -135,7 +138,7 @@ test('FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 
     await command(source,['export','--output',old,'--no-queue'])
     const bytes=await readFile(old,'utf8')
     assert.ok(bytes.includes('Temporary joiner'))
-    for(const excluded of [replyKey,replyAddress,createHash('sha256').update(replyKey).digest('hex')])assert.ok(!bytes.includes(excluded),'FOLLOW-004 reply capability and transport stay local')
+    for(const excluded of [replyKey,replyAddress,createHash('sha256').update(replyKey).digest('hex'),productionOwner.split('=')[1]])assert.ok(!bytes.includes(excluded),'FOLLOW-004 reply capability, hosted session and transport stay local')
     for(const excluded of ['Excluded secret','token_hash',key.token,createHash('sha256').update(key.token).digest('hex'),new URL(shared.shareUrl).pathname.slice(3),new URL(pendingShare.shareUrl).pathname.slice(3),verified.cookie.split('=')[1],identity.owner.split('=')[1]])assert.ok(!bytes.includes(excluded),'credentials and private invitations stay local')
     await command(restored,['import','--input',old,'--yes','--no-queue'])
     await command(restored,['export','--output',again,'--no-queue'])

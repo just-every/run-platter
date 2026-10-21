@@ -930,7 +930,7 @@ test('SEND-006 desktop and phone rehearse to self, then edit invitations, fresh 
     await page.getByLabel('Invitation message',{exact:true}).fill('Hi Avery, the second location is included.')
     if(screenshots)await page.screenshot({path:join(screenshots,`SEND-006-revision-composer-${width}.png`),fullPage:true})
     await page.getByRole('button',{name:'Send approved proposal'}).click()
-    await page.getByRole('heading',{name:'Revised photography scope',exact:true}).waitFor()
+    await history.getByRole('heading',{name:'Revised photography scope',exact:true}).waitFor()
     delivered=await (await context.request.get(app.origin+'/api/platter/state')).json()
     live=delivered.proposals.find(p=>p.id===made.id)
     assert.equal(live.revision,next.revision);assert.equal(live.invitationMessages.length,3)

@@ -1365,6 +1365,14 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, pol
   await h.cmd('proposal.approve',{id:p.id,version:4,revision:2},people[order[1]].cookie)
   assert.equal((await current(p.id)).approval.complete,true);await h.cmd('proposal.send',{id:p.id,version:5},people.sales.cookie)
  }
+ const raced=await prepare('sales',{terms:'Original'})
+ await h.cmd('proposal.revise',{...offer,clientId:client.id,id:raced.id,version:1,terms:'New legal terms'},people.sales.cookie)
+ const concurrent=await Promise.all(['admin','billing'].map(role=>h.send('/api/platter/command',{name:'proposal.approve',input:{id:raced.id,version:2,revision:2}},people[role].cookie)))
+ assert.deepEqual(concurrent.map(r=>r.status).sort(),[200,409])
+ assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_approval_decisions WHERE proposal_id=?').bind(raced.id).first()).n,1,'the refused concurrent decision writes nothing')
+ const loser=concurrent[0].status===409?'admin':'billing'
+ await h.cmd('proposal.approve',{id:raced.id,version:3,revision:2},people[loser].cookie)
+ assert.equal((await current(raced.id)).approval.complete,true)
  const reject=await prepare('sales',{terms:'Original'});await h.cmd('proposal.revise',{...offer,clientId:client.id,id:reject.id,version:1,terms:'Legal change'},people.sales.cookie)
  await h.cmd('proposal.reject',{id:reject.id,version:2,revision:2,note:'Review needed'},people.billing.cookie)
  await h.cmd('proposal.approve',{id:reject.id,version:3,revision:2},people.admin.cookie,403)

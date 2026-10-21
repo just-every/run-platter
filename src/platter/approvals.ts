@@ -75,9 +75,12 @@ export async function approvalCommand(env:Bindings,a:Actor,name:string,p:Record<
  const id=crypto.randomUUID(),pending=row.negotiating
  // Serialize decisions with the existing proposal version; only the exact current plan may advance.
  const guard={sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?',values:[original.id,original.version,plan.policyVersion]}
- await commit(db,a,[db.prepare('INSERT INTO p_approval_decisions(id,proposal_id,revision,plan,step,actor_id,approver_index,decision,note,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,plan.plan,step.id,a.id,index,decision,note,at),db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id),...(decision==='approved'?[db.prepare('INSERT INTO p_approvals(id,proposal_id,revision,actor_id,approved_at) VALUES(?,?,?,?,?)').bind(id,row.id,row.revision,a.id,at)]:[])],false,guard)
- // The final status update is version guarded, so edits or concurrent decisions cannot stamp a newer revision.
- const next=await approvalPlan(db,row,a)
- if(next.complete){await commit(db,a,[pending?db.prepare('UPDATE p_negotiations SET approved_by=?,approved_at=? WHERE proposal_id=? AND revision=?').bind(a.email,at,row.id,row.revision):db.prepare("UPDATE p_proposals SET status=?,approved_by=?,approved_at=? WHERE id=? AND revision=?").bind(original.status==='sent'?'sent':'approved',a.email,at,row.id,row.revision)],false,{sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?',values:[row.id,original.version+1,plan.policyVersion]})}
- return {approved:next.complete,rejected:next.rejected}
+ const complete=decision==='approved'&&plan.steps.every(s=>s.done||s.id===step.id&&(s.any||s.approvers.every((_,i)=>i===index||s.decisions.some(d=>d.decision==='approved'&&d.approver_index===i))))
+ const finalize=complete?[pending?db.prepare('UPDATE p_negotiations SET approved_by=?,approved_at=? WHERE proposal_id=? AND revision=?').bind(a.email,at,row.id,row.revision):db.prepare("UPDATE p_proposals SET status=?,approved_by=?,approved_at=? WHERE id=? AND revision=?").bind(original.status==='sent'?'sent':'approved',a.email,at,row.id,row.revision)]:[]
+ await commit(db,a,[
+  db.prepare('INSERT INTO p_approval_decisions(id,proposal_id,revision,plan,step,actor_id,approver_index,decision,note,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,plan.plan,step.id,a.id,index,decision,note,at),
+  db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id),
+  ...(decision==='approved'?[db.prepare('INSERT INTO p_approvals(id,proposal_id,revision,actor_id,approved_at) VALUES(?,?,?,?,?)').bind(id,row.id,row.revision,a.id,at)]:[]),...finalize,
+ ],false,guard)
+ return {approved:complete,rejected:decision==='rejected'}
 }

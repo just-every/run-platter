@@ -1224,6 +1224,7 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  await h.cmd('proposal.lose',{id:other.p.id,version:3,reason:'Cancelled'},member,403)
  await h.cmd('proposal.lose',{id:other.p.id,version:2,reason:'Cancelled'},h.owner,409)
  await h.cmd('proposal.lose',{id:other.p.id,version:3,reason:''},h.owner,400)
+ const clock=Date.now()+3600000;await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?)').bind(clock).run()
  const mailBefore=(await h.state()).outbox.map(m=>m.id)
  await h.cmd('proposal.lose',{id:other.p.id,version:3,reason:'Project cancelled'})
  const lost=await current(other.p.id)
@@ -1233,5 +1234,11 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  for(const suffix of ['', '/action?name=accept','/action?name=code.request','/download.pdf?optionId=one','/attachments/any-file'])assert.equal((await h.send(other.path+suffix,suffix.includes('/action')?{name:'Avery',optionId:'one',consent:true}:undefined,otherCookie)).status,410)
  const lostAudit=(await h.send('/api/platter/audit?action=proposal.lose',undefined,h.owner)).value.rows
  assert.equal(lostAudit.length,1);assert.equal(lostAudit[0].actor_id,(await h.state()).actor.id);assert.equal(lostAudit[0].occurred_at,lost.outcomes[0].occurred_at)
+ await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:lost.id,version:lost.version})
+ let retry=await current(lost.id);await h.cmd('proposal.approve',{id:retry.id,version:retry.version,revision:retry.revision});retry=await current(lost.id)
+ await h.cmd('proposal.send',{id:retry.id,version:retry.version});retry=await current(lost.id)
+ await h.cmd('proposal.lose',{id:retry.id,version:retry.version,reason:'Funding withdrawn'})
+ const sameTimeAudit=(await h.send('/api/platter/audit?action=proposal.lose&subject='+lost.id,undefined,h.owner)).value.rows
+ assert.equal(sameTimeAudit.length,2);assert.ok(sameTimeAudit.every(row=>row.occurred_at===clock));assert.deepEqual(sameTimeAudit.map(row=>row.reason).sort(),['Funding withdrawn','Project cancelled'],'separate outcomes at the same server time retain their own audit reason')
  const accepted=await current(p.id);await h.cmd('proposal.lose',{id:p.id,version:accepted.version,reason:'Too late'},h.owner,409)
 }))

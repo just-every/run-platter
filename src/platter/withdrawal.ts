@@ -9,10 +9,10 @@ export function outcomeStatement(db:D1Database,row:any,actor:{id:string,email:st
 
 /** Both outcome doors use the same link revocation, queue closure and retained history as SEND-010. */
 export async function withdrawalStatements(env:Bindings,row:any,actor:{id:string,email:string,role:string},contact:string,reason:string,notice:boolean,at:number,action='proposal.withdraw') {
- const db=env.DB
+ const db=env.DB,eventId=crypto.randomUUID()
  const shares=(await db.prepare('SELECT s.*,COALESCE(s.recipient,c.email) AS email FROM p_shares s JOIN p_clients c ON c.id=? WHERE s.proposal_id=?').bind(row.client_id,row.id).all<any>()).results
  const writes=[
-  db.prepare('INSERT INTO p_withdrawals(id,proposal_id,revision,actor_id,actor_email,withdrawn_at,reason,notice) VALUES(?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),row.id,row.revision,actor.id,actor.email,at,reason,notice?1:0),
+  db.prepare('INSERT INTO p_withdrawals(id,proposal_id,revision,actor_id,actor_email,withdrawn_at,reason,notice) VALUES(?,?,?,?,?,?,?,?)').bind(eventId,row.id,row.revision,actor.id,actor.email,at,reason,notice?1:0),
   ...shares.map(s=>db.prepare('INSERT INTO p_withdrawn_links(token,contact_email) VALUES(?,?)').bind(s.token,contact)),
   db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(row.id),
   db.prepare("UPDATE p_followups SET closed_at=?,resolution='Proposal withdrawn',updated_at=? WHERE proposal_id=? AND closed_at IS NULL").bind(at,at,row.id),
@@ -20,7 +20,7 @@ export async function withdrawalStatements(env:Bindings,row:any,actor:{id:string
   db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id),
   db.prepare('UPDATE p_question_reply_keys SET used_at=? WHERE question_id IN (SELECT id FROM p_questions WHERE proposal_id=?) AND used_at IS NULL').bind(at,row.id),
   db.prepare("UPDATE p_bounce_notices SET closed_at=?,action='Proposal withdrawn' WHERE proposal_id=? AND closed_at IS NULL").bind(at,row.id),
-  db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),actor.id,actor.role,action,row.id,at),
+  db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(eventId,actor.id,actor.role,action,row.id,at),
  ]
  if(notice)for(const s of shares)writes.push(queueMail(env,row.id,s.email,'Proposal withdrawn: '+row.title,`The firm has withdrawn this proposal.\nReason: ${reason}\nContact: ${contact}`,actor.id))
  return writes

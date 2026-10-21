@@ -27,7 +27,7 @@ export async function providerCredential(env:Bindings,id:string){
 }
 export async function providerJson(url:string,token:string){
  try{
-  const response=await fetch(url,{headers:{authorization:'Bearer '+token,accept:'application/json'},redirect:'error'})
+  const response=await fetch(url,{headers:{authorization:'Bearer '+token,accept:'application/json'},redirect:'manual'})
   need(response.ok,'The provider refused the connection check',400)
   const body=await response.text();need(body.length<=262144,'The provider response was too large',400)
   const value=JSON.parse(body);need(value&&typeof value==='object','The provider response was invalid',400);return value

@@ -40,7 +40,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='proposal.prepare'&&p.templateId!==undefined)return templateCommand(env,a,'template.start',{id:p.templateId,version:p.templateVersion,clientId:p.clientId,...(p.title?{title:p.title}:{})})
  if(name.startsWith('followup.'))return followupCommand(env,a,name,p)
  if(name==='proposal.duplicate')return duplicateProposal(env,a,p)
- if(name==='proposal.withdraw')return withdraw(env,a,p)
+ if(name==='proposal.withdraw'||name==='proposal.lose')return withdraw(env,a,p,name==='proposal.lose')
  if(name.startsWith('question.'))return questionCommand(env,a,name,p)
  if(name.startsWith('expiry.'))return expiryCommand(env,a,name,p)
  if(name==='pdf.downloads')return pdfCommand(env,a,p)

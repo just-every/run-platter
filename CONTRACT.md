@@ -54,7 +54,7 @@ Platter is one product. Where the market sells a neighboring product separately,
 
 - **Published clauses** are the `- **ID — Title.**` bullets under [Published guarantees](#published-guarantees). They are what the first release already promised, kept and rewritten as named clauses.
 - **Target clauses** are the `#### ID — Title.` headings under [Target clauses](#target-clauses), and **push-further clauses** are those under [Push further](#push-further). They are binding product requirements not yet delivered in full. A build round that delivers one turns it into a published bullet with the same ID; IDs never change.
-- **Status** (in [Status](#status) and after each target clause) is `done`, `partial` or `missing`, judged from the code and tests at commit `e8ddbe11ee2eb3f39815996bfb118967c49ec140` (21 October 2026). `done` means the behavior ships and a cited test exercises it; `partial` means some of it ships, or it ships without a test of the whole behavior; `missing` means there is no implementation. Status is a build-planning judgment, not acceptance.
+- **Status** (in [Status](#status) and after each target clause) is `done`, `partial` or `missing`, judged from the code and tests at commit `21359a9fdff12a21d22d5f95cc96f91ffcc2e2aa` (21 October 2026). `done` means the behavior ships and a cited test exercises it; `partial` means some of it ships, or it ships without a test of the whole behavior; `missing` means there is no implementation. Status is a build-planning judgment, not acceptance.
 - **Acceptance** is a journey or test through a public door: an HTTP route, the browser at 1440 and 390 pixels, the CLI, the MCP server, a native app or an import or export file. Fakes are allowed only at a paid or network edge (Stripe, Twilio, mail, CRM, accounting, storage and chat providers); a provider fake proves Platter's side only, never live provider behavior, which is proven in the provider's sandbox or test mode.
 
 ## Published guarantees
@@ -605,7 +605,7 @@ Before shipping, extend FOLLOW-002 with declined/lost closure and the named queu
 
 *Acceptance:* Decline as the client with the reason Budget, see the proposal lost and the HubSpot deal fake moved to Closed lost; mark another sent proposal lost and see each of its recipient links show the withdrawn page; reopen the declined one as a new revision and send.
 
-*Status:* missing. No decline or lost state.
+*Status:* partial. Mailbox-verified clients decline an unsigned offer with a reason; owners mark it lost with no recipient notice by default. Both use SEND-010 revocation and FOLLOW-002 closure, retain revision/actor/time/reason, feed REPORT-001 filters/sorts/counts/totals and reopen through NEG-001 with fresh approval. Gap: CRM outcome sync, configurable reason lists and explicit won overrides remain. (`src/platter/withdrawal.ts`, `src/platter/signing.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### FOLLOW-006 — Default reminder schedule and expiry from the workspace and templates.
 
@@ -1386,13 +1386,13 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 
 ## Status
 
-Judged from the code and tests at commit `e8ddbe11ee2eb3f39815996bfb118967c49ec140` (21 October 2026).
+Judged from the code and tests at commit `21359a9fdff12a21d22d5f95cc96f91ffcc2e2aa` (21 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 22 | 26 | 80 | 128 |
-| All | 34 | 26 | 80 | 140 |
+| Target and push further | 22 | 27 | 79 | 128 |
+| All | 34 | 27 | 79 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1459,7 +1459,7 @@ Judged from the code and tests at commit `e8ddbe11ee2eb3f39815996bfb118967c49ec1
 | `FOLLOW-002` | Next-action follow-up queue by sales owner | target | done | `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `FOLLOW-003` | Expiry and renewal notifications | target | missing |  | No expiry or renewal notices. |
 | `FOLLOW-004` | Client questions and comments | target | done | `src/platter/questions.ts`, `src/platter/question-replies.ts`, `src/platter/ui/questions.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
-| `FOLLOW-005` | Decline reasons and won or lost outcomes | target | missing |  | No decline or lost state. |
+| `FOLLOW-005` | Decline reasons and won or lost outcomes | target | partial | `src/platter/withdrawal.ts`, `src/platter/signing.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Mailbox-verified clients decline an unsigned offer with a reason; owners mark it lost with no recipient notice by default. Both use SEND-010 revocation and FOLLOW-002 closure, retain revision/actor/time/reason, feed REPORT-001 filters/sorts/counts/totals and reopen through NEG-001 with fresh approval. Gap: CRM outcome sync, configurable reason lists and explicit won overrides remain. |
 | `FOLLOW-006` | Default reminder schedule and expiry from the workspace and templates | target | missing |  | No reminders, expiry, workspace defaults or template settings for either. |
 | `NEG-001` | Negotiated revisions after sending | target | done | `src/platter/negotiation.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `NEG-002` | Client-suggested text edits | target | done | `src/platter/suggestions.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |

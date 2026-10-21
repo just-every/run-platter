@@ -1,3 +1,4 @@
+import { withdrawalStatements, outcomeStatement } from './withdrawal'
 import { selectedContent, agreementContent } from './conditional'
 import { offerSelection, reviewItems, selectionItems } from './selection'
 import { createQuestion, clientQuestionState } from './questions'
@@ -25,6 +26,19 @@ export function acceptanceTerms(row:any,optionId:unknown,input:Record<string,any
 export const acceptanceView=(a:any)=>({name:a.name,email:a.email,optionId:a.option_id,totalCents:a.total_cents,depositCents:a.deposit_cents,acceptedAt:a.accepted_at,revision:a.revision,currency:a.currency??'AUD',...(JSON.parse(a.snapshot).selection?{selection:JSON.parse(a.snapshot).selection}:{})})
 async function atomic(env:Bindings,c:any,writes:D1PreparedStatement[],condition:string,values:any[],completed=false){try{await env.DB.batch([env.DB.prepare(`INSERT INTO p_guard(ok) VALUES((EXISTS(SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id WHERE s.token=? AND s.revision=p.revision AND p.status IN (${completed?"'sent','accepted'":"'sent'"}) AND ${condition})))`).bind(c.token,...values),...writes,env.DB.prepare('DELETE FROM p_guard')])}catch(e){if(String(e).includes('CHECK constraint')||String(e).includes('UNIQUE constraint'))fail('The proposal or verification changed. Reload before continuing.',409);throw e}}
 export async function clientCommand(env:Bindings,c:Awaited<ReturnType<typeof clientContext>>,name:string,p:Record<string,unknown>){const{row,share}=c,db=env.DB,at=await currentTime(env.DB)
+ if(name==='decline'){
+  need(c.verified,'Verify your email before declining',401)
+  need(row.status==='sent','An accepted agreement cannot be declined',409)
+  need(Number(p.revision)===row.revision,'This revision changed. Reload before declining.',409)
+  const reason=text(p.reason,'a decline reason',1000)
+  const owner=await db.prepare("SELECT email FROM oa_operators WHERE role='owner' AND status='active' ORDER BY id LIMIT 1").first<{email:string}>()
+  need(owner,'Contact the firm to decline this proposal',409)
+  const actor={id:row.client_id,email:row.clientEmail,role:'client'}
+  const writes=await withdrawalStatements(env,row,actor,owner.email,reason,false,at,'proposal.decline')
+  writes.push(outcomeStatement(db,row,actor,'declined',reason,at))
+  await atomic(env,c,writes,"s.session_hash=? AND s.session_expires>MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0)) AND p.revision=? AND NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=p.id AND revision=p.revision)",[share.session_hash,at,row.revision])
+  return {withdrawn:true,contact:owner.email}
+ }
  if(name==='question.create')return createQuestion(env,c,p)
  if(name==='expiry.reopen')return requestReopen(env,c)
  if(name==='suggestion.create'){need(!c.expiry.expired,'This proposal has expired',409);return suggest(env,c,p)}

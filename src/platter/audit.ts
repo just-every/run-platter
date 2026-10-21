@@ -20,7 +20,7 @@ export async function auditRows(db: D1Database, actor: Actor, query: URLSearchPa
   const value = query.get(parameter)
   if (value) { const at = Number(value); need(Number.isSafeInteger(at) && at >= 0, 'Use an epoch-millisecond audit time'); filters.push(`occurred_at${comparison}?`); values.push(at) }
  }
- return (await db.prepare(`SELECT p_audit.*,(SELECT reason FROM p_withdrawals w WHERE p_audit.action='proposal.withdraw' AND w.proposal_id=p_audit.subject AND w.withdrawn_at=p_audit.occurred_at LIMIT 1) AS reason FROM p_audit${filters.length ? ' WHERE ' + filters.join(' AND ') : ''} ORDER BY occurred_at,id`).bind(...values).all<any>()).results
+ return (await db.prepare(`SELECT p_audit.*,(SELECT reason FROM p_withdrawals w WHERE p_audit.action IN ('proposal.withdraw','proposal.lose','proposal.decline') AND w.proposal_id=p_audit.subject AND w.withdrawn_at=p_audit.occurred_at LIMIT 1) AS reason FROM p_audit${filters.length ? ' WHERE ' + filters.join(' AND ') : ''} ORDER BY occurred_at,id`).bind(...values).all<any>()).results
 }
 export function auditCsv(rows: any[]) {
  const columns = ['id', 'actor_id', 'actor_role', 'action', 'subject', 'occurred_at', 'reason']

@@ -632,7 +632,7 @@ test('MOB-001 / FOLLOW-004 invited client asks exact sent sections; owner queue 
 })
 
 
-test('SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision', {timeout:180000}, async()=>{
+test('FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision', {timeout:180000}, async()=>{
  let browser,app
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
@@ -667,6 +667,23 @@ test('SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect revoked offer an
     await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();assert.equal(await page.getByRole('button',{name:'Send answer to client'}).count(),0);await capture('reissued')
     assert.equal((await context.request.get(app.origin+oldPath)).status(),410)
     await page.getByRole('link',{name:'Open client proposal',exact:true}).click();assert.equal(await page.getByRole('heading',{name:'Verify your email',exact:true}).count(),1);await capture('new-offer')
+    await page.getByRole('button',{name:'Send verification code'}).click()
+    const newState=await(await context.request.get(app.origin+'/api/platter/state')).json(),newCode=newState.outbox.find(m=>m.proposal_id===original.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    await page.getByLabel('Email verification code').fill(newCode);await page.getByRole('button',{name:'Verify email',exact:true}).click()
+    await page.getByLabel('Decline reason',{exact:true}).fill('Budget');await capture('decline-client')
+    await page.getByRole('button',{name:'Decline proposal',exact:true}).click()
+    assert.equal(await page.getByRole('heading',{name:'Proposal withdrawn',exact:true}).count(),1);assert.ok(!(await page.locator('main').innerText()).includes('Studio photography'))
+    await page.goto(proposalUrl);const outcome=page.locator('section.panel').filter({has:page.getByRole('heading',{name:'Proposal outcome',exact:true})})
+    assert.match(await outcome.innerText(),/declined/);assert.match(await outcome.innerText(),/Budget/);assert.equal(await page.getByRole('button',{name:'Send fresh client link',exact:true}).count(),0);await capture('declined-owner')
+    await page.goto(app.origin+'/app?status=declined');assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'1');assert.match(await page.locator('[data-pipeline-total="USD"]').innerText(),/4,200/);assert.equal(await page.locator('[data-proposal-id]').count(),1);await capture('declined-pipeline')
+    const cmd=async(name,input)=>{const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
+    const lost=await cmd('proposal.prepare',{clientId:original.client_id,title:'Cancelled campaign',scope:'A campaign cancelled before work began.',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+    await cmd('proposal.approve',{id:lost.id,version:1,revision:1});const lostShare=await cmd('proposal.send',{id:lost.id,version:2})
+    await page.goto(app.origin+'/app/proposal?id='+lost.id);await page.getByLabel('Lost reason',{exact:true}).fill('Project cancelled');await page.getByRole('button',{name:'Mark proposal lost',exact:true}).click()
+    assert.match(await page.locator('main').innerText(),/Project cancelled/);await capture('lost-owner')
+    const lostState=await(await context.request.get(app.origin+'/api/platter/state')).json();assert.ok(!lostState.outbox.some(m=>m.proposal_id===lost.id&&m.subject.startsWith('Proposal withdrawn:')));assert.ok(!lostState.followups.rows.some(r=>r.id===lost.id||r.id===original.id))
+    assert.equal((await context.request.get(lostShare.shareUrl)).status(),410)
+    await page.goto(app.origin+'/app?status=lost');assert.equal(await page.locator('[data-proposal-id]').count(),1);assert.match(await page.locator('[data-proposal-id]').innerText(),/Cancelled campaign/);await capture('lost-pipeline')
    }finally{await context.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}

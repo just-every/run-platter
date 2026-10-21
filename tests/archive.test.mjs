@@ -28,7 +28,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -125,6 +125,15 @@ test('EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-
     const withdrawn=await h.cmd('proposal.prepare',{...offer,title:'Withdrawn offer'})
     await h.cmd('proposal.approve',{id:withdrawn.id,version:1,revision:1});const withdrawnShare=await h.cmd('proposal.send',{id:withdrawn.id,version:2})
     await h.cmd('proposal.withdraw',{id:withdrawn.id,version:3,reason:'Sent to the wrong client'})
+    const declined=await h.cmd('proposal.prepare',{...offer,title:'Declined budget'})
+    await h.cmd('proposal.approve',{id:declined.id,version:1,revision:1});const declinedShare=await h.cmd('proposal.send',{id:declined.id,version:2}),declinedPath=new URL(declinedShare.shareUrl).pathname
+    await h.send(declinedPath+'/action?name=code.request',{})
+    const declinedCode=(await h.state()).outbox.find(m=>m.proposal_id===declined.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    const declinedSession=await h.send(declinedPath+'/action?name=code.verify',{code:declinedCode})
+    assert.equal((await h.send(declinedPath+'/action?name=decline',{revision:1,reason:'Budget'},declinedSession.cookie)).status,410)
+    const lost=await h.cmd('proposal.prepare',{...offer,title:'Lost project'})
+    await h.cmd('proposal.approve',{id:lost.id,version:1,revision:1});await h.cmd('proposal.send',{id:lost.id,version:2});await h.cmd('proposal.lose',{id:lost.id,version:3,reason:'Project cancelled'})
+    const outcomeHistory=(await h.state()).proposals.filter(p=>[declined.id,lost.id].includes(p.id)).map(p=>({id:p.id,outcomes:p.outcomes,pipelineStatus:p.pipelineStatus}))
     const withdrawalHistory=(await h.state()).proposals.find(p=>p.id===withdrawn.id).withdrawals
     const duplicate=await h.cmd('proposal.duplicate',{id:work.id,version:4})
     const duplicateBefore=(await h.state()).proposals.find(p=>p.id===duplicate.id)
@@ -174,7 +183,7 @@ test('EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-
     assert.equal(openThread[0].answers.length,0)
     const beforeAudit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows.map(({reason,...row})=>row)
     assert.ok(beforeAudit.some(row=>row.action==='proposal.preview'&&row.subject===duplicate.id&&row.actor_role==='owner'),'EDIT-018 / TEAM-004 preview action is retained without payload or invitation authority')
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','draft','withdrawn'])
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -218,6 +227,12 @@ test('EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-
     assert.equal((await h.db.prepare('SELECT COUNT(*) AS count FROM p_question_reply_keys').first()).count,0,'restoring business threads never restores email reply authority')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===withdrawn.id).withdrawals,withdrawalHistory,'SEND-010 history survives CLI restore without invitation authority')
     assert.equal(restoredState.proposals.find(p=>p.id===withdrawn.id).status,'withdrawn')
+    assert.deepEqual(restoredState.proposals.filter(p=>[declined.id,lost.id].includes(p.id)).map(p=>({id:p.id,outcomes:p.outcomes,pipelineStatus:p.pipelineStatus})),outcomeHistory,'FOLLOW-005 reasons, actors, times and report outcomes survive public CLI restore')
+    assert.equal((await h.send(declinedPath,undefined,declinedSession.cookie)).status,404,'restoring a decline never restores its invitation or verified session')
+    await h.cmd('proposal.negotiate',{...offer,id:declined.id,version:4},restoredOwner)
+    const reopened=(await h.state(restoredOwner)).proposals.find(p=>p.id===declined.id)
+    assert.equal(reopened.status,'draft');assert.deepEqual(reopened.outcomes,outcomeHistory.find(p=>p.id===declined.id).outcomes)
+    await h.cmd('proposal.send',{id:declined.id,version:reopened.version},restoredOwner,409)
     await h.cmd('proposal.send',{id:withdrawn.id,version:4},restoredOwner,409)
     assert.equal(archived.filter(item=>item.table==='p_withdrawn_links').length,0)
     assert.deepEqual(restoredState.proposals.find(p=>p.id===duplicate.id),duplicateBefore,'EDIT-012 copied content, files and delivery configuration survive CLI restore exactly')

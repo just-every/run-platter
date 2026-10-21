@@ -1,3 +1,4 @@
+import { invitationMail } from './invitation-mail'
 import { sendTestMail } from './test-mail'
 import { pricedOptions, pricingInput, tableInputs, packageInputs, editablePackages } from './pricing'
 import { templateCommand } from './templates'
@@ -18,7 +19,7 @@ import type { Bindings } from '../auth.server'
 import { createPortability } from '@runeditrun/rer/modules/portability'
 import archivePolicy from './archive-policy.mjs'
 import { need,fail,text,email,dollars,exact,commit,proposal,snapshot,secret,type Actor } from './model'
-import { queueMail,dispatchMail,proposalMail } from './mail'
+import { dispatchMail } from './mail'
 import { exportInvoice } from './invoices'
 import { suggestionCommand } from './suggestions'
 import { restoreFields } from './history'
@@ -87,7 +88,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
    await commit(db,a,[db.prepare("UPDATE p_proposals SET status='approved',approved_by=?,approved_at=?,version=version+1 WHERE id=?").bind(a.email,at,old.id),db.prepare('INSERT INTO p_approvals(id,proposal_id,revision,actor_id,approved_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),old.id,old.revision,a.id,at)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status='draft')",values:[old.id,old.version,old.revision]});return{approved:true}
   }
   need(['approved','sent'].includes(old.status),'Approve this revision before sending',409);const token=secret(),client=await db.prepare('SELECT c.*,COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(old.id,old.client_id).first<any>(),shareUrl=env.AUTH_ORIGIN+'/p/'+token
-  await commit(db,a,[db.prepare("UPDATE p_proposals SET status='sent',version=version+1 WHERE id=?").bind(old.id),db.prepare('INSERT INTO p_shares(proposal_id,revision,token) VALUES(?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET token=excluded.token,revision=excluded.revision,code_hash=NULL,code_expires=NULL,code_attempts=0,code_generation=0,code_sent_at=NULL,session_hash=NULL,session_expires=NULL').bind(old.id,old.revision,token),...await expirySendStatements(db,old.id,a.id,at),queueMail(env,old.id,client.email,...proposalMail(old.title,shareUrl),a.id)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('approved','sent'))",values:[old.id,old.version]});await dispatchMail(env,old.id);return{shareUrl}
+  await commit(db,a,[db.prepare("UPDATE p_proposals SET status='sent',version=version+1 WHERE id=?").bind(old.id),db.prepare('INSERT INTO p_shares(proposal_id,revision,token) VALUES(?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET token=excluded.token,revision=excluded.revision,code_hash=NULL,code_expires=NULL,code_attempts=0,code_generation=0,code_sent_at=NULL,session_hash=NULL,session_expires=NULL').bind(old.id,old.revision,token),...await expirySendStatements(db,old.id,a.id,at),...invitationMail(env,a,p,old,client.email,shareUrl,at)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('approved','sent'))",values:[old.id,old.version]});await dispatchMail(env,old.id);return{shareUrl}
  }
  fail('Unknown command',404)
 }

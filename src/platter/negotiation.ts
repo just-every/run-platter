@@ -1,7 +1,8 @@
+import { invitationMail } from './invitation-mail'
 import { expirySendStatements, currentTime } from './expiry'
 import type { Bindings } from '../auth.server'
 import { commit, exact, need, secret, snapshot, type Actor } from './model'
-import { dispatchMail, proposalMail, queueMail } from './mail'
+import { dispatchMail } from './mail'
 
 export async function pendingNegotiation(db: D1Database, id: string) {
  return db.prepare('SELECT * FROM p_negotiations WHERE proposal_id=?').bind(id).first<any>()
@@ -49,7 +50,7 @@ export async function negotiationCommand(env: Bindings, actor: Actor, name: stri
   db.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient) VALUES(?,?,?,?)').bind(offer.id, next.revision, token,client.email),
   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(offer.id),
   ...await expirySendStatements(db,offer.id,actor.id,at,true),
-  queueMail(env, offer.id, client.email, ...proposalMail(next.title, shareUrl),actor.id),
+  ...invitationMail(env, actor, input, {...next,id:offer.id}, client.email, shareUrl, at),
  ], true, guard)
  await dispatchMail(env, offer.id)
  return { shareUrl }

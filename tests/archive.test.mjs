@@ -391,7 +391,7 @@ test('MIG-006 public CLI archives imported business records, original CSV and im
 })
 
 
-test('SEND-006 public CLI excludes rehearsal content and preserves its test-send audit without invitation authority', {timeout:180000},async()=>{
+test('SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority', {timeout:180000},async()=>{
  const temporary=await mkdtemp(join(tmpdir(),'platter-test-mail-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
  let h
  try{
@@ -401,14 +401,21 @@ test('SEND-006 public CLI excludes rehearsal content and preserves its test-send
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Email rehearsal',scope:'A photography session',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
   await h.cmd('proposal.test-mail',{id:p.id,version:1,subject:'Archive rehearsal only',message:'Test-only message never in the agreement package'})
+  const real=await h.cmd('proposal.prepare',{clientId:client.id,title:'Retained invitation',scope:'A second photography session',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+  await h.cmd('proposal.approve',{id:real.id,version:1,revision:1})
+  const invitation=await h.cmd('proposal.send',{id:real.id,version:2,mailSubject:'Your photography agreement',mailMessage:'Hi Avery, please review the agreed session.'})
   const before=await h.state(),proposal=before.proposals.find(row=>row.id===p.id)
-  assert.equal(proposal.testMail.length,1);assert.equal(before.outbox.length,1)
+  const retained=before.proposals.find(row=>row.id===real.id).invitationMessages
+  assert.equal(retained.length,1)
+  assert.equal(proposal.testMail.length,1);assert.equal(before.outbox.length,2)
   await h.close();h=null
   const archive=join(temporary,'source.rer')
   await command(source,['export','--output',archive])
   const bytes=await readFile(archive,'utf8'),parts=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(item=>item.kind==='part'),records=parts.flatMap(part=>part.items).filter(item=>item.kind==='row')
   assert.ok(!bytes.includes('Test-only message never in the agreement package'))
   assert.ok(!bytes.includes('[Test] Archive rehearsal only'))
+  assert.ok(!bytes.includes(new URL(invitation.shareUrl).pathname))
+  assert.deepEqual(records.filter(item=>item.table==='p_invitation_messages').map(item=>item.row),retained)
   assert.equal(records.filter(item=>item.table==='p_mail').length,0)
   const tests=records.filter(item=>item.table==='p_audit'&&item.row.action==='proposal.test-mail')
   assert.equal(tests.length,1)
@@ -417,6 +424,10 @@ test('SEND-006 public CLI excludes rehearsal content and preserves its test-send
   h=await harness({root:restored,unclaimed:true})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
   assert.deepEqual(after.proposals.find(row=>row.id===p.id),proposal)
+  assert.deepEqual(after.proposals.find(row=>row.id===real.id).invitationMessages,retained)
+  assert.equal((await h.send(new URL(invitation.shareUrl).pathname)).status,404)
+  const history=await h.send('/app/proposal?id='+real.id,undefined,owner)
+  assert.match(history.text,/Your photography agreement/);assert.match(history.text,/Hi Avery, please review the agreed session\./)
   assert.deepEqual(after.outbox,[])
   assert.ok(after.proposals.every(row=>!row.shareToken))
   await h.cmd('proposal.send',{id:p.id,version:1},owner,409)

@@ -26,6 +26,55 @@ async function finishSetup(h) {
 
 const mailRows = async h => (await h.db.prepare('SELECT * FROM p_mail ORDER BY created_at, id').all()).results
 
+test('SEND-006 invitation, fresh link and negotiated send deliver edited text and retain exact link-free history atomically', async()=>{
+ const sent=[]
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'fake-invitation-edge-key'},outboundService:async request=>{
+  assert.equal(new URL(request.url).origin,'https://api.resend.com')
+  sent.push(await request.json());return Response.json({id:'invitation-'+sent.length})
+ }})
+ try{
+  await finishSetup(h)
+  const id=await approved(h),input={id,version:2,mailSubject:'Proposal for Northstar',mailMessage:'Hi Avery,\nPlease review the photography scope.'}
+  const before=await h.state()
+  await h.cmd('proposal.send',{...input,mailSubject:'Unsafe\r\nHeader'},h.owner,400)
+  const missing=await h.cmd('proposal.send',{...input,mailMessage:'Hi {client.first_name}'},h.owner,400)
+  assert.match(missing.error,/client.first_name/)
+  for(const fields of [{mailSubject:undefined},{mailMessage:undefined},{mailSubject:''},{mailMessage:''},{mailSubject:'x'.repeat(201)},{mailMessage:'x'.repeat(10001)}])await h.cmd('proposal.send',{...input,...fields},h.owner,400)
+  await h.cmd('proposal.send',{...input,version:1},h.owner,409)
+  assert.deepEqual(await h.state(),before);assert.equal(sent.length,0)
+  const first=await h.cmd('proposal.send',input)
+  assert.deepEqual(sent[0].to,[recipient]);assert.equal(sent[0].subject,input.mailSubject)
+  assert.equal(sent[0].text,input.mailMessage+'\n\n'+first.shareUrl)
+  let p=(await h.state()).proposals.find(p=>p.id===id)
+  assert.equal(p.revision,1);assert.equal(p.approved_by,h.auth.OWNER_EMAIL)
+  const approvedAt=p.approved_at
+  const freshInput={id,version:p.version,mailSubject:'Updated invitation',mailMessage:'Avery, use this fresh link.'}
+  const fresh=await h.cmd('proposal.send',freshInput)
+  assert.equal((await h.send(new URL(first.shareUrl).pathname)).status,404)
+  assert.equal(sent[1].text,freshInput.mailMessage+'\n\n'+fresh.shareUrl)
+  p=(await h.state()).proposals.find(p=>p.id===id)
+  assert.equal(p.revision,1);assert.equal(p.approved_at,approvedAt)
+  const client=(await h.state()).clients[0]
+  const next=await h.cmd('proposal.negotiate',{...offer,id,version:p.version,clientId:client.id,scope:'An extra studio day.'})
+  await h.cmd('proposal.send',{...input,version:next.version},h.owner,409)
+  await h.cmd('proposal.approve',{id,version:next.version,revision:next.revision})
+  const revisionMail={mailSubject:'Revised scope for Northstar',mailMessage:'Hi Avery, here is the extra studio day.'}
+  const revision=await h.cmd('proposal.send',{id,version:next.version+1,...revisionMail})
+  assert.equal(sent[2].text,revisionMail.mailMessage+'\n\n'+revision.shareUrl)
+  assert.equal((await h.send(new URL(fresh.shareUrl).pathname)).status,404)
+  p=(await h.state()).proposals.find(p=>p.id===id)
+  const messages=p.invitationMessages
+  assert.equal(messages.length,3)
+  for(const [i,expected] of [input,freshInput,revisionMail].entries()){
+   const row=messages.find(m=>m.subject===expected.mailSubject)
+   assert.equal(row.message,expected.mailMessage);assert.equal(row.recipient,recipient)
+   assert.equal(row.revision,i===2?next.revision:1);assert.equal(row.actor_id,before.actor.id)
+   assert.ok(Number.isSafeInteger(row.queued_at));assert.ok(!JSON.stringify(row).includes('/p/'))
+  }
+  assert.equal(p.scope,'An extra studio day.')
+ }finally{await h.close()}
+})
+
 test('FOLLOW-004 verified client questions, native answers and one-use authenticated owner email replies', {timeout:120000}, async()=>{
  const {createHmac,createHash,randomBytes}=await import('node:crypto')
  const keyBytes=Buffer.from(Array.from({length:32},(_,i)=>i)),sent=[],received=new Map(),fetches=[]

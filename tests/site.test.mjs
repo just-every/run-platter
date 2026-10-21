@@ -849,7 +849,7 @@ test('MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop an
 test('MOB-001 / EDIT-002 desktop and phone start all five starters, save, replace and start personal templates, preview and accept independent drafts', {timeout:180000}, templatesJourney)
 
 
-test('SEND-006 desktop and phone rehearse editable email to self and open a session-only preview without approving or inviting the client', {timeout:120000},async()=>{
+test('SEND-006 desktop and phone rehearse to self, then edit invitations, fresh links and negotiated sends with exact retained history', {timeout:180000},async()=>{
  let app,browser
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
@@ -892,6 +892,52 @@ test('SEND-006 desktop and phone rehearse editable email to self and open a sess
     if(screenshots)await page.screenshot({path:join(screenshots,`SEND-006-preview-${width}.png`),fullPage:true})
     const signedOut=await browser.newContext()
     try{assert.equal((await signedOut.request.get(preview)).status(),401)}finally{await signedOut.close()}
+    await page.goto(app.origin+'/app/proposal?id='+made.id)
+    await page.getByRole('button',{name:'Approve this revision'}).click()
+    await page.getByText('Review invitation email',{exact:true}).click()
+    await page.getByLabel('Invitation subject',{exact:true}).fill('Photography for {client.company}')
+    await page.getByLabel('Invitation message',{exact:true}).fill('Hi Avery, please review the photography scope.')
+    await page.getByRole('button',{name:'Send approved proposal'}).click()
+    await page.getByText('Fill the variable before sending: client.company',{exact:true}).waitFor()
+    assert.equal(await page.getByLabel('Invitation message',{exact:true}).inputValue(),'Hi Avery, please review the photography scope.')
+    await page.getByLabel('Invitation subject',{exact:true}).fill('Photography for Northstar')
+    if(screenshots)await page.screenshot({path:join(screenshots,`SEND-006-invitation-${width}.png`),fullPage:true})
+    await page.getByRole('button',{name:'Send approved proposal'}).click()
+    const history=page.locator('section').filter({has:page.getByRole('heading',{name:'Invitation email history',exact:true})})
+    await history.getByRole('heading',{name:'Photography for Northstar',exact:true}).waitFor()
+    assert.match(await history.innerText(),/Hi Avery, please review the photography scope\./)
+    let delivered=await (await context.request.get(app.origin+'/api/platter/state')).json()
+    let live=delivered.proposals.find(p=>p.id===made.id)
+    const firstPath='/p/'+live.shareToken
+    let invitation=delivered.outbox.find(m=>m.subject==='Photography for Northstar')
+    assert.equal(invitation.recipient,'avery@northstar.example')
+    assert.equal(invitation.body,'Hi Avery, please review the photography scope.\n\n'+app.origin+firstPath)
+    assert.equal(live.revision,1);assert.equal(live.status,'sent')
+    if(screenshots)await page.screenshot({path:join(screenshots,`SEND-006-invited-${width}.png`),fullPage:true})
+    await page.getByText('Review invitation email',{exact:true}).click()
+    await page.getByLabel('Invitation subject',{exact:true}).fill('Fresh photography invitation')
+    await page.getByLabel('Invitation message',{exact:true}).fill('Avery, please use this new link.')
+    await page.getByRole('button',{name:'Send fresh client link',exact:true}).click()
+    assert.equal((await context.request.get(app.origin+firstPath)).status(),404)
+    delivered=await (await context.request.get(app.origin+'/api/platter/state')).json()
+    live=delivered.proposals.find(p=>p.id===made.id)
+    assert.equal(live.invitationMessages.length,2)
+    const next=await cmd('proposal.negotiate',{id:made.id,version:live.version,clientId:client.id,title:'Photography rehearsal',scope:'A studio photography session with a second location.',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+    await page.goto(app.origin+'/app/proposal?id='+made.id)
+    await page.getByRole('button',{name:'Approve this revision'}).click()
+    await page.getByText('Review invitation email',{exact:true}).click()
+    await page.getByLabel('Invitation subject',{exact:true}).fill('Revised photography scope')
+    await page.getByLabel('Invitation message',{exact:true}).fill('Hi Avery, the second location is included.')
+    if(screenshots)await page.screenshot({path:join(screenshots,`SEND-006-revision-composer-${width}.png`),fullPage:true})
+    await page.getByRole('button',{name:'Send approved proposal'}).click()
+    await page.getByRole('heading',{name:'Revised photography scope',exact:true}).waitFor()
+    delivered=await (await context.request.get(app.origin+'/api/platter/state')).json()
+    live=delivered.proposals.find(p=>p.id===made.id)
+    assert.equal(live.revision,next.revision);assert.equal(live.invitationMessages.length,3)
+    invitation=delivered.outbox.find(m=>m.subject==='Revised photography scope')
+    assert.equal(invitation.body,'Hi Avery, the second location is included.\n\n'+app.origin+'/p/'+live.shareToken)
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+    if(screenshots)await page.screenshot({path:join(screenshots,`SEND-006-revision-invited-${width}.png`),fullPage:true})
    }finally{await context.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}

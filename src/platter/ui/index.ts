@@ -48,6 +48,6 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
       content += panel('Local development mail', `<p>Messages captured locally for this installation.</p><ul class="records">${state.outbox.map((message: any) => `<li><article><h3>${escape(message.subject)}</h3><p>To: ${escape(message.recipient)} · ${escape(message.status)}</p><p class="preserve">${escape(message.body)}</p></article></li>`).join('')}</ul>`)
     }
     const name = (state.reportPeople ?? []).find((person: any) => person.email === state.actor?.email)?.name
-    return document(title, content, { actor: state.actor, path, feedback, zone, name, layout, eyebrow: above, inlineNotices: url.pathname === '/app/proposal' || Boolean(url.pathname === '/app' && composerRefusal), beforeTitle: url.pathname === '/app/proposal' ? '<p class="breadcrumb"><a href="/app">All proposals</a></p>' : undefined })
+    return document(title, content, { status: feedback?.status, actor: state.actor, path, feedback, zone, name, layout, eyebrow: above, inlineNotices: url.pathname === '/app/proposal' || Boolean(url.pathname === '/app' && composerRefusal), beforeTitle: url.pathname === '/app/proposal' ? '<p class="breadcrumb"><a href="/app">All proposals</a></p>' : undefined })
   })
 }

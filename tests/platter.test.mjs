@@ -1474,3 +1474,26 @@ test('TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions a
   const tiny=await h.cmd('proposal.prepare',{...input,title:'Fractional costs',pricingTables:[{optionId:'main',name:'Rounding',lines:[{name:'Priced line',description:'Positive package revenue',unit:'unit',quantity:'1',unitPrice:'1'},{name:'Fraction',description:'Revenue rounds to zero',unit:'unit',quantity:'0.001',unitPrice:'0.01'}]}]},people.sales.cookie);let fractional=(await h.state()).proposals.find(r=>r.id===tiny.id);const fraction=fractional.internalPricing.lines.find(l=>l.name==='Fraction');await h.cmd('pricing.cost',{id:tiny.id,version:1,lineKey:fraction.key,unitCost:'10'},people.manager.cookie);fractional=(await h.state()).proposals.find(r=>r.id===tiny.id);const zero=fractional.internalPricing.lines.find(l=>l.name==='Fraction');assert.deepEqual([zero.revenueCents,zero.costCents,zero.marginCents,zero.marginBps],[0,1,-1,null])
  }finally{await h.close()}
 })
+
+test('TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens',async()=>{
+ const calls=[];let mailbox='sales@synthetic-platter.example'
+ const h=await harness({outboundService:async request=>{const url=new URL(request.url);calls.push({url:url.href,authorization:request.headers.get('authorization')});if(url.hostname==='api.stripe.com')return Response.json({id:'synthetic-platter-2100'});if(url.hostname==='quickbooks.api.intuit.com')return Response.json({CompanyInfo:{CompanyName:'Synthetic company'}});if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-2101',email:mailbox,email_verified:true});if(url.hostname==='graph.microsoft.com')return Response.json({id:'synthetic-platter-2102',mail:mailbox});throw Error('Unexpected provider') }})
+ try{
+  const people={};for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[]});people[role]={cookie,id,email}}
+  const connect={provider:'quickbooks',version:0,realmId:'synthetic-platter-2103',token:'synthetic-platter-2104',consent:true}
+  for(const role of ['manager','sales','content_editor','viewer','billing']){await h.cmd('provider.connect',connect,people[role].cookie,403);assert.equal(calls.length,0)}
+  await h.cmd('provider.connect',connect,people.admin.cookie);assert.equal(calls.length,1);assert.equal((await h.state()).connections[0].accountId,connect.realmId)
+  const stored=await h.db.prepare('SELECT sealed FROM p_connection_secrets').first();assert.ok(stored.sealed);assert.equal(stored.sealed.includes(connect.token),false)
+  for(const role of ['manager','sales','content_editor','viewer','billing'])assert.deepEqual((await h.state(people[role].cookie)).connections,[])
+  const before=JSON.stringify((await h.db.prepare('SELECT * FROM p_connections').all()).results)
+  await h.cmd('provider.disconnect',{provider:'quickbooks',version:1},people.sales.cookie,403);assert.equal(JSON.stringify((await h.db.prepare('SELECT * FROM p_connections').all()).results),before);assert.equal(calls.length,1)
+  await h.cmd('provider.disconnect',{provider:'quickbooks',version:1},people.admin.cookie);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_connection_secrets').first()).n,0);assert.equal((await h.state()).connections[0].status,'disconnected')
+  for(const role of ['owner','admin','manager','sales','billing']){mailbox=role==='owner'?h.auth.OWNER_EMAIL:people[role].email;await h.cmd('provider.connect',{provider:'gmail',version:0,token:'synthetic-platter-2105',consent:true},role==='owner'?h.owner:people[role].cookie)}
+  for(const role of ['content_editor','viewer'])await h.cmd('provider.connect',{provider:'gmail',version:0,token:'synthetic-platter-2105',consent:true},people[role].cookie,403)
+  const total=calls.length;await h.cmd('provider.disconnect',{provider:'gmail',id:'mailbox:gmail:'+people.sales.id,version:1},people.manager.cookie,403);assert.equal(calls.length,total)
+  mailbox=people.sales.email;await h.cmd('provider.connect',{provider:'microsoft',version:0,token:'synthetic-platter-2106',consent:true},people.manager.cookie,403)
+  assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_connections WHERE provider='microsoft'").first()).n,0)
+  await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-2107',webhookSecret:'synthetic-platter-2108',consent:true})
+  for(const cookie of [h.owner,...Object.values(people).map(p=>p.cookie)]){const s=await h.state(cookie);assert.doesNotMatch(JSON.stringify(s),/synthetic-platter-210[45678]|sealed|webhookSecret/);const page=await h.send(cookie===h.owner?'/app/settings':'/app/team',undefined,cookie);assert.doesNotMatch(page.text,/synthetic-platter-210[45678]/)}
+ }finally{await h.close()}
+})

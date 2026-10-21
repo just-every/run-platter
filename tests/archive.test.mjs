@@ -461,12 +461,13 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source})
+  h=await harness({root:source,outboundService:async request=>{assert.equal(new URL(request.url).hostname,'quickbooks.api.intuit.com');return Response.json({CompanyInfo:{CompanyName:'Synthetic company'}})}})
   const people={}
   for(const role of ['sales','manager','other']){
    const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)
    const cookie=await h.signIn(email);people[role]={cookie,...(await h.state(cookie)).actor}
   }
+  await h.cmd('provider.connect',{provider:'quickbooks',version:0,realmId:'synthetic-platter-2300',token:'synthetic-platter-2301',consent:true})
   await h.cmd('workspace.defaults',{version:0,reminderDays:[2,5],expiryDays:30,paymentMethods:['card']})
   const team=await h.cmd('team.create',{name:'Archive team'})
   for(const role of ['sales','manager'])await h.cmd('member.set',{operatorId:people[role].id,version:0,role,teams:[team.id]})
@@ -480,13 +481,14 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   await h.cmd('template.save',{id:p.id,version:2,name:'Private cost template'},people.sales.cookie)
   await h.cmd('library.save',{title:'Synthetic case study',kind:'case_study',content:'An archived text library item'})
   await h.cmd('proposal.approve',{id:p.id,version:2,revision:2},people.manager.cookie)
-  const before=await h.state(),tables=['p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
+  const before=await h.state(),tables=['p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
   const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
   await h.close();h=undefined
   const archive=join(temporary,'teams.rer');await command(source,['export','--output',archive]);await command(restored,['import','--input',archive,'--yes'])
   h=await harness({root:restored,unclaimed:true})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_connection_secrets').first()).n,0);assert.equal(after.connections[0].status,'needs_reconnection');assert.doesNotMatch(JSON.stringify(after),/synthetic-platter-2301/)
   assert.deepEqual(after.workspaceDefaults,before.workspaceDefaults);assert.deepEqual(after.approvalSettings,before.approvalSettings);assert.deepEqual(after.proposals.find(r=>r.id===p.id).internalPricing,before.proposals.find(r=>r.id===p.id).internalPricing);assert.deepEqual(after.libraryItems,before.libraryItems)
   for(const [i,t] of tables.entries())assert.deepEqual(canonical((await h.db.prepare('SELECT * FROM '+t).all()).results),rows[i],t)
   const sales=await h.signIn(people.sales.email),manager=await h.signIn(people.manager.email),other=await h.signIn(people.other.email)

@@ -1,0 +1,2 @@
+CREATE TABLE p_connections(id TEXT PRIMARY KEY,provider TEXT NOT NULL,operator_id TEXT REFERENCES oa_operators(id),account_id TEXT NOT NULL,mailbox_email TEXT,status TEXT NOT NULL CHECK(status IN ('connected','disconnected')),version INTEGER NOT NULL DEFAULT 1,connected_by TEXT NOT NULL REFERENCES oa_operators(id),connected_at INTEGER NOT NULL);
+CREATE TABLE p_connection_secrets(connection_id TEXT PRIMARY KEY REFERENCES p_connections(id),sealed TEXT NOT NULL);

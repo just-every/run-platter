@@ -1,3 +1,4 @@
+import { connectionsPanel } from './connections'
 import { workspacePanel } from './workspace'
 import { libraryPage } from './library'
 import { teamPage } from './team'
@@ -27,9 +28,9 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
     let layout = ''
     switch (url.pathname) {
       case '/app/library': title='Content library'; content=libraryPage(state); break
-      case '/app/team': title='Team'; content=teamPage(state); break
+      case '/app/team': title='Team'; content=teamPage(state)+connectionsPanel(state,true); break
       case '/app/approvals': title='Approvals'; content=approvalsPage(state); break
-      case '/app/settings': title = 'Vendor documents'; above = eyebrow('Settings · defaults for new proposals'); content = vendorSettings(state)+workspacePanel(state); break
+      case '/app/settings': title = 'Vendor documents'; above = eyebrow('Settings · defaults for new proposals'); content = vendorSettings(state)+workspacePanel(state)+connectionsPanel(state,false); break
       case '/app': title = 'Proposals'; above = eyebrow(`Pipeline · ${count((state.proposals ?? []).length, 'proposal')} · ${count((state.clients ?? []).length, 'client')}`); layout = 'proposals-page'; content = proposalsPage(state, url.searchParams, composerRefusal); break
       case '/app/proposal': {
         const id = url.searchParams.get('id') ?? ''

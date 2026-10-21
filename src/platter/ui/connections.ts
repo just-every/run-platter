@@ -1,0 +1,9 @@
+import { escape, field, form, hidden, panel } from './shared'
+export function connectionsPanel(s:any,mailbox:boolean){
+ if(!(mailbox?['owner','admin','manager','sales','billing']:['owner','admin']).includes(s.actor.role))return ''
+ const providers=mailbox?[['gmail','Google mailbox'],['microsoft','Microsoft mailbox']]:[['stripe','Stripe'],['quickbooks','QuickBooks Online']]
+ return panel(mailbox?'Your mailbox connections':'Workspace provider connections','<p>Connect explicitly using a provider-issued access token. Credentials stay encrypted in this installation and are excluded from exports. Restores require reconnection. '+(mailbox?'The verified mailbox must match your sign-in address. Sending still uses the installation mail transport.':'Connections verify the account; payment collection and accounting synchronization are not available yet.')+'</p>'+providers.map(([provider,label])=>{
+ const c=s.connections.find((r:any)=>r.provider===provider),version=c?.version??0,back=mailbox?'/app/team':'/app/settings'
+ return '<article><h3>'+escape(label)+'</h3><p>'+escape(c?c.status+' · '+(c.mailboxEmail??c.accountId):'Not connected')+'</p>'+form('provider.connect',back,hidden('provider',provider)+hidden('version',version)+field(label+' access token','token','','type="password" autocomplete="off" required maxlength="8192"')+(provider==='stripe'?field('Stripe webhook signing secret','webhookSecret','','type="password" autocomplete="off" required maxlength="8192"'):'')+(provider==='quickbooks'?field('QuickBooks company id','realmId','','required maxlength="100"'):'')+'<label><input type="checkbox" name="consent" value="yes" required>I authorize this connection and its stated account access.</label><button>Connect '+escape(label)+'</button>')+(c&&c.status!=='disconnected'?form('provider.disconnect',back,hidden('provider',provider)+hidden('version',version)+'<button>Disconnect '+escape(label)+'</button>'):'')+'</article>'
+ }).join(''))
+}

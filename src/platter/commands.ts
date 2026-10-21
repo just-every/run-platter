@@ -1,3 +1,4 @@
+import { connectionCommand } from './connections'
 import { defaultStatements, workspaceCommand } from './workspace'
 import { saveCost, copyCosts, patchCosts, type CostPatch } from './internal-pricing'
 import { libraryCommand } from './library'
@@ -43,6 +44,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  await authorizeCommand(db,a,name,p)
  if(name.startsWith('team.')||name.startsWith('member.')||name==='proposal.share')return teamCommand(db,a,name,p)
  if(name.startsWith('approval.')||name==='proposal.approve'||name==='proposal.reject')return approvalCommand(env,a,name,p)
+ if(name.startsWith('provider.'))return connectionCommand(env,a,name,p)
  if(name==='workspace.defaults')return workspaceCommand(db,a,p)
  if(name==='pricing.cost')return saveCost(env,a,p,(fields,patch)=>command(env,a,'proposal.revise',fields,undefined,patch))
  if(name.startsWith('library.'))return libraryCommand(db,a,name,p)

@@ -1,3 +1,4 @@
+import { copyDefaults } from './workspace'
 import { copyCosts } from './internal-pricing'
 import type { Bindings } from '../auth.server'
 import { copyAttachments } from './attachments'
@@ -26,7 +27,7 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
    prepared_by,created_at,currency,sales_owner_id,sales_owner_name,attachments)
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
    .bind(id, clientId, title, row.scope, row.terms, row.deposit_bps, JSON.stringify(options), a.email, at, row.currency, a.id, a.email, JSON.stringify(attachments)),
-  copyCosts(db,source.id,displayed.revision,id,1),
+  copyCosts(db,source.id,displayed.revision,id,1),copyDefaults(db,source.id,id),
   db.prepare('UPDATE p_proposals SET section_conditions=? WHERE id=?').bind(typeof row.section_conditions==='string'?row.section_conditions:JSON.stringify(row.section_conditions),id),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)')
    .bind(id, JSON.stringify(snapshot(row)), a.email, at, row.currency),

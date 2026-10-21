@@ -1,3 +1,4 @@
+import { workspaceDefaults, templateDefaults, startDefaults, defaultStatements } from './workspace'
 import { saveTemplateCosts, startTemplateCosts } from './internal-pricing'
 import type { Bindings } from '../auth.server'
 import { starterTemplate } from './starter-templates'
@@ -46,7 +47,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   const writes = existing
    ? [db.prepare('UPDATE p_personal_templates SET name=?,snapshot=?,pdf_enabled=?,expiry=?,suggestion_sections=?,version=version+1,updated_at=? WHERE id=? AND owner_id=? AND version=?').bind(...values, at, id, a.id, existing.version)]
    : [db.prepare('INSERT INTO p_personal_templates(name,snapshot,pdf_enabled,expiry,suggestion_sections,id,owner_id,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,1,?,?)').bind(...values, id, a.id, at, at)]
-  writes.push(...saveTemplateCosts(db,source.id,displayed.revision,id))
+  writes.push(...saveTemplateCosts(db,source.id,displayed.revision,id),...templateDefaults(db,source.id,id))
   await commit(db, a, writes, false, {
    sql: 'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?)' + (existing ? ' AND EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND owner_id=? AND version=?)' : ''),
    values: [source.id, source.version, ...(existing ? [id, a.id, existing.version] : [])],
@@ -62,7 +63,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  exact(template, input)
  const personal = starter ? null : template as any
  const content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
- const expiry = starter ? { mode: 'never', period_days: null, expires_on: null, time_zone: await installationZone(db), warning_days: null } : JSON.parse(personal.expiry)
+ const defaults=await workspaceDefaults(db)
+ const expiry = starter ? { mode: defaults.expiryDays===null?'never':'days', period_days: defaults.expiryDays, expires_on: null, time_zone: await installationZone(db), warning_days: null } : JSON.parse(personal.expiry)
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)
  need(content.currency === 'USD', 'Personal templates require USD content', 409)
  const id = crypto.randomUUID(), title = input.title === undefined || input.title === '' ? content.title : text(input.title, 'a title')
@@ -74,7 +76,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
    prepared_by,created_at,currency,sales_owner_id,sales_owner_name,attachments)
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
    .bind(id, clientId, title, row.scope, row.terms ?? '', row.deposit_bps, JSON.stringify(row.options), preparer, at, 'USD', a.id, a.email, JSON.stringify(attachments)),
-  ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),
+  ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),...await (starter?defaultStatements(db,id,false):startDefaults(db,template.id,id)),
   db.prepare('UPDATE p_proposals SET section_conditions=? WHERE id=?').bind(JSON.stringify(row.section_conditions ?? {}), id),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)').bind(id, JSON.stringify(snapshot(row)), preparer, at, 'USD'),
   db.prepare('INSERT INTO p_pdf_settings(proposal_id,enabled) VALUES(?,?)').bind(id, template.pdf_enabled),

@@ -1,3 +1,4 @@
+import { defaultStatements, workspaceCommand } from './workspace'
 import { saveCost, copyCosts, patchCosts, type CostPatch } from './internal-pricing'
 import { libraryCommand } from './library'
 import { approvalCommand, approvalPlan } from './approvals'
@@ -42,6 +43,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  await authorizeCommand(db,a,name,p)
  if(name.startsWith('team.')||name.startsWith('member.')||name==='proposal.share')return teamCommand(db,a,name,p)
  if(name.startsWith('approval.')||name==='proposal.approve'||name==='proposal.reject')return approvalCommand(env,a,name,p)
+ if(name==='workspace.defaults')return workspaceCommand(db,a,p)
  if(name==='pricing.cost')return saveCost(env,a,p,(fields,patch)=>command(env,a,'proposal.revise',fields,undefined,patch))
  if(name.startsWith('library.'))return libraryCommand(db,a,name,p)
  if(name==='proposal.test-mail')return sendTestMail(env,a,p)
@@ -86,6 +88,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   else writes.push(db.prepare("INSERT INTO p_proposals(id,client_id,title,scope,version,revision,status,deposit_bps,options,prepared_by,created_at,currency,sales_owner_id,sales_owner_name,terms,attachments) VALUES(?,?,?,?,1,?,'draft',?,?,?,?,?,?,?,?,?)").bind(id,f.client_id,f.title,f.scope,revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency,a.id,a.email,f.terms,JSON.stringify(attachments)))
   writes.push(db.prepare('UPDATE p_proposals SET section_conditions=? WHERE id=?').bind(JSON.stringify(f.section_conditions),id))
   writes.push(db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,?,?,?,?,?)').bind(id,revision,JSON.stringify(snapshot(row)),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency))
+  if(!old)writes.push(...await defaultStatements(db,id))
   if(old)writes.push(copyCosts(db,id,costSourceRevision??old.revision,id,revision))
   if(internalCosts)writes.push(...patchCosts(db,id,revision,internalCosts))
   await commit(db,a,writes,false,old?{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))",values:[id,old.version]}:undefined);return{id,revision,version:(old?.version??0)+1}

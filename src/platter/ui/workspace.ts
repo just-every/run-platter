@@ -1,0 +1,5 @@
+import { escape, field, form, hidden, panel } from './shared'
+export function workspacePanel(s:any){
+ const defaults=s.workspaceDefaults;if(!defaults)return ''
+ return panel('Workspace defaults','<p>New drafts copy these defaults. Existing proposals and personal templates keep their saved settings. Expiry runs after sending; scheduled reminders and payment collection are not available yet.</p>'+form('workspace.defaults','/app/settings',hidden('version',defaults.version)+field('Reminder days after sending','reminderDays',defaults.reminderDays.join(', '),'placeholder="2, 5, 9"')+field('Default expiry days after sending (empty for no expiry)','expiryDays',defaults.expiryDays??'','type="number" min="1" max="36500"')+'<fieldset><legend>Payment method defaults</legend>'+[['card','Card'],['ach','ACH'],['apple_pay','Apple Pay'],['google_pay','Google Pay']].map(([id,label])=>`<label><input type="checkbox" name="method:${id}" value="yes"${defaults.paymentMethods.includes(id)?' checked':''}>${escape(label)}</label>`).join('')+'</fieldset><button>Save workspace defaults</button>'))
+}

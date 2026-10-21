@@ -23,7 +23,7 @@ export async function permitted(db:D1Database,a:Actor,id:unknown,right:Right='vi
  return row
 }
 export async function teamState(db:D1Database,a:Actor) {
- if(!administrators.includes(a.role)&&a.role!=='manager')return {}
+ if(!administrators.includes(a.role)&&a.role!=='manager')return {teams:(await db.prepare('SELECT t.* FROM p_teams t JOIN p_team_members m ON m.team_id=t.id WHERE m.operator_id=? ORDER BY t.name').bind(a.id).all<any>()).results}
  const people=(await db.prepare("SELECT o.id,o.email,o.display_name,CASE WHEN o.role IN ('owner','admin') THEN o.role ELSE COALESCE(m.role,'sales') END AS role,COALESCE(m.version,0) AS version,COALESCE(m.time_zone,'UTC') AS time_zone FROM oa_operators o LEFT JOIN p_members m ON m.operator_id=o.id WHERE o.status='active' ORDER BY o.email").all<any>()).results
  const teams=(await db.prepare('SELECT * FROM p_teams ORDER BY name').all<any>()).results
  const memberships=(await db.prepare('SELECT * FROM p_team_members').all<any>()).results

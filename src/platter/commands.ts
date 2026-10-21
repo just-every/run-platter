@@ -1,3 +1,4 @@
+import { folderCommand } from './folders'
 import { paymentCommand } from './payments'
 import { connectionCommand } from './connections'
 import { defaultStatements, workspaceCommand } from './workspace'
@@ -45,6 +46,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  await authorizeCommand(db,a,name,p)
  if(name.startsWith('team.')||name.startsWith('member.')||name==='proposal.share')return teamCommand(db,a,name,p)
  if(name.startsWith('approval.')||name==='proposal.approve'||name==='proposal.reject')return approvalCommand(env,a,name,p)
+ if(name==='folder.save')return folderCommand(db,a,p)
  if(name.startsWith('payment.'))return paymentCommand(env,a,name,p)
  if(name.startsWith('provider.'))return connectionCommand(env,a,name,p)
  if(name==='workspace.defaults')return workspaceCommand(db,a,p)

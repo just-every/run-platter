@@ -1523,3 +1523,25 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   assert.equal((await h.state()).proposals.find(r=>r.id===p.id).acceptance.depositCents,60000,'refunds never rewrite the accepted deposit')
  }finally{await h.close()}
 })
+
+test('TEAM-001 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content',()=>run(async h=>{
+ const east=await h.cmd('team.create',{name:'East'}),west=await h.cmd('team.create',{name:'West'}),people={}
+ for(const role of ['admin','manager','sales','content_editor','viewer','billing','other']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role:role==='other'?'sales':role,teams:[role==='other'?west.id:east.id]});people[role]={cookie,id}}
+ const folder=await h.cmd('folder.save',{kind:'template',name:'East templates',teams:[east.id],shareConsent:true},people.manager.cookie),library=await h.cmd('folder.save',{kind:'library',name:'East library',teams:[east.id],shareConsent:true},people.content_editor.cookie)
+ for(const role of ['sales','viewer','billing'])await h.cmd('folder.save',{kind:'template',name:'Forbidden',teams:[],shareConsent:true},people[role].cookie,403)
+ await h.cmd('folder.save',{kind:'template',name:'Other team',teams:[west.id],shareConsent:true},people.manager.cookie,403)
+ const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'}),source=await h.cmd('proposal.prepare',{...offer,clientId:client.id},people.content_editor.cookie)
+ const shared=await h.cmd('template.save',{id:source.id,version:1,name:'Shared East',shared:true,shareConsent:true,folderId:folder.id},people.content_editor.cookie)
+ const item=await h.cmd('library.save',{title:'East bio',kind:'bio',content:'Team-only text',folderId:library.id},people.content_editor.cookie)
+ for(const role of ['sales','viewer','billing'])await h.cmd('template.save',{id:source.id,version:1,name:'Forbidden',shared:true,shareConsent:true},people[role].cookie,403)
+ for(const role of ['owner','admin','manager','sales','content_editor']){const cookie=role==='owner'?h.owner:people[role].cookie,s=await h.state(cookie);assert.ok(s.templates.some(t=>t.id===shared.id));assert.ok(s.libraryItems.some(t=>t.id===item.id));const copy=await h.cmd('template.start',{id:shared.id,version:1,clientId:client.id},cookie);assert.equal((await h.state(cookie)).proposals.find(p=>p.id===copy.id).approved_by,null)}
+ const outsider=await h.state(people.other.cookie);assert.equal(outsider.templates.some(t=>t.id===shared.id),false);assert.equal(outsider.libraryItems.some(t=>t.id===item.id),false);assert.equal(outsider.resourceFolders.some(f=>f.id===folder.id),false)
+ await h.cmd('template.start',{id:shared.id,version:1,clientId:client.id},people.other.cookie,403);await h.cmd('library.save',{id:item.id,version:1,title:'Stolen',kind:'bio',content:'No',folderId:null},people.other.cookie,403)
+ await h.cmd('member.set',{operatorId:people.content_editor.id,version:1,role:'content_editor',teams:[west.id]})
+ assert.equal((await h.state(people.content_editor.cookie)).templates.some(t=>t.id===shared.id),false)
+ await h.cmd('template.save',{id:source.id,version:1,templateId:shared.id,templateVersion:1,name:'Stolen',shared:true,folderId:null},people.content_editor.cookie,403)
+ await h.cmd('library.save',{id:item.id,version:1,title:'Stolen',kind:'bio',content:'No',folderId:null},people.content_editor.cookie,403)
+ await h.cmd('template.save',{id:source.id,version:1,templateId:shared.id,templateVersion:1,name:'Updated shared'},h.owner);const current=(await h.state()).templates.find(t=>t.id===shared.id);assert.equal(current.shared,1);assert.equal(current.folder_id,folder.id)
+ const oldCopy=(await h.state(people.sales.cookie)).proposals[0];assert.equal(oldCopy.title,offer.title,'replacing the shared template cannot mutate an existing draft')
+ const rows=(await h.db.prepare('SELECT * FROM p_personal_templates').all()).results;assert.equal(rows.length,1);assert.equal((await h.db.prepare('SELECT content FROM p_library_items WHERE id=?').bind(item.id).first()).content,'Team-only text')
+}))

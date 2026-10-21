@@ -1086,3 +1086,85 @@ test('EDIT-016 body phrase search returns only two of 500 proposals through the 
  const priced=await h.send('/api/platter/pipeline?q='+encodeURIComponent('weatherproof copper finish'),undefined,h.owner);assert.equal(priced.status,200);assert.deepEqual(priced.value.rows.map(p=>p.id),[pricedId])
  const credential=await h.send('/api/platter/pipeline?q='+oldLink.split('/').at(-1),undefined,h.owner);assert.equal(credential.status,200);assert.equal(credential.value.count,0,'invitation credentials never participate in search')
 }))
+
+
+test('SEND-006 self-test mail uses only the active sign-in address, previews an unsent revision and atomically limits daily rehearsals without sending an offer',()=>run(async h=>{
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+ const {client,p}=await draft(h)
+ const input={id:p.id,version:1,subject:'Proposal for Northstar',message:'Hi Avery,\nPlease review the photography scope.'}
+ const lifecycle=async()=>{
+  const state=await h.state(),proposal=state.proposals.find(row=>row.id===p.id)
+  const {testMail,...content}=proposal
+  return {proposal:content,revisions:state.revisions,followups:state.followups,actions:state.followupActions,
+   shares:(await h.db.prepare('SELECT * FROM p_shares').all()).results,
+   approvals:(await h.db.prepare('SELECT * FROM p_approvals').all()).results,
+   expiry:(await h.db.prepare('SELECT * FROM p_expiry').all()).results}
+ }
+ const before=await lifecycle()
+ await h.send('/api/platter/command',{name:'proposal.test-mail',input},'',{}).then(r=>assert.equal(r.status,401))
+ await h.cmd('proposal.test-mail',input,h.owner,403,{origin:'https://foreign.example'})
+ const key=await h.cmd('agent.create',{label:'No test-mail authority'})
+ assert.equal((await h.send('/api/platter/agent/command',{name:'proposal.test-mail',input},'',{authorization:'Bearer '+key.token})).status,403)
+ for(const recipient of ['recipient','to','email','cc','bcc'])await h.cmd('proposal.test-mail',{...input,[recipient]:'someone@else.example'},h.owner,400)
+ await h.cmd('proposal.test-mail',{...input,subject:'Bad\nHeader'},h.owner,400)
+ await h.cmd('proposal.test-mail',{...input,message:'Hi {client.first_name}'},h.owner,400)
+ await h.cmd('proposal.test-mail',{...input,version:0},h.owner,409)
+ assert.equal((await h.state()).outbox.length,0)
+ const result=await h.cmd('proposal.test-mail',input)
+ assert.equal(result.recipient,h.auth.OWNER_EMAIL)
+ const mail=(await h.state()).outbox
+ assert.equal(mail.length,1);assert.equal(mail[0].recipient,h.auth.OWNER_EMAIL)
+ assert.equal(mail[0].subject,'[Test] Proposal for Northstar')
+ const preview=h.origin+'/app/preview?'+new URLSearchParams({id:p.id,revision:'1'})
+ assert.equal(mail[0].body,input.message+'\n\nPreview this revision (sign-in required):\n'+preview)
+ assert.ok(!mail[0].body.includes('/p/'))
+ assert.deepEqual(await lifecycle(),before)
+ assert.equal((await h.send(preview.slice(h.origin.length))).status,401)
+ const view=await h.send(preview.slice(h.origin.length),undefined,h.owner)
+ assert.equal(view.status,200);assert.match(view.text,/Preview · Revision 1/)
+ const context=await h.send('/app/preview/client?id='+p.id+'&revision=1',undefined,h.owner)
+ assert.equal(context.status,200);assert.match(context.text,/Preview only/)
+ assert.equal((await h.send('/app/preview/client?id='+p.id+'&revision=1',{name:'accept'},h.owner)).status,403)
+ let state=await h.state();assert.equal(state.proposals.find(row=>row.id===p.id).testMail.length,1)
+ assert.equal((await h.db.prepare("SELECT COUNT(*) AS n FROM p_audit WHERE action='proposal.view' AND subject=?").bind(p.id).first()).n,0)
+ // The tenth slot is shared atomically; concurrent eleventh requests cannot queue mail.
+ for(let n=1;n<9;n++)await h.cmd('proposal.test-mail',input)
+ const raced=await Promise.all([h.send('/api/platter/command',{name:'proposal.test-mail',input},h.owner),h.send('/api/platter/command',{name:'proposal.test-mail',input},h.owner)])
+ assert.deepEqual(raced.map(r=>r.status).sort(),[200,429])
+ await h.cmd('proposal.test-mail',input,h.owner,429)
+ assert.equal((await h.state()).outbox.length,10)
+ // Another member has an independent quota and receives only their own rehearsal.
+ await h.send('/auth/invite',{email:'editor@studio.example',displayName:'Editor',role:'member',returnTo:'/app'},h.owner)
+ const member=await h.signIn('editor@studio.example')
+ await h.cmd('proposal.test-mail',input,member)
+ const memberState=await h.state(member)
+ assert.equal(memberState.proposals.find(row=>row.id===p.id).testMail.length,1)
+ const memberMail=(await h.state()).outbox.find(m=>m.recipient==='editor@studio.example')
+ assert.equal(memberMail.subject,'[Test] Proposal for Northstar')
+ // The quota uses installation calendar days, even across DST, rather than a rolling 24h window.
+ await h.db.prepare("INSERT INTO p_installation_settings(singleton,time_zone) VALUES(1,'America/New_York') ON CONFLICT(singleton) DO UPDATE SET time_zone=excluded.time_zone").run()
+ const future=Date.parse('2030-03-10T05:00:00Z')
+ await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET observed_at=excluded.observed_at').bind(future).run()
+ for(let n=0;n<10;n++)await h.cmd('proposal.test-mail',input)
+ await h.cmd('proposal.test-mail',input,h.owner,429)
+ await h.db.prepare('UPDATE p_expiry_clock SET observed_at=? WHERE singleton=1').bind(Date.parse('2030-03-11T03:59:59Z')).run()
+ await h.cmd('proposal.test-mail',input,h.owner,429)
+ await h.db.prepare('UPDATE p_expiry_clock SET observed_at=? WHERE singleton=1').bind(Date.parse('2030-03-11T04:00:00Z')).run()
+ await h.cmd('proposal.test-mail',input)
+ // Test mail does not approve or freeze: ordinary approval/send remains mandatory.
+ await h.cmd('proposal.send',{id:p.id,version:1},h.owner,409)
+ await h.cmd('proposal.approve',{id:p.id,version:1,revision:1})
+ await h.cmd('proposal.test-mail',{...input,version:2})
+ const shared=await h.cmd('proposal.send',{id:p.id,version:2}),oldPath=new URL(shared.shareUrl).pathname
+ await h.cmd('proposal.test-mail',{...input,version:3},h.owner,409)
+ const negotiated=await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:p.id,version:3,scope:'Expanded photography scope'})
+ await h.cmd('proposal.test-mail',{...input,version:negotiated.version})
+ const pendingMail=(await h.state()).outbox.find(m=>m.subject===input.subject.replace(/^/,'[Test] ')&&m.body.includes('revision=2'))
+ assert.ok(pendingMail,'test opens the pending revision, never the still-live client offer')
+ assert.equal((await h.send(oldPath)).status,200)
+ const proposal=(await h.state()).proposals.find(row=>row.id===p.id)
+ assert.equal(proposal.revision,2);assert.equal(proposal.status,'draft');assert.equal(proposal.sentRevision,1)
+ const audit=(await h.send('/api/platter/audit?action=proposal.test-mail',undefined,h.owner)).value.rows
+ assert.ok(audit.every(row=>row.subject===p.id&&['owner','member'].includes(row.actor_role)&&row.occurred_at>0))
+ assert.ok(!JSON.stringify(audit).includes(input.message))
+}))

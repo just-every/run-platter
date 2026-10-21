@@ -54,7 +54,7 @@ Platter is one product. Where the market sells a neighboring product separately,
 
 - **Published clauses** are the `- **ID — Title.**` bullets under [Published guarantees](#published-guarantees). They are what the first release already promised, kept and rewritten as named clauses.
 - **Target clauses** are the `#### ID — Title.` headings under [Target clauses](#target-clauses), and **push-further clauses** are those under [Push further](#push-further). They are binding product requirements not yet delivered in full. A build round that delivers one turns it into a published bullet with the same ID; IDs never change.
-- **Status** (in [Status](#status) and after each target clause) is `done`, `partial` or `missing`, judged from the code and tests at commit `658ddc0` (17 October 2026). `done` means the behavior ships and a cited test exercises it; `partial` means some of it ships, or it ships without a test of the whole behavior; `missing` means there is no implementation. Status is a build-planning judgment, not acceptance.
+- **Status** (in [Status](#status) and after each target clause) is `done`, `partial` or `missing`, judged from the code and tests at commit `53209e3a555718afa0242f88a0e4c1e82130efa9` (21 October 2026). `done` means the behavior ships and a cited test exercises it; `partial` means some of it ships, or it ships without a test of the whole behavior; `missing` means there is no implementation. Status is a build-planning judgment, not acceptance.
 - **Acceptance** is a journey or test through a public door: an HTTP route, the browser at 1440 and 390 pixels, the CLI, the MCP server, a native app or an import or export file. Fakes are allowed only at a paid or network edge (Stripe, Twilio, mail, CRM, accounting, storage and chat providers); a provider fake proves Platter's side only, never live provider behavior, which is proven in the provider's sandbox or test mode.
 
 ## Published guarantees
@@ -459,7 +459,7 @@ Add an editable withdrawal notice template to SEND-010, with its exact subject/b
 
 *Acceptance:* Save a template with subject "Proposal for {client.company}" and a body starting "Hi {client.first_name},"; send with it to Dana at Acme: the mail fake and the timeline both hold the subject "Proposal for Acme" and the body "Hi Dana," exactly. Edit the text of the scheduled second reminder: the first reminder in the mail fake carries the template text and the second carries the edited text. Send with an unfilled variable (refused, naming it); as a member edit a locked template's text (refused). On an unapproved draft, send a test to me: the mail fake holds exactly one message, to the member's own address, with the subject "[Test] Proposal for Acme"; its link opens the preview with the member's session and returns 401 without one; the proposal is still an unapproved draft at the same revision, with no tracking record, no reminder scheduled and no client link; a request that names another address for the test is refused (400), and the eleventh test that day is refused (429).
 
-*Status:* missing. Proposal mail has a fixed subject ("Your proposal:" and the title) and a fixed body, set in src/platter/commands.ts; no editing, templates or timeline copy.
+*Status:* partial. Test-to-self rehearsals provide an editable subject/message, an active-sign-in-address-only recipient, a session-protected exact-revision preview, a durable test-send timeline and an atomic 10-per-person/proposal/calendar-day limit in the installation time zone. Test mail and its content stay outside agreement archives; the audit event survives. Gap: real invitation/reminder/invoice editing, shared/default/locked templates, variables and retained real-send subject/body remain. (`src/platter/test-mail.ts`, `src/platter/ui/test-mail.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### SEND-007 — Replace an unsigned signer on a sent proposal.
 
@@ -1386,13 +1386,13 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 
 ## Status
 
-Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed57b` (17 October 2026).
+Judged from the code and tests at commit `53209e3a555718afa0242f88a0e4c1e82130efa9` (21 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 22 | 25 | 81 | 128 |
-| All | 34 | 25 | 81 | 140 |
+| Target and push further | 22 | 26 | 80 | 128 |
+| All | 34 | 26 | 80 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1446,7 +1446,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `SEND-003` | Recipients, roles and sharing | target | missing |  | One client recipient per proposal. |
 | `SEND-004` | Expiry and reopening | target | done | `src/platter/expiry.ts`, `src/platter/expiry-time.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `SEND-005` | Completion and activity notifications | target | missing |  | No notifications to the sender. |
-| `SEND-006` | Editable subject, message and shared email templates | target | missing |  | Proposal mail has a fixed subject ("Your proposal:" and the title) and a fixed body, set in src/platter/commands.ts; no editing, templates or timeline copy. |
+| `SEND-006` | Editable subject, message and shared email templates | target | partial | `src/platter/test-mail.ts`, `src/platter/ui/test-mail.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Test-to-self rehearsals provide an editable subject/message, an active-sign-in-address-only recipient, a session-protected exact-revision preview, a durable test-send timeline and an atomic 10-per-person/proposal/calendar-day limit in the installation time zone. Test mail and its content stay outside agreement archives; the audit event survives. Gap: real invitation/reminder/invoice editing, shared/default/locked templates, variables and retained real-send subject/body remain. |
 | `SEND-007` | Replace an unsigned signer on a sent proposal | target | missing |  | One client recipient fixed at sending; a fresh invitation (`PROP-002`) rotates the link but cannot change who receives it. |
 | `SEND-008` | Sending and reminders by text message | target | missing |  | Email only; no SMS. |
 | `SEND-009` | Reusable public signing link | target | missing |  | Every proposal has one invited recipient; there is no public link or embeddable form. |

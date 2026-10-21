@@ -847,3 +847,52 @@ test('MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop an
 })
 
 test('MOB-001 / EDIT-002 desktop and phone start all five starters, save, replace and start personal templates, preview and accept independent drafts', {timeout:180000}, templatesJourney)
+
+
+test('SEND-006 desktop and phone rehearse editable email to self and open a session-only preview without approving or inviting the client', {timeout:120000},async()=>{
+ let app,browser
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp()
+   const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage()
+    const claimed=await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0});assert.equal(claimed.status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
+    const client=await cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
+    const made=await cmd('proposal.prepare',{clientId:client.id,title:'Photography rehearsal',scope:'A studio photography session.',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+    await page.goto(app.origin+'/app/proposal?id='+made.id)
+    const composer=page.locator('section').filter({has:page.getByRole('heading',{name:'Test the proposal email',exact:true})})
+    await composer.getByLabel('Test subject',{exact:true}).fill('Proposal for Northstar')
+    await composer.getByLabel('Test message',{exact:true}).fill('Hi Avery, please review the photography scope.')
+    assert.match(await composer.innerText(),/owner@northstar.example/)
+    if(screenshots)await page.screenshot({path:join(screenshots,`SEND-006-composer-${width}.png`),fullPage:true})
+    await composer.getByRole('button',{name:'Send test to me',exact:true}).click()
+    await page.getByText('Test queued to your sign-in address. No client invitation was sent.',{exact:true}).waitFor()
+    assert.match(await page.locator('.proposal-status').innerText(),/draft.*Revision 1/is)
+    assert.equal(await page.getByRole('button',{name:'Approve this revision'}).count(),1)
+    assert.equal(await page.getByRole('button',{name:'Send approved proposal'}).count(),0)
+    assert.equal(await page.getByRole('heading',{name:'Test-send timeline'}).count(),1)
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+    if(screenshots)await page.screenshot({path:join(screenshots,`SEND-006-tested-${width}.png`),fullPage:true})
+    const state=await (await context.request.get(app.origin+'/api/platter/state')).json()
+    assert.equal(state.outbox.length,1)
+    const mail=state.outbox[0]
+    assert.equal(mail.recipient,'owner@northstar.example');assert.equal(mail.subject,'[Test] Proposal for Northstar')
+    assert.ok(mail.body.startsWith('Hi Avery, please review the photography scope.\n\n'))
+    const preview=mail.body.match(/https?:\/\/[^\s]+/)[0]
+    assert.equal(new URL(preview).pathname,'/app/preview')
+    await page.goto(preview)
+    await page.getByText(/Preview · Revision 1 · Viewing as Northstar Coffee/).waitFor()
+    assert.match(await page.frameLocator('iframe[title="Client-page preview"]').locator('main').innerText(),/Preview only/)
+    if(screenshots)await page.screenshot({path:join(screenshots,`SEND-006-preview-${width}.png`),fullPage:true})
+    const signedOut=await browser.newContext()
+    try{assert.equal((await signedOut.request.get(preview)).status(),401)}finally{await signedOut.close()}
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

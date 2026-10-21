@@ -297,7 +297,7 @@ test('MAIL-001 hosted mail commits and claims before provider acceptance; timeou
 
 // The fake is only the configured provider's outbound HTTP and signed callback.
 // Native sessions, application HTTP, D1, serializers and intake are production.
-test('SEND-002 signed provider delivery, durable sender notice and actionable address correction', { timeout: 120000 }, async () => {
+test('SEND-006 / SEND-002 signed provider delivery, durable sender notice and actionable address correction', { timeout: 120000 }, async () => {
  const { createHmac, randomBytes } = await import('node:crypto')
  const keyBytes=randomBytes(32), webhookKey='whsec_'+keyBytes.toString('base64')
  const calls=[]
@@ -370,6 +370,20 @@ test('SEND-002 signed provider delivery, durable sender notice and actionable ad
   assert.ok((await state()).bounceNotices[0].closed_at)
   const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
   assert.ok(audit.some(r=>r.action==='delivery.correct'))
+  // A rehearsal must not release another queued invitation or create a client bounce task.
+  const testId=await approved(h),queuedId=crypto.randomUUID(),callsBefore=calls.length
+  await h.db.prepare("INSERT INTO p_mail(id,proposal_id,recipient,subject,body,status,created_at,sender_id,provider) VALUES(?,?,?,?,?,'pending',?,?,?)").bind(queuedId,testId,recipient,'Your proposal: waiting','A queued client invitation',Date.now(),(await state()).actor.id,'resend').run()
+  await h.cmd('proposal.test-mail',{id:testId,version:2,subject:'Proposal for Northstar',message:'Hi Avery, review the scope.'})
+  assert.equal(calls.length,callsBefore+1,'SEND-006 sends exactly its own queued message')
+  const rehearsal=calls.at(-1)
+  assert.deepEqual(rehearsal.to,[h.auth.OWNER_EMAIL])
+  assert.equal(rehearsal.subject,'[Test] Proposal for Northstar')
+  assert.equal(rehearsal.text,'Hi Avery, review the scope.\n\nPreview this revision (sign-in required):\n'+h.origin+'/app/preview?'+new URLSearchParams({id:testId,revision:'1'}))
+  assert.equal((await h.db.prepare('SELECT status FROM p_mail WHERE id=?').bind(queuedId).first()).status,'pending')
+  assert.equal((await event(calls.length,'email.bounced',Date.now(),{to:[h.auth.OWNER_EMAIL]})).status,200)
+  const afterTest=await state()
+  assert.equal(afterTest.bounceNotices.length,1,'a bounced rehearsal never opens a client follow-up')
+  assert.ok(afterTest.proposals.find(p=>p.id===testId).deliveries.every(d=>d.recipient===recipient),'rehearsals never appear as client invitation delivery')
  }finally{await h.close()}
 })
 

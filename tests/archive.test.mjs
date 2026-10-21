@@ -28,7 +28,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('SEND-006 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -46,6 +46,7 @@ test('EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-
     await upload({kind:'w9'},'Northstar-W9.pdf',attachmentBytes)
     await upload({kind:'insurance'},'Northstar-insurance.pdf','%PDF insurance')
     const proposal=await h.cmd('proposal.prepare',offer)
+    await h.cmd('proposal.test-mail',{id:proposal.id,version:1,subject:'Archive rehearsal only',message:'Test-only message never in the agreement package'})
     await h.cmd('proposal.approve',{id:proposal.id,version:1,revision:1})
     await h.cmd('proposal.revise',{...offer,id:proposal.id,version:2,scope:'Studio photographs, usage licence and delivery'})
     await h.cmd('proposal.approve',{id:proposal.id,version:3,revision:2})
@@ -187,6 +188,8 @@ test('EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-
     await command(restored,['export','--output',again,'--no-queue'])
     const rows=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part')
     assert.ok(rows(bytes).length>0);assert.deepEqual(rows(await readFile(again,'utf8')),rows(bytes))
+    assert.ok(!bytes.includes('Test-only message never in the agreement package'),'SEND-006 rehearsal body never enters the agreement archive')
+    assert.ok(!bytes.includes('[Test] Archive rehearsal only'),'SEND-006 rehearsal subject never enters the agreement archive')
     const archived=rows(bytes).flatMap(part=>part.items).filter(item=>item.kind==='row')
     assert.equal(archived.filter(item=>item.table==='p_questions').length,2,'FOLLOW-004 retains answered and unanswered questions')
     assert.equal(archived.filter(item=>item.table==='p_question_answers').length,1,'FOLLOW-004 retains the answer')
@@ -235,6 +238,7 @@ test('EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-
     assert.deepEqual(restoredState.agentKeys,[])
     assert.deepEqual((await h.send('/api/platter/send-requests',undefined,restoredOwner)).value.requests,beforeRequests)
     assert.equal((await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'ping'},'',{authorization:'Bearer '+key.token})).status,401)
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).testMail,before.proposals.find(p=>p.id===proposal.id).testMail,'SEND-006 test-send audit timeline survives restore without mail bodies')
     assert.deepEqual(restoredState.outbox,[])
     assert.ok(restoredState.proposals.every(p=>!p.shareToken&&!p.delivery&&p.deliveries.length===0))
     const restoredDraft=await h.cmd('template.start',{id:template.id,version:1,clientId:client.id},restoredOwner)

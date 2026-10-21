@@ -1,4 +1,4 @@
-import { invitationFields, invitationTimeline } from './invitation-mail'
+import { invitationComposer, invitationTimeline } from './invitation-mail'
 import { testMailPanel } from './test-mail'
 import { selectedSummary } from './packages'
 import { personalTemplates, savePersonalTemplate, starterTemplatesPanel } from './templates'
@@ -70,12 +70,12 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   if (!frozen && person) {
     const actions = `<a class="button-link secondary" aria-label="Preview client page" href="/app/preview?id=${encodeURIComponent(p.id)}&amp;revision=${encodeURIComponent(p.revision)}">Preview</a><button form="composer-${escape(p.id)}" class="secondary">Save revision</button>`
       + (owner && p.status === 'draft' ? form('proposal.approve', path, hidden('id', p.id) + hidden('version', p.version) + hidden('revision', p.revision) + '<button aria-label="Approve this revision"><span>Approve<span class="wide-only"> this revision</span></span></button>') : '')
-      + (owner && p.status === 'approved' ? form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + invitationFields(p, feedback) + '<button aria-label="Send approved proposal"><span>Send<span class="wide-only"> approved proposal</span></span></button>') : '')
+      + (owner && p.status === 'approved' ? `<button form="invitation-${escape(p.id)}" aria-label="Send approved proposal"><span>Send<span class="wide-only"> approved proposal</span></span></button>` : '')
     const note = p.status === 'approved' ? `Approved by ${escape(personName(state, p.approved_by))} · ${date(p.approved_at)}. Sending freezes this offer; saving a revision clears the approval.` : owner ? 'Confirm the scope and exact offered prices before approving this revision. Saving a revision clears any previous approval.' : 'Saving a revision clears any previous approval. The owner approves the offer before it is sent.'
     html += `<div class="composer-page">${composerShelf(state)}${composerForm(state, p, 'revise', `composer-${p.id}`)}${negotiated}${exceptionBand(state, p, feedback, `composer-${p.id}`) ?? notices(feedback)}${receipt(sum, actions, note)}</div>`
   } else {
     const share = owner && p.shareToken && frozen ? `<a class="button-link" href="/p/${encodeURIComponent(p.shareToken)}">Open client proposal</a>` : ''
-    const fresh = owner && ['sent', 'expired'].includes(p.status) ? form('proposal.send', path, hidden('id', p.id) + hidden('version', p.version) + invitationFields(p, feedback) + '<button class="secondary">Send fresh client link</button>') : ''
+    const fresh = owner && ['sent', 'expired'].includes(p.status) ? `<button form="invitation-${escape(p.id)}" class="secondary">Send fresh client link</button>` : ''
     const note = frozen ? `${pricing} This offer is frozen. Its scope, options, and prices can no longer be revised.${fresh ? ' A fresh invitation replaces any previous client link and verification session while keeping the offer frozen.' : ''}` : pricing
     html += `<div class="composer-page frozen">${offerCards(p)}${exceptionBand(state, p, feedback, `negotiate-${p.id}`) ?? notices(feedback)}${receipt(sum, fresh + share, note)}</div>`
   }
@@ -86,6 +86,6 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   if (p.acceptance) dossier.push(panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)}${p.acceptance.method === 'upload' ? '' : ` · ${escape(p.acceptance.email)}`}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd>${acceptanceMethod(p.acceptance, '/api/platter/attachments/' + encodeURIComponent(p.id) + '/')}</dl><p>The accepted agreement is permanent.</p>`))
   if (p.acceptance?.selection) dossier.push(selectedSummary(p.acceptance.selection, p.currency))
   if (owner && p.acceptance) dossier.push(panel('Invoice export', form('invoice.export', path, hidden('id', p.id) + '<button>Export invoice CSV</button>') + (p.invoice ? `<p>Invoice ${escape(p.invoice.number)} · Exported ${date(p.invoice.exported_at)}</p><a href="/api/platter/invoices/${encodeURIComponent(p.invoice.id)}.csv">Download deposit invoice CSV</a>` : '')))
-  dossier.push(invitationTimeline(p), testMailPanel(state, p, feedback), duplicatePanel(state, p), savePersonalTemplate(state, p), ownerQuestions(state, p), deliveryPanel(state, p), p.status === 'withdrawn' ? '' : suggestionsPanel(state, p), historyPanel(state, p, selection))
+  dossier.push(invitationComposer(state, p, feedback), invitationTimeline(p), testMailPanel(state, p, feedback), duplicatePanel(state, p), savePersonalTemplate(state, p), ownerQuestions(state, p), deliveryPanel(state, p), p.status === 'withdrawn' ? '' : suggestionsPanel(state, p), historyPanel(state, p, selection))
   return html + `<div class="dossier">${dossier.join('')}</div>`
 }

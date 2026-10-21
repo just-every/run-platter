@@ -901,7 +901,8 @@ test('SEND-006 desktop and phone rehearse to self, then edit invitations, fresh 
     await page.getByText('Fill the variable before sending: client.company',{exact:true}).waitFor()
     assert.equal(await page.getByLabel('Invitation message',{exact:true}).inputValue(),'Hi Avery, please review the photography scope.')
     await page.getByLabel('Invitation subject',{exact:true}).fill('Photography for Northstar')
-    if(screenshots)await page.screenshot({path:join(screenshots,`SEND-006-invitation-${width}.png`),fullPage:true})
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+    if(screenshots){await page.screenshot({path:join(screenshots,`SEND-006-invitation-${width}.png`),fullPage:true});await page.locator('#invitation-'+made.id).screenshot({path:join(screenshots,`SEND-006-invitation-panel-${width}.png`)})}
     await page.getByRole('button',{name:'Send approved proposal'}).click()
     const history=page.locator('section').filter({has:page.getByRole('heading',{name:'Invitation email history',exact:true})})
     await history.getByRole('heading',{name:'Photography for Northstar',exact:true}).waitFor()
@@ -928,7 +929,8 @@ test('SEND-006 desktop and phone rehearse to self, then edit invitations, fresh 
     await page.getByText('Review invitation email',{exact:true}).click()
     await page.getByLabel('Invitation subject',{exact:true}).fill('Revised photography scope')
     await page.getByLabel('Invitation message',{exact:true}).fill('Hi Avery, the second location is included.')
-    if(screenshots)await page.screenshot({path:join(screenshots,`SEND-006-revision-composer-${width}.png`),fullPage:true})
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+    if(screenshots){await page.screenshot({path:join(screenshots,`SEND-006-revision-composer-${width}.png`),fullPage:true});await page.locator('#invitation-'+made.id).screenshot({path:join(screenshots,`SEND-006-revision-panel-${width}.png`)})}
     await page.getByRole('button',{name:'Send approved proposal'}).click()
     await history.getByRole('heading',{name:'Revised photography scope',exact:true}).waitFor()
     delivered=await (await context.request.get(app.origin+'/api/platter/state')).json()

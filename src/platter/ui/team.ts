@@ -1,8 +1,9 @@
+import { libraryReaders } from '../library'
 import { escape, field, form, hidden, panel } from './shared'
 const names:Record<string,string>={owner:'Owner',admin:'Admin',manager:'Manager',sales:'Sales',content_editor:'Content editor',viewer:'Viewer',billing:'Billing'}
 export function teamPage(s:any){
  const owner=s.actor.role==='owner',admin=['owner','admin'].includes(s.actor.role)
- return panel('Your time zone',form('member.zone','/app/team',field('IANA time zone','timeZone',s.personalTimeZone??'UTC','required maxlength="100"')+'<button>Save time zone</button>'))
+ return (libraryReaders.includes(s.actor.role)?panel('Workspace resources','<a href="/app/library">Content library</a>'):'')+panel('Your time zone',form('member.zone','/app/team',field('IANA time zone','timeZone',s.personalTimeZone??'UTC','required maxlength="100"')+'<button>Save time zone</button>'))
  +(admin?panel('Create team',form('team.create','/app/team',field('Team name','name','','required maxlength="100"')+'<button>Create team</button>')):'')
  +(s.teamPeople?panel('Members',(s.teamPeople??[]).map((p:any)=>`<article><h3>${escape(p.display_name||p.email)}</h3><p>${escape(p.email)} · ${escape(names[p.role])}</p>`+(p.role==='owner'||(!owner&&p.role==='admin')?'':form('member.set','/app/team',hidden('operatorId',p.id)+hidden('version',p.version)+`<label>Role for ${escape(p.email)}<select name="role">${Object.entries(names).filter(([role])=>role!=='owner'&&(owner||role!=='admin')&&(admin||['sales','content_editor','viewer'].includes(role))).map(([role,label])=>`<option value="${role}"${role===p.role?' selected':''}>${label}</option>`).join('')}</select></label><fieldset><legend>Teams for ${escape(p.email)}</legend>${(s.teams??[]).map((t:any)=>`<label><input type="checkbox" name="team:${escape(t.id)}" value="yes"${p.teams.includes(t.id)?' checked':''}>${escape(t.name)}</label>`).join('')}</fieldset><button>Save membership</button>`))+'</article>').join('')):'')
 }

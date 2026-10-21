@@ -974,7 +974,7 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
    let h
    try{h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,unclaimed:true,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-1'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mailCalls.push(await request.json());return Response.json({id:'synthetic-platter-'+mailCalls.length})}});edge.attach(h)}catch(error){await edge.close();throw error}
    app={...h,token:h.auth.SETUP_TOKEN,close:async()=>{await edge.close();await h.close()}}
-   const owner=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),sales=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),manager=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),clientContext=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
+   const owner=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),sales=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),manager=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),editor=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),clientContext=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
    try{
     const post=(context,path,data)=>context.request.post(app.origin+path,{headers:{origin:app.origin},data,maxRedirects:0})
     const command=async(context,name,input,status=200)=>{const r=await post(context,'/api/platter/command',{name,input});assert.equal(r.status(),status,await r.text());return r.json()}
@@ -990,22 +990,25 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
      assert.equal((await post(context,'/auth/confirm',{token:new URL(url).searchParams.get('token')})).status(),303)
      return (await state(context)).actor
     }
-    const sp=await invite(sales,'sales'),mp=await invite(manager,'manager'),team=await command(owner,'team.create',{name:'East team'})
+    const sp=await invite(sales,'sales'),mp=await invite(manager,'manager'),ep=await invite(editor,'content_editor'),team=await command(owner,'team.create',{name:'East team'})
     await command(owner,'member.set',{operatorId:sp.id,version:0,role:'sales',teams:[team.id]})
     await command(owner,'member.set',{operatorId:mp.id,version:0,role:'manager',teams:[team.id]})
+    await command(owner,'member.set',{operatorId:ep.id,version:0,role:'content_editor',teams:[team.id]})
     const client=await command(owner,'client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
     await op.goto(app.origin+'/app/team');await capture(op,'team')
     await op.goto(app.origin+'/app/approvals');await op.getByLabel('Require approval for every proposal').selectOption('no');await op.getByRole('button',{name:'Save approval policy'}).click()
     await op.getByLabel('Rule name',{exact:true}).fill('Manager above $25,000');await op.getByLabel('First approver').selectOption('role:manager');await op.getByRole('button',{name:'Add approval rule',exact:true}).click();assert.equal(await op.getByRole('alert').count(),0);await capture(op,'approval-settings')
+    const editorPage=await editor.newPage();await editorPage.goto(app.origin+'/app/team');await editorPage.getByRole('link',{name:'Content library',exact:true}).click();await editorPage.getByLabel('Item title',{exact:true}).fill('Synthetic case study');await editorPage.getByLabel('Library text',{exact:true}).fill('A reusable client story');await editorPage.getByRole('button',{name:'Create library item',exact:true}).click();const editLibrary=editorPage.locator('form:has(input[name=id])').first();await editLibrary.getByLabel('Library text',{exact:true}).fill('The case study updated by its content editor');await editLibrary.getByRole('button',{name:'Save library item',exact:true}).click();assert.equal(await editorPage.getByRole('alert').count(),0);assert.equal((await state(owner)).libraryItems[0].content,'The case study updated by its content editor');await capture(editorPage,'editor-library')
     const page=await sales.newPage();await page.goto(app.origin+'/app')
     await page.getByLabel('Starter template',{exact:true}).selectOption('starter:consultancy');await page.getByLabel('Client for starter proposal',{exact:true}).selectOption(client.id);await page.getByRole('button',{name:'Start starter proposal',exact:true}).click()
     const draft=(await state(sales)).proposals[0];assert.equal(draft.sales_owner_id,sp.id)
     assert.equal(await page.getByRole('button',{name:'Approve this revision',exact:true}).count(),0)
     for(const input of await page.locator('[data-pricing-field=unitPrice]').all())await input.fill('15000');await page.getByRole('button',{name:'Save revision',exact:true}).click()
-    const high=(await state(sales)).proposals[0]
+    let high=(await state(sales)).proposals[0]
     await command(sales,'proposal.approve',{id:high.id,version:high.version,revision:high.revision},403)
-    await capture(page,'sales-awaiting')
-    const review=await manager.newPage();await review.goto(app.origin+'/app/proposal?id='+high.id);await review.getByRole('button',{name:'Approve this revision',exact:true}).click();assert.equal(await review.getByRole('alert').count(),0);await capture(review,'manager-approved')
+    await capture(page,'sales-awaiting');assert.equal(await page.getByRole('heading',{name:'Internal cost and margin',exact:true}).count(),0)
+    await command(owner,'proposal.share',{id:high.id,operatorId:ep.id});await editorPage.goto(app.origin+'/app/proposal?id='+high.id);assert.equal(await editorPage.getByRole('button',{name:'Save revision',exact:true}).count(),1);assert.equal(await editorPage.getByRole('button',{name:'Send approved proposal',exact:true}).count(),0);await command(editor,'proposal.send',{id:high.id,version:high.version},403);await capture(editorPage,'editor-proposal')
+    const review=await manager.newPage();await review.goto(app.origin+'/app/proposal?id='+high.id);const costs=review.locator('section').filter({has:review.getByRole('heading',{name:'Internal cost and margin',exact:true})});await costs.getByLabel('Internal unit cost',{exact:true}).first().fill('500');await costs.getByRole('button',{name:'Save internal cost',exact:true}).first().click();assert.equal(await review.getByRole('alert').count(),0);high=(await state(sales)).proposals.find(p=>p.id===high.id);assert.equal((await sales.request.get(app.origin+'/api/platter/internal-pricing.pdf?id='+high.id+'&revision='+high.revision)).status(),403);await capture(review,'manager-costs');await review.getByRole('button',{name:'Approve this revision',exact:true}).click();assert.equal(await review.getByRole('alert').count(),0);await capture(review,'manager-approved')
     await page.reload();await page.getByRole('button',{name:'Send approved proposal',exact:true}).click();assert.equal(await page.getByRole('alert').count(),0)
     const sent=(await state(sales)).proposals.find(p=>p.id===high.id);assert.equal(sent.status,'sent');assert.equal(sent.approved_by,mp.email)
     await capture(page,'sales-sent')
@@ -1021,7 +1024,7 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
     await page.goto(app.origin+'/app');await page.getByRole('button',{name:'Start from Sales personal template',exact:true}).click();const copy=(await state(sales)).proposals.find(p=>p.id!==high.id);assert.ok(copy);assert.equal(copy.approved_by,null)
     const report=await sales.request.get(app.origin+'/api/platter/pipeline?status=awaiting-approval&sort=value');assert.equal(report.status(),200);assert.equal((await report.json()).count,1)
     const simple=await command(sales,'template.start',{id:'starter:consultancy',version:1,clientId:client.id});await page.goto(app.origin+'/app/proposal?id='+simple.id);assert.equal(await page.getByRole('button',{name:'Send proposal',exact:true}).count(),1);assert.equal(await page.getByRole('button',{name:'Approve this revision',exact:true}).count(),0);await capture(page,'sales-unruled');await page.getByRole('button',{name:'Send proposal',exact:true}).click();assert.equal((await state(sales)).proposals.find(p=>p.id===simple.id).status,'sent')
-   }finally{await owner.close();await sales.close();await manager.close();await clientContext.close();await app.close();app=undefined}
+   }finally{await owner.close();await sales.close();await manager.close();await editor.close();await clientContext.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}
 })

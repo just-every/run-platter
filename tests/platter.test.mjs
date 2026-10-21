@@ -1310,6 +1310,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, pol
  await h.cmd('proposal.send',{id:outside.id,version:3},people.sales.cookie)
  await h.cmd('proposal.share',{id:outside.id,operatorId:people.sales.id,shared:false},people.other.cookie)
  assert.equal((await h.state(people.sales.cookie)).proposals.some(p=>p.id===outside.id),false)
+ const library=await h.cmd('library.save',{title:'Synthetic case study',kind:'case_study',content:'An independently reusable case study.'})
  // Existing send/edit/template/report/audit/policy/key doors exercise every current role.
  for(const role of ['owner','admin','manager','sales','content_editor','viewer','billing']){
   const person=people[role],made=await prepare('sales',{title:'Matrix '+role});await h.cmd('proposal.share',{id:made.id,operatorId:person.id})
@@ -1321,6 +1322,9 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, pol
   await h.cmd('proposal.approve',{id:row.id,version:row.version,revision:row.revision});row=await current(made.id)
   if(['owner','admin','manager','sales'].includes(role))await h.cmd('proposal.send',{id:row.id,version:row.version},person.cookie)
   else await unchanged(()=>h.cmd('proposal.send',{id:row.id,version:row.version},person.cookie,403))
+  const libraryBefore=(await h.db.prepare('SELECT * FROM p_library_items WHERE id=?').bind(library.id).first())
+  if(['owner','admin','manager','content_editor'].includes(role))await h.cmd('library.save',{id:library.id,version:libraryBefore.version,title:'Synthetic case study',kind:'case_study',content:'Edited by '+role},person.cookie)
+  else{await h.cmd('library.save',{id:library.id,version:libraryBefore.version,title:'Forbidden',kind:'case_study',content:'Not allowed'},person.cookie,403);assert.deepEqual(await h.db.prepare('SELECT * FROM p_library_items WHERE id=?').bind(library.id).first(),libraryBefore)}
   assert.equal((await h.send('/api/platter/audit',undefined,person.cookie)).status,['owner','admin'].includes(role)?200:403)
   assert.equal((await h.send('/api/platter/pipeline',undefined,person.cookie)).status,['owner','admin','manager','sales','viewer'].includes(role)?200:403)
   if(role!=='owner')await h.cmd('agent.create',{label:'synthetic-platter-denied'},person.cookie,403)
@@ -1414,3 +1418,53 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, pol
  await unchanged(()=>h.cmd('proposal.revise',{...offer,clientId:client.id,id:pacific.id,version:1},people.sales.cookie,403))
  const audit=(await h.send('/api/platter/audit?action=approval.policy',undefined,h.owner)).value.rows;assert.ok(audit.length>=5);assert.ok(audit.every(r=>r.actor_id===people.owner.id&&r.occurred_at>0))
 }))
+
+test('TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions and templates, and stay out of sales/client data and public PDFs',async()=>{
+ const h=await harness({assetsDirectory:'public'})
+ try{
+  const team=await h.cmd('team.create',{name:'Pricing team'}),people={}
+  for(const role of ['sales','manager','billing']){
+   const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)
+   const cookie=await h.signIn(email),actor=(await h.state(cookie)).actor
+   await h.cmd('member.set',{operatorId:actor.id,version:0,role,teams:[team.id]});people[role]={cookie,...actor}
+  }
+  const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
+  const input={clientId:client.id,title:'Private-cost proposal',scope:'Public delivery scope',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'350'}],pricingTables:[{optionId:'main',name:'Services',lines:[{name:'First line',description:'Public first description',unit:'hour',quantity:'1.5',unitPrice:'100'},{name:'Second line',description:'Public second description',unit:'hour',quantity:'2',unitPrice:'100'}]}]}
+  const p=await h.cmd('proposal.prepare',input,people.sales.cookie),current=async(cookie=h.owner)=>(await h.state(cookie)).proposals.find(r=>r.id===p.id)
+  assert.equal((await current(people.sales.cookie)).internalPricing,undefined)
+  let row=await current(people.manager.cookie)
+  assert.equal(row.internalPricing.packages[0].marginCents,null,'missing costs are never inferred as zero')
+  await h.cmd('pricing.cost',{id:p.id,version:1,lineKey:row.internalPricing.lines[0].key,unitCost:'40.01'},people.manager.cookie)
+  row=await current(people.manager.cookie);await h.cmd('pricing.cost',{id:p.id,version:2,lineKey:row.internalPricing.lines[1].key,unitCost:'80'},people.manager.cookie)
+  row=await current(people.manager.cookie)
+  assert.equal(row.revision,3);assert.equal(row.approved_by,null)
+  assert.deepEqual(row.internalPricing.lines.map(l=>[l.costCents,l.marginCents]),[[6002,8998],[16000,4000]])
+  assert.deepEqual([row.internalPricing.packages[0].costCents,row.internalPricing.packages[0].marginCents,row.internalPricing.packages[0].marginBps],[22002,12998,3714])
+  const billing=await current(people.billing.cookie);assert.deepEqual(billing.internalPricing,row.internalPricing)
+  for(const person of [people.sales,people.billing])await h.cmd('pricing.cost',{id:p.id,version:3,lineKey:row.internalPricing.lines[0].key,unitCost:'0'},person.cookie,403)
+  await h.cmd('pricing.cost',{id:p.id,version:3,lineKey:row.internalPricing.lines[0].key,unitCost:'-1'},people.manager.cookie,400)
+  await h.cmd('pricing.cost',{id:p.id,version:3,lineKey:row.internalPricing.lines[0].key,unitCost:'NaN'},people.manager.cookie,400)
+  const before=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+  assert.equal((await h.send(`/api/platter/internal-pricing.pdf?id=${p.id}&revision=3`,undefined,people.sales.cookie)).status,403)
+  assert.deepEqual((await h.send('/api/platter/audit',undefined,h.owner)).value.rows,before)
+  const privateFile=await h.mf.dispatchFetch(h.origin+`/api/platter/internal-pricing.pdf?id=${p.id}&revision=3`,{headers:{cookie:people.manager.cookie}});assert.equal(privateFile.status,200)
+  const privateText=(await pdfPages(await privateFile.arrayBuffer())).join(' ');assert.match(privateText,/Internal cost: USD 60.02/);assert.match(privateText,/margin: USD 89.98/)
+  const sales=await current(people.sales.cookie);assert.ok(!JSON.stringify(sales).includes('unitCostCents'));assert.ok(!JSON.stringify(sales).includes('marginCents'))
+  const template=await h.cmd('template.save',{id:p.id,version:3,name:'Cost-preserving personal template'},people.sales.cookie)
+  const started=await h.cmd('template.start',{id:template.id,version:1,clientId:client.id},people.sales.cookie)
+  assert.deepEqual((await h.state()).proposals.find(r=>r.id===started.id).internalPricing,row.internalPricing)
+  const duplicate=await h.cmd('proposal.duplicate',{id:p.id,version:3},people.sales.cookie)
+  assert.deepEqual((await h.state()).proposals.find(r=>r.id===duplicate.id).internalPricing,row.internalPricing)
+  await h.cmd('proposal.approve',{id:p.id,version:3,revision:3});await h.cmd('proposal.send',{id:p.id,version:4},people.sales.cookie)
+  row=await current();const path='/p/'+row.shareToken,cookie=await verified(h,path)
+  const publicPage=await h.send(path,undefined,cookie);assert.equal(publicPage.status,200);assert.ok(!publicPage.text.includes('Internal cost'));assert.ok(!publicPage.text.includes('unitCostCents'));assert.ok(!publicPage.text.includes('marginCents'))
+  const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId=main',{headers:{cookie}});assert.equal(pdf.status,200)
+  const publicText=(await pdfPages(await pdf.arrayBuffer())).join(' ');assert.ok(!/internal cost|margin/i.test(publicText));assert.match(publicText,/350.00/)
+  await h.cmd('proposal.negotiate',{...input,id:p.id,version:5,scope:'A negotiated public scope'},people.sales.cookie)
+  row=await current();assert.equal(row.internalPricing.packages[0].costCents,22002)
+  await h.cmd('pricing.cost',{id:p.id,version:6,lineKey:row.internalPricing.lines[0].key,unitCost:'50'},people.manager.cookie)
+  row=await current();assert.equal(row.internalPricing.lines[0].costCents,7500);assert.equal(row.approved_by,null)
+  await h.cmd('proposal.restore',{id:p.id,version:7,revision:3},people.sales.cookie)
+  assert.equal((await current()).internalPricing.lines[0].costCents,6002)
+ }finally{await h.close()}
+})

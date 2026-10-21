@@ -1,0 +1,2 @@
+CREATE TABLE p_internal_costs(proposal_id TEXT NOT NULL REFERENCES p_proposals(id),revision INTEGER NOT NULL,line_key TEXT NOT NULL,unit_cost_cents INTEGER NOT NULL CHECK(unit_cost_cents>=0),PRIMARY KEY(proposal_id,revision,line_key));
+CREATE TABLE p_template_costs(template_id TEXT NOT NULL REFERENCES p_personal_templates(id),line_key TEXT NOT NULL,unit_cost_cents INTEGER NOT NULL CHECK(unit_cost_cents>=0),PRIMARY KEY(template_id,line_key));

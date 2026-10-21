@@ -473,16 +473,19 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   await h.cmd('approval.policy',{version:0,required:false,defaultRole:'manager'})
   await h.cmd('approval.rule',{version:1,name:'High value manager',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager']})
   const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
-  const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archive routed offer',scope:'An audited scope',optionOne:'First',priceOne:'28000',optionTwo:'Second',priceTwo:'30000',depositPercent:'25'},people.sales.cookie)
+  const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archive routed offer',scope:'An audited scope',optionOne:'First',priceOne:'28000',optionTwo:'Second',priceTwo:'30000',depositPercent:'25',pricingTables:[{optionId:'one',name:'Services',lines:[{name:'Delivery',description:'Public scope',unit:'project',quantity:'1',unitPrice:'28000'}]}]},people.sales.cookie)
   await h.cmd('proposal.share',{id:p.id,operatorId:people.other.id},people.sales.cookie)
-  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1},people.manager.cookie)
-  const before=await h.state(),tables=['p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions']
+  const line=(await h.state()).proposals.find(r=>r.id===p.id).internalPricing.lines[0];await h.cmd('pricing.cost',{id:p.id,version:1,lineKey:line.key,unitCost:'7000'},people.manager.cookie)
+  await h.cmd('template.save',{id:p.id,version:2,name:'Private cost template'},people.sales.cookie)
+  await h.cmd('library.save',{title:'Synthetic case study',kind:'case_study',content:'An archived text library item'})
+  await h.cmd('proposal.approve',{id:p.id,version:2,revision:2},people.manager.cookie)
+  const before=await h.state(),tables=['p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items']
   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all().then(r=>r.results)))
   await h.close();h=undefined
   const archive=join(temporary,'teams.rer');await command(source,['export','--output',archive]);await command(restored,['import','--input',archive,'--yes'])
   h=await harness({root:restored,unclaimed:true})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
-  assert.deepEqual(after.approvalSettings,before.approvalSettings)
+  assert.deepEqual(after.approvalSettings,before.approvalSettings);assert.deepEqual(after.proposals.find(r=>r.id===p.id).internalPricing,before.proposals.find(r=>r.id===p.id).internalPricing);assert.deepEqual(after.libraryItems,before.libraryItems)
   for(const [i,t] of tables.entries())assert.deepEqual((await h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all()).results,rows[i],t)
   const sales=await h.signIn(people.sales.email),manager=await h.signIn(people.manager.email),other=await h.signIn(people.other.email)
   assert.equal((await h.state(sales)).actor.role,'sales');assert.equal((await h.state(manager)).actor.role,'manager')
@@ -490,6 +493,6 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.equal((await h.state(other)).proposals.some(r=>r.id===p.id),true)
   assert.deepEqual(after.proposals.find(r=>r.id===p.id).approval,before.proposals.find(r=>r.id===p.id).approval)
   assert.equal((await h.send('/api/platter/state',undefined,people.sales.cookie)).status,401,'source sessions confer no restored authority')
-  await h.cmd('proposal.send',{id:p.id,version:2},sales)
+  await h.cmd('proposal.send',{id:p.id,version:3},sales)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

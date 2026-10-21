@@ -1,0 +1,1 @@
+CREATE TABLE p_library_items(id TEXT PRIMARY KEY,title TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN ('section','case_study','bio','testimonial','terms')),content TEXT NOT NULL,version INTEGER NOT NULL DEFAULT 1,updated_by TEXT NOT NULL REFERENCES oa_operators(id),updated_at INTEGER NOT NULL);

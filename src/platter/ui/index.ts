@@ -1,3 +1,4 @@
+import { libraryPage } from './library'
 import { teamPage } from './team'
 import { approvalsPage } from './approvals'
 import { vendorSettings } from './attachments'
@@ -24,6 +25,7 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
     let above = ''
     let layout = ''
     switch (url.pathname) {
+      case '/app/library': title='Content library'; content=libraryPage(state); break
       case '/app/team': title='Team'; content=teamPage(state); break
       case '/app/approvals': title='Approvals'; content=approvalsPage(state); break
       case '/app/settings': title = 'Vendor documents'; above = eyebrow('Settings · defaults for new proposals'); content = vendorSettings(state); break

@@ -1,3 +1,4 @@
+import { templatesHttp } from './templates-http.mjs'
 import { followupJourney } from './followup-journey.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -270,7 +271,7 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  const initialized=await rpc('initialize',{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'Platter acceptance MCP client',version:'1'}})
  assert.equal(initialized.protocolVersion,'2025-06-18');assert.ok(initialized.capabilities.tools)
  const notified=await h.send(endpoint,{jsonrpc:'2.0',method:'notifications/initialized'},'',{authorization:'Bearer '+key.token});assert.equal(notified.status,202);assert.equal(notified.text,'')
- const listed=await rpc('tools/list');assert.ok(listed.tools.every(t=>t.inputSchema.type==='object'));assert.deepEqual(listed.tools.map(t=>t.name).sort(),['prepare_proposal','read_engagement','read_proposal','request_send','revise_proposal','search_proposals'])
+ const listed=await rpc('tools/list');assert.ok(listed.tools.every(t=>t.inputSchema.type==='object'));assert.deepEqual(listed.tools.map(t=>t.name).sort(),['prepare_from_template','prepare_proposal','read_engagement','read_proposal','request_send','revise_proposal','search_proposals','search_templates'])
  const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
  const found=await call('search_proposals',{query:'Northstar'});assert.ok(found.clients.some(c=>c.id===client.id));assert.equal(found.proposalCount,0)
  const p=await call('prepare_proposal',{...offer,depositPercent:25,clientId:client.id})
@@ -1061,3 +1062,5 @@ test('PRICE-002 / SIGN-008 / TEAM-004 signed-upload selections use sent prices, 
  const invoice=await h.cmd('invoice.export',{id:p.id});assert.match((await h.send('/api/platter/invoices/'+invoice.id+'.csv',undefined,h.owner)).text,/575\.25/)
  const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows.filter(x=>x.action==='acceptance.upload'&&x.subject===p.id);assert.equal(audit.length,1);assert.equal(audit[0].actor_role,'owner');assert.ok(audit[0].occurred_at)
 }))
+
+test('EDIT-002 / MOB-001 personal templates start independent drafts, guard ownership and versions, and retain agent approval boundaries',()=>run(templatesHttp))

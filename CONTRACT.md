@@ -108,7 +108,7 @@ Template defaults inherit EDIT-014’s PDF-download enable/disable setting and i
 
 *Acceptance:* Create a template with a pricing table and variables, start two proposals from it, edit the template, and confirm both proposals are unchanged while a third proposal picks up the edit. On a fresh installation the five starter templates (agency, consultancy, IT managed services, creative studio, professional services) are listed, and each starts a proposal with a pricing table and filled variables. Put a template in a folder limited to the Design team: a Design-team member lists and uses it, and a Sales-team member neither lists it nor starts from it (403). A sales member saves a proposal as a personal template and is recorded as its owner, and their edit of a shared template is refused (403). A proposal started from a template with recipient roles opens with those role slots, as the `SIGN-011` journey checks. A template set to offer card and ACH only, a 30% deposit with a net-15 milestone, reminders at 2, 5 and 9 days and a 14-day expiry starts a proposal carrying all of them, as the `PAY-001`, `PRICE-007` and `FOLLOW-006` journeys check, and editing them on that proposal leaves the template unchanged.
 
-*Status:* missing. No templates.
+*Status:* partial. Owner/member people save and replace their own personal templates from a displayed USD revision and start independent unapproved drafts for a chosen client. Current content, pricing tables/packages/optional items, conditions, attachments, PDF-download setting, expiry configuration and suggestion opt-ins are retained; source identities, approvals, invitations and lifecycle history are not copied. Version and personal ownership guards, owner-bound MCP drafting, desktop/phone starts and public CLI custody are asserted. Gap: shared templates and team folders, five starter templates, filled variables, recipient roles, payment methods/schedules and reminder defaults remain. (`src/platter/templates.ts`, `src/platter/ui/templates.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`)
 
 #### EDIT-003 — Reusable content library.
 
@@ -1157,7 +1157,7 @@ On a phone browser, a sales member creates a proposal from a template, sends it,
 
 *Acceptance:* A browser journey at 390 pixels completes each of those actions, the sends and answers as a sales member and the approval as a manager; the same approval attempted by the sales member is refused (403).
 
-*Status:* partial. Named MOB-001 browser journeys at 390 pixels (and 1440) complete today's owner path: create a proposal in the composer, approve and send it (`PRICE-002`), answer client questions from the owner queue (`FOLLOW-004`) and schedule, complete and reopen actions in the follow-up queue (`FOLLOW-002`). Gap: creating from a template (`EDIT-002`), sending and answering as a sales member, approving as a manager under the `APPROVE-003` policy and the sales member's refused approval (403) wait on `TEAM-001`, `EDIT-002` and `APPROVE-003`. (`src/platter/ui/shared.ts`, `tests/site.test.mjs`, `tests/packages-journey.mjs`)
+*Status:* partial. Named MOB-001 browser journeys at 390 pixels (and 1440) complete today's owner path: create a proposal in the composer, approve and send it (`PRICE-002`), answer client questions from the owner queue (`FOLLOW-004`) and schedule, complete and reopen actions in the follow-up queue (`FOLLOW-002`). Named MOB-001 / EDIT-002 journeys also save, replace and start personal templates at both widths, preview and send the independent draft with renewed owner approval, and accept its exact content and deposit. Gap: creating from a template as a sales member, sending and answering as a sales member, approving as a manager under the `APPROVE-003` policy and the sales member's refused approval (403) wait on `TEAM-001` and `APPROVE-003`. (`src/platter/ui/shared.ts`, `tests/site.test.mjs`, `tests/packages-journey.mjs`)
 
 #### MOB-002 — iOS and Android apps with push notifications.
 
@@ -1390,8 +1390,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 22 | 23 | 83 | 128 |
-| All | 34 | 23 | 83 | 140 |
+| Target and push further | 22 | 24 | 82 | 128 |
+| All | 34 | 24 | 82 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1408,7 +1408,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `MAIL-001` | Durable proposal mail with honest outcomes | published | done | `src/platter/mail.ts`, `tests/mail.test.mjs` |  |
 | `SITE-001` | Public run site and documentation | published | done | `tests/site.test.mjs`, `scripts/verification/run.mjs`, `src/site/pages.ts` |  |
 | `EDIT-001` | Branded drag-and-drop proposal editor | target | partial | `src/platter/ui/proposals.ts`, `src/platter/commands.ts` | Only a title, scope and two-option form with fixed Platter styling; no block editor, layouts or brand kit. |
-| `EDIT-002` | Proposal templates | target | missing |  | No templates. |
+| `EDIT-002` | Proposal templates | target | partial | `src/platter/templates.ts`, `src/platter/ui/templates.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Personal templates ship. Shared templates/team folders, five starters, variables, recipient roles and payment/reminder defaults remain. |
 | `EDIT-003` | Reusable content library | target | missing |  | No content library. |
 | `EDIT-004` | Variables from client, deal and CRM records | target | missing |  | No variables or merge fields. |
 | `EDIT-005` | Word and PDF import and export | target | missing |  | No import or export of documents. |
@@ -1517,7 +1517,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `MIG-005` | Open proposals and payment schedules continue | target | missing |  | No in-flight migration. |
 | `MIG-006` | Clients, contacts and catalog CSV move-in | target | partial | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | image URLs fetched through Base's egress relay |
 | `MIG-007` | Move-in from exported files without API access | target | missing |  | No document import; only the client CSV kit exists. |
-| `MOB-001` | Team app on a phone | target | partial | `src/platter/ui/shared.ts`, `tests/site.test.mjs`, `tests/packages-journey.mjs` | Owner phone journeys create, approve, send, answer client questions and work the follow-up queue at 390; template, sales-member and manager-approval parts wait on EDIT-002, TEAM-001 and APPROVE-003. |
+| `MOB-001` | Team app on a phone | target | partial | `src/platter/ui/shared.ts`, `tests/site.test.mjs`, `tests/packages-journey.mjs` | Owner personal-template phone path ships; sales-member send/answer/template use and manager approval/403 remain under TEAM-001 and APPROVE-003. |
 | `MOB-002` | iOS and Android apps with push notifications | target | missing |  | No native apps or push. |
 | `AI-001` | Drafts from meeting notes, transcripts and email | target | partial | `src/platter/http.ts`, `tests/platter.test.mjs` | External agents can post structured drafts; there is no ingestion of notes, transcripts or email and no in-product drafting. |
 | `AI-002` | Writing assistant in the editor | target | missing |  | No writing assistant. |

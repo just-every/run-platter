@@ -1,4 +1,5 @@
 import { pricedOptions, pricingInput, tableInputs, packageInputs, editablePackages } from './pricing'
+import { templateCommand } from './templates'
 import { sectionConditions } from './conditional'
 import { followupCommand } from './followup/commands'
 import { duplicateProposal } from './duplicate'
@@ -32,6 +33,8 @@ export function proposalFields(p:Record<string,unknown>){
  return{section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)}
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown){const db=env.DB,at=await currentTime(env.DB)
+ if(name.startsWith('template.'))return templateCommand(env,a,name,p)
+ if(name==='proposal.prepare'&&p.templateId!==undefined)return templateCommand(env,a,'template.start',{id:p.templateId,version:p.templateVersion,clientId:p.clientId,...(p.title?{title:p.title}:{})})
  if(name.startsWith('followup.'))return followupCommand(env,a,name,p)
  if(name==='proposal.duplicate')return duplicateProposal(env,a,p)
  if(name==='proposal.withdraw')return withdraw(env,a,p)

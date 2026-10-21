@@ -1,0 +1,75 @@
+import assert from 'node:assert/strict'
+import { packageFixture } from './packages-fixture.mjs'
+import { pricingFixture } from './pricing-fixture.mjs'
+
+export async function templatesHttp(h) {
+ const client = await h.cmd('client.save', { name: 'Northstar Coffee', email: 'avery@northstar.example' })
+ const other = await h.cmd('client.save', { name: 'Juniper Studio', email: 'morgan@juniper.example' })
+ const file = new FormData(); file.set('kind', 'w9'); file.set('file', new File(['%PDF Northstar vendor W9'], 'Northstar-W9.pdf', { type: 'application/pdf' }))
+ const upload = new Request(h.origin + '/app/attachment', { method: 'POST', headers: { host: new URL(h.origin).host, origin: h.origin, cookie: h.owner }, body: file })
+ assert.equal((await h.mf.dispatchFetch(upload.url, { method: 'POST', headers: upload.headers, body: await upload.arrayBuffer() })).status, 200)
+ const fields = { clientId: client.id, title: 'Brand campaign', scope: 'Photography and usage licence.', terms: 'Rush delivery terms.', depositPercent: 30, packages: packageFixture(), pricingTables: pricingFixture(), sectionConditions: { terms: 'item:rush' } }
+ const source = await h.cmd('proposal.prepare', fields)
+ await h.cmd('pdf.downloads', { id: source.id, version: 1, enabled: false })
+ await h.cmd('expiry.set', { id: source.id, version: 2, mode: 'days', days: 14, warningDays: 2 })
+ await h.cmd('proposal.approve', { id: source.id, version: 3, revision: 1 })
+ await h.cmd('proposal.send', { id: source.id, version: 4 })
+ await h.cmd('suggestions.allow', { id: source.id, version: 5, section: 'scope', enabled: true })
+ const before = await h.state(), original = before.proposals.find(p => p.id === source.id)
+ const template = await h.cmd('template.save', { id: source.id, version: original.version, name: 'Campaign template' })
+ assert.deepEqual((await h.state()).proposals, before.proposals, 'saving a template does not revise or approve its source')
+ const start = () => h.cmd('template.start', { id: template.id, version: 1, clientId: other.id, title: '' })
+ const first = await start(), second = await start()
+ let state = await h.state()
+ for (const draft of [first, second]) {
+  const p = state.proposals.find(p => p.id === draft.id)
+  for (const field of ['title', 'scope', 'terms', 'options', 'attachments', 'section_conditions', 'deposit_bps', 'suggestionSections']) assert.deepEqual(p[field], original[field], field)
+  assert.equal(p.client_id, other.id); assert.equal(p.status, 'draft'); assert.equal(p.version, 1); assert.equal(p.revision, 1)
+  assert.equal(p.approved_by, null); assert.equal(p.shareToken, undefined); assert.equal(p.acceptance, undefined)
+  assert.equal(p.sales_owner_id, state.actor.id); assert.equal(p.prepared_by, state.actor.email)
+  assert.equal(p.pdfDownloadsEnabled, false); assert.equal(p.pdfDownloads.length, 0)
+  assert.equal(p.expiry.days, 14); assert.equal(p.expiry.warningDays, 2); assert.equal(p.expiry.sentAt, null); assert.equal(p.expiry.deadlineAt, null)
+  await h.cmd('proposal.send', { id: p.id, version: 1 }, h.owner, 409)
+ }
+ const priorDrafts = state.proposals.filter(p => [first.id, second.id].includes(p.id))
+ await h.cmd('proposal.negotiate', { ...fields, id: source.id, version: original.version, scope: 'Expanded campaign with interviews.' })
+ await h.cmd('template.save', { id: source.id, version: original.version + 1, name: 'Campaign template', templateId: template.id, templateVersion: 1 })
+ await h.cmd('template.start', { id: template.id, version: 1, clientId: other.id }, h.owner, 409)
+ await h.cmd('template.save', { id: source.id, version: original.version + 1, name: 'Stale', templateId: template.id, templateVersion: 1 }, h.owner, 409)
+ await h.cmd('template.save', { id: source.id, version: original.version, name: 'Stale source' }, h.owner, 409)
+ const third = await h.cmd('template.start', { id: template.id, version: 2, clientId: client.id, title: 'Updated campaign' })
+ state = await h.state()
+ assert.deepEqual(state.proposals.filter(p => [first.id, second.id].includes(p.id)), priorDrafts)
+ assert.equal(state.proposals.find(p => p.id === third.id).scope, 'Expanded campaign with interviews.')
+ assert.equal(state.proposals.find(p => p.id === third.id).title, 'Updated campaign')
+ assert.equal(state.templates[0].owner_id, state.actor.id)
+ for (const key of ['id', 'client_id', 'revision', 'approved_by', 'shareToken']) assert.ok(!Object.hasOwn(state.templates[0].snapshot, key), key)
+ await h.send('/auth/invite', { email: 'designer@studio.example', displayName: 'Casey Designer', role: 'member', returnTo: '/app' }, h.owner)
+ const member = await h.signIn('designer@studio.example')
+ assert.deepEqual((await h.state(member)).templates, [])
+ const refusedBefore = (await h.state()).templates
+ await h.cmd('template.start', { id: template.id, version: 2, clientId: client.id }, member, 403)
+ await h.cmd('template.save', { id: source.id, version: original.version + 1, name: 'Not mine', templateId: template.id, templateVersion: 2 }, member, 403)
+ assert.deepEqual((await h.state()).templates, refusedBefore)
+ const personal = await h.cmd('template.save', { id: source.id, version: original.version + 1, name: 'Casey’s personal template' }, member)
+ const memberState = await h.state(member)
+ assert.deepEqual(memberState.templates.map(t => t.id), [personal.id]); assert.equal(memberState.templates[0].owner_id, memberState.actor.id)
+ assert.deepEqual((await h.state()).templates.map(t => t.id), [template.id])
+ const key = await h.cmd('agent.create', { label: 'Template drafter' })
+ const rpc = async (name, args) => {
+  const r = await h.send('/api/platter/agent/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, '', { authorization: 'Bearer ' + key.token })
+  assert.equal(r.status, 200); return r.value.result
+ }
+ const listed = await rpc('search_templates', { query: 'campaign' })
+ assert.deepEqual(JSON.parse(listed.content[0].text).templates, [{ id: template.id, name: 'Campaign template', version: 2 }])
+ const prepared = await rpc('prepare_from_template', { templateId: template.id, templateVersion: 2, clientId: other.id })
+ assert.ok(!prepared.isError, JSON.stringify(prepared)); const agentDraft = JSON.parse(prepared.content[0].text)
+ const agentProposal = (await h.state()).proposals.find(p => p.id === agentDraft.id)
+ assert.equal(agentProposal.prepared_by, 'agent:' + key.id); assert.equal(agentProposal.scope, 'Expanded campaign with interviews.')
+ await h.cmd('proposal.send', { id: agentDraft.id, version: 1 }, h.owner, 409)
+ assert.equal((await rpc('prepare_from_template', { templateId: personal.id, templateVersion: 1, clientId: other.id })).isError, true)
+ const audit = (await h.send('/api/platter/audit', undefined, h.owner)).value.rows
+ for (const action of ['template.save', 'template.start', 'mcp.search_templates', 'mcp.prepare_from_template']) assert.ok(audit.some(r => r.action === action && r.subject), action)
+ await h.cmd('agent.revoke', { id: key.id })
+ assert.equal((await h.send('/api/platter/agent/context', undefined, '', { authorization: 'Bearer ' + key.token })).status, 401)
+}

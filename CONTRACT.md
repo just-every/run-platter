@@ -397,6 +397,8 @@ Current rule semantics: total-value thresholds compare integer cents in the rule
 
 *Status:* done. One approval policy now covers all current preparation, template, duplication, negotiation, approval, sending and fresh-invitation doors. tests/platter.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP” proves unruled sales sends with no approval record, manager amount approval, exact-revision invalidation, sales/content-editor/foreign-owner refusals, agent-origin approval after human edits, policy authority and audit, manager team scope, owner/admin/manager defaults, approval-required and approval-free copies, and sales negotiation. tests/platter.test.mjs — “FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner/status and every field, sort and total exact values without changing ownership” proves awaiting-approval filters, sorting, counts and totals under role visibility; tests/site.test.mjs — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” proves the sales and manager screens at 1440/390; tests/archive.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions” proves policy and exact-revision custody. No acceptance point remains unproved for current doors; future doors named in the clause inherit this same policy before shipping.
 
+### Sending and delivery
+
 #### SEND-001 — Send from the firm's own mailbox.
 
 A member connects Gmail or Google Workspace (OAuth `gmail.send`) or Microsoft 365 or Outlook (Graph `Mail.Send`) and sends proposals, reminders and replies as themselves. Replies thread back to the proposal. Tokens follow `SEC-001`. Without a connected mailbox, mail goes through the installation's branded sender (`EDIT-008`).
@@ -1386,13 +1388,13 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 
 ## Status
 
-Judged from the code and tests at commit `21359a9fdff12a21d22d5f95cc96f91ffcc2e2aa` (21 October 2026).
+Judged from the code and tests at commit `69676a2849e71be59f835e2ac5a8dcd6b5684526` (21 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 22 | 27 | 79 | 128 |
-| All | 34 | 27 | 79 | 140 |
+| Target and push further | 24 | 25 | 79 | 128 |
+| All | 36 | 25 | 79 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |

@@ -975,7 +975,7 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
     const post=(context,path,data)=>context.request.post(app.origin+path,{headers:{origin:app.origin},data,maxRedirects:0})
     const command=async(context,name,input,status=200)=>{const r=await post(context,'/api/platter/command',{name,input});assert.equal(r.status(),status,await r.text());return r.json()}
     const state=async(context=owner)=>(await context.request.get(app.origin+'/api/platter/state')).json()
-    const capture=async(page,name)=>{assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow on '+name+' at '+width);if(screenshots)await page.screenshot({path:join(screenshots,`TEAM-001-${name}-${width}.png`),fullPage:true})}
+    const capture=async(page,name)=>{await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow on '+name+' at '+width);if(screenshots)await page.screenshot({path:join(screenshots,`TEAM-001-${name}-${width}.png`),fullPage:true})}
     assert.equal((await post(owner,'/auth/bootstrap',{token:app.token,displayName:'Synthetic owner'})).status(),303)
     const op=await owner.newPage();await op.goto(app.origin+'/setup');await op.getByRole('checkbox').check();await op.getByRole('button',{name:'Finish setup'}).click()
     const invite=async(context,role)=>{
@@ -995,10 +995,10 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
     await op.goto(app.origin+'/app/approvals');await op.getByLabel('Require approval for every proposal').selectOption('no');await op.getByRole('button',{name:'Save approval policy'}).click()
     await op.getByLabel('Rule name',{exact:true}).fill('Manager above $25,000');await op.getByLabel('First approver',{exact:true}).selectOption('role:manager');await op.getByRole('button',{name:'Add approval rule',exact:true}).click();assert.equal(await op.getByRole('alert').count(),0);await capture(op,'approval-settings')
     const page=await sales.newPage();await page.goto(app.origin+'/app')
-    await page.getByLabel('Starter template',{exact:true}).selectOption('starter:consultancy');await page.getByLabel('Client for starter',{exact:true}).selectOption(client.id);await page.getByRole('button',{name:'Start from template',exact:true}).click()
+    await page.getByLabel('Starter template',{exact:true}).selectOption('starter:consultancy');await page.getByLabel('Client for starter proposal',{exact:true}).selectOption(client.id);await page.getByRole('button',{name:'Start starter proposal',exact:true}).click()
     const draft=(await state(sales)).proposals[0];assert.equal(draft.sales_owner_id,sp.id)
     assert.equal(await page.getByRole('button',{name:'Approve this revision',exact:true}).count(),0)
-    await page.locator('[name="priceOne"]').fill('28000');await page.locator('[name="priceTwo"]').fill('30000');await page.getByRole('button',{name:'Save revision',exact:true}).click()
+    for(const input of await page.locator('[data-pricing-field=unitPrice]').all())await input.fill('15000');await page.getByRole('button',{name:'Save revision',exact:true}).click()
     const high=(await state(sales)).proposals[0]
     await command(sales,'proposal.approve',{id:high.id,version:high.version,revision:high.revision},403)
     await capture(page,'sales-awaiting')
@@ -1006,9 +1006,9 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
     await page.reload();await page.getByRole('button',{name:'Send approved proposal',exact:true}).click();assert.equal(await page.getByRole('alert').count(),0)
     const sent=(await state(sales)).proposals.find(p=>p.id===high.id);assert.equal(sent.status,'sent');assert.equal(sent.approved_by,mp.email)
     await capture(page,'sales-sent')
-    const path='/p/'+sent.shareToken,clientPage=await clientContext.newPage();await clientPage.goto(app.origin+path);await clientPage.getByRole('button',{name:'Email me a verification code'}).click()
+    const path='/p/'+sent.shareToken,clientPage=await clientContext.newPage();await clientPage.goto(app.origin+path);await clientPage.getByRole('button',{name:'Send verification code',exact:true}).click()
     const mail=(await app.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code' ORDER BY created_at DESC").bind(high.id).first()).body
-    await clientPage.getByLabel('Verification code',{exact:true}).fill(mail.match(/\b\d{6}\b/)[0]);await clientPage.getByRole('button',{name:'Verify email',exact:true}).click()
+    await clientPage.getByLabel('Email verification code',{exact:true}).fill(mail.match(/\b\d{6}\b/)[0]);await clientPage.getByRole('button',{name:'Verify email',exact:true}).click()
     await clientPage.getByLabel('Your question',{exact:true}).fill('Can the project begin next month?');await clientPage.getByRole('button',{name:'Send question to owner',exact:true}).click()
     await page.reload();await page.getByLabel('Answer this question',{exact:true}).fill('Yes, we can begin next month.');await page.getByRole('button',{name:'Send answer to client',exact:true}).click();assert.equal(await page.getByRole('alert').count(),0)
     await clientPage.reload();assert.match(await clientPage.locator('main').innerText(),/Yes, we can begin next month\./)

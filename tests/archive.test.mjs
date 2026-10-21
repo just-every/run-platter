@@ -28,7 +28,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('SEND-006 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -46,7 +46,6 @@ test('SEND-006 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-
     await upload({kind:'w9'},'Northstar-W9.pdf',attachmentBytes)
     await upload({kind:'insurance'},'Northstar-insurance.pdf','%PDF insurance')
     const proposal=await h.cmd('proposal.prepare',offer)
-    await h.cmd('proposal.test-mail',{id:proposal.id,version:1,subject:'Archive rehearsal only',message:'Test-only message never in the agreement package'})
     await h.cmd('proposal.approve',{id:proposal.id,version:1,revision:1})
     await h.cmd('proposal.revise',{...offer,id:proposal.id,version:2,scope:'Studio photographs, usage licence and delivery'})
     await h.cmd('proposal.approve',{id:proposal.id,version:3,revision:2})
@@ -188,8 +187,6 @@ test('SEND-006 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-
     await command(restored,['export','--output',again,'--no-queue'])
     const rows=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part')
     assert.ok(rows(bytes).length>0);assert.deepEqual(rows(await readFile(again,'utf8')),rows(bytes))
-    assert.ok(!bytes.includes('Test-only message never in the agreement package'),'SEND-006 rehearsal body never enters the agreement archive')
-    assert.ok(!bytes.includes('[Test] Archive rehearsal only'),'SEND-006 rehearsal subject never enters the agreement archive')
     const archived=rows(bytes).flatMap(part=>part.items).filter(item=>item.kind==='row')
     assert.equal(archived.filter(item=>item.table==='p_questions').length,2,'FOLLOW-004 retains answered and unanswered questions')
     assert.equal(archived.filter(item=>item.table==='p_question_answers').length,1,'FOLLOW-004 retains the answer')
@@ -238,7 +235,6 @@ test('SEND-006 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-
     assert.deepEqual(restoredState.agentKeys,[])
     assert.deepEqual((await h.send('/api/platter/send-requests',undefined,restoredOwner)).value.requests,beforeRequests)
     assert.equal((await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'ping'},'',{authorization:'Bearer '+key.token})).status,401)
-    assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).testMail,before.proposals.find(p=>p.id===proposal.id).testMail,'SEND-006 test-send audit timeline survives restore without mail bodies')
     assert.deepEqual(restoredState.outbox,[])
     assert.ok(restoredState.proposals.every(p=>!p.shareToken&&!p.delivery&&p.deliveries.length===0))
     const restoredDraft=await h.cmd('template.start',{id:template.id,version:1,clientId:client.id},restoredOwner)
@@ -391,5 +387,41 @@ test('MIG-006 public CLI archives imported business records, original CSV and im
   assert.deepEqual(Buffer.from(original.original.base64,'base64'),await readFile('fixtures/business/brand.png'))
   await undoBusiness(h,catalog.job.id,cookie);await undoBusiness(h,contacts.job.id,cookie)
   assert.deepEqual((await h.state(cookie)).businessRecords,{companies:[],contacts:[],catalog:[]})
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})
+
+
+test('SEND-006 public CLI excludes rehearsal content and preserves its test-send audit without invitation authority', {timeout:180000},async()=>{
+ const temporary=await mkdtemp(join(tmpdir(),'platter-test-mail-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
+ let h
+ try{
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source})
+  const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
+  const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Email rehearsal',scope:'A photography session',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+  await h.cmd('proposal.test-mail',{id:p.id,version:1,subject:'Archive rehearsal only',message:'Test-only message never in the agreement package'})
+  const before=await h.state(),proposal=before.proposals.find(row=>row.id===p.id)
+  assert.equal(proposal.testMail.length,1);assert.equal(before.outbox.length,1)
+  await h.close();h=null
+  const archive=join(temporary,'source.rer')
+  await command(source,['export','--output',archive])
+  const bytes=await readFile(archive,'utf8'),parts=rows(bytes),records=parts.flatMap(part=>part.items).filter(item=>item.kind==='row')
+  assert.ok(!bytes.includes('Test-only message never in the agreement package'))
+  assert.ok(!bytes.includes('[Test] Archive rehearsal only'))
+  assert.equal(records.filter(item=>item.table==='p_mail').length,0)
+  const tests=records.filter(item=>item.table==='p_audit'&&item.row.action==='proposal.test-mail')
+  assert.equal(tests.length,1)
+  assert.equal(tests[0].row.subject,p.id);assert.equal(tests[0].row.actor_role,'owner')
+  await command(restored,['import','--input',archive,'--yes'])
+  h=await harness({root:restored,unclaimed:true})
+  const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
+  assert.deepEqual(after.proposals.find(row=>row.id===p.id),proposal)
+  assert.deepEqual(after.outbox,[])
+  assert.ok(after.proposals.every(row=>!row.shareToken))
+  await h.cmd('proposal.send',{id:p.id,version:1},owner,409)
+  await h.cmd('proposal.test-mail',{id:p.id,version:1,subject:'Restored rehearsal',message:'Review the restored draft'},owner)
+  const restoredMail=(await h.state(owner)).outbox
+  assert.equal(restoredMail.length,1);assert.equal(restoredMail[0].recipient,h.auth.OWNER_EMAIL)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

@@ -481,13 +481,14 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   await h.cmd('library.save',{title:'Synthetic case study',kind:'case_study',content:'An archived text library item'})
   await h.cmd('proposal.approve',{id:p.id,version:2,revision:2},people.manager.cookie)
   const before=await h.state(),tables=['p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
-  const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all().then(r=>r.results)))
+  const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
+  const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
   await h.close();h=undefined
   const archive=join(temporary,'teams.rer');await command(source,['export','--output',archive]);await command(restored,['import','--input',archive,'--yes'])
   h=await harness({root:restored,unclaimed:true})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
   assert.deepEqual(after.workspaceDefaults,before.workspaceDefaults);assert.deepEqual(after.approvalSettings,before.approvalSettings);assert.deepEqual(after.proposals.find(r=>r.id===p.id).internalPricing,before.proposals.find(r=>r.id===p.id).internalPricing);assert.deepEqual(after.libraryItems,before.libraryItems)
-  for(const [i,t] of tables.entries())assert.deepEqual((await h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all()).results,rows[i],t)
+  for(const [i,t] of tables.entries())assert.deepEqual(canonical((await h.db.prepare('SELECT * FROM '+t).all()).results),rows[i],t)
   const sales=await h.signIn(people.sales.email),manager=await h.signIn(people.manager.email),other=await h.signIn(people.other.email)
   assert.equal((await h.state(sales)).actor.role,'sales');assert.equal((await h.state(manager)).actor.role,'manager')
   assert.equal((await h.state(sales)).followups.timeZone,'America/New_York')

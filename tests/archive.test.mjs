@@ -406,7 +406,7 @@ test('SEND-006 public CLI excludes rehearsal content and preserves its test-send
   await h.close();h=null
   const archive=join(temporary,'source.rer')
   await command(source,['export','--output',archive])
-  const bytes=await readFile(archive,'utf8'),parts=rows(bytes),records=parts.flatMap(part=>part.items).filter(item=>item.kind==='row')
+  const bytes=await readFile(archive,'utf8'),parts=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(item=>item.kind==='part'),records=parts.flatMap(part=>part.items).filter(item=>item.kind==='row')
   assert.ok(!bytes.includes('Test-only message never in the agreement package'))
   assert.ok(!bytes.includes('[Test] Archive rehearsal only'))
   assert.equal(records.filter(item=>item.table==='p_mail').length,0)

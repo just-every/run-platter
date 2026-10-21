@@ -1423,14 +1423,14 @@ test('TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions a
  const h=await harness({assetsDirectory:'public'})
  try{
   const team=await h.cmd('team.create',{name:'Pricing team'}),people={}
-  for(const role of ['sales','manager','billing']){
+  for(const role of ['admin','sales','manager','billing','viewer','content_editor']){
    const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)
    const cookie=await h.signIn(email),actor=(await h.state(cookie)).actor
    await h.cmd('member.set',{operatorId:actor.id,version:0,role,teams:[team.id]});people[role]={cookie,...actor}
   }
   const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
   const input={clientId:client.id,title:'Private-cost proposal',scope:'Public delivery scope',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'350'}],pricingTables:[{optionId:'main',name:'Services',lines:[{name:'First line',description:'Public first description',unit:'hour',quantity:'1.5',unitPrice:'100'},{name:'Second line',description:'Public second description',unit:'hour',quantity:'2',unitPrice:'100'}]}]}
-  const p=await h.cmd('proposal.prepare',input,people.sales.cookie),current=async(cookie=h.owner)=>(await h.state(cookie)).proposals.find(r=>r.id===p.id)
+  const p=await h.cmd('proposal.prepare',input,people.sales.cookie);await h.cmd('proposal.share',{id:p.id,operatorId:people.content_editor.id});const current=async(cookie=h.owner)=>(await h.state(cookie)).proposals.find(r=>r.id===p.id)
   assert.equal((await current(people.sales.cookie)).internalPricing,undefined)
   let row=await current(people.manager.cookie)
   assert.equal(row.internalPricing.packages[0].marginCents,null,'missing costs are never inferred as zero')
@@ -1440,12 +1440,13 @@ test('TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions a
   assert.equal(row.revision,3);assert.equal(row.approved_by,null)
   assert.deepEqual(row.internalPricing.lines.map(l=>[l.costCents,l.marginCents]),[[6002,8998],[16000,4000]])
   assert.deepEqual([row.internalPricing.packages[0].costCents,row.internalPricing.packages[0].marginCents,row.internalPricing.packages[0].marginBps],[22002,12998,3714])
-  const billing=await current(people.billing.cookie);assert.deepEqual(billing.internalPricing,row.internalPricing)
-  for(const person of [people.sales,people.billing])await h.cmd('pricing.cost',{id:p.id,version:3,lineKey:row.internalPricing.lines[0].key,unitCost:'0'},person.cookie,403)
+  for(const role of ['admin','manager','billing'])assert.deepEqual((await current(people[role].cookie)).internalPricing,row.internalPricing)
+  for(const role of ['sales','viewer','content_editor'])assert.equal((await current(people[role].cookie)).internalPricing,undefined)
+  for(const person of [people.sales,people.viewer,people.content_editor,people.billing])await h.cmd('pricing.cost',{id:p.id,version:3,lineKey:row.internalPricing.lines[0].key,unitCost:'0'},person.cookie,403)
   await h.cmd('pricing.cost',{id:p.id,version:3,lineKey:row.internalPricing.lines[0].key,unitCost:'-1'},people.manager.cookie,400)
   await h.cmd('pricing.cost',{id:p.id,version:3,lineKey:row.internalPricing.lines[0].key,unitCost:'NaN'},people.manager.cookie,400)
   const before=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
-  assert.equal((await h.send(`/api/platter/internal-pricing.pdf?id=${p.id}&revision=3`,undefined,people.sales.cookie)).status,403)
+  for(const role of ['sales','viewer','content_editor'])assert.equal((await h.send(`/api/platter/internal-pricing.pdf?id=${p.id}&revision=3`,undefined,people[role].cookie)).status,403)
   assert.deepEqual((await h.send('/api/platter/audit',undefined,h.owner)).value.rows,before)
   const privateFile=await h.mf.dispatchFetch(h.origin+`/api/platter/internal-pricing.pdf?id=${p.id}&revision=3`,{headers:{cookie:people.manager.cookie}});assert.equal(privateFile.status,200)
   const privateText=(await pdfPages(await privateFile.arrayBuffer())).join(' ');assert.match(privateText,/Internal cost: USD 60.02/);assert.match(privateText,/margin: USD 89.98/)
@@ -1466,5 +1467,6 @@ test('TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions a
   row=await current();assert.equal(row.internalPricing.lines[0].costCents,7500);assert.equal(row.approved_by,null)
   await h.cmd('proposal.restore',{id:p.id,version:7,revision:3},people.sales.cookie)
   assert.equal((await current()).internalPricing.lines[0].costCents,6002)
+  for(const cookie of [h.owner,people.admin.cookie,people.manager.cookie]){row=await current(cookie);await h.cmd('pricing.cost',{id:p.id,version:row.version,lineKey:row.internalPricing.lines[0].key,unitCost:'40.01'},cookie);assert.equal((await current(cookie)).internalPricing.lines[0].costCents,6002)}
  }finally{await h.close()}
 })

@@ -7,7 +7,7 @@ import { negotiatedView, pendingNegotiation } from './negotiation'
 import { expiryFor } from './expiry'
 import { suggestionState } from './suggestions'
 import { pdfEnabled } from './documents/client-pdf'
-import { offerSelection, selectionItems } from './selection'
+import { offerSelection, reviewItems } from './selection'
 import { renderClient } from './ui/client'
 import { previewFrame } from './ui/preview'
 
@@ -23,7 +23,7 @@ export async function previewResponse(request:Request,env:Bindings) {
  need(row.revision===Number(url.searchParams.get('revision')),'This revision changed. Return to the editor.',409)
  const content=snapshot(row),optionId=url.searchParams.get('optionId')??content.options[0].id
  if(file){const attachment=copyAttachments(content.attachments).find(item=>item.id===file[1]);need(attachment,'Attachment not found',404);return downloadAttachment(env.DB,attachment)}
- const selection=offerSelection(content.options,content.deposit_bps,optionId,selectionItems(Object.fromEntries(url.searchParams)))
+ const selection=offerSelection(content.options,content.deposit_bps,optionId,reviewItems(Object.fromEntries(url.searchParams)))
  const width=url.searchParams.get('width')??'1440'
  need(['1440','390'].includes(width),'Choose desktop or phone width')
  const query=new URLSearchParams({id:row.id,revision:String(row.revision),width,optionId,...(selection.items.length?{items:JSON.stringify(selection.items.map(({id,quantity}:any)=>({id,quantity})))}:{})})

@@ -30,7 +30,7 @@ export async function packagesJourney() {
     if(!editable)await item.locator('[data-item-field=editable]').uncheck()
    }
    assert.deepEqual(await page.locator('[name=termsOption] option[value^="item:"]').allTextContents(),['Only with Rush delivery','Only with Team training'],'optional items become section conditions as they are named')
-   const capture=async(target,name)=>{await target.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await target.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${name} fits ${width}`);if(screenshots)await target.screenshot({path:join(screenshots,`PRICE-002-${name}-${width}.png`),fullPage:true})}
+   const capture=async(target,name)=>{await target.waitForLoadState('load');assert.ok(await target.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${name} fits ${width}`);if(screenshots)await target.screenshot({path:join(screenshots,`PRICE-002-${name}-${width}.png`),fullPage:true})}
    await capture(page,'editor')
    await page.getByRole('button',{name:'Prepare proposal',exact:true}).click();await page.getByRole('link',{name:'Northstar package choices',exact:true}).click()
    const state=await(await context.request.get(app.origin+'/api/platter/state')).json(),p=state.proposals.find(p=>p.title==='Northstar package choices');assert.equal(p.options.length,3);assert.equal(p.options[1].optionalItems.length,2)
@@ -43,7 +43,7 @@ export async function packagesJourney() {
    const unchanged=await(await context.request.get(app.origin+'/api/platter/state')).json();assert.equal(unchanged.proposals.find(x=>x.id===p.id).version,1);assert.equal(unchanged.outbox.length,0)
    await page.goto(app.origin+'/app/proposal?id='+p.id);await page.getByRole('button',{name:'Approve this revision',exact:true}).click();await page.getByRole('button',{name:'Send approved proposal',exact:true}).click()
    const sent=await(await context.request.get(app.origin+'/api/platter/state')).json(),path='/p/'+sent.proposals.find(x=>x.id===p.id).shareToken
-   clientContext=await browser.newContext({viewport:{width,height:900}});const clientPage=await clientContext.newPage()
+   clientContext=await browser.newContext({viewport:{width,height:900},javaScriptEnabled:false});const clientPage=await clientContext.newPage()
    await clientPage.goto(app.origin+path);await clientPage.getByLabel('Review sections for').selectOption('two');await clientPage.getByRole('button',{name:'Review package',exact:true}).click()
    await clientPage.getByRole('checkbox',{name:/Add Rush delivery/}).check();await clientPage.getByLabel('Quantity for Rush delivery').fill('4');await clientPage.getByRole('button',{name:'Review package',exact:true}).click()
    assert.match(await clientPage.getByLabel('Selected total').innerText(),/2,301\.00/)

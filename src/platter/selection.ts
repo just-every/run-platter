@@ -8,6 +8,12 @@ export function selectionItems(input: Record<string, any>): unknown {
  return Object.keys(input).filter(key => key.startsWith('add.')).map(key => ({ id: key.slice(4), quantity: input['qty.' + key.slice(4)] }))
 }
 
+/** Review forms carry the package whose item controls were rendered. */
+export function reviewItems(input: Record<string, any>): unknown {
+ if (input.items === undefined && typeof input.itemsOptionId === 'string' && input.itemsOptionId !== input.optionId) return []
+ return selectionItems(input)
+}
+
 /** One server calculation for preview, review, PDF and the frozen agreement. */
 export function offerSelection(options: any[], depositBps: number, optionId: unknown, input: unknown = []) {
  const offered = options.find(option => option.id === optionId)

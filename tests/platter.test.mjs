@@ -972,6 +972,11 @@ test('PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-
   assert.deepEqual(await current(),offerBefore,'refused selections write nothing')
   r=await h.send(path+'?optionId=two&items='+encodeURIComponent(JSON.stringify(items)),undefined,cookie);assert.equal(r.status,200);assert.match(r.text,/2,301\.00/);assert.match(r.text,/575\.25/)
   const removed=await h.send(path+'?optionId=two',undefined,cookie);assert.match(removed.text,/2,000\.00/)
+  // PRICE-002: native review forms discard the previous package's checked items on a switch.
+  for(const route of [path+'?optionId=one',`/app/preview/client?id=${copy.id}&revision=2&optionId=one`]){
+   const review=await h.send(route+'&itemsOptionId=two&add.rush=yes&qty.rush=4',undefined,route.startsWith('/app/')?h.owner:cookie)
+   assert.equal(review.status,200,review.text);assert.match(review.text,route.startsWith('/app/')?/1,200\.00/:/1,000\.00/)
+  }
   const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId=two&items='+encodeURIComponent(JSON.stringify(items)),{headers:{host:new URL(h.origin).host,cookie}});assert.equal(pdf.status,200)
   const pages=await pdfPages(await pdf.arrayBuffer());for(const page of pages)assert.match(page,/Not signed, revision 3/)
   const pdfText=pages.join(' ');for(const text of ['2,301.00','575.25','Rush delivery: 4 x USD 75.25 = USD 301.00'])assert.ok(pdfText.includes(text),pdfText);assert.ok(!pdfText.includes('Complete package only'))

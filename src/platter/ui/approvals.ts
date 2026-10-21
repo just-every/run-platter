@@ -9,9 +9,9 @@ export function approvalsPage(s:any){
  +panel('Add rule',form('approval.rule','/app/approvals',hidden('version',policy.version)+field('Rule name','name','','required maxlength="100"')+field('Sequence order','position','0','type="number" min="0" max="1000" required')+'<label>Condition<select name="kind"><option value="totalOver">Total above amount</option><option value="termsEdited">Legal terms edited since first draft</option></select></label>'+field('Threshold amount (for total rule)','amount','25000','inputmode="decimal"')+'<label>Currency<select name="currency"><option>USD</option><option>AUD</option></select></label>'+select('approverOne','First approver')+select('approverTwo','Second approver (parallel)',true)+'<button>Add approval rule</button>'))
 }
 export function approvalPanel(p:any){
- const approval=p.approval;if(!approval?.required||!['draft','approved'].includes(p.status))return ''
+ const approval=p.approval;if(!approval?.required||!['draft','approved','sent'].includes(p.status))return ''
  const inputs=hidden('id',p.id)+hidden('version',p.version)+hidden('revision',p.revision)
  return panel('Revision approvals',`<p>${approval.rejected?'Rejected. Save a new revision before requesting approval again.':approval.complete?'All required approvals complete.':'Awaiting approval of this exact revision.'}</p><ol>${approval.steps.map((s:any)=>`<li>${escape(s.name)} · ${s.done?'Approved':s.active?'Waiting':'Pending earlier step'}</li>`).join('')}</ol>`
- +(!p.canEdit&&p.canApprove?form('proposal.approve',proposalPath(p.id),inputs+'<button aria-label="Approve this revision">Approve this revision</button>'):'')
+ +((!p.canEdit||p.status==='sent')&&p.canApprove?form('proposal.approve',proposalPath(p.id),inputs+'<button aria-label="Approve this revision">Approve this revision</button>'):'')
  +(p.canApprove?form('proposal.reject',proposalPath(p.id),inputs+field('Rejection note','note','','required maxlength="2000"')+'<button>Reject revision</button>'):''))
 }

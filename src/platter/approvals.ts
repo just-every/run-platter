@@ -11,9 +11,9 @@ export async function approvalSettings(db:D1Database){
 function matches(a:Actor,approver:string){return approver==='person:'+a.id||approver==='role:'+a.role}
 export async function approvalPlan(db:D1Database,row:any,a?:Actor){
  const {policy,rules}=await approvalSettings(db),options=typeof row.options==='string'?JSON.parse(row.options):row.options
- const total=Math.max(...options.map((o:any)=>o.cents)),first=await db.prepare('SELECT snapshot FROM p_revisions WHERE proposal_id=? AND revision=1').bind(row.id).first<any>()
+ const total=Math.max(...options.map((o:any)=>o.cents+(o.optionalItems??[]).reduce((sum:number,item:any)=>sum+item.unitCents*(item.editable?item.max:item.quantity),0))),first=await db.prepare('SELECT snapshot,prepared_by FROM p_revisions WHERE proposal_id=? AND revision=1').bind(row.id).first<any>()
  const selected=rules.filter(r=>r.condition.kind==='totalOver'?row.currency===r.condition.currency&&total>r.condition.cents:row.revision>1&&Boolean(first)&&String(row.terms??'')!==String(JSON.parse(first.snapshot).terms??''))
- const agent=String(row.prepared_by).startsWith('agent:')
+ const agent=String(row.prepared_by).startsWith('agent:')||String(first?.prepared_by).startsWith('agent:')
  const steps=selected.map(r=>({id:r.id,name:r.name,approvers:r.approvers as string[],any:false}))
  if(!steps.length&&(policy.required||agent))steps.push({id:'default',name:agent&&!policy.required?'Person approval for agent draft':'Default approval',approvers:agent&&!policy.required?['role:owner','role:admin','role:manager']:['role:'+policy.default_role],any:agent&&!policy.required})
  const plan=await hash(JSON.stringify({version:policy.version,steps,revision:row.revision})),decisions=(await db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=? AND revision=? AND plan=? ORDER BY occurred_at,id').bind(row.id,row.revision,plan).all<any>()).results
@@ -66,8 +66,8 @@ export async function approvalCommand(env:Bindings,a:Actor,name:string,p:Record<
  }
  const original=await permitted(db,a,p.id,'approve');exact(original,p)
  const row=negotiatedView(original,await pendingNegotiation(db,original.id))
- need(['draft','approved'].includes(row.status)&&row.revision===Number(p.revision),'Approve the current draft revision',409)
- const plan=await approvalPlan(db,row,a),step=plan.steps.find(s=>s.id===p.step)??plan.steps.find(s=>s.canApprove)
+ need(['draft','approved','sent'].includes(row.status)&&row.revision===Number(p.revision),'Approve the current draft revision',409)
+ const plan=await approvalPlan(db,row,a),step=p.step===undefined?plan.steps.find(s=>s.canApprove):plan.steps.find(s=>s.id===p.step)
  need(step?.canApprove,'No current approval step names you',403)
  const note=p.note===undefined?'':String(p.note);need(note.length<=2000,'Keep the approval note under 2000 characters')
  const index=step.approvers.findIndex(v=>matches(a,v)&&!step.decisions.some(d=>d.note.startsWith(step.approvers.indexOf(v)+':')))
@@ -78,6 +78,6 @@ export async function approvalCommand(env:Bindings,a:Actor,name:string,p:Record<
  await commit(db,a,[db.prepare('INSERT INTO p_approval_decisions(id,proposal_id,revision,plan,step,actor_id,decision,note,occurred_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,plan.plan,step.id,a.id,decision,index+':'+note,at),db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id),...(decision==='approved'?[db.prepare('INSERT INTO p_approvals(id,proposal_id,revision,actor_id,approved_at) VALUES(?,?,?,?,?)').bind(id,row.id,row.revision,a.id,at)]:[])],false,guard)
  // The final status update is version guarded, so edits or concurrent decisions cannot stamp a newer revision.
  const next=await approvalPlan(db,row,a)
- if(next.complete){await commit(db,a,[pending?db.prepare('UPDATE p_negotiations SET approved_by=?,approved_at=? WHERE proposal_id=? AND revision=?').bind(a.email,at,row.id,row.revision):db.prepare("UPDATE p_proposals SET status='approved',approved_by=?,approved_at=? WHERE id=? AND revision=?").bind(a.email,at,row.id,row.revision)],false,{sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND EXISTS(SELECT 1 FROM p_approval_policy WHERE singleton=1 AND version=?)',values:[row.id,original.version+1,plan.policyVersion]})}
+ if(next.complete){await commit(db,a,[pending?db.prepare('UPDATE p_negotiations SET approved_by=?,approved_at=? WHERE proposal_id=? AND revision=?').bind(a.email,at,row.id,row.revision):db.prepare("UPDATE p_proposals SET status=?,approved_by=?,approved_at=? WHERE id=? AND revision=?").bind(original.status==='sent'?'sent':'approved',a.email,at,row.id,row.revision)],false,{sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND EXISTS(SELECT 1 FROM p_approval_policy WHERE singleton=1 AND version=?)',values:[row.id,original.version+1,plan.policyVersion]})}
  return {approved:next.complete,rejected:next.rejected}
 }

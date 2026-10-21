@@ -454,3 +454,42 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.equal(restoredMail.length,1);assert.equal(restoredMail[0].recipient,h.auth.OWNER_EMAIL)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions', {timeout:180000},async()=>{
+ const temporary=await mkdtemp(join(tmpdir(),'platter-team-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
+ let h
+ try{
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source})
+  const people={}
+  for(const role of ['sales','manager','other']){
+   const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)
+   const cookie=await h.signIn(email);people[role]={cookie,...(await h.state(cookie)).actor}
+  }
+  const team=await h.cmd('team.create',{name:'Archive team'})
+  for(const role of ['sales','manager'])await h.cmd('member.set',{operatorId:people[role].id,version:0,role,teams:[team.id]})
+  await h.cmd('member.zone',{timeZone:'America/New_York'},people.sales.cookie)
+  await h.cmd('approval.policy',{version:0,required:false,defaultRole:'manager'})
+  await h.cmd('approval.rule',{version:1,name:'High value manager',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager']})
+  const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
+  const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archive routed offer',scope:'An audited scope',optionOne:'First',priceOne:'28000',optionTwo:'Second',priceTwo:'30000',depositPercent:'25'},people.sales.cookie)
+  await h.cmd('proposal.share',{id:p.id,operatorId:people.other.id},people.sales.cookie)
+  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1},people.manager.cookie)
+  const before=await h.state(),tables=['p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions']
+  const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all().then(r=>r.results)))
+  await h.close();h=undefined
+  const archive=join(temporary,'teams.rer');await command(source,['export','--output',archive]);await command(restored,['import','--input',archive,'--yes'])
+  h=await harness({root:restored,unclaimed:true})
+  const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
+  assert.deepEqual(after.approvalSettings,before.approvalSettings)
+  for(const [i,t] of tables.entries())assert.deepEqual((await h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all()).results,rows[i],t)
+  const sales=await h.signIn(people.sales.email),manager=await h.signIn(people.manager.email),other=await h.signIn(people.other.email)
+  assert.equal((await h.state(sales)).actor.role,'sales');assert.equal((await h.state(manager)).actor.role,'manager')
+  assert.equal((await h.state(sales)).followups.timeZone,'America/New_York')
+  assert.equal((await h.state(other)).proposals.some(r=>r.id===p.id),true)
+  assert.deepEqual(after.proposals.find(r=>r.id===p.id).approval,before.proposals.find(r=>r.id===p.id).approval)
+  assert.equal((await h.send('/api/platter/state',undefined,people.sales.cookie)).status,401,'source sessions confer no restored authority')
+  await h.cmd('proposal.send',{id:p.id,version:2},sales)
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

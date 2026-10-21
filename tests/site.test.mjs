@@ -996,7 +996,7 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
     const client=await command(owner,'client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
     await op.goto(app.origin+'/app/team');await capture(op,'team')
     await op.goto(app.origin+'/app/approvals');await op.getByLabel('Require approval for every proposal').selectOption('no');await op.getByRole('button',{name:'Save approval policy'}).click()
-    await op.getByLabel('Rule name',{exact:true}).fill('Manager above $25,000');await op.getByLabel('First approver',{exact:true}).selectOption('role:manager');await op.getByRole('button',{name:'Add approval rule',exact:true}).click();assert.equal(await op.getByRole('alert').count(),0);await capture(op,'approval-settings')
+    await op.getByLabel('Rule name',{exact:true}).fill('Manager above $25,000');await op.getByLabel('First approver').selectOption('role:manager');await op.getByRole('button',{name:'Add approval rule',exact:true}).click();assert.equal(await op.getByRole('alert').count(),0);await capture(op,'approval-settings')
     const page=await sales.newPage();await page.goto(app.origin+'/app')
     await page.getByLabel('Starter template',{exact:true}).selectOption('starter:consultancy');await page.getByLabel('Client for starter proposal',{exact:true}).selectOption(client.id);await page.getByRole('button',{name:'Start starter proposal',exact:true}).click()
     const draft=(await state(sales)).proposals[0];assert.equal(draft.sales_owner_id,sp.id)

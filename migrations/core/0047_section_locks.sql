@@ -1,0 +1,2 @@
+CREATE TABLE p_template_locks(template_id TEXT NOT NULL REFERENCES p_personal_templates(id),section TEXT NOT NULL CHECK(section IN ('title','scope','terms','pricing','deposit')),PRIMARY KEY(template_id,section));
+CREATE TABLE p_proposal_locks(proposal_id TEXT NOT NULL REFERENCES p_proposals(id),section TEXT NOT NULL CHECK(section IN ('title','scope','terms','pricing','deposit')),PRIMARY KEY(proposal_id,section));

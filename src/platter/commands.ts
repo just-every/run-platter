@@ -1,3 +1,4 @@
+import { assertSectionLocks, sectionLockCommand } from './section-locks'
 import { folderCommand } from './folders'
 import { paymentCommand } from './payments'
 import { connectionCommand } from './connections'
@@ -31,7 +32,7 @@ import { dispatchMail } from './mail'
 import { exportInvoice } from './invoices'
 import { suggestionCommand } from './suggestions'
 import { restoreFields } from './history'
-import { negotiationCommand, pendingNegotiation } from './negotiation'
+import { negotiationCommand, pendingNegotiation, negotiatedView } from './negotiation'
 
 export function proposalFields(p:Record<string,unknown>){
  const tables=tableInputs(p.pricingTables)
@@ -46,6 +47,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  await authorizeCommand(db,a,name,p)
  if(name.startsWith('team.')||name.startsWith('member.')||name==='proposal.share')return teamCommand(db,a,name,p)
  if(name.startsWith('approval.')||name==='proposal.approve'||name==='proposal.reject')return approvalCommand(env,a,name,p)
+ if(name==='proposal.unlock'||name==='template.locks')return sectionLockCommand(db,a,name,p)
  if(name==='folder.save')return folderCommand(db,a,p)
  if(name.startsWith('payment.'))return paymentCommand(env,a,name,p)
  if(name.startsWith('provider.'))return connectionCommand(env,a,name,p)
@@ -84,6 +86,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   if(p.pricingTables===undefined){const pending=await pendingNegotiation(db,current.id);const content=pending?JSON.parse(pending.snapshot):current;p={...p,pricingTables:pricingInput(typeof content.options==='string'?JSON.parse(content.options):content.options)}}
   if(p.sectionConditions===undefined&&p.scopeOption===undefined&&p.termsOption===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,sectionConditions:pending?JSON.parse(pending.snapshot).section_conditions??{}:current.section_conditions}}
   if(p.terms===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,terms:pending?JSON.parse(pending.snapshot).terms??'':current.terms}}
+  await assertSectionLocks(db,negotiatedView(current,await pendingNegotiation(db,current.id)),proposalFields(p))
   if(name==='proposal.negotiate'||await pendingNegotiation(db,current.id))return negotiationCommand(env,a,name,p,current,{...proposalFields(p),...(restoredAttachments!==undefined?{attachments:restoredAttachments}:{}),internalCosts,costSourceRevision})
  }
  if(name==='proposal.prepare'||name==='proposal.revise'){

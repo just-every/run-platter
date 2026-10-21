@@ -1545,3 +1545,29 @@ test('TEAM-001 shared templates and library folders enforce role edits and live 
  const oldCopy=(await h.state(people.sales.cookie)).proposals[0];assert.equal(oldCopy.title,offer.title,'replacing the shared template cannot mutate an existing draft')
  const rows=(await h.db.prepare('SELECT * FROM p_personal_templates').all()).results;assert.equal(rows.length,1);assert.equal((await h.db.prepare('SELECT content FROM p_library_items WHERE id=?').bind(item.id).first()).content,'Team-only text')
 }))
+
+test('TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval',()=>run(async h=>{
+ const team=await h.cmd('team.create',{name:'East'}),people={}
+ for(const role of ['admin','manager','sales','content_editor','viewer','billing','other']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role:role==='other'?'manager':role,teams:role==='other'?[]:[team.id]});people[role]={cookie,id}}
+ const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'}),source=await h.cmd('proposal.prepare',{...offer,clientId:client.id,terms:'Payment within 14 days.'})
+ const saved=await h.cmd('template.save',{id:source.id,version:1,name:'Locked legal',shared:true,shareConsent:true})
+ await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
+ await h.cmd('approval.rule',{version:1,name:'Legal review',position:0,condition:{kind:'termsEdited'},approvers:['person:'+people.admin.id]})
+ for(const role of ['owner','admin','manager','content_editor']){const cookie=role==='owner'?h.owner:people[role].cookie,current=(await h.state()).templates.find(t=>t.id===saved.id);await h.cmd('template.locks',{id:saved.id,version:current.version,sections:['terms']},cookie)}
+ const template=(await h.state()).templates.find(t=>t.id===saved.id)
+ for(const role of ['sales','viewer','billing'])await h.cmd('template.locks',{id:saved.id,version:template.version,sections:[]},people[role].cookie,403)
+ const p=await h.cmd('template.start',{id:saved.id,version:template.version,clientId:client.id},people.sales.cookie),fields={...offer,clientId:client.id,id:p.id,version:1,terms:'Changed terms'}
+ await h.cmd('proposal.revise',fields,people.sales.cookie,403);assert.equal((await h.state(people.sales.cookie)).proposals.find(r=>r.id===p.id).revision,1)
+ const copy=await h.cmd('proposal.duplicate',{id:p.id,version:1},people.sales.cookie);await h.cmd('proposal.revise',{...fields,id:copy.id},people.sales.cookie,403)
+ const personal=await h.cmd('template.save',{id:p.id,version:1,name:'Personal with locks'},people.sales.cookie),started=await h.cmd('template.start',{id:personal.id,version:1,clientId:client.id},people.sales.cookie);await h.cmd('proposal.revise',{...fields,id:started.id},people.sales.cookie,403)
+ await h.cmd('proposal.share',{id:p.id,operatorId:people.content_editor.id},people.sales.cookie)
+ for(const role of ['sales','content_editor','viewer','billing','other'])await h.cmd('proposal.unlock',{id:p.id,version:1,section:'terms'},people[role].cookie,403)
+ await h.cmd('proposal.unlock',{id:p.id,version:1,section:'terms'},people.admin.cookie)
+ await h.cmd('proposal.revise',{...fields,version:2},people.sales.cookie)
+ const edited=(await h.state(people.sales.cookie)).proposals.find(r=>r.id===p.id);assert.equal(edited.terms,'Changed terms');assert.equal(edited.approval.required,true);assert.equal(edited.approval.complete,false)
+ await h.cmd('proposal.send',{id:p.id,version:3},people.sales.cookie,409)
+ await h.cmd('proposal.approve',{id:p.id,version:3,revision:2},people.admin.cookie);await h.cmd('proposal.send',{id:p.id,version:4},people.sales.cookie)
+ const audit=await h.send('/api/platter/audit?action=proposal.unlock',undefined,h.owner);assert.equal(audit.status,200);assert.ok(audit.value.rows.some(r=>r.actor_id===people.admin.id&&r.subject===p.id))
+ // An allowed team manager can unlock their team's draft, and a stale revision cannot do so twice.
+ await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'terms'},people.manager.cookie);await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'terms'},people.manager.cookie,409)
+}))

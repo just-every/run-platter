@@ -14,9 +14,11 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
  const displayed = negotiatedView(source, await pendingNegotiation(db, source.id))
  const clientId = input.clientId === undefined ? displayed.client_id : text(input.clientId, 'a client')
  need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(clientId).first(), 'Client not found', 404)
+ const titleLocked=await db.prepare("SELECT 1 FROM p_proposal_locks WHERE proposal_id=? AND section='title'").bind(source.id).first()
  const title = input.title === undefined
-  ? text(displayed.title.slice(0, 193) + ' (copy)', 'a title')
-  : text(input.title, 'a title')
+  ? titleLocked?displayed.title:text(displayed.title.slice(0,193)+' (copy)','a title')
+  : text(input.title,'a title')
+ need(!titleLocked||title===displayed.title,'The proposal title is locked',403)
  const id = crypto.randomUUID(), at = await currentTime(db)
  const attachments = copyAttachments(typeof displayed.attachments === 'string' ? JSON.parse(displayed.attachments) : displayed.attachments)
  const options = typeof displayed.options === 'string' ? JSON.parse(displayed.options) : displayed.options
@@ -27,6 +29,7 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
    prepared_by,created_at,currency,sales_owner_id,sales_owner_name,attachments)
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
    .bind(id, clientId, title, row.scope, row.terms, row.deposit_bps, JSON.stringify(options), a.email, at, row.currency, a.id, a.email, JSON.stringify(attachments)),
+  db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_proposal_locks WHERE proposal_id=?').bind(id,source.id),
   copyCosts(db,source.id,displayed.revision,id,1),copyDefaults(db,source.id,id),
   db.prepare('UPDATE p_proposals SET section_conditions=? WHERE id=?').bind(typeof row.section_conditions==='string'?row.section_conditions:JSON.stringify(row.section_conditions),id),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)')

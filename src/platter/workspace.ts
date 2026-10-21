@@ -23,7 +23,8 @@ export async function workspaceCommand(db:D1Database,a:Actor,p:Record<string,unk
  const expiry=nullableDays(p.expiryDays,old.expiryDays),warning=nullableDays(p.warningDays,old.warningDays),cap=p.reminderCap===undefined?old.reminderCap:Number(p.reminderCap)
  for(const [label,value] of [['Expiry',expiry],['Warning',warning]] as const)need(value===null||Number.isInteger(value)&&value>=1&&value<=36500,label+' days must be from 1 to 36500, or empty')
  need(Number.isInteger(cap)&&cap>=0&&cap<=365,'Choose a reminder cap from 0 to 365')
- let methods:any=p.paymentMethods??Object.keys(p).filter(k=>k.startsWith('method:')&&p[k]==='yes').map(k=>k.slice(7))
+ const methodFields=Object.keys(p).filter(k=>k.startsWith('method:'))
+ let methods:any=p.paymentMethods??(p.methodsProvided==='yes'||methodFields.length?methodFields.filter(k=>p[k]==='yes').map(k=>k.slice(7)):old.paymentMethods)
  if(typeof methods==='string'){try{methods=JSON.parse(methods)}catch{need(false,'Choose payment methods')}}
  need(Array.isArray(methods)&&methods.length<=4&&methods.every((m:any)=>['card','ach','apple_pay','google_pay'].includes(m))&&new Set(methods).size===methods.length,'Choose distinct supported payment methods')
  const settings={remindersEnabled:enabled,reminderDays:dayList(p.reminderDays,old.reminderDays),beforeExpiryDays:dayList(p.beforeExpiryDays,old.beforeExpiryDays),reminderCap:cap,expiryDays:expiry,warningDays:warning,paymentMethods:methods}

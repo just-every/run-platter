@@ -8,7 +8,7 @@ import { pdfFonts } from './documents/pdf-fonts'
 export const costReaders=['owner','admin','manager','billing']
 export interface CostPatch {key:string;cents:number}
 const exactInteger=(n:bigint):number|string=>n<=BigInt(Number.MAX_SAFE_INTEGER)&&n>=BigInt(Number.MIN_SAFE_INTEGER)?Number(n):n.toString()
-const marginRate=(margin:bigint,revenue:number)=>{const negative=margin<0n,absolute=(negative?-margin:margin)*10000n,denominator=BigInt(revenue);return exactInteger((negative?-1n:1n)*((absolute+denominator/2n)/denominator))}
+const marginRate=(margin:bigint,revenue:number)=>{if(revenue===0)return null;const negative=margin<0n,absolute=(negative?-margin:margin)*10000n,denominator=BigInt(revenue);return exactInteger((negative?-1n:1n)*((absolute+denominator/2n)/denominator))}
 const fixed=(value:number|string)=>{const n=BigInt(value),absolute=n<0n?-n:n;return (n<0n?'-':'')+(absolute/100n).toString()+'.'+(absolute%100n).toString().padStart(2,'0')}
 export const costMoney=(value:number|string,currency:string)=>currency+' '+fixed(value)
 export const costPercent=(value:number|string)=>fixed(value)+'%'
@@ -59,6 +59,6 @@ export async function internalPricingPdf(env:Bindings,a:Actor,query:URLSearchPar
  const pdf=await PdfText.create(row.revision,await pdfFonts(env)),money=(n:number|string)=>costMoney(n,row.currency)
  pdf.document.setTitle('Internal pricing: '+row.title);pdf.document.setSubject('Internal use only')
  pdf.text('Internal pricing — firm use only',20);pdf.text(row.title,16);pdf.text('Revision '+row.revision)
- for(const line of detail.lines){pdf.heading(line.option+' / '+line.table+' / '+line.name);pdf.text('Revenue: '+money(line.revenueCents));pdf.text(line.costCents===null?'Cost and margin not recorded':`Internal cost: ${money(line.costCents)}; margin: ${money(line.marginCents)} (${costPercent(line.marginBps)})`)}
+ for(const line of detail.lines){pdf.heading(line.option+' / '+line.table+' / '+line.name);pdf.text('Revenue: '+money(line.revenueCents));pdf.text(line.costCents===null?'Cost and margin not recorded':`Internal cost: ${money(line.costCents)}; margin: ${money(line.marginCents)}${line.marginBps===null?'':` (${costPercent(line.marginBps)})`}`)}
  return new Response(new Uint8Array(await pdf.document.save()).buffer,{headers:{'content-type':'application/pdf','content-disposition':'attachment; filename="internal-pricing.pdf"','cache-control':'no-store','x-content-type-options':'nosniff'}})
 }

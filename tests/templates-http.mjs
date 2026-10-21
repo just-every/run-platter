@@ -26,7 +26,7 @@ export async function templatesHttp(h) {
   assert.ok(!copy.scope.includes('Northstar Coffee')); assert.ok(!JSON.stringify(p).includes('{{'))
   assert.equal(p.currency, 'USD'); assert.equal(p.deposit_bps, 3000); assert.equal(p.status, 'draft')
   assert.equal(p.approved_by, null); assert.equal(p.shareToken, undefined)
-  assert.equal(p.pdfDownloadsEnabled, true); assert.equal(p.expiry.mode, 'never')
+  assert.equal(p.pdfDownloadsEnabled,true);assert.equal(p.expiry.mode,'days');assert.equal(p.expiry.days,60);assert.equal(p.expiry.warningDays,1);assert.equal(p.expiry.sentAt,null);assert.equal(p.expiry.deadlineAt,null)
   assert.equal(p.attachments[0].filename, 'Northstar-W9.pdf')
   assert.equal(p.options.length, 2)
   for (const option of p.options) {

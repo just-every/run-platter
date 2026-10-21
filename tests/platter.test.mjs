@@ -814,7 +814,7 @@ test('EDIT-012 duplicate accepted content into an independent member-owned draft
   if(status==='expired')await h.cmd('expiry.set',{id:source.id,version:3,mode:'date',date:'2020-01-01'})
   if(status==='withdrawn')await h.cmd('proposal.withdraw',{id:source.id,version:3,reason:'Cancelled',notice:false})
   const old=await get(source.id);assert.equal(old.status,status)
-  const next=await h.cmd('proposal.duplicate',{id:source.id,version:old.version});const copied=await get(next.id);assert.equal(copied.status,'draft');for(const field of ['mode','days','date','warningDays'])assert.deepEqual(copied.expiry[field],old.expiry[field],'expiry '+field+' copied from '+status);assert.deepEqual(await get(source.id),old)
+  const next=await h.cmd('proposal.duplicate',{id:source.id,version:old.version});const copied=await get(next.id);assert.equal(copied.status,'draft');for(const field of ['mode','days','date','warningDays'])assert.deepEqual(copied.expiry[field],field==='date'&&old.expiry.mode==='days'?null:old.expiry[field],'expiry '+field+' copied from '+status);assert.deepEqual(await get(source.id),old)
  }
  const draftSource=await get(same.id);await h.cmd('proposal.approve',{id:same.id,version:draftSource.version,revision:1});await h.cmd('proposal.send',{id:same.id,version:2});await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:same.id,version:3,scope:'Unsent negotiated scope'})
  const negotiated=await h.cmd('proposal.duplicate',{id:same.id,version:4});assert.equal((await get(negotiated.id)).scope,'Unsent negotiated scope')
@@ -1471,5 +1471,6 @@ test('TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions a
   await h.cmd('proposal.restore',{id:p.id,version:7,revision:3},people.sales.cookie)
   assert.equal((await current()).internalPricing.lines[0].costCents,6002)
   for(const cookie of [h.owner,people.admin.cookie,people.manager.cookie]){row=await current(cookie);await h.cmd('pricing.cost',{id:p.id,version:row.version,lineKey:row.internalPricing.lines[0].key,unitCost:'40.01'},cookie);assert.equal((await current(cookie)).internalPricing.lines[0].costCents,6002)}
+  const tiny=await h.cmd('proposal.prepare',{...input,title:'Fractional costs',pricingTables:[{optionId:'main',name:'Rounding',lines:[{name:'Priced line',description:'Positive package revenue',unit:'unit',quantity:'1',unitPrice:'1'},{name:'Fraction',description:'Revenue rounds to zero',unit:'unit',quantity:'0.001',unitPrice:'0.01'}]}]},people.sales.cookie);let fractional=(await h.state()).proposals.find(r=>r.id===tiny.id);const fraction=fractional.internalPricing.lines.find(l=>l.name==='Fraction');await h.cmd('pricing.cost',{id:tiny.id,version:1,lineKey:fraction.key,unitCost:'10'},people.manager.cookie);fractional=(await h.state()).proposals.find(r=>r.id===tiny.id);const zero=fractional.internalPricing.lines.find(l=>l.name==='Fraction');assert.deepEqual([zero.revenueCents,zero.costCents,zero.marginCents,zero.marginBps],[0,1,-1,null])
  }finally{await h.close()}
 })

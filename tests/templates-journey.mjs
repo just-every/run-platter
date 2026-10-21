@@ -42,7 +42,7 @@ export async function templatesJourney() {
     const firstId = new URL(page.url()).searchParams.get('id')
     assert.notEqual(firstId, source.id); assert.equal(await page.locator('textarea[name=scope]').inputValue(), 'Studio photography and a usage licence.')
     assert.equal(await page.getByLabel('Proposal title', { exact: true }).inputValue(), 'Juniper campaign')
-    assert.equal(await page.locator('select[name=clientId]').inputValue(), secondClient.id)
+    assert.equal(await page.locator('form.composer select[name=clientId]').inputValue(), secondClient.id)
     assert.match(await page.locator('main').innerText(), /Unsigned PDF downloads are off/); assert.match(await page.locator('main').innerText(), /14 calendar days/)
     assert.equal(await page.getByRole('button', { name: 'Send approved proposal', exact: true }).count(), 0)
     await capture('draft')

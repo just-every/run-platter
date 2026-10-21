@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { packageFixture } from './packages-fixture.mjs'
 import { pricingFixture } from './pricing-fixture.mjs'
+import { pdfPages } from './pdf-document.mjs'
 
 export async function templatesHttp(h) {
  const client = await h.cmd('client.save', { name: 'Northstar Coffee', email: 'avery@northstar.example' })
@@ -51,10 +52,28 @@ export async function templatesHttp(h) {
  await h.cmd('template.start', { id: template.id, version: 2, clientId: client.id }, member, 403)
  await h.cmd('template.save', { id: source.id, version: original.version + 1, name: 'Not mine', templateId: template.id, templateVersion: 2 }, member, 403)
  assert.deepEqual((await h.state()).templates, refusedBefore)
- const personal = await h.cmd('template.save', { id: source.id, version: original.version + 1, name: 'Casey’s personal template' }, member)
+ await h.cmd('pdf.downloads', { id: third.id, version: 1, enabled: true })
+ const personal = await h.cmd('template.save', { id: third.id, version: 2, name: 'Casey’s personal template' }, member)
  const memberState = await h.state(member)
  assert.deepEqual(memberState.templates.map(t => t.id), [personal.id]); assert.equal(memberState.templates[0].owner_id, memberState.actor.id)
  assert.deepEqual((await h.state()).templates.map(t => t.id), [template.id])
+ const memberDraft = await h.cmd('template.start', { id: personal.id, version: 1, clientId: other.id }, member)
+ const memberProposal = (await h.state(member)).proposals.find(p => p.id === memberDraft.id)
+ assert.equal(memberProposal.sales_owner_id, memberState.actor.id); assert.equal(memberProposal.pdfDownloadsEnabled, true)
+ await h.cmd('proposal.approve', { id: memberDraft.id, version: 1, revision: 1 }, member, 403)
+ await h.cmd('proposal.approve', { id: memberDraft.id, version: 1, revision: 1 })
+ const share = await h.cmd('proposal.send', { id: memberDraft.id, version: 2 }), path = new URL(share.shareUrl).pathname
+ await h.send(path + '/action?name=code.request', {})
+ const code = (await h.state()).outbox.find(m => m.proposal_id === memberDraft.id && m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+ const verified = await h.send(path + '/action?name=code.verify', { code })
+ const pdf = await h.mf.dispatchFetch(h.origin + path + '/download.pdf?optionId=two', { headers: { host: new URL(h.origin).host, cookie: verified.cookie } })
+ assert.equal(pdf.status, 200)
+ const pages = await pdfPages(new Uint8Array(await pdf.arrayBuffer()))
+ assert.ok(pages.every(page => /Not signed, revision 1/.test(page)))
+ assert.match(pages.join(' '), /Expanded campaign with interviews/); assert.match(pages.join(' '), /2,000\.00/)
+ const attachment = memberProposal.attachments[0]
+ const downloaded = await h.mf.dispatchFetch(h.origin + path + '/attachments/' + attachment.id, { headers: { host: new URL(h.origin).host, cookie: verified.cookie } })
+ assert.equal(downloaded.status, 200); assert.equal(await downloaded.text(), '%PDF Northstar vendor W9')
  const key = await h.cmd('agent.create', { label: 'Template drafter' })
  const rpc = async (name, args) => {
   const r = await h.send('/api/platter/agent/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, '', { authorization: 'Bearer ' + key.token })

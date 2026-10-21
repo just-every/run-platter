@@ -461,7 +461,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source,outboundService:async request=>{assert.equal(new URL(request.url).hostname,'quickbooks.api.intuit.com');return Response.json({CompanyInfo:{CompanyName:'Synthetic company'}})}})
+  h=await harness({root:source,outboundService:async request=>{const url=new URL(request.url);if(url.hostname==='quickbooks.api.intuit.com')return Response.json({CompanyInfo:{CompanyName:'Synthetic company'}});assert.equal(url.hostname,'api.stripe.com');if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2800'});if(request.method==='GET'){const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id:'synthetic-platter-2801',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:0,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}})}const amount=Number(new URLSearchParams(await request.text()).get('amount'));return Response.json({id:'synthetic-platter-2802',charge:'synthetic-platter-2801',amount,status:'succeeded'})}})
   const people={}
   for(const role of ['sales','manager','other']){
    const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)
@@ -481,14 +481,19 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   await h.cmd('template.save',{id:p.id,version:2,name:'Private cost template'},people.sales.cookie)
   await h.cmd('library.save',{title:'Synthetic case study',kind:'case_study',content:'An archived text library item'})
   await h.cmd('proposal.approve',{id:p.id,version:2,revision:2},people.manager.cookie)
-  const before=await h.state(),tables=['p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
+  const paid=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic paid proposal',scope:'Synthetic scope',optionOne:'First',priceOne:'2400',optionTwo:'Second',priceTwo:'4200',depositPercent:'25'})
+  const paidPath=new URL((await h.cmd('proposal.send',{id:paid.id,version:1})).shareUrl).pathname
+  await h.send(paidPath+'/action?name=code.request',{});const code=(await h.state()).outbox.find(r=>r.subject==='Your Platter verification code').body.match(/\b\d{6}\b/)[0],verified=(await h.send(paidPath+'/action?name=code.verify',{code})).cookie;assert.equal((await h.send(paidPath+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},verified)).status,200)
+  await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-2803',webhookSecret:'synthetic-platter-2804',consent:true});const payment=await h.cmd('payment.bind',{id:paid.id,chargeId:'synthetic-platter-2801',consent:true}),refund={paymentId:payment.id,amount:'100',reason:'Synthetic partial refund',requestId:'synthetic-platter-2805',consent:true};await h.cmd('payment.refund',refund)
+  await h.cmd('payment.record',{id:paid.id,amount:'50',method:'check',reference:'synthetic-platter-2806',receivedOn:'2026-10-21',consent:true})
+  const before=await h.state(),tables=['p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
   const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
   await h.close();h=undefined
   const archive=join(temporary,'teams.rer');await command(source,['export','--output',archive]);await command(restored,['import','--input',archive,'--yes'])
   h=await harness({root:restored,unclaimed:true})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
-  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_connection_secrets').first()).n,0);assert.equal(after.connections[0].status,'needs_reconnection');assert.doesNotMatch(JSON.stringify(after),/synthetic-platter-2301/)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_connection_secrets').first()).n,0);assert.ok(after.connections.every(c=>c.status==='needs_reconnection'));assert.deepEqual(after.paymentRecords,before.paymentRecords);assert.equal((await h.cmd('payment.refund',refund,owner)).status,'succeeded','restored historical refund retries never issue another provider call');assert.doesNotMatch(JSON.stringify(after),/synthetic-platter-2301/)
   assert.deepEqual(after.workspaceDefaults,before.workspaceDefaults);assert.deepEqual(after.approvalSettings,before.approvalSettings);assert.deepEqual(after.proposals.find(r=>r.id===p.id).internalPricing,before.proposals.find(r=>r.id===p.id).internalPricing);assert.deepEqual(after.libraryItems,before.libraryItems)
   for(const [i,t] of tables.entries())assert.deepEqual(canonical((await h.db.prepare('SELECT * FROM '+t).all()).results),rows[i],t)
   const sales=await h.signIn(people.sales.email),manager=await h.signIn(people.manager.email),other=await h.signIn(people.other.email)

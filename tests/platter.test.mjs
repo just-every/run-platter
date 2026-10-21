@@ -1063,4 +1063,4 @@ test('PRICE-002 / SIGN-008 / TEAM-004 signed-upload selections use sent prices, 
  const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows.filter(x=>x.action==='acceptance.upload'&&x.subject===p.id);assert.equal(audit.length,1);assert.equal(audit[0].actor_role,'owner');assert.ok(audit[0].occurred_at)
 }))
 
-test('EDIT-002 / MOB-001 personal templates start independent drafts, guard ownership and versions, and retain agent approval boundaries',()=>run(templatesHttp))
+test('EDIT-002 / MOB-001 personal templates start independent drafts, guard ownership and versions, and retain agent approval boundaries',async()=>{const h=await harness({assetsDirectory:'public'});try{await templatesHttp(h)}finally{await h.close()}})

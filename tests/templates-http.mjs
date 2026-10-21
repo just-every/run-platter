@@ -4,6 +4,7 @@ import { pricingFixture } from './pricing-fixture.mjs'
 import { pdfPages } from './pdf-document.mjs'
 
 export async function templatesHttp(h) {
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
  const client = await h.cmd('client.save', { name: 'Northstar Coffee', email: 'avery@northstar.example' })
  const other = await h.cmd('client.save', { name: 'Juniper Studio', email: 'morgan@juniper.example' })
  const file = new FormData(); file.set('kind', 'w9'); file.set('file', new File(['%PDF Northstar vendor W9'], 'Northstar-W9.pdf', { type: 'application/pdf' }))

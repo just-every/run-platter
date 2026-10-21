@@ -109,7 +109,7 @@ export async function recordAnswer(env:Bindings,a:Actor,input:AnswerInput,hook?:
   ...(hook?.writes??[]),
   db.prepare('UPDATE p_question_reply_keys SET used_at=? WHERE question_id=? AND used_at IS NULL').bind(at,questionId),
   db.prepare('INSERT INTO p_question_answers(id,question_id,text,owner_id,owner_email,source,source_key,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(answerId,questionId,body,a.id,a.email,source,sourceKey,at),
-  queueMail(env,id,question.client_email,'Answer to your question: '+question.title,`The owner answered your ${question.section} question on revision ${question.revision}.\n\nYour question:\n${question.text}\n\nAnswer:\n${body}`,a.id),
+  queueMail(env,id,question.client_email,'Answer to your question: '+question.title,`The firm answered your ${question.section} question on revision ${question.revision}.\n\nYour question:\n${question.text}\n\nAnswer:\n${body}`,a.id),
   audit(db,a.id,a.role,'question.answer',questionId,at)
  ],true,guard) }catch(error){
   // A concurrent delivery may have committed the same authenticated message first.

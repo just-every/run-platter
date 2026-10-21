@@ -2,7 +2,7 @@ import { area, date, escape, form, hidden, panel, proposalPath, statusPill } fro
 import type { QuestionThread } from '../questions'
 
 function thread(question:QuestionThread,answerForm='',closed=false) {
- return `<article id="question-${escape(question.id)}"><h3>${escape(question.section)} · Revision ${escape(question.revision)}</h3><p>${statusPill(closed?'closed':question.status)} · Asked ${date(question.created_at)}</p><p class="preserve">${escape(question.text)}</p>${question.answers.map(answer=>`<article><h4>Owner answer</h4><p>${date(answer.created_at)}</p><p class="preserve">${escape(answer.text)}</p></article>`).join('')}${answerForm}</article>`
+ return `<article id="question-${escape(question.id)}"><h3>${escape(question.section)} · Revision ${escape(question.revision)}</h3><p>${statusPill(closed?'closed':question.status)} · Asked ${date(question.created_at)}</p><p class="preserve">${escape(question.text)}</p>${question.answers.map(answer=>`<article><h4>Team answer</h4><p>${date(answer.created_at)}</p><p class="preserve">${escape(answer.text)}</p></article>`).join('')}${answerForm}</article>`
 }
 
 /** Proposal history is visible to people; only the current owner receives answer controls. */

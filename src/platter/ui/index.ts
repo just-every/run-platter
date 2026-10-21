@@ -15,7 +15,7 @@ const eyebrow = (text: string) => `<p class="eyebrow">${escape(text)}</p>`
 const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`
 export function renderApp(state: any, path: string, feedback?: Feedback): Response {
   const url = new URL(path, 'https://platter.invalid')
-  const zone = state.timeZone ?? 'UTC'
+  const zone = state.personalTimeZone ?? state.timeZone ?? 'UTC'
   // A refused composer save is shown in the composer's own band, not over the page.
   const composerRefusal = feedback?.error && /^package:/.test(feedback.field ?? '') ? feedback : undefined
   return inZone(zone, () => {

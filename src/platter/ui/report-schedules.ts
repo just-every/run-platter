@@ -7,7 +7,7 @@ const statusLabel: Record<string, string> = { local: 'Captured locally; no email
 const when = (s: any, zone: string) => `${s.cadence === 'weekly' ? `Weekly on ${days[s.weekday]}` : 'Daily'} at ${String(s.hour).padStart(2, '0')}:00 ${zone}`
 
 export function reportSchedulesPanel(state: any, selection: URLSearchParams) {
-  if (state.actor?.role !== 'owner') return ''
+  if (!['owner','admin'].includes(state.actor?.role)) return ''
   const filters = new URLSearchParams(); for (const key of filterKeys) { const v = selection.get(key); if (v) filters.set(key, v) }
   const query = filters.toString()
   const schedules = (state.reportSchedules ?? []).map((s: any) => `<li><article><h3>${escape(when(s, state.timeZone))}</h3><dl><dt>Filters</dt><dd>${escape(s.filters || 'All proposals')}</dd><dt>Recipients</dt><dd>${s.recipients.map(escape).join(', ')}</dd><dt>Next run</dt><dd>${date(s.nextRunAt)}</dd></dl>`

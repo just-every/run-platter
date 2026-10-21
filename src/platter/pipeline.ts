@@ -30,7 +30,7 @@ export function pipeline(proposals: any[], params = new URLSearchParams(), now =
   clientId: String(p.client_id), client: String(p.clientName), age: Math.max(0, Math.floor((now - p.created_at) / 86400000)),
   dueDate: followups?.rows.find((r:any)=>r.id===p.id)?.dueDate??null,
   dueFollowup: Boolean(followups?.rows.some((r:any)=>r.id===p.id&&r.dueDate<=followups.today)),
-  nextAction: (followups?.rows.some((r:any)=>r.id===p.id&&r.scheduled)?'followup':p.pipelineStatus === 'withdrawn' || p.status === 'withdrawn' ? 'withdrawn' : p.pipelineStatus === 'expired' || p.status === 'expired' ? 'reopen' : p.status === 'draft' ? 'approve' : p.status === 'approved' ? 'send' : p.status === 'sent' ? 'await-client' : p.invoice ? 'complete' : 'export-deposit') as keyof typeof nextActions,
+  nextAction: (followups?.rows.some((r:any)=>r.id===p.id&&r.scheduled)?'followup':p.pipelineStatus === 'withdrawn' || p.status === 'withdrawn' ? 'withdrawn' : p.pipelineStatus === 'expired' || p.status === 'expired' ? 'reopen' : ['draft','approved'].includes(p.status) ? (p.approval ? p.approval.complete ? 'send' : 'approve' : p.status==='draft'?'approve':'send') : p.status === 'sent' ? 'await-client' : p.invoice ? 'complete' : 'export-deposit') as keyof typeof nextActions,
  }))
  const owners = [...new Map(rows.map(r => [r.ownerId || 'unrecorded', { id: r.ownerId || 'unrecorded', name: r.owner }])).values()].sort((a,b) => a.name.localeCompare(b.name))
  const clients = [...new Map(rows.map(r => [r.clientId, { id: r.clientId, name: r.client }])).values()].sort((a,b) => a.name.localeCompare(b.name))

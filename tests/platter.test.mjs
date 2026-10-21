@@ -1283,11 +1283,11 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
 test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP',()=>run(async h=>{
  assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
  const people={owner:{cookie:h.owner,...(await h.state()).actor}},red=await h.cmd('team.create',{name:'Sales East'}),blue=await h.cmd('team.create',{name:'Sales West'})
- for(const role of ['admin','manager','sales','content_editor','viewer','billing','other']){
+ for(const role of ['admin','manager','sales','content_editor','viewer','billing','other','billing2']){
   const email=role+'@synthetic-platter.example';assert.equal((await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)).status,202)
   const cookie=await h.signIn(email),actor=(await h.state(cookie)).actor
   assert.equal(actor.role,'sales','new native members default to scoped sales')
-  await h.cmd('member.set',{operatorId:actor.id,version:0,role:role==='other'?'sales':role,teams:[role==='other'?blue.id:red.id]})
+  await h.cmd('member.set',{operatorId:actor.id,version:0,role:role==='other'?'sales':role==='billing2'?'billing':role,teams:[role==='other'?blue.id:red.id]})
   people[role]={cookie,...(await h.state(cookie)).actor}
  }
  await h.cmd('team.member',{operatorId:people.owner.id,teamId:red.id})
@@ -1328,7 +1328,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, pol
  const policy=async(required,defaultRole='owner')=>h.cmd('approval.policy',{version:(await h.state()).approvalSettings.policy.version,required,defaultRole})
  const rule=async condition=>h.cmd('approval.rule',{version:(await h.state()).approvalSettings.policy.version,name:'Manager above $25,000',position:0,condition,approvers:['role:manager']})
  await policy(false);await rule({kind:'totalOver',cents:2500000,currency:'USD'})
- const small=await prepare('sales',{priceOne:'2000',priceTwo:'3000'});await h.cmd('proposal.send',{id:small.id,version:1},people.sales.cookie)
+ const small=await prepare('sales',{priceOne:'2000',priceTwo:'3000'});assert.equal((await h.send('/api/platter/pipeline?nextAction=send',undefined,people.sales.cookie)).value.rows.some(r=>r.id===small.id),true);await h.cmd('proposal.send',{id:small.id,version:1},people.sales.cookie)
  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_approvals WHERE proposal_id=?').bind(small.id).first()).n,0)
  const large=await prepare('sales',{priceOne:'28000',priceTwo:'30000'});await h.cmd('proposal.send',{id:large.id,version:1},people.sales.cookie,409)
  await h.cmd('proposal.approve',{id:large.id,version:1,revision:1},people.sales.cookie,403)
@@ -1358,6 +1358,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, pol
   await h.cmd('proposal.revise',{...offer,clientId:client.id,id:p.id,version:1,terms:'Edited legal terms',priceOne:'28000',priceTwo:'30000'},people.sales.cookie)
   await h.cmd('proposal.approve',{id:p.id,version:2,revision:2},people.admin.cookie,403)
   await h.cmd('proposal.approve',{id:p.id,version:2,revision:2},people.manager.cookie)
+  await unchanged(()=>h.cmd('proposal.approve',{id:p.id,version:3,revision:2},people.billing2.cookie,403))
   await h.cmd('proposal.approve',{id:p.id,version:3,revision:2},people[order[0]].cookie)
   assert.equal((await current(p.id)).approval.complete,false)
   await h.cmd('proposal.send',{id:p.id,version:4},people.sales.cookie,409)

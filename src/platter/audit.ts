@@ -5,7 +5,7 @@ export async function recordAudit(db: D1Database, actor: Pick<Actor, 'id'> & { r
   .bind(crypto.randomUUID(), actor.keyId ? `agent:${actor.keyId}` : actor.id, actor.role, action, subject, Date.now()).run()
 }
 export async function auditRows(db: D1Database, actor: Actor, query: URLSearchParams) {
- need(actor.role === 'owner', 'Only the owner reads the audit log', 403)
+ need(['owner','admin'].includes(actor.role), 'Only the owner reads the audit log', 403)
  const filters: string[] = [], values: (string | number)[] = []
  for (const [parameter, column] of [['actor', 'actor_id'], ['action', 'action'], ['subject', 'subject']] as const) {
   const value = query.get(parameter)

@@ -113,7 +113,7 @@ export async function followupJourney(h, {offer, verified}) {
 
   await h.send('/auth/invite', {email: 'followup-member@studio.example', displayName: 'Sales member', role: 'member', returnTo: '/app'}, h.owner)
   const member = await h.signIn('followup-member@studio.example')
-  assert.equal((await h.send('/api/platter/followups', undefined, member)).status, 403)
+  const scoped=await h.send('/api/platter/followups', undefined, member);assert.equal(scoped.status,200);assert.equal(scoped.value.count,0)
   assert.equal((await h.send('/api/platter/followups')).status, 401)
   for (const [name, input] of [
     ['followup.schedule', {id: fixture.A.id, action: 'Unauthorized call', dueDate: '2027-03-10'}],

@@ -109,6 +109,7 @@ export async function templatesHttp(h) {
  await h.cmd('template.save', { id: source.id, version: original.version + 1, name: 'Not mine', templateId: template.id, templateVersion: 2 }, member, 403)
  assert.deepEqual((await h.state()).templates, refusedBefore)
  await h.cmd('pdf.downloads', { id: third.id, version: 1, enabled: true })
+ await h.cmd('proposal.share',{id:third.id,operatorId:(await h.state(member)).actor.id})
  const personal = await h.cmd('template.save', { id: third.id, version: 2, name: 'Casey’s personal template' }, member)
  const memberStarter = await h.cmd('template.start', { id: fresh.starterTemplates[1].id, version: 1, clientId: other.id }, member)
  assert.equal((await h.state(member)).proposals.find(p => p.id === memberStarter.id).sales_owner_id, (await h.state(member)).actor.id)

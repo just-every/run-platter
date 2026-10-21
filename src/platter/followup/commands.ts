@@ -6,7 +6,7 @@ import { queueMail, dispatchMail } from '../mail'
 import { state } from '../state'
 
 export async function followupCommand(env:Bindings,a:Actor,name:string,input:Record<string,unknown>) {
- need(a.role==='owner','Only the owner manages sales follow-ups',403)
+ need(['owner','admin','manager','sales'].includes(a.role),'Only the owner manages sales follow-ups',403)
  const db=env.DB,offer=await proposal(db,input.id),p=negotiatedView(offer,await pendingNegotiation(db,offer.id)),at=await currentTime(db)
  need(!await db.prepare('SELECT proposal_id FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()&&p.status!=='withdrawn','This proposal is closed',409)
  const current=(await state(env,a)).followups?.rows.find((r:any)=>r.id===p.id)

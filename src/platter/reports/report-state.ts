@@ -7,7 +7,7 @@ export const installationZone = async (db: D1Database) => (await db.prepare('SEL
 export const activePeople = (db: D1Database) => db.prepare("SELECT id,email,display_name,role FROM oa_operators WHERE status='active' AND role IN ('owner','admin','member') ORDER BY role DESC,display_name").all<any>().then(r => r.results)
 
 export async function reportState(env: Bindings, a: Actor) {
- if (a.role !== 'owner') return {}
+ if (!['owner','admin'].includes(a.role)) return {}
  const db = env.DB, people = await activePeople(db), everyone = (await db.prepare('SELECT id,email FROM oa_operators').all<any>()).results
  const schedules = (await db.prepare('SELECT * FROM p_report_schedules ORDER BY created_at,id').all<any>()).results
  const runs = (await db.prepare('SELECT * FROM p_report_runs ORDER BY ran_at DESC,id').all<any>()).results

@@ -1,3 +1,5 @@
+import { teamPage } from './team'
+import { approvalsPage } from './approvals'
 import { vendorSettings } from './attachments'
 import { accessPage, importPage } from './admin'
 import { clientsPage } from './clients'
@@ -22,6 +24,8 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
     let above = ''
     let layout = ''
     switch (url.pathname) {
+      case '/app/team': title='Team'; content=teamPage(state); break
+      case '/app/approvals': title='Approvals'; content=approvalsPage(state); break
       case '/app/settings': title = 'Vendor documents'; above = eyebrow('Settings · defaults for new proposals'); content = vendorSettings(state); break
       case '/app': title = 'Proposals'; above = eyebrow(`Pipeline · ${count((state.proposals ?? []).length, 'proposal')} · ${count((state.clients ?? []).length, 'client')}`); layout = 'proposals-page'; content = proposalsPage(state, url.searchParams, composerRefusal); break
       case '/app/proposal': {

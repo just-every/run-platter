@@ -20,7 +20,7 @@ export function changes(before: any, after: any): string {
 
 export function historyPanel(state: any, proposal: any, selection: URLSearchParams): string {
  const revisions = (state.revisions ?? []).filter((row: any) => row.proposal_id === proposal.id)
- const editable = ['draft', 'approved'].includes(proposal.status) && ['owner', 'member'].includes(state.actor?.role)
+ const editable = ['draft', 'approved'].includes(proposal.status) && proposal.canEdit
  const list = `<ol class="records">${revisions.map((row: any) => `<li><article><h3>Revision ${escape(row.revision)}</h3><p>${escape(String(row.prepared_by).startsWith('agent:') ? `Agent · ${(state.agentKeys ?? []).find((k: any) => 'agent:' + k.id === row.prepared_by)?.label ?? 'key ' + String(row.prepared_by).slice(6)}` : row.prepared_by)} · ${date(row.prepared_at)}</p>${editable && row.revision < proposal.revision ? form('proposal.restore', proposalPath(proposal.id), hidden('id', proposal.id) + hidden('version', proposal.version) + hidden('revision', row.revision) + `<button>Restore revision ${escape(row.revision)}</button>`) : ''}</article></li>`).join('')}</ol>`
  const from = Number(selection.get('from') ?? revisions.at(-1)?.revision), to = Number(selection.get('to') ?? proposal.revision)
  const options = (selected: number) => revisions.map((row: any) => `<option value="${escape(row.revision)}"${row.revision === selected ? ' selected' : ''}>Revision ${escape(row.revision)}</option>`).join('')

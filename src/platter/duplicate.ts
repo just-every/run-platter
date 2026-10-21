@@ -6,7 +6,7 @@ import { negotiatedView, pendingNegotiation } from './negotiation'
 
 /** Start an independent draft from the currently displayed proposal content. */
 export async function duplicateProposal(env: Bindings, a: Actor, input: Record<string, unknown>) {
- need(a.role === 'owner' || a.role === 'member', 'Only an owner or member duplicates proposals', 403)
+ need(['owner','admin','manager','sales','content_editor'].includes(a.role), 'Only an owner or member duplicates proposals', 403)
  const db = env.DB, source = await proposal(db, input.id)
  exact(source, input)
  const displayed = negotiatedView(source, await pendingNegotiation(db, source.id))

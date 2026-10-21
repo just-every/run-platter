@@ -1,3 +1,5 @@
+import { approvalPanel } from './approvals'
+import { sharingPanel } from './team'
 import { invitationComposer, invitationTimeline } from './invitation-mail'
 import { testMailPanel } from './test-mail'
 import { selectedSummary } from './packages'
@@ -22,8 +24,8 @@ import { date, empty, escape, form, hidden, money, notices, panel, proposalPath,
 export function proposalsPage(state: any, selection = new URLSearchParams(), feedback?: Feedback): string {
   const proposals = state.proposals ?? []
   const list = proposals.length ? `<ul class="records">${proposals.map((p: any) => `<li><a href="${escape(proposalPath(p.id))}">${escape(p.title)}</a><span>${escape(p.clientName)} · ${statusPill(p.status)}</span></li>`).join('')}</ul>` : empty('No proposals yet. Prepare your first proposal below.')
-  const canPrepare = ['owner', 'member'].includes(state.actor?.role)
-  const owner = state.actor?.role === 'owner'
+  const canPrepare = ['owner','admin','manager','sales','content_editor'].includes(state.actor?.role)
+  const owner = ['owner','admin','manager','sales','viewer'].includes(state.actor?.role)
   // Exceptions appear only when there is one, above the line they interrupt (owner pick A).
   const exceptions = (state.openQuestions?.length ? openQuestionsPanel(state) : '') + (state.bounceNotices?.length ? bounceInbox(state) : '')
   const prepare = canPrepare ? `<section class="prepare" aria-labelledby="prepare-title"><h2 id="prepare-title">Prepare a proposal</h2>` + (state.clients?.length
@@ -36,7 +38,7 @@ export function proposalsPage(state: any, selection = new URLSearchParams(), fee
 export function proposalEyebrow(state: any, id: string): string {
   const p = state.proposals?.find((item: any) => String(item.id) === id)
   if (!p) return ''
-  const editable = ['draft', 'approved'].includes(p.status) && ['owner', 'member'].includes(state.actor?.role)
+  const editable = ['draft', 'approved'].includes(p.status) && ['owner','admin','manager','sales','content_editor'].includes(state.actor?.role)
   return `<p class="eyebrow proposal-status">${editable ? 'Compose · ' : ''}${escape(p.status)} · Revision ${escape(p.revision)} · To ${escape(p.clientName)}${p.negotiating ? ` · Revision ${escape(p.sentRevision)} still with the client` : ''}</p>`
 }
 
@@ -59,7 +61,7 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   if (!p) return null
   const path = proposalPath(p.id)
   const owner = state.actor?.role === 'owner'
-  const person = ['owner', 'member'].includes(state.actor?.role)
+  const person = Boolean(p.canEdit)
   const frozen = p.status === 'sent' || p.status === 'accepted' || p.status === 'expired' || p.status === 'withdrawn'
   const pricing = p.currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'
   const sum = receiptSum(p.options ?? [], Number(p.deposit_bps), p.currency, p.acceptance?.optionId)
@@ -69,18 +71,18 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   let html = preparedLine(state, p)
   if (!frozen && person) {
     const actions = `<a class="button-link secondary" aria-label="Preview client page" href="/app/preview?id=${encodeURIComponent(p.id)}&amp;revision=${encodeURIComponent(p.revision)}">Preview</a><button form="composer-${escape(p.id)}" class="secondary">Save revision</button>`
-      + (owner && p.status === 'draft' ? form('proposal.approve', path, hidden('id', p.id) + hidden('version', p.version) + hidden('revision', p.revision) + '<button aria-label="Approve this revision"><span>Approve<span class="wide-only"> this revision</span></span></button>') : '')
-      + (owner && p.status === 'approved' ? `<button form="invitation-${escape(p.id)}" aria-label="Send approved proposal"><span>Send<span class="wide-only"> approved proposal</span></span></button>` : '')
+      + (p.canApprove && ['draft','approved'].includes(p.status) ? form('proposal.approve', path, hidden('id', p.id) + hidden('version', p.version) + hidden('revision', p.revision) + '<button aria-label="Approve this revision"><span>Approve<span class="wide-only"> this revision</span></span></button>') : '')
+      + (p.canSend && p.approval?.complete ? `<button form="invitation-${escape(p.id)}" aria-label="Send approved proposal"><span>Send<span class="wide-only"> approved proposal</span></span></button>` : '')
     const note = p.status === 'approved' ? `Approved by ${escape(personName(state, p.approved_by))} · ${date(p.approved_at)}. Sending freezes this offer; saving a revision clears the approval.` : owner ? 'Confirm the scope and exact offered prices before approving this revision. Saving a revision clears any previous approval.' : 'Saving a revision clears any previous approval. The owner approves the offer before it is sent.'
     html += `<div class="composer-page">${composerShelf(state)}${composerForm(state, p, 'revise', `composer-${p.id}`)}${negotiated}${exceptionBand(state, p, feedback, `composer-${p.id}`) ?? notices(feedback)}${receipt(sum, actions, note)}</div>`
   } else {
     const share = owner && p.shareToken && frozen ? `<a class="button-link" href="/p/${encodeURIComponent(p.shareToken)}">Open client proposal</a>` : ''
-    const fresh = owner && ['sent', 'expired'].includes(p.status) ? `<button form="invitation-${escape(p.id)}" class="secondary">Send fresh client link</button>` : ''
+    const fresh = p.canSend && ['sent', 'expired'].includes(p.status) ? `<button form="invitation-${escape(p.id)}" class="secondary">Send fresh client link</button>` : ''
     const note = frozen ? `${pricing} This offer is frozen. Its scope, options, and prices can no longer be revised.${fresh ? ' A fresh invitation replaces any previous client link and verification session while keeping the offer frozen.' : ''}` : pricing
     html += `<div class="composer-page frozen">${offerCards(p)}${exceptionBand(state, p, feedback, `negotiate-${p.id}`) ?? notices(feedback)}${receipt(sum, fresh + share, note)}</div>`
   }
   const itemised = pricingTables(p.options ?? [], p.currency)
-  const dossier: string[] = [followupPanel(state, p), withdrawalPanel(state, p), itemised ? `<section class="panel wide"><h2>Itemised pricing</h2>${itemised}</section>` : '', panel('Offer record', people(state, p)), proposalAttachments(state, p), p.status === 'withdrawn' ? '' : pdfPanel(state, p), expiryPanel(state, p)]
+  const dossier: string[] = [approvalPanel(p),sharingPanel(state,p),followupPanel(state, p), withdrawalPanel(state, p), itemised ? `<section class="panel wide"><h2>Itemised pricing</h2>${itemised}</section>` : '', panel('Offer record', people(state, p)), proposalAttachments(state, p), p.status === 'withdrawn' ? '' : pdfPanel(state, p), expiryPanel(state, p)]
   if (['sent', 'expired', 'withdrawn'].includes(p.status) && person) dossier.push(`<section class="panel wide"><h2>Negotiate a new revision</h2><p>The sent offer stays frozen. Prepare changed terms for a new approval before replacing the client invitation.</p>${composerForm(state, p, 'negotiate', `negotiate-${p.id}`, 'Prepare negotiated revision')}</section>`)
   dossier.push(paperAcceptanceForm(state, p, selection))
   if (p.acceptance) dossier.push(panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)}${p.acceptance.method === 'upload' ? '' : ` · ${escape(p.acceptance.email)}`}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd>${acceptanceMethod(p.acceptance, '/api/platter/attachments/' + encodeURIComponent(p.id) + '/')}</dl><p>The accepted agreement is permanent.</p>`))

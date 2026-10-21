@@ -57,7 +57,7 @@ export async function vendorDocuments(db: D1Database): Promise<AttachmentRef[]> 
 
 /** Settings replacement retains all prior file versions, including their original bytes. */
 export async function saveVendorDocument(db: D1Database, actor: Actor, kind: AttachmentKind, upload: AttachmentUpload | null) {
- need(actor.role === 'owner', 'Only the owner changes vendor document defaults', 403)
+ need(['owner','admin'].includes(actor.role), 'Only the owner changes vendor document defaults', 403)
  vendorKind(kind)
  if (upload === null) {
   await commit(db, actor, [db.prepare('DELETE FROM p_vendor_documents WHERE kind=?').bind(kind)], true)

@@ -1,3 +1,5 @@
+import { actorById } from './credentials'
+import { permitted, senders } from './permissions'
 import type { Bindings } from '../auth.server'
 import { commit, exact, fail, need, proposal, type Actor } from './model'
 import { dispatchMail, queueMail } from './mail'
@@ -44,7 +46,7 @@ function integer(value: unknown, label: string, min: number) {
  return n
 }
 export async function expiryCommand(env: Bindings, a: Actor, name: string, p: Record<string, unknown>) {
- need(a.role === 'owner', 'Only the owner changes expiry', 403)
+ need(['owner','admin','manager','sales','content_editor'].includes(a.role), 'Only the owner changes expiry', 403)
  need(name === 'expiry.set' || name === 'expiry.remove', 'Unknown expiry command', 404)
  const db = env.DB, row = await proposal(db, p.id), at = await currentTime(db)
  exact(row, p)
@@ -101,12 +103,13 @@ export async function runExpiry(env: Bindings, at: number) {
  AND NOT EXISTS(SELECT 1 FROM p_acceptances WHERE proposal_id=p.id)`).bind(now).all<any>()).results
  for (const e of due) {
   if (startOfDate(addDays(e.expires_on, -e.warning_days), e.time_zone) > now) continue
-  const owner = await db.prepare("SELECT id,email FROM oa_operators WHERE id=? AND role='owner' AND status='active'").bind(e.owner_id).first<any>()
-  if (!owner) continue
+  const owner = await actorById(db,e.owner_id)
+  if(owner){try{await permitted(db,owner,e.proposal_id,'send')}catch{continue}}
+  if (!owner || !senders.includes(owner.role)) continue
   const subject = 'Expiry warning: ' + e.title
   const body = `This proposal expires at the start of ${e.expires_on} (${e.time_zone}). Verify your email to review and accept before that date.\n${env.AUTH_ORIGIN}/p/${e.token}\n\nThis is a fixed automatic expiry warning. Shared editable email templates are not available.`
   try {
-   await commit(db, { id: owner.id, email: owner.email, role: 'owner' }, [
+   await commit(db, owner, [
     db.prepare('UPDATE p_expiry SET warning_sent_at=? WHERE proposal_id=?').bind(now, e.proposal_id),
     queueMail(env, e.proposal_id, e.recipient, subject, body),
     db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(), 'scheduler', 'owner', 'expiry.warning', e.proposal_id, now),

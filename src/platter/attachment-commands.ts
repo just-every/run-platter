@@ -1,3 +1,4 @@
+import { permitted } from './permissions'
 import { copyAttachments, prepareAttachment, saveVendorDocument, vendorDocuments, type AttachmentKind } from './attachments'
 import { commit, exact, need, proposal, snapshot, type Actor } from './model'
 
@@ -8,7 +9,7 @@ export async function attachmentUpload(db:D1Database,a:Actor,form:FormData){
  need(file instanceof File,'Choose an attachment file')
  const upload={filename:file.name,mediaType:file.type,bytes:await file.arrayBuffer()}
  if(kind){const attachment=await saveVendorDocument(db,a,kind as AttachmentKind,upload);return {id:undefined,attachment}}
- const row=await proposal(db,form.get('id'));exact(row,{version:form.get('version')})
+ const row=await permitted(db,a,form.get('id'),'edit');exact(row,{version:form.get('version')})
  need(row.status==='draft'||row.status==='approved','Upload attachments before sending',409)
  const prepared=await prepareAttachment(db,upload),attachments=[...copyAttachments(JSON.parse(row.attachments)),prepared.attachment]
  return saveRevision(db,a,row,attachments,prepared.writes)

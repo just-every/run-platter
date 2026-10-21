@@ -1,7 +1,7 @@
 import { action, date, escape, field, hidden, panel, proposalPath, type Feedback } from './shared'
 
 export function invitationComposer(state: any, p: any, feedback?: Feedback) {
- if (state.actor?.role !== 'owner' || !['approved', 'sent', 'expired'].includes(p.status)) return ''
+ if (!p.canSend || (!p.approval?.complete && !['sent','expired'].includes(p.status))) return ''
  const retry = feedback?.command === 'proposal.send' && feedback.input?.id === p.id ? feedback.input : undefined
  return panel('Review invitation email', `<form id="invitation-${escape(p.id)}" method="post" action="${action('proposal.send', proposalPath(p.id))}">${hidden('id', p.id)}${hidden('version', p.version)}<p>The personal message goes with a new client link. Sending keeps this revision’s approved content.</p>` +
   field('Invitation subject', 'mailSubject', retry?.mailSubject ?? ('Your proposal: ' + p.title).slice(0, 200), 'required maxlength="200"') +

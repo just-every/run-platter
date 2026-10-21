@@ -1,7 +1,7 @@
 import { escape, field, form, hidden, panel, proposalPath } from './shared'
 
 export function personalTemplates(state: any): string {
- if (!['owner', 'member'].includes(state.actor?.role) || !state.templates?.length) return ''
+ if (!['owner','admin','manager','sales','content_editor'].includes(state.actor?.role) || !state.templates?.length) return ''
  const clients = (state.clients ?? []).map((c: any) => `<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('')
  return panel('Personal templates', '<p>Start an independent draft for a client. Later template changes do not change that draft.</p>'
   + state.templates.map((t: any) => `<article><h3>${escape(t.name)}</h3><p>Version ${escape(t.version)} · your personal template</p>`
@@ -11,7 +11,7 @@ export function personalTemplates(state: any): string {
 }
 
 export function savePersonalTemplate(state: any, p: any): string {
- if (!['owner', 'member'].includes(state.actor?.role) || p.currency !== 'USD') return ''
+ if (!['owner','admin','manager','sales','content_editor'].includes(state.actor?.role) || p.currency !== 'USD') return ''
  const source = hidden('id', p.id) + hidden('version', p.version)
  const replace = (state.templates ?? []).map((t: any) => form('template.save', proposalPath(p.id), source
   + hidden('templateId', t.id) + hidden('templateVersion', t.version) + hidden('name', t.name)
@@ -22,7 +22,7 @@ export function savePersonalTemplate(state: any, p: any): string {
 }
 
 export function starterTemplatesPanel(state: any): string {
- if (!['owner', 'member'].includes(state.actor?.role)) return ''
+ if (!['owner','admin','manager','sales','content_editor'].includes(state.actor?.role)) return ''
  const clients = (state.clients ?? []).map((c: any) => `<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('')
  const choices = (state.starterTemplates ?? []).map((t: any) => `<option value="${escape(t.id)}">${escape(t.name)}</option>`).join('')
  return panel('Starter templates', '<p>Five starting points with example USD pricing. Client and sender details are filled when you start an independent draft. Review scope, prices and terms before approval.</p>'

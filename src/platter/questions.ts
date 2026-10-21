@@ -1,3 +1,4 @@
+import { permitted, scope, senders } from './permissions'
 import { currentTime } from './expiry-time'
 import type { Bindings } from '../auth.server'
 import { commit, fail, hash, need, text, type Actor } from './model'
@@ -41,8 +42,8 @@ export async function clientQuestionState(db:D1Database,c:ClientContext) {
 }
 
 async function activeOwner(db:D1Database,a:Actor) {
- need(a.role==='owner','Only the owner manages client questions',403)
- const owner=await db.prepare("SELECT id,email,version FROM oa_operators WHERE id=? AND email=? AND role='owner' AND status='active'").bind(a.id,a.email).first<{id:string;email:string;version:number}>()
+ need(senders.includes(a.role),'Your role cannot manage client questions',403)
+ const owner=await db.prepare("SELECT id,email,version FROM oa_operators WHERE id=? AND email=? AND status='active'").bind(a.id,a.email).first<{id:string;email:string;version:number}>()
  need(owner,'An active owner account is required',403)
  return owner
 }
@@ -51,7 +52,8 @@ async function activeOwner(db:D1Database,a:Actor) {
 export async function openQuestions(db:D1Database,a:Actor) {
  await activeOwner(db,a)
  const withdrawn=(await db.prepare('SELECT proposal_id,revision FROM p_withdrawals').all<any>()).results
- return (await questionState(db)).questions.filter(q=>q.status==='open'&&!withdrawn.some(w=>w.proposal_id===q.proposal_id&&w.revision===q.revision))
+ const visibility=scope(a,'send'),visible=new Set((await db.prepare('SELECT p.id FROM p_proposals p WHERE '+visibility.sql).bind(...visibility.values).all<any>()).results.map(p=>p.id))
+ return (await questionState(db)).questions.filter(q=>visible.has(q.proposal_id)&&q.status==='open'&&!withdrawn.some(w=>w.proposal_id===q.proposal_id&&w.revision===q.revision))
 }
 
 /** A current sent revision remains discussable while its acceptance is expired. */
@@ -88,6 +90,7 @@ export interface AnswerInput {
  */
 export async function recordAnswer(env:Bindings,a:Actor,input:AnswerInput,hook?:{guard:QuestionGuard;writes:D1PreparedStatement[]}) {
  const db=env.DB,owner=await activeOwner(db,a),id=text(input.id,'a proposal'),questionId=text(input.questionId,'a question'),normalizedBody=text(input.text,'your answer',10000)
+ await permitted(db,a,id,'send')
  const source=input.source??'app';need(source==='app'||source==='email','Unknown answer source')
  const body=source==='email'?input.text as string:normalizedBody
  need(source!=='email'||input.sourceId!==undefined,'Authenticated inbound message identity is required')
@@ -98,7 +101,7 @@ export async function recordAnswer(env:Bindings,a:Actor,input:AnswerInput,hook?:
  const question=await db.prepare('SELECT q.*,p.title FROM p_questions q JOIN p_proposals p ON p.id=q.proposal_id WHERE q.id=? AND q.proposal_id=?').bind(questionId,id).first<any>()
  need(question,'Question not found on this proposal',404)
  need(!(await db.prepare('SELECT id FROM p_withdrawals WHERE proposal_id=? AND revision=?').bind(id,question.revision).first()),'Withdrawn revisions are read-only',409)
- const guard={sql:"NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=? AND revision=?) AND EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND email=? AND version=? AND role='owner' AND status='active') AND EXISTS(SELECT 1 FROM p_questions WHERE id=? AND proposal_id=? AND revision=? AND client_id=? AND client_email=?)",values:[id,question.revision,owner.id,owner.email,owner.version,questionId,id,question.revision,question.client_id,question.client_email]}
+ const guard={sql:"NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=? AND revision=?) AND EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND email=? AND version=? AND status='active') AND EXISTS(SELECT 1 FROM p_questions WHERE id=? AND proposal_id=? AND revision=? AND client_id=? AND client_email=?)",values:[id,question.revision,owner.id,owner.email,owner.version,questionId,id,question.revision,question.client_id,question.client_email]}
  if(hook){guard.sql+=' AND ('+hook.guard.sql+')';guard.values.push(...hook.guard.values)}
  const prior=await db.prepare('SELECT id,question_id,text,owner_id FROM p_question_answers WHERE source_key=?').bind(sourceKey).first<any>()
  if(prior){need(source!=='email','This reply has already been recorded',409);need(prior.question_id===questionId&&prior.owner_id===a.id&&prior.text===body,'This message identity has already been used',409);await commit(db,a,[],true,guard);return {id,questionId,answerId:prior.id,replayed:true}}
@@ -107,7 +110,7 @@ export async function recordAnswer(env:Bindings,a:Actor,input:AnswerInput,hook?:
   db.prepare('UPDATE p_question_reply_keys SET used_at=? WHERE question_id=? AND used_at IS NULL').bind(at,questionId),
   db.prepare('INSERT INTO p_question_answers(id,question_id,text,owner_id,owner_email,source,source_key,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(answerId,questionId,body,a.id,a.email,source,sourceKey,at),
   queueMail(env,id,question.client_email,'Answer to your question: '+question.title,`The owner answered your ${question.section} question on revision ${question.revision}.\n\nYour question:\n${question.text}\n\nAnswer:\n${body}`,a.id),
-  audit(db,a.id,'owner','question.answer',questionId,at)
+  audit(db,a.id,a.role,'question.answer',questionId,at)
  ],true,guard) }catch(error){
   // A concurrent delivery may have committed the same authenticated message first.
   if(source==='app'&&(error as any)?.status===409){const duplicate=await db.prepare('SELECT id,question_id,text,owner_id FROM p_question_answers WHERE source_key=?').bind(sourceKey).first<any>();if(duplicate&&duplicate.question_id===questionId&&duplicate.owner_id===a.id&&duplicate.text===body){await commit(db,a,[],true,guard);return {id,questionId,answerId:duplicate.id,replayed:true}}}
@@ -120,6 +123,7 @@ export async function recordAnswer(env:Bindings,a:Actor,input:AnswerInput,hook?:
 export async function questionCommand(env:Bindings,a:Actor,name:string,input:Record<string,unknown>) {
  need(name==='question.answer'||name==='question.email','Unknown question action',404)
  if(name==='question.email'){
+  need(a.role==='owner','Only the owner uses inbound reply capabilities',403)
   const db=env.DB,owner=await activeOwner(db,a),id=text(input.id,'a proposal'),questionId=text(input.questionId,'a question')
   need(!(await db.prepare('SELECT w.id FROM p_withdrawals w JOIN p_proposals p ON p.id=w.proposal_id AND p.revision=w.revision WHERE p.id=?').bind(id).first()),'Withdrawn proposals are read-only',409)
  const question=await db.prepare('SELECT q.*,p.title FROM p_questions q JOIN p_proposals p ON p.id=q.proposal_id WHERE q.id=? AND q.proposal_id=?').bind(questionId,id).first<any>()

@@ -7,7 +7,7 @@ import { negotiatedView, pendingNegotiation } from './negotiation'
 import { installationZone } from './reports/report-state'
 
 export async function templateState(db: D1Database, a: Actor) {
- need(['owner', 'member', 'agent'].includes(a.role), 'Personal template access is required', 403)
+ need(['owner','admin','manager','sales','content_editor','agent','viewer','billing'].includes(a.role), 'Personal template access is required', 403)
  const rows = (await db.prepare('SELECT * FROM p_personal_templates WHERE owner_id=? ORDER BY updated_at DESC,id').bind(a.id).all<any>()).results
  return rows.map(row => ({ ...row, snapshot: JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
 }
@@ -22,7 +22,7 @@ async function ownTemplate(db: D1Database, a: Actor, id: unknown) {
 
 export async function templateCommand(env: Bindings, a: Actor, name: string, input: Record<string, unknown>) {
  need(name === 'template.save' || name === 'template.start', 'Unknown template command', 404)
- need(a.role === 'owner' || a.role === 'member' || (a.role === 'agent' && name === 'template.start'), 'A person saves personal templates', 403)
+ need(['owner','admin','manager','sales','content_editor'].includes(a.role) || (a.role === 'agent' && name === 'template.start'), 'A person saves personal templates', 403)
  const db = env.DB, at = await currentTime(db)
  if (name === 'template.save') {
   const source = await proposal(db, input.id)

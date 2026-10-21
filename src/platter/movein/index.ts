@@ -7,7 +7,7 @@ import { clientSource, namespace } from './csv.ts'
 import { clientTargets, destination, mappingVersion } from './targets.ts'
 import { fail, requiredText } from './errors.ts'
 
-export type Actor = { id: string; email: string; role: 'owner' | 'member' | 'agent' }
+export type Actor = { id: string; email: string; role: import('../model').Actor['role'] }
 const ownerSql = "EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND role='owner' AND status='active')"
 async function owner(db: D1Database, who: Actor) {
   if (who.role !== 'owner') fail('owner_required', 403, 'Only an owner can move clients in')

@@ -1,7 +1,7 @@
 import { need } from './model'
 
 export const nextActions = { approve: 'Approve revision', send: 'Send approved offer', 'await-client': 'Await client decision', 'export-deposit': 'Export deposit invoice', complete: 'Deposit invoice exported', withdrawn: 'Prepare a new revision', reopen: 'Review expiry or reopening', followup: 'Sales follow-up' }
-const statuses = ['draft', 'approved', 'sent', 'accepted', 'expired', 'withdrawn', 'declined', 'lost']
+const statuses = ['draft', 'awaiting-approval', 'approved', 'sent', 'accepted', 'expired', 'withdrawn', 'declined', 'lost']
 const sorts = ['status', 'value', 'owner', 'client', 'age', 'nextAction', 'dueDate']
 function bound(params: URLSearchParams, key: string, money = false) {
  const raw = params.get(key)

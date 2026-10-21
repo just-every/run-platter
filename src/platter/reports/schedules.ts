@@ -1,3 +1,4 @@
+import { actorById } from '../credentials'
 import type { Bindings } from '../../auth.server'
 import { operatorMail } from '../../mail.server.mjs'
 import { demoEffect } from '@runeditrun/rer/internal/modules/demo/index.mjs'
@@ -29,7 +30,7 @@ function recipientEmails(p: Record<string, unknown>) {
 
 export async function reportCommand(env: Bindings, a: Actor, name: string, p: Record<string, unknown>) {
  const db = env.DB
- need(a.role === 'owner', 'Only the owner schedules report email', 403)
+ need(['owner','admin'].includes(a.role), 'Only the owner schedules report email', 403)
  if (name === 'report.time-zone') {
   const zone = text(p.timeZone, 'an IANA time zone such as America/New_York', 64)
   need(validZone(zone), 'Enter an IANA time zone such as America/New_York')
@@ -63,10 +64,10 @@ export async function runDueReports(env: Bindings, at: number) {
  for (const s of due) {
   const claimed = await db.prepare('UPDATE p_report_schedules SET next_run_at=?,last_run_at=? WHERE id=? AND next_run_at=?').bind(nextRun(s.cadence, s.weekday, s.hour, at, zone), at, s.id, s.next_run_at).run()
   if (!claimed.meta.changes) continue
-  const owner = await db.prepare("SELECT id,email FROM oa_operators WHERE id=? AND role='owner' AND status='active'").bind(s.owner_id).first<any>()
+  const person=await actorById(db,s.owner_id),owner=person&&['owner','admin'].includes(person.role)?person:undefined
   const runId = crypto.randomUUID(), people = await activePeople(db), ids: string[] = JSON.parse(s.recipients)
   const to = owner ? people.filter(p => ids.includes(p.id)) : [], skipped = owner ? ids.filter(id => !to.some(p => p.id === id)).map(() => 'no longer active') : ['schedule owner is no longer an active owner']
-  const snapshot=owner?await state(env,{id:owner.id,email:owner.email,role:'owner'}):null
+  const snapshot=owner?await state(env,owner):null
   const report = snapshot ? pipeline(snapshot.proposals,new URLSearchParams(s.filters),at,snapshot.followups) : { rows: [], count: 0 }
   const writes = [db.prepare('INSERT INTO p_report_runs(id,schedule_id,ran_at,row_count,skipped) VALUES(?,?,?,?,?)').bind(runId, s.id, at, report.count, JSON.stringify(skipped))]
   if (owner) {

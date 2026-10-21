@@ -79,6 +79,7 @@ test('COLLAB-003 every saved revision has an author/time, comparisons highlight 
  await h.cmd('proposal.restore',{id:p.id,version:3,revision:1},h.owner,409)
  await h.send('/auth/invite',{email:'editor@studio.example',displayName:'Proposal editor',role:'member',returnTo:'/app'},h.owner)
  const member=await h.signIn('editor@studio.example')
+ await h.cmd('proposal.share',{id:p.id,operatorId:(await h.state(member)).actor.id})
  await h.cmd('proposal.restore',{id:p.id,version:4,revision:1},member)
  const after=await h.state(), restored=after.proposals.find(row=>row.id===p.id)
  assert.equal(restored.prepared_by,'editor@studio.example');assert.equal(after.revisions.find(r=>r.proposal_id===p.id&&r.revision===4).prepared_by,'editor@studio.example')
@@ -158,11 +159,11 @@ test('FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposal
     assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
    }
   }
-  fixture.push({id:made.id,title:input.title,status,owner:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':status==='sent'?'await-client':status==='expired'?'reopen':['withdrawn','declined','lost'].includes(status)?'withdrawn':'export-deposit'})
+  fixture.push({id:made.id,title:input.title,status:status==='draft'?'awaiting-approval':status,owner:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':status==='sent'?'await-client':status==='expired'?'reopen':['withdrawn','declined','lost'].includes(status)?'withdrawn':'export-deposit'})
  }
  const scheduled=fixture.filter(p=>p.status==='sent').slice(0,2)
  for(const [i,row] of scheduled.entries()){await h.cmd('followup.schedule',{id:row.id,action:'Call the client',dueDate:i?'2000-03-02':'2000-03-01'});row.nextAction='followup'}
- const aged=fixture.find(p=>p.status==='draft')
+ const aged=fixture.find(p=>p.status==='awaiting-approval')
  await h.db.prepare('UPDATE p_proposals SET created_at=? WHERE id=?').bind(Date.now()-3*86400000-3600000,aged.id).run()
  const report=async query=>{const r=await h.send('/api/platter/pipeline'+(query?'?'+query:''),undefined,h.owner);assert.equal(r.status,200,r.text);return r.value}
  const all=await report('sort=value&direction=desc')
@@ -183,7 +184,7 @@ test('FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposal
   ['status=expired',fixture.filter(p=>p.status==='expired')],['nextAction=reopen',fixture.filter(p=>p.status==='expired')],
   ['client='+clients[0].id,fixture.filter(p=>p.client===clients[0].id)],
   ['minValue=2100&maxValue=2400',fixture.filter(p=>p.valueCents>=210000&&p.valueCents<=240000)],
-  ['minAge=0&maxAge=0',fixture.filter(p=>p.id!==aged.id)],['minAge=3&maxAge=3',[aged]],['minAge=4',[]],['nextAction=approve',fixture.filter(p=>p.status==='draft')],
+  ['minAge=0&maxAge=0',fixture.filter(p=>p.id!==aged.id)],['minAge=3&maxAge=3',[aged]],['minAge=4',[]],['nextAction=approve',fixture.filter(p=>p.status==='awaiting-approval')],
  ])assert.deepEqual(new Set((await report(query)).rows.map(p=>p.id)),new Set(expected.map(p=>p.id)))
  for(const sort of ['status','owner','client','age','nextAction']){
   const rows=(await report('sort='+sort)).rows
@@ -191,9 +192,9 @@ test('FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposal
   for(let i=1;i<rows.length;i++)assert.ok(sort==='age'?rows[i-1][field]<=rows[i][field]:rows[i-1][field].localeCompare(rows[i][field])<=0)
  }
  for(const query of ['sort=invalid','status=paid','minValue=1.234','minAge=-1','minValue=20&maxValue=10'])assert.equal((await h.send('/api/platter/pipeline?'+query,undefined,h.owner)).status,400)
- assert.equal((await h.send('/api/platter/pipeline',undefined,people[1].cookie)).status,403)
+ assert.equal((await h.send('/api/platter/pipeline',undefined,people[1].cookie)).value.count,fixture.filter(p=>p.owner===people[1].id).length)
  assert.equal((await h.send('/api/platter/pipeline')).status,401)
- const owned=fixture.find(p=>p.status==='draft'&&p.owner===people[1].id)
+ const owned=fixture.find(p=>p.status==='awaiting-approval'&&p.owner===people[1].id)
  await h.cmd('proposal.revise',{...offer,clientId:owned.client,id:owned.id,version:1},h.owner)
  assert.equal((await report()).rows.find(p=>p.id===owned.id).ownerId,people[1].id,'later editor never becomes the sales owner')
  const key=await h.cmd('agent.create',{label:'Campaign assistant'})
@@ -534,6 +535,7 @@ test('SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by uplo
  await h.db.prepare("DELETE FROM p_mail WHERE subject='Your Platter verification code'").run()
  assert.equal((await h.send(otherPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},await verified(h,otherPath))).status,200)
  assert.equal((await h.state()).proposals.find(x=>x.id===other.id).acceptance.method,'platter')
+ await h.cmd('proposal.share',{id:p.id,operatorId:(await h.state(member)).actor.id})
  assert.equal((await h.state(member)).proposals.find(x=>x.id===p.id).acceptance.signedCopy.id,a.signedCopy.id)
  const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows;assert.ok(audit.some(x=>x.action==='acceptance.upload'&&x.subject===p.id&&x.actor_id&&x.occurred_at),'TEAM-004 acceptance.upload')
 }))
@@ -555,7 +557,7 @@ test('FOLLOW-005 / EDIT-016 / REPORT-005 / FOLLOW-002 / TEAM-004 pipeline export
  await h.cmd('report.time-zone',{timeZone:'America/New_York'});assert.equal((await h.state()).timeZone,'America/New_York')
  assert.equal((await h.send('/api/platter/pipeline?q='+encodeURIComponent('.*'),undefined,h.owner)).value.count,0,'search punctuation is literal')
  assert.equal((await h.send('/api/platter/pipeline?q='+encodeURIComponent('x'.repeat(201)),undefined,h.owner)).status,400)
- assert.equal((await h.send('/api/platter/pipeline?q=seasonal',undefined,member)).status,403)
+ assert.equal((await h.send('/api/platter/pipeline?q=seasonal',undefined,member)).value.count,0)
  assert.equal((await h.send('/api/platter/pipeline?q=seasonal')).status,401)
  const newYork=at=>Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hourCycle:'h23',weekday:'long',hour:'numeric',minute:'numeric'}).formatToParts(at).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]))
  const schedule={cadence:'weekly',weekday:1,hour:8,filters,recipients:['owner@studio.example','colleague@studio.example']}
@@ -777,6 +779,7 @@ test('EDIT-012 duplicate accepted content into an independent member-owned draft
  await h.cmd('invoice.export',{id:p.id})
  await h.send('/auth/invite',{email:'sales@studio.example',displayName:'Morgan Sales',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('sales@studio.example'),actor=(await h.state(member)).actor
  const before=await get(p.id),accepted=(await h.send(path,undefined,cookie)).text
+ await h.cmd('proposal.share',{id:p.id,operatorId:actor.id})
  await h.cmd('proposal.duplicate',{id:p.id,version:1,clientId:beta.id},member,409)
  const copy=await h.cmd('proposal.duplicate',{id:p.id,version:before.version,clientId:beta.id},member),after=await get(copy.id)
  assert.notEqual(copy.id,p.id);assert.equal(after.status,'draft');assert.equal(after.revision,1);assert.equal(after.version,1);assert.equal(after.client_id,beta.id);assert.equal(after.clientName,'Beta Co');assert.equal(after.clientEmail,'contact@beta.example');assert.equal(after.sales_owner_id,actor.id);assert.equal(after.prepared_by,actor.email)
@@ -811,6 +814,7 @@ test('EDIT-018 member-only exact-revision previews share selection math and neve
  await h.cmd('expiry.set',{id:p.id,version:2,mode:'days',days:14,warningDays:1})
  await h.send('/auth/invite',{email:'previewer@studio.example',displayName:'Previewer',role:'member',returnTo:'/app'},h.owner)
  const member=await h.signIn('previewer@studio.example')
+ await h.cmd('proposal.share',{id:p.id,operatorId:(await h.state(member)).actor.id})
  const key=await h.cmd('agent.create',{label:'Preview boundary'})
  const url=`/app/preview?id=${p.id}&revision=2`,inner=url.replace('/app/preview?','/app/preview/client?')
  const unchanged=()=>h.state(),audit=async()=>(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
@@ -827,7 +831,7 @@ test('EDIT-018 member-only exact-revision previews share selection math and neve
   }
  }
  const viewedAudit=await audit(),previewRows=viewedAudit.filter(row=>row.action==='proposal.preview')
- assert.equal(previewRows.length,12);for(const row of previewRows){assert.equal(row.subject,p.id);assert.ok(row.actor_id);assert.ok(['owner','member'].includes(row.actor_role));assert.ok(Number.isFinite(row.occurred_at))}
+ assert.equal(previewRows.length,12);for(const row of previewRows){assert.equal(row.subject,p.id);assert.ok(row.actor_id);assert.ok(['owner','sales'].includes(row.actor_role));assert.ok(Number.isFinite(row.occurred_at))}
  assert.deepEqual(viewedAudit.filter(row=>row.action!=='proposal.preview'),initialAudit)
  for(const path of [url,inner]){
   assert.equal((await h.send(path)).status,401)
@@ -1157,6 +1161,7 @@ test('SEND-006 self-test mail uses only the active sign-in address, previews an 
  // Another member has an independent quota and receives only their own rehearsal.
  await h.send('/auth/invite',{email:'editor@studio.example',displayName:'Editor',role:'member',returnTo:'/app'},h.owner)
  const member=await h.signIn('editor@studio.example')
+ await h.cmd('proposal.share',{id:p.id,operatorId:(await h.state(member)).actor.id})
  await h.cmd('proposal.test-mail',input,member)
  const memberState=await h.state(member)
  assert.equal(memberState.proposals.find(row=>row.id===p.id).testMail.length,1)
@@ -1186,7 +1191,7 @@ test('SEND-006 self-test mail uses only the active sign-in address, previews an 
  const proposal=(await h.state()).proposals.find(row=>row.id===p.id)
  assert.equal(proposal.revision,2);assert.equal(proposal.status,'draft');assert.equal(proposal.sentRevision,1)
  const audit=(await h.send('/api/platter/audit?action=proposal.test-mail',undefined,h.owner)).value.rows
- assert.ok(audit.every(row=>row.subject===p.id&&['owner','member'].includes(row.actor_role)&&row.occurred_at>0))
+ assert.ok(audit.every(row=>row.subject===p.id&&['owner','sales'].includes(row.actor_role)&&row.occurred_at>0))
  assert.ok(!JSON.stringify(audit).includes(input.message))
 }))
 
@@ -1258,4 +1263,97 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  const sameTimeAudit=(await h.send('/api/platter/audit?action=proposal.lose&subject='+lost.id,undefined,h.owner)).value.rows
  assert.equal(sameTimeAudit.length,2);assert.ok(sameTimeAudit.every(row=>row.occurred_at===clock));assert.deepEqual(sameTimeAudit.map(row=>row.reason).sort(),['Funding withdrawn','Project cancelled'],'separate outcomes at the same server time retain their own audit reason')
  const accepted=await current(p.id);await h.cmd('proposal.lose',{id:p.id,version:accepted.version,reason:'Too late'},h.owner,409)
+}))
+
+test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP',()=>run(async h=>{
+ assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
+ const people={owner:{cookie:h.owner,...(await h.state()).actor}},red=await h.cmd('team.create',{name:'Sales East'}),blue=await h.cmd('team.create',{name:'Sales West'})
+ for(const role of ['admin','manager','sales','content_editor','viewer','billing','other']){
+  const email=role+'@synthetic-platter.example';assert.equal((await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)).status,202)
+  const cookie=await h.signIn(email),actor=(await h.state(cookie)).actor
+  assert.equal(actor.role,'sales','new native members default to scoped sales')
+  await h.cmd('member.set',{operatorId:actor.id,version:0,role:role==='other'?'sales':role,teams:[role==='other'?blue.id:red.id]})
+  people[role]={cookie,...(await h.state(cookie)).actor}
+ }
+ await h.cmd('team.member',{operatorId:people.owner.id,teamId:red.id})
+ const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
+ const prepare=(person='sales',extra={})=>h.cmd('proposal.prepare',{...offer,clientId:client.id,...extra},people[person].cookie)
+ const current=async id=>(await h.state()).proposals.find(p=>p.id===id)
+ const unchanged=async fn=>{const tables=['p_proposals','p_revisions','p_approvals','p_approval_decisions','p_mail','p_audit','p_collaborators'];const read=()=>Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all().then(r=>r.results)));const before=await read();await fn();assert.deepEqual(await read(),before,'refusal writes neither business state nor audit/mail')}
+ const outside=await prepare('other',{title:'Private west proposal'}),inside=await prepare('sales',{title:'East proposal'})
+ assert.equal((await h.send('/app/proposal?id='+outside.id,undefined,people.manager.cookie)).status,403)
+ assert.equal((await h.send('/app/proposal?id='+inside.id,undefined,people.manager.cookie)).status,200)
+ for(const [role,expected] of [['owner',true],['admin',true],['manager',false],['sales',false],['content_editor',false],['viewer',false],['billing',true]]){
+  const s=await h.state(people[role].cookie);assert.equal(s.proposals.some(p=>p.id===outside.id),expected,role+' view scope');assert.equal(s.revisions.some(r=>r.proposal_id===outside.id),expected,role+' revision scope')
+  if(!expected)await unchanged(()=>h.cmd('proposal.revise',{...offer,clientId:client.id,id:outside.id,version:1},people[role].cookie,403))
+ }
+ assert.equal((await h.send('/api/platter/pipeline?q=Private',undefined,people.sales.cookie)).value.count,0)
+ await h.cmd('proposal.share',{id:outside.id,operatorId:people.sales.id},people.other.cookie)
+ assert.equal((await h.state(people.sales.cookie)).proposals.some(p=>p.id===outside.id),true)
+ await h.cmd('proposal.revise',{...offer,clientId:client.id,id:outside.id,version:1},people.sales.cookie)
+ await h.cmd('proposal.approve',{id:outside.id,version:2,revision:2})
+ await h.cmd('proposal.send',{id:outside.id,version:3},people.sales.cookie)
+ await h.cmd('proposal.share',{id:outside.id,operatorId:people.sales.id,shared:false},people.other.cookie)
+ assert.equal((await h.state(people.sales.cookie)).proposals.some(p=>p.id===outside.id),false)
+ // Existing send/edit/template/report/audit/policy/key doors exercise every current role.
+ for(const role of ['owner','admin','manager','sales','content_editor','viewer','billing']){
+  const person=people[role],made=await prepare('sales',{title:'Matrix '+role});await h.cmd('proposal.share',{id:made.id,operatorId:person.id})
+  const canEdit=['owner','admin','manager','sales','content_editor'].includes(role)
+  if(canEdit){await h.cmd('proposal.revise',{...offer,clientId:client.id,id:made.id,version:1},person.cookie);await h.cmd('template.save',{id:made.id,version:2,name:'Personal '+role},person.cookie)}
+  else await unchanged(()=>h.cmd('proposal.revise',{...offer,clientId:client.id,id:made.id,version:1},person.cookie,403))
+  let row=await current(made.id)
+  if(role!=='owner')await unchanged(()=>h.cmd('proposal.approve',{id:row.id,version:row.version,revision:row.revision},person.cookie,403))
+  await h.cmd('proposal.approve',{id:row.id,version:row.version,revision:row.revision});row=await current(made.id)
+  if(['owner','admin','manager','sales'].includes(role))await h.cmd('proposal.send',{id:row.id,version:row.version},person.cookie)
+  else await unchanged(()=>h.cmd('proposal.send',{id:row.id,version:row.version},person.cookie,403))
+  assert.equal((await h.send('/api/platter/audit',undefined,person.cookie)).status,['owner','admin'].includes(role)?200:403)
+  assert.equal((await h.send('/api/platter/pipeline',undefined,person.cookie)).status,['owner','admin','manager','sales','viewer'].includes(role)?200:403)
+  if(role!=='owner')await h.cmd('agent.create',{label:'synthetic-platter-denied'},person.cookie,403)
+ }
+ const policy=async(required,defaultRole='owner')=>h.cmd('approval.policy',{version:(await h.state()).approvalSettings.policy.version,required,defaultRole})
+ const rule=async condition=>h.cmd('approval.rule',{version:(await h.state()).approvalSettings.policy.version,name:'Manager above $25,000',position:0,condition,approvers:['role:manager']})
+ await policy(false);await rule({kind:'totalOver',cents:2500000,currency:'USD'})
+ const small=await prepare('sales',{priceOne:'2000',priceTwo:'3000'});await h.cmd('proposal.send',{id:small.id,version:1},people.sales.cookie)
+ assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_approvals WHERE proposal_id=?').bind(small.id).first()).n,0)
+ const large=await prepare('sales',{priceOne:'28000',priceTwo:'30000'});await h.cmd('proposal.send',{id:large.id,version:1},people.sales.cookie,409)
+ await h.cmd('proposal.approve',{id:large.id,version:1,revision:1},people.sales.cookie,403)
+ await h.cmd('proposal.approve',{id:large.id,version:1,revision:1},people.manager.cookie)
+ await h.cmd('proposal.revise',{...offer,clientId:client.id,id:large.id,version:2,priceOne:'29000',priceTwo:'31000'},people.sales.cookie)
+ await h.cmd('proposal.send',{id:large.id,version:3},people.sales.cookie,409)
+ await h.cmd('proposal.approve',{id:large.id,version:3,revision:2},people.manager.cookie);await h.cmd('proposal.send',{id:large.id,version:4},people.sales.cookie)
+ const foreign=await prepare('other',{priceOne:'28000',priceTwo:'30000'});await unchanged(()=>h.cmd('proposal.approve',{id:foreign.id,version:1,revision:1},people.manager.cookie,403))
+ const key=await h.cmd('agent.create',{label:'synthetic-platter-agent'})
+ const agent=await h.send('/api/platter/agent/command',{name:'proposal.prepare',input:{...offer,clientId:client.id,priceOne:'2000',priceTwo:'3000'}},'',{authorization:'Bearer '+key.token});assert.equal(agent.status,200)
+ await h.cmd('proposal.send',{id:agent.value.id,version:1},h.owner,409);await h.cmd('proposal.approve',{id:agent.value.id,version:1,revision:1},people.manager.cookie)
+ const agentRow=await current(agent.value.id);await h.cmd('proposal.send',{id:agentRow.id,version:agentRow.version})
+ await h.cmd('approval.policy',{version:(await h.state()).approvalSettings.policy.version,required:true,defaultRole:'owner'},people.sales.cookie,403)
+ await policy(true)
+ const required=await prepare('sales',{priceOne:'2000',priceTwo:'3000'});await h.cmd('proposal.send',{id:required.id,version:1},people.sales.cookie,409);await h.cmd('proposal.approve',{id:required.id,version:1,revision:1});await h.cmd('proposal.send',{id:required.id,version:2},people.sales.cookie)
+ for(const defaultRole of ['manager','admin']){
+  await policy(true,defaultRole);const p=await prepare('sales',{priceOne:'2000',priceTwo:'3000'})
+  if(defaultRole==='admin')await h.cmd('proposal.approve',{id:p.id,version:1,revision:1},people.manager.cookie,403)
+  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1},people[defaultRole].cookie);await h.cmd('proposal.send',{id:p.id,version:2},people.sales.cookie)
+ }
+ await policy(false)
+ const approvalVersion=async()=> (await h.state()).approvalSettings.policy.version
+ await h.cmd('approval.rule',{version:await approvalVersion(),name:'Legal review',position:1,condition:{kind:'termsEdited'},approvers:['person:'+people.admin.id,'person:'+people.billing.id]})
+ await h.cmd('approval.rule',{version:await approvalVersion(),name:'Invalid sales approver',position:3,condition:{kind:'termsEdited'},approvers:['person:'+people.sales.id]},h.owner,400)
+ for(const order of [['admin','billing'],['billing','admin']]){
+  const p=await prepare('sales',{terms:'Original terms',priceOne:'28000',priceTwo:'30000'})
+  await h.cmd('proposal.revise',{...offer,clientId:client.id,id:p.id,version:1,terms:'Edited legal terms',priceOne:'28000',priceTwo:'30000'},people.sales.cookie)
+  await h.cmd('proposal.approve',{id:p.id,version:2,revision:2},people.admin.cookie,403)
+  await h.cmd('proposal.approve',{id:p.id,version:2,revision:2},people.manager.cookie)
+  await h.cmd('proposal.approve',{id:p.id,version:3,revision:2},people[order[0]].cookie)
+  assert.equal((await current(p.id)).approval.complete,false)
+  await h.cmd('proposal.send',{id:p.id,version:4},people.sales.cookie,409)
+  await h.cmd('proposal.approve',{id:p.id,version:4,revision:2},people[order[1]].cookie)
+  assert.equal((await current(p.id)).approval.complete,true);await h.cmd('proposal.send',{id:p.id,version:5},people.sales.cookie)
+ }
+ const reject=await prepare('sales',{terms:'Original'});await h.cmd('proposal.revise',{...offer,clientId:client.id,id:reject.id,version:1,terms:'Legal change'},people.sales.cookie)
+ await h.cmd('proposal.reject',{id:reject.id,version:2,revision:2,note:'Review needed'},people.billing.cookie)
+ await h.cmd('proposal.approve',{id:reject.id,version:3,revision:2},people.admin.cookie,403)
+ await h.cmd('proposal.send',{id:reject.id,version:3},people.sales.cookie,409)
+ await h.cmd('member.zone',{timeZone:'America/Los_Angeles'},people.sales.cookie)
+ assert.equal((await h.state(people.sales.cookie)).followups.timeZone,'America/Los_Angeles')
+ const audit=(await h.send('/api/platter/audit?action=approval.policy',undefined,h.owner)).value.rows;assert.ok(audit.length>=5);assert.ok(audit.every(r=>r.actor_id===people.owner.id&&r.occurred_at>0))
 }))

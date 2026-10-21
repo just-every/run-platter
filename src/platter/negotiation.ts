@@ -1,3 +1,4 @@
+import { approvalPlan } from './approvals'
 import { invitationMail } from './invitation-mail'
 import { expirySendStatements, currentTime } from './expiry'
 import type { Bindings } from '../auth.server'
@@ -29,7 +30,6 @@ export async function negotiationCommand(env: Bindings, actor: Actor, name: stri
   ], false, guard)
   return { id: offer.id, revision, version: offer.version + 1 }
  }
- need(actor.role === 'owner', 'Only the owner approves prices and sends proposals', 403)
  need(pending, 'No negotiated revision is waiting', 409)
  if (name === 'proposal.approve') {
   need(!pending.approved_by && pending.revision === Number(input.revision), 'Approve the current draft revision', 409)
@@ -40,7 +40,8 @@ export async function negotiationCommand(env: Bindings, actor: Actor, name: stri
   ], true, guard)
   return { approved: true }
  }
- need(pending.approved_by, 'Approve this revision before sending', 409)
+ const approval=await approvalPlan(db,negotiatedView(offer,pending),actor);need(approval.complete, 'Approve this revision before sending', 409)
+ guard.sql+=' AND EXISTS(SELECT 1 FROM p_approval_policy WHERE singleton=1 AND version=?)';guard.values.push(approval.policyVersion)
  const next = JSON.parse(pending.snapshot), token = secret(), shareUrl = env.AUTH_ORIGIN + '/p/' + token
  const client = await db.prepare('SELECT COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(offer.id,offer.client_id).first<any>()
  await commit(db, actor, [

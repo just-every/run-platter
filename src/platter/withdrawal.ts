@@ -27,7 +27,7 @@ export async function withdrawalStatements(env:Bindings,row:any,actor:{id:string
 }
 
 export async function withdraw(env:Bindings,a:Actor,input:Record<string,unknown>,lost=false) {
- need(a.role==='owner','Only the owner sends or withdraws proposals',403)
+ need(['owner','admin','manager','sales'].includes(a.role),'Only the owner sends or withdraws proposals',403)
  const db=env.DB,row=await proposal(db,input.id),at=await currentTime(db)
  exact(row,input)
  need(row.status==='sent','Only an unsigned sent proposal can be withdrawn',409)

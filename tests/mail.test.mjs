@@ -166,7 +166,7 @@ test('FOLLOW-004 verified client questions, native answers and one-use authentic
   finally{await h.db.prepare('UPDATE oa_operators SET email=?,version=? WHERE id=?').bind(owner.email,owner.version,owner.id).run()}
   await h.send('/auth/invite',{email:'question-member@studio.example',displayName:'Colleague',role:'member',returnTo:'/app'},h.owner)
   const member=await h.signIn('question-member@studio.example')
-  assert.equal((await h.send('/api/platter/questions',undefined,member)).status,403)
+  const scoped=await h.send('/api/platter/questions',undefined,member);assert.equal(scoped.status,200);assert.deepEqual(scoped.value.questions,[],'the sales member sees no foreign question')
   await h.cmd('question.answer',{id,questionId:appQuestion.id,text:'Tuesday works.',requestId:'member-attempt'},member,403)
   const agent=await h.cmd('agent.create',{label:'Question boundary'})
   assert.equal((await h.send('/api/platter/agent/command',{name:'question.answer',input:{id,questionId:appQuestion.id,text:'Unauthorized'}},'',{authorization:'Bearer '+agent.token})).status,403)

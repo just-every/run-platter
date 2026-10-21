@@ -580,7 +580,7 @@ test('SEND-004 expired offer requests reopening and owner extends same links at 
  } finally {await browser?.close();await app?.close()}
 })
 
-test('FOLLOW-004 invited client asks exact sent sections; owner queue answers and agreement retains threads on desktop and phone', {timeout:120000}, async()=>{
+test('MOB-001 / FOLLOW-004 invited client asks exact sent sections; owner queue answers and agreement retains threads on desktop and phone', {timeout:120000}, async()=>{
  let app,browser;const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
   browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});if(screenshots)await mkdir(screenshots,{recursive:true})
@@ -738,7 +738,7 @@ test('EDIT-018 desktop and phone preview exact client content, switch widths and
  }finally{await browser?.close();await app?.close()}
 })
 
-test('FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting', {timeout:120000}, async()=>{
+test('MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting', {timeout:120000}, async()=>{
  let app,browser
  try{
   browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
@@ -823,6 +823,6 @@ test('PRICE-001 / COLLAB-003 / EDIT-014 / EDIT-018 desktop and phone create grou
  const {pricingJourney}=await import('./pricing-journey.mjs');await pricingJourney()
 })
 
-test('PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads', {timeout:180000}, async()=>{
+test('MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads', {timeout:180000}, async()=>{
  const {packagesJourney}=await import('./packages-journey.mjs');await packagesJourney()
 })

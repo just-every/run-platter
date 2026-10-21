@@ -201,7 +201,7 @@ Not yet supported (target clauses below): USD pricing tables, payment collection
 
 ### Mobile
 
-- **MOB-001 — Team app on a phone** (partial). A browser journey at 390 pixels completes each of those actions, the sends and answers as a sales member and the approval as a manager; the same approval attempted by the sales member is refused (403).
+- **MOB-001 — Team app on a phone** (partial). A browser journey at 390 pixels completes each of those actions, the sends and answers as a sales member and the approval as a manager; the same approval attempted by the sales member is refused (403). Named MOB-001 journeys (`tests/site.test.mjs`, `tests/packages-journey.mjs`) now cover the owner's create, approve and send, client-question answers and follow-up queue at 390; the template, sales-member and manager parts wait on EDIT-002, TEAM-001 and APPROVE-003.
 - **MOB-002 — iOS and Android apps with push notifications** (missing). On iOS and Android test devices, sign in, receive a push when the client views and signs, approve a request, and answer a question.
 
 ### AI assistance

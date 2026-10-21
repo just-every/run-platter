@@ -1157,7 +1157,7 @@ On a phone browser, a sales member creates a proposal from a template, sends it,
 
 *Acceptance:* A browser journey at 390 pixels completes each of those actions, the sends and answers as a sales member and the approval as a manager; the same approval attempted by the sales member is refused (403).
 
-*Status:* partial. The team pages have viewport and narrow-screen styling only; there is no phone journey for creating, sending or approving. (`src/platter/ui/shared.ts`)
+*Status:* partial. Named MOB-001 browser journeys at 390 pixels (and 1440) complete today's owner path: create a proposal in the composer, approve and send it (`PRICE-002`), answer client questions from the owner queue (`FOLLOW-004`) and schedule, complete and reopen actions in the follow-up queue (`FOLLOW-002`). Gap: creating from a template (`EDIT-002`), sending and answering as a sales member, approving as a manager under the `APPROVE-003` policy and the sales member's refused approval (403) wait on `TEAM-001`, `EDIT-002` and `APPROVE-003`. (`src/platter/ui/shared.ts`, `tests/site.test.mjs`, `tests/packages-journey.mjs`)
 
 #### MOB-002 — iOS and Android apps with push notifications.
 
@@ -1366,7 +1366,7 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 | 05 Send | Retainers: $1,200.00/mo × 12, $650.00/mo × 6 | PRICE-003, PAY-003 | contract, not yet in code |  |
 | 06 Revise | Clients ask on the page; the firm replies | FOLLOW-004 | code | `src/platter/questions.ts`, `src/platter/question-replies.ts`, `tests/mail.test.mjs` |
 | 06 Revise | Rev 2 with every change marked; the rev 1 link retired | NEG-001, COLLAB-003, PROP-002 | code | `src/platter/negotiation.ts`, `src/platter/history.ts`, `src/platter/commands.ts` |
-| 06 Revise | Signed on her phone | EDIT-007, SIGN-001 | partly | `src/platter/ui/client.ts` (narrow-screen client page); mobile journey: contract |
+| 06 Revise | Signed on her phone | EDIT-007, SIGN-001 | partly | `src/platter/ui/client.ts`, `tests/mobile-client-journey.mjs` (390-pixel keyboard client journey to acceptance; EDIT-007 partial); Stripe payment and assistive-technology checks: contract |
 | 07 Sign | Two client signers in order, each with a mailbox code | SIGN-001, SIGN-004 | partly | `src/platter/signing.ts` (one verified signer); signing order: contract |
 | 07 Sign | ESIGN consent, drawn and typed signatures | SIGN-003 | partly | `src/platter/signing.ts` (typed name and consent) |
 | 07 Sign | Certificate of completion with document hash | SIGN-005 | partly | `src/platter/signing.ts` (immutable accepted snapshot); PDF and certificate: contract |
@@ -1517,7 +1517,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `MIG-005` | Open proposals and payment schedules continue | target | missing |  | No in-flight migration. |
 | `MIG-006` | Clients, contacts and catalog CSV move-in | target | partial | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | image URLs fetched through Base's egress relay |
 | `MIG-007` | Move-in from exported files without API access | target | missing |  | No document import; only the client CSV kit exists. |
-| `MOB-001` | Team app on a phone | target | partial | `src/platter/ui/shared.ts` | The team pages have viewport and narrow-screen styling only; there is no phone journey for creating, sending or approving. |
+| `MOB-001` | Team app on a phone | target | partial | `src/platter/ui/shared.ts`, `tests/site.test.mjs`, `tests/packages-journey.mjs` | Owner phone journeys create, approve, send, answer client questions and work the follow-up queue at 390; template, sales-member and manager-approval parts wait on EDIT-002, TEAM-001 and APPROVE-003. |
 | `MOB-002` | iOS and Android apps with push notifications | target | missing |  | No native apps or push. |
 | `AI-001` | Drafts from meeting notes, transcripts and email | target | partial | `src/platter/http.ts`, `tests/platter.test.mjs` | External agents can post structured drafts; there is no ingestion of notes, transcripts or email and no in-product drafting. |
 | `AI-002` | Writing assistant in the editor | target | missing |  | No writing assistant. |

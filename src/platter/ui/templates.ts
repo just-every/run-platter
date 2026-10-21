@@ -5,11 +5,8 @@ import { escape, field, form, hidden, panel, proposalPath } from './shared'
 export function personalTemplates(state: any): string {
  if (!['owner','admin','manager','sales','content_editor'].includes(state.actor?.role) || !state.templates?.length) return ''
  const clients = (state.clients ?? []).map((c: any) => `<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('')
- return panel('Saved templates', '<p>Start an independent draft for a client. Later template changes do not change that draft.</p>'
-  + state.templates.map((t: any) => `<article><h3>${escape(t.name)}</h3><p>Version ${escape(t.version)} · ${t.shared?'shared template':'your personal template'}</p>`
-   + (clients ? form('template.start', '/app', hidden('id', t.id) + hidden('version', t.version)
-    + `<label>Client for ${escape(t.name)}<select name="clientId" required>${clients}</select></label>`
-    + field('New proposal title (optional)', 'title', '', 'maxlength="200"') + `<button>Start from ${escape(t.name)}</button>`) : '<p>Add a client to use this template.</p>') + '</article>').join(''))
+ const group=(shared:boolean)=>{const rows=state.templates.filter((t:any)=>Boolean(t.shared)===shared);if(!rows.length)return '';return panel(shared?'Shared templates':'Personal templates','<p>Start an independent draft for a client. Later template changes do not change that draft.</p>'+rows.map((t:any)=>`<article><h3>${escape(t.name)}</h3><p>Version ${escape(t.version)} · ${shared?'shared template':'your personal template'}</p>`+(clients?form('template.start','/app',hidden('id',t.id)+hidden('version',t.version)+`<label>Client for ${escape(t.name)}<select name="clientId" required>${clients}</select></label>`+field('New proposal title (optional)','title','','maxlength="200"')+`<button>Start from ${escape(t.name)}</button>`):'<p>Add a client to use this template.</p>')+'</article>').join(''))}
+ return group(false)+group(true)
 }
 
 export function savePersonalTemplate(state: any, p: any): string {

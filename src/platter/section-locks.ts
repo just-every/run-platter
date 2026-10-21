@@ -8,6 +8,10 @@ export async function assertSectionLocks(db:D1Database,old:any,next:any){
  const locks=(await db.prepare('SELECT section FROM p_proposal_locks WHERE proposal_id=?').bind(old.id).all<any>()).results
  for(const {section} of locks)need(JSON.stringify(canonical(fieldValue(old,section)))===JSON.stringify(canonical(fieldValue(next,section))),'The '+section+' section is locked. Ask an owner, admin or team manager to unlock this proposal first.',403)
 }
+export async function assertTemplateLocks(db:D1Database,template:any,next:any){
+ const locks=(await db.prepare('SELECT section FROM p_template_locks WHERE template_id=?').bind(template.id).all<any>()).results,old=JSON.parse(template.snapshot)
+ for(const {section} of locks)need(JSON.stringify(canonical(fieldValue(old,section)))===JSON.stringify(canonical(fieldValue(next,section))),'The '+section+' template section is locked. Unlock it explicitly before replacing its content.',403)
+}
 export async function sectionLockCommand(db:D1Database,a:Actor,name:string,p:Record<string,unknown>){
  if(name==='proposal.unlock'){
   need(['owner','admin','manager'].includes(a.role),'Only owner, admins and team managers unlock proposal sections',403)

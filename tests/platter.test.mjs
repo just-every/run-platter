@@ -1559,7 +1559,10 @@ test('TEAM-001 / EDIT-015 template locks survive starts, copies and personal tem
  const p=await h.cmd('template.start',{id:saved.id,version:template.version,clientId:client.id},people.sales.cookie),fields={...offer,clientId:client.id,id:p.id,version:1,terms:'Changed terms'}
  await h.cmd('proposal.revise',fields,people.sales.cookie,403);assert.equal((await h.state(people.sales.cookie)).proposals.find(r=>r.id===p.id).revision,1)
  const copy=await h.cmd('proposal.duplicate',{id:p.id,version:1},people.sales.cookie);await h.cmd('proposal.revise',{...fields,id:copy.id},people.sales.cookie,403)
- const personal=await h.cmd('template.save',{id:p.id,version:1,name:'Personal with locks'},people.sales.cookie),started=await h.cmd('template.start',{id:personal.id,version:1,clientId:client.id},people.sales.cookie);await h.cmd('proposal.revise',{...fields,id:started.id},people.sales.cookie,403)
+ const personal=await h.cmd('template.save',{id:p.id,version:1,name:'Personal with locks'},people.sales.cookie)
+ const unlockedSource=await h.cmd('proposal.prepare',{...offer,clientId:client.id,terms:'Changed terms'},people.sales.cookie)
+ await h.cmd('template.save',{id:unlockedSource.id,version:1,templateId:personal.id,templateVersion:1,name:'Bypass'},people.sales.cookie,403)
+ const started=await h.cmd('template.start',{id:personal.id,version:1,clientId:client.id},people.sales.cookie);await h.cmd('proposal.revise',{...fields,id:started.id},people.sales.cookie,403)
  await h.cmd('proposal.share',{id:p.id,operatorId:people.content_editor.id},people.sales.cookie)
  for(const role of ['sales','content_editor','viewer','billing','other'])await h.cmd('proposal.unlock',{id:p.id,version:1,section:'terms'},people[role].cookie,403)
  await h.cmd('proposal.unlock',{id:p.id,version:1,section:'terms'},people.admin.cookie)

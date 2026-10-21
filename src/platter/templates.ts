@@ -1,3 +1,4 @@
+import { assertTemplateLocks } from './section-locks'
 import { folderGuard, resourceScope, resourceEditors } from './folders'
 import { workspaceDefaults, templateDefaults, startDefaults, defaultStatements } from './workspace'
 import { saveTemplateCosts, startTemplateCosts } from './internal-pricing'
@@ -43,6 +44,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   const folderId=shared?(input.folderId===undefined?existing?.folder_id??null:input.folderId||null):null,folder=await folderGuard(db,a,folderId,'template'),previous=existing?await folderGuard(db,a,existing.folder_id,'template'):{sql:'1',values:[]}
   const templateName = text(input.name, 'a template name')
   const { id: _id, client_id: _client, revision: _revision, ...content } = snapshot(displayed)
+  if(existing)await assertTemplateLocks(db,existing,content)
   const [pdf, savedExpiry, sections] = await Promise.all([
    db.prepare('SELECT enabled FROM p_pdf_settings WHERE proposal_id=?').bind(source.id).first<any>(),
    db.prepare('SELECT mode,period_days,expires_on,time_zone,warning_days FROM p_expiry WHERE proposal_id=?').bind(source.id).first<any>(),
@@ -56,7 +58,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
    ? [db.prepare('UPDATE p_personal_templates SET name=?,snapshot=?,pdf_enabled=?,expiry=?,suggestion_sections=?,version=version+1,updated_at=? WHERE id=? AND version=?').bind(...values, at, id, existing.version)]
    : [db.prepare('INSERT INTO p_personal_templates(name,snapshot,pdf_enabled,expiry,suggestion_sections,id,owner_id,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,1,?,?)').bind(...values, id, a.id, at, at)]
   writes.push(db.prepare('UPDATE p_personal_templates SET shared=?,folder_id=? WHERE id=?').bind(shared?1:0,folderId,id))
-  writes.push(db.prepare('DELETE FROM p_template_locks WHERE template_id=?').bind(id),db.prepare('INSERT INTO p_template_locks(template_id,section) SELECT ?,section FROM p_proposal_locks WHERE proposal_id=?').bind(id,source.id))
+  writes.push(db.prepare('INSERT OR IGNORE INTO p_template_locks(template_id,section) SELECT ?,section FROM p_proposal_locks WHERE proposal_id=?').bind(id,source.id))
   writes.push(...saveTemplateCosts(db,source.id,displayed.revision,id),...templateDefaults(db,source.id,id))
   await commit(db, a, writes, false, {
    sql: 'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND '+folder.sql+' AND '+previous.sql+(existing?' AND EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?)':''),

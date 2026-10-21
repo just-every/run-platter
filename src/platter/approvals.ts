@@ -16,9 +16,9 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
  const agent=String(row.prepared_by).startsWith('agent:')||String(first?.prepared_by).startsWith('agent:')
  const steps=selected.map(r=>({id:r.id,name:r.name,approvers:r.approvers as string[],any:false}))
  if(!steps.length&&(policy.required||agent))steps.push({id:'default',name:agent&&!policy.required?'Person approval for agent draft':'Default approval',approvers:agent&&!policy.required?['role:owner','role:admin','role:manager']:['role:'+policy.default_role],any:agent&&!policy.required})
- const plan=await hash(JSON.stringify({version:policy.version,steps,revision:row.revision})),decisions=(await db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=? AND revision=? AND plan=? ORDER BY occurred_at,id').bind(row.id,row.revision,plan).all<any>()).results
+ const plan=await hash(JSON.stringify({version:policy.version,steps,revision:row.revision})),history=(await db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=? AND revision=? ORDER BY occurred_at,id').bind(row.id,row.revision).all<any>()).results,decisions=history.filter(d=>d.plan===plan)
  const legacy=policy.version===0&&row.approved_by&&steps.length===1&&steps[0].id==='default'
- let prior=true,rejected=decisions.some(d=>d.decision==='rejected')
+ let prior=true,rejected=history.some(d=>d.decision==='rejected')
  const evaluated=steps.map(step=>{
   const approvals=decisions.filter(d=>d.step===step.id&&d.decision==='approved'),done=Boolean(legacy)||(step.any?approvals.length>0:step.approvers.every((_:string,i:number)=>approvals.some(d=>d.approver_index===i)))
   const eligible=a?step.approvers.map((v:string,i:number)=>matches(a,v)?i:-1).filter((i:number)=>i>=0):[]

@@ -979,7 +979,7 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
     const post=(context,path,data)=>context.request.post(app.origin+path,{headers:{origin:app.origin},data,maxRedirects:0})
     const command=async(context,name,input,status=200)=>{const r=await post(context,'/api/platter/command',{name,input});assert.equal(r.status(),status,await r.text());return r.json()}
     const state=async(context=owner)=>(await context.request.get(app.origin+'/api/platter/state')).json()
-    const capture=async(page,name)=>{await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow on '+name+' at '+width);if(screenshots)await page.screenshot({path:join(screenshots,`TEAM-001-${name}-${width}.png`),fullPage:true})}
+    const capture=async(page,name)=>{await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow on '+name+' at '+width);if(screenshots){await page.screenshot({path:join(screenshots,`TEAM-001-${name}-${width}.png`),fullPage:true});await page.screenshot({path:join(screenshots,`TEAM-001-${name}-${width}-viewport.png`)})}}
     assert.equal((await post(owner,'/auth/bootstrap',{token:app.token,displayName:'Synthetic owner'})).status(),303)
     const op=await owner.newPage();await op.goto(app.origin+'/setup');await op.getByRole('checkbox').check();await op.getByRole('button',{name:'Finish setup'}).click()
     const invite=async(context,role)=>{
@@ -1020,6 +1020,7 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
     await page.goto(app.origin+'/app/proposal?id='+high.id);await page.getByLabel('Template name',{exact:true}).fill('Sales personal template');await page.getByRole('button',{name:'Save personal template',exact:true}).click()
     await page.goto(app.origin+'/app');await page.getByRole('button',{name:'Start from Sales personal template',exact:true}).click();const copy=(await state(sales)).proposals.find(p=>p.id!==high.id);assert.ok(copy);assert.equal(copy.approved_by,null)
     const report=await sales.request.get(app.origin+'/api/platter/pipeline?status=awaiting-approval&sort=value');assert.equal(report.status(),200);assert.equal((await report.json()).count,1)
+    const simple=await command(sales,'template.start',{id:'starter:consultancy',version:1,clientId:client.id});await page.goto(app.origin+'/app/proposal?id='+simple.id);assert.equal(await page.getByRole('button',{name:'Send proposal',exact:true}).count(),1);assert.equal(await page.getByRole('button',{name:'Approve this revision',exact:true}).count(),0);await capture(page,'sales-unruled');await page.getByRole('button',{name:'Send proposal',exact:true}).click();assert.equal((await state(sales)).proposals.find(p=>p.id===simple.id).status,'sent')
    }finally{await owner.close();await sales.close();await manager.close();await clientContext.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}

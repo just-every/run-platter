@@ -24,7 +24,7 @@ export async function permitted(db:D1Database,a:Actor,id:unknown,right:Right='vi
 }
 export async function teamState(db:D1Database,a:Actor) {
  if(!administrators.includes(a.role)&&a.role!=='manager')return {}
- const people=(await db.prepare("SELECT o.id,o.email,o.display_name,CASE WHEN o.role='owner' THEN 'owner' ELSE COALESCE(m.role,'sales') END AS role,COALESCE(m.version,0) AS version,COALESCE(m.time_zone,'UTC') AS time_zone FROM oa_operators o LEFT JOIN p_members m ON m.operator_id=o.id WHERE o.status='active' ORDER BY o.email").all<any>()).results
+ const people=(await db.prepare("SELECT o.id,o.email,o.display_name,CASE WHEN o.role IN ('owner','admin') THEN o.role ELSE COALESCE(m.role,'sales') END AS role,COALESCE(m.version,0) AS version,COALESCE(m.time_zone,'UTC') AS time_zone FROM oa_operators o LEFT JOIN p_members m ON m.operator_id=o.id WHERE o.status='active' ORDER BY o.email").all<any>()).results
  const teams=(await db.prepare('SELECT * FROM p_teams ORDER BY name').all<any>()).results
  const memberships=(await db.prepare('SELECT * FROM p_team_members').all<any>()).results
  const mine=memberships.filter(m=>m.operator_id===a.id).map(m=>m.team_id)
@@ -59,6 +59,7 @@ export async function teamCommand(db:D1Database,a:Actor,name:string,p:Record<str
  need(name==='member.set','Unknown team command',404)
  const id=text(p.operatorId,'a member'),role=String(p.role),person=await db.prepare("SELECT o.*,COALESCE(m.role,'sales') AS product_role,COALESCE(m.version,0) AS product_version FROM oa_operators o LEFT JOIN p_members m ON m.operator_id=o.id WHERE o.id=? AND o.status='active'").bind(id).first<any>()
  need(person&&person.role!=='owner','The native owner keeps ownership',403)
+ need(person.role!=='admin','Manage a native admin role through native account administration',403)
  need((roles as readonly string[]).includes(role),'Choose a product role')
  need(Number(p.version)===person.product_version,'Membership changed. Reload.',409)
  let teams:any=p.teams??Object.keys(p).filter(k=>k.startsWith('team:')&&p[k]==='yes').map(k=>k.slice(5));if(typeof teams==='string'){try{teams=JSON.parse(teams)}catch{need(false,'Provide a team list')}}

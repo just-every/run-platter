@@ -1377,6 +1377,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, pol
  await h.cmd('proposal.reject',{id:reject.id,version:2,revision:2,note:'Review needed'},people.billing.cookie)
  await h.cmd('proposal.approve',{id:reject.id,version:3,revision:2},people.admin.cookie,403)
  await h.cmd('proposal.send',{id:reject.id,version:3},people.sales.cookie,409)
+ await policy(false);await h.cmd('proposal.send',{id:reject.id,version:3},people.sales.cookie,409)
  await h.cmd('member.zone',{timeZone:'America/Los_Angeles'},people.sales.cookie)
  assert.equal((await h.state(people.sales.cookie)).followups.timeZone,'America/Los_Angeles')
  // Duplication inherits the live approval policy and never copies approval authority.

@@ -15,6 +15,7 @@ export function pipelinePanel(proposals: any[], params: URLSearchParams, followu
  const report = pipeline(proposals, params,Date.now(),followups)
  const select = (label: string, key: string, choices: { id: string; name: string }[]) => `<label>${label}<select name="${key}" aria-label="${label}"><option value="">All</option>${choices.map(c => `<option value="${escape(c.id)}"${params.get(key) === c.id ? ' selected' : ''}>${escape(c.name)}</option>`).join('')}</select></label>`
  const filters = `<form method="get" action="/app" class="filters"><div class="filter-grid">`
+  + field('Search proposal text', 'q', params.get('q'), 'type="search" maxlength="200"')
   + select('Owner', 'owner', report.owners) + select('Status', 'status', ['draft','approved','sent','accepted','expired','withdrawn'].map(id => ({id,name:id})))
   + select('Due follow-up','dueFollowup',[{id:'yes',name:'Due today or overdue'},{id:'no',name:'No due follow-up'}])
   + select('Client', 'client', report.clients) + select('Next action', 'nextAction', Object.entries(nextActions).map(([id,name]) => ({id,name})))

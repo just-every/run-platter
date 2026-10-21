@@ -42,6 +42,7 @@ Platter is one product. Where the market sells a neighboring product separately,
 | Contract lifecycle management and master-agreement redlining | [Locket](https://github.com/just-every/run-locket) (or Ironclad) | Client-suggested text edits on the proposal (`NEG-002`); MSAs and obligations are linked as attachments (`EDIT-010`) |
 | Subscription and usage-based billing, dunning beyond the agreed schedule | [Nectar](https://github.com/just-every/run-nectar) (or Stripe Billing, Chargebee) | Platter runs the schedule the client accepted (`PAY-003`); metered or long-running subscription billing hands off through the API (`AUTO-004`) |
 | Project delivery, time, staffing and margin | [Gauge](https://github.com/just-every/run-gauge) (or Harvest with Forecast, Kantata, Asana) | Accepted-scope handoff (`HAND-001`, `HAND-002`) and delivery actuals read by `AGENT-002` and `AGENT-006` |
+| Work and project management | [Pegboard](https://github.com/just-every/run-pegboard) | Linked sibling; project management stays outside Platter |
 | Meeting booking | [Dial](https://github.com/just-every/run-dial) (or Calendly) | Booking links embedded in proposals (`EDIT-006`) |
 | File storage | [Chest](https://github.com/just-every/run-chest) (or Google Drive, SharePoint, Box) | Signed documents filed by `AUTO-002` |
 | Team chat | [Nook](https://github.com/just-every/run-nook) (or Slack, Microsoft Teams) | Notifications and approval actions (`AUTO-003`, `APPROVE-002`) |
@@ -232,7 +233,7 @@ When proposal numbering ships, extend FOLLOW-002 with proposal-number tie-breaki
 
 *Acceptance:* Seed 500 proposals; search a phrase that appears only in the body of two proposals and one uploaded PDF and get exactly those three within one second; file proposals in a team folder and see a member outside the team find none of them by search or by folder.
 
-*Status:* missing. A single proposal list; no search or folders.
+*Status:* partial. Owner pipeline searches current proposal/agreement title, client name/email, recorded owner, status, scope, terms, package and pricing-line text using a case-insensitive literal phrase with whitespace collapsed (up to 200 characters). Search combines with existing field filters, sorting, currency totals, CSV export and scheduled reports. Gap: template and uploaded-PDF text search, folders, TEAM-001 member/team visibility and proposal numbering remain. (`src/platter/pipeline.ts`, `src/platter/ui/pipeline.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`)
 
 #### EDIT-017 — Client page in the client's language.
 
@@ -1390,8 +1391,8 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 22 | 24 | 82 | 128 |
-| All | 34 | 24 | 82 | 140 |
+| Target and push further | 22 | 25 | 81 | 128 |
+| All | 34 | 25 | 81 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1422,7 +1423,7 @@ Judged from the code and tests at commit `658ddc0d7c9d10ede5801dc92e86ead37e0ed5
 | `EDIT-013` | Documents without pricing | target | missing |  | Every proposal requires two priced options; there is no unpriced document type. |
 | `EDIT-014` | Client PDF download before signing | target | done | `src/platter/documents/client-pdf.ts`, `src/platter/documents/offer-pdf.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `EDIT-015` | Locked template sections | target | missing |  | No templates, so no section locks. |
-| `EDIT-016` | Proposal search and folders | target | missing |  | A single proposal list; no search or folders. |
+| `EDIT-016` | Proposal search and folders | target | partial | `src/platter/pipeline.ts`, `src/platter/ui/pipeline.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs` | Owner pipeline searches current proposal/agreement title, client name/email, recorded owner, status, scope, terms, package and pricing-line text using a case-insensitive literal phrase with whitespace collapsed (up to 200 characters). Search combines with existing field filters, sorting, currency totals, CSV export and scheduled reports. Gap: template and uploaded-PDF text search, folders, TEAM-001 member/team visibility and proposal numbering remain. |
 | `EDIT-017` | Client page in the client's language | target | missing |  | The client page and mail are English only. |
 | `EDIT-018` | Client-page preview before sending | target | done | `src/platter/preview.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
 | `CAT-001` | Service and product catalog | target | partial | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs` | Imported catalog metadata and images only; no catalog editing, provider sync, pricing-table insertion or line-image rendering. |

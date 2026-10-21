@@ -10,6 +10,10 @@ function bound(params: URLSearchParams, key: string, money = false) {
  return money ? Math.round(Number(raw) * 100) : Number(raw)
 }
 export function pipeline(proposals: any[], params = new URLSearchParams(), now = Date.now(), followups?:any) {
+ const query = params.get('q') || ''
+ need(query.length <= 200, 'Search must be at most 200 characters')
+ const phrase = query.trim().replace(/\s+/g, ' ').toLowerCase()
+ const matching = new Set(proposals.filter(p => !phrase || proposalText(p).some(value => value.replace(/\s+/g, ' ').toLowerCase().includes(phrase))).map(p => String(p.id)))
  const sort = params.get('sort') || 'status', direction = params.get('direction') || 'asc'
  need(sorts.includes(sort) && ['asc', 'desc'].includes(direction), 'Choose a pipeline sort')
  const due=params.get('dueFollowup');need(!due||['yes','no'].includes(due),'Choose due follow-ups')
@@ -30,11 +34,21 @@ export function pipeline(proposals: any[], params = new URLSearchParams(), now =
  }))
  const owners = [...new Map(rows.map(r => [r.ownerId || 'unrecorded', { id: r.ownerId || 'unrecorded', name: r.owner }])).values()].sort((a,b) => a.name.localeCompare(b.name))
  const clients = [...new Map(rows.map(r => [r.clientId, { id: r.clientId, name: r.client }])).values()].sort((a,b) => a.name.localeCompare(b.name))
- rows = rows.filter(r => (!due||(due==='yes')===r.dueFollowup) && (!status || r.status === status) && (!params.get('owner') || (r.ownerId || 'unrecorded') === params.get('owner')) && (!params.get('client') || r.clientId === params.get('client')) && (!nextAction || r.nextAction === nextAction) && (minValue === undefined || r.valueCents >= minValue) && (maxValue === undefined || r.valueCents <= maxValue) && (minAge === undefined || r.age >= minAge) && (maxAge === undefined || r.age <= maxAge))
+ rows = rows.filter(r => matching.has(r.id) && (!due||(due==='yes')===r.dueFollowup) && (!status || r.status === status) && (!params.get('owner') || (r.ownerId || 'unrecorded') === params.get('owner')) && (!params.get('client') || r.clientId === params.get('client')) && (!nextAction || r.nextAction === nextAction) && (minValue === undefined || r.valueCents >= minValue) && (maxValue === undefined || r.valueCents <= maxValue) && (minAge === undefined || r.age >= minAge) && (maxAge === undefined || r.age <= maxAge))
  rows.sort((a,b) => {
   const order = sort === 'value' ? a.currency.localeCompare(b.currency) || a.valueCents - b.valueCents : sort === 'age' ? a.age - b.age : sort === 'dueDate' ? (a.dueDate??'9999').localeCompare(b.dueDate??'9999') : String(a[sort as 'status' | 'owner' | 'client' | 'nextAction']).localeCompare(String(b[sort as 'status' | 'owner' | 'client' | 'nextAction']))
   return order * (direction === 'asc' ? 1 : -1) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id)
  })
  const totals = [...new Set(rows.map(r => r.currency))].sort().map(currency => ({ currency, count: rows.filter(r => r.currency === currency).length, valueCents: rows.filter(r => r.currency === currency).reduce((sum,r) => sum + r.valueCents, 0) }))
  return { rows, count: rows.length, totals, owners, clients, generatedAt: now }
+}
+
+/** Search only offer content and visible metadata; invitation and verification credentials never participate. */
+function proposalText(p: any): string[] {
+ return [p.title, p.clientName, p.clientEmail, p.sales_owner_name, p.pipelineStatus ?? p.status, p.scope, p.terms,
+  ...p.options.flatMap((option: any) => [option.label,
+   ...(option.optionalItems ?? []).flatMap((item: any) => [item.label, item.description]),
+   ...(option.tables ?? []).flatMap((table: any) => [table.name, ...table.lines.flatMap((line: any) => [line.name, line.description, line.group, line.unit])]),
+  ]),
+ ].filter((value): value is string => typeof value === 'string')
 }

@@ -10,7 +10,7 @@ import { activePeople, installationZone } from './report-state'
 import { nextRun, validZone } from './zone'
 
 // REPORT-005: owner-named people receive a report at an hour in the installation's time zone; each run is claimed once.
-const filterKeys = ['owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
+const filterKeys = ['q', 'owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
 
 /** Keep only the pipeline's own filters, in a fixed order, after the pipeline validates them. */
 export function savedFilters(value: unknown) {

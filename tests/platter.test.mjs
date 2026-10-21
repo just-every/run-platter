@@ -533,13 +533,14 @@ test('SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by uplo
  assert.equal((await h.state(member)).proposals.find(x=>x.id===p.id).acceptance.signedCopy.id,a.signedCopy.id)
  const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows;assert.ok(audit.some(x=>x.action==='acceptance.upload'&&x.subject===p.id&&x.actor_id&&x.occurred_at),'TEAM-004 acceptance.upload')
 }))
-test('REPORT-005 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures',{timeout:60000},()=>run(async h=>{
+test('EDIT-016 / REPORT-005 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures',{timeout:60000},()=>run(async h=>{
  assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
  await h.send('/auth/invite',{email:'colleague@studio.example',displayName:'Colleague',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('colleague@studio.example')
  const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
- await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Draft only'})
- for(const [title,priceTwo] of [['Spring catalogue','3234.56'],['Autumn campaign','4200.00']]){const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title,priceTwo});await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});await h.cmd('proposal.send',{id:p.id,version:2})}
- const filters='status=sent&sort=value&direction=desc',screen=(await h.send('/api/platter/pipeline?'+filters,undefined,h.owner)).value
+ await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Draft only',scope:'No seasonal engagement.'})
+ for(const [title,priceTwo] of [['Spring catalogue','3234.56'],['Autumn campaign','4200.00']]){const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title,priceTwo,scope:'Seasonal [campaign] scope.'});await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});await h.cmd('proposal.send',{id:p.id,version:2})}
+ const unrelated=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Unrelated sent proposal',scope:'A separate engagement.'});await h.cmd('proposal.approve',{id:unrelated.id,version:1,revision:1});await h.cmd('proposal.send',{id:unrelated.id,version:2})
+ const filters='q=seasonal+%5Bcampaign%5D&status=sent&sort=value&direction=desc',screen=(await h.send('/api/platter/pipeline?'+filters,undefined,h.owner)).value
  let r=await h.send('/api/platter/pipeline.csv?'+filters,undefined,h.owner);assert.equal(r.status,200);assert.match(r.headers.get('content-disposition'),/platter-pipeline\.csv/)
  const lines=r.text.trim().split('\r\n');assert.equal(lines[0],'Title,Client,Owner,Status,Next action,Currency,Value,Age in days,Follow-up due')
  assert.deepEqual(lines.slice(1,3),screen.rows.map(x=>[x.title,x.client,x.owner,x.status,'Await client decision',x.currency,(x.valueCents/100).toFixed(2),x.age,x.dueDate].join(',')))
@@ -548,6 +549,10 @@ test('REPORT-005 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and
  assert.equal((await h.state()).timeZone,'UTC','schedules use UTC until the owner sets a time zone')
  await h.cmd('report.time-zone',{timeZone:'America/New_York'},member,403);await h.cmd('report.time-zone',{timeZone:'Mars/Olympus'},h.owner,400)
  await h.cmd('report.time-zone',{timeZone:'America/New_York'});assert.equal((await h.state()).timeZone,'America/New_York')
+ assert.equal((await h.send('/api/platter/pipeline?q='+encodeURIComponent('.*'),undefined,h.owner)).value.count,0,'search punctuation is literal')
+ assert.equal((await h.send('/api/platter/pipeline?q='+encodeURIComponent('x'.repeat(201)),undefined,h.owner)).status,400)
+ assert.equal((await h.send('/api/platter/pipeline?q=seasonal',undefined,member)).status,403)
+ assert.equal((await h.send('/api/platter/pipeline?q=seasonal')).status,401)
  const newYork=at=>Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hourCycle:'h23',weekday:'long',hour:'numeric',minute:'numeric'}).formatToParts(at).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]))
  const schedule={cadence:'weekly',weekday:1,hour:8,filters,recipients:['owner@studio.example','colleague@studio.example']}
  await h.cmd('report.schedule',schedule,member,403)
@@ -1064,3 +1069,20 @@ test('PRICE-002 / SIGN-008 / TEAM-004 signed-upload selections use sent prices, 
 }))
 
 test('EDIT-002 / MOB-001 five starter and personal templates start independent drafts, guard ownership and versions, and retain agent approval boundaries',async()=>{const h=await harness({assetsDirectory:'public'});try{await templatesHttp(h)}finally{await h.close()}})
+
+
+test('EDIT-016 body phrase search returns only two of 500 proposals through the owner HTTP pipeline', {timeout:120000}, ()=>run(async h=>{
+ const client=await h.cmd('client.save',{name:'Search client',email:'search@studio.example'}),matches=[];let pricedId,oldLink
+ for(let n=0;n<500;n++){
+  const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:`Proposal ${String(n).padStart(3,'0')}`,scope:n===0?'Delivery includes literal [50%_budget] review.':offer.scope,terms:n===1?'Confirm literal [50%_budget] review before delivery.':'',...(n===2?{pricingTables:[{optionId:'one',name:'Services',lines:[{name:'Painting',description:'Weatherproof copper finish',quantity:'1',unit:'project',unitPrice:'1200'}]}]}:{})})
+  if(n<2)matches.push(p.id)
+  if(n===2)pricedId=p.id
+  if(n===0){await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:p.id,version:2});oldLink=new URL(share.shareUrl).pathname;const cookie=await verified(h,oldLink);assert.equal((await h.send(oldLink+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)}
+ }
+ const started=performance.now(),r=await h.send('/api/platter/pipeline?q='+encodeURIComponent('LITERAL   [50%_budget] REVIEW'),undefined,h.owner)
+ console.log('EDIT-016 500-proposal HTTP search elapsed ms:',Math.round(performance.now()-started))
+ assert.equal(r.status,200,r.text);assert.deepEqual(new Set(r.value.rows.map(p=>p.id)),new Set(matches));assert.equal(r.value.count,2)
+ assert.deepEqual(r.value.totals,[{currency:'USD',count:2,valueCents:660000}])
+ const priced=await h.send('/api/platter/pipeline?q='+encodeURIComponent('weatherproof copper finish'),undefined,h.owner);assert.equal(priced.status,200);assert.deepEqual(priced.value.rows.map(p=>p.id),[pricedId])
+ const credential=await h.send('/api/platter/pipeline?q='+oldLink.split('/').at(-1),undefined,h.owner);assert.equal(credential.status,200);assert.equal(credential.value.count,0,'invitation credentials never participate in search')
+}))

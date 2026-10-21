@@ -17,7 +17,11 @@ export async function templatesJourney() {
     const capture = async name => {
      await page.waitForLoadState('load'); await page.evaluate(async () => { await document.fonts.ready; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))) })
      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
-     if (screenshots) await page.screenshot({ path: join(screenshots, `MOB-001-templates-${name}-${width}.png`), fullPage: true })
+     if (screenshots) {
+      await page.screenshot({ path: join(screenshots, `MOB-001-templates-${name}-${width}.png`), fullPage: true })
+      const panel = page.locator('section').filter({ has: page.getByRole('heading', { name: name === 'list' ? 'Personal templates' : 'Save a personal template', exact: true }) })
+      if (await panel.count()) await panel.screenshot({ path: join(screenshots, `MOB-001-templates-${name}-panel-${width}.png`) })
+     }
     }
     const state = async () => (await (await context.request.get(app.origin + '/api/platter/state')).json())
     const cmd = async (name, input) => { const r = await context.request.post(app.origin + '/api/platter/command', { headers: { origin: app.origin }, data: { name, input } }); assert.equal(r.status(), 200, await r.text()); return r.json() }
@@ -47,6 +51,7 @@ export async function templatesJourney() {
     assert.equal(await page.getByRole('button', { name: 'Send approved proposal', exact: true }).count(), 0)
     await capture('draft')
     await page.getByRole('link', { name: 'Preview client page', exact: true }).click()
+    if (width === 390) { await page.getByLabel('Preview width').selectOption('390'); await page.getByRole('button', { name: 'Change preview width', exact: true }).click() }
     const frame = page.frameLocator('iframe'); assert.match(await frame.locator('main').innerText(), /Studio photography and a usage licence/)
     await capture('preview')
     await page.goto(app.origin + '/app/proposal?id=' + source.id)

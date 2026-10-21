@@ -1575,7 +1575,11 @@ test('TEAM-001 / EDIT-015 template locks survive starts, copies and personal tem
  await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'terms'},people.manager.cookie);await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'terms'},people.manager.cookie,409)
 }))
 
-test('TEAM-001 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses',()=>run(async h=>{
+test('TEAM-001 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses',async()=>{
+ const mailCalls=[],h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-2900'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mailCalls.push(await request.json());return Response.json({id:'synthetic-platter-'+(3000+mailCalls.length)})}})
+ const inviteToken=address=>new URL(mailCalls.findLast(m=>m.to.includes(address)).text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get('token')
+ const joinInvite=async address=>{const r=await h.send('/auth/confirm',{token:inviteToken(address)});assert.equal(r.status,303,r.text);return r.cookie}
+ try{
  const east=await h.cmd('team.create',{name:'East'}),west=await h.cmd('team.create',{name:'West'}),people={}
  for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[east.id]});people[role]={cookie,id}}
  const input={email:'new-sales@synthetic-platter.example',displayName:'New salesperson',role:'sales',teams:[east.id]}
@@ -1589,11 +1593,12 @@ test('TEAM-001 delegated invitations bind roles and teams to current inviter aut
  const invited=await h.db.prepare('SELECT * FROM oa_operators WHERE email=?').bind(input.email).first();assert.equal(invited.status,'invited');assert.equal(await h.db.prepare('SELECT role FROM p_members WHERE operator_id=?').bind(invited.id).first(),null)
  // Even while an eligible pending grant exists, raw native invitations cannot bypass its target role/team selection.
  const raw=await h.send('/auth/invite',{email:'bypass@synthetic-platter.example',displayName:'Bypass',role:'member',returnTo:'/app'},people.manager.cookie);assert.equal(raw.status,403);assert.equal(await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind('bypass@synthetic-platter.example').first(),null)
- const joined=await h.signIn(input.email),s=await h.state(joined);assert.equal(s.actor.role,'sales');assert.deepEqual(s.teams.map(t=>t.id),[east.id]);assert.equal((await h.db.prepare('SELECT status FROM p_member_invitations WHERE email=?').bind(input.email).first()).status,'accepted')
- const managerInvite={...input,email:'new-manager@synthetic-platter.example',displayName:'New manager',role:'manager',teams:[west.id]};assert.equal((await h.cmd('member.invite',managerInvite,people.admin.cookie)).status,'invited');const newManager=await h.signIn(managerInvite.email),managerState=await h.state(newManager);assert.equal(managerState.actor.role,'manager');assert.deepEqual(managerState.teams.map(t=>t.id),[west.id])
+ const joined=await joinInvite(input.email),s=await h.state(joined);assert.equal(s.actor.role,'sales');assert.deepEqual(s.teams.map(t=>t.id),[east.id]);assert.equal((await h.db.prepare('SELECT status FROM p_member_invitations WHERE email=?').bind(input.email).first()).status,'accepted')
+ const managerInvite={...input,email:'new-manager@synthetic-platter.example',displayName:'New manager',role:'manager',teams:[west.id]};assert.equal((await h.cmd('member.invite',managerInvite,people.admin.cookie)).status,'invited');const newManager=await joinInvite(managerInvite.email),managerState=await h.state(newManager);assert.equal(managerState.actor.role,'manager');assert.deepEqual(managerState.teams.map(t=>t.id),[west.id])
  const stale={...input,email:'stale@synthetic-platter.example'};assert.equal((await h.cmd('member.invite',stale,people.manager.cookie)).status,'invited');await h.cmd('member.set',{operatorId:people.manager.id,version:1,role:'sales',teams:[east.id]})
- const rows=(await h.db.prepare('SELECT message FROM rer_mail_development_outbox ORDER BY sequence DESC').all()).results,mail=rows.map(r=>JSON.parse(r.message)).find(m=>m.to.includes(stale.email)),url=mail.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0],refused=await h.send('/auth/confirm',{token:new URL(url).searchParams.get('token')})
+ const staleToken=inviteToken(stale.email),refused=await h.send('/auth/confirm',{token:staleToken})
  assert.ok(refused.status>=400);assert.equal(refused.cookie,undefined);const person=await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind(stale.email).first();assert.equal(await h.db.prepare('SELECT role FROM p_members WHERE operator_id=?').bind(person.id).first(),null)
  assert.equal((await h.send('/api/platter/state',undefined,refused.cookie??'')).status,401)
- assert.equal((await h.cmd('member.invite',{...stale,role:'content_editor',teams:[west.id]})).status,'invited');const recovered=await h.state(await h.signIn(stale.email));assert.equal(recovered.actor.role,'content_editor');assert.deepEqual(recovered.teams.map(t=>t.id),[west.id]);assert.ok((await h.send('/auth/confirm',{token:new URL(url).searchParams.get('token')})).status>=400,'reissue revokes the earlier invitation')
-}))
+ assert.equal((await h.cmd('member.invite',{...stale,role:'content_editor',teams:[west.id]})).status,'invited');const recovered=await h.state(await joinInvite(stale.email));assert.equal(recovered.actor.role,'content_editor');assert.deepEqual(recovered.teams.map(t=>t.id),[west.id]);assert.ok((await h.send('/auth/confirm',{token:staleToken})).status>=400,'reissue revokes the earlier invitation')
+ }finally{await h.close()}
+})

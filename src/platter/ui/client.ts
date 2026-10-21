@@ -34,7 +34,7 @@ function clientDocument(view: any, token: string, feedback?: Feedback): Response
   html += clientQuestions(view,publicForm)
   if(!view.expiry?.expired) html += clientSuggestions(view,publicForm)
   if(view.previous) html += panel('Changes since your previous offer', `<p>Revision ${escape(view.previous.revision)} compared with revision ${escape(view.revision)}</p>${changes(view.previous,view)}`)
-  if(conditional&&!view.preview)html+=selectedSummary(view.selection,currency,true)
+  if(conditional&&!view.preview)html+=selectedSummary(view.selection,currency,options.find((o:any)=>o.id===selectedId)?.label)
   if(view.preview)html+=previewSelection(view)
   else if(conditional&&view.status!=='accepted')html+=panel('Choose your package',`<form method="get" action="/p/${encodeURIComponent(token)}#selection-review">${hidden('itemsOptionId',selectedId)}<label>Review sections for<select name="optionId">${options.map((o:any)=>`<option value="${escape(o.id)}"${o.id===selectedId?' selected':''}>${escape(o.label)}</option>`).join('')}</select></label>${itemChoices(options.find((o:any)=>o.id===selectedId),view.selection)}<button>Review package</button></form><p>Scope and terms above match this selection. Review them before accepting.</p>`)
   if (view.acceptance) {

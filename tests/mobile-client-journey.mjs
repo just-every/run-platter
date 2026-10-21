@@ -34,9 +34,11 @@ export async function mobileClientJourney() {
   if (screenshots) await mkdir(screenshots, { recursive: true })
   for (const width of [1440, 390]) {
    app = await installedApp()
-   // The phone also proves that native review focus and every client action
-   // work with application JavaScript disabled.
-   const owner = await browser.newContext(), client = await browser.newContext({ viewport: { width, height: 900 }, javaScriptEnabled: width !== 390 })
+   const owner = await browser.newContext(), client = await browser.newContext({ viewport: { width, height: 900 } })
+   // Block the application's script on the phone while leaving the browser's
+   // JavaScript engine available to the axe accessibility test itself.
+   let blockedScripts=0
+   if(width===390)await client.route('**/platter.js',route=>{blockedScripts++;return route.abort()})
    try {
     assert.equal((await owner.request.post(app.origin + '/auth/bootstrap', { headers: { origin: app.origin }, data: { token: app.token, displayName: 'Jordan Northstar' }, maxRedirects: 0 })).status(), 303)
     const setup = await owner.newPage()
@@ -143,6 +145,7 @@ export async function mobileClientJourney() {
     assert.match(await page.locator('main').innerText(), /\$4,650\.00 USD/)
     assert.match(await page.locator('main').innerText(), /\$1,162\.50 USD/)
     assert.match(await page.locator('main').innerText(), /Premium delivery includes/)
+    assert.match(await review.ariaSnapshot(), /Full campaign/, 'EDIT-007 the frozen selection still names its accepted package')
     await inspect('accepted')
     assert.equal(await page.getByRole('link',{name:/production-schedule\.pdf/}).count(),1)
     assert.match(await page.locator('main').ariaSnapshot(),/Avery Chen/)
@@ -151,6 +154,7 @@ export async function mobileClientJourney() {
     assert.deepEqual(saved.acceptance.selection.items.map(({ id, quantity }) => ({ id, quantity })), [{ id: 'retouch', quantity: 3 }]); assert.equal(saved.acceptance.totalCents, 465000); assert.equal(saved.acceptance.depositCents, 116250)
     assert.equal(saved.questions[0].text, 'Can the week-four launch review take place on Friday?')
     assert.equal((await client.cookies()).some(cookie => !cookie.name.startsWith('platter_client')), false, 'client completes without a member account')
+    if(width===390)assert.ok(blockedScripts>0,'EDIT-007 phone completes with the application script blocked')
    } finally { await client.close(); await owner.close(); await app.close(); app = undefined }
   }
  } finally { await browser?.close(); await app?.close() }

@@ -479,14 +479,17 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   await h.cmd('proposal.share',{id:p.id,operatorId:people.other.id},people.sales.cookie)
   const line=(await h.state()).proposals.find(r=>r.id===p.id).internalPricing.lines[0];await h.cmd('pricing.cost',{id:p.id,version:1,lineKey:line.key,unitCost:'7000'},people.manager.cookie)
   await h.cmd('template.save',{id:p.id,version:2,name:'Private cost template'},people.sales.cookie)
-  await h.cmd('library.save',{title:'Synthetic case study',kind:'case_study',content:'An archived text library item'})
+  const templateFolder=await h.cmd('folder.save',{name:'East templates',kind:'template',teams:[team.id],shareConsent:true}),libraryFolder=await h.cmd('folder.save',{name:'East library',kind:'library',teams:[team.id],shareConsent:true})
+  const shared=await h.cmd('template.save',{id:p.id,version:2,name:'Shared locked cost template',shared:true,folderId:templateFolder.id,shareConsent:true});await h.cmd('template.locks',{id:shared.id,version:1,sections:['terms']})
+  const lockedCopy=await h.cmd('template.start',{id:shared.id,version:2,clientId:client.id},people.sales.cookie)
+  await h.cmd('library.save',{title:'Synthetic case study',kind:'case_study',content:'An archived text library item',folderId:libraryFolder.id})
   await h.cmd('proposal.approve',{id:p.id,version:2,revision:2},people.manager.cookie)
   const paid=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic paid proposal',scope:'Synthetic scope',optionOne:'First',priceOne:'2400',optionTwo:'Second',priceTwo:'4200',depositPercent:'25'})
   const paidPath=new URL((await h.cmd('proposal.send',{id:paid.id,version:1})).shareUrl).pathname
   await h.send(paidPath+'/action?name=code.request',{});const code=(await h.state()).outbox.find(r=>r.subject==='Your Platter verification code').body.match(/\b\d{6}\b/)[0],verified=(await h.send(paidPath+'/action?name=code.verify',{code})).cookie;assert.equal((await h.send(paidPath+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},verified)).status,200)
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-2803',webhookSecret:'synthetic-platter-2804',consent:true});const payment=await h.cmd('payment.bind',{id:paid.id,chargeId:'synthetic-platter-2801',consent:true}),refund={paymentId:payment.id,amount:'100',reason:'Synthetic partial refund',requestId:'synthetic-platter-2805',consent:true};await h.cmd('payment.refund',refund)
   await h.cmd('payment.record',{id:paid.id,amount:'50',method:'check',reference:'synthetic-platter-2806',receivedOn:'2026-10-21',consent:true})
-  const before=await h.state(),tables=['p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
+  const before=await h.state(),tables=['p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
   const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
   await h.close();h=undefined
@@ -497,6 +500,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.deepEqual(after.workspaceDefaults,before.workspaceDefaults);assert.deepEqual(after.approvalSettings,before.approvalSettings);assert.deepEqual(after.proposals.find(r=>r.id===p.id).internalPricing,before.proposals.find(r=>r.id===p.id).internalPricing);assert.deepEqual(after.libraryItems,before.libraryItems)
   for(const [i,t] of tables.entries())assert.deepEqual(canonical((await h.db.prepare('SELECT * FROM '+t).all()).results),rows[i],t)
   const sales=await h.signIn(people.sales.email),manager=await h.signIn(people.manager.email),other=await h.signIn(people.other.email)
+  assert.deepEqual((await h.state(sales)).proposals.find(r=>r.id===lockedCopy.id).lockedSections,['terms']);await h.cmd('proposal.revise',{id:lockedCopy.id,version:1,clientId:client.id,title:'Archive routed offer',scope:'An audited scope',optionOne:'First',priceOne:'28000',optionTwo:'Second',priceTwo:'30000',depositPercent:'25',terms:'Changed locked terms'},sales,403)
   assert.equal((await h.state(sales)).actor.role,'sales');assert.equal((await h.state(manager)).actor.role,'manager')
   assert.equal((await h.state(sales)).followups.timeZone,'America/New_York')
   assert.equal((await h.state(other)).proposals.some(r=>r.id===p.id),true)

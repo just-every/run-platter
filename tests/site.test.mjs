@@ -828,4 +828,4 @@ test('MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop an
  const {packagesJourney}=await import('./packages-journey.mjs');await packagesJourney()
 })
 
-test('MOB-001 / EDIT-002 desktop and phone save, replace and start personal templates, preview and accept independent drafts', {timeout:180000}, templatesJourney)
+test('MOB-001 / EDIT-002 desktop and phone start all five starters, save, replace and start personal templates, preview and accept independent drafts', {timeout:180000}, templatesJourney)

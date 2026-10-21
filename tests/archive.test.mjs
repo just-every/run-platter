@@ -133,6 +133,10 @@ test('EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-
     await h.cmd('followup.schedule',{id:pending.id,action:'Call Avery about scope',dueDate:'2027-03-10'})
     await h.cmd('followup.schedule',{id:duplicate.id,action:'Review new scope',dueDate:'2027-03-11'})
     await h.cmd('followup.complete',{id:duplicate.id,action:'Reviewed scope with Avery by phone'})
+    const starterBefore = await h.cmd('template.start', { id: 'starter:consultancy', version: 1, clientId: client.id })
+    const starterSnapshot = (await h.state()).proposals.find(p => p.id === starterBefore.id)
+    assert.match(starterSnapshot.scope, /Northstar Coffee/)
+    assert.ok(starterSnapshot.options.every(o => o.tables[0].lines.length === 2))
     const followupsBefore=(await h.state()).followups.rows.map(({sentAt,...r})=>r)
     const actionsBefore=(await h.state()).followupActions
     const {packageFixture,packageSelection:packageItems,packageExpected}=await import('./packages-fixture.mjs')
@@ -170,7 +174,7 @@ test('EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-
     assert.equal(openThread[0].answers.length,0)
     const beforeAudit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows.map(({reason,...row})=>row)
     assert.ok(beforeAudit.some(row=>row.action==='proposal.preview'&&row.subject===duplicate.id&&row.actor_role==='owner'),'EDIT-018 / TEAM-004 preview action is retained without payload or invitation authority')
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','withdrawn'])
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','draft','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -237,6 +241,11 @@ test('EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-
     const started=(await h.state(restoredOwner)).proposals.find(p=>p.id===restoredDraft.id)
     assert.equal(started.status,'draft');assert.equal(started.approved_by,null);assert.equal(started.shareToken,undefined)
     for(const field of ['scope','terms','options','attachments','section_conditions','deposit_bps'])assert.deepEqual(started[field],templateSource[field],'EDIT-002 restored template starts independent content: '+field)
+    const restoredStarter = (await h.state(restoredOwner)).proposals.find(p => p.id === starterBefore.id)
+    for (const field of ['scope', 'terms', 'options', 'deposit_bps', 'attachments']) assert.deepEqual(restoredStarter[field], starterSnapshot[field], 'EDIT-002 filled starter draft survives public CLI restore: ' + field)
+    assert.equal((await h.state(restoredOwner)).starterTemplates.length, 5)
+    const restarted = await h.cmd('template.start', { id: 'starter:consultancy', version: 1, clientId: client.id }, restoredOwner)
+    assert.equal((await h.state(restoredOwner)).proposals.find(p => p.id === restarted.id).scope, starterSnapshot.scope, 'EDIT-002 built-in starter remains usable after CLI restore')
     assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id},restoredOwner),journal)
     assert.equal((await h.send(invoicePath,undefined,restoredOwner)).text,invoiceCsv)
     for(const file of frozenAttachments){const r=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+proposal.id+'/'+file.id,{headers:{cookie:restoredOwner,host:new URL(h.origin).host}});assert.equal(r.status,200);assert.deepEqual(new Uint8Array(await r.arrayBuffer()),file.kind==='w9'?attachmentBytes:new TextEncoder().encode('%PDF insurance'))}

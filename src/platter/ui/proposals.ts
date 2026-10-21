@@ -1,5 +1,5 @@
 import { selectedSummary } from './packages'
-import { personalTemplates, savePersonalTemplate } from './templates'
+import { personalTemplates, savePersonalTemplate, starterTemplatesPanel } from './templates'
 import { pricingTables } from './pricing'
 import { followupQueuePanel, followupPanel } from './followup'
 import { duplicatePanel } from './duplicate'
@@ -27,7 +27,7 @@ export function proposalsPage(state: any, selection = new URLSearchParams(), fee
   const prepare = canPrepare ? `<section class="prepare" aria-labelledby="prepare-title"><h2 id="prepare-title">Prepare a proposal</h2>` + (state.clients?.length
     ? composerShelf(state) + composerForm(state, undefined, 'prepare', 'composer-new') + (exceptionBand(state, undefined, feedback, 'composer-new') ?? '') + receipt('<p class="receipt-sum muted">The client chooses one of the two options and pays the deposit percentage of it.</p>', '<button form="composer-new">Prepare proposal</button>')
     : '<p>Add a client before preparing a proposal.</p>' + (owner ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) + '</section>' : ''
-  return (exceptions ? `<div class="exceptions">${exceptions}</div>` : '') + followupQueuePanel(state, selection.get('owner')) + (owner ? pipelinePanel(proposals, selection, state.followups) + reportSchedulesPanel(state, selection) : panel('Your proposals', list)) + personalTemplates(state) + prepare
+  return (exceptions ? `<div class="exceptions">${exceptions}</div>` : '') + followupQueuePanel(state, selection.get('owner')) + (owner ? pipelinePanel(proposals, selection, state.followups) + reportSchedulesPanel(state, selection) : panel('Your proposals', list)) + personalTemplates(state) + starterTemplatesPanel(state) + prepare
 }
 
 /** The tracked-caps line over the heading: stage, status, revision and client. */

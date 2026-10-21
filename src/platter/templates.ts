@@ -1,5 +1,6 @@
 import type { Bindings } from '../auth.server'
-import { copyAttachments } from './attachments'
+import { starterTemplate } from './starter-templates'
+import { copyAttachments, vendorDocuments } from './attachments'
 import { currentTime } from './expiry'
 import { commit, exact, need, proposal, snapshot, text, type Actor } from './model'
 import { negotiatedView, pendingNegotiation } from './negotiation'
@@ -12,6 +13,7 @@ export async function templateState(db: D1Database, a: Actor) {
 }
 
 async function ownTemplate(db: D1Database, a: Actor, id: unknown) {
+ need(!String(id).startsWith('starter:'), 'Start a draft to customize a built-in starter; save your changes as a personal template', 403)
  const row = await db.prepare('SELECT * FROM p_personal_templates WHERE id=?').bind(text(id, 'a template')).first<any>()
  need(row, 'Template not found', 404)
  need(row.owner_id === a.id, 'Only the owner of this personal template may use or edit it', 403)
@@ -50,11 +52,16 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   return { id, version }
  }
 
- const template = await ownTemplate(db, a, input.id)
+ const clientId = text(input.clientId ?? input.starterClientId, 'a client')
+ const client = await db.prepare('SELECT id,name,email FROM p_clients WHERE id=?').bind(clientId).first<{ id: string; name: string; email: string }>()
+ need(client, 'Client not found', 404)
+ const starter = starterTemplate(input.id, client, a)
+ const template = starter ? { id: starter.id, version: starter.version, pdf_enabled: 1 } : await ownTemplate(db, a, input.id)
  exact(template, input)
- const clientId = text(input.clientId, 'a client')
- need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(clientId).first(), 'Client not found', 404)
- const content = JSON.parse(template.snapshot), expiry = JSON.parse(template.expiry), sections: string[] = JSON.parse(template.suggestion_sections)
+ const personal = starter ? null : template as any
+ const content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
+ const expiry = starter ? { mode: 'never', period_days: null, expires_on: null, time_zone: await installationZone(db), warning_days: null } : JSON.parse(personal.expiry)
+ const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)
  need(content.currency === 'USD', 'Personal templates require USD content', 409)
  const id = crypto.randomUUID(), title = input.title === undefined || input.title === '' ? content.title : text(input.title, 'a title')
  const attachments = copyAttachments(content.attachments ?? [])
@@ -71,8 +78,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   db.prepare('INSERT INTO p_expiry(proposal_id,mode,period_days,expires_on,time_zone,warning_days) VALUES(?,?,?,?,?,?)').bind(id, expiry.mode, expiry.period_days, expiry.expires_on, expiry.time_zone, expiry.warning_days),
   ...sections.map(section => db.prepare('INSERT INTO p_suggestion_sections(proposal_id,revision,section) VALUES(?,1,?)').bind(id, section)),
  ], false, {
-  sql: 'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND owner_id=? AND version=?) AND EXISTS(SELECT 1 FROM p_clients WHERE id=?)',
-  values: [template.id, a.id, template.version, clientId],
+  sql: (starter ? '' : 'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND owner_id=? AND version=?) AND ') + 'EXISTS(SELECT 1 FROM p_clients WHERE id=?)',
+  values: [...(starter ? [] : [template.id, a.id, template.version]), clientId],
  })
  return { id, revision: 1, version: 1 }
 }

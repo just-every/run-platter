@@ -10,6 +10,61 @@ export async function templatesHttp(h) {
  const file = new FormData(); file.set('kind', 'w9'); file.set('file', new File(['%PDF Northstar vendor W9'], 'Northstar-W9.pdf', { type: 'application/pdf' }))
  const upload = new Request(h.origin + '/app/attachment', { method: 'POST', headers: { host: new URL(h.origin).host, origin: h.origin, cookie: h.owner }, body: file })
  assert.equal((await h.mf.dispatchFetch(upload.url, { method: 'POST', headers: upload.headers, body: await upload.arrayBuffer() })).status, 200)
+ // EDIT-002: all five starters exist without a seeding command or personal-template write.
+ const starterNames = ['Agency', 'Consultancy', 'IT managed services', 'Creative studio', 'Professional services']
+ const fresh = await h.state()
+ assert.deepEqual(fresh.starterTemplates.map(t => t.name), starterNames)
+ assert.deepEqual(fresh.templates, [])
+ const starterDrafts = []
+ const starterTotals = [[300000, 540000], [380000, 700000], [240000, 420000], [340000, 620000], [320000, 580000]]
+ for (const [index, starter] of fresh.starterTemplates.entries()) {
+  const first = await h.cmd('template.start', { id: starter.id, version: starter.version, clientId: client.id })
+  const second = await h.cmd('template.start', { id: starter.id, version: starter.version, clientId: other.id })
+  const state = await h.state(), p = state.proposals.find(p => p.id === first.id), copy = state.proposals.find(p => p.id === second.id)
+  assert.match(p.scope, /Northstar Coffee/); assert.match(p.scope, /avery@northstar\.example/)
+  assert.ok(p.terms.includes(state.actor.email)); assert.match(copy.scope, /Juniper Studio/)
+  assert.ok(!copy.scope.includes('Northstar Coffee')); assert.ok(!JSON.stringify(p).includes('{{'))
+  assert.equal(p.currency, 'USD'); assert.equal(p.deposit_bps, 3000); assert.equal(p.status, 'draft')
+  assert.equal(p.approved_by, null); assert.equal(p.shareToken, undefined)
+  assert.equal(p.pdfDownloadsEnabled, true); assert.equal(p.expiry.mode, 'never')
+  assert.equal(p.attachments[0].filename, 'Northstar-W9.pdf')
+  assert.equal(p.options.length, 2)
+  for (const option of p.options) {
+   assert.equal(option.tables.length, 1); assert.equal(option.tables[0].lines.length, 2)
+   assert.equal(option.cents, option.tables[0].lines.reduce((sum, line) => sum + line.lineTotalCents, 0))
+   assert.ok(option.tables[0].lines.every(line => line.description.includes('Northstar Coffee')))
+  }
+  assert.deepEqual(p.options.map(o => o.cents), starterTotals[index], 'EDIT-002 example pricing totals in integer cents')
+  assert.deepEqual(copy.options.map(o => o.cents), p.options.map(o => o.cents))
+  await h.cmd('proposal.send', { id: p.id, version: 1 }, h.owner, 409)
+  await h.cmd('template.start', { id: starter.id, version: 2, clientId: client.id }, h.owner, 409)
+  // EDIT-014 inheritance: exact filled text, selected prices and revision on client PDFs.
+  await h.cmd('proposal.approve', { id: copy.id, version: 1, revision: 1 })
+  const shared = await h.cmd('proposal.send', { id: copy.id, version: 2 }), clientPath = new URL(shared.shareUrl).pathname
+  await h.send(clientPath + '/action?name=code.request', {})
+  const code = (await h.state()).outbox.find(m => m.proposal_id === copy.id && m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+  const verified = await h.send(clientPath + '/action?name=code.verify', { code })
+  const pdf = await h.mf.dispatchFetch(h.origin + clientPath + '/download.pdf?optionId=two', { headers: { host: new URL(h.origin).host, cookie: verified.cookie } })
+  assert.equal(pdf.status, 200)
+  const pages = await pdfPages(new Uint8Array(await pdf.arrayBuffer())), written = pages.join(' ')
+  assert.ok(pages.every(page => /Not signed, revision 1/.test(page)))
+  assert.match(written, /Juniper Studio/); assert.ok(written.replace(/\s+/g, ' ').includes(copy.scope.replace(/\s+/g, ' '))); assert.ok(!written.includes('{{'))
+  assert.ok(written.includes((starterTotals[index][1] / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })))
+  assert.equal((await h.send(clientPath + '/action?name=accept', { name: 'Morgan Lee', optionId: 'two', consent: true }, verified.cookie)).status, 200)
+  const accepted = (await h.state()).proposals.find(p => p.id === copy.id).acceptance
+  assert.equal(accepted.totalCents, starterTotals[index][1]); assert.equal(accepted.depositCents, starterTotals[index][1] * 0.3)
+  assert.equal((await h.state()).proposals.find(p => p.id === copy.id).scope, copy.scope)
+  assert.ok((await h.send(clientPath, undefined, verified.cookie)).text.includes(copy.scope), 'EDIT-002 accepted client page retains the filled scope')
+  starterDrafts.push(p)
+ }
+ const starterSource = starterDrafts[0]
+ await h.cmd('proposal.revise', { id: starterSource.id, version: 1, clientId: client.id, title: starterSource.title, scope: 'Individually revised agency scope.', terms: starterSource.terms, optionOne: 'Essential', priceOne: '1', optionTwo: 'Extended', priceTwo: '1', depositPercent: 30 })
+ const untouched = await h.cmd('template.start', { id: fresh.starterTemplates[0].id, version: 1, clientId: client.id })
+ assert.equal((await h.state()).proposals.find(p => p.id === untouched.id).scope, starterSource.scope)
+ assert.deepEqual((await h.state()).starterTemplates, fresh.starterTemplates)
+ assert.deepEqual((await h.state()).templates, [])
+ await h.cmd('template.save', { id: untouched.id, version: 1, name: 'Overwrite starter', templateId: fresh.starterTemplates[0].id, templateVersion: 1 }, h.owner, 403)
+ await h.cmd('template.start', { id: fresh.starterTemplates[0].id, version: 1, clientId: 'absent' }, h.owner, 404)
  const fields = { clientId: client.id, title: 'Brand campaign', scope: 'Photography and usage licence.', terms: 'Rush delivery terms.', depositPercent: 30, packages: packageFixture(), pricingTables: pricingFixture(), sectionConditions: { terms: 'item:rush' } }
  const source = await h.cmd('proposal.prepare', fields)
  await h.cmd('pdf.downloads', { id: source.id, version: 1, enabled: false })
@@ -55,6 +110,8 @@ export async function templatesHttp(h) {
  assert.deepEqual((await h.state()).templates, refusedBefore)
  await h.cmd('pdf.downloads', { id: third.id, version: 1, enabled: true })
  const personal = await h.cmd('template.save', { id: third.id, version: 2, name: 'Casey’s personal template' }, member)
+ const memberStarter = await h.cmd('template.start', { id: fresh.starterTemplates[1].id, version: 1, clientId: other.id }, member)
+ assert.equal((await h.state(member)).proposals.find(p => p.id === memberStarter.id).sales_owner_id, (await h.state(member)).actor.id)
  const memberState = await h.state(member)
  assert.deepEqual(memberState.templates.map(t => t.id), [personal.id]); assert.equal(memberState.templates[0].owner_id, memberState.actor.id)
  assert.deepEqual((await h.state()).templates.map(t => t.id), [template.id])
@@ -82,6 +139,14 @@ export async function templatesHttp(h) {
  }
  const listed = await rpc('search_templates', { query: 'campaign' })
  assert.deepEqual(JSON.parse(listed.content[0].text).templates, [{ id: template.id, name: 'Campaign template', version: 2 }])
+ const starterSearch = await rpc('search_templates', { query: 'IT managed' })
+ assert.deepEqual(JSON.parse(starterSearch.content[0].text).templates, [{ id: 'starter:it-managed-services', name: 'IT managed services', version: 1 }])
+ const starterPrepared = await rpc('prepare_from_template', { templateId: 'starter:it-managed-services', templateVersion: 1, clientId: other.id })
+ assert.ok(!starterPrepared.isError, JSON.stringify(starterPrepared))
+ const starterAgentId = JSON.parse(starterPrepared.content[0].text).id
+ const starterAgent = (await h.state()).proposals.find(p => p.id === starterAgentId)
+ assert.equal(starterAgent.prepared_by, 'agent:' + key.id); assert.match(starterAgent.scope, /Juniper Studio/)
+ await h.cmd('proposal.send', { id: starterAgentId, version: 1 }, h.owner, 409)
  const prepared = await rpc('prepare_from_template', { templateId: template.id, templateVersion: 2, clientId: other.id })
  assert.ok(!prepared.isError, JSON.stringify(prepared)); const agentDraft = JSON.parse(prepared.content[0].text)
  const agentProposal = (await h.state()).proposals.find(p => p.id === agentDraft.id)

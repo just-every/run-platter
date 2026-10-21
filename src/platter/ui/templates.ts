@@ -20,3 +20,14 @@ export function savePersonalTemplate(state: any, p: any): string {
   + form('template.save', proposalPath(p.id), source + field('Template name', 'name', p.title, 'required maxlength="200"') + '<button>Save personal template</button>')
   + (replace ? `<details><summary>Replace an existing personal template</summary>${replace}</details>` : ''))
 }
+
+export function starterTemplatesPanel(state: any): string {
+ if (!['owner', 'member'].includes(state.actor?.role)) return ''
+ const clients = (state.clients ?? []).map((c: any) => `<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('')
+ const choices = (state.starterTemplates ?? []).map((t: any) => `<option value="${escape(t.id)}">${escape(t.name)}</option>`).join('')
+ return panel('Starter templates', '<p>Five starting points with example USD pricing. Client and sender details are filled when you start an independent draft. Review scope, prices and terms before approval.</p>'
+  + (clients ? form('template.start', '/app', hidden('version', 1)
+   + `<label for="starter-template">Starter template</label><select id="starter-template" name="id" required>${choices}</select>`
+   + `<label for="starter-client">Client for starter proposal</label><select id="starter-client" name="starterClientId" required>${clients}</select>`
+   + '<button>Start starter proposal</button>') : '<p>Add a client to start from Agency, Consultancy, IT managed services, Creative studio or Professional services.</p>'))
+}

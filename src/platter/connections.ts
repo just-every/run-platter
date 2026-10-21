@@ -23,7 +23,7 @@ export async function providerCredential(env:Bindings,id:string){
   const secret=JSON.parse(new TextDecoder().decode(plaintext))
   need(secret.accountId===row.account_id&&secret.provider===row.provider,'Provider credential binding changed',409)
   return {connection:row,secret}
- }catch{fail('Connect this provider again before using it',409)}
+ }catch{return fail('Connect this provider again before using it',409)}
 }
 export async function providerJson(url:string,token:string){
  try{

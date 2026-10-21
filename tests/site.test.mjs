@@ -963,14 +963,18 @@ test('SEND-006 desktop and phone rehearse to self, then edit invitations, fresh 
 })
 
 test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths', {timeout:180000}, async()=>{
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs')
  let app,browser
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
   browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
-   app=await installedApp({scheduled:true})
-   const owner=await browser.newContext({viewport:{width,height:900}}),sales=await browser.newContext({viewport:{width,height:900}}),manager=await browser.newContext({viewport:{width,height:900}}),clientContext=await browser.newContext({viewport:{width,height:900}})
+   const edge=await browserEdge(),mailCalls=[]
+   let h
+   try{h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,unclaimed:true,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-1'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mailCalls.push(await request.json());return Response.json({id:'synthetic-platter-'+mailCalls.length})}});edge.attach(h)}catch(error){await edge.close();throw error}
+   app={...h,token:h.auth.SETUP_TOKEN,close:async()=>{await edge.close();await h.close()}}
+   const owner=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),sales=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),manager=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),clientContext=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
    try{
     const post=(context,path,data)=>context.request.post(app.origin+path,{headers:{origin:app.origin},data,maxRedirects:0})
     const command=async(context,name,input,status=200)=>{const r=await post(context,'/api/platter/command',{name,input});assert.equal(r.status(),status,await r.text());return r.json()}
@@ -982,8 +986,7 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
      const email=role+'@synthetic-platter.example'
      assert.equal((await post(owner,'/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'})).status(),202)
      assert.equal((await post(context,'/auth/magic-link',{email})).status(),202)
-     const rows=(await app.db.prepare('SELECT message FROM rer_mail_development_outbox ORDER BY sequence DESC').all()).results
-     const mail=rows.map(r=>JSON.parse(r.message)).find(m=>m.to.includes(email)),url=mail.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]
+     const mail=mailCalls.findLast(m=>m.to.includes(email)),url=mail.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]
      assert.equal((await post(context,'/auth/confirm',{token:new URL(url).searchParams.get('token')})).status(),303)
      return (await state(context)).actor
     }

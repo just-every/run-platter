@@ -64,7 +64,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  const personal = starter ? null : template as any
  const content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
  const defaults=await workspaceDefaults(db)
- const expiry = starter ? { mode: defaults.expiryDays===null?'never':'days', period_days: defaults.expiryDays, expires_on: null, time_zone: await installationZone(db), warning_days: null } : JSON.parse(personal.expiry)
+ const expiry = starter ? { mode: defaults.expiryDays===null?'never':'days', period_days: defaults.expiryDays, expires_on: null, time_zone: await installationZone(db), warning_days: defaults.expiryDays===null?null:defaults.warningDays } : JSON.parse(personal.expiry)
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)
  need(content.currency === 'USD', 'Personal templates require USD content', 409)
  const id = crypto.randomUUID(), title = input.title === undefined || input.title === '' ? content.title : text(input.title, 'a title')

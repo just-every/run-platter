@@ -1574,3 +1574,25 @@ test('TEAM-001 / EDIT-015 template locks survive starts, copies and personal tem
  // An allowed team manager can unlock their team's draft, and a stale revision cannot do so twice.
  await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'terms'},people.manager.cookie);await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'terms'},people.manager.cookie,409)
 }))
+
+test('TEAM-001 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses',()=>run(async h=>{
+ const east=await h.cmd('team.create',{name:'East'}),west=await h.cmd('team.create',{name:'West'}),people={}
+ for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[east.id]});people[role]={cookie,id}}
+ const input={email:'new-sales@synthetic-platter.example',displayName:'New salesperson',role:'sales',teams:[east.id]}
+ const before=(await h.db.prepare('SELECT count(*) AS n FROM oa_operators').first()).n
+ for(const role of ['sales','content_editor','viewer','billing'])await h.cmd('member.invite',input,people[role].cookie,403)
+ for(const role of ['admin','manager','billing'])await h.cmd('member.invite',{...input,role},people.manager.cookie,403)
+ await h.cmd('member.invite',{...input,teams:[west.id]},people.manager.cookie,403);await h.cmd('member.invite',{...input,teams:[]},people.manager.cookie,403)
+ await h.cmd('member.invite',{...input,role:'admin'},people.admin.cookie,403)
+ assert.equal((await h.db.prepare('SELECT count(*) AS n FROM oa_operators').first()).n,before);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_member_invitations').first()).n,0)
+ const invitation=await h.cmd('member.invite',input,people.manager.cookie);assert.equal(invitation.status,'invited')
+ const invited=await h.db.prepare('SELECT * FROM oa_operators WHERE email=?').bind(input.email).first();assert.equal(invited.status,'invited');assert.equal(await h.db.prepare('SELECT role FROM p_members WHERE operator_id=?').bind(invited.id).first(),null)
+ // Even while an eligible pending grant exists, raw native invitations cannot bypass its target role/team selection.
+ const raw=await h.send('/auth/invite',{email:'bypass@synthetic-platter.example',displayName:'Bypass',role:'member',returnTo:'/app'},people.manager.cookie);assert.equal(raw.status,403);assert.equal(await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind('bypass@synthetic-platter.example').first(),null)
+ const joined=await h.signIn(input.email),s=await h.state(joined);assert.equal(s.actor.role,'sales');assert.deepEqual(s.teams.map(t=>t.id),[east.id]);assert.equal((await h.db.prepare('SELECT status FROM p_member_invitations WHERE email=?').bind(input.email).first()).status,'accepted')
+ const managerInvite={...input,email:'new-manager@synthetic-platter.example',displayName:'New manager',role:'manager',teams:[west.id]};assert.equal((await h.cmd('member.invite',managerInvite,people.admin.cookie)).status,'invited');const newManager=await h.signIn(managerInvite.email),managerState=await h.state(newManager);assert.equal(managerState.actor.role,'manager');assert.deepEqual(managerState.teams.map(t=>t.id),[west.id])
+ const stale={...input,email:'stale@synthetic-platter.example'};assert.equal((await h.cmd('member.invite',stale,people.manager.cookie)).status,'invited');await h.cmd('member.set',{operatorId:people.manager.id,version:1,role:'sales',teams:[east.id]})
+ const rows=(await h.db.prepare('SELECT message FROM rer_mail_development_outbox ORDER BY sequence DESC').all()).results,mail=rows.map(r=>JSON.parse(r.message)).find(m=>m.to.includes(stale.email)),url=mail.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0],refused=await h.send('/auth/confirm',{token:new URL(url).searchParams.get('token')})
+ assert.ok(refused.status>=400);assert.equal(refused.cookie,undefined);const person=await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind(stale.email).first();assert.equal(await h.db.prepare('SELECT role FROM p_members WHERE operator_id=?').bind(person.id).first(),null)
+ assert.equal((await h.send('/api/platter/state',undefined,refused.cookie??'')).status,401)
+}))

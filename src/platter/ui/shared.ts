@@ -15,7 +15,7 @@ export const date = (value: unknown): string => {
 }
 export const hidden = (name: string, value: unknown): string => `<input type="hidden" name="${escape(name)}" value="${escape(value)}">`
 export const field = (label: string, name: string, value: unknown = '', extra = ''): string => `<label>${escape(label)}<input name="${escape(name)}" value="${escape(value)}" ${extra}></label>`
-export const area = (label: string, name: string, value: unknown = '', extra = ''): string => `<label>${escape(label)}<textarea name="${escape(name)}"${/\brows=/.test(extra) ? '' : ' rows="5"'} ${extra}>${escape(value)}</textarea></label>`
+export const area = (label: string, name: string, value: unknown = '', extra = ''): string => `<label>${escape(label)}<textarea name="${escape(name)}"${/\baria-label=/.test(extra)?'':` aria-label="${escape(label)}"`}${/\brows=/.test(extra) ? '' : ' rows="5"'} ${extra}>${escape(value)}</textarea></label>`
 export const action = (command: string, returnTo: string): string => `/app/action?name=${encodeURIComponent(command)}&amp;returnTo=${encodeURIComponent(returnTo)}`
 export const form = (command: string, returnTo: string, contents: string, draft?: string): string => `<form method="post" action="${action(command, returnTo)}"${draft ? ` data-draft="${escape(draft)}"` : ''}>${contents}</form>`
 export const panel = (title: string, contents: string, kind = ''): string => `<section class="panel${kind ? ' ' + kind : ''}"><h2>${escape(title)}</h2>${contents}</section>`

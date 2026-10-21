@@ -1404,5 +1404,12 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, pol
  await h.cmd('proposal.send',{id:agentDraft.value.id,version:2},h.owner,409)
  const optional=await prepare('sales',{packages:[{id:'one',label:'Base',price:'2000',optionalItems:[{id:'extra',label:'Optional delivery',unitPrice:'1000',min:1,max:30,quantity:1,editable:true}]}]})
  await h.cmd('proposal.send',{id:optional.id,version:1},people.sales.cookie,409)
+ await h.cmd('member.zone',{timeZone:'Asia/Tokyo'},people.other.cookie)
+ await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET observed_at=excluded.observed_at').bind(Date.parse('2027-03-10T01:00:00Z')).run()
+ const pacific=await prepare('sales',{title:'Pacific calendar'}),tokyo=await prepare('other',{title:'Tokyo calendar'})
+ const zoneRows=(await h.state()).followups.rows
+ for(const [id,date,zone] of [[pacific.id,'2027-03-09','America/Los_Angeles'],[tokyo.id,'2027-03-10','Asia/Tokyo']]){const row=zoneRows.find(r=>r.id===id);assert.equal(row.dueDate,date);assert.equal(row.period,'today');assert.equal(row.timeZone,zone)}
+ await h.cmd('member.set',{operatorId:people.sales.id,version:(await h.state()).teamPeople.find(p=>p.id===people.sales.id).version,role:'viewer',teams:[]})
+ await unchanged(()=>h.cmd('proposal.revise',{...offer,clientId:client.id,id:pacific.id,version:1},people.sales.cookie,403))
  const audit=(await h.send('/api/platter/audit?action=approval.policy',undefined,h.owner)).value.rows;assert.ok(audit.length>=5);assert.ok(audit.every(r=>r.actor_id===people.owner.id&&r.occurred_at>0))
 }))

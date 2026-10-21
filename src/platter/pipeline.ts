@@ -29,7 +29,7 @@ export function pipeline(proposals: any[], params = new URLSearchParams(), now =
   ownerId: p.sales_owner_id as string | null, owner: p.sales_owner_name || 'Not recorded',
   clientId: String(p.client_id), client: String(p.clientName), age: Math.max(0, Math.floor((now - p.created_at) / 86400000)),
   dueDate: followups?.rows.find((r:any)=>r.id===p.id)?.dueDate??null,
-  dueFollowup: Boolean(followups?.rows.some((r:any)=>r.id===p.id&&r.dueDate<=followups.today)),
+  dueFollowup: Boolean(followups?.rows.some((r:any)=>r.id===p.id&&['overdue','today'].includes(r.period))),
   nextAction: (followups?.rows.some((r:any)=>r.id===p.id&&r.scheduled)?'followup':p.pipelineStatus === 'withdrawn' || p.status === 'withdrawn' ? 'withdrawn' : p.pipelineStatus === 'expired' || p.status === 'expired' ? 'reopen' : ['draft','approved'].includes(p.status) ? (p.approval ? p.approval.complete ? 'send' : 'approve' : p.status==='draft'?'approve':'send') : p.status === 'sent' ? 'await-client' : p.invoice ? 'complete' : 'export-deposit') as keyof typeof nextActions,
  }))
  const owners = [...new Map(rows.map(r => [r.ownerId || 'unrecorded', { id: r.ownerId || 'unrecorded', name: r.owner }])).values()].sort((a,b) => a.name.localeCompare(b.name))

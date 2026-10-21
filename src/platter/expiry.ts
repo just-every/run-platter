@@ -46,7 +46,7 @@ function integer(value: unknown, label: string, min: number) {
  return n
 }
 export async function expiryCommand(env: Bindings, a: Actor, name: string, p: Record<string, unknown>) {
- need(['owner','admin','manager','sales','content_editor'].includes(a.role), 'Only the owner changes expiry', 403)
+ need(senders.includes(a.role), 'Only the owner changes expiry', 403)
  need(name === 'expiry.set' || name === 'expiry.remove', 'Unknown expiry command', 404)
  const db = env.DB, row = await proposal(db, p.id), at = await currentTime(db)
  exact(row, p)

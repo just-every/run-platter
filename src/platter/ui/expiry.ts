@@ -11,7 +11,7 @@ export function expiryPanel(state: any, p: any): string {
  if (p.status === 'withdrawn') return ''
  if (p.status === 'accepted') return panel('Expiry', '<p>Accepted agreements never expire.</p>')
  let html = `<p${expiry.expired ? ' role="status"' : ''}>${expiry.expired ? '<strong>This offer has expired.</strong> ' : ''}${expiryLabel(expiry)}</p>`
- if (!p.canEdit) return panel('Expiry', html)
+ if (!p.canSend) return panel('Expiry', html)
  if (['sent','expired'].includes(p.status) && expiry.sentAt == null) html += '<p>No original send time is recorded for this legacy offer. Choose a specific expiry date or send a negotiated revision; calendar days after sending is unavailable.</p>'
  const returnTo = proposalPath(p.id), identity = hidden('id', p.id) + hidden('version', p.version)
  html += '<p>Expiry starts at midnight on the expiry date in the installation time zone. Days are calendar days from the first send date. A fresh invitation keeps that deadline; sending a negotiated revision starts the period again.</p>'

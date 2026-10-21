@@ -33,13 +33,13 @@ export function deliveryPanel(state: any, p: any): string {
       + '</dl></article></li>'
   }).join('')}</ol>` : empty('No invitation has been recorded for this proposal.')
   const notice = state.bounceNotices?.find((n:any)=>n.proposal_id===p.id&&!n.closed_at)
-  const correct = state.actor?.role === 'owner' && p.status === 'sent' && notice
+  const correct = p.canSend && p.status === 'sent' && notice
     ? '<h3>Correct invitation address</h3>' + correction(notice.id, notice.recipient, proposalPath(p.id)) : ''
   return panel('Invitation delivery', (state.mailTransport==='cloudflare'?'<p>Delivery events unavailable with this mail transport.</p>':'') + '<p>Invitations are listed newest first. Provider acceptance is separate from reported delivery; neither proves a person received or read the invitation.</p>' + list + correct)
 }
 
 export function bounceInbox(state: any): string {
-  if (state.actor?.role !== 'owner') return ''
+  if (!state.bounceNotices?.length) return ''
   const notices = state.bounceNotices ?? []
   const list = notices.length ? `<ul class="records" aria-label="Sender bounce notices">${notices.map((notice: any) => {
     const proposal = (state.proposals ?? []).find((p: any) => String(p.id) === String(notice.proposal_id))
@@ -58,5 +58,5 @@ export function bounceInbox(state: any): string {
       + (notice.action ? `<dt>Recorded action</dt><dd>${escape(notice.action)}</dd>` : '') + '</dl>'
       + markRead + correct + dismiss + '</article></li>'
   }).join('')}</ul>` : empty('No bounced invitation notices.')
-  return panel('Bounced invitations', '<p>These notices belong to the sending owner and stay here after reading or closing. Reading a notice does not close its follow-up. An uncertain sending result keeps the follow-up open. Close a follow-up only after checking it, with a logged reason.</p>' + list)
+  return panel('Bounced invitations', '<p>These notices belong to the sending person and stay here after reading or closing. Reading a notice does not close its follow-up. An uncertain sending result keeps the follow-up open. Close a follow-up only after checking it, with a logged reason.</p>' + list)
 }

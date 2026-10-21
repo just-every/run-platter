@@ -14,7 +14,7 @@ export async function pdfState(db: D1Database) {
 export const pdfEnabled = async (db: D1Database, id: string) => (await db.prepare('SELECT enabled FROM p_pdf_settings WHERE proposal_id=?').bind(id).first<any>())?.enabled !== 0
 
 export async function pdfCommand(env: Bindings, actor: Actor, input: Record<string, unknown>) {
- need(['owner','admin','manager','sales','content_editor'].includes(actor.role), 'Only the owner changes client PDF downloads', 403)
+ need(['owner','admin'].includes(actor.role), 'Only the owner changes client PDF downloads', 403)
  const row = await proposal(env.DB, input.id); exact(row, input)
  need(['draft','approved','sent'].includes(row.status), 'The accepted agreement is permanent', 409)
  need([true, false, 'yes', 'no'].includes(input.enabled as any), 'Choose whether client PDF downloads are allowed')

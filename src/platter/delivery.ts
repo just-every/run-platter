@@ -1,3 +1,5 @@
+import { scope, senders, permitted } from './permissions'
+import { approvalPlan } from './approvals'
 import type { Bindings } from '../auth.server'
 import { deliveryIntake } from './delivery-intake.mjs'
 import { commit, email, need, proposal, secret, text, type Actor } from './model'
@@ -29,17 +31,20 @@ export async function deliveryState(env: Bindings, actor: Actor) {
  LEFT JOIN rer_mail_event_states s ON s.provider=e.provider AND s.tenant_id=? AND s.event_namespace='platter-mail-v1'
  AND s.provider_message_id=e.provider_message_id AND s.recipient=e.recipient
  WHERE m.sender_id IS NOT NULL) WHERE rank=1 ORDER BY created_at DESC,id`).bind(env.AUTH_ORIGIN).all<any>()).results
- const bounceNotices = actor.role === 'owner' ? (await env.DB.prepare(`SELECT n.*,p.title
+ const visibility=scope(actor,'send')
+ const bounceNotices = senders.includes(actor.role) ? (await env.DB.prepare(`SELECT n.*,p.title
  FROM p_bounce_notices n JOIN p_proposals p ON p.id=n.proposal_id
- WHERE n.sender_id=? ORDER BY n.created_at,n.id`).bind(actor.id).all<any>()).results : []
+ WHERE n.sender_id=? AND (${visibility.sql}) ORDER BY n.created_at,n.id`).bind(actor.id,...visibility.values).all<any>()).results : []
  return { deliveries, bounceNotices }
 }
 
 export async function deliveryCommand(env: Bindings, actor: Actor, name: string, input: Record<string,unknown>) {
- need(actor.role === 'owner', 'Only the sending owner manages bounce follow-ups', 403)
+ need(senders.includes(actor.role),'Only the active sending person manages bounce follow-ups',403)
  const db=env.DB, noticeId=text(input.noticeId,'a notice'), at=Date.now()
- const notice=await db.prepare(`SELECT n.* FROM p_bounce_notices n WHERE n.id=? AND n.sender_id=?`).bind(noticeId,actor.id).first<any>()
+ const notice=await db.prepare(`SELECT n.* FROM p_bounce_notices n WHERE n.id=?`).bind(noticeId).first<any>()
  need(notice,'Bounce notification not found',404)
+ need(notice.sender_id===actor.id,'Only the active sending person manages this notice',403)
+ await permitted(db,actor,notice.proposal_id,'send')
  if(name==='delivery.read') {
   await commit(db,actor,[db.prepare('UPDATE p_bounce_notices SET read_at=COALESCE(read_at,?) WHERE id=?').bind(at,noticeId)],true)
   return {id:notice.proposal_id,read:true}
@@ -53,6 +58,7 @@ export async function deliveryCommand(env: Bindings, actor: Actor, name: string,
  need(name==='delivery.correct','Unknown delivery action',404)
  const recipient=email(input.email), old=await proposal(db,notice.proposal_id)
  need(old.status==='sent','Only an unsigned sent offer can have its invitation corrected',409)
+ const approval=await approvalPlan(db,old,actor);need(approval.complete,'Approve this revision under the current policy before correcting its invitation',409)
  const token=secret(), shareUrl=env.AUTH_ORIGIN+'/p/'+token
  const statement=queueMail(env,old.id,recipient,...proposalMail(old.title,shareUrl),actor.id)
  await commit(db,actor,[
@@ -62,7 +68,7 @@ export async function deliveryCommand(env: Bindings, actor: Actor, name: string,
   statement,
   db.prepare("INSERT INTO p_bounce_notice_transport(notice_id,correction_mail_id) VALUES(?,(SELECT id FROM p_mail WHERE proposal_id=? AND sender_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1)) ON CONFLICT(notice_id) DO UPDATE SET correction_mail_id=excluded.correction_mail_id").bind(noticeId,old.id,actor.id),
   db.prepare('UPDATE p_bounce_notices SET action=? WHERE id=?').bind('Corrected invitation address to '+recipient,noticeId),
- ],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status='sent') AND EXISTS(SELECT 1 FROM p_bounce_notices WHERE id=? AND sender_id=? AND closed_at IS NULL)",values:[old.id,old.version,noticeId,actor.id]})
+ ],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status='sent') AND EXISTS(SELECT 1 FROM p_bounce_notices WHERE id=? AND sender_id=? AND closed_at IS NULL) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?",values:[old.id,old.version,noticeId,actor.id,approval.policyVersion]})
  await dispatchMail(env,old.id)
  return {id:old.id,shareUrl}
 }

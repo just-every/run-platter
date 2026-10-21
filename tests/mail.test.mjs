@@ -477,3 +477,32 @@ test('SEND-002 SendGrid signed correlation, queued state, uncertainty and logged
   }finally{await queued.close()}
  }
 })
+
+test('APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy',async()=>{
+ const {resendEvents}=await import('./delivery-provider.mjs'),events=resendEvents(),calls=[]
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-201',MAIL_WEBHOOK_KEY:events.key},outboundService:async request=>{assert.equal(new URL(request.url).origin,'https://api.resend.com');calls.push(await request.json());return Response.json({id:'synthetic-platter-'+(300+calls.length)})}})
+ try{
+  const team=await h.cmd('team.create',{name:'Delivery team'}),people={}
+  for(const role of ['sales','manager']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),person=(await h.state(cookie)).actor;await h.cmd('member.set',{operatorId:person.id,version:0,role,teams:[team.id]});people[role]={cookie,...person}}
+  await h.cmd('approval.policy',{version:0,required:true,defaultRole:'manager'})
+  const client=await h.cmd('client.save',{name:'Synthetic client',email:recipient}),p=await h.cmd('proposal.prepare',{...offer,clientId:client.id},people.sales.cookie)
+  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1},people.manager.cookie)
+  const original=await h.cmd('proposal.send',{id:p.id,version:2},people.sales.cookie)
+  const frozen=(await h.db.prepare('SELECT snapshot FROM p_revisions WHERE proposal_id=? AND revision=1').bind(p.id).first()).snapshot
+  assert.equal((await events.emit(h,'synthetic-platter-301','email.bounced')).status,200)
+  const notice=(await h.state(people.sales.cookie)).bounceNotices[0];assert.ok(notice);assert.equal(notice.sender_id,people.sales.id)
+  assert.deepEqual((await h.state(people.manager.cookie)).bounceNotices,[])
+  const before=(await h.db.prepare('SELECT * FROM p_bounce_notices WHERE id=?').bind(notice.id).first())
+  await h.cmd('delivery.correct',{noticeId:notice.id,email:'corrected@synthetic-platter.example'},people.manager.cookie,403)
+  assert.deepEqual(await h.db.prepare('SELECT * FROM p_bounce_notices WHERE id=?').bind(notice.id).first(),before);assert.equal(calls.length,1)
+  await h.cmd('approval.policy',{version:1,required:true,defaultRole:'admin'})
+  await h.cmd('delivery.correct',{noticeId:notice.id,email:'corrected@synthetic-platter.example'},people.sales.cookie,409);assert.equal(calls.length,1)
+  await h.cmd('member.set',{operatorId:people.manager.id,version:1,role:'admin',teams:[team.id]})
+  await h.cmd('proposal.approve',{id:p.id,version:3,revision:1},people.manager.cookie)
+  const corrected=await h.cmd('delivery.correct',{noticeId:notice.id,email:'corrected@synthetic-platter.example'},people.sales.cookie)
+  assert.deepEqual(calls[1].to,['corrected@synthetic-platter.example']);assert.equal(calls.length,2)
+  assert.equal((await h.send(new URL(original.shareUrl).pathname)).status,404);assert.equal((await h.send(new URL(corrected.shareUrl).pathname)).status,200)
+  assert.equal((await h.db.prepare('SELECT snapshot FROM p_revisions WHERE proposal_id=? AND revision=1').bind(p.id).first()).snapshot,frozen)
+  assert.ok((await h.state(people.sales.cookie)).bounceNotices[0].closed_at)
+ }finally{await h.close()}
+})

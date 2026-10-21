@@ -15,7 +15,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  need(Array.isArray(options), 'Offer options are missing')
  const selection = offerSelection(options,view.deposit_bps,optionId,items), selected = selection.option
  need(selected, 'Choose one offered option')
- view = selectedContent(view,optionId)
+ view = selectedContent(view,optionId,selection.items)
  const revision = Number(view.revision)
  const depositBps = Number(view.deposit_bps)
  need(Number.isSafeInteger(revision) && revision > 0, 'Invalid proposal revision')

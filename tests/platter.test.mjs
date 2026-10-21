@@ -945,6 +945,8 @@ test('PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-
   assert.deepEqual((await current()).options,row.options);assert.equal((await current()).version,1);assert.deepEqual((await h.state()).outbox,before.outbox)
   for(const optionId of ['one','two','three']){r=await h.send(`/app/preview/client?id=${p.id}&revision=1&optionId=${optionId}`,undefined,h.owner);assert.equal(r.status,200);assert.equal(r.text.includes('Complete package only'),optionId==='three')}
   r=await h.send(preview.replace('quantity%22%3A4','quantity%22%3A11'),undefined,h.owner);assert.equal(r.status,400)
+  const records=({proposals,revisions,outbox})=>({proposals,revisions,outbox}),unchanged=records(await h.state())
+  r=await h.send(`/app/preview/client/action?id=${p.id}&revision=1&name=accept${query}`,{name:'Avery Chen',optionId:'two',items,consent:true},h.owner);assert.equal(r.status,403);assert.deepEqual(records(await h.state()),unchanged,'a preview selection cannot accept or write')
   const changed=packageFixture();changed[1].optionalItems[0].unitPrice='80'
   await h.cmd('proposal.revise',{...input,id:p.id,version:1,packages:changed})
   r=await h.send(`/app/proposal?id=${p.id}&from=1&to=2`,undefined,h.owner);assert.match(r.text,/optional items/);assert.match(r.text,/80\.00/)
@@ -956,6 +958,9 @@ test('PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-
 
   // A single package is valid too; no fixed two-package limit remains.
   const single=await h.cmd('proposal.prepare',{...input,packages:[packageFixture()[0]],sectionConditions:{}});assert.equal((await h.state()).proposals.find(x=>x.id===single.id).options.length,1)
+  // PRICE-001 inheritance: any package can be priced by tables, and its selected optional items add to the table total.
+  const tabled=await h.cmd('proposal.prepare',{...input,sectionConditions:{},pricingTables:[{optionId:'three',name:'Delivery',lines:[{name:'Sprint',quantity:'2',unit:'week',unitPrice:'1500.50'}]}]})
+  r=await h.send(`/app/preview/client?id=${tabled.id}&revision=1&optionId=three&items=`+encodeURIComponent(JSON.stringify([{id:'rush',quantity:2}])),undefined,h.owner);assert.equal(r.status,200,r.text);assert.match(r.text,/3,151\.50/);assert.match(r.text,/787\.88/)
   await h.cmd('proposal.approve',{id:p.id,version:3,revision:3});const share=await h.cmd('proposal.send',{id:p.id,version:4}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
   const offerBefore=await current()
   for(const invalid of [[{id:'rush',quantity:11}],[{id:'rush',quantity:0}],[{id:'rush',quantity:'1.5'}],[{id:'unknown',quantity:1}],[{id:'rush',quantity:1},{id:'rush',quantity:1}],[{id:'training',quantity:2}],{},null]){
@@ -978,6 +983,33 @@ test('PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-
   await h.send(path+'/action?name=accept',{name:'Another signer',optionId:'one',items:[],consent:true},cookie);assert.deepEqual(await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first(),accepted)
   r=await h.send(path,undefined,cookie);assert.match(r.text,/2,301\.00/);assert.match(r.text,/Rush delivery/)
   const invoice=await h.cmd('invoice.export',{id:p.id});assert.match((await h.send('/api/platter/invoices/'+invoice.id+'.csv',undefined,h.owner)).text,/575\.25/)
+
+  // EDIT-009 inheritance: a section shown only while an optional item is added, in whichever package offers it.
+  const rushTerms='Rush delivery terms apply.',rushInput={...input,title:'Rush-dependent terms',terms:rushTerms,sectionConditions:{terms:'item:rush'}},withRush='&items='+encodeURIComponent(JSON.stringify(items)),beforeRush=await h.state()
+  for(const terms of ['item:absent','item:','item:rush:extra','rush'])await h.cmd('proposal.prepare',{...rushInput,sectionConditions:{terms}},h.owner,400)
+  assert.deepEqual((await h.state()).proposals,beforeRush.proposals,'unknown optional-item conditions write nothing')
+  const rush=await h.cmd('proposal.prepare',rushInput),rushCopy=await h.cmd('proposal.duplicate',{id:rush.id,version:1}),conditions=async id=>JSON.parse((await h.state()).proposals.find(x=>x.id===id).section_conditions)
+  assert.deepEqual(await conditions(rushCopy.id),{terms:'item:rush'})
+  await h.cmd('proposal.revise',{...rushInput,id:rushCopy.id,version:1,sectionConditions:{terms:'item:training'}});await h.cmd('proposal.restore',{id:rushCopy.id,version:2,revision:1});assert.deepEqual(await conditions(rushCopy.id),{terms:'item:rush'})
+  for(const [selection,shown] of [['&optionId=two',false],['&optionId=two'+withRush,true],['&optionId=three&items='+encodeURIComponent(JSON.stringify([{id:'rush',quantity:1}])),true],['&optionId=one&items='+encodeURIComponent(JSON.stringify([{id:'training',quantity:1}])),false]]){
+   r=await h.send(`/app/preview/client?id=${rush.id}&revision=1${selection}`,undefined,h.owner);assert.equal(r.status,200,r.text);assert.equal(r.text.includes(rushTerms),shown,selection)
+  }
+  const sendRush=async(id,version,revision)=>{
+   await h.cmd('proposal.approve',{id,version,revision});const path=new URL((await h.cmd('proposal.send',{id,version:version+1})).shareUrl).pathname
+   assert.equal((await h.send(path+'/action?name=code.request',{})).status,200);const code=(await h.state()).outbox.find(x=>x.proposal_id===id&&x.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+   const v=await h.send(path+'/action?name=code.verify',{code});assert.equal(v.status,200,v.text);return {path,cookie:v.cookie}
+  }
+  const added=await sendRush(rush.id,1,1),omitted=await sendRush(rushCopy.id,3,3)
+  for(const [selection,shown] of [['?optionId=two',false],['?optionId=two'+withRush,true]]){
+   assert.equal((await h.send(added.path+selection,undefined,added.cookie)).text.includes(rushTerms),shown,selection)
+   const pdf=await h.mf.dispatchFetch(h.origin+added.path+'/download.pdf'+selection,{headers:{host:new URL(h.origin).host,cookie:added.cookie}});assert.equal(pdf.status,200)
+   assert.equal((await pdfPages(await pdf.arrayBuffer())).join(' ').includes(rushTerms),shown,'PDF '+selection)
+  }
+  assert.equal((await h.send(added.path+'/action?name=accept',{name:'Avery Chen',optionId:'two',items,consent:true},added.cookie)).status,200)
+  assert.equal((await h.send(omitted.path+'/action?name=accept',{name:'Avery Chen',optionId:'two',items:[],consent:true},omitted.cookie)).status,200)
+  const agreement=async id=>JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(id).first()).snapshot)
+  assert.equal((await agreement(rush.id)).terms,rushTerms);assert.ok(!(await agreement(rushCopy.id)).terms,'the agreement omits a section whose optional item was not added')
+  assert.ok((await h.send(added.path,undefined,added.cookie)).text.includes(rushTerms));assert.ok(!(await h.send(omitted.path,undefined,omitted.cookie)).text.includes(rushTerms))
  }finally{await h.close()}
 })
 

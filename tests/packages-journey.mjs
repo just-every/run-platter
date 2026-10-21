@@ -29,6 +29,7 @@ export async function packagesJourney() {
     for(const [key,value]of Object.entries({label,unitPrice:price,min:'1',max,quantity:'1'}))await item.locator(`[data-item-field=${key}]`).fill(value)
     if(!editable)await item.locator('[data-item-field=editable]').uncheck()
    }
+   assert.deepEqual(await page.locator('[name=termsOption] option[value^="item:"]').allTextContents(),['Only with Rush delivery','Only with Team training'],'optional items become section conditions as they are named')
    const capture=async(target,name)=>{await target.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await target.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${name} fits ${width}`);if(screenshots)await target.screenshot({path:join(screenshots,`PRICE-002-${name}-${width}.png`),fullPage:true})}
    await capture(page,'editor')
    await page.getByRole('button',{name:'Prepare proposal',exact:true}).click();await page.getByRole('link',{name:'Northstar package choices',exact:true}).click()
@@ -88,6 +89,15 @@ export async function packagesJourney() {
    assert.equal(paperState.acceptance.method,'upload');assert.equal(paperState.acceptance.selection.items[0].quantity,4);assert.equal(paperState.acceptance.totalCents,230100);assert.equal(paperState.acceptance.depositCents,57525)
    await capture(page,'upload-accepted');await page.getByRole('button',{name:'Export invoice CSV',exact:true}).click()
    const invoice=await context.request.get(app.origin+await page.getByRole('link',{name:'Download deposit invoice CSV',exact:true}).getAttribute('href'));assert.equal(invoice.status(),200);assert.match(await invoice.text(),/575\.25/);await capture(page,'upload-invoice')
+   // PRICE-002 / EDIT-009: the editor makes a section depend on an optional item; the preview shows it only while the item is added.
+   const rushTerms='Rush delivery terms apply.',rush=await cmd('proposal.prepare',{clientId:client.id,title:'Northstar rush terms',scope:'Delivery on request.',terms:rushTerms,depositPercent:25,packages:packageFixture()})
+   await page.goto(app.origin+'/app/proposal?id='+rush.id);await page.locator('[name=termsOption]').selectOption({label:'Only with Rush delivery'});await page.getByRole('button',{name:'Save revision',exact:true}).click()
+   await page.getByRole('link',{name:'Preview client page',exact:true}).click()
+   assert.deepEqual(JSON.parse((await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals.find(x=>x.id===rush.id).section_conditions),{terms:'item:rush'})
+   if(width===390){await page.getByLabel('Preview width').selectOption('390');await page.getByRole('button',{name:'Change preview width'}).click()}
+   await frame.getByLabel('Choose one option',{exact:true}).selectOption('two');await updatePreview();assert.ok(!(await frame.locator('main').innerText()).includes(rushTerms))
+   await frame.getByRole('checkbox',{name:/Add Rush delivery/}).check();await frame.getByLabel('Quantity for Rush delivery').fill('4');await updatePreview()
+   assert.ok((await frame.locator('main').innerText()).includes(rushTerms));await capture(page,'item-condition-preview')
 
   }finally{await clientContext?.close();await context.close();await app.close()}
  }}finally{await browser.close()}

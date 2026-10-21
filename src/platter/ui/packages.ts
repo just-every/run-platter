@@ -42,8 +42,11 @@ export function itemChoices(option:any, selection:any): string {
   <p class="muted">${item.editable?`Choose ${item.min} to ${item.max}.`:`Fixed quantity: ${item.quantity}.`}</p></fieldset>`
  }).join('')
 }
-export function selectedSummary(selection:any,currency:string): string {
+export function selectedSummary(selection:any,currency:string,review=false): string {
  if(!selection)return ''
  const total=selection.totalCents??selection.option?.cents,deposit=selection.depositCents??selection.deposit
- return panel('Your selection',`<ul>${(selection.items??[]).map((x:any)=>`<li>${escape(x.label)} · ${x.quantity} × ${money(x.unitCents,currency)} = ${money(x.totalCents,currency)}</li>`).join('')}</ul><p>Total: <output aria-label="Selected total">${money(total,currency)}</output></p><p>Deposit due: <output aria-label="Selected deposit">${money(deposit,currency)}</output></p>`)
+ const contents=`${review?`<p>Package: ${escape(selection.option?.label)}</p>`:''}<ul>${(selection.items??[]).map((x:any)=>`<li>${escape(x.label)} · ${x.quantity} × ${money(x.unitCents,currency)} = ${money(x.totalCents,currency)}</li>`).join('')}</ul><p>Total: <output aria-label="Selected total">${money(total,currency)}</output></p><p>Deposit due: <output aria-label="Selected deposit">${money(deposit,currency)}</output></p>`
+ // A native fragment target restores reading/focus after the GET review, even
+ // without JavaScript. Other summary surfaces retain their existing markup.
+ return review?`<section class="panel" id="selection-review" tabindex="-1" aria-labelledby="selection-heading"><h2 id="selection-heading">Your selection</h2>${contents}</section>`:panel('Your selection',contents)
 }

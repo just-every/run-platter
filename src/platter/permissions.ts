@@ -57,7 +57,7 @@ export async function teamCommand(db:D1Database,a:Actor,name:string,p:Record<str
   await commit(db,a,[db.prepare('INSERT INTO p_team_members(team_id,operator_id) VALUES(?,?) ON CONFLICT DO NOTHING').bind(team,id),db.prepare('UPDATE p_members SET version=version+1 WHERE operator_id=?').bind(id)]);return {id}
  }
  need(name==='member.set','Unknown team command',404)
- const id=text(p.operatorId,'a member'),role=String(p.role),person=await db.prepare("SELECT o.*,COALESCE(m.role,'sales') AS product_role,COALESCE(m.version,0) AS product_version FROM oa_operators o LEFT JOIN p_members m ON m.operator_id=o.id WHERE o.id=? AND o.status='active'").bind(id).first<any>()
+ const id=text(p.operatorId,'a member'),role=String(p.role),person=await db.prepare("SELECT o.*,COALESCE(m.role,g.role,'sales') AS product_role,COALESCE(m.version,0) AS product_version FROM oa_operators o LEFT JOIN p_members m ON m.operator_id=o.id LEFT JOIN p_member_invitations g ON g.email=o.email AND g.status='pending' WHERE o.id=? AND o.status='active'").bind(id).first<any>()
  need(person&&person.role!=='owner','The native owner keeps ownership',403)
  need(person.role!=='admin','Manage a native admin role through native account administration',403)
  need((roles as readonly string[]).includes(role),'Choose a product role')
@@ -72,7 +72,7 @@ export async function teamCommand(db:D1Database,a:Actor,name:string,p:Record<str
   const existing=(await db.prepare('SELECT team_id FROM p_team_members WHERE operator_id=?').bind(id).all<any>()).results.map(r=>r.team_id)
   need(teams.length&&teams.every((t:string)=>mine.includes(t))&&existing.every(t=>mine.includes(t)),'Managers assign only their own teams',403)
  }
- await commit(db,a,[db.prepare("INSERT INTO p_members(operator_id,role) VALUES(?,?) ON CONFLICT(operator_id) DO UPDATE SET role=excluded.role,version=p_members.version+1").bind(id,role),db.prepare('DELETE FROM p_team_members WHERE operator_id=?').bind(id),...teams.map((t:string)=>db.prepare('INSERT INTO p_team_members(team_id,operator_id) VALUES(?,?)').bind(t,id))],false,{sql:"EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND status='active' AND role!='owner') AND COALESCE((SELECT version FROM p_members WHERE operator_id=?),0)=?",values:[id,id,person.product_version]})
+ await commit(db,a,[db.prepare("INSERT INTO p_members(operator_id,role) VALUES(?,?) ON CONFLICT(operator_id) DO UPDATE SET role=excluded.role,version=p_members.version+1").bind(id,role),db.prepare("UPDATE p_member_invitations SET status='accepted',accepted_id=? WHERE email=? AND status='pending'").bind(id,person.email),db.prepare('DELETE FROM p_team_members WHERE operator_id=?').bind(id),...teams.map((t:string)=>db.prepare('INSERT INTO p_team_members(team_id,operator_id) VALUES(?,?)').bind(t,id))],false,{sql:"EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND status='active' AND role!='owner') AND COALESCE((SELECT version FROM p_members WHERE operator_id=?),0)=?",values:[id,id,person.product_version]})
  return {id}
 }
 export async function authorizeCommand(db:D1Database,a:Actor,name:string,p:Record<string,unknown>) {

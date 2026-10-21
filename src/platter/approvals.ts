@@ -4,7 +4,7 @@ import { permitted, administrators } from './permissions'
 import { negotiatedView, pendingNegotiation } from './negotiation'
 import { currentTime } from './expiry-time'
 export async function approvalSettings(db:D1Database){
- const policy=(await db.prepare('SELECT * FROM p_approval_policy WHERE singleton=1').first<any>())!
+ const policy=await db.prepare('SELECT * FROM p_approval_policy WHERE singleton=1').first<any>()??{singleton:1,required:1,default_role:'owner',version:0}
  const rules=(await db.prepare('SELECT * FROM p_approval_rules ORDER BY position,id').all<any>()).results.map(r=>({...r,condition:JSON.parse(r.condition),approvers:JSON.parse(r.approvers)}))
  return {policy,rules}
 }
@@ -20,9 +20,9 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
  const legacy=policy.version===0&&row.approved_by&&steps.length===1&&steps[0].id==='default'
  let prior=true,rejected=decisions.some(d=>d.decision==='rejected')
  const evaluated=steps.map(step=>{
-  const approvals=decisions.filter(d=>d.step===step.id&&d.decision==='approved'),done=Boolean(legacy)||(step.any?approvals.length>0:step.approvers.every((_:string,i:number)=>approvals.some(d=>d.note.startsWith(i+':'))))
+  const approvals=decisions.filter(d=>d.step===step.id&&d.decision==='approved'),done=Boolean(legacy)||(step.any?approvals.length>0:step.approvers.every((_:string,i:number)=>approvals.some(d=>d.approver_index===i)))
   const eligible=a?step.approvers.map((v:string,i:number)=>matches(a,v)?i:-1).filter((i:number)=>i>=0):[]
-  const result={...step,done,active:prior&&!done&&!rejected,canApprove:prior&&!done&&!rejected&&eligible.some((i:number)=>!approvals.some(d=>d.note.startsWith(i+':'))),decisions:decisions.filter(d=>d.step===step.id)}
+  const result={...step,done,active:prior&&!done&&!rejected,canApprove:prior&&!done&&!rejected&&eligible.some((i:number)=>!approvals.some(d=>d.approver_index===i)),decisions:decisions.filter(d=>d.step===step.id)}
   prior=prior&&done;return result
  })
  return {policyVersion:policy.version,plan,steps:evaluated,required:steps.length>0,complete:prior&&!rejected,rejected}
@@ -32,7 +32,7 @@ export async function approvalCommand(env:Bindings,a:Actor,name:string,p:Record<
  if(name==='approval.policy'||name==='approval.rule'||name==='approval.rule.delete'){
   need(administrators.includes(a.role),'Only owner and admins change approval settings',403)
   const {policy}=await approvalSettings(db);need(Number(p.version)===policy.version,'Approval settings changed. Reload.',409)
-  const writes:D1PreparedStatement[]=[]
+  const writes:D1PreparedStatement[]=[db.prepare("INSERT INTO p_approval_policy(singleton,required,default_role) VALUES(1,1,'owner') ON CONFLICT DO NOTHING")]
   if(name==='approval.policy'){
    need([true,false,'yes','no'].includes(p.required as any),'Choose whether approval is required')
    need(['owner','admin','manager'].includes(String(p.defaultRole)),'Choose an approver role')
@@ -62,7 +62,7 @@ export async function approvalCommand(env:Bindings,a:Actor,name:string,p:Record<
    need(Number.isSafeInteger(position)&&position>=0&&position<=1000,'Choose the rule sequence')
    writes.push(db.prepare('INSERT INTO p_approval_rules(id,name,position,condition,approvers) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,position=excluded.position,condition=excluded.condition,approvers=excluded.approvers').bind(id,text(p.name,'a rule name',100),position,JSON.stringify(condition),JSON.stringify(approvers)),db.prepare('UPDATE p_approval_policy SET version=version+1 WHERE singleton=1'))
   }
-  await commit(db,a,writes,false,{sql:'EXISTS(SELECT 1 FROM p_approval_policy WHERE singleton=1 AND version=?)',values:[policy.version]});return {saved:true}
+  await commit(db,a,writes,false,{sql:'COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?',values:[policy.version]});return {saved:true}
  }
  const original=await permitted(db,a,p.id,'approve');exact(original,p)
  const row=negotiatedView(original,await pendingNegotiation(db,original.id))
@@ -70,14 +70,14 @@ export async function approvalCommand(env:Bindings,a:Actor,name:string,p:Record<
  const plan=await approvalPlan(db,row,a),step=p.step===undefined?plan.steps.find(s=>s.canApprove):plan.steps.find(s=>s.id===p.step)
  need(step?.canApprove,'No current approval step names you',403)
  const note=p.note===undefined?'':String(p.note);need(note.length<=2000,'Keep the approval note under 2000 characters')
- const index=step.approvers.findIndex(v=>matches(a,v)&&!step.decisions.some(d=>d.note.startsWith(step.approvers.indexOf(v)+':')))
+ const index=step.approvers.findIndex(v=>matches(a,v)&&!step.decisions.some(d=>d.approver_index===step.approvers.indexOf(v)))
  const decision=name==='proposal.reject'?'rejected':'approved'
  const id=crypto.randomUUID(),pending=row.negotiating
  // Serialize decisions with the existing proposal version; only the exact current plan may advance.
- const guard={sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND EXISTS(SELECT 1 FROM p_approval_policy WHERE singleton=1 AND version=?)',values:[original.id,original.version,plan.policyVersion]}
- await commit(db,a,[db.prepare('INSERT INTO p_approval_decisions(id,proposal_id,revision,plan,step,actor_id,decision,note,occurred_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,plan.plan,step.id,a.id,decision,index+':'+note,at),db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id),...(decision==='approved'?[db.prepare('INSERT INTO p_approvals(id,proposal_id,revision,actor_id,approved_at) VALUES(?,?,?,?,?)').bind(id,row.id,row.revision,a.id,at)]:[])],false,guard)
+ const guard={sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?',values:[original.id,original.version,plan.policyVersion]}
+ await commit(db,a,[db.prepare('INSERT INTO p_approval_decisions(id,proposal_id,revision,plan,step,actor_id,approver_index,decision,note,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,plan.plan,step.id,a.id,index,decision,note,at),db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id),...(decision==='approved'?[db.prepare('INSERT INTO p_approvals(id,proposal_id,revision,actor_id,approved_at) VALUES(?,?,?,?,?)').bind(id,row.id,row.revision,a.id,at)]:[])],false,guard)
  // The final status update is version guarded, so edits or concurrent decisions cannot stamp a newer revision.
  const next=await approvalPlan(db,row,a)
- if(next.complete){await commit(db,a,[pending?db.prepare('UPDATE p_negotiations SET approved_by=?,approved_at=? WHERE proposal_id=? AND revision=?').bind(a.email,at,row.id,row.revision):db.prepare("UPDATE p_proposals SET status=?,approved_by=?,approved_at=? WHERE id=? AND revision=?").bind(original.status==='sent'?'sent':'approved',a.email,at,row.id,row.revision)],false,{sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND EXISTS(SELECT 1 FROM p_approval_policy WHERE singleton=1 AND version=?)',values:[row.id,original.version+1,plan.policyVersion]})}
+ if(next.complete){await commit(db,a,[pending?db.prepare('UPDATE p_negotiations SET approved_by=?,approved_at=? WHERE proposal_id=? AND revision=?').bind(a.email,at,row.id,row.revision):db.prepare("UPDATE p_proposals SET status=?,approved_by=?,approved_at=? WHERE id=? AND revision=?").bind(original.status==='sent'?'sent':'approved',a.email,at,row.id,row.revision)],false,{sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?',values:[row.id,original.version+1,plan.policyVersion]})}
  return {approved:next.complete,rejected:next.rejected}
 }

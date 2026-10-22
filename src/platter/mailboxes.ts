@@ -1,3 +1,5 @@
+import { reminderPolicy, reminderQuiet } from './reminders'
+import { currentTime } from './expiry-time'
 import { approvalPlan } from './approvals'
 import type { Bindings } from '../auth.server'
 import { actorById } from './credentials'
@@ -75,6 +77,15 @@ export async function sendingActor(env:Bindings,row:any){
  if(!row.sender_id)return null
  const a=await actorById(env.DB,row.sender_id);need(a&&senders.includes(a.role),'The sender no longer has permission to send',403)
  const proposal=await permitted(env.DB,a,row.proposal_id,'send')
+ const reminder=await env.DB.prepare('SELECT r.*,t.share_hash,t.settings_version FROM p_reminder_transport t JOIN p_reminder_runs r ON r.id=t.run_id WHERE t.mail_id=?').bind(row.id).first<any>()
+ if(reminder){
+  const current=await env.DB.prepare('SELECT s.token,COALESCE(s.recipient,c.email) AS recipient,e.deadline_at FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id JOIN p_clients c ON c.id=p.client_id LEFT JOIN p_expiry e ON e.proposal_id=p.id WHERE p.id=? AND s.revision=p.revision').bind(proposal.id).first<any>()
+  const at=await currentTime(env.DB)
+  need(proposal.status==='sent'&&proposal.revision===reminder.revision&&current&&await hash(current.token)===reminder.share_hash&&current.recipient===reminder.recipient&&(current.deadline_at===null||current.deadline_at>at),'This reminder invitation is no longer open',403)
+  need(!await env.DB.prepare('SELECT 1 FROM p_reminder_optouts WHERE proposal_id=? AND revision=? AND recipient=?').bind(proposal.id,proposal.revision,reminder.recipient).first(),'The recipient opted out of reminders',403)
+  if(reminder.kind==='scheduled')need(!reminderQuiet(at,reminder.time_zone,await reminderPolicy(env.DB)),'Scheduled reminders wait for quiet hours to end',403)
+  if(reminder.kind==='scheduled')need(await env.DB.prepare('SELECT 1 FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version WHERE s.proposal_id=? AND s.revision=? AND s.version=? AND s.enabled=1 AND s.sender_id=?').bind(proposal.id,proposal.revision,reminder.settings_version,a.id).first(),'Scheduled reminder consent changed',403)
+ }
  if(row.requires_approval)need(proposal.revision===row.proposal_revision&&(await approvalPlan(env.DB,proposal,a)).complete,'Approve this revision under the current policy before sending',403)
  return a
 }

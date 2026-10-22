@@ -1,0 +1,8 @@
+CREATE TABLE p_reminder_policy(singleton INTEGER PRIMARY KEY CHECK(singleton=1),quiet_start INTEGER NOT NULL DEFAULT 20,quiet_end INTEGER NOT NULL DEFAULT 8,version INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE p_reminder_settings(proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),revision INTEGER NOT NULL,sender_id TEXT NOT NULL,recipient TEXT NOT NULL,time_zone TEXT NOT NULL,enabled INTEGER NOT NULL,settings TEXT NOT NULL,subject TEXT NOT NULL,message TEXT NOT NULL,version INTEGER NOT NULL DEFAULT 1);
+-- Explicit execution authority and invitation transport never survive an archive.
+CREATE TABLE p_reminder_authority(proposal_id TEXT PRIMARY KEY,revision INTEGER NOT NULL,settings_version INTEGER NOT NULL);
+CREATE TABLE p_reminder_runs(id TEXT PRIMARY KEY,proposal_id TEXT NOT NULL REFERENCES p_proposals(id),revision INTEGER NOT NULL,recipient TEXT NOT NULL,kind TEXT NOT NULL,slot TEXT NOT NULL,local_date TEXT NOT NULL,time_zone TEXT NOT NULL,actor_id TEXT NOT NULL,subject TEXT NOT NULL,message TEXT NOT NULL,queued_at INTEGER NOT NULL,request_id TEXT NOT NULL UNIQUE,UNIQUE(proposal_id,revision,recipient,kind,slot));
+CREATE TABLE p_reminder_transport(mail_id TEXT PRIMARY KEY,run_id TEXT NOT NULL UNIQUE REFERENCES p_reminder_runs(id),share_hash TEXT NOT NULL,settings_version INTEGER);
+CREATE TABLE p_reminder_optouts(proposal_id TEXT NOT NULL REFERENCES p_proposals(id),revision INTEGER NOT NULL,recipient TEXT NOT NULL,opted_out_at INTEGER NOT NULL,PRIMARY KEY(proposal_id,revision,recipient));
+CREATE UNIQUE INDEX p_reminder_manual_daily ON p_reminder_runs(proposal_id,recipient,local_date) WHERE kind='manual';

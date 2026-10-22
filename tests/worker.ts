@@ -6,6 +6,7 @@ import { createD1DevelopmentOutbox } from '@runeditrun/rer/internal/modules/mail
 import { withAuthAudit } from '../src/platter/auth-audit'
 import { authResponse,authConfig,type Bindings } from '../src/auth.server'
 import { platterResponse } from '../src/platter/http'
+import { runReminders } from '../src/platter/reminders'
 import { runExpiry } from '../src/platter/expiry'
 import { runDueReports } from '../src/platter/reports/schedules'
 import { runtimeBindings } from '../src/auth.server'
@@ -15,4 +16,4 @@ export default {async fetch(request:Request,env:Bindings){
   return withAuthAudit(request,env,async()=>await memberAuthHandler(request,env,auth),auth)
  }
  return await authResponse(request,env)??await platterResponse(request,env)??new Response('Not found',{status:404})
-},async scheduled(controller:ScheduledController,env:Bindings){await runExpiry(runtimeBindings(env),controller.scheduledTime);await runDueReports(runtimeBindings(env),controller.scheduledTime)}}
+},async scheduled(controller:ScheduledController,env:Bindings){await runExpiry(runtimeBindings(env),controller.scheduledTime);await runReminders(runtimeBindings(env),controller.scheduledTime);await runDueReports(runtimeBindings(env),controller.scheduledTime)}}

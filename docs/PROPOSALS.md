@@ -78,3 +78,30 @@ attempts and provider event receipts remain installation-local.
 After verifying their mailbox, the invited client can ask about scope, pricing or terms on the sent revision. The owner sees open questions on Proposals and the proposal, answers in the thread, and the client receives a notification. Questions and answers remain with the accepted agreement and portable archive.
 
 The owner can also answer a question by email when Resend receiving is configured. Set `QUESTION_REPLY_DOMAIN` to the installation's Resend receiving domain, set `MAIL_WEBHOOK_KEY` to its signing secret, and direct signed `email.received` events to `/api/platter/question-replies`. Use the existing Resend `MAIL_API_KEY` with access to fetch received messages. Other transports use app answers. **Email me this question** sends a fresh notice to the active owner mailbox and replaces the prior private reply address. Reply from that exact mailbox within seven days, in plain text without attachments. The complete reply is retained as the answer, including quoted text; remove any quoted private reply address. Each private address works once. An app answer also spends outstanding addresses. Provider acceptance of a notification does not prove recipient delivery.
+
+
+## Client email reply records
+
+When Resend receiving is configured, the sender may opt in to saving one plain-text client email reply per invitation. Direct signed `email.received` events to `/api/platter/client-mail-replies`. The private Reply-To address is one-use and rotates with a fresh invitation. The reply appears in Invitation delivery for people who can view the proposal. It is a record only: it cannot approve, sign or change the proposal. The claimed From address is not proven client identity; Platter shows Resend's receiving-server SPF/DKIM results, or “unavailable” for older/missing results. Sender-controlled Authentication-Results headers are never used as provider results. Automatic replies, bulk/list mail and out-of-office replies are discarded without a record or notice. Reaching the one-reply cap creates one owner-only in-app notice, with no automatic outbound email. Reply text and provenance survive archives; reply authority does not.
+
+## Email reminder command preview
+
+Reminder configuration currently uses the signed-in, same-origin `POST /api/platter/command` door. Owner/admin workspace quiet hours use `reminder.policy` with the current policy version, `quietStart` and `quietEnd` (whole hours 0–23, default 20 and 8). Agent keys cannot use these commands. Sender-facing configuration forms and multiple unsigned recipients are still pending.
+
+A person who can send the proposal first supplies its recipient's IANA time zone. They may copy its saved workspace/template day lists and cap by omitting `afterDays`, `beforeDays` and `cap`, or set them explicitly. Obtain `id` and the current proposal `version` from the signed-in state response:
+
+```json
+{"name":"reminder.configure","input":{"id":"synthetic-platter-proposal","version":2,"enabled":true,"consent":true,"timeZone":"America/Los_Angeles","afterDays":[2,5,9],"beforeDays":[3],"cap":2,"subject":"Please review your proposal","message":"Let me know if you have questions."}}
+```
+
+Configuration changes the proposal's metadata version, without changing its frozen revision or approvals. Scheduled execution requires this explicit audited consent. Existing and restored settings never activate sending; reauthorize a restored schedule explicitly. Recipient zones are supplied, never inferred. This conservative rollout/restore default awaits product-policy approval. Scheduled email waits for the owner-set quiet hours to end and stops after acceptance, decline, withdrawal, expiry or verified recipient opt-out. Every claimed attempt counts toward the cap, including uncertain attempts, which are never blindly retried.
+
+With a recipient zone configured, send an immediate manual reminder even when the schedule is disabled or its cap is zero:
+
+```json
+{"name":"reminder.send","input":{"id":"synthetic-platter-proposal","requestId":"synthetic-platter-7000","subject":"Following up on the start date","message":"Could you review the proposed start date?"}}
+```
+
+Reuse a request id only for the identical request. A second manual reminder to the same recipient on the same recipient calendar day returns 429; manual attempts do not consume the scheduled cap and manual email bypasses quiet hours. The current sending member's connected Gmail or Microsoft mailbox sends the reminder or answer, with the same visible broken-connection fallback and uncertain-send hold as an invitation. Sending authority, current invitation and recipient decisions are rechecked immediately before provider I/O. Platter appends the current private client link only to transport mail; the exact retained subject/message and provider status appear in Invitation delivery. Archives keep these facts without transport credentials or active schedules.
+
+After mailbox verification, the client may choose **Stop email reminders** on the proposal. This stops reminder email for that revision without accepting or declining it. Opt-out persists in archives. A new revision is a separate recipient decision.

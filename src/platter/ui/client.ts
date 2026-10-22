@@ -32,6 +32,7 @@ function clientDocument(view: any, token: string, feedback?: Feedback): Response
   if(!view.hiddenSections?.includes('terms')) html += panel('Terms',`<p class="preserve">${escape(view.terms||'No additional terms.')}</p>`)
   html += panel(view.status==='accepted'?'Signed agreement package attachments':'Proposal attachments',attachmentList(view.attachments??[],view.preview?'/app/preview/client/attachments/':`/p/${encodeURIComponent(token)}/attachments/`,view.preview?'?id='+encodeURIComponent(view.id)+'&revision='+encodeURIComponent(view.revision):''))
   html += clientExpiryPanel(view,publicForm)
+  if(view.verified&&!view.preview&&view.status==='sent')html+=panel('Email reminders',view.reminderOptedOut?'<p>Email reminders are stopped for this revision. Your proposal decision is unchanged.</p>':'<p>You can stop reminder email for this revision without accepting or declining the proposal.</p>'+publicForm('reminder.opt-out','<button class="secondary">Stop email reminders</button>'))
   html += clientQuestions(view,publicForm)
   if(!view.expiry?.expired) html += clientSuggestions(view,publicForm)
   if(view.previous) html += panel('Changes since your previous offer', `<p>Revision ${escape(view.previous.revision)} compared with revision ${escape(view.revision)}</p>${changes(view.previous,view)}`)

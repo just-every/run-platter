@@ -657,3 +657,157 @@ test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute s
   assert.doesNotMatch(JSON.stringify(await h.state(people.sales.cookie)),/synthetic-platter-510[256]/)
  }finally{await h.close()}
 })
+
+test('SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient quiet hours, caps and terminal decisions without retrying uncertain sends', {timeout:120000}, async()=>{
+ const sent=[],installation=[];let provider='gmail',refused=false
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-6000',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-6001',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-6002',MICROSOFT_MAIL_CLIENT_ID:'synthetic-platter-6003',MICROSOFT_MAIL_CLIENT_SECRET:'synthetic-platter-6004'},outboundService:async request=>{
+  const url=new URL(request.url)
+  if(['oauth2.googleapis.com','login.microsoftonline.com'].includes(url.hostname))return refused?Response.json({error:'invalid_grant'},{status:400}):Response.json({access_token:'synthetic-platter-6005',refresh_token:'synthetic-platter-6006',scope:url.hostname==='oauth2.googleapis.com'?'openid email https://www.googleapis.com/auth/gmail.send':'User.Read Mail.Send'})
+  if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-6007',email:'own-mailbox@synthetic-platter.example',email_verified:true})
+  if(url.hostname==='graph.microsoft.com'&&request.method==='GET')return Response.json({id:'synthetic-platter-6008',mail:'own-mailbox@synthetic-platter.example'})
+  if(url.hostname==='gmail.googleapis.com'){
+   const raw=Buffer.from((await request.json()).raw,'base64url').toString('utf8'),subject=Buffer.from(raw.match(/Subject: =\?UTF-8\?B\?([^?]+)\?=/)[1],'base64').toString('utf8')
+   sent.push({provider:'gmail',subject,from:raw.match(/^From: (.+)\r/m)[1],body:Buffer.from(raw.split('\r\n\r\n')[1],'base64').toString('utf8')})
+   if(subject==='Reminder: timeout')throw Error('Synthetic uncertain mailbox response')
+   return Response.json({id:'synthetic-platter-'+(6100+sent.length)})
+  }
+  if(url.hostname==='graph.microsoft.com'){
+   const {message}=await request.json();sent.push({provider:'microsoft',subject:message.subject,from:message.from.emailAddress.address,body:message.body.content});return new Response(null,{status:202})
+  }
+  assert.equal(url.hostname,'api.resend.com');installation.push(await request.json());return Response.json({id:'synthetic-platter-'+(6200+installation.length)})
+ }})
+ try{
+  await finishSetup(h);await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
+  const worker=await h.mf.getWorker(),tick=async date=>worker.scheduled({scheduledTime:new Date(date),cron:'*/15 * * * *'})
+  const connect=async value=>{provider=value;const auth=await h.send('/api/platter/mailbox/authorize',{provider,consent:true},h.owner);assert.equal(auth.status,303,auth.text);const state=new URL(auth.headers.get('location')).searchParams.get('state');assert.equal((await h.send('/api/platter/mailbox/callback?'+new URLSearchParams({state,code:'synthetic-platter-6009'}),undefined,h.owner)).status,303)}
+  await connect('gmail');await tick('2030-03-08T14:00:00Z') // 6 am Pacific before the DST change.
+  const client=await h.cmd('client.save',{name:'Reminder recipient',email:recipient}),proposals={}
+  for(const name of ['cap','accepted','optout','withdrawn','declined','expired','disabled','timeout','fallback']){
+   const p=await h.cmd('proposal.prepare',{...offer,title:name,clientId:client.id})
+   await h.cmd('reminder.configure',{id:p.id,version:1,enabled:name!=='disabled',consent:true,timeZone:'America/Los_Angeles',afterDays:[2,5,9],beforeDays:[],cap:name==='cap'?2:3})
+   const result=await h.cmd('proposal.send',{id:p.id,version:2});proposals[name]={id:p.id,path:new URL(result.shareUrl).pathname}
+  }
+  const reminders=()=>sent.filter(m=>m.subject.startsWith('Reminder:'))
+  await tick('2030-03-10T13:00:00Z');assert.equal(reminders().length,0,'a 6 am Pacific due time waits, including across DST')
+  await tick('2030-03-10T14:59:00Z');assert.equal(reminders().length,0)
+  await Promise.all([tick('2030-03-10T15:00:00Z'),tick('2030-03-10T15:00:00Z')]);assert.equal(reminders().length,8)
+  assert.ok(reminders().every(m=>m.provider==='gmail'&&m.from==='own-mailbox@synthetic-platter.example'))
+  const first=(await h.state()).proposals.find(p=>p.id===proposals.cap.id).reminderRuns[0];assert.equal(first.queued_at,Date.parse('2030-03-10T15:00:00Z'));assert.equal(first.time_zone,'America/Los_Angeles');assert.equal(first.transport_status,'accepted');assert.doesNotMatch(first.message,/\/p\/[a-f0-9]{64}/)
+  await tick('2030-03-10T15:15:00Z');assert.equal(reminders().length,8,'a claimed slot and an uncertain send are never resent')
+  const verified=async name=>{const path=proposals[name].path;assert.equal((await h.send(path+'/action?name=code.request',{})).status,200);const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code' ORDER BY created_at DESC").bind(proposals[name].id).first()).body.match(/\b\d{6}\b/)[0];const r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,200,r.text);return r.cookie}
+  const acceptedCookie=await verified('accepted');assert.equal((await h.send(proposals.accepted.path+'/action?name=accept',{optionId:'one',name:'Synthetic client',consent:true},acceptedCookie)).status,200)
+  assert.equal((await h.send(proposals.optout.path+'/action?name=reminder.opt-out',{})).status,401)
+  const optoutCookie=await verified('optout');assert.equal((await h.send(proposals.optout.path+'/action?name=reminder.opt-out',{},optoutCookie)).status,200)
+  const beforeOptout=(await h.state()).proposals.find(p=>p.id===proposals.optout.id);assert.equal(beforeOptout.status,'sent');await h.cmd('reminder.send',{id:beforeOptout.id,requestId:'synthetic-platter-6010'},h.owner,409)
+  const withdraw=(await h.state()).proposals.find(p=>p.id===proposals.withdrawn.id);await h.cmd('proposal.withdraw',{id:withdraw.id,version:withdraw.version,reason:'Stop reminders',notice:false})
+  const declinedCookie=await verified('declined');assert.equal((await h.send(proposals.declined.path+'/action?name=decline',{revision:1,reason:'No longer needed'},declinedCookie)).status,410)
+  const expiring=(await h.state()).proposals.find(p=>p.id===proposals.expired.id);await h.cmd('expiry.set',{id:expiring.id,version:expiring.version,mode:'date',date:'2030-03-11',warningDays:''})
+  // Hold timeout's slot without enabling any blind retry. Disconnecting its mailbox does not replay it.
+  assert.equal((await h.state()).proposals.find(p=>p.id===proposals.timeout.id).reminderRuns[0].transport_status,'uncertain')
+  const timed=(await h.state()).proposals.find(p=>p.id===proposals.timeout.id);await h.cmd('reminder.configure',{id:timed.id,version:timed.version,enabled:false,timeZone:'America/Los_Angeles'})
+  await connect('microsoft');await tick('2030-03-13T15:00:00Z')
+  assert.equal(reminders().filter(m=>m.subject==='Reminder: cap').length,2);assert.equal(reminders().findLast(m=>m.subject==='Reminder: cap').provider,'microsoft')
+  for(const name of ['accepted','optout','withdrawn','declined','expired','timeout'])assert.equal(reminders().filter(m=>m.subject==='Reminder: '+name).length,1,name+' stops all later reminders')
+  assert.equal(reminders().filter(m=>m.subject==='Reminder: disabled').length,0)
+  const replyCookie=await verified('cap');assert.equal((await h.send(proposals.cap.path+'/action?name=question.create',{revision:1,section:'scope',text:'Can we bring the start date forward?'},replyCookie)).status,200)
+  const ownQuestion=(await h.state()).proposals.find(p=>p.id===proposals.cap.id).questions[0];await h.cmd('question.answer',{id:proposals.cap.id,questionId:ownQuestion.id,text:'Yes, we can start earlier.'})
+  const ownReply=sent.findLast(m=>m.subject==='Answer to your question: cap');assert.equal(ownReply.provider,'microsoft');assert.equal(ownReply.from,'own-mailbox@synthetic-platter.example');assert.match(ownReply.body,/Yes, we can start earlier/)
+  refused=true;await tick('2030-03-17T15:00:00Z')
+  assert.equal(reminders().filter(m=>m.subject==='Reminder: cap').length,2,'scheduled cap excludes the ninth-day reminder')
+  assert.equal(installation.filter(m=>m.subject==='Reminder: fallback').length,1,'revoked grant falls back once to the installation sender')
+  const fallback=(await h.state()).proposals.find(p=>p.id===proposals.fallback.id);assert.equal(fallback.reminderRuns.length,3);assert.ok(fallback.mailAttributions.some(m=>m.route==='installation'&&m.fallback===1))
+  refused=false;await connect('gmail')
+  const beforeExpiry=await h.cmd('proposal.prepare',{...offer,title:'before-expiry',clientId:client.id})
+  await h.cmd('reminder.configure',{id:beforeExpiry.id,version:1,enabled:true,consent:true,timeZone:'America/Los_Angeles',afterDays:[],beforeDays:[3],cap:1,subject:'Expiry follow-up',message:'Review before the deadline.'})
+  await h.cmd('expiry.set',{id:beforeExpiry.id,version:2,mode:'date',date:'2030-03-21',warningDays:''});await h.cmd('proposal.send',{id:beforeExpiry.id,version:3})
+  await tick('2030-03-17T15:15:00Z');assert.equal(sent.filter(m=>m.subject==='Expiry follow-up').length,1,'before-expiry uses the recipient calendar date of the actual expiry instant')
+  await tick('2030-03-18T15:15:00Z');assert.equal(sent.filter(m=>m.subject==='Expiry follow-up').length,1)
+  const audit=await h.send('/api/platter/audit?action=reminder.scheduled',undefined,h.owner);assert.equal(audit.value.rows.filter(r=>r.subject===proposals.cap.id).length,2)
+ }finally{await h.close()}
+})
+
+test('FOLLOW-001 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap', {timeout:120000}, async()=>{
+ const mail=[];const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-6300'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mail.push(await request.json());return Response.json({id:'synthetic-platter-'+(6301+mail.length)})}})
+ try{
+  await finishSetup(h);const people={}
+  for(const role of ['admin','manager','sales','content_editor','viewer','billing','other']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role:role==='other'?'sales':role,teams:[]});people[role]={cookie,id}}
+  await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
+  const worker=await h.mf.getWorker(),tick=async date=>worker.scheduled({scheduledTime:new Date(date),cron:'*/15 * * * *'});await tick('2030-06-01T12:00:00Z')
+  const client=await h.cmd('client.save',{name:'Reminder client',email:recipient}),p=await h.cmd('proposal.prepare',{...offer,clientId:client.id},people.sales.cookie)
+  const initialMail=mail.length
+  for(const role of ['manager','content_editor','viewer','billing','other'])await h.cmd('reminder.configure',{id:p.id,version:1,enabled:false,timeZone:'America/Los_Angeles'},people[role].cookie,403)
+  assert.equal(mail.length,initialMail);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_reminder_settings').first()).n,0)
+  await h.cmd('reminder.configure',{id:p.id,version:1,enabled:true,timeZone:'America/Los_Angeles'},people.sales.cookie,400)
+  await h.cmd('reminder.configure',{id:p.id,version:1,enabled:false,timeZone:'America/Los_Angeles',cap:0},people.sales.cookie)
+  await h.cmd('proposal.send',{id:p.id,version:2},people.sales.cookie)
+  const request={id:p.id,requestId:'synthetic-platter-6400',subject:'A personal follow-up',message:'Could you review the revised schedule?'}
+  const before=mail.length
+  for(const role of ['manager','content_editor','viewer','billing','other'])await h.cmd('reminder.send',request,people[role].cookie,403)
+  await h.cmd('reminder.send',{...request,subject:'Missing {client.company}'},people.sales.cookie,400)
+  await h.cmd('reminder.send',{...request,timeZone:'UTC'},people.sales.cookie,400)
+  assert.equal(mail.length,before)
+  const r=await h.cmd('reminder.send',request,people.sales.cookie);assert.equal(mail.length,before+1);assert.equal(mail.at(-1).subject,request.subject);assert.match(mail.at(-1).text,/Could you review the revised schedule\?/)
+  assert.equal((await h.cmd('reminder.send',request,people.sales.cookie)).replayed,true);assert.equal(mail.length,before+1)
+  await h.cmd('reminder.send',{...request,message:'Changed request'},people.sales.cookie,409)
+  const second=await Promise.all(Array.from({length:4},(_,i)=>h.cmd('reminder.send',{...request,requestId:'synthetic-platter-'+(6410+i)},people.sales.cookie,429)));assert.equal(second.length,4);assert.equal(mail.length,before+1)
+  const row=(await h.state(people.sales.cookie)).proposals.find(p2=>p2.id===p.id);assert.equal(row.reminderRuns.length,1);assert.equal(row.reminderRuns[0].kind,'manual');assert.equal(row.reminderRuns[0].message,request.message);assert.equal(row.reminderSettings.enabled,0)
+  const policyBefore=(await h.state()).reminderPolicy
+  for(const role of ['manager','sales','content_editor','viewer','billing'])await h.cmd('reminder.policy',{version:policyBefore.version,quietStart:21,quietEnd:9},people[role].cookie,403)
+  await h.cmd('reminder.policy',{version:policyBefore.version,quietStart:21,quietEnd:9},people.admin.cookie);assert.equal((await h.state()).reminderPolicy.quiet_start,21)
+  await tick('2030-06-02T06:59:00Z');await h.cmd('reminder.send',{...request,requestId:'synthetic-platter-6420'},people.sales.cookie,429)
+  await tick('2030-06-02T07:00:00Z');await h.cmd('reminder.send',{...request,requestId:'synthetic-platter-6421'},people.sales.cookie);assert.equal(mail.filter(m=>m.subject===request.subject).length,2,'manual email goes at midnight despite quiet hours and schedule off/cap zero')
+  await h.cmd('member.set',{operatorId:people.sales.id,version:1,role:'content_editor',teams:[]});const after=mail.length;await h.cmd('reminder.send',{...request,requestId:'synthetic-platter-6422'},people.sales.cookie,403);assert.equal(mail.length,after)
+  assert.equal((await h.send('/app/proposal?id='+p.id,undefined,people.sales.cookie)).status,200)
+  assert.equal((await h.send('/api/platter/state',undefined,people.other.cookie)).value.proposals.some(p2=>p2.id===p.id),false)
+  const east=await h.cmd('team.create',{name:'Reminder team'})
+  for(const role of ['sales','manager']){const person=(await h.state()).teamPeople.find(p=>p.id===people[role].id);await h.cmd('member.set',{operatorId:person.id,version:person.version,role,teams:[east.id]})}
+  const teamOffer=await h.cmd('proposal.prepare',{...offer,title:'Team reminder',clientId:client.id},people.sales.cookie)
+  await h.cmd('reminder.configure',{id:teamOffer.id,version:1,enabled:false,timeZone:'America/Los_Angeles'},people.manager.cookie);await h.cmd('proposal.send',{id:teamOffer.id,version:2},people.sales.cookie)
+  await h.cmd('reminder.send',{id:teamOffer.id,requestId:'synthetic-platter-6423',subject:'Manager team follow-up',message:'A scoped reminder'},people.manager.cookie);assert.equal(mail.at(-1).subject,'Manager team follow-up')
+  const manager=(await h.state()).teamPeople.find(p=>p.id===people.manager.id);await h.cmd('member.set',{operatorId:manager.id,version:manager.version,role:'manager',teams:[]})
+  await h.cmd('reminder.send',{id:teamOffer.id,requestId:'synthetic-platter-6424'},people.manager.cookie,403)
+  const stored=(await h.db.prepare('SELECT * FROM p_reminder_runs WHERE id=?').bind(r.reminderId).first());assert.equal(stored.actor_id,people.sales.id);assert.doesNotMatch(stored.message,/\/p\/[a-f0-9]{64}/)
+ }finally{await h.close()}
+})
+
+test('SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh', {timeout:120000}, async()=>{
+ let race=null,h;const sent=[]
+ h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-6600',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-6601',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-6602'},outboundService:async request=>{
+  const url=new URL(request.url)
+  if(url.hostname==='oauth2.googleapis.com'){
+   const input=new URLSearchParams(await request.text())
+   if(input.get('grant_type')==='refresh_token'&&race){const change=race;race=null;await change()}
+   return Response.json({access_token:'synthetic-platter-6603',refresh_token:'synthetic-platter-6604',scope:'openid email https://www.googleapis.com/auth/gmail.send'})
+  }
+  if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-6605',email:'race-mailbox@synthetic-platter.example',email_verified:true})
+  if(url.hostname==='gmail.googleapis.com'){const raw=Buffer.from((await request.json()).raw,'base64url').toString('utf8');assert.match(raw,/^From: race-mailbox@synthetic-platter.example\r\n/);sent.push(Buffer.from(raw.match(/Subject: =\?UTF-8\?B\?([^?]+)\?=/)[1],'base64').toString('utf8'));return Response.json({id:'synthetic-platter-'+(6700+sent.length)})}
+  assert.equal(url.hostname,'api.resend.com');return Response.json({id:'synthetic-platter-6606'})
+ }})
+ try{
+  await finishSetup(h);await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
+  const address='sender@synthetic-platter.example';await h.send('/auth/invite',{email:address,displayName:'Reminder sender',role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(address),person=(await h.state(cookie)).actor
+  const start=await h.send('/api/platter/mailbox/authorize',{provider:'gmail',consent:true},cookie),state=new URL(start.headers.get('location')).searchParams.get('state');assert.equal((await h.send('/api/platter/mailbox/callback?'+new URLSearchParams({state,code:'synthetic-platter-6607'}),undefined,cookie)).status,303)
+  const client=await h.cmd('client.save',{name:'Race client',email:recipient})
+  for(const action of ['optout','accepted','withdrawn','rotated','role']){
+   const p=await h.cmd('proposal.prepare',{...offer,title:'Race '+action,clientId:client.id},cookie);await h.cmd('reminder.configure',{id:p.id,version:1,enabled:false,timeZone:'America/Los_Angeles'},cookie)
+   const link=await h.cmd('proposal.send',{id:p.id,version:2},cookie),path=new URL(link.shareUrl).pathname
+   await h.send(path+'/action?name=code.request',{});const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code' ORDER BY created_at DESC").bind(p.id).first()).body.match(/\b\d{6}\b/)[0],verified=(await h.send(path+'/action?name=code.verify',{code})).cookie
+   if(action==='optout'){
+    assert.equal((await h.send(path+'/action?name=question.create',{revision:1,section:'scope',text:'When can we start?'},verified)).status,200)
+    const question=(await h.state(cookie)).proposals.find(r=>r.id===p.id).questions[0];await h.cmd('question.answer',{id:p.id,questionId:question.id,text:'Next Monday.'},cookie);assert.ok(sent.includes('Answer to your question: Race optout'),'a native answer sends through the connected Gmail mailbox')
+   }
+   race=async()=>{
+    const row=(await h.state(cookie)).proposals.find(r=>r.id===p.id)
+    if(action==='optout')assert.equal((await h.send(path+'/action?name=reminder.opt-out',{},verified)).status,200)
+    if(action==='accepted')assert.equal((await h.send(path+'/action?name=accept',{optionId:'one',name:'Synthetic client',consent:true},verified)).status,200)
+    if(action==='withdrawn')await h.cmd('proposal.withdraw',{id:p.id,version:row.version,reason:'Stop the queued reminder',notice:false},cookie)
+    if(action==='rotated')await h.cmd('proposal.send',{id:p.id,version:row.version},cookie)
+    if(action==='role')await h.cmd('member.set',{operatorId:person.id,version:0,role:'content_editor',teams:[]})
+   }
+   const subject='Refused reminder '+action,before=sent.filter(s=>s.startsWith('Refused reminder')).length
+   await h.cmd('reminder.send',{id:p.id,requestId:'synthetic-platter-race-'+action,subject,message:'Must not leave the mailbox'},cookie,403)
+   assert.equal(race,null);assert.equal(sent.filter(s=>s.startsWith('Refused reminder')).length,before,action+' is rechecked after provider refresh, with no reminder or fallback')
+   const row=(await h.state()).proposals.find(r=>r.id===p.id);assert.equal(row.reminderRuns.length,1);assert.equal(row.reminderRuns[0].transport_status,'withheld');assert.ok(row.mailAttributions.some(m=>m.outcome==='withheld'))
+  }
+ }finally{await h.close()}
+})

@@ -1739,6 +1739,18 @@ test('TEAM-001 delegated invitations bind roles and teams to current inviter aut
  assert.ok(refused.status>=400);assert.equal(refused.cookie,undefined);const person=await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind(stale.email).first();assert.equal(await h.db.prepare('SELECT role FROM p_members WHERE operator_id=?').bind(person.id).first(),null)
  assert.equal((await h.send('/api/platter/state',undefined,refused.cookie??'')).status,401)
  assert.equal((await h.cmd('member.invite',{...stale,role:'content_editor',teams:[west.id]})).status,'invited');const recovered=await h.state(await joinInvite(stale.email));assert.equal(recovered.actor.role,'content_editor');await audited(h,'member.invite',people.manager.id,'manager',invitation.id);await audited(h,'native.auth.confirm',recovered.actor.id,'content_editor',recovered.actor.id);assert.deepEqual(recovered.teams.map(t=>t.id),[west.id]);assert.ok((await h.send('/auth/confirm',{token:staleToken})).status>=400,'reissue revokes the earlier invitation')
+ // Reproduce the supported-Base dependency without rebinding or weakening its credential version guard.
+ const retainedIssuer={email:'promoted-issuer@synthetic-platter.example',displayName:'Promoted issuer',role:'member',returnTo:'/app'}
+ assert.equal((await h.send('/auth/invite',retainedIssuer,h.owner)).status,202)
+ const retainedCookie=await h.signIn(retainedIssuer.email),retainedPerson=(await h.state(retainedCookie)).actor
+ await h.cmd('member.set',{operatorId:retainedPerson.id,version:0,role:'manager',teams:[east.id]})
+ const retainedGrant={...input,email:'native-version-blocked@synthetic-platter.example'}
+ await h.cmd('member.invite',retainedGrant,retainedCookie);const retainedToken=inviteToken(retainedGrant.email)
+ const promoted=await h.send('/auth/operator/role',{operatorId:retainedPerson.id,role:'admin'},h.owner);assert.equal(promoted.status,200,promoted.text)
+ const blocked=await rejectLink(retainedToken);assert.equal(blocked.status,400,'pinned Base invalidates the issuer-version capability even though the promoted admin can still issue the grant')
+ const blockedPerson=await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind(retainedGrant.email).first()
+ assert.equal(await h.db.prepare('SELECT * FROM p_members WHERE operator_id=?').bind(blockedPerson.id).first(),null)
+ assert.equal((await h.db.prepare('SELECT count(*) AS n FROM oa_sessions WHERE operator_id=? AND revoked_at IS NULL').bind(blockedPerson.id).first()).n,0)
  }finally{await h.close()}
 })
 

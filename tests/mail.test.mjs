@@ -623,7 +623,8 @@ test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute s
   assert.equal(gmail.length,2);assert.equal(installation.length,1)
   timeout=false;await connect('gmail');demoteDuringRefresh=true
   const raced=await h.cmd('proposal.prepare',{...offer,clientId:client.id},people.sales.cookie),sentBefore=gmail.length
-  await h.cmd('proposal.send',{id:raced.id,version:1},people.sales.cookie,403)
+  await h.cmd('proposal.send',{id:raced.id,version:1,mailRepliesConsent:true},people.sales.cookie,403)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_mail_reply_keys WHERE proposal_id=?').bind(raced.id).first()).n,0,'authority loss cannot mint a client reply capability')
   assert.equal(gmail.length,sentBefore);assert.equal(installation.length,1,'loss of sending authority never falls back')
   assert.equal((await h.state()).proposals.find(p=>p.id===raced.id).mailAttributions[0].outcome,'withheld')
   await h.cmd('member.set',{operatorId:people.sales.id,version:4,role:'sales',teams:[]})

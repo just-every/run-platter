@@ -17,7 +17,9 @@ export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string
   const claimed=await env.DB.prepare("UPDATE p_mail SET status='sending' WHERE id=? AND status='pending'").bind(row.id).run();if(!claimed.meta.changes)continue
   let route='installation',address=env.MAIL_FROM??'',fallback=false
   try{
-   const actor=await sendingActor(env,row),mailbox=actor?await memberMailbox(env,actor):null
+   let actor=await sendingActor(env,row)
+   const mailbox=actor?await memberMailbox(env,actor):null
+   actor=await sendingActor(env,row)
    const sealedReply=actor?await prepareClientReply(env,actor,row):row.reply_to
    const replyTo=sealedReply?await openReplyAddress(env,sealedReply):undefined
    let result:{status:string;providerMessageId:string|null}|undefined

@@ -1,3 +1,4 @@
+import { saveReminderTemplate } from './reminder-messages'
 import { reminderCommand } from './reminders'
 import { disputeCommand } from './disputes'
 import { catalogInsertion, saveCatalog } from './catalog'
@@ -50,6 +51,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  await authorizeCommand(db,a,name,p)
  if(name.startsWith('team.')||name.startsWith('member.')||name==='proposal.share')return teamCommand(db,a,name,p)
  if(name.startsWith('approval.')||name==='proposal.approve'||name==='proposal.reject')return approvalCommand(env,a,name,p)
+ if(name==='reminder-template.save')return saveReminderTemplate(db,a,p)
  if(name.startsWith('reminder.'))return reminderCommand(env,a,name,p)
  if(name.startsWith('dispute.'))return disputeCommand(env,a,name,p)
  if(name==='catalog.save')return saveCatalog(db,a,p)

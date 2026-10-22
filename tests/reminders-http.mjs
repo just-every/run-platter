@@ -79,3 +79,42 @@ export async function remindersHttp(){
   const audit=(await h.send('/api/platter/audit?action=template.delivery',undefined,h.owner)).value.rows;assert.ok(audit.some(r=>r.subject===shared.id&&r.actor_id===people.admin.id))
  }finally{await h.close()}
 }
+
+export async function reminderMessagesHttp(){
+ const mail=[],h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7300'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mail.push(await request.json());return Response.json({id:'synthetic-platter-'+(7400+mail.length)})}})
+ try{
+  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+  const email='sales@synthetic-platter.example';assert.equal((await h.send('/auth/invite',{email,displayName:'Sam Sales',role:'member',returnTo:'/app'},h.owner)).status,202);const sales=await h.signIn(email)
+  await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
+  const tick=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'});await tick('2031-03-01T18:00:00Z')
+  const current=async id=>(await h.state()).proposals.find(p=>p.id===id),client=await h.cmd('client.save',{name:'Acme',email:'dana@synthetic-platter.example'}),other=await h.cmd('client.save',{name:'Other company',email:'other-client@synthetic-platter.example'}),draft=()=>h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic service',scope:'A scoped service',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'},sales)
+  const templateInput={name:'Locked review',subject:'Proposal for {client.company}',message:'Hi {client.first_name},\n{sender.name} asks you to review {proposal.title} before {proposal.expires_on}.',locked:true,isDefault:true}
+  const unchanged=async fn=>{const tables=['p_reminder_templates','p_template_reminder_messages','p_reminder_settings','p_reminder_authority','p_delivery_changes','p_proposal_defaults','p_audit','p_mail'],read=()=>Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all().then(r=>r.results))),before=await read();await fn();assert.deepEqual(await read(),before)}
+  await unchanged(()=>h.cmd('reminder-template.save',templateInput,sales,403));await unchanged(()=>h.cmd('reminder-template.save',{...templateInput,subject:'Unknown {private.secret}'},h.owner,400))
+  const message=await h.cmd('reminder-template.save',templateInput),p=await draft();await h.cmd('expiry.set',{id:p.id,version:1,mode:'days',days:14,warningDays:''},sales)
+  const configure={id:p.id,version:2,enabled:true,consent:true,timeZone:'America/Los_Angeles',afterDays:[2,5],beforeDays:[],cap:2}
+  const missing=await h.cmd('reminder.configure',configure,sales,400);assert.match(missing.error,/client.first_name/)
+  await unchanged(()=>h.cmd('reminder.configure',{...configure,clientFirstName:'Dana',subject:'Member edited a locked subject'},sales,403))
+  await h.cmd('reminder.configure',{...configure,clientFirstName:'Dana'},sales)
+  const saved=(await current(p.id)).reminderSettings;assert.equal(saved.subject,'Proposal for Acme');assert.equal(saved.message,'Hi Dana,\nSam Sales asks you to review Synthetic service before 2031-03-15.');assert.equal(JSON.parse(saved.settings).messageTemplate.id,message.id)
+  await h.cmd('proposal.send',{id:p.id,version:3},sales)
+  const before=mail.length;await tick('2031-03-03T18:00:00Z');assert.equal(mail.length,before+1);assert.deepEqual(mail.at(-1).to,['dana@synthetic-platter.example']);assert.equal(mail.at(-1).subject,saved.subject);assert.ok(mail.at(-1).text.startsWith(saved.message+'\n\n'))
+  const firstCopy=(await current(p.id)).reminderRuns[0]
+  const sent=await current(p.id);await unchanged(()=>h.cmd('reminder.send',{id:p.id,requestId:'synthetic-platter-7301',subject:'Edited locked text'},sales,403));await h.cmd('reminder.send',{id:p.id,requestId:'synthetic-platter-7302'},sales);assert.equal(mail.at(-1).subject,saved.subject)
+  await h.cmd('reminder-template.save',{...templateInput,id:message.id,version:1,subject:'Changed shared source for {client.company}'})
+  const after=await current(p.id);await h.cmd('reminder.configure',{id:p.id,version:after.version,enabled:true,consent:true,timeZone:'America/Los_Angeles',subject:'Second reminder for {client.company}',message:'Hi {client.first_name}, the exact second body.'})
+  await tick('2031-03-06T18:00:00Z');const second=mail.filter(m=>m.subject==='Second reminder for Acme');assert.equal(second.length,1);assert.ok(second[0].text.startsWith('Hi Dana, the exact second body.\n\n'));assert.deepEqual((await current(p.id)).reminderRuns[0],firstCopy)
+  // Loading a message is review only and disables the schedule even if an old checkbox is still checked.
+  const row=await current(p.id),count=mail.length;await h.cmd('reminder.configure',{id:p.id,version:row.version,enabled:true,consent:true,timeZone:'America/Los_Angeles',messageTemplateId:message.id,loadTemplate:'yes',clientFirstName:'Dana'})
+  const loaded=await current(p.id);assert.equal(loaded.reminderSettings.enabled,0);assert.equal(loaded.reminderSettings.authorized,0);assert.equal(mail.length,count)
+  // First-name input is not copied with a source schedule to a different client.
+  const copy=await h.cmd('proposal.duplicate',{id:p.id,version:loaded.version,clientId:other.id},sales);assert.equal((await current(copy.id)).reminderSettings,null);await unchanged(()=>h.cmd('reminder.configure',{id:copy.id,version:1,enabled:true,consent:true,timeZone:'America/Los_Angeles'},sales,400))
+  const special=await h.cmd('reminder-template.save',{name:'Project check',subject:'Check {proposal.title}',message:'For {client.company}.',locked:false,isDefault:false}),shared=await h.cmd('template.save',{id:p.id,version:loaded.version,name:'Shared delivery message',shared:true,shareConsent:true})
+  await h.cmd('template.delivery',{id:shared.id,version:1,reminderTemplateId:special.id})
+  const start=await h.cmd('template.start',{id:shared.id,version:2,clientId:client.id},sales);await h.cmd('reminder.configure',{id:start.id,version:1,enabled:false,timeZone:'America/Los_Angeles'},sales)
+  assert.equal((await current(start.id)).reminderSettings.subject,'Check Synthetic service');assert.equal(JSON.parse((await current(start.id)).reminderSettings.settings).messageTemplate.id,special.id)
+  await h.cmd('reminder.configure',{id:start.id,version:2,enabled:false,timeZone:'America/Los_Angeles',subject:'Personal {client.company} follow-up',message:'A personal message for {proposal.title}.'},sales);assert.equal((await current(start.id)).reminderSettings.subject,'Personal Acme follow-up')
+  const agent=await h.cmd('agent.create',{label:'No reminder message authority'});assert.equal((await h.send('/api/platter/agent/command',{name:'reminder-template.save',input:templateInput},'',{authorization:'Bearer '+agent.token})).status,403);assert.deepEqual((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+agent.token})).value.reminderTemplates,[])
+  assert.ok((await h.send('/api/platter/audit?action=reminder-template.save',undefined,h.owner)).value.rows.some(r=>r.subject===message.id))
+ }finally{await h.close()}
+}

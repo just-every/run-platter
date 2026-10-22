@@ -44,5 +44,6 @@ export async function resolveTemplateDelivery(db:D1Database,template?:any){
  if(!template)return {settings:delivery(workspace),expiry:fallback}
  const saved=await db.prepare('SELECT settings FROM p_template_defaults WHERE template_id=?').bind(template.id).first<any>(),settings=saved?JSON.parse(saved.settings):delivery(workspace),sources=JSON.parse(template.delivery_sources),expiry=JSON.parse(template.expiry)
  const reminders=sources.reminders==='inherit'?delivery(workspace):settings
- return {settings:{...settings,remindersEnabled:reminders.remindersEnabled,reminderDays:reminders.reminderDays,beforeExpiryDays:reminders.beforeExpiryDays,reminderCap:reminders.reminderCap},expiry:{...(sources.expiry==='inherit'?fallback:expiry),warning_days:sources.warning==='inherit'?workspace.warningDays:expiry.warning_days}}
+ const choice=await db.prepare('SELECT message_id FROM p_template_reminder_messages WHERE template_id=?').bind(template.id).first<any>()
+ return {settings:{...settings,...(choice?{reminderTemplateId:choice.message_id}:{}),remindersEnabled:reminders.remindersEnabled,reminderDays:reminders.reminderDays,beforeExpiryDays:reminders.beforeExpiryDays,reminderCap:reminders.reminderCap},expiry:{...(sources.expiry==='inherit'?fallback:expiry),warning_days:sources.warning==='inherit'?workspace.warningDays:expiry.warning_days}}
 }

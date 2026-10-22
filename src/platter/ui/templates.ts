@@ -1,3 +1,4 @@
+import { reminderMessageChoice } from './reminder-messages'
 import { resourceEditors } from '../folders'
 import { folderSelect } from './folders'
 import { escape, field, form, hidden, panel, proposalPath } from './shared'
@@ -9,7 +10,7 @@ function templateDelivery(state:any,t:any){
  return '<details><summary>Reminder and expiry defaults for '+escape(t.name)+'</summary><p>Each new draft copies these choices. Later changes never alter existing proposals. Copies require fresh reminder authorization and a recipient time zone.</p>'+form('template.delivery','/app',hidden('id',t.id)+hidden('version',t.version)
  +source('reminders','Reminder source')+'<label>Template reminders<select name="remindersEnabled"><option value="yes"'+(d.remindersEnabled?' selected':'')+'>On</option><option value="no"'+(!d.remindersEnabled?' selected':'')+'>Off</option></select></label>'
  +field('Template days after sending','reminderDays',(d.reminderDays??[]).join(', '))+field('Template days before expiry','beforeExpiryDays',(d.beforeExpiryDays??[]).join(', '))+field('Template reminder cap','reminderCap',d.reminderCap??3,'type="number" required min="0" max="365"')
- +source('expiry','Expiry source')+field('Template expiry days (empty for no expiry)','expiryDays',t.expiry.period_days??'','type="number" min="1" max="36500"')+(t.expiry.mode==='date'?'<p>The saved fixed expiry date '+escape(t.expiry.expires_on)+' will be replaced by the period above when saving these controls.</p>':'')
+ +reminderMessageChoice(state,t.reminderTemplateId,'reminderTemplateId','Template reminder message')+source('expiry','Expiry source')+field('Template expiry days (empty for no expiry)','expiryDays',t.expiry.period_days??'','type="number" min="1" max="36500"')+(t.expiry.mode==='date'?'<p>The saved fixed expiry date '+escape(t.expiry.expires_on)+' will be replaced by the period above when saving these controls.</p>':'')
  +source('warning','Warning source')+field('Template warning days (empty for no warning)','warningDays',t.expiry.warning_days??'','type="number" min="1" max="36500"')+'<button>Save template delivery defaults</button>')+'</details>'
 }
 

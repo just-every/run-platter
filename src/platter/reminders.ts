@@ -1,3 +1,4 @@
+import { reminderCopy, scheduledReminderCopy } from './reminder-messages'
 import type { Bindings } from '../auth.server'
 import { actorById } from './credentials'
 import { commit, exact, hash, need, text, type Actor } from './model'
@@ -17,14 +18,6 @@ function days(value:unknown,fallback:number[]){
  need(Array.isArray(result)&&result.length<=20&&result.every(d=>Number.isInteger(d)&&d>=1&&d<=365)&&new Set(result).size===result.length,'Choose distinct reminder days from 1 to 365')
  return result.toSorted((a:number,b:number)=>a-b)
 }
-function content(p:Record<string,unknown>,title:string,old?:any){
- const subject=text(p.subject??old?.subject??'Reminder: '+title,'a reminder subject',200),message=text(p.message??old?.message??'Please review your proposal and verify your email before accepting.','a reminder message',10000)
- need(!/[\r\n]/.test(subject),'The reminder subject must be one line')
- const missing=(subject+'\n'+message).match(/\{([^{}]+)\}/);need(!missing,'Fill the variable before sending: '+(missing?.[1]??''))
- // Client links are generated only at dispatch and stay out of retained text.
- need(!/\/p\/[a-f0-9]{64}/i.test(subject+'\n'+message),'Remove client invitation links from the retained reminder text')
- return {subject,message}
-}
 export async function reminderState(db:D1Database,a:Actor){
  const settings=(await db.prepare('SELECT s.*,EXISTS(SELECT 1 FROM p_reminder_authority a WHERE a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version) AS authorized FROM p_reminder_settings s').all<any>()).results
  return {policy:await reminderPolicy(db),settings,runs:(await db.prepare("SELECT r.*,CASE WHEN m.held_reason='sender_not_authorized' THEN 'withheld' ELSE m.status END AS transport_status FROM p_reminder_runs r LEFT JOIN p_reminder_transport t ON t.run_id=r.id LEFT JOIN p_mail m ON m.id=t.mail_id ORDER BY r.queued_at,r.id").all<any>()).results,optouts:(await db.prepare('SELECT * FROM p_reminder_optouts').all<any>()).results}
@@ -43,20 +36,20 @@ export async function reminderCommand(env:Bindings,a:Actor,name:string,p:Record<
  const old=await db.prepare('SELECT * FROM p_reminder_settings WHERE proposal_id=?').bind(row.id).first<any>()
  if(name==='reminder.configure'){
   exact(row,p);need(['draft','approved','sent'].includes(row.status),'Only open proposals can have reminders',409)
-  const enabled=p.enabled===true||p.enabled==='yes';need([true,false,'yes','no'].includes(p.enabled as any),'Choose whether reminders are enabled')
+  const enabled=p.loadTemplate==='yes'?false:p.enabled===true||p.enabled==='yes';need([true,false,'yes','no'].includes(p.enabled as any),'Choose whether reminders are enabled')
   need(!enabled||p.consent===true||p.consent==='yes','Explicitly authorize scheduled reminder email')
   const zone=text(p.timeZone,'the recipient IANA time zone',100);need(validZone(zone),'Choose the recipient IANA time zone')
   const defaults=await db.prepare('SELECT settings FROM p_proposal_defaults WHERE proposal_id=?').bind(row.id).first<any>(),base=defaults?JSON.parse(defaults.settings):{reminderDays:[2,5,9],beforeExpiryDays:[3],reminderCap:3}
   const cap=Number(p.cap??base.reminderCap);need(Number.isInteger(cap)&&cap>=0&&cap<=365,'Choose a reminder cap from 0 to 365')
-  const settings={afterDays:days(p.afterDays,base.reminderDays),beforeDays:days(p.beforeDays,base.beforeExpiryDays),cap},copy=content(p,row.title,old)
+  const copy=await reminderCopy(db,a,row,p,old),settings={afterDays:days(p.afterDays,base.reminderDays),beforeDays:days(p.beforeDays,base.beforeExpiryDays),cap,...(copy.messageTemplate?{messageTemplate:copy.messageTemplate}:{})}
   const client=await db.prepare('SELECT email FROM p_clients WHERE id=?').bind(row.client_id).first<any>(),share=await db.prepare('SELECT recipient FROM p_shares WHERE proposal_id=?').bind(row.id).first<any>(),recipient=share?.recipient??client.email,version=(old?.version??0)+1
-  await commit(db,a,[db.prepare('INSERT INTO p_reminder_settings(proposal_id,revision,sender_id,recipient,time_zone,enabled,settings,subject,message) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,sender_id=excluded.sender_id,recipient=excluded.recipient,time_zone=excluded.time_zone,enabled=excluded.enabled,settings=excluded.settings,subject=excluded.subject,message=excluded.message,version=p_reminder_settings.version+1').bind(row.id,row.revision,a.id,recipient,zone,enabled?1:0,JSON.stringify(settings),copy.subject,copy.message),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?) ON CONFLICT(proposal_id) DO UPDATE SET settings=excluded.settings').bind(row.id,JSON.stringify({...base,remindersEnabled:enabled,reminderDays:settings.afterDays,beforeExpiryDays:settings.beforeDays,reminderCap:cap})),deliveryChange(db,a,row,'reminder.configure',{enabled,timeZone:zone,...settings,...copy,consent:enabled},at),db.prepare('DELETE FROM p_reminder_authority WHERE proposal_id=?').bind(row.id),...(enabled?[db.prepare('INSERT INTO p_reminder_authority(proposal_id,revision,settings_version) VALUES(?,?,?)').bind(row.id,row.revision,version)]:[]),db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status IN ('draft','approved','sent')) AND COALESCE((SELECT version FROM p_reminder_settings WHERE proposal_id=?),0)=?",values:[row.id,row.version,row.revision,row.id,old?.version??0]})
+  await commit(db,a,[db.prepare('INSERT INTO p_reminder_settings(proposal_id,revision,sender_id,recipient,time_zone,enabled,settings,subject,message) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,sender_id=excluded.sender_id,recipient=excluded.recipient,time_zone=excluded.time_zone,enabled=excluded.enabled,settings=excluded.settings,subject=excluded.subject,message=excluded.message,version=p_reminder_settings.version+1').bind(row.id,row.revision,a.id,recipient,zone,enabled?1:0,JSON.stringify(settings),copy.subject,copy.message),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?) ON CONFLICT(proposal_id) DO UPDATE SET settings=excluded.settings').bind(row.id,JSON.stringify({...base,remindersEnabled:enabled,reminderDays:settings.afterDays,beforeExpiryDays:settings.beforeDays,reminderCap:cap,reminderTemplateId:copy.messageTemplate?.id??null})),deliveryChange(db,a,row,'reminder.configure',{enabled,timeZone:zone,...settings,...copy,consent:enabled},at),db.prepare('DELETE FROM p_reminder_authority WHERE proposal_id=?').bind(row.id),...(enabled?[db.prepare('INSERT INTO p_reminder_authority(proposal_id,revision,settings_version) VALUES(?,?,?)').bind(row.id,row.revision,version)]:[]),db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status IN ('draft','approved','sent')) AND COALESCE((SELECT version FROM p_reminder_settings WHERE proposal_id=?),0)=?",values:[row.id,row.version,row.revision,row.id,old?.version??0]})
   return {id:row.id,version:row.version+1}
  }
  need(name==='reminder.send','Unknown reminder action',404)
  need(old&&old.revision===row.revision,'Configure the recipient time zone before sending reminders',409)
  const zone=old.time_zone;need(p.timeZone===undefined||p.timeZone===zone,'Use the configured recipient time zone')
- const copy=content(p,row.title,old),requestId=text(p.requestId,'a reminder request id',100)
+ const copy=await reminderCopy(db,a,row,p,old),requestId=text(p.requestId,'a reminder request id',100)
  const prior=await db.prepare('SELECT * FROM p_reminder_runs WHERE request_id=?').bind(requestId).first<any>()
  if(prior){need(prior.proposal_id===row.id&&prior.actor_id===a.id&&prior.kind==='manual'&&prior.subject===copy.subject&&prior.message===copy.message&&prior.time_zone===zone,'This reminder request id was already used',409);return {id:row.id,reminderId:prior.id,replayed:true}}
  return queueReminder(env,a,row,{...copy,zone,kind:'manual',slot:localDate(at,zone),requestId,at,settingsVersion:old.version})
@@ -96,7 +89,7 @@ export async function runReminders(env:Bindings,at:number){
   let row:any;try{row=await permitted(db,actor,s.proposal_id,'send')}catch{continue}
   const settings=JSON.parse(s.settings),slots=reminderSlots(settings,s.sent_at,s.time_zone,{date:s.expires_on,deadlineAt:s.deadline_at},policy)
   for(const slot of slots.filter(slot=>slot.at<=now).sort((a,b)=>a.at-b.at)){
-   try{await queueReminder(env,actor,row,{subject:s.subject,message:s.message,zone:s.time_zone,kind:'scheduled',slot:slot.id,requestId:crypto.randomUUID(),at:now,settingsVersion:s.version,cap:settings.cap})}catch(error){if([403,409,429].includes((error as any).status))continue;throw error}
+   try{const copy=await scheduledReminderCopy(db,actor,row,s);await queueReminder(env,actor,row,{...copy,zone:s.time_zone,kind:'scheduled',slot:slot.id,requestId:crypto.randomUUID(),at:now,settingsVersion:s.version,cap:settings.cap})}catch(error){if([400,403,409,429].includes((error as any).status))continue;throw error}
    break
   }
  }

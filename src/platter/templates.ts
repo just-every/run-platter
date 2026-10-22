@@ -16,7 +16,8 @@ export async function templateState(db: D1Database, a: Actor) {
  const access=resourceScope(a,'r'),rows=(await db.prepare('SELECT r.* FROM p_personal_templates r WHERE (r.owner_id=? OR r.shared=1) AND '+access.sql+' ORDER BY r.updated_at DESC,r.id').bind(a.id,...access.values).all<any>()).results
  const locks=(await db.prepare('SELECT * FROM p_template_locks ORDER BY section').all<any>()).results
  const delivery=(await db.prepare('SELECT * FROM p_template_defaults').all<any>()).results
- return rows.map(row => ({deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, snapshot: JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
+ const messages=(await db.prepare('SELECT * FROM p_template_reminder_messages').all<any>()).results
+ return rows.map(row => ({reminderTemplateId:messages.some(m=>m.template_id===row.id)?messages.find(m=>m.template_id===row.id).message_id:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}').reminderTemplateId??null,deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, snapshot: JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
 }
 
 async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false) {
@@ -119,7 +120,9 @@ async function templateDeliveryCommand(db:D1Database,a:Actor,p:Record<string,unk
  const expiryDays=nullableDays(p.expiryDays,expiry.period_days),warningDays=nullableDays(p.warningDays,expiry.warning_days)
  for(const [label,value] of [['Expiry',expiryDays],['Warning',warningDays]] as const)need(value===null||Number.isInteger(value)&&value>=1&&value<=36500,label+' days must be from 1 to 36500, or empty')
  const settings={...old,remindersEnabled:p.remindersEnabled===undefined?old.remindersEnabled:p.remindersEnabled===true||p.remindersEnabled==='yes',reminderDays:dayList(p.reminderDays,old.reminderDays),beforeExpiryDays:dayList(p.beforeExpiryDays,old.beforeExpiryDays),reminderCap:cap}
+ const messageId=p.reminderTemplateId===undefined?undefined:String(p.reminderTemplateId)||null
+ if(messageId)need(await db.prepare('SELECT 1 FROM p_reminder_templates WHERE id=?').bind(messageId).first(),'Reminder template not found',404)
  const nextExpiry={...expiry,...(p.expiryDays!==undefined?{mode:expiryDays===null?'never':'days',period_days:expiryDays,expires_on:null}:{}),warning_days:warningDays}
- await commit(db,a,[db.prepare('UPDATE p_personal_templates SET delivery_sources=?,expiry=?,version=version+1,updated_at=? WHERE id=?').bind(JSON.stringify(sources),JSON.stringify(nextExpiry),at,row.id),db.prepare('INSERT INTO p_template_defaults(template_id,settings) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET settings=excluded.settings').bind(row.id,JSON.stringify(settings))],false,{sql:'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?) AND '+access.sql,values:[row.id,row.version,...access.values]})
+ await commit(db,a,[...(messageId===undefined?[]:[db.prepare('INSERT INTO p_template_reminder_messages(template_id,message_id) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET message_id=excluded.message_id').bind(row.id,messageId)]),db.prepare('UPDATE p_personal_templates SET delivery_sources=?,expiry=?,version=version+1,updated_at=? WHERE id=?').bind(JSON.stringify(sources),JSON.stringify(nextExpiry),at,row.id),db.prepare('INSERT INTO p_template_defaults(template_id,settings) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET settings=excluded.settings').bind(row.id,JSON.stringify(settings))],false,{sql:'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?) AND '+access.sql,values:[row.id,row.version,...access.values]})
  return {id:row.id,version:row.version+1}
 }

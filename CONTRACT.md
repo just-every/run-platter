@@ -1218,7 +1218,7 @@ An owner handles a US privacy request (CCPA/CPRA or similar): erase a contact's 
 
 #### PORT-002 — Complete product archive.
 
-Archives and restore cover everything in the product: templates, library, catalog, media, signed PDFs and certificates, payment and invoice records, reports' source data and integration mappings, under `PORT-001`'s rules. Provider credentials never travel. Every record kind supported today must round-trip, including clients, draft/sent/accepted proposals, revisions, approval history, immutable acceptances, retained invoice files and client-import originals, journal and provenance. `EDIT-002`, `EDIT-003`, `CAT-001`, `EDIT-006`, `EDIT-010`, `SIGN-005`, `PAY-001` to `PAY-009`, `REPORT-001` to `REPORT-005`, `CRM-001` to `CRM-004`, `AUTO-001` to `AUTO-004` and `SEC-001` inherit archive/restore coverage of their new record kinds and credential exclusion before shipping. No provider connection exists today; agent keys, native sessions, client invitations, verification state and mail stay local under `PORT-001`.
+Archives and restore cover everything in the product: templates, library, catalog, media, signed PDFs and certificates, payment and invoice records, reports' source data and integration mappings, under `PORT-001`'s rules. Provider credentials never travel. Every record kind supported today must round-trip, including clients, draft/sent/accepted proposals, revisions, approval history, immutable acceptances, retained invoice files and client-import originals, journal and provenance. `EDIT-002`, `EDIT-003`, `CAT-001`, `EDIT-006`, `EDIT-010`, `SIGN-005`, `PAY-001` to `PAY-009`, `REPORT-001` to `REPORT-005`, `CRM-001` to `CRM-004`, `AUTO-001` to `AUTO-004` and `SEC-001` inherit archive/restore coverage of their new record kinds and credential exclusion before shipping. Provider connection metadata now round-trips while encrypted credentials stay local; agent keys, native sessions, client invitations, verification state and mail stay local under `PORT-001`.
 
 *Acceptance:* Export an installation with every record kind, restore into an empty one, and re-export identical parts; no provider token appears in the archive.
 
@@ -1388,7 +1388,7 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 
 ## Status
 
-Judged from the code and tests at commit `d9e19040cebdff9a94cf0cfb1fec272c363b4816` (22 October 2026).
+Judged from the code and tests at commit `e17e2c0e8707eb579f6be13ea894feffa3bbb53e` (22 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |

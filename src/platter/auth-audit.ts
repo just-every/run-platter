@@ -30,6 +30,7 @@ export async function withAuthAudit(request: Request, original: Bindings, handle
   const value = await response.clone().json() as any, id = value.operatorId ?? value.operator?.id ?? value.id
   if (typeof id === 'string' && /^[a-f0-9-]{36}$/.test(id)) requestedSubject = id
  }
- await recordAudit(env.DB, actor ? { id: actor.id, role: actor.role } : { id: 'unidentified', role: 'visitor' }, 'native' + path.replaceAll('/', '.'), requestedSubject ?? actor?.id ?? 'installation')
+ const role=actor?.role==='member'?(await env.DB.prepare('SELECT role FROM p_members WHERE operator_id=?').bind(actor.id).first<{role:string}>())?.role??'sales':actor?.role
+ await recordAudit(env.DB, actor ? { id: actor.id, role: role! } : { id: 'unidentified', role: 'visitor' }, 'native' + path.replaceAll('/', '.'), requestedSubject ?? actor?.id ?? 'installation')
  return response
 }

@@ -31,6 +31,7 @@ export async function approvalCommand(env:Bindings,a:Actor,name:string,p:Record<
  const db=env.DB,at=await currentTime(db)
  if(name==='approval.policy'||name==='approval.rule'||name==='approval.rule.delete'){
   need(administrators.includes(a.role),'Only owner and admins change approval settings',403)
+  let resource='installation'
   const {policy}=await approvalSettings(db);need(Number(p.version)===policy.version,'Approval settings changed. Reload.',409)
   const writes:D1PreparedStatement[]=[db.prepare("INSERT INTO p_approval_policy(singleton,required,default_role) VALUES(1,1,'owner') ON CONFLICT DO NOTHING")]
   if(name==='approval.policy'){
@@ -40,6 +41,7 @@ export async function approvalCommand(env:Bindings,a:Actor,name:string,p:Record<
    need(a.role==='owner'||p.defaultRole===policy.default_role,'Only the owner names the default approver',403)
    writes.push(db.prepare('UPDATE p_approval_policy SET required=?,default_role=?,version=version+1 WHERE singleton=1').bind(p.required===true||p.required==='yes'?1:0,String(p.defaultRole)))
   }else if(name==='approval.rule.delete'){
+   resource=text(p.id,'a rule')
    writes.push(db.prepare('DELETE FROM p_approval_rules WHERE id=?').bind(text(p.id,'a rule')),db.prepare('UPDATE p_approval_policy SET version=version+1 WHERE singleton=1'))
   }else{
    let condition:any=p.condition??(p.kind==='termsEdited'?{kind:'termsEdited'}:{kind:'totalOver',cents:dollars(p.amount),currency:p.currency}),approvers:any=p.approvers??[p.approverOne,p.approverTwo].filter(Boolean)
@@ -54,15 +56,15 @@ export async function approvalCommand(env:Bindings,a:Actor,name:string,p:Record<
     if(approver.startsWith('role:'))need(['role:owner','role:admin','role:manager'].includes(approver),'Choose owner, admin or manager')
     else{
      need(approver.startsWith('person:'),'Choose a named person or approver role')
-     const person=await db.prepare("SELECT CASE WHEN o.role='owner' THEN 'owner' ELSE COALESCE(m.role,'sales') END AS role FROM oa_operators o LEFT JOIN p_members m ON m.operator_id=o.id WHERE o.id=? AND o.status='active'").bind(approver.slice(7)).first<any>()
+     const person=await db.prepare("SELECT CASE WHEN o.role IN ('owner','admin') THEN o.role ELSE COALESCE(m.role,'sales') END AS role FROM oa_operators o LEFT JOIN p_members m ON m.operator_id=o.id WHERE o.id=? AND o.status='active'").bind(approver.slice(7)).first<any>()
      need(person&&['owner','admin','manager','billing'].includes(person.role),'Named approvers must be owner, admin, manager or billing')
     }
    }
-   const id=p.id?text(p.id,'a rule'):crypto.randomUUID(),position=Number(p.position)
+   const id=p.id?text(p.id,'a rule'):crypto.randomUUID(),position=Number(p.position);resource=id
    need(Number.isSafeInteger(position)&&position>=0&&position<=1000,'Choose the rule sequence')
    writes.push(db.prepare('INSERT INTO p_approval_rules(id,name,position,condition,approvers) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,position=excluded.position,condition=excluded.condition,approvers=excluded.approvers').bind(id,text(p.name,'a rule name',100),position,JSON.stringify(condition),JSON.stringify(approvers)),db.prepare('UPDATE p_approval_policy SET version=version+1 WHERE singleton=1'))
   }
-  await commit(db,a,writes,false,{sql:'COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?',values:[policy.version]});return {saved:true}
+  await commit(db,a,writes,false,{sql:'COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?',values:[policy.version]});return {saved:true,id:resource}
  }
  const original=await permitted(db,a,p.id,'approve');exact(original,p)
  const row=negotiatedView(original,await pendingNegotiation(db,original.id))

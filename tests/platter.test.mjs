@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises'
 import { run, harness } from './harness.mjs'
 import { pdfPages } from './pdf-document.mjs'
 const offer={title:'Northstar brand photography',scope:'One studio shoot, edited photographs, and usage licence.',optionOne:'Studio essentials',priceOne:'2400.00',optionTwo:'Full campaign',priceTwo:'4200.00',depositPercent:'25'}
+async function audited(h,action,actor,role,subject){const query=new URLSearchParams({action,actor,subject}),r=await h.send('/api/platter/audit?'+query,undefined,h.owner);assert.equal(r.status,200,r.text);assert.ok(r.value.rows.some(row=>row.action===action&&row.actor_id===actor&&row.actor_role===role&&row.subject===subject&&Number.isSafeInteger(row.occurred_at)&&row.occurred_at>0),'audit identifies the acting role and exact resource for '+action)}
 async function draft(h){const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'});const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id});return{client,p}}
 async function sent(h){const{client,p}=await draft(h);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:p.id,version:2});return{client,p,path:new URL(share.shareUrl).pathname}}
 async function verified(h,path){let r=await h.send(path+'/action?name=code.request',{});assert.equal(r.status,200,r.text);const mail=(await h.state()).outbox.find(x=>x.subject.includes('verification code'));const code=mail.body.match(/\b\d{6}\b/)[0];r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,200,r.text);assert.ok(r.cookie);return r.cookie}
@@ -1544,6 +1545,7 @@ test('TEAM-001 shared templates and library folders enforce role edits and live 
  await h.cmd('template.save',{id:source.id,version:1,templateId:shared.id,templateVersion:1,name:'Updated shared'},h.owner);const current=(await h.state()).templates.find(t=>t.id===shared.id);assert.equal(current.shared,1);assert.equal(current.folder_id,folder.id)
  const oldCopy=(await h.state(people.sales.cookie)).proposals[0];assert.equal(oldCopy.title,offer.title,'replacing the shared template cannot mutate an existing draft')
  const rows=(await h.db.prepare('SELECT * FROM p_personal_templates').all()).results;assert.equal(rows.length,1);assert.equal((await h.db.prepare('SELECT content FROM p_library_items WHERE id=?').bind(item.id).first()).content,'Team-only text')
+ await audited(h,'folder.save',people.manager.id,'manager',folder.id);await audited(h,'library.save',people.content_editor.id,'content_editor',item.id);await audited(h,'template.save',people.content_editor.id,'content_editor',shared.id)
 }))
 
 test('TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval',()=>run(async h=>{
@@ -1599,7 +1601,7 @@ test('TEAM-001 delegated invitations bind roles and teams to current inviter aut
  const staleToken=inviteToken(stale.email),refused=await h.send('/auth/confirm',{token:staleToken})
  assert.ok(refused.status>=400);assert.equal(refused.cookie,undefined);const person=await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind(stale.email).first();assert.equal(await h.db.prepare('SELECT role FROM p_members WHERE operator_id=?').bind(person.id).first(),null)
  assert.equal((await h.send('/api/platter/state',undefined,refused.cookie??'')).status,401)
- assert.equal((await h.cmd('member.invite',{...stale,role:'content_editor',teams:[west.id]})).status,'invited');const recovered=await h.state(await joinInvite(stale.email));assert.equal(recovered.actor.role,'content_editor');assert.deepEqual(recovered.teams.map(t=>t.id),[west.id]);assert.ok((await h.send('/auth/confirm',{token:staleToken})).status>=400,'reissue revokes the earlier invitation')
+ assert.equal((await h.cmd('member.invite',{...stale,role:'content_editor',teams:[west.id]})).status,'invited');const recovered=await h.state(await joinInvite(stale.email));assert.equal(recovered.actor.role,'content_editor');await audited(h,'member.invite',people.manager.id,'manager',invitation.id);await audited(h,'native.auth.confirm',recovered.actor.id,'content_editor',recovered.actor.id);assert.deepEqual(recovered.teams.map(t=>t.id),[west.id]);assert.ok((await h.send('/auth/confirm',{token:staleToken})).status>=400,'reissue revokes the earlier invitation')
  }finally{await h.close()}
 })
 
@@ -1628,7 +1630,7 @@ test('TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices an
  await h.cmd('catalog.insert',{id:fresh.id,version:1,catalogId:catalog[0].id,catalogVersion:2,optionId:'one',quantity:'2'},people.sales);assert.equal((await h.state()).proposals.find(r=>r.id===fresh.id).options[0].cents,270000)
  await h.cmd('catalog.insert',{id:fresh.id,version:2,catalogId:catalog[0].id,catalogVersion:1,optionId:'one',quantity:'1'},people.sales,409)
  await h.cmd('catalog.save',{...input,sku:input.sku+'-owner'},h.owner,409);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_priced_catalog').first()).n,3)
- await h.cmd('catalog.save',{...input,sku:'synthetic-platter-3101',unitCost:'0.00'});assert.equal((await h.state()).catalogItems.find(r=>r.sku==='synthetic-platter-3101').unitCostCents,0)
+ await h.cmd('catalog.save',{...input,sku:'synthetic-platter-3101',unitCost:'0.00'});assert.equal((await h.state()).catalogItems.find(r=>r.sku==='synthetic-platter-3101').unitCostCents,0);await audited(h,'catalog.save',(await h.state(people.manager)).actor.id,'manager',catalog[0].id);await audited(h,'catalog.insert',(await h.state(people.sales)).actor.id,'sales',p.id)
  }finally{await h.close()}
 })
 
@@ -1649,6 +1651,16 @@ test('TEAM-001 / PAY-006 dispute responses enforce financial roles, exact deposi
    const text=(await pdfPages(bytes)).join('\n');assert.match(text,/not a signature certificate/);assert.match(text,/Synthetic client/);assert.match(text,/Northstar brand photography/);assert.doesNotMatch(text,/Internal cost|unit_cost_cents|unitCostCents|1337\.29|synthetic-platter-3405/)
   }
   await h.cmd('dispute.import',{...input,disputeId:'synthetic-platter-3404'},people.billing);const deadlineCalls=calls.length;await h.cmd('dispute.submit',{disputeId:'synthetic-platter-3404',version:1,requestId:'synthetic-platter-3430',note:'Late response',consent:true},people.billing,409);assert.equal(uploads.length,3);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_dispute_submissions').first()).n,3);assert.equal(calls.length,deadlineCalls+1)
-  assert.deepEqual((await h.state(people.sales)).disputes,[])
+  assert.deepEqual((await h.state(people.sales)).disputes,[]);await audited(h,'dispute.import',(await h.state(people.billing)).actor.id,'billing','synthetic-platter-3410');await audited(h,'dispute.submit',(await h.state(people.billing)).actor.id,'billing','synthetic-platter-3420')
  }finally{await h.close()}
 })
+
+test('TEAM-001 / APPROVE-003 native admins remain eligible named approvers and settings audit records identify the actual person or workspace',()=>run(async h=>{
+ const email='native-admin@synthetic-platter.example';assert.equal((await h.send('/auth/invite',{email,displayName:'Native admin',role:'admin',returnTo:'/app'},h.owner)).status,202);const admin=await h.signIn(email),actor=(await h.state(admin)).actor;assert.equal(actor.role,'admin')
+ await h.cmd('member.zone',{timeZone:'America/New_York'},admin);await audited(h,'member.zone',actor.id,'admin',actor.id)
+ await h.cmd('workspace.defaults',{version:0,reminderDays:[2,5],expiryDays:30},admin);await audited(h,'workspace.defaults',actor.id,'admin','installation')
+ await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'},admin);await audited(h,'approval.policy',actor.id,'admin','installation')
+ const rule=await h.cmd('approval.rule',{version:1,name:'Named native admin',position:0,condition:{kind:'totalOver',cents:0,currency:'USD'},approvers:['person:'+actor.id]},admin);await audited(h,'approval.rule',actor.id,'admin',rule.id)
+ const {p}=await draft(h);await h.cmd('proposal.send',{id:p.id,version:1},h.owner,409);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1},admin);await h.cmd('proposal.send',{id:p.id,version:2});await audited(h,'proposal.approve',actor.id,'admin',p.id)
+ await h.cmd('approval.rule.delete',{id:rule.id,version:2},admin);await audited(h,'approval.rule.delete',actor.id,'admin',rule.id)
+}))

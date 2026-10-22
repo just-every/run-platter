@@ -5,6 +5,13 @@ import { date, escape, field, panel } from './shared'
 export interface AuditNames { proposals: Map<string, string>; clients: Map<string, string>; people: Map<string, string>; keys: Map<string, string> }
 
 const verbs: Record<string, string> = {
+ 'team.create':'created the team','member.set':'changed membership for','member.zone':'changed the personal time zone of','member.invite':'issued the member invitation',
+ 'proposal.share':'changed collaborator access to','proposal.unlock':'unlocked a section in','template.save':'saved the template','template.start':'started a draft from a template:', 'template.locks':'changed section locks in',
+ 'folder.save':'changed the shared resource folder','library.save':'saved the library item','catalog.save':'saved the catalog item','catalog.insert':'copied a catalog price into',
+ 'workspace.defaults':'changed workspace defaults for','approval.policy':'changed the approval policy for','approval.rule':'saved the approval rule','approval.rule.delete':'removed the approval rule',
+ 'pricing.cost':'saved private costing for','pricing.export':'downloaded private costing for','provider.connect':'verified the provider connection','provider.disconnect':'disconnected the provider',
+ 'payment.record':'recorded received money','payment.bind':'verified a Stripe deposit','payment.refund':'requested the deposit refund','dispute.import':'verified the Stripe dispute','dispute.submit':'submitted the available dispute evidence','dispute.evidence':'downloaded available dispute evidence for',
+
  'client.save': 'saved the client', 'client.erase': 'erased an unused client',
  'proposal.prepare': 'prepared', 'proposal.revise': 'saved a new revision of', 'proposal.restore': 'restored an earlier revision of',
  'proposal.approve': 'approved', 'proposal.send': 'sent', 'proposal.negotiate': 'prepared a negotiated revision of',

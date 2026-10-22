@@ -77,6 +77,8 @@ export async function remindersHttp(){
   await tick('2030-03-21T00:00:00Z');const warning=mail.filter(m=>m.subject==='Expiry warning: '+sentTemplate.title);assert.equal(warning.length,1);assert.match(warning[0].text,/2030-03-22/)
   await tick('2030-03-21T00:15:00Z');assert.equal(mail.filter(m=>m.subject==='Expiry warning: '+sentTemplate.title).length,1)
   const audit=(await h.send('/api/platter/audit?action=template.delivery',undefined,h.owner)).value.rows;assert.ok(audit.some(r=>r.subject===shared.id&&r.actor_id===people.admin.id))
+  await tick('2032-03-01T03:00:00Z');await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'});const zoned=await h.cmd('proposal.prepare',{clientId:client.id,title:'Zone preview',scope:'A scoped service',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'});await h.cmd('expiry.set',{id:zoned.id,version:1,mode:'days',days:14,warningDays:''});await h.cmd('report.time-zone',{timeZone:'America/Los_Angeles'});let next=await current(zoned.id);assert.equal(next.deliveryPreview.expiryDate,'2032-03-14','an unsent preview uses the zone that first send will capture');assert.equal(next.deliveryPreview.timeZone,'America/Los_Angeles');await h.cmd('proposal.send',{id:zoned.id,version:2});assert.equal((await current(zoned.id)).expiry.date,next.deliveryPreview.expiryDate)
+  await tick('2032-03-02T03:00:00Z');next=await current(zoned.id);await h.cmd('proposal.negotiate',{id:zoned.id,version:next.version,clientId:client.id,title:'Synthetic service',scope:'A scoped service',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'});next=await current(zoned.id);assert.equal(next.deliveryPreview.expiryDate,'2032-03-15','a negotiated send preview starts its period again');await h.cmd('proposal.send',{id:zoned.id,version:next.version});assert.equal((await current(zoned.id)).expiry.date,next.deliveryPreview.expiryDate)
  }finally{await h.close()}
 }
 
@@ -119,5 +121,6 @@ export async function reminderMessagesHttp(){
   await h.cmd('reminder.configure',{id:start.id,version:2,enabled:false,timeZone:'America/Los_Angeles',subject:'Personal {client.company} follow-up',message:'A personal message for {proposal.title}.'},sales);assert.equal((await current(start.id)).reminderSettings.subject,'Personal Acme follow-up')
   const agent=await h.cmd('agent.create',{label:'No reminder message authority'});assert.equal((await h.send('/api/platter/agent/command',{name:'reminder-template.save',input:templateInput},'',{authorization:'Bearer '+agent.token})).status,403);assert.deepEqual((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+agent.token})).value.reminderTemplates,[]);assert.doesNotMatch(JSON.stringify((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+agent.token})).value),/Hi Dana|Changed shared source|sourceSubject|sourceMessage/)
   assert.ok((await h.send('/api/platter/audit?action=reminder-template.save',undefined,h.owner)).value.rows.some(r=>r.subject===message.id))
+
  }finally{await h.close()}
 }

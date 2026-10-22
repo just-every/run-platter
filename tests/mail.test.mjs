@@ -816,3 +816,5 @@ test('SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdra
   }
  }finally{await h.close()}
 })
+
+test('FOLLOW-001 / FOLLOW-006 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority', {timeout:120000}, async()=>{const {remindersHttp}=await import('./reminders-http.mjs');await remindersHttp()})

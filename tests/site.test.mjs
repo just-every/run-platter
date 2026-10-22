@@ -1149,3 +1149,5 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('FOLLOW-001 / FOLLOW-006 sender controls, template delivery overrides, preview dates, manual email and inactive copies at desktop and phone widths', {timeout:120000}, async()=>{const {remindersJourney}=await import('./reminders-journey.mjs');await remindersJourney()})

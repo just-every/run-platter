@@ -1,3 +1,4 @@
+import { reminderPanel } from './reminders'
 import { disputesPanel } from './disputes'
 import { catalogPanel } from './catalog'
 import { sectionLocksPanel } from './section-locks'
@@ -87,7 +88,7 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
     html += `<div class="composer-page frozen">${offerCards(p)}${exceptionBand(state, p, feedback, `negotiate-${p.id}`) ?? notices(feedback)}${receipt(sum, fresh + share, note)}</div>`
   }
   const itemised = pricingTables(p.options ?? [], p.currency)
-  const dossier: string[] = [disputesPanel(state,p),catalogPanel(state,p),sectionLocksPanel(state,p),paymentsPanel(state,p),internalPricingPanel(p,selection.get('costOption')),approvalPanel(p),sharingPanel(state,p),followupPanel(state, p), withdrawalPanel(state, p), itemised ? `<section class="panel wide"><h2>Itemised pricing</h2>${itemised}</section>` : '', panel('Offer record', people(state, p)), proposalAttachments(state, p), p.status === 'withdrawn' ? '' : pdfPanel(state, p), expiryPanel(state, p)]
+  const dossier: string[] = [disputesPanel(state,p),catalogPanel(state,p),sectionLocksPanel(state,p),paymentsPanel(state,p),internalPricingPanel(p,selection.get('costOption')),approvalPanel(p),sharingPanel(state,p),followupPanel(state, p), withdrawalPanel(state, p), itemised ? `<section class="panel wide"><h2>Itemised pricing</h2>${itemised}</section>` : '', panel('Offer record', people(state, p)), proposalAttachments(state, p), p.status === 'withdrawn' ? '' : pdfPanel(state, p), expiryPanel(state, p), reminderPanel(state,p)]
   if (['sent', 'expired', 'withdrawn'].includes(p.status) && person) dossier.push(`<section class="panel wide"><h2>Negotiate a new revision</h2><p>The sent offer stays frozen. Prepare changed terms for a new approval before replacing the client invitation.</p>${composerForm(state, p, 'negotiate', `negotiate-${p.id}`, 'Prepare negotiated revision')}</section>`)
   dossier.push(paperAcceptanceForm(state, p, selection))
   if (p.acceptance) dossier.push(panel('Client acceptance', `<dl><dt>Accepted by</dt><dd>${escape(p.acceptance.name)}${p.acceptance.method === 'upload' ? '' : ` · ${escape(p.acceptance.email)}`}</dd><dt>Chosen option</dt><dd>${escape(p.options?.find((o: any) => o.id === p.acceptance.optionId)?.label)}</dd><dt>Total</dt><dd>${money(p.acceptance.totalCents, p.currency)}</dd><dt>Deposit due</dt><dd>${money(p.acceptance.depositCents, p.currency)}</dd><dt>Accepted at</dt><dd>${date(p.acceptance.acceptedAt)}</dd>${acceptanceMethod(p.acceptance, '/api/platter/attachments/' + encodeURIComponent(p.id) + '/')}</dl><p>The accepted agreement is permanent.</p>`))

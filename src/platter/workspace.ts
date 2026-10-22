@@ -7,8 +7,8 @@ export async function workspaceDefaults(db:D1Database){
  const row=await db.prepare('SELECT * FROM p_workspace_defaults WHERE singleton=1').first<any>()
  return {...(row?JSON.parse(row.settings):initial()),version:row?.version??0}
 }
-const delivery=(settings:any)=>({remindersEnabled:settings.remindersEnabled,reminderDays:settings.reminderDays,beforeExpiryDays:settings.beforeExpiryDays,reminderCap:settings.reminderCap,paymentMethods:settings.paymentMethods})
-function dayList(value:unknown,fallback:number[]){
+export const delivery=(settings:any)=>({remindersEnabled:settings.remindersEnabled,reminderDays:settings.reminderDays,beforeExpiryDays:settings.beforeExpiryDays,reminderCap:settings.reminderCap,paymentMethods:settings.paymentMethods})
+export function dayList(value:unknown,fallback:number[]){
  let days:any=value??fallback
  if(typeof days==='string'){const source=days.trim();if(source.startsWith('[')){try{days=JSON.parse(source)}catch{need(false,'Choose reminder days')}}else days=source?source.split(',').map((v:string)=>Number(v.trim())):[]}
  need(Array.isArray(days)&&days.length<=20&&days.every((d:any)=>Number.isInteger(d)&&d>=1&&d<=365)&&new Set(days).size===days.length,'Choose distinct reminder days from 1 to 365')
@@ -38,7 +38,11 @@ export async function defaultStatements(db:D1Database,id:string,expiry=true){
 }
 export const copyDefaults=(db:D1Database,from:string,to:string)=>db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) SELECT ?,settings FROM p_proposal_defaults WHERE proposal_id=?').bind(to,from)
 export const templateDefaults=(db:D1Database,id:string,template:string)=>[db.prepare('DELETE FROM p_template_defaults WHERE template_id=?').bind(template),db.prepare('INSERT INTO p_template_defaults(template_id,settings) SELECT ?,settings FROM p_proposal_defaults WHERE proposal_id=?').bind(template,id)]
-export async function startDefaults(db:D1Database,template:string,id:string){
- const row=await db.prepare('SELECT settings FROM p_template_defaults WHERE template_id=?').bind(template).first<any>()
- return row?[db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,row.settings)]:defaultStatements(db,id,false)
+/** Resolve independent reminder, expiry and warning sources once, at creation. */
+export async function resolveTemplateDelivery(db:D1Database,template?:any){
+ const workspace=await workspaceDefaults(db),zone=await installationZone(db),fallback={mode:workspace.expiryDays===null?'never':'days',period_days:workspace.expiryDays,expires_on:null,time_zone:zone,warning_days:workspace.warningDays}
+ if(!template)return {settings:delivery(workspace),expiry:fallback}
+ const saved=await db.prepare('SELECT settings FROM p_template_defaults WHERE template_id=?').bind(template.id).first<any>(),settings=saved?JSON.parse(saved.settings):delivery(workspace),sources=JSON.parse(template.delivery_sources),expiry=JSON.parse(template.expiry)
+ const reminders=sources.reminders==='inherit'?delivery(workspace):settings
+ return {settings:{...settings,remindersEnabled:reminders.remindersEnabled,reminderDays:reminders.reminderDays,beforeExpiryDays:reminders.beforeExpiryDays,reminderCap:reminders.reminderCap},expiry:{...(sources.expiry==='inherit'?fallback:expiry),warning_days:sources.warning==='inherit'?workspace.warningDays:expiry.warning_days}}
 }

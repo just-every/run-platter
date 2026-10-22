@@ -2020,5 +2020,7 @@ test('TEAM-001 upgrading a pre-role database keeps former members as sales witho
   assert.equal((await h.send('/app/proposal?id='+ownId,undefined,cookie)).status,200)
   for(const id of [foreignId,unrecordedId])assert.equal((await h.send('/app/proposal?id='+id,undefined,cookie)).status,403)
   const report=await h.send('/api/platter/pipeline',undefined,cookie);assert.equal(report.status,200);assert.equal(report.value.count,1);assert.equal(report.value.rows[0].id,ownId)
+  const upgraded=await h.state();assert.deepEqual(upgraded.workspaceDefaults,{remindersEnabled:true,reminderDays:[2,5,9],beforeExpiryDays:[3],reminderCap:3,expiryDays:60,warningDays:1,paymentMethods:['card'],version:0});assert.equal(upgraded.proposals.find(p=>p.id===ownId).reminderSettings,null);assert.equal(upgraded.proposals.find(p=>p.id===ownId).deliveryDefaults,undefined);assert.equal(upgraded.proposals.find(p=>p.id===ownId).expiry.mode,'never')
+  const future=await h.cmd('proposal.prepare',{...offer,clientId});const copied=(await h.state()).proposals.find(p=>p.id===future.id);assert.deepEqual(copied.deliveryDefaults,{remindersEnabled:true,reminderDays:[2,5,9],beforeExpiryDays:[3],reminderCap:3,paymentMethods:['card']});assert.equal(copied.expiry.days,60);assert.equal(copied.expiry.warningDays,1);assert.equal(copied.reminderSettings,null);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_reminder_authority').first()).n,0)
  }finally{await h.close()}
 })

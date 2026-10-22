@@ -15,7 +15,7 @@ If you ran preview, stop it with `rer preview --stop` too. Keep the archive in a
 
 ## What travels
 
-Archives preserve owner identities, clients, proposals, revisions, recorded approvals, immutable acceptances, retained invoice CSVs, import journals and erasure history.
+Archives preserve owner identities, clients, proposals, revisions, recorded approvals, immutable acceptances, retained invoice CSVs, import journals and erasure history. Workspace and template delivery defaults, independent inheritance choices, proposal snapshots and link-free delivery-settings/reminder history also travel. Scheduled-reminder authorizations and invitation transport do not; after restoring, a sender must explicitly authorize each schedule again with the recipient’s IANA time zone.
 
 Sign-in sessions, agent keys, client invitations, verification sessions, outbox messages and private provider settings do not travel. Set up private configuration again after restoring. Sent offers need fresh client invitations, and agents need new keys.
 

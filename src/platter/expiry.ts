@@ -1,3 +1,4 @@
+import { deliveryChange } from './delivery-settings'
 import { actorById } from './credentials'
 import { permitted, senders } from './permissions'
 import type { Bindings } from '../auth.server'
@@ -64,7 +65,7 @@ export async function expiryCommand(env: Bindings, a: Actor, name: string, p: Re
  const writes = [db.prepare(`INSERT INTO p_expiry(proposal_id,mode,period_days,expires_on,time_zone,sent_at,deadline_at,warning_days,owner_id)
  VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET mode=excluded.mode,period_days=excluded.period_days,expires_on=excluded.expires_on,time_zone=excluded.time_zone,sent_at=excluded.sent_at,deadline_at=excluded.deadline_at,warning_days=excluded.warning_days,owner_id=excluded.owner_id`)
   .bind(row.id, mode, days, expiresOn, zone, sentAt, deadlineAt, warningDays, a.id),
-  db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id)]
+  db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id),deliveryChange(db,a,row,name,{mode,days,date:expiresOn,timeZone:zone,warningDays},at)]
  if (deadlineAt === null || deadlineAt > at) writes.push(db.prepare('UPDATE p_reopen_requests SET resolved_at=?,resolution=? WHERE proposal_id=? AND resolved_at IS NULL').bind(at, mode === 'never' ? 'removed' : 'extended', row.id))
  await commit(db, a, writes, true, { sql: "EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved','sent'))", values: [row.id, row.version] })
  return { id: row.id, version: row.version + 1, expiry: await expiryFor(db, row, at) }

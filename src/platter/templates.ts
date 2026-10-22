@@ -1,6 +1,6 @@
 import { assertTemplateLocks } from './section-locks'
 import { folderGuard, resourceScope, resourceEditors, requireAudienceConsent } from './folders'
-import { workspaceDefaults, templateDefaults, startDefaults, defaultStatements } from './workspace'
+import { templateDefaults, resolveTemplateDelivery, dayList } from './workspace'
 import { saveTemplateCosts, startTemplateCosts } from './internal-pricing'
 import type { Bindings } from '../auth.server'
 import { starterTemplate } from './starter-templates'
@@ -15,7 +15,8 @@ export async function templateState(db: D1Database, a: Actor) {
  if(['viewer','billing'].includes(a.role))return []
  const access=resourceScope(a,'r'),rows=(await db.prepare('SELECT r.* FROM p_personal_templates r WHERE (r.owner_id=? OR r.shared=1) AND '+access.sql+' ORDER BY r.updated_at DESC,r.id').bind(a.id,...access.values).all<any>()).results
  const locks=(await db.prepare('SELECT * FROM p_template_locks ORDER BY section').all<any>()).results
- return rows.map(row => ({lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, snapshot: JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
+ const delivery=(await db.prepare('SELECT * FROM p_template_defaults').all<any>()).results
+ return rows.map(row => ({deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, snapshot: JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
 }
 
 async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false) {
@@ -28,9 +29,10 @@ async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false)
 }
 
 export async function templateCommand(env: Bindings, a: Actor, name: string, input: Record<string, unknown>) {
- need(name === 'template.save' || name === 'template.start', 'Unknown template command', 404)
+ need(name === 'template.save' || name === 'template.start' || name === 'template.delivery', 'Unknown template command', 404)
  need(['owner','admin','manager','sales','content_editor'].includes(a.role) || (a.role === 'agent' && name === 'template.start'), 'A person saves personal templates', 403)
  const db = env.DB, at = await currentTime(db)
+ if(name==='template.delivery')return templateDeliveryCommand(db,a,input,at)
  if (name === 'template.save') {
   const source = await proposal(db, input.id)
   exact(source, input)
@@ -77,8 +79,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  const personal = starter ? null : template as any
  const access=starter?{sql:'1',values:[]}:await folderGuard(db,a,personal.folder_id,'template')
  const content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
- const defaults=await workspaceDefaults(db)
- const expiry = starter ? { mode: defaults.expiryDays===null?'never':'days', period_days: defaults.expiryDays, expires_on: null, time_zone: await installationZone(db), warning_days: defaults.expiryDays===null?null:defaults.warningDays } : JSON.parse(personal.expiry)
+ const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)
  need(content.currency === 'USD', 'Personal templates require USD content', 409)
  const id = crypto.randomUUID(), title = input.title === undefined || input.title === '' ? content.title : text(input.title, 'a title')
@@ -94,7 +95,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
    .bind(id, clientId, title, row.scope, row.terms ?? '', row.deposit_bps, JSON.stringify(row.options), preparer, at, 'USD', a.id, a.email, JSON.stringify(attachments)),
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) VALUES(?,?,?)').bind(id,template.id,template.version),
   ...(!starter?[db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_template_locks WHERE template_id=?').bind(id,template.id)]:[]),
-  ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),...await (starter?defaultStatements(db,id,false):startDefaults(db,template.id,id)),
+  ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify(resolved.settings)),
   db.prepare('UPDATE p_proposals SET section_conditions=? WHERE id=?').bind(JSON.stringify(row.section_conditions ?? {}), id),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)').bind(id, JSON.stringify(snapshot(row)), preparer, at, 'USD'),
   db.prepare('INSERT INTO p_pdf_settings(proposal_id,enabled) VALUES(?,?)').bind(id, template.pdf_enabled),
@@ -105,4 +106,20 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   values: [...(starter ? [] : [template.id, a.id, template.version]), clientId,...access.values],
  })
  return { id, revision: 1, version: 1 }
+}
+
+async function templateDeliveryCommand(db:D1Database,a:Actor,p:Record<string,unknown>,at:number){
+ const row=await ownTemplate(db,a,p.id,true);exact(row,p)
+ const access=await folderGuard(db,a,row.folder_id,'template'),oldSources=JSON.parse(row.delivery_sources),sources:any={}
+ for(const key of ['reminders','expiry','warning']){const value=p[key+'Source']??oldSources[key];need(['inherit','override'].includes(String(value)),'Choose workspace inheritance or a template override');sources[key]=value}
+ const saved=await db.prepare('SELECT settings FROM p_template_defaults WHERE template_id=?').bind(row.id).first<any>(),old=saved?JSON.parse(saved.settings):(await resolveTemplateDelivery(db)).settings,expiry=JSON.parse(row.expiry)
+ need(p.remindersEnabled===undefined||[true,false,'yes','no'].includes(p.remindersEnabled as any),'Choose whether reminders are on')
+ const cap=p.reminderCap===undefined?old.reminderCap:Number(p.reminderCap);need(Number.isInteger(cap)&&cap>=0&&cap<=365,'Choose a reminder cap from 0 to 365')
+ const nullableDays=(value:unknown,fallback:number|null)=>value===undefined?fallback:value===''||value===null?null:Number(value)
+ const expiryDays=nullableDays(p.expiryDays,expiry.period_days),warningDays=nullableDays(p.warningDays,expiry.warning_days)
+ for(const [label,value] of [['Expiry',expiryDays],['Warning',warningDays]] as const)need(value===null||Number.isInteger(value)&&value>=1&&value<=36500,label+' days must be from 1 to 36500, or empty')
+ const settings={...old,remindersEnabled:p.remindersEnabled===undefined?old.remindersEnabled:p.remindersEnabled===true||p.remindersEnabled==='yes',reminderDays:dayList(p.reminderDays,old.reminderDays),beforeExpiryDays:dayList(p.beforeExpiryDays,old.beforeExpiryDays),reminderCap:cap}
+ const nextExpiry={...expiry,...(p.expiryDays!==undefined?{mode:expiryDays===null?'never':'days',period_days:expiryDays,expires_on:null}:{}),warning_days:warningDays}
+ await commit(db,a,[db.prepare('UPDATE p_personal_templates SET delivery_sources=?,expiry=?,version=version+1,updated_at=? WHERE id=?').bind(JSON.stringify(sources),JSON.stringify(nextExpiry),at,row.id),db.prepare('INSERT INTO p_template_defaults(template_id,settings) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET settings=excluded.settings').bind(row.id,JSON.stringify(settings))],false,{sql:'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?) AND '+access.sql,values:[row.id,row.version,...access.values]})
+ return {id:row.id,version:row.version+1}
 }

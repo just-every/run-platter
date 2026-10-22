@@ -1678,23 +1678,121 @@ test('TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices an
 })
 
 test('TEAM-001 / PAY-006 dispute responses enforce financial roles, exact deposit binding, deadlines and consent, retaining the exact idempotent Stripe evidence',async()=>{
- const calls=[],uploads=[],statuses=new Map();let accepted
- const h=await harness({assetsDirectory:'public',outboundService:async request=>{const url=new URL(request.url);calls.push({host:url.hostname,path:url.pathname,method:request.method});if(url.hostname==='files.stripe.com'){const data=await request.formData();assert.equal(data.get('purpose'),'dispute_evidence');const bytes=new Uint8Array(await data.get('file').arrayBuffer());assert.match(new TextDecoder().decode(bytes.subarray(0,8)),/^%PDF-/);uploads.push(bytes);return Response.json({id:'synthetic-platter-'+(3500+uploads.length)})}assert.equal(url.hostname,'api.stripe.com');if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-3400'});if(url.pathname.includes('/charges/'))return Response.json({id:'synthetic-platter-3401',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:0,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}});const id=url.pathname.split('/').at(-1);if(request.method==='GET')return Response.json({id,charge:id==='synthetic-platter-3403'?'synthetic-platter-other-charge':'synthetic-platter-3401',amount:accepted.deposit_cents,currency:accepted.currency.toLowerCase(),status:statuses.get(id)??'needs_response',evidence_details:{due_by:Math.floor(Date.now()/1000)+(id==='synthetic-platter-3404'?-60:86400)}});const body=new URLSearchParams(await request.text());assert.equal(body.get('submit'),'true');assert.equal(body.get('evidence[customer_name]'),'Synthetic client');assert.equal(body.get('evidence[customer_email_address]'),accepted.email);assert.match(body.get('evidence[service_documentation]'),/^synthetic-platter-/);assert.ok(request.headers.get('idempotency-key'));statuses.set(id,'under_review');return Response.json({id,status:'under_review'})}})
+ const calls=[],uploads=[],statuses=new Map(),overrides=new Map(),deadline=Math.floor(Date.now()/1000)+86400
+ let accepted,h,claim,chargeId='synthetic-platter-3401',receiptStatus='under_review',timeout=false
+ h=await harness({assetsDirectory:'public',outboundService:async request=>{
+  const url=new URL(request.url);calls.push({host:url.hostname,path:url.pathname,method:request.method})
+  if(claim)assert.equal((await h.db.prepare('SELECT status FROM p_dispute_submissions WHERE id=?').bind(claim).first()).status,'reserved','claim is durable before every provider call')
+  if(url.hostname==='files.stripe.com'){
+   const key=request.headers.get('idempotency-key');assert.ok(key?.startsWith('platter-dispute-file-'));assert.equal((await h.db.prepare('SELECT status FROM p_dispute_submissions WHERE id=?').bind(key.slice('platter-dispute-file-'.length)).first()).status,'reserved');if(claim)assert.equal(key,'platter-dispute-file-'+claim)
+   const data=await request.formData();assert.equal(data.get('purpose'),'dispute_evidence');const bytes=new Uint8Array(await data.get('file').arrayBuffer());assert.match(new TextDecoder().decode(bytes.subarray(0,8)),/^%PDF-/);uploads.push(bytes);return Response.json({id:'synthetic-platter-'+(3500+uploads.length)})
+  }
+  assert.equal(url.hostname,'api.stripe.com')
+  if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-3400'})
+  if(url.pathname.includes('/charges/'))return Response.json({id:chargeId,paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:0,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}})
+  const id=url.pathname.split('/').at(-1)
+  if(request.method==='GET')return Response.json({id,charge:id==='synthetic-platter-3403'?'synthetic-platter-other-charge':chargeId,amount:accepted.deposit_cents,currency:accepted.currency.toLowerCase(),status:statuses.get(id)??'needs_response',evidence_details:{due_by:deadline},...overrides.get(id)})
+  const body=new URLSearchParams(await request.text());assert.deepEqual([...body.keys()].sort(),['evidence[service_documentation]','submit']);assert.equal(body.get('submit'),'true');assert.match(body.get('evidence[service_documentation]'),/^synthetic-platter-/)
+  assert.ok(request.headers.get('idempotency-key')?.startsWith('platter-dispute-submit-'));if(claim)assert.equal(request.headers.get('idempotency-key'),'platter-dispute-submit-'+claim)
+  if(timeout)throw new Error('Synthetic provider timeout')
+  statuses.set(id,receiptStatus);return Response.json({id,status:receiptStatus})
+ }})
  try{
+  assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
   const people={};for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[]});people[role]=cookie}
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,pricingTables:[{optionId:'one',name:'Delivery',lines:[{name:'Studio',description:'Synthetic delivery',quantity:'1',unit:'project',unitPrice:'2400'}]}]});const line=(await h.state()).proposals[0].internalPricing.lines[0];await h.cmd('pricing.cost',{id:p.id,version:1,lineKey:line.key,unitCost:'1337.29'});await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const path=new URL((await h.cmd('proposal.send',{id:p.id,version:3})).shareUrl).pathname,cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},cookie)).status,200);accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-3405',webhookSecret:'synthetic-platter-3406',consent:true});const payment=await h.cmd('payment.bind',{id:p.id,chargeId:'synthetic-platter-3401',consent:true}),input={paymentId:payment.id,disputeId:'synthetic-platter-3402'}
-  const before=calls.length;for(const role of ['manager','sales','content_editor','viewer']){await h.cmd('dispute.import',input,people[role],403);await h.cmd('dispute.submit',{disputeId:input.disputeId,version:1,requestId:'synthetic-platter-3407',note:'Synthetic response',consent:true},people[role],403);assert.equal((await h.send('/api/platter/disputes/'+input.disputeId+'/evidence.pdf',undefined,people[role])).status,403)}assert.equal(calls.length,before);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_disputes').first()).n,0)
-  await h.cmd('dispute.import',{...input,disputeId:'synthetic-platter-3403'},people.billing,409)
-  for(const [index,role] of ['billing','owner','admin'].entries()){
-   const actor=role==='owner'?h.owner:people[role],disputeId='synthetic-platter-'+(3410+index);await h.cmd('dispute.import',{...input,disputeId},actor)
-   const request={disputeId,version:1,requestId:'synthetic-platter-'+(3420+index),note:'Synthetic response '+role,consent:true},noConsentCalls=calls.length;await h.cmd('dispute.submit',{...request,consent:false},actor,400);assert.equal(calls.length,noConsentCalls)
-   assert.equal((await h.cmd('dispute.submit',request,actor)).status,'submitted');const submittedCalls=calls.length;assert.equal((await h.cmd('dispute.submit',request,actor)).status,'submitted');assert.equal(calls.length,submittedCalls);await h.cmd('dispute.submit',{...request,note:'Changed response'},actor,409)
-   const file=await h.mf.dispatchFetch(h.origin+'/api/platter/disputes/'+disputeId+'/evidence.pdf?submission='+request.requestId,{headers:{host:new URL(h.origin).host,cookie:actor}});assert.equal(file.status,200);const bytes=new Uint8Array(await file.arrayBuffer());assert.deepEqual(bytes,uploads[index]);const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');assert.equal((await h.db.prepare('SELECT document_hash FROM p_dispute_submissions WHERE id=?').bind(request.requestId).first()).document_hash,hash)
-   const text=(await pdfPages(bytes)).join('\n');assert.match(text,/not a signature certificate/);assert.match(text,/Synthetic client/);assert.match(text,/Northstar brand photography/);assert.doesNotMatch(text,/Internal cost|unit_cost_cents|unitCostCents|1337\.29|synthetic-platter-3405/)
+
+  const forbidden=['manager','sales','content_editor','viewer'],before=calls.length
+  for(const role of forbidden){
+   for(const name of ['dispute.import','dispute.prepare','dispute.authorize','dispute.submit'])await h.cmd(name,{...input,version:1,note:'Forbidden',consent:true},people[role],403)
+   assert.equal((await h.send('/api/platter/disputes/'+input.disputeId+'/evidence.pdf',undefined,people[role])).status,403)
   }
-  await h.cmd('dispute.import',{...input,disputeId:'synthetic-platter-3404'},people.billing);const deadlineCalls=calls.length;await h.cmd('dispute.submit',{disputeId:'synthetic-platter-3404',version:1,requestId:'synthetic-platter-3430',note:'Late response',consent:true},people.billing,409);assert.equal(uploads.length,3);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_dispute_submissions').first()).n,3);assert.equal(calls.length,deadlineCalls+1)
-  assert.deepEqual((await h.state(people.sales)).disputes,[]);await audited(h,'dispute.import',(await h.state(people.billing)).actor.id,'billing','synthetic-platter-3410');await audited(h,'dispute.submit',(await h.state(people.billing)).actor.id,'billing','synthetic-platter-3420')
+  const key=await h.cmd('agent.create',{label:'Synthetic dispute refusal'})
+  for(const name of ['dispute.import','dispute.prepare','dispute.authorize','dispute.submit'])assert.equal((await h.send('/api/platter/agent/command',{name,input},'',{authorization:'Bearer '+key.token})).status,403)
+  assert.equal(calls.length,before);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_disputes').first()).n,0)
+  await h.cmd('dispute.import',{...input,disputeId:'synthetic-platter-3403'},people.billing,409)
+  const preview=async(disputeId,packetId,actor=h.owner)=>{const file=await h.mf.dispatchFetch(h.origin+'/api/platter/disputes/'+disputeId+'/evidence.pdf?packet='+packetId,{headers:{host:new URL(h.origin).host,cookie:actor}});assert.equal(file.status,200);const bytes=new Uint8Array(await file.arrayBuffer());const hash=Buffer.from(await crypto.subtle.digest('SHA-256',bytes)).toString('hex');assert.equal(file.headers.get('x-platter-packet-sha256'),hash);return {bytes,hash}}
+  const prepare=async(disputeId,actor=h.owner)=>{
+   await h.cmd('dispute.import',{...input,disputeId},actor)
+   const count=calls.length,note='Synthetic response',packet=await h.cmd('dispute.prepare',{disputeId,version:1,note},actor),view=await preview(disputeId,packet.id,actor)
+   assert.equal(packet.documentHash,view.hash);assert.equal(calls.length,count,'preparation and preview use retained facts only')
+   return {disputeId,packetId:packet.id,documentHash:view.hash,requestId:packet.id,note}
+  }
+  const authorize=async(request,actor=h.owner)=>h.cmd('dispute.authorize',{...request,consent:true},actor)
+  const submit=async(request,actor=h.owner)=>{claim=request.requestId;try{return await h.cmd('dispute.submit',request,actor)}finally{claim=undefined}}
+  for(const [index,role] of ['billing','owner','admin'].entries()){
+   const actor=role==='owner'?h.owner:people[role],request=await prepare('synthetic-platter-'+(3410+index),actor),view=await preview(request.disputeId,request.packetId,actor),count=calls.length
+   await h.cmd('dispute.submit',request,actor,409)
+   await h.cmd('dispute.authorize',{...request,consent:false},actor,400)
+   await h.cmd('dispute.authorize',{...request,documentHash:'0'.repeat(64),consent:true},actor,409)
+   await authorize(request,actor)
+   await h.cmd('dispute.submit',{...request,documentHash:'0'.repeat(64)},actor,409)
+   await h.cmd('dispute.submit',{...request,note:'Changed response'},actor,409)
+   assert.equal(calls.length,count,'absent authorization, wrong hash and changed note make no provider call')
+   const audit=await h.send('/api/platter/audit?action=dispute.authorize',undefined,h.owner),entry=audit.value.rows.find(r=>JSON.parse(r.subject).packetId===request.packetId)
+   assert.equal(entry.actor_id,(await h.state(actor)).actor.id);assert.equal(entry.actor_role,role)
+   assert.deepEqual(JSON.parse(entry.subject),{packetId:request.packetId,disputeId:request.disputeId,cents:accepted.deposit_cents,currency:accepted.currency,deadline:deadline*1000,sha256:view.hash})
+   assert.equal((await submit(request,actor)).status,'submitted');await audited(h,'dispute.submit',(await h.state(actor)).actor.id,role,request.requestId)
+   const submittedCalls=calls.length;assert.equal((await h.cmd('dispute.submit',request,actor)).status,'submitted');assert.equal((await h.cmd('dispute.submit',{...request,requestId:'synthetic-platter-replay-'+index},actor)).status,'submitted');assert.equal(calls.length,submittedCalls)
+   const file=await h.mf.dispatchFetch(h.origin+'/api/platter/disputes/'+request.disputeId+'/evidence.pdf?submission='+request.requestId,{headers:{host:new URL(h.origin).host,cookie:actor}});assert.equal(file.status,200);const bytes=new Uint8Array(await file.arrayBuffer());assert.deepEqual(bytes,view.bytes);assert.deepEqual(bytes,uploads[index])
+   assert.equal((await h.db.prepare('SELECT document_hash FROM p_dispute_submissions WHERE id=?').bind(request.requestId).first()).document_hash,view.hash)
+   const text=(await pdfPages(bytes)).join(' ');assert.match(text,/not a signature certificate/);assert.match(text,/Synthetic client/);assert.match(text,/Northstar brand photography/);assert.match(text,/invitation mailbox code verified/);assert.match(text,/Verified mailbox:/)
+   for(const expected of ['SIGN-005','TRACK-001','PAY-001','PAY-002','Attachment contents are not included',request.disputeId,'USD 600.00'])assert.ok(text.includes(expected),expected)
+   assert.doesNotMatch(text,/Internal cost|unit_cost_cents|unitCostCents|1337\.29|synthetic-platter-3405/)
+  }
+  // A refresh changing the amount invalidates the already authorized packet locally.
+  const changed=await prepare('synthetic-platter-3440');await authorize(changed);overrides.set(changed.disputeId,{amount:accepted.deposit_cents-1})
+  await h.cmd('dispute.import',{...input,disputeId:changed.disputeId,version:1});let count=calls.length
+  await h.cmd('dispute.submit',changed,h.owner,409);assert.equal(calls.length,count)
+  // A provider-side change after authorization is detected after the claim, before uploading any bytes.
+  const remoteChanged=await prepare('synthetic-platter-3441');await authorize(remoteChanged);overrides.set(remoteChanged.disputeId,{amount:accepted.deposit_cents-1})
+  const uploadCount=uploads.length;assert.equal((await submit(remoteChanged)).status,'needs_review');assert.equal(uploads.length,uploadCount)
+  // Let a genuinely provider-issued deadline pass after preparation and authorization.
+  const expiringId='synthetic-platter-3442';overrides.set(expiringId,{evidence_details:{due_by:Math.floor(Date.now()/1000)+5}})
+  const expired=await prepare(expiringId);await authorize(expired)
+  const expiry=(await h.state()).disputes.find(d=>d.id===expiringId).deadline
+  await new Promise(r=>setTimeout(r,Math.max(0,expiry-Date.now()+20)));count=calls.length
+  await h.cmd('dispute.submit',expired,h.owner,409);assert.equal(calls.length,count)
+  // A timeout holds custody forever: replay, a different request ID and refresh cannot resend.
+  const held=await prepare('synthetic-platter-3443');await authorize(held);timeout=true
+  assert.equal((await submit(held)).status,'needs_review');timeout=false;count=calls.length
+  assert.equal((await h.cmd('dispute.submit',held)).status,'needs_review')
+  assert.equal((await h.cmd('dispute.submit',{...held,requestId:'synthetic-platter-3444'})).status,'needs_review');assert.equal(calls.length,count)
+  await h.cmd('dispute.import',{...input,disputeId:held.disputeId,version:3});count=calls.length
+  await h.cmd('dispute.prepare',{disputeId:held.disputeId,version:4,note:'Do not retry'},h.owner,409);assert.equal(calls.length,count)
+  statuses.set(held.disputeId,'under_review');await h.cmd('dispute.import',{...input,disputeId:held.disputeId,version:4})
+  assert.equal((await h.state()).disputes.find(d=>d.id===held.disputeId).submissions[0].status,'submitted')
+  for(const status of ['won','lost']){const d=(await h.state()).disputes.find(d=>d.id===held.disputeId);statuses.set(held.disputeId,status);await h.cmd('dispute.import',{...input,disputeId:held.disputeId,version:d.version});assert.equal((await h.state()).disputes.find(d=>d.id===held.disputeId).status,status)}
+  // A terminal response does not manufacture an under-review receipt.
+  const terminal=await prepare('synthetic-platter-3445');await authorize(terminal);receiptStatus='won'
+  assert.equal((await submit(terminal)).status,'needs_review');assert.equal((await h.state()).disputes.find(d=>d.id===terminal.disputeId).status,'won');receiptStatus='under_review'
+  // Two independent authorized packets cannot race into a second network attempt.
+  const racing=await prepare('synthetic-platter-3446'),second=await h.cmd('dispute.prepare',{disputeId:racing.disputeId,version:1,note:'Other packet'})
+  const other={...racing,note:'Other packet',packetId:second.id,documentHash:second.documentHash,requestId:second.id};await authorize(racing);await authorize(other)
+  count=uploads.length
+  const results=await Promise.all([racing,other].map(input=>h.send('/api/platter/command',{name:'dispute.submit',input},h.owner)))
+  assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);assert.equal(results.find(r=>r.status===200).value.status,'submitted');assert.equal(uploads.length,count+1)
+  // An owner-attested signed copy is retained but its contents are explicitly omitted.
+  const paper=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Synthetic attested agreement'})
+  const attachment=new FormData();attachment.set('id',paper.id);attachment.set('version','1');attachment.set('file',new File(['Retained attachment contents'],'synthetic-platter-attachment.txt',{type:'text/plain'}))
+  const attachmentRequest=new Request(h.origin+'/app/attachment',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner},body:attachment});const upload=await h.mf.dispatchFetch(attachmentRequest.url,{method:'POST',headers:attachmentRequest.headers,body:await attachmentRequest.arrayBuffer()});assert.equal(upload.status,200,await upload.text());assert.equal((await h.state()).proposals.find(r=>r.id===paper.id).version,2)
+  await h.cmd('proposal.approve',{id:paper.id,version:2,revision:2});await h.cmd('proposal.send',{id:paper.id,version:3})
+  const form=new FormData();for(const [key,value] of Object.entries({id:paper.id,version:'4',signer:'Synthetic client',signedOn:'2026-10-21',optionId:'one',attest:'yes'}))form.set(key,value)
+  form.set('file',new File(['Retained signed copy contents'],'synthetic-platter-signed.txt',{type:'text/plain'}))
+  const paperRequestUpload=new Request(h.origin+'/app/paper-acceptance',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner},body:form});const recorded=await h.mf.dispatchFetch(paperRequestUpload.url,{method:'POST',headers:paperRequestUpload.headers,body:await paperRequestUpload.arrayBuffer()});assert.equal(recorded.status,200,await recorded.text())
+  accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(paper.id).first();chargeId='synthetic-platter-3450'
+  const paperPayment=await h.cmd('payment.bind',{id:paper.id,chargeId,consent:true})
+  await h.cmd('dispute.import',{paymentId:paperPayment.id,disputeId:'synthetic-platter-3447'})
+  const packet=await h.cmd('dispute.prepare',{disputeId:'synthetic-platter-3447',version:1,note:'Owner-attested copy'})
+  const view=await preview('synthetic-platter-3447',packet.id),paperText=(await pdfPages(view.bytes)).join(' ')
+  assert.match(paperText,/owner-attested upload/);assert.match(paperText,/Platter did not verify the signature/)
+  assert.doesNotMatch(paperText,/Verified mailbox|invitation mailbox code/)
+  for(const expected of ['synthetic-platter-attachment.txt','synthetic-platter-signed.txt','Attachment contents are not included','SIGN-005','TRACK-001','PAY-001','PAY-002'])assert.ok(paperText.includes(expected),expected)
+  assert.doesNotMatch(paperText,/Retained attachment contents|Retained signed copy contents/)
+  const paperRequest={disputeId:'synthetic-platter-3447',packetId:packet.id,documentHash:packet.documentHash,requestId:packet.id};await authorize(paperRequest,people.billing);assert.equal((await submit(paperRequest,people.billing)).status,'submitted');assert.deepEqual(uploads.at(-1),view.bytes)
+  assert.deepEqual((await h.state(people.sales)).disputes,[])
+  await audited(h,'dispute.import',(await h.state(people.billing)).actor.id,'billing','synthetic-platter-3410')
  }finally{await h.close()}
 })
 

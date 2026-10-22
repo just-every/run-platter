@@ -41,7 +41,7 @@ export async function clientMailReplyResponse(request:Request,env:Bindings){
    // The one-reply cap is reached with this record. Tell the owner once, atomically.
    db.prepare('INSERT INTO p_mail_reply_cap_notices(mail_id,proposal_id,revision,created_at) VALUES(?,?,?,?)').bind(k.mail_id,k.proposal_id,k.revision,at),
    db.prepare('INSERT INTO p_mail_replies(id,proposal_id,revision,client_id,client_email,text,received_at,source_key,claimed_from,spf_result,dkim_result) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id,k.proposal_id,k.revision,k.client_id,k.recipient,message.text,at,sourceKey,message.from,spf,dkim),
-   db.prepare("INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,'client','mail.client-reply',?,?)").bind(id,k.client_id,k.proposal_id,at),
+   db.prepare("INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,'email','mail.client-reply',?,?)").bind(id,'email-reply',k.proposal_id,at),
    db.prepare('DELETE FROM p_guard'),
   ])}catch(error){if(/CHECK constraint|UNIQUE constraint/.test(String(error)))fail('This reply is no longer current or was already recorded',409);throw error}
   return Response.json({message:'Reply recorded on the proposal.'},{status:201,headers:{'cache-control':'no-store'}})

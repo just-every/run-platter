@@ -7,3 +7,5 @@ CREATE TABLE p_mail_reply_cap_notices(
  mail_id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id),
  revision INTEGER NOT NULL, created_at INTEGER NOT NULL
 );
+-- A matching claimed From never identifies the verified client in the audit log.
+UPDATE p_audit SET actor_role='email',actor_id='email-reply' WHERE action='mail.client-reply';

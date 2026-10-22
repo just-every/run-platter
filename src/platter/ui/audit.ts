@@ -5,6 +5,7 @@ import { date, escape, field, panel } from './shared'
 export interface AuditNames { proposals: Map<string, string>; clients: Map<string, string>; people: Map<string, string>; keys: Map<string, string> }
 
 const verbs: Record<string, string> = {
+ 'mail.client-reply':'recorded an email reply for',
  'mail.accepted':'sent mail accepted by the provider for','mail.uncertain':'recorded an uncertain sending result for','mail.withheld':'refused mail for',
  'team.create':'created the team','member.set':'changed membership for','member.zone':'changed the personal time zone of','member.invite':'issued the member invitation',
  'proposal.share':'changed collaborator access to','proposal.unlock':'unlocked a section in','template.save':'saved the template','template.start':'started a draft from a template:', 'template.locks':'changed section locks in',
@@ -41,6 +42,7 @@ const spoken = (action: string) => verbs[action] ?? (action.startsWith('mcp.') ?
 function actor(row: any, names: AuditNames): string {
  const id = String(row.actor_id ?? '')
  if (id.startsWith('agent:')) return `<strong>${escape(names.keys.get(id.slice(6)) ?? 'An agent key')}</strong> (agent)`
+ if (row.actor_role === 'email') return '<strong>An email sender (identity unproven)</strong>'
  if (row.actor_role === 'client') return `<strong>${escape(names.clients.get(id) ?? 'The client')}</strong> (client)`
  if (row.actor_role === 'invitation') return '<strong>Someone with the client link</strong>'
  if (id === 'scheduler') return '<strong>Platter</strong>'

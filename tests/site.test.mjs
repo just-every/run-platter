@@ -1133,6 +1133,7 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
      assert.equal((await state(owner)).replyCapNotices.filter(n=>n.proposal_id===outgoing.id).length,1)
      for(let i=0;i<2;i++)assert.equal((await inbound.deliver(h,replyAddress,'client@synthetic-platter.example','Another reply')).status,409)
      await op.goto(app.origin+'/app');assert.equal((await state(owner)).replyCapNotices.filter(n=>n.proposal_id===outgoing.id).length,1);assert.match(await op.locator('main').innerText(),/Email reply limits/);assert.ok(await op.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await capture(op,provider+'-reply-limit')
+     await op.goto(app.origin+'/app/audit?action=mail.client-reply&subject='+outgoing.id);assert.match(await op.locator('main').innerText(),/An email sender \(identity unproven\)/);await capture(op,provider+'-reply-audit')
      await op.goto(app.origin+'/app/audit?action=mail.accepted&subject='+outgoing.id);assert.match(await op.locator('main').innerText(),/connected@synthetic-platter.example/);await capture(op,provider+'-sender-audit')
     }
     assert.equal(mailboxSends.length,2)

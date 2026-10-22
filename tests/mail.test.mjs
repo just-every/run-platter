@@ -608,7 +608,7 @@ test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute s
    const replyPage=(await h.send('/app/proposal?id='+proposal.id,undefined,people.sales.cookie)).text;assert.match(replyPage,/Claimed From:/);assert.match(replyPage,/From address is not proven client identity/);assert.match(replyPage,/does not approve, sign or change/);assert.match(replyPage,new RegExp('Resend SPF: '+saved[0].spf_result+' · DKIM: '+saved[0].dkim_result))
    assert.ok(!(await h.state(people.other.cookie)).proposals.some(p=>p.id===proposal.id),'reply text inherits proposal scope')
    const audit=(await h.send('/api/platter/audit?action=mail.client-reply&subject='+proposal.id,undefined,h.owner)).value.rows
-   assert.equal(audit.length,1);assert.equal(audit[0].actor_role,'client')
+   assert.equal(audit.length,1);assert.equal(audit[0].actor_role,'email');assert.equal(audit[0].actor_id,'email-reply');assert.match((await h.send('/app/audit?action=mail.client-reply&subject='+proposal.id,undefined,h.owner)).text,/An email sender \(identity unproven\)/)
   }
   const afterHuman=await custody()
   for(const message of automatic)assert.equal((await inbound.deliver(h,googleReply,recipient,'Automatic message',{message})).status,204)

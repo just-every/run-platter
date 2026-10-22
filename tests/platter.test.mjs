@@ -1296,7 +1296,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, pol
  const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
  const prepare=(person='sales',extra={})=>h.cmd('proposal.prepare',{...offer,clientId:client.id,...extra},people[person].cookie)
  const current=async id=>(await h.state()).proposals.find(p=>p.id===id)
- const unchanged=async fn=>{const tables=['p_proposals','p_revisions','p_approvals','p_approval_decisions','p_mail','p_audit','p_collaborators'];const read=()=>Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all().then(r=>r.results)));const before=await read();await fn();assert.deepEqual(await read(),before,'refusal writes neither business state nor audit/mail')}
+ const unchanged=async fn=>{const tables=['p_proposals','p_revisions','p_approvals','p_approval_decisions','p_mail','p_audit','p_collaborators','p_personal_templates','p_agent_keys'];const read=()=>Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all().then(r=>r.results)));const before=await read();await fn();assert.deepEqual(await read(),before,'refusal writes neither business state nor audit/mail')}
  const outside=await prepare('other',{title:'Private west proposal'}),inside=await prepare('sales',{title:'East proposal'})
  assert.equal((await h.send('/app/proposal?id='+outside.id,undefined,people.manager.cookie)).status,403)
  assert.equal((await h.send('/app/proposal?id='+inside.id,undefined,people.manager.cookie)).status,200)
@@ -1313,12 +1313,19 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, pol
  await h.cmd('proposal.share',{id:outside.id,operatorId:people.sales.id,shared:false},people.other.cookie)
  assert.equal((await h.state(people.sales.cookie)).proposals.some(p=>p.id===outside.id),false)
  const library=await h.cmd('library.save',{title:'Synthetic case study',kind:'case_study',content:'An independently reusable case study.'})
+ const matrixKey=await h.cmd('agent.create',{label:'Synthetic matrix revocation'})
  // Existing send/edit/template/report/audit/policy/key doors exercise every current role.
  for(const role of ['owner','admin','manager','sales','content_editor','viewer','billing']){
   const person=people[role],made=await prepare('sales',{title:'Matrix '+role});await h.cmd('proposal.share',{id:made.id,operatorId:person.id})
   const canEdit=['owner','admin','manager','sales','content_editor'].includes(role)
   if(canEdit){await h.cmd('proposal.revise',{...offer,clientId:client.id,id:made.id,version:1},person.cookie);await h.cmd('template.save',{id:made.id,version:2,name:'Personal '+role},person.cookie)}
   else await unchanged(()=>h.cmd('proposal.revise',{...offer,clientId:client.id,id:made.id,version:1},person.cookie,403))
+  if(!canEdit)await unchanged(()=>h.cmd('template.save',{id:made.id,version:1,name:'Forbidden personal template'},person.cookie,403))
+  if(['owner','admin','manager','sales'].includes(role)){await h.cmd('proposal.share',{id:made.id,operatorId:people.other.id},person.cookie);assert.ok((await h.state(people.other.cookie)).proposals.some(p=>p.id===made.id));await h.cmd('proposal.share',{id:made.id,operatorId:people.other.id,shared:false},person.cookie);assert.ok(!(await h.state(people.other.cookie)).proposals.some(p=>p.id===made.id))}
+  else await unchanged(()=>h.cmd('proposal.share',{id:made.id,operatorId:people.other.id},person.cookie,403))
+  if(['owner','admin'].includes(role))assert.equal((await h.send('/api/platter/audit.csv',undefined,person.cookie)).status,200)
+  else await unchanged(async()=>assert.equal((await h.send('/api/platter/audit.csv',undefined,person.cookie)).status,403))
+  if(role!=='owner')await unchanged(()=>h.cmd('agent.revoke',{id:matrixKey.id},person.cookie,403))
   let row=await current(made.id)
   if(role!=='owner')await unchanged(()=>h.cmd('proposal.approve',{id:row.id,version:row.version,revision:row.revision},person.cookie,403))
   await h.cmd('proposal.approve',{id:row.id,version:row.version,revision:row.revision});row=await current(made.id)
@@ -1334,6 +1341,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, pol
   assert.equal((await h.send('/api/platter/pipeline',undefined,person.cookie)).status,['owner','admin','manager','sales','viewer'].includes(role)?200:403)
   if(role!=='owner')await h.cmd('agent.create',{label:'synthetic-platter-denied'},person.cookie,403)
  }
+ await h.cmd('agent.revoke',{id:matrixKey.id});assert.ok((await h.db.prepare('SELECT revoked_at FROM p_agent_keys WHERE id=?').bind(matrixKey.id).first()).revoked_at)
  const policy=async(required,defaultRole='owner')=>h.cmd('approval.policy',{version:(await h.state()).approvalSettings.policy.version,required,defaultRole})
  const rule=async condition=>h.cmd('approval.rule',{version:(await h.state()).approvalSettings.policy.version,name:'Manager above $25,000',position:0,condition,approvers:['role:manager']})
  await policy(false);await rule({kind:'totalOver',cents:2500000,currency:'USD'})

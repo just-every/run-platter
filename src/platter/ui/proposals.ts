@@ -32,7 +32,7 @@ export function proposalsPage(state: any, selection = new URLSearchParams(), fee
   const canPrepare = ['owner','admin','manager','sales','content_editor'].includes(state.actor?.role)
   const owner = ['owner','admin','manager','sales','viewer'].includes(state.actor?.role)||(state.actor?.role==='billing'&&selection.get('view')==='recorded-revenue')
   // Exceptions appear only when there is one, above the line they interrupt (owner pick A).
-  const exceptions = (state.openQuestions?.length ? openQuestionsPanel(state) : '') + (state.bounceNotices?.length ? bounceInbox(state) : '')
+  const exceptions = (state.openQuestions?.length ? openQuestionsPanel(state) : '') + ((state.bounceNotices?.length || state.replyCapNotices?.length) ? bounceInbox(state) : '')
   const prepare = canPrepare ? `<section class="prepare" aria-labelledby="prepare-title"><h2 id="prepare-title">Prepare a proposal</h2>` + (state.clients?.length
     ? composerShelf(state) + composerForm(state, undefined, 'prepare', 'composer-new') + (exceptionBand(state, undefined, feedback, 'composer-new') ?? '') + receipt('<p class="receipt-sum muted">The client chooses one of the two options and pays the deposit percentage of it.</p>', '<button form="composer-new">Prepare proposal</button>')
     : '<p>Add a client before preparing a proposal.</p>' + (owner ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) + '</section>' : ''

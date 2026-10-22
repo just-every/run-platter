@@ -1127,7 +1127,12 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
      assert.match(await page.locator('main').innerText(),/connected@synthetic-platter.example/);await capture(page,provider+'-sender-attribution')
      const wire=mailboxSends.at(-1).body,replyAddress=provider==='gmail'?Buffer.from(wire.raw,'base64url').toString('utf8').match(/\r\nReply-To: ([^\r\n]+)/)[1]:wire.message.replyTo[0].emailAddress.address
      const reply=await inbound.deliver(h,replyAddress,'client@synthetic-platter.example','Client reply to '+provider+': Monday works for us.')
-     assert.equal(reply.status,201,reply.text);await page.reload();assert.match(await page.locator('main').innerText(),/Monday works for us/);await capture(page,provider+'-client-reply')
+     assert.equal(reply.status,201,reply.text);await page.reload();assert.match(await page.locator('main').innerText(),/Monday works for us/)
+     const replyText=await page.locator('main').innerText();assert.match(replyText,/Claimed From: client@synthetic-platter.example/);assert.match(replyText,/Resend SPF: pass · DKIM: pass/);assert.match(replyText,/From address is not proven client identity/);assert.match(replyText,/does not approve, sign or change the proposal/);assert.equal((await state(sales)).proposals.find(p=>p.id===outgoing.id).status,'sent');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await capture(page,provider+'-client-reply')
+     assert.equal((await inbound.deliver(h,replyAddress,'client@synthetic-platter.example','Out of office',{message:{headers:{'Auto-Submitted':'auto-replied'}}})).status,204)
+     assert.equal((await state(owner)).replyCapNotices.filter(n=>n.proposal_id===outgoing.id).length,1)
+     for(let i=0;i<2;i++)assert.equal((await inbound.deliver(h,replyAddress,'client@synthetic-platter.example','Another reply')).status,409)
+     await op.goto(app.origin+'/app');assert.equal((await state(owner)).replyCapNotices.filter(n=>n.proposal_id===outgoing.id).length,1);assert.match(await op.locator('main').innerText(),/Email reply limits/);assert.ok(await op.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await capture(op,provider+'-reply-limit')
      await op.goto(app.origin+'/app/audit?action=mail.accepted&subject='+outgoing.id);assert.match(await op.locator('main').innerText(),/connected@synthetic-platter.example/);await capture(op,provider+'-sender-audit')
     }
     assert.equal(mailboxSends.length,2)

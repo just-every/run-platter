@@ -34,7 +34,7 @@ export function deliveryPanel(state: any, p: any): string {
       + '</dl></article></li>'
   }).join('')}</ol>` : empty('No invitation has been recorded for this proposal.')
   const attribution=(p.mailAttributions??[]).map((m:any)=>'<p>'+escape(m.actor_email)+' · '+escape(m.route==='installation'?'Installation sender':m.route+' mailbox')+' · '+escape(m.sender_address)+' · '+escape(m.outcome==='accepted'?'Accepted by provider':m.outcome)+(m.fallback?' · Mailbox unavailable; sent through the installation sender.':'')+'</p>').join('')
-  const replies=(p.mailReplies??[]).map((m:any)=>'<article><h3>Client email reply · revision '+escape(m.revision)+'</h3><p>'+escape(m.client_email)+' · '+date(m.received_at)+'</p><p class="preserve">'+escape(m.text)+'</p></article>').join('')
+  const replies=(p.mailReplies??[]).map((m:any)=>'<article><h3>Client email reply · revision '+escape(m.revision)+'</h3><p>'+'Claimed From: '+escape(m.claimed_from??m.client_email)+' · '+date(m.received_at)+'</p><p>Resend SPF: '+escape(m.spf_result)+' · DKIM: '+escape(m.dkim_result)+'. The From address is not proven client identity.</p><p>This email is a record only. It does not approve, sign or change the proposal.</p><p class="preserve">'+escape(m.text)+'</p></article>').join('')
   const notice = state.bounceNotices?.find((n:any)=>n.proposal_id===p.id&&!n.closed_at)
   const correct = p.canSend && p.status === 'sent' && notice
     ? '<h3>Correct invitation address</h3>' + correction(notice.id, notice.recipient, proposalPath(p.id)) : ''
@@ -42,7 +42,8 @@ export function deliveryPanel(state: any, p: any): string {
 }
 
 export function bounceInbox(state: any): string {
-  if (!state.bounceNotices?.length) return ''
+  const caps=state.replyCapNotices?.length?panel('Email reply limits', '<p>One notice is saved per invitation that reaches its one-reply limit. Further replies are not recorded.</p><ul class="records">'+state.replyCapNotices.map((n:any)=>'<li><a href="'+escape(proposalPath(n.proposal_id))+'">'+escape(n.title)+'</a> · revision '+escape(n.revision)+' · '+date(n.created_at)+'</li>').join('')+'</ul>'):''
+  if (!state.bounceNotices?.length) return caps
   const notices = state.bounceNotices ?? []
   const list = notices.length ? `<ul class="records" aria-label="Sender bounce notices">${notices.map((notice: any) => {
     const proposal = (state.proposals ?? []).find((p: any) => String(p.id) === String(notice.proposal_id))
@@ -61,5 +62,5 @@ export function bounceInbox(state: any): string {
       + (notice.action ? `<dt>Recorded action</dt><dd>${escape(notice.action)}</dd>` : '') + '</dl>'
       + markRead + correct + dismiss + '</article></li>'
   }).join('')}</ul>` : empty('No bounced invitation notices.')
-  return panel('Bounced invitations', '<p>These notices belong to the sending person and stay here after reading or closing. Reading a notice does not close its follow-up. An uncertain sending result keeps the follow-up open. Close a follow-up only after checking it, with a logged reason.</p>' + list)
+  return caps+panel('Bounced invitations', '<p>These notices belong to the sending person and stay here after reading or closing. Reading a notice does not close its follow-up. An uncertain sending result keeps the follow-up open. Close a follow-up only after checking it, with a logged reason.</p>' + list)
 }

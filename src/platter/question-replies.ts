@@ -7,6 +7,20 @@ import { replyDomain, resendReplyAvailable } from './question-reply-mail'
 
 const MAX_BYTES=1024*1024
 
+/** Classification uses only the signed event's fetched message, never webhook body hints. */
+function automaticReply(email:any):boolean {
+ const headers=new Map<string,string>()
+ if(email.headers&&typeof email.headers==='object'&&!Array.isArray(email.headers)){
+  for(const [name,value] of Object.entries(email.headers))if(typeof value==='string'){
+   const key=name.toLowerCase(),text=value.replace(/\r?\n[ \t]+/g,' ').trim().toLowerCase()
+   headers.set(key,(headers.get(key)?headers.get(key)+',':'')+text)
+  }
+ }
+ const submitted=headers.get('auto-submitted')
+ return Boolean((submitted&&submitted!=='no')||/\b(bulk|list|junk)\b/.test(headers.get('precedence')??'')||headers.has('list-id')||headers.has('x-autoreply')||headers.has('x-autorespond')||/\b(out[ -]+of[ -]+office|automatic reply|auto[ -]?reply|vacation (?:reply|response))\b/i.test(String(email.subject??'')))
+}
+
+
 /** Bound bytes while reading, including chunked bodies without Content-Length. */
 async function boundedBytes(message:Request|Response):Promise<Uint8Array> {
  const declared=message.headers.get('content-length')
@@ -28,7 +42,7 @@ function json(bytes:Uint8Array):any {
  catch{need(false,'Invalid message',400)}
 }
 
-export async function authenticatedReply(request:Request,env:Bindings){
+export async function authenticatedReply(request:Request,env:Bindings,ignoreAutomatic=false){
  need(request.method==='POST','Use POST',405)
   need(resendReplyAvailable(env),'Email replies are unavailable',503)
   const raw=await boundedBytes(request)
@@ -46,11 +60,14 @@ export async function authenticatedReply(request:Request,env:Bindings){
    need(response.ok,'Received message could not be fetched',502)
    email=json(await boundedBytes(response))
   }catch{need(false,'Received message could not be fetched',502)}
+  need(email?.id===signedEmailId,'Received message identity changed',422)
+  if(ignoreAutomatic&&automaticReply(email))return {message:null as any,token:'',email,ignored:true}
   let message:any
   try {
    // No attachment fetcher is supplied: any attachments are refused by the pinned parser.
    message=await normalizeInbound({provider:'resend',signedEmailId,email},{maxRawBytes:MAX_BYTES,maxBodyBytes:MAX_BYTES,maxAttachments:1,maxAttachmentBytes:1,maxTotalAttachmentBytes:1})
   }catch{need(false,'A valid plain-text message without attachments is required',422)}
+  if(ignoreAutomatic&&automaticReply({...email,subject:message.subject}))return {message:null as any,token:'',email,ignored:true}
   need(typeof message.text==='string'&&message.text.trim().length>0&&message.text.length<=10000,'A plain-text answer up to 10000 characters is required',422)
   const domain=replyDomain(env)!
   const addresses=[...new Set<string>(message.to.map((address:string)=>address.toLowerCase()))]
@@ -59,7 +76,7 @@ export async function authenticatedReply(request:Request,env:Bindings){
   const token=targets[0].slice(0,64)
   // Keep the original plain-text reply, including quotations, only when it contains no capability.
   need(!message.text.toLowerCase().includes(token)&&!/[a-f0-9]{64}@/i.test(message.text),'Remove the private reply address from the message body',422)
-  return {message,token,email}
+  return {message,token,email,ignored:false}
 }
 
 /** The dispatcher mounts this POST before the browser Origin gate. No session authority is inferred here. */

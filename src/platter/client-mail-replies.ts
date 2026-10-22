@@ -22,15 +22,25 @@ export async function prepareClientReply(env:Bindings,a:Actor,row:any){
 
 export async function clientMailReplyResponse(request:Request,env:Bindings){
  try{
-  const {message,token,email}=await authenticatedReply(request,env),keyhash=await hash(token),db=env.DB
+  const {message,token,email,ignored}=await authenticatedReply(request,env,true)
+  if(ignored)return new Response(null,{status:204,headers:{'cache-control':'no-store'}})
+  const keyhash=await hash(token),db=env.DB
   const k=await db.prepare("SELECT k.*,p.client_id,p.status,p.revision AS current_revision,s.token AS current_token,m.status AS mail_status FROM p_mail_reply_keys k JOIN p_proposals p ON p.id=k.proposal_id JOIN p_shares s ON s.proposal_id=p.id JOIN p_mail m ON m.id=k.mail_id WHERE k.keyhash=?").bind(keyhash).first<any>()
-  need(k&&k.used_at===null&&k.mail_status==='accepted'&&['sent','accepted'].includes(k.status)&&k.current_revision===k.revision&&await hash(k.current_token)===k.share_hash,'This reply address is no longer current',409)
+  need(k&&k.mail_status==='accepted'&&['sent','accepted'].includes(k.status)&&k.current_revision===k.revision&&await hash(k.current_token)===k.share_hash,'This reply address is no longer current',409)
   need(message.from.toLowerCase()===k.recipient.toLowerCase(),'Reply from the invited client mailbox',403)
   const at=Date.now(),id=crypto.randomUUID(),sourceKey=await hash('resend:'+email.id)
+  need(!await db.prepare('SELECT id FROM p_mail_replies WHERE source_key=?').bind(sourceKey).first(),'This reply was already recorded',409)
+  need(k.used_at===null,'The invitation reply limit has been reached',409)
+  // Resend's receiving-server receipt is distinct from sender-controlled headers.
+  // Even pass/pass authenticates domains, never the identity of a person.
+  const result=(value:unknown)=>typeof value==='string'&&['pass','fail','gray','processing_failed','unknown'].includes(value)?value:'unavailable'
+  const spf=result(email.authentication?.spf),dkim=result(email.authentication?.dkim)
   try{await db.batch([
    db.prepare("INSERT INTO p_guard(ok) VALUES(EXISTS(SELECT 1 FROM p_mail_reply_keys k JOIN p_mail m ON m.id=k.mail_id JOIN p_proposals p ON p.id=k.proposal_id JOIN p_shares s ON s.proposal_id=p.id WHERE k.keyhash=? AND k.used_at IS NULL AND m.status='accepted' AND p.status IN ('sent','accepted') AND p.revision=k.revision AND p.client_id=? AND s.token=? AND NOT EXISTS(SELECT 1 FROM p_withdrawals w WHERE w.proposal_id=p.id AND w.revision=p.revision)))").bind(keyhash,k.client_id,k.current_token),
    db.prepare('UPDATE p_mail_reply_keys SET used_at=? WHERE keyhash=? AND used_at IS NULL').bind(at,keyhash),
-   db.prepare('INSERT INTO p_mail_replies(id,proposal_id,revision,client_id,client_email,text,received_at,source_key) VALUES(?,?,?,?,?,?,?,?)').bind(id,k.proposal_id,k.revision,k.client_id,k.recipient,message.text,at,sourceKey),
+   // The one-reply cap is reached with this record. Tell the owner once, atomically.
+   db.prepare('INSERT INTO p_mail_reply_cap_notices(mail_id,proposal_id,revision,created_at) VALUES(?,?,?,?)').bind(k.mail_id,k.proposal_id,k.revision,at),
+   db.prepare('INSERT INTO p_mail_replies(id,proposal_id,revision,client_id,client_email,text,received_at,source_key,claimed_from,spf_result,dkim_result) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id,k.proposal_id,k.revision,k.client_id,k.recipient,message.text,at,sourceKey,message.from,spf,dkim),
    db.prepare("INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,'client','mail.client-reply',?,?)").bind(id,k.client_id,k.proposal_id,at),
    db.prepare('DELETE FROM p_guard'),
   ])}catch(error){if(/CHECK constraint|UNIQUE constraint/.test(String(error)))fail('This reply is no longer current or was already recorded',409);throw error}

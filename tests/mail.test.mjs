@@ -592,16 +592,35 @@ test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute s
   assert.equal((await inbound.deliver(h,googleReply,recipient,'Attachment',{message:{attachments:[{id:'synthetic-platter-5900',filename:'file.txt',size:10,content_type:'text/plain'}]}})).status,422)
   assert.equal((await inbound.deliver(h,googleReply,recipient,'x'.repeat(10001))).status,422)
   const beforeReplies=installation.length
+  const custody=async()=>Object.fromEntries(await Promise.all(['p_mail_replies','p_mail_reply_keys','p_mail_reply_cap_notices','p_audit','p_mail','p_proposals','p_approvals','p_acceptances'].map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results])))
+  const automatic=[{headers:{'AuTo-SuBmItTeD':'auto-replied'}},{headers:{'Auto-Submitted':'auto-generated'}},{headers:{Precedence:'bulk'}},{headers:{precedence:'list'}},{headers:{precedence:'junk'}},{headers:{'X-Autoreply':'yes'}},{headers:{'X-Autorespond':'yes'}},{headers:{'List-Id':'synthetic-platter-5901'}},{subject:'Out of office: proposal'},{subject:'Automatic reply: proposal'},{subject:'Vacation response'},{headers:{'Auto-Submitted':'auto-replied'},text:null,attachments:[{id:'synthetic-platter-5902',filename:'out.txt',size:10,content_type:'text/plain'}]}]
+  const untouched=await custody()
+  for(const message of automatic)assert.equal((await inbound.deliver(h,googleReply,recipient,'Automatic message',{message})).status,204)
+  assert.deepEqual(await custody(),untouched,'automatic and bulk mail leave no record, notice, audit, state change or consumed capability')
   for(const [proposal,replyTo] of [[google,googleReply],[microsoft,microsoftReply]]){
-   const receipts=await Promise.all(Array.from({length:proposal.id===microsoft.id?2:1},()=>inbound.deliver(h,replyTo,recipient,'Can we start next Monday?')))
+   const businessBefore=await h.db.prepare('SELECT * FROM p_proposals WHERE id=?').bind(proposal.id).first(),decisionsBefore=(await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(proposal.id).all()).results
+   const receipts=await Promise.all(Array.from({length:proposal.id===microsoft.id?2:1},()=>inbound.deliver(h,replyTo,recipient,'Can we start next Monday?',{message:{headers:{'Auto-Submitted':'no','Authentication-Results':'forged; spf=pass; dkim=pass'},authentication:proposal.id===google.id?{spf:'fail',dkim:'gray'}:null}})))
    assert.deepEqual(receipts.map(r=>r.status).sort(),proposal.id===microsoft.id?[201,409]:[201]);const receipt=receipts.find(r=>r.status===201);assert.equal((await receipt.submit()).status,409)
    const saved=(await h.state(people.sales.cookie)).proposals.find(p=>p.id===proposal.id).mailReplies
-   assert.equal(saved.length,1);assert.equal(saved[0].text,'Can we start next Monday?');assert.equal(saved[0].client_email,recipient)
+   assert.equal(saved.length,1);assert.equal(saved[0].text,'Can we start next Monday?');assert.equal(saved[0].client_email,recipient);assert.equal(saved[0].claimed_from,recipient);assert.equal(saved[0].spf_result,proposal.id===google.id?'fail':'unavailable');assert.equal(saved[0].dkim_result,proposal.id===google.id?'gray':'unavailable')
+   assert.deepEqual(await h.db.prepare('SELECT * FROM p_proposals WHERE id=?').bind(proposal.id).first(),businessBefore,'an email never changes the proposal, revision, approval or signature state');assert.deepEqual((await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(proposal.id).all()).results,decisionsBefore);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_acceptances WHERE proposal_id=?').bind(proposal.id).first()).n,0)
    assert.match((await h.send('/app/proposal?id='+proposal.id,undefined,people.sales.cookie)).text,/Can we start next Monday\?/)
+   const replyPage=(await h.send('/app/proposal?id='+proposal.id,undefined,people.sales.cookie)).text;assert.match(replyPage,/Claimed From:/);assert.match(replyPage,/From address is not proven client identity/);assert.match(replyPage,/does not approve, sign or change/);assert.match(replyPage,new RegExp('Resend SPF: '+saved[0].spf_result+' · DKIM: '+saved[0].dkim_result))
    assert.ok(!(await h.state(people.other.cookie)).proposals.some(p=>p.id===proposal.id),'reply text inherits proposal scope')
    const audit=(await h.send('/api/platter/audit?action=mail.client-reply&subject='+proposal.id,undefined,h.owner)).value.rows
    assert.equal(audit.length,1);assert.equal(audit[0].actor_role,'client')
   }
+  const afterHuman=await custody()
+  for(const message of automatic)assert.equal((await inbound.deliver(h,googleReply,recipient,'Automatic message',{message})).status,204)
+  assert.deepEqual(await custody(),afterHuman,'automatic replies after the cap also generate no notice')
+  assert.equal((await inbound.deliver(h,googleReply,'other@synthetic-platter.example','A forged cap hit')).status,403)
+  assert.equal((await h.state()).replyCapNotices.filter(n=>n.proposal_id===google.id).length,1)
+  const cap=await Promise.all(Array.from({length:4},()=>inbound.deliver(h,googleReply,recipient,'Please also accept this proposal')))
+  assert.ok(cap.every(r=>r.status===409));assert.equal((await h.state()).replyCapNotices.filter(n=>n.proposal_id===google.id).length,1)
+  assert.deepEqual((await h.state(people.sales.cookie)).replyCapNotices,[],'cap notices belong only to the owner')
+  assert.match((await h.send('/app',undefined,h.owner)).text,/Email reply limits/)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_mail_replies WHERE proposal_id=?').bind(google.id).first()).n,1)
+  assert.equal((await inbound.deliver(h,googleReply,recipient,'One more reply')).status,409);assert.equal((await h.state()).replyCapNotices.filter(n=>n.proposal_id===google.id).length,1,'owner is told only once per invitation')
   const agent=await h.cmd('agent.create',{label:'Reply visibility check'})
   const agentContext=await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+agent.token});assert.equal(agentContext.status,200);assert.doesNotMatch(agentContext.text,/Can we start next Monday/);assert.ok(agentContext.value.proposals.every(p=>p.mailReplies.length===0))
   assert.equal(installation.length,beforeReplies,'incoming replies cause no automatic outgoing mail')

@@ -7,7 +7,7 @@ export function inboundMailFixture(){
   settings:{MAIL_WEBHOOK_KEY:['whsec',bytes.toString('base64')].join('_'),QUESTION_REPLY_DOMAIN:'replies.example.com'},
   messages,
   async deliver(h,to,from,text,options={}){
-   const id='synthetic-platter-'+(5701+serial++),message={id,to:[to],from,subject:'Re: proposal',text,html:null,headers:{},attachments:[],...options.message}
+   const id='synthetic-platter-'+(5701+serial++),message={id,to:[to],from,subject:'Re: proposal',text,html:null,headers:{},authentication:{spf:'pass',dkim:'pass',dmarc:'pass'},attachments:[],...options.message}
    messages.set(id,message)
    const body=JSON.stringify({type:'email.received',data:{email_id:id}}),event='synthetic-platter-'+(5800+serial),timestamp=String(Math.floor(Date.now()/1000))
    const signature=createHmac('sha256',bytes).update(event+'.'+timestamp+'.'+body).digest('base64')

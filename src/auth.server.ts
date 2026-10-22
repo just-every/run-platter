@@ -1,11 +1,11 @@
-import { memberAuthOptions, directInviteBoundary } from './platter/member-invitations'
+import { memberAuthOptions, memberAuthHandler } from './platter/member-invitations'
 import { withAuthAudit } from './platter/auth-audit'
 import { rejectedResponse } from './base/rejected-response'
 import { createDependencies } from '@runeditrun/rer/internal/modules/dependencies/index.mjs'
 import { createIdpOwnerClaimHandler, createOwnerClaimHandler } from '@runeditrun/rer/internal/modules/owner-claim/index.mjs'
 import { firstRunResponse } from './base/setup'
 import { fontDocumentResponse } from './base/font-response'
-import { createOperatorAuth, createAuthHandler, createSignInHandler, type AuthConfig } from '@runeditrun/rer/internal/modules/operator-auth/index.mjs'
+import { createOperatorAuth, createSignInHandler, type AuthConfig } from '@runeditrun/rer/internal/modules/operator-auth/index.mjs'
 import { operatorMail } from './mail.server.mjs'
 import branding from './branding.json'
 
@@ -75,7 +75,7 @@ async function handleAuthResponse(request: Request, original: Bindings): Promise
   })(request)
   if (page) return fontDocumentResponse(page)
  }
- if (url.pathname.startsWith('/auth/')) {const auth=operatorAuth(env);return await directInviteBoundary(request,env,auth)??fontDocumentResponse(await createAuthHandler(auth)(request))}
+ if (url.pathname.startsWith('/auth/')) return fontDocumentResponse(await memberAuthHandler(request,env,operatorAuth(env)))
  if (url.pathname === '/setup' || url.pathname === '/app' || url.pathname.startsWith('/app/')) {
   const setup = await firstRunResponse(request, env, operatorAuth(env), { theme })
   if (setup) return setup

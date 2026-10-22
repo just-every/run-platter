@@ -1,5 +1,5 @@
 import { hashToken } from '@runeditrun/rer/internal/modules/operator-auth/crypto.mjs'
-import { AuthError, defaultRolePolicy, type AuthOptions, type RolePolicy } from '@runeditrun/rer/modules/operator-auth'
+import { AuthError, createAuthHandler, defaultRolePolicy, type AuthOptions, type RolePolicy } from '@runeditrun/rer/modules/operator-auth'
 import { operatorAuth, type Bindings } from '../auth.server'
 import { commit, email, need, text, type Actor } from './model'
 import { roles } from './permissions'
@@ -12,8 +12,15 @@ async function bindLegacyGrant(db:D1Database,g:any){
  await db.prepare("UPDATE p_member_invitations SET token_id=(SELECT t.id FROM oa_tokens t JOIN oa_operators o ON o.id=t.operator_id WHERE o.email=? AND t.kind='invite' AND t.issuer_id=? AND t.revoked_at IS NULL AND t.consumed_at IS NULL AND t.operator_version=o.version AND o.status='invited' AND NOT EXISTS(SELECT 1 FROM oa_invitation_cancellations c WHERE c.operator_id=o.id) ORDER BY t.created_at DESC,t.id DESC LIMIT 1),token_binding_pending=1 WHERE email=? AND request_id=? AND token_id IS NULL AND token_binding_pending=0").bind(g.email,g.issuer_id,g.email,g.request_id).run()
  return await db.prepare('SELECT * FROM p_member_invitations WHERE email=?').bind(g.email).first<any>()
 }
+// The native cancellation ledger changes atomically with account status. Check
+// it at admission even if a crash prevented the product marker being recorded.
+export async function syncInvitationRevocations(db:D1Database){
+ await db.prepare("UPDATE p_member_invitations SET revoked_at=? WHERE status='pending' AND revoked_at IS NULL AND token_id IN (SELECT t.id FROM oa_tokens t JOIN oa_invitation_cancellations c ON c.operator_id=t.operator_id WHERE c.operator_version>t.operator_version)").bind(Date.now()).run()
+}
 async function grantAuthority(db:D1Database,g:any){
- const a=await issuer(db,g.issuer_id);if(!a||g.revoked_at!==null||g.expires_at<=Date.now())return null
+ await syncInvitationRevocations(db)
+ const revoked=await db.prepare('SELECT revoked_at FROM p_member_invitations WHERE email=?').bind(g.email).first<any>()
+ const a=await issuer(db,g.issuer_id);if(revoked?.revoked_at||!a||g.revoked_at!==null||g.expires_at<=Date.now())return null
  const teams:string[]=JSON.parse(g.teams)
  if(a.role==='owner')return a
  if(a.role==='admin'&&g.role!=='admin')return a
@@ -57,6 +64,11 @@ export async function directInviteBoundary(request:Request,env:Bindings,auth:Ret
  if(path!=='/auth/invite')return null
  const session=await auth.getSession(request);if(session?.operator.role==='member')return Response.json({error:'Use the team invitation form to choose the permitted role and teams.'},{status:403})
  return null
+}
+export async function memberAuthHandler(request:Request,env:Bindings,auth:ReturnType<typeof operatorAuth>){
+ const response=await directInviteBoundary(request,env,auth)??await createAuthHandler(auth)(request)
+ if(new URL(request.url).pathname==='/auth/invite/cancel'&&response?.ok)await syncInvitationRevocations(env.DB)
+ return response
 }
 export async function inviteMember(env:Bindings,a:Actor,p:Record<string,unknown>,request:Request){
  need(['owner','admin','manager'].includes(a.role),'Your role cannot invite members',403)

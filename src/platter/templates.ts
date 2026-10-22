@@ -1,3 +1,4 @@
+import { agentDeliveryDefaults } from './reminder-message-defaults'
 import { assertTemplateLocks } from './section-locks'
 import { folderGuard, resourceScope, resourceEditors, requireAudienceConsent } from './folders'
 import { templateDefaults, resolveTemplateDelivery, dayList } from './workspace'
@@ -17,7 +18,7 @@ export async function templateState(db: D1Database, a: Actor) {
  const locks=(await db.prepare('SELECT * FROM p_template_locks ORDER BY section').all<any>()).results
  const delivery=(await db.prepare('SELECT * FROM p_template_defaults').all<any>()).results
  const messages=(await db.prepare('SELECT * FROM p_template_reminder_messages').all<any>()).results
- return rows.map(row => ({reminderTemplateId:messages.some(m=>m.template_id===row.id)?messages.find(m=>m.template_id===row.id).message_id:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}').reminderTemplateId??null,deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, snapshot: JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
+ return rows.map(row => ({reminderTemplateId:messages.some(m=>m.template_id===row.id)?messages.find(m=>m.template_id===row.id).message_id:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}').reminderTemplateId??null,deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:a.role==='agent'?agentDeliveryDefaults(JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}')):JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, snapshot: JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
 }
 
 async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false) {

@@ -24,17 +24,14 @@ export async function fillReminder(db:D1Database,a:Actor,row:any,copy:{subject:s
  const result=reminderText(fill(copy.subject),fill(copy.message)),missing=(result.subject+'\n'+result.message).match(/\{([^{}]+)\}/);need(!missing,'Fill the variable before sending: '+(missing?.[1]??''));return result
 }
 export async function reminderCopy(db:D1Database,a:Actor,row:any,p:Record<string,unknown>,old?:any){
- const saved=old?JSON.parse(old.settings).messageTemplate:null
- let selected:any=saved
+ const defaults=await db.prepare('SELECT settings FROM p_proposal_defaults WHERE proposal_id=?').bind(row.id).first<any>(),base=defaults?JSON.parse(defaults.settings):{},saved=old?JSON.parse(old.settings).messageTemplate:null
+ let selected:any=saved??(!old?base.reminderMessageTemplate:null)
  if(p.messageTemplateId!==undefined){
   const id=String(p.messageTemplateId)
-  selected=id?(saved?.id===id&&p.loadTemplate!=='yes'?saved:await db.prepare('SELECT * FROM p_reminder_templates WHERE id=?').bind(id).first<any>()):null
+  selected=id?(selected?.id===id&&p.loadTemplate!=='yes'?selected:await db.prepare('SELECT * FROM p_reminder_templates WHERE id=?').bind(id).first<any>()):null
   if(id)need(selected,'Reminder template not found',404)
- }else if(!old){
-  const defaults=await db.prepare('SELECT settings FROM p_proposal_defaults WHERE proposal_id=?').bind(row.id).first<any>(),id=defaults?JSON.parse(defaults.settings).reminderTemplateId:undefined
-  selected=id?await db.prepare('SELECT * FROM p_reminder_templates WHERE id=?').bind(id).first<any>():await db.prepare('SELECT * FROM p_reminder_templates WHERE is_default=1').first<any>()
- }
- const raw=reminderText(p.loadTemplate==='yes'?selected?.subject??old?.subject??'Reminder: '+row.title:p.subject??selected?.subject??old?.subject??'Reminder: '+row.title,p.loadTemplate==='yes'?selected?.message??old?.message??'Please review your proposal and verify your email before accepting.':p.message??selected?.message??old?.message??'Please review your proposal and verify your email before accepting.')
+ }else if(!old&&!Object.hasOwn(base,'reminderTemplateId'))selected=await db.prepare('SELECT * FROM p_reminder_templates WHERE is_default=1').first<any>()
+ const raw=reminderText(p.loadTemplate==='yes'?selected?.subject??old?.subject??'Reminder: '+row.title:p.subject??selected?.subject??old?.subject??base.reminderSubject??'Reminder: '+row.title,p.loadTemplate==='yes'?selected?.message??old?.message??'Please review your proposal and verify your email before accepting.':p.message??selected?.message??old?.message??base.reminderMessage??'Please review your proposal and verify your email before accepting.')
  if(!selected){const missing=(raw.subject+'\n'+raw.message).match(/\{([^{}]+)\}/);need(!missing,'Fill the variable before sending: '+(missing?.[1]??''));return {...raw,messageTemplate:null}}
  const current=await db.prepare('SELECT locked FROM p_reminder_templates WHERE id=?').bind(selected.id).first<any>()
  const sourceSubject=selected.sourceSubject??selected.subject,sourceMessage=selected.sourceMessage??selected.message

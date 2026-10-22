@@ -1,3 +1,4 @@
+import { reminderMessageDefaults } from './reminder-message-defaults'
 import { commit, need, type Actor } from './model'
 import { administrators } from './permissions'
 import { installationZone } from './reports/report-state'
@@ -32,7 +33,7 @@ export async function workspaceCommand(db:D1Database,a:Actor,p:Record<string,unk
  return {id:'workspace'}
 }
 export async function defaultStatements(db:D1Database,id:string,expiry=true){
- const defaults=await workspaceDefaults(db),writes=[db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify(delivery(defaults)))]
+ const defaults=await workspaceDefaults(db),writes=[db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify({...delivery(defaults),...await reminderMessageDefaults(db)}))]
  if(expiry&&defaults.expiryDays!==null)writes.push(db.prepare("INSERT INTO p_expiry(proposal_id,mode,period_days,time_zone,warning_days) VALUES(?,'days',?,?,?)").bind(id,defaults.expiryDays,await installationZone(db),defaults.warningDays))
  return writes
 }
@@ -41,9 +42,10 @@ export const templateDefaults=(db:D1Database,id:string,template:string)=>[db.pre
 /** Resolve independent reminder, expiry and warning sources once, at creation. */
 export async function resolveTemplateDelivery(db:D1Database,template?:any){
  const workspace=await workspaceDefaults(db),zone=await installationZone(db),fallback={mode:workspace.expiryDays===null?'never':'days',period_days:workspace.expiryDays,expires_on:null,time_zone:zone,warning_days:workspace.warningDays}
- if(!template)return {settings:delivery(workspace),expiry:fallback}
+ if(!template)return {settings:{...delivery(workspace),...await reminderMessageDefaults(db)},expiry:fallback}
  const saved=await db.prepare('SELECT settings FROM p_template_defaults WHERE template_id=?').bind(template.id).first<any>(),settings=saved?JSON.parse(saved.settings):delivery(workspace),sources=JSON.parse(template.delivery_sources),expiry=JSON.parse(template.expiry)
  const reminders=sources.reminders==='inherit'?delivery(workspace):settings
  const choice=await db.prepare('SELECT message_id FROM p_template_reminder_messages WHERE template_id=?').bind(template.id).first<any>()
- return {settings:{...settings,...(choice?{reminderTemplateId:choice.message_id}:{}),remindersEnabled:reminders.remindersEnabled,reminderDays:reminders.reminderDays,beforeExpiryDays:reminders.beforeExpiryDays,reminderCap:reminders.reminderCap},expiry:{...(sources.expiry==='inherit'?fallback:expiry),warning_days:sources.warning==='inherit'?workspace.warningDays:expiry.warning_days}}
+ const message=choice?{reminderTemplateId:null,reminderMessageTemplate:null,reminderSubject:null,reminderMessage:null,...await reminderMessageDefaults(db,choice.message_id)}:Object.hasOwn(settings,'reminderTemplateId')?{}:await reminderMessageDefaults(db)
+ return {settings:{...settings,...message,remindersEnabled:reminders.remindersEnabled,reminderDays:reminders.reminderDays,beforeExpiryDays:reminders.beforeExpiryDays,reminderCap:reminders.reminderCap},expiry:{...(sources.expiry==='inherit'?fallback:expiry),warning_days:sources.warning==='inherit'?workspace.warningDays:expiry.warning_days}}
 }

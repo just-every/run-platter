@@ -91,6 +91,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
    prepared_by,created_at,currency,sales_owner_id,sales_owner_name,attachments)
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
    .bind(id, clientId, title, row.scope, row.terms ?? '', row.deposit_bps, JSON.stringify(row.options), preparer, at, 'USD', a.id, a.email, JSON.stringify(attachments)),
+  db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) VALUES(?,?,?)').bind(id,template.id,template.version),
   ...(!starter?[db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_template_locks WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),...await (starter?defaultStatements(db,id,false):startDefaults(db,template.id,id)),
   db.prepare('UPDATE p_proposals SET section_conditions=? WHERE id=?').bind(JSON.stringify(row.section_conditions ?? {}), id),

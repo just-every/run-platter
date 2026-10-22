@@ -1555,7 +1555,7 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   }
   const csv=await h.send('/api/platter/pipeline.csv?'+query,undefined,h.owner);assert.equal(csv.status,200);assert.match(csv.text,/Received payments,Confirmed refunds,Net received,Unconfirmed refunds,Exported deposit CSV value/);assert.match(csv.text,/Total \(2 proposals\),,,,,USD,4800\.00,,?,610\.00,400\.00,210\.00,50\.00,600\.00/)
   const scheduled=await h.cmd('report.schedule',{filters:query,cadence:'daily',hour:8,recipients:[h.auth.OWNER_EMAIL]});const due=(await h.state()).reportSchedules.find(r=>r.id===scheduled.id).nextRunAt,worker=await h.mf.getWorker();await worker.scheduled({scheduledTime:new Date(due),cron:'*/15 * * * *'});await worker.scheduled({scheduledTime:new Date(due),cron:'*/15 * * * *'})
-  const email=(await h.state()).reportOutbox;assert.equal(email.length,1);assert.match(email[0].subject,/recorded revenue/);assert.ok(email[0].body.includes(csv.text),'scheduled CSV equals the same filtered rows');assert.match(email[0].body,/Net received: \$210\.00 USD/);assert.match(email[0].body,/Unconfirmed refunds: \$50\.00 USD/)
+  const email=(await h.state()).reportOutbox;assert.equal(email.length,1);assert.match(email[0].subject,/recorded revenue/);const asOfRun=await h.send('/api/platter/pipeline.csv?'+query,undefined,h.owner);assert.equal(asOfRun.status,200);assert.ok(email[0].body.includes(asOfRun.text),'scheduled CSV equals the same filtered rows as of the run time');assert.match(email[0].body,/Net received: \$210\.00 USD/);assert.match(email[0].body,/Unconfirmed refunds: \$50\.00 USD/)
 
  }finally{await h.close()}
 })

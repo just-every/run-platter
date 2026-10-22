@@ -1701,11 +1701,21 @@ test('TEAM-001 delegated invitations bind roles and teams to current inviter aut
  assert.equal(await h.db.prepare('SELECT * FROM p_members WHERE operator_id=?').bind(rotatedPerson.id).first(),null)
  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_team_members WHERE operator_id=?').bind(rotatedPerson.id).first()).n,0)
  const rotatedState=await h.state(await joinInvite(rotated.email));assert.equal(rotatedState.actor.role,'viewer');assert.deepEqual(rotatedState.teams.map(t=>t.id),[west.id])
+ const ownerIssued={...input,email:'owner-issued@synthetic-platter.example',role:'admin'}
+ await h.cmd('member.invite',ownerIssued);const ownerIssuedToken=inviteToken(ownerIssued.email)
+ await h.cmd('member.invite',{...ownerIssued,role:'sales'},people.admin.cookie)
+ assert.equal((await rejectLink(ownerIssuedToken)).status,403)
+ assert.equal((await h.state(await joinInvite(ownerIssued.email))).actor.role,'sales','reissue depends on authority for the new grant')
  const zoneInvite={...input,email:'zone@synthetic-platter.example'}
  await h.cmd('member.invite',zoneInvite,people.manager.cookie)
  await h.cmd('member.zone',{timeZone:'America/New_York'},people.manager.cookie)
  await h.cmd('team.member',{operatorId:people.manager.id,teamId:west.id})
  const zoneState=await h.state(await joinInvite(zoneInvite.email));assert.equal(zoneState.actor.role,'sales');assert.deepEqual(zoneState.teams.map(t=>t.id),[east.id])
+ // A pre-upgrade pending grant binds its existing native link on first use.
+ const legacyInvite={...input,email:'legacy-invite@synthetic-platter.example'}
+ await h.cmd('member.invite',legacyInvite,people.manager.cookie)
+ await h.db.prepare('UPDATE p_member_invitations SET token_id=NULL,token_binding_pending=0 WHERE email=?').bind(legacyInvite.email).run()
+ assert.equal((await h.state(await joinInvite(legacyInvite.email))).actor.role,'sales')
  const expired={...input,email:'expired@synthetic-platter.example'}
  await h.cmd('member.invite',expired,people.manager.cookie)
  await h.db.prepare('UPDATE p_member_invitations SET expires_at=? WHERE email=?').bind(Date.now()-1,expired.email).run()
@@ -1722,6 +1732,8 @@ test('TEAM-001 delegated invitations bind roles and teams to current inviter aut
  await rejectLink(inviteToken(revoked.email))
  assert.equal(await h.db.prepare('SELECT * FROM p_members WHERE operator_id=?').bind(revokedPerson.id).first(),null)
  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_team_members WHERE operator_id=?').bind(revokedPerson.id).first()).n,0)
+ await h.cmd('member.invite',{...revoked,role:'viewer',teams:[west.id]})
+ const legitimatelyReissued=await h.state(await joinInvite(revoked.email));assert.equal(legitimatelyReissued.actor.role,'viewer');assert.deepEqual(legitimatelyReissued.teams.map(t=>t.id),[west.id])
  const stale={...input,email:'stale@synthetic-platter.example'};assert.equal((await h.cmd('member.invite',stale,people.manager.cookie)).status,'invited');await h.cmd('member.set',{operatorId:people.manager.id,version:3,role:'sales',teams:[east.id]})
  const staleToken=inviteToken(stale.email),refused=await h.send('/auth/confirm',{token:staleToken})
  assert.ok(refused.status>=400);assert.equal(refused.cookie,undefined);const person=await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind(stale.email).first();assert.equal(await h.db.prepare('SELECT role FROM p_members WHERE operator_id=?').bind(person.id).first(),null)

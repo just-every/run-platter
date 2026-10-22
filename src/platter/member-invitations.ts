@@ -4,6 +4,14 @@ import { operatorAuth, type Bindings } from '../auth.server'
 import { commit, email, need, text, type Actor } from './model'
 import { roles } from './permissions'
 async function issuer(db:D1Database,id:string){return db.prepare("SELECT o.id,o.email,o.version AS nativeVersion,CASE WHEN o.role IN ('owner','admin') THEN o.role ELSE COALESCE(m.role,'sales') END AS role,COALESCE(m.version,0) AS memberVersion FROM oa_operators o LEFT JOIN p_members m ON m.operator_id=o.id WHERE o.id=? AND o.status='active'").bind(id).first<any>()}
+// Bind pre-upgrade pending grants lazily. This changes excluded credential rows
+// only, and refuses cancelled grants. Newly issued grants are never eligible:
+// they are bound explicitly after native issuance finishes.
+async function bindLegacyGrant(db:D1Database,g:any){
+ if(g.token_id!==null||g.token_binding_pending!==0)return g
+ await db.prepare("UPDATE p_member_invitations SET token_id=(SELECT t.id FROM oa_tokens t JOIN oa_operators o ON o.id=t.operator_id WHERE o.email=? AND t.kind='invite' AND t.issuer_id=? AND t.revoked_at IS NULL AND t.consumed_at IS NULL AND t.operator_version=o.version AND o.status='invited' AND NOT EXISTS(SELECT 1 FROM oa_invitation_cancellations c WHERE c.operator_id=o.id) ORDER BY t.created_at DESC,t.id DESC LIMIT 1),token_binding_pending=1 WHERE email=? AND request_id=? AND token_id IS NULL AND token_binding_pending=0").bind(g.email,g.issuer_id,g.email,g.request_id).run()
+ return await db.prepare('SELECT * FROM p_member_invitations WHERE email=?').bind(g.email).first<any>()
+}
 async function grantAuthority(db:D1Database,g:any){
  const a=await issuer(db,g.issuer_id);if(!a||g.revoked_at!==null||g.expires_at<=Date.now())return null
  const teams:string[]=JSON.parse(g.teams)
@@ -41,7 +49,8 @@ export async function directInviteBoundary(request:Request,env:Bindings,auth:Ret
   let input:any;try{const copy=request.clone();input=copy.headers.get('content-type')?.includes('application/json')?await copy.json():Object.fromEntries(new URLSearchParams(await copy.text()))}catch{return null}
   if(typeof input.token!=='string'||input.token.length>200)return null
   const digest=await hashToken(env.SESSION_SECRET,'link',input.token)
-  const g=await env.DB.prepare("SELECT g.*,t.id AS presented_token,t.kind AS token_kind,t.revoked_at AS token_revoked,t.consumed_at AS token_consumed,t.expires_at AS token_expiry FROM oa_tokens t JOIN oa_operators o ON o.id=t.operator_id JOIN p_member_invitations g ON g.email=o.email WHERE t.token_hash=?").bind(digest).first<any>()
+  let g=await env.DB.prepare("SELECT g.*,t.id AS presented_token,t.kind AS token_kind,t.revoked_at AS token_revoked,t.consumed_at AS token_consumed,t.expires_at AS token_expiry FROM oa_tokens t JOIN oa_operators o ON o.id=t.operator_id JOIN p_member_invitations g ON g.email=o.email WHERE t.token_hash=?").bind(digest).first<any>()
+  if(g&&g.token_id===null&&g.token_binding_pending===0){const current=await bindLegacyGrant(env.DB,g);g={...g,...current}}
   if(g&&(g.status==='pending'||g.token_kind==='invite')&&(g.status!=='pending'||g.token_id!==g.presented_token||g.token_revoked!==null||g.token_consumed!==null||g.token_expiry<=Date.now()||!await grantAuthority(env.DB,g)))return Response.json({error:'This invitation is no longer valid. Ask for a fresh invitation.'},{status:403})
   return null
  }
@@ -59,10 +68,12 @@ export async function inviteMember(env:Bindings,a:Actor,p:Record<string,unknown>
  for(const team of teams){need(await db.prepare('SELECT id FROM p_teams WHERE id=?').bind(team).first(),'Team not found');if(a.role==='manager')need(await db.prepare('SELECT 1 FROM p_team_members WHERE operator_id=? AND team_id=?').bind(a.id,team).first(),'Invite only into your own teams',403)}
  const existing=await db.prepare('SELECT * FROM oa_operators WHERE email=?').bind(address).first<any>(),old=await db.prepare('SELECT * FROM p_member_invitations WHERE email=?').bind(address).first<any>()
  need(!existing||((existing.status==='invited'||(existing.status==='inactive'&&old?.revoked_at))&&existing.role==='member'&&(old?.status==='pending'||a.role==='owner')),'This account already exists. Manage its current membership instead.',409)
- if(old){need(old.status==='pending','Manage the joined member instead',409);if(a.role==='admin')need(old.role!=='admin','Only the owner reissues admin invitations',403);}
+ if(old)need(old.status==='pending','Manage the joined member instead',409)
  const current=await issuer(db,a.id);need(current,'Active inviter required',403)
  const requestId=crypto.randomUUID(),expiresAt=Date.now()+7*86400000
- await commit(db,a,[db.prepare("INSERT INTO p_member_invitations(email,request_id,role,teams,issuer_id,issuer_native_version,issuer_member_version,expires_at,status) VALUES(?,?,?,?,?,?,?,?,'pending') ON CONFLICT(email) DO UPDATE SET request_id=excluded.request_id,role=excluded.role,teams=excluded.teams,issuer_id=excluded.issuer_id,issuer_native_version=excluded.issuer_native_version,issuer_member_version=excluded.issuer_member_version,expires_at=excluded.expires_at,status='pending',accepted_id=NULL,revoked_at=NULL,token_id=NULL").bind(address,requestId,role,JSON.stringify(teams),a.id,current.nativeVersion,current.memberVersion,expiresAt)],false,{sql:(existing?"EXISTS(SELECT 1 FROM oa_operators WHERE email=? AND status IN ('invited','inactive') AND role='member')":"NOT EXISTS(SELECT 1 FROM oa_operators WHERE email=?)")+(old?" AND EXISTS(SELECT 1 FROM p_member_invitations WHERE email=? AND request_id=? AND status='pending')":'')+(a.role==='manager'?' AND '+teams.map(()=>"EXISTS(SELECT 1 FROM p_team_members WHERE operator_id=? AND team_id=?)").join(' AND '):''),values:[address,...(old?[address,old.request_id]:[]),...(a.role==='manager'?teams.flatMap(t=>[a.id,t]):[])]})
- try{await operatorAuth(env).invite(request,{email:address,displayName,role:'member',returnTo:'/app'});return {id:requestId,status:'invited',expiresAt}}
+ await commit(db,a,[db.prepare("INSERT INTO p_member_invitations(email,request_id,role,teams,issuer_id,issuer_native_version,issuer_member_version,expires_at,status,token_binding_pending) VALUES(?,?,?,?,?,?,?,?,'pending',1) ON CONFLICT(email) DO UPDATE SET request_id=excluded.request_id,role=excluded.role,teams=excluded.teams,issuer_id=excluded.issuer_id,issuer_native_version=excluded.issuer_native_version,issuer_member_version=excluded.issuer_member_version,expires_at=excluded.expires_at,status='pending',accepted_id=NULL,revoked_at=NULL,token_id=NULL,token_binding_pending=1").bind(address,requestId,role,JSON.stringify(teams),a.id,current.nativeVersion,current.memberVersion,expiresAt)],false,{sql:(existing?"EXISTS(SELECT 1 FROM oa_operators WHERE email=? AND status IN ('invited','inactive') AND role='member')":"NOT EXISTS(SELECT 1 FROM oa_operators WHERE email=?)")+(old?" AND EXISTS(SELECT 1 FROM p_member_invitations WHERE email=? AND request_id=? AND status='pending')":'')+(a.role==='manager'?' AND '+teams.map(()=>"EXISTS(SELECT 1 FROM p_team_members WHERE operator_id=? AND team_id=?)").join(' AND '):''),values:[address,...(old?[address,old.request_id]:[]),...(a.role==='manager'?teams.flatMap(t=>[a.id,t]):[])]})
+ try{await operatorAuth(env).invite(request,{email:address,displayName,role:'member',returnTo:'/app'});
+  const bound=await db.prepare("UPDATE p_member_invitations SET token_id=(SELECT t.id FROM oa_tokens t JOIN oa_operators o ON o.id=t.operator_id WHERE o.email=? AND t.kind='invite' AND t.issuer_id=? AND t.revoked_at IS NULL AND t.consumed_at IS NULL AND t.operator_version=o.version AND o.status='invited' ORDER BY t.created_at DESC,t.id DESC LIMIT 1) WHERE email=? AND request_id=? AND revoked_at IS NULL AND status='pending' RETURNING token_id").bind(address,a.id,address,requestId).first<any>();need(bound?.token_id,'Invitation binding changed',409)
+  return {id:requestId,status:'invited',expiresAt}}
  catch{return {id:requestId,status:'needs_review',message:'The invitation request is recorded, but delivery was not confirmed. Ask the owner to review it before retrying.'}}
 }

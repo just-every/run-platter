@@ -640,11 +640,16 @@ test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute s
   assert.equal(uncertain.mailAttributions[0].outcome,'uncertain');assert.equal(uncertain.mailAttributions[0].route,'gmail')
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
   assert.equal(gmail.length,2);assert.equal(installation.length,1)
-  timeout=false;await connect('gmail');demoteDuringRefresh=true
+  timeout=false;refused=true
+  const gmailFallback=await send();assert.equal(gmail.length,2,'a refused Gmail refresh grant sends nothing through Gmail');assert.equal(installation.length,2)
+  assert.equal(gmailFallback.mailAttributions[0].route,'installation');assert.equal(gmailFallback.mailAttributions[0].fallback,1);assert.equal((await h.state(people.sales.cookie)).connections.find(c=>c.provider==='gmail').status,'broken')
+  assert.match((await h.send('/app/proposal?id='+gmailFallback.id,undefined,people.sales.cookie)).text,/Mailbox unavailable; sent through the installation sender/)
+  const gmailFallbackAudit=(await h.send('/api/platter/audit?action=mail.accepted&subject='+gmailFallback.id,undefined,h.owner)).value.rows[0];assert.equal(gmailFallbackAudit.mail_route,'installation');assert.equal(gmailFallbackAudit.sender_address,h.auth.MAIL_FROM)
+  refused=false;await connect('gmail');demoteDuringRefresh=true
   const raced=await h.cmd('proposal.prepare',{...offer,clientId:client.id},people.sales.cookie),sentBefore=gmail.length
   await h.cmd('proposal.send',{id:raced.id,version:1,mailRepliesConsent:true},people.sales.cookie,403)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_mail_reply_keys WHERE proposal_id=?').bind(raced.id).first()).n,0,'authority loss cannot mint a client reply capability')
-  assert.equal(gmail.length,sentBefore);assert.equal(installation.length,1,'loss of sending authority never falls back')
+  assert.equal(gmail.length,sentBefore);assert.equal(installation.length,2,'loss of sending authority never falls back; only the two explicitly asserted provider-refusal fallbacks were sent')
   assert.equal((await h.state()).proposals.find(p=>p.id===raced.id).mailAttributions[0].outcome,'withheld')
   await h.cmd('member.set',{operatorId:people.sales.id,version:4,role:'sales',teams:[]})
   const rotated=await send(),oldReply=gmail.at(-1).match(/\r\nReply-To: ([^\r\n]+)/)[1]

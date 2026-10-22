@@ -1,4 +1,4 @@
-import { resourceScope, folderGuard } from './folders'
+import { resourceScope, folderGuard, requireAudienceConsent } from './folders'
 import { commit, exact, need, text, type Actor } from './model'
 export const libraryEditors=['owner','admin','manager','content_editor']
 export const libraryReaders=[...libraryEditors,'sales']
@@ -13,6 +13,7 @@ export async function libraryCommand(db:D1Database,a:Actor,name:string,p:Record<
  if(p.id)need(old,'Library item not found',404)
  if(old)exact(old,p)
  const previous=old?await folderGuard(db,a,old.folder_id,'library'):{sql:'1',values:[]},folderId=p.folderId===undefined?old?.folder_id??null:p.folderId||null,next=await folderGuard(db,a,folderId,'library')
+ if(old)await requireAudienceConsent(db,old.folder_id,folderId,p.shareConsent)
  const title=text(p.title,'a title'),content=text(p.content,'the library content',10000),kind=String(p.kind)
  need(['section','case_study','bio','testimonial','terms'].includes(kind),'Choose a supported library text type')
  const at=Date.now(),writes=old?[db.prepare('UPDATE p_library_items SET title=?,kind=?,content=?,version=version+1,updated_by=?,updated_at=? WHERE id=?').bind(title,kind,content,a.id,at,id)]:[db.prepare('INSERT INTO p_library_items(id,title,kind,content,updated_by,updated_at) VALUES(?,?,?,?,?,?)').bind(id,title,kind,content,a.id,at)]

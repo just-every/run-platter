@@ -1312,6 +1312,30 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, pol
  await h.cmd('proposal.send',{id:outside.id,version:3},people.sales.cookie)
  await h.cmd('proposal.share',{id:outside.id,operatorId:people.sales.id,shared:false},people.other.cookie)
  assert.equal((await h.state(people.sales.cookie)).proposals.some(p=>p.id===outside.id),false)
+ // Out-of-team shares widen View/Edit only; every authority and removal is checked through HTTP.
+ const sharedOutside=await prepare('other',{title:'Shared west collaborator'})
+ const lockedTemplate=await h.cmd('template.save',{id:sharedOutside.id,version:1,name:'West locked',shared:true,shareConsent:true})
+ await h.cmd('template.locks',{id:lockedTemplate.id,version:1,sections:['terms']})
+ const sharedLocked=await h.cmd('template.start',{id:lockedTemplate.id,version:2,clientId:client.id},people.other.cookie)
+ for(const role of ['manager','viewer']){
+  await h.cmd('proposal.share',{id:sharedLocked.id,operatorId:people[role].id},people.other.cookie)
+  assert.ok((await h.state(people[role].cookie)).proposals.some(p=>p.id===sharedLocked.id))
+  assert.ok((await h.send('/api/platter/pipeline?q=Shared%20west',undefined,people[role].cookie)).value.rows.some(p=>p.id===sharedLocked.id))
+  assert.equal((await h.send('/app/proposal?id='+sharedLocked.id,undefined,people[role].cookie)).status,200)
+ }
+ await h.cmd('proposal.revise',{...offer,title:'Shared west collaborator',clientId:client.id,id:sharedLocked.id,version:1},people.manager.cookie)
+ const sharedNow=await current(sharedLocked.id)
+ for(const name of ['proposal.send','proposal.share','proposal.approve','proposal.unlock'])await unchanged(()=>h.cmd(name,{id:sharedLocked.id,version:sharedNow.version,revision:sharedNow.revision,operatorId:people.sales.id,section:'terms'},people.manager.cookie,403))
+ await unchanged(()=>h.cmd('proposal.revise',{...offer,clientId:client.id,id:sharedLocked.id,version:sharedNow.version},people.viewer.cookie,403))
+ for(const role of ['manager','viewer']){
+  const visible=(await h.state(people[role].cookie)).proposals.find(p=>p.id===sharedLocked.id)
+  assert.equal(visible.canSend,false);assert.equal(visible.canApprove,false);assert.equal(visible.canUnlock,false)
+  await h.cmd('proposal.share',{id:sharedLocked.id,operatorId:people[role].id,shared:false},people.other.cookie)
+  assert.ok(!(await h.state(people[role].cookie)).proposals.some(p=>p.id===sharedLocked.id))
+  assert.ok(!(await h.send('/api/platter/pipeline?q=Shared%20west',undefined,people[role].cookie)).value.rows.some(p=>p.id===sharedLocked.id))
+  assert.equal((await h.send('/app/proposal?id='+sharedLocked.id,undefined,people[role].cookie)).status,403)
+ }
+ await unchanged(()=>h.cmd('proposal.revise',{...offer,clientId:client.id,id:sharedLocked.id,version:sharedNow.version},people.manager.cookie,403))
  const library=await h.cmd('library.save',{title:'Synthetic case study',kind:'case_study',content:'An independently reusable case study.'})
  const matrixKey=await h.cmd('agent.create',{label:'Synthetic matrix revocation'})
  // Existing send/edit/template/report/audit/policy/key doors exercise every current role.
@@ -1588,6 +1612,34 @@ test('TEAM-001 shared templates and library folders enforce role edits and live 
  await h.cmd('template.save',{id:source.id,version:1,templateId:shared.id,templateVersion:1,name:'Updated shared'},h.owner);const current=(await h.state()).templates.find(t=>t.id===shared.id);assert.equal(current.shared,1);assert.equal(current.folder_id,folder.id)
  const oldCopy=(await h.state(people.sales.cookie)).proposals[0];assert.equal(oldCopy.title,offer.title,'replacing the shared template cannot mutate an existing draft')
  const rows=(await h.db.prepare('SELECT * FROM p_personal_templates').all()).results;assert.equal(rows.length,1);assert.equal((await h.db.prepare('SELECT content FROM p_library_items WHERE id=?').bind(item.id).first()).content,'Team-only text')
+ // Widening moves need explicit consent, preserve every row on refusal, and expose only the selected audience.
+ const westLibrary=await h.cmd('folder.save',{kind:'library',name:'West library',teams:[west.id],shareConsent:true})
+ const westTemplates=await h.cmd('folder.save',{kind:'template',name:'West templates',teams:[west.id],shareConsent:true})
+ const readResources=async()=>Promise.all(['p_library_items','p_personal_templates','p_resource_folders','p_folder_teams','p_audit'].map(t=>h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all().then(r=>r.results)))
+ for(const target of [null,westLibrary.id]){
+  const before=await readResources(),row=await h.db.prepare('SELECT * FROM p_library_items WHERE id=?').bind(item.id).first(),move={id:item.id,version:row.version,title:'East bio',kind:'bio',content:'Team-only text',folderId:target}
+  await h.cmd('library.save',move,h.owner,400);assert.deepEqual(await readResources(),before)
+  await h.cmd('library.save',{...move,shareConsent:true})
+  assert.ok((await h.state(people.other.cookie)).libraryItems.some(r=>r.id===item.id))
+  assert.equal((await h.state(people.sales.cookie)).libraryItems.some(r=>r.id===item.id),target===null)
+  await audited(h,'library.save',(await h.state()).actor.id,'owner',item.id)
+  const moved=await h.db.prepare('SELECT * FROM p_library_items WHERE id=?').bind(item.id).first()
+  await h.cmd('library.save',{...move,version:moved.version,folderId:library.id,shareConsent:true})
+ }
+ for(const target of [null,westTemplates.id]){
+  const row=(await h.state()).templates.find(t=>t.id===shared.id),move={id:source.id,version:1,templateId:shared.id,templateVersion:row.version,name:row.name,folderId:target}
+  const before=await readResources();await h.cmd('template.save',move,h.owner,400);assert.deepEqual(await readResources(),before)
+  await h.cmd('template.save',{...move,shareConsent:true})
+  assert.ok((await h.state(people.other.cookie)).templates.some(r=>r.id===shared.id))
+  assert.equal((await h.state(people.sales.cookie)).templates.some(r=>r.id===shared.id),target===null)
+  await audited(h,'template.save',(await h.state()).actor.id,'owner',shared.id)
+  await h.cmd('template.save',{...move,templateVersion:row.version+1,folderId:folder.id,shareConsent:true})
+ }
+ const folderBefore=await readResources()
+ await h.cmd('folder.save',{id:library.id,version:1,name:'Shared library',teams:[]},h.owner,400);assert.deepEqual(await readResources(),folderBefore)
+ await h.cmd('folder.save',{id:library.id,version:1,name:'Shared library',teams:[],shareConsent:true})
+ assert.ok((await h.state(people.other.cookie)).libraryItems.some(r=>r.id===item.id))
+ await audited(h,'folder.save',(await h.state()).actor.id,'owner',library.id)
  await audited(h,'folder.save',people.manager.id,'manager',folder.id);await audited(h,'library.save',people.content_editor.id,'content_editor',item.id);await audited(h,'template.save',people.content_editor.id,'content_editor',shared.id)
 }))
 
@@ -1640,7 +1692,37 @@ test('TEAM-001 delegated invitations bind roles and teams to current inviter aut
  const raw=await h.send('/auth/invite',{email:'bypass@synthetic-platter.example',displayName:'Bypass',role:'member',returnTo:'/app'},people.manager.cookie);assert.equal(raw.status,403);assert.equal(await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind('bypass@synthetic-platter.example').first(),null)
  const joined=await joinInvite(input.email),s=await h.state(joined);assert.equal(s.actor.role,'sales');assert.deepEqual(s.teams.map(t=>t.id),[east.id]);assert.equal((await h.db.prepare('SELECT status FROM p_member_invitations WHERE email=?').bind(input.email).first()).status,'accepted')
  const managerInvite={...input,email:'new-manager@synthetic-platter.example',displayName:'New manager',role:'manager',teams:[west.id]};assert.equal((await h.cmd('member.invite',managerInvite,people.admin.cookie)).status,'invited');const newManager=await joinInvite(managerInvite.email),managerState=await h.state(newManager);assert.equal(managerState.actor.role,'manager');assert.deepEqual(managerState.teams.map(t=>t.id),[west.id])
- const stale={...input,email:'stale@synthetic-platter.example'};assert.equal((await h.cmd('member.invite',stale,people.manager.cookie)).status,'invited');await h.cmd('member.set',{operatorId:people.manager.id,version:1,role:'sales',teams:[east.id]})
+ const rejectLink=async token=>{const r=await h.send('/auth/confirm',{token});assert.ok(r.status>=400,r.text);assert.equal(r.cookie,undefined);return r}
+ const rotated={...input,email:'rotated@synthetic-platter.example'}
+ await h.cmd('member.invite',rotated,people.manager.cookie);const neverUsed=inviteToken(rotated.email)
+ await h.cmd('member.invite',{...rotated,role:'viewer',teams:[west.id]})
+ await rejectLink(neverUsed)
+ const rotatedPerson=await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind(rotated.email).first()
+ assert.equal(await h.db.prepare('SELECT * FROM p_members WHERE operator_id=?').bind(rotatedPerson.id).first(),null)
+ assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_team_members WHERE operator_id=?').bind(rotatedPerson.id).first()).n,0)
+ const rotatedState=await h.state(await joinInvite(rotated.email));assert.equal(rotatedState.actor.role,'viewer');assert.deepEqual(rotatedState.teams.map(t=>t.id),[west.id])
+ const zoneInvite={...input,email:'zone@synthetic-platter.example'}
+ await h.cmd('member.invite',zoneInvite,people.manager.cookie)
+ await h.cmd('member.zone',{timeZone:'America/New_York'},people.manager.cookie)
+ await h.cmd('team.member',{operatorId:people.manager.id,teamId:west.id})
+ const zoneState=await h.state(await joinInvite(zoneInvite.email));assert.equal(zoneState.actor.role,'sales');assert.deepEqual(zoneState.teams.map(t=>t.id),[east.id])
+ const expired={...input,email:'expired@synthetic-platter.example'}
+ await h.cmd('member.invite',expired,people.manager.cookie)
+ await h.db.prepare('UPDATE p_member_invitations SET expires_at=? WHERE email=?').bind(Date.now()-1,expired.email).run()
+ const expiredResponse=await rejectLink(inviteToken(expired.email));assert.equal(expiredResponse.status,403)
+ const expiredPerson=await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind(expired.email).first()
+ assert.equal(await h.db.prepare('SELECT * FROM p_members WHERE operator_id=?').bind(expiredPerson.id).first(),null)
+ assert.equal((await h.db.prepare('SELECT count(*) AS n FROM oa_sessions WHERE operator_id=? AND revoked_at IS NULL').bind(expiredPerson.id).first()).n,0)
+ const revoked={...input,email:'revoked@synthetic-platter.example'}
+ await h.cmd('member.invite',revoked,people.manager.cookie);const revokedToken=inviteToken(revoked.email),revokedPerson=await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind(revoked.email).first()
+ assert.equal((await h.send('/auth/invite/cancel',{operatorId:revokedPerson.id},h.owner)).status,200)
+ assert.ok((await h.db.prepare('SELECT revoked_at FROM p_member_invitations WHERE email=?').bind(revoked.email).first()).revoked_at)
+ await rejectLink(revokedToken)
+ assert.equal((await h.send('/auth/invite',{email:revoked.email,displayName:'Native reissue',role:'member',returnTo:'/app'},h.owner)).status,202)
+ await rejectLink(inviteToken(revoked.email))
+ assert.equal(await h.db.prepare('SELECT * FROM p_members WHERE operator_id=?').bind(revokedPerson.id).first(),null)
+ assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_team_members WHERE operator_id=?').bind(revokedPerson.id).first()).n,0)
+ const stale={...input,email:'stale@synthetic-platter.example'};assert.equal((await h.cmd('member.invite',stale,people.manager.cookie)).status,'invited');await h.cmd('member.set',{operatorId:people.manager.id,version:3,role:'sales',teams:[east.id]})
  const staleToken=inviteToken(stale.email),refused=await h.send('/auth/confirm',{token:staleToken})
  assert.ok(refused.status>=400);assert.equal(refused.cookie,undefined);const person=await h.db.prepare('SELECT id FROM oa_operators WHERE email=?').bind(stale.email).first();assert.equal(await h.db.prepare('SELECT role FROM p_members WHERE operator_id=?').bind(person.id).first(),null)
  assert.equal((await h.send('/api/platter/state',undefined,refused.cookie??'')).status,401)

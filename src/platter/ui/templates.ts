@@ -14,6 +14,7 @@ export function savePersonalTemplate(state: any, p: any): string {
  const source = hidden('id', p.id) + hidden('version', p.version)
  const replace = (state.templates ?? []).filter((t:any)=>!t.shared||resourceEditors.includes(state.actor.role)).map((t: any) => form('template.save', proposalPath(p.id), source
   + hidden('templateId', t.id) + hidden('templateVersion', t.version) + hidden('name', t.name)
+  + (t.shared?folderSelect(state,'template',t.folder_id)+'<label><input type="checkbox" name="shareConsent" value="yes">I authorize sharing with the selected folder audience if it widens access.</label>':'')
   + `<button class="secondary">Replace ${escape(t.name)} with this revision</button>`)).join('')
  return panel('Save a personal template', '<p>Keep this displayed revision’s content, packages, attachments, PDF-download choice and expiry settings for future drafts. Approvals, client details and signing links are not copied.</p>'
   + form('template.save', proposalPath(p.id), source + field('Template name', 'name', p.title, 'required maxlength="200"') + '<button>Save personal template</button>')

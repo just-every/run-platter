@@ -3,7 +3,7 @@ import { internalPricing, costReaders } from './internal-pricing'
 import { starterTemplates } from './starter-templates'
 import type { Bindings } from '../auth.server'
 import { commit, exact, hash, need, text, dollars, type Actor } from './model'
-import { permitted, administrators } from './permissions'
+import { permitted, administrators, scope } from './permissions'
 import { negotiatedView, pendingNegotiation } from './negotiation'
 import { currentTime } from './expiry-time'
 export async function approvalSettings(db:D1Database){
@@ -38,9 +38,10 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
  const plan=await hash(JSON.stringify({version:policy.version,steps,revision:row.revision})),history=(await db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=? AND revision=? ORDER BY occurred_at,id').bind(row.id,row.revision).all<any>()).results,decisions=history.filter(d=>d.plan===plan)
  const legacy=policy.version===0&&row.approved_by&&steps.length===1&&steps[0].id==='default'
  let prior=true,rejected=history.some(d=>d.decision==='rejected')
+ const access=a?scope(a,'approve'):null,mayApprove=Boolean(a&&access&&await db.prepare('SELECT p.id FROM p_proposals p WHERE p.id=? AND ('+access.sql+')').bind(row.id,...access.values).first())
  const evaluated=steps.map(step=>{
   const approvals=decisions.filter(d=>d.step===step.id&&d.decision==='approved'),done=Boolean(legacy)||(step.any?approvals.length>0:step.approvers.every((_:string,i:number)=>approvals.some(d=>d.approver_index===i)))
-  const eligible=a&&['owner','admin','manager','billing'].includes(a.role)?step.approvers.map((v:string,i:number)=>matches(a,v)?i:-1).filter((i:number)=>i>=0):[]
+  const eligible=mayApprove&&a&&['owner','admin','manager','billing'].includes(a.role)?step.approvers.map((v:string,i:number)=>matches(a,v)?i:-1).filter((i:number)=>i>=0):[]
   const privateName=selected.find(r=>r.id===step.id)?.condition.kind==='marginBelow'&&a&&!costReaders.includes(a.role)
   const result={...step,...(privateName?{name:'Internal approval review'}:{}),done,active:prior&&!done&&!rejected,canApprove:prior&&!done&&!rejected&&eligible.some((i:number)=>!approvals.some(d=>d.approver_index===i)),decisions:decisions.filter(d=>d.step===step.id)}
   prior=prior&&done;return result

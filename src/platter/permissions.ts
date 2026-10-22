@@ -12,7 +12,10 @@ export function scope(a:Actor,right:Right,alias='p'):{sql:string;values:any[]} {
  if(!eligible.includes(a.role))return {sql:'0',values:[]}
  if(a.role==='billing')return {sql:'1',values:[]} // Named-step eligibility is checked by the approval engine.
  const own=`${alias}.sales_owner_id=?`,values:any[]=[a.id]
- if(a.role==='manager'||a.role==='viewer')return {sql:`(${own} OR EXISTS(SELECT 1 FROM p_team_members mine JOIN p_team_members theirs ON mine.team_id=theirs.team_id WHERE mine.operator_id=? AND theirs.operator_id=${alias}.sales_owner_id))`,values:[...values,a.id]}
+ if(a.role==='manager'||a.role==='viewer'){
+  const collaborator=right==='view'||(right==='edit'&&a.role==='manager')
+  return {sql:`(${own} OR EXISTS(SELECT 1 FROM p_team_members mine JOIN p_team_members theirs ON mine.team_id=theirs.team_id WHERE mine.operator_id=? AND theirs.operator_id=${alias}.sales_owner_id)${collaborator?' OR EXISTS(SELECT 1 FROM p_collaborators c WHERE c.proposal_id='+alias+'.id AND c.operator_id=?)':''})`,values:[...values,a.id,...(collaborator?[a.id]:[])]}
+ }
  return {sql:`(${own} OR EXISTS(SELECT 1 FROM p_collaborators c WHERE c.proposal_id=${alias}.id AND c.operator_id=?))`,values:[...values,a.id]}
 }
 export async function permitted(db:D1Database,a:Actor,id:unknown,right:Right='view') {

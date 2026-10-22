@@ -30,3 +30,12 @@ export async function folderCommand(db:D1Database,a:Actor,p:Record<string,unknow
  await commit(db,a,[old?db.prepare('UPDATE p_resource_folders SET name=?,version=version+1,updated_by=?,updated_at=? WHERE id=?').bind(name,a.id,Date.now(),id):db.prepare('INSERT INTO p_resource_folders(id,kind,name,updated_by,updated_at) VALUES(?,?,?,?,?)').bind(id,kind,name,a.id,Date.now()),db.prepare('DELETE FROM p_folder_teams WHERE folder_id=?').bind(id),...teams.map(team=>db.prepare('INSERT INTO p_folder_teams(folder_id,team_id) VALUES(?,?)').bind(id,team))],false,{sql:access.sql+(checkMembership?' AND '+membership:''),values:[...access.values,...(checkMembership?teams.flatMap(t=>[t,a.id]):[])]})
  return{id,version:(old?.version??0)+1}
 }
+
+// Compare the declared team audiences, including teams with no current members.
+export async function requireAudienceConsent(db:D1Database,previous:unknown,next:unknown,consent:unknown){
+ if(previous===next||!previous)return
+ const before=(await db.prepare('SELECT team_id FROM p_folder_teams WHERE folder_id=?').bind(previous).all<any>()).results.map(r=>r.team_id)
+ if(!before.length)return
+ const after=next?(await db.prepare('SELECT team_id FROM p_folder_teams WHERE folder_id=?').bind(next).all<any>()).results.map(r=>r.team_id):[]
+ if(!after.length||after.some(t=>!before.includes(t)))need(consent===true||consent==='yes','Authorize sharing with the selected folder audience before saving')
+}

@@ -15,7 +15,7 @@ export async function assertTemplateLocks(db:D1Database,template:any,next:any){
 export async function sectionLockCommand(db:D1Database,a:Actor,name:string,p:Record<string,unknown>){
  if(name==='proposal.unlock'){
   need(['owner','admin','manager'].includes(a.role),'Only owner, admins and team managers unlock proposal sections',403)
-  const row=await permitted(db,a,p.id,'edit');exact(row,p)
+  const row=await permitted(db,a,p.id,'send');exact(row,p)
   need(['draft','approved'].includes(row.status)||await db.prepare('SELECT proposal_id FROM p_negotiations WHERE proposal_id=?').bind(row.id).first(),'Unlock a draft revision before editing',409)
   const section=text(p.section,'a locked section');need(lockSections.includes(section),'Choose a supported section')
   need(await db.prepare('SELECT 1 FROM p_proposal_locks WHERE proposal_id=? AND section=?').bind(row.id,section).first(),'This section is no longer locked',409)

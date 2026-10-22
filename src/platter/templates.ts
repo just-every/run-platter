@@ -1,5 +1,5 @@
 import { assertTemplateLocks } from './section-locks'
-import { folderGuard, resourceScope, resourceEditors } from './folders'
+import { folderGuard, resourceScope, resourceEditors, requireAudienceConsent } from './folders'
 import { workspaceDefaults, templateDefaults, startDefaults, defaultStatements } from './workspace'
 import { saveTemplateCosts, startTemplateCosts } from './internal-pricing'
 import type { Bindings } from '../auth.server'
@@ -42,6 +42,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   if(shared)need(resourceEditors.includes(a.role),'Your role cannot edit shared templates',403)
   if(shared&&existing?.shared!==1)need(input.shareConsent===true||input.shareConsent==='yes','Confirm that this content may be shared')
   const folderId=shared?(input.folderId===undefined?existing?.folder_id??null:input.folderId||null):null,folder=await folderGuard(db,a,folderId,'template'),previous=existing?await folderGuard(db,a,existing.folder_id,'template'):{sql:'1',values:[]}
+  if(existing?.shared===1)await requireAudienceConsent(db,existing.folder_id,folderId,input.shareConsent)
   const templateName = text(input.name, 'a template name')
   const { id: _id, client_id: _client, revision: _revision, ...content } = snapshot(displayed)
   if(existing)await assertTemplateLocks(db,existing,content)

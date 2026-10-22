@@ -66,3 +66,18 @@ instructions under `scripts/base-cli/modules/deploy-kit`; account scope,
 resource ownership, migrations, receipt and health checks are defined there.
 Local validation does not prove hosted acceptance, provider delivery or remote
 health.
+
+
+## Team authority and billing workflows
+
+The Team screen assigns product roles, team membership and collaborator access. Delegated invitations pin the inviter’s current authority and apply the chosen role/teams only after native mailbox verification. Owner/admin can reissue an unaccepted invitation; old links are revoked. Changes to the inviter’s role or teams invalidate pending grants. Pending grants and all authentication capabilities are excluded from archives.
+
+Owner/admin control approval settings and workspace defaults. New drafts copy reminder/payment defaults and actual expiry settings; reminder execution and payment collection remain unavailable. Shared templates and library folders enforce their current team audience on both reads and writes. Locked native sections require an explicit owner/admin/team-manager proposal unlock; template lock changes require a template-editing role.
+
+Catalog prices are copied into drafts. Price changes do not change existing drafts or sent offers. Internal costs belong only to owner/admin/manager/billing views and the separately authorized internal PDF. Unselected optional items stay outside package totals; accepted totals use the client’s exact frozen quantities. The mailbox-verified GET `/p/<invitation>/data.json` route exposes only public content, pricing and acceptance fields, never private operator state. Revoked invitations return 410.
+
+Workspace Stripe/QuickBooks connections require owner/admin rights. Mailbox connections are bound to the member and currently require an address matching their sign-in address; own-mailbox sending is not yet available. Tokens stay encrypted locally and are excluded from exports. Restored connection metadata requires reconnection.
+
+Owner/admin/billing can record received check, wire and ACH credit payments, link an already successful Stripe deposit and explicitly refund it. Linking requires the connected account, exact accepted deposit amount/currency and Stripe charge metadata `platter_proposal_id` / `platter_revision`. Refund requests reserve their amount and use provider idempotency; an uncertain outcome remains held for reconciliation. Do not create a new request to retry the same uncertain refund.
+
+A Stripe dispute must match that verified deposit. Responses require explicit consent and a current provider deadline. The acceptance-evidence PDF identifies unavailable certificate, attachment, analytics and checkout-authorization artifacts. It never fabricates them or includes private costing. The exact uploaded PDF and its SHA-256 are retained through archives. Replaying the same submission returns its stored result without another Stripe call; uncertain outcomes require provider reconciliation. Accounting credits and complete dispute evidence remain unfinished.

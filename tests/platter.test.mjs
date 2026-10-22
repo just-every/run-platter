@@ -2,7 +2,8 @@ import { templatesHttp } from './templates-http.mjs'
 import { followupJourney } from './followup-journey.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
+import { unstable_splitSqlQuery } from 'wrangler'
 import { run, harness } from './harness.mjs'
 import { pdfPages } from './pdf-document.mjs'
 const offer={title:'Northstar brand photography',scope:'One studio shoot, edited photographs, and usage licence.',optionOne:'Studio essentials',priceOne:'2400.00',optionTwo:'Full campaign',priceTwo:'4200.00',depositPercent:'25'}
@@ -1752,3 +1753,27 @@ test('APPROVE-001 gross value and 20% discount require manager then owner; margi
  const scoped=await rule('Agency manager',{kind:'totalOver',cents:0,currency:'USD'},['role:manager'],1,['starter:agency']);assert.deepEqual((await current(agency.id)).approval.steps.map(s=>s.id),[scoped.id]);assert.deepEqual((await current(consultancy.id)).approval.steps.map(s=>s.id),[sourceRule.id])
  const priorVersion=(await policy()).version;await h.cmd('approval.rule',{version:priorVersion,name:'Unknown template',condition:{kind:'template'},approvers:['role:owner'],position:2,templates:['synthetic-platter-missing']},h.owner,400);assert.equal((await policy()).version,priorVersion)
 }))
+
+
+test('TEAM-001 upgrading a pre-role database keeps former members as sales without inferring historical ownership',async()=>{
+ const files=(await readdir('migrations/core')).filter(f=>f.endsWith('.sql')).sort()
+ assert.ok(files.some(f=>f.startsWith('0038_')))
+ const old=files.filter(f=>f<'0039_').at(-1),h=await harness({migrateThrough:old})
+ try{
+  assert.equal(await h.db.prepare("SELECT name FROM sqlite_master WHERE name='p_members'").first(),null)
+  const owner=(await h.db.prepare("SELECT * FROM oa_operators WHERE role='owner'").first()),legacyId=crypto.randomUUID(),email='legacy-sales@synthetic-platter.example',clientId=crypto.randomUUID(),ownId=crypto.randomUUID(),foreignId=crypto.randomUUID(),unrecordedId=crypto.randomUUID()
+  await h.db.prepare("INSERT INTO oa_operators(id,email,display_name,role,status,version,created_at) VALUES(?,?,?,'member','active',1,?)").bind(legacyId,email,'Former member',owner.created_at).run()
+  await h.db.prepare('INSERT INTO p_clients(id,name,email) VALUES(?,?,?)').bind(clientId,'Synthetic upgrade client','upgrade-client@synthetic-platter.example').run()
+  const legacy=JSON.parse((await readFile('fixtures/first-release-aud.rer','utf8')).split('\n').filter(Boolean).find(line=>{const x=JSON.parse(line);return x.kind==='part'&&x.items.some(i=>i.table==='p_proposals')})).items.find(i=>i.table==='p_proposals').row
+  for(const [id,salesOwner,title] of [[ownId,legacyId,'Recorded own proposal'],[foreignId,owner.id,'Other owner proposal'],[unrecordedId,null,'Unrecorded historical ownership']]){
+   await h.db.prepare("INSERT INTO p_proposals(id,client_id,title,scope,version,revision,status,deposit_bps,options,prepared_by,created_at,sales_owner_id,sales_owner_name,currency) VALUES(?,?,?,?,1,1,'draft',?,?,?,?,?,?,'AUD')").bind(id,clientId,title,legacy.scope,legacy.deposit_bps,legacy.options,email,owner.created_at,salesOwner,salesOwner===legacyId?'Former member':salesOwner?'Owner':null).run()
+  }
+  for(const file of files.filter(f=>f>old))await h.db.batch(unstable_splitSqlQuery(await readFile('migrations/core/'+file,'utf8')).map(sql=>h.db.prepare(sql)))
+  const cookie=await h.signIn(email),state=await h.state(cookie)
+  assert.equal(state.actor.role,'sales');assert.deepEqual(state.teams,[]);assert.deepEqual(state.proposals.map(p=>p.id),[ownId]);assert.equal(await h.db.prepare('SELECT operator_id FROM p_members WHERE operator_id=?').bind(legacyId).first(),null,'upgrade fallback does not invent membership or ownership')
+  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+  assert.equal((await h.send('/app/proposal?id='+ownId,undefined,cookie)).status,200)
+  for(const id of [foreignId,unrecordedId])assert.equal((await h.send('/app/proposal?id='+id,undefined,cookie)).status,403)
+  const report=await h.send('/api/platter/pipeline',undefined,cookie);assert.equal(report.status,200);assert.equal(report.value.count,1);assert.equal(report.value.rows[0].id,ownId)
+ }finally{await h.close()}
+})

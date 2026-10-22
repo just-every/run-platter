@@ -282,12 +282,16 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const standard=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=one`,undefined,restoredOwner),premium=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=two`,undefined,restoredOwner)
     assert.match(standard.text,/403\.89/);assert.match(standard.text,/Project services/);assert.equal(standard.status,200);assert.equal(premium.status,200);assert.ok(!standard.text.includes('Premium timeline: four weeks.'));assert.ok(premium.text.includes('Premium timeline: four weeks.'),'EDIT-009 restored conditions remain functional')
     await h.close();h=null
-    await command(restored,['import','--input',old,'--yes','--no-queue'],4)
     const corrupt=join(temporary,'corrupt.rer');await writeFile(corrupt,bytes.replace('Temporary joiner','Changed joiner'),{mode:0o600})
-    // Checksum damage is a transfer failure (1); restore policy conflicts remain 4.
-    await command(erased,['import','--input',corrupt,'--yes','--no-queue'],1)
-    h=await harness({root:source,...identity});await h.cmd('client.erase',{id:p.id,confirmName:'Temporary joiner'},await h.signIn(h.auth.OWNER_EMAIL));await h.close();h=null
-    await command(source,['export','--output',later,'--no-queue'])
+    // These operations own different checkouts. Finish all three before using
+    // the erasure journal; keep every refusal and custody assertion intact.
+    const independent=await Promise.allSettled([
+      command(restored,['import','--input',old,'--yes','--no-queue'],4),
+      // Checksum damage is a transfer failure (1); policy conflicts remain 4.
+      command(erased,['import','--input',corrupt,'--yes','--no-queue'],1),
+      (async()=>{h=await harness({root:source,...identity});try{await h.cmd('client.erase',{id:p.id,confirmName:'Temporary joiner'},await h.signIn(h.auth.OWNER_EMAIL))}finally{await h.close();h=null}await command(source,['export','--output',later,'--no-queue'])})(),
+    ])
+    for(const result of independent)if(result.status==='rejected')throw result.reason
     await command(erased,['import','--input',old,'--journal',later,'--yes','--no-queue'],4)
     await command(erased,['import','--input',later,'--yes','--no-queue'])
     const proxy=await getPlatformProxy({configPath:join(erased,'wrangler.jsonc'),persist:{path:join(erased,'.wrangler/state/v3')},remoteBindings:false})

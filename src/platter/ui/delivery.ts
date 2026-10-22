@@ -1,6 +1,7 @@
 import { area, date, empty, escape, field, form, hidden, panel, proposalPath, statusPill } from './shared'
 
 const deliveryStates: Record<string, { label: string; detail: string }> = {
+  withheld: { label: 'Sending refused', detail: 'The sender’s permission or approval changed. Nothing was sent.' },
   local: { label: 'Captured locally', detail: 'No external email was sent.' },
   pending: { label: 'Queued', detail: 'Waiting for a sending attempt. The provider has not accepted this invitation.' },
   sending: { label: 'Sending', detail: 'A sending attempt is in progress. Delivery is not confirmed.' },
@@ -32,10 +33,11 @@ export function deliveryPanel(state: any, p: any): string {
       + (mail.provider ? `<dt>Provider</dt><dd>${escape(mail.provider)}</dd>` : '')
       + '</dl></article></li>'
   }).join('')}</ol>` : empty('No invitation has been recorded for this proposal.')
+  const attribution=(p.mailAttributions??[]).map((m:any)=>'<p>'+escape(m.actor_email)+' · '+escape(m.route==='installation'?'Installation sender':m.route+' mailbox')+' · '+escape(m.sender_address)+' · '+escape(m.outcome==='accepted'?'Accepted by provider':m.outcome)+(m.fallback?' · Mailbox unavailable; sent through the installation sender.':'')+'</p>').join('')
   const notice = state.bounceNotices?.find((n:any)=>n.proposal_id===p.id&&!n.closed_at)
   const correct = p.canSend && p.status === 'sent' && notice
     ? '<h3>Correct invitation address</h3>' + correction(notice.id, notice.recipient, proposalPath(p.id)) : ''
-  return panel('Invitation delivery', (state.mailTransport==='cloudflare'?'<p>Delivery events unavailable with this mail transport.</p>':'') + '<p>Invitations are listed newest first. Provider acceptance is separate from reported delivery; neither proves a person received or read the invitation.</p>' + list + correct)
+  return panel('Invitation delivery', (state.mailTransport==='cloudflare'?'<p>Delivery events unavailable with this mail transport.</p>':'') + '<p>Invitations are listed newest first. Provider acceptance is separate from reported delivery; neither proves a person received or read the invitation.</p>' + attribution + list + correct)
 }
 
 export function bounceInbox(state: any): string {

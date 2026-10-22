@@ -23,7 +23,7 @@ export function invitationMail(
   body = message + '\n\n' + shareUrl
  }
  return [
-  queueMail(env, offer.id, recipient, subject, body, actor.id),
+  queueMail(env, offer.id, recipient, subject, body, actor.id, null, crypto.randomUUID(), true),
   env.DB.prepare('INSERT INTO p_invitation_messages(id,proposal_id,revision,recipient,subject,message,queued_at,actor_id) VALUES(?,?,?,?,?,?,?,?)')
    .bind(crypto.randomUUID(), offer.id, offer.revision, recipient, subject, message, at, actor.id),
  ]

@@ -9,18 +9,21 @@ async function encryptionKey(env:Bindings){
  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('platter-provider-credentials-v1\0'+env.SESSION_SECRET))
  return crypto.subtle.importKey('raw',digest,'AES-GCM',false,['encrypt','decrypt'])
 }
-async function seal(env:Bindings,id:string,value:unknown){
+export async function sealCredential(env:Bindings,id:string,value:unknown){
  const iv=crypto.getRandomValues(new Uint8Array(12)),data=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:new TextEncoder().encode(id)},await encryptionKey(env),new TextEncoder().encode(JSON.stringify(value)))
  const encoded=(v:Uint8Array)=>btoa(Array.from(v,b=>String.fromCharCode(b)).join(''))
  return JSON.stringify({iv:encoded(iv),data:encoded(new Uint8Array(data))})
+}
+export async function openCredential(env:Bindings,id:string,sealed:string){
+ const envelope=JSON.parse(sealed),bytes=(v:string)=>Uint8Array.from(atob(v),c=>c.charCodeAt(0))
+ const plaintext=await crypto.subtle.decrypt({name:'AES-GCM',iv:bytes(envelope.iv),additionalData:new TextEncoder().encode(id)},await encryptionKey(env),bytes(envelope.data))
+ return JSON.parse(new TextDecoder().decode(plaintext))
 }
 export async function providerCredential(env:Bindings,id:string){
  const row=await env.DB.prepare("SELECT c.*,s.sealed FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.status='connected'").bind(id).first<any>()
  need(row,'Connect this provider again before using it',409)
  try{
-  const envelope=JSON.parse(row.sealed),bytes=(v:string)=>Uint8Array.from(atob(v),c=>c.charCodeAt(0))
-  const plaintext=await crypto.subtle.decrypt({name:'AES-GCM',iv:bytes(envelope.iv),additionalData:new TextEncoder().encode(id)},await encryptionKey(env),bytes(envelope.data))
-  const secret=JSON.parse(new TextDecoder().decode(plaintext))
+  const secret=await openCredential(env,id,row.sealed)
   need(secret.accountId===row.account_id&&secret.provider===row.provider,'Provider credential binding changed',409)
   return {connection:row,secret}
  }catch{return fail('Connect this provider again before using it',409)}
@@ -36,7 +39,7 @@ export async function providerJson(url:string,token:string){
 export async function connectionState(env:Bindings,a:Actor){
  if(!mailboxRoles.includes(a.role))return []
  const rows=(await env.DB.prepare("SELECT c.*,EXISTS(SELECT 1 FROM p_connection_secrets s WHERE s.connection_id=c.id) AS has_secret FROM p_connections c WHERE c.operator_id=? OR (c.operator_id IS NULL AND ?=1) ORDER BY c.provider,c.id").bind(a.id,administrators.includes(a.role)?1:0).all<any>()).results
- return rows.map(r=>({id:r.id,provider:r.provider,operatorId:r.operator_id,accountId:r.account_id,mailboxEmail:r.mailbox_email,status:r.status==='connected'&&!r.has_secret?'needs_reconnection':r.status,version:r.version,connectedAt:r.connected_at}))
+ return rows.map(r=>({id:r.id,provider:r.provider,operatorId:r.operator_id,accountId:r.account_id,mailboxEmail:r.mailbox_email,status:r.status==='connected'&&!r.has_secret?'needs_reconnection':r.broken_at?'broken':r.status,version:r.version,connectedAt:r.connected_at}))
 }
 export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  const provider=String(p.provider??'');need(['stripe','quickbooks','gmail','microsoft','hubspot','salesforce','google_drive','slack'].includes(provider),'Choose a supported provider')
@@ -46,10 +49,10 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
  need(p.id===undefined||p.id===id,'This connection belongs to another scope',403)
  const old=await db.prepare('SELECT * FROM p_connections WHERE id=?').bind(id).first<any>()
  need(Number(p.version)===(old?.version??0),'Connection changed. Reload.',409)
- const guard={sql:'COALESCE((SELECT version FROM p_connections WHERE id=?),0)=?',values:[id,old?.version??0]}
+ const guard:{sql:string;values:any[]}={sql:'COALESCE((SELECT version FROM p_connections WHERE id=?),0)=?',values:[id,old?.version??0]}
  if(name==='provider.disconnect'){
   need(old,'Connection not found',404)
-  await commit(db,a,[db.prepare("UPDATE p_connections SET status='disconnected',version=version+1 WHERE id=?").bind(id),db.prepare('DELETE FROM p_connection_secrets WHERE connection_id=?').bind(id)],false,guard)
+  await commit(db,a,[db.prepare("UPDATE p_connections SET status='disconnected',broken_at=NULL,version=version+1 WHERE id=?").bind(id),db.prepare('DELETE FROM p_connection_secrets WHERE connection_id=?').bind(id)],false,guard)
   return {id,status:'disconnected'}
  }
  need(name==='provider.connect','Unknown provider action',404)
@@ -74,11 +77,16 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
  }else{
   const result=await providerJson(provider==='gmail'?'https://openidconnect.googleapis.com/v1/userinfo':'https://graph.microsoft.com/v1.0/me?$select=id,mail,userPrincipalName',token)
   if(provider==='gmail')need(result.email_verified===true,'Verify the provider mailbox first',403)
-  mailboxEmail=email(provider==='gmail'?result.email:result.mail||result.userPrincipalName)
+  mailboxEmail=email(provider==='gmail'?result.email:result.mail)
   need(mailboxEmail===a.email.toLowerCase(),'Connect the mailbox matching your sign-in address',403)
   accountId=text(provider==='gmail'?result.sub:result.id,'the verified mailbox account',200)
  }
- const sealed=await seal(env,id,{provider,token,accountId,...(webhookSecret?{webhookSecret}:{})}),at=Date.now()
- await commit(db,a,[db.prepare("INSERT INTO p_connections(id,provider,operator_id,account_id,mailbox_email,status,connected_by,connected_at) VALUES(?,?,?,?,?,'connected',?,?) ON CONFLICT(id) DO UPDATE SET account_id=excluded.account_id,mailbox_email=excluded.mailbox_email,status='connected',version=p_connections.version+1,connected_by=excluded.connected_by,connected_at=excluded.connected_at").bind(id,provider,isMailbox(provider)?a.id:null,accountId,mailboxEmail,a.id,at),db.prepare('INSERT INTO p_connection_secrets(connection_id,sealed) VALUES(?,?) ON CONFLICT(connection_id) DO UPDATE SET sealed=excluded.sealed').bind(id,sealed)],false,guard)
+ if(mailboxEmail){
+  const sql="NOT EXISTS(SELECT 1 FROM oa_operators WHERE lower(email)=? AND id!=? AND status='active') AND NOT EXISTS(SELECT 1 FROM p_connections WHERE lower(mailbox_email)=? AND operator_id!=? AND status='connected')",values=[mailboxEmail,a.id,mailboxEmail,a.id]
+  need(await db.prepare('SELECT 1 WHERE '+sql).bind(...values).first(),'This mailbox is already bound to another member',403)
+  guard.sql+=' AND '+sql;guard.values.push(...values)
+ }
+ const sealed=await sealCredential(env,id,{provider,token,accountId,...(webhookSecret?{webhookSecret}:{})}),at=Date.now()
+ await commit(db,a,[db.prepare("INSERT INTO p_connections(id,provider,operator_id,account_id,mailbox_email,status,connected_by,connected_at) VALUES(?,?,?,?,?,'connected',?,?) ON CONFLICT(id) DO UPDATE SET account_id=excluded.account_id,mailbox_email=excluded.mailbox_email,status='connected',broken_at=NULL,version=p_connections.version+1,connected_by=excluded.connected_by,connected_at=excluded.connected_at").bind(id,provider,isMailbox(provider)?a.id:null,accountId,mailboxEmail,a.id,at),db.prepare('INSERT INTO p_connection_secrets(connection_id,sealed) VALUES(?,?) ON CONFLICT(connection_id) DO UPDATE SET sealed=excluded.sealed').bind(id,sealed)],false,guard)
  return {id,status:'connected'}
 }

@@ -1,3 +1,4 @@
+import { mailboxAuthorize, mailboxCallback } from './mailboxes'
 import { revenueReaders } from './reports/recorded-revenue'
 import { clientData } from './client-data'
 import { disputePdf } from './disputes'
@@ -56,6 +57,16 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    fail('Not found',404)
   }
   actor=await principal(request,env,isAgent)
+  if(path==='/api/platter/mailbox/authorize'){
+   need(request.method==='POST'&&request.headers.get('origin')===env.AUTH_ORIGIN,'Authorize from this installation',403)
+   const result=await mailboxAuthorize(env,actor,await body(request))
+   return new Response(null,{status:303,headers:{...headers,location:result.url}})
+  }
+  if(path==='/api/platter/mailbox/callback'){
+   need(request.method==='GET','Use the provider callback',405)
+   const id=await mailboxCallback(env,actor,url);await recordAudit(env.DB,actor,'mailbox.connected',id)
+   return new Response(null,{status:303,headers:{...headers,location:'/app/team'}})
+  }
   if(path==='/app/preview'||path.startsWith('/app/preview/')){need(request.method==='GET','Preview actions cannot be submitted',403);await permitted(env.DB,actor,url.searchParams.get('id'));const response=await previewResponse(request,env);await recordAudit(env.DB,actor,path.startsWith('/app/preview/client/attachments/')?'attachment.download':'proposal.preview',path.startsWith('/app/preview/client/attachments/')?path.split('/').at(-1)!:String(url.searchParams.get('id')));return response}
   if(path==='/api/platter/agent/mcp')return handleMcp(request,env,actor)
   if(request.method==='POST'&&path==='/app/attachment'){need(request.headers.get('content-type')?.includes('multipart/form-data'),'Use a file upload form',415);const data=await request.formData();if(!data.get('kind'))await permitted(env.DB,actor,data.get('id'),'edit');const result=await attachmentUpload(env.DB,actor,data);await recordAudit(env.DB,actor,data.get('kind')?'vendor-document.save':'attachment.upload',String(result.id??data.get('kind')));return renderApp(await state(env,actor),result.id?'/app/proposal?id='+encodeURIComponent(result.id):'/app/settings',{message:result.id?'Document saved. Review the revision before approving.':'Document saved. Existing revisions retain their files.'})}

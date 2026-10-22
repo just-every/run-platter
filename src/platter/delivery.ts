@@ -25,7 +25,7 @@ export async function deliveryWebhook(request: Request, env: Bindings) {
 
 export async function deliveryState(env: Bindings, actor: Actor) {
  const deliveries = (await env.DB.prepare(`SELECT id,proposal_id,recipient,provider,created_at,status,event_at FROM (
- SELECT m.id,m.proposal_id,m.recipient,m.provider,m.created_at,COALESCE(s.status,m.status) AS status,s.occurred_at AS event_at,
+ SELECT m.id,m.proposal_id,m.recipient,m.provider,m.created_at,COALESCE(s.status,CASE WHEN m.held_reason='sender_not_authorized' THEN 'withheld' ELSE m.status END) AS status,s.occurred_at AS event_at,
  ROW_NUMBER() OVER(PARTITION BY m.id ORDER BY s.terminal DESC,s.occurred_at DESC) AS rank FROM p_mail m
  LEFT JOIN p_delivery_events e ON e.mail_id=m.id
  LEFT JOIN rer_mail_event_states s ON s.provider=e.provider AND s.tenant_id=? AND s.event_namespace='platter-mail-v1'
@@ -60,7 +60,7 @@ export async function deliveryCommand(env: Bindings, actor: Actor, name: string,
  need(old.status==='sent','Only an unsigned sent offer can have its invitation corrected',409)
  const approval=await approvalPlan(db,old,actor);need(approval.complete,'Approve this revision under the current policy before correcting its invitation',409)
  const token=secret(), shareUrl=env.AUTH_ORIGIN+'/p/'+token
- const statement=queueMail(env,old.id,recipient,...proposalMail(old.title,shareUrl),actor.id)
+ const statement=queueMail(env,old.id,recipient,...proposalMail(old.title,shareUrl),actor.id,null,crypto.randomUUID(),true)
  await commit(db,actor,[
   db.prepare("UPDATE p_proposals SET version=version+1 WHERE id=?").bind(old.id),
   db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(old.id),

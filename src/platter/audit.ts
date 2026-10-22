@@ -20,10 +20,10 @@ export async function auditRows(db: D1Database, actor: Actor, query: URLSearchPa
   const value = query.get(parameter)
   if (value) { const at = Number(value); need(Number.isSafeInteger(at) && at >= 0, 'Use an epoch-millisecond audit time'); filters.push(`occurred_at${comparison}?`); values.push(at) }
  }
- return (await db.prepare(`SELECT p_audit.*,COALESCE((SELECT reason FROM p_withdrawals w WHERE p_audit.action IN ('proposal.withdraw','proposal.lose','proposal.decline') AND w.id=p_audit.id AND w.proposal_id=p_audit.subject),(SELECT reason FROM p_withdrawals w WHERE p_audit.action IN ('proposal.withdraw','proposal.lose','proposal.decline') AND w.proposal_id=p_audit.subject AND w.withdrawn_at=p_audit.occurred_at LIMIT 1)) AS reason FROM p_audit${filters.length ? ' WHERE ' + filters.join(' AND ') : ''} ORDER BY occurred_at,id`).bind(...values).all<any>()).results
+ return (await db.prepare(`SELECT p_audit.*,(SELECT route FROM p_mail_attributions m WHERE m.mail_id=p_audit.id) AS mail_route,(SELECT sender_address FROM p_mail_attributions m WHERE m.mail_id=p_audit.id) AS sender_address,COALESCE((SELECT reason FROM p_withdrawals w WHERE p_audit.action IN ('proposal.withdraw','proposal.lose','proposal.decline') AND w.id=p_audit.id AND w.proposal_id=p_audit.subject),(SELECT reason FROM p_withdrawals w WHERE p_audit.action IN ('proposal.withdraw','proposal.lose','proposal.decline') AND w.proposal_id=p_audit.subject AND w.withdrawn_at=p_audit.occurred_at LIMIT 1)) AS reason FROM p_audit${filters.length ? ' WHERE ' + filters.join(' AND ') : ''} ORDER BY occurred_at,id`).bind(...values).all<any>()).results
 }
 export function auditCsv(rows: any[]) {
- const columns = ['id', 'actor_id', 'actor_role', 'action', 'subject', 'occurred_at', 'reason']
+ const columns = ['id', 'actor_id', 'actor_role', 'action', 'subject', 'occurred_at', 'reason', 'mail_route', 'sender_address']
  const cell = (value: unknown) => '"' + String(value ?? '').replace(/^[=+@-]/, "'" + '$&').replaceAll('"', '""') + '"'
  return [columns.join(','), ...rows.map(row => columns.map(column => cell(row[column])).join(','))].join('\r\n') + '\r\n'
 }

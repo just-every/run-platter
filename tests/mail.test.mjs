@@ -506,3 +506,103 @@ test('APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign send
   assert.ok((await h.state(people.sales.cookie)).bounceNotices[0].closed_at)
  }finally{await h.close()}
 })
+
+test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail', async()=>{
+ let address='mailbox@synthetic-platter.example',verified=true,aliasVerified=true,hasSmtp=true,hasScope=true,refused=false,timeout=false,demoteDuringRefresh=false
+ const calls=[],gmail=[],graph=[],installation=[]
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5100',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5101',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5102',MICROSOFT_MAIL_CLIENT_ID:'synthetic-platter-5103',MICROSOFT_MAIL_CLIENT_SECRET:'synthetic-platter-5104'},outboundService:async request=>{
+  const url=new URL(request.url);calls.push({host:url.hostname,path:url.pathname,method:request.method})
+  if(['oauth2.googleapis.com','login.microsoftonline.com'].includes(url.hostname)){
+   const body=new URLSearchParams(await request.text())
+   if(body.get('grant_type')==='authorization_code'){assert.equal(body.get('redirect_uri'),'https://platter.example/api/platter/mailbox/callback');assert.ok(body.get('code_verifier').length>=43)}
+   else {assert.equal(body.get('grant_type'),'refresh_token');assert.equal(body.get('refresh_token'),'synthetic-platter-5105')}
+   if(demoteDuringRefresh&&body.get('grant_type')==='refresh_token'){
+    demoteDuringRefresh=false
+    const member=(await h.state()).teamPeople.find(p=>p.email==='sales@synthetic-platter.example')
+    await h.cmd('member.set',{operatorId:member.id,version:member.version,role:'content_editor',teams:[]})
+   }
+   if(refused)return Response.json({error:'invalid_grant'},{status:400})
+   return Response.json({access_token:'synthetic-platter-5106',refresh_token:'synthetic-platter-5105',scope:hasScope?(url.hostname==='oauth2.googleapis.com'?'openid email https://www.googleapis.com/auth/gmail.send':'User.Read Mail.Send'):'openid email',expires_in:3600})
+  }
+  if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-5107',email:'primary@synthetic-platter.example',email_verified:verified})
+  if(url.pathname.endsWith('/settings/sendAs'))return Response.json({sendAs:[{sendAsEmail:address,verificationStatus:aliasVerified?'accepted':'pending'}]})
+  if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-5108',...(hasSmtp?{mail:address}:{}),userPrincipalName:address})
+  if(url.pathname.endsWith('/messages/send')){
+   const payload=await request.json(),raw=Buffer.from(payload.raw,'base64url').toString('utf8')
+   gmail.push(raw);assert.match(raw,/^From: mailbox@synthetic-platter.example\r\n/);assert.match(raw,/\r\nTo: avery@northstar.example\r\n/)
+   if(timeout)throw Error('Synthetic provider timeout')
+   return Response.json({id:'synthetic-platter-'+(5200+gmail.length)})
+  }
+  if(url.pathname==='/v1.0/me/sendMail'){const payload=await request.json();graph.push(payload);assert.equal(payload.message.from.emailAddress.address,address);return new Response(null,{status:202})}
+  assert.equal(url.hostname,'api.resend.com');installation.push(await request.json());return Response.json({id:'synthetic-platter-'+(5300+installation.length)})
+ }})
+ try{
+  await finishSetup(h)
+  const people={}
+  for(const role of ['sales','other','content_editor']){
+   const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)
+   const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id
+   await h.cmd('member.set',{operatorId:id,version:0,role:role==='other'?'sales':role,teams:[]})
+   people[role]={cookie,id,email}
+  }
+  const authorize=async(provider,person=people.sales,mailbox=address)=>{
+   const r=await h.send('/api/platter/mailbox/authorize',{provider,mailboxEmail:mailbox,consent:true},person.cookie)
+   assert.equal(r.status,303,r.text);const url=new URL(r.headers.get('location'));assert.equal(url.searchParams.get('code_challenge_method'),'S256');assert.ok(url.searchParams.get('code_challenge'));return '/api/platter/mailbox/callback?'+new URLSearchParams({state:url.searchParams.get('state'),code:'synthetic-platter-5400'})
+  }
+  const connect=async(provider,expected=303,person=people.sales)=>{
+   const callback=await authorize(provider,person),r=await h.send(callback,undefined,person.cookie)
+   assert.equal(r.status,expected,r.text);return callback
+  }
+  assert.equal((await h.send('/api/platter/mailbox/authorize',{provider:'gmail',consent:true},people.content_editor.cookie)).status,403)
+  const callback=await authorize('gmail')
+  assert.equal((await h.send(callback,undefined,people.other.cookie)).status,403)
+  assert.equal((await h.send(callback,undefined,people.sales.cookie)).status,303)
+  const beforeReplay=calls.length;assert.equal((await h.send(callback,undefined,people.sales.cookie)).status,403);assert.equal(calls.length,beforeReplay)
+  const connection=(await h.state(people.sales.cookie)).connections[0];assert.equal(connection.mailboxEmail,address)
+  const secrets=JSON.stringify((await h.db.prepare('SELECT * FROM p_connection_secrets').all()).results);assert.doesNotMatch(secrets,/synthetic-platter-510[256]/)
+  const original=(await h.db.prepare('SELECT * FROM p_connections ORDER BY id').all()).results
+  verified=false;await connect('gmail',403);verified=true
+  aliasVerified=false;await connect('gmail',403);aliasVerified=true
+  hasScope=false;await connect('gmail',403);hasScope=true
+  address=people.other.email;await connect('gmail',403);address='mailbox@synthetic-platter.example'
+  await connect('gmail',403,people.other)
+  hasSmtp=false;await connect('microsoft',400);hasSmtp=true
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_connections ORDER BY id').all()).results,original,'all refused connections preserve the existing bindings')
+  await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
+  const client=await h.cmd('client.save',{name:'Northstar',email:recipient})
+  const send=async()=>{
+   const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id},people.sales.cookie)
+   await h.cmd('proposal.send',{id:p.id,version:1},people.sales.cookie)
+   return (await h.state(people.sales.cookie)).proposals.find(r=>r.id===p.id)
+  }
+  const google=await send();assert.equal(gmail.length,1);assert.equal(installation.length,0)
+  assert.deepEqual(google.mailAttributions.map(m=>[m.actor_id,m.route,m.sender_address,m.outcome]),[[people.sales.id,'gmail',address,'accepted']])
+  assert.equal(google.deliveries[0].status,'accepted');assert.equal(google.deliveries[0].provider,'gmail')
+  const audit=(await h.send('/api/platter/audit?action=mail.accepted&subject='+google.id,undefined,h.owner)).value.rows
+  assert.equal(audit[0].actor_id,people.sales.id);assert.equal(audit[0].mail_route,'gmail');assert.equal(audit[0].sender_address,address)
+  const timeline=await h.send('/app/proposal?id='+google.id,undefined,people.sales.cookie);assert.match(timeline.text,/mailbox@synthetic-platter.example/);assert.match(timeline.text,/Accepted by provider/)
+  await connect('microsoft')
+  const microsoft=await send();assert.equal(graph.length,1);assert.equal(microsoft.mailAttributions[0].route,'microsoft');assert.equal(microsoft.mailAttributions[0].sender_address,address);assert.equal(microsoft.mailAttributions[0].outcome,'accepted')
+  const blocked=await h.cmd('proposal.prepare',{...offer,clientId:client.id},people.sales.cookie)
+  await h.cmd('member.set',{operatorId:people.sales.id,version:1,role:'content_editor',teams:[]})
+  const beforeDenied=calls.length;await h.cmd('proposal.send',{id:blocked.id,version:1},people.sales.cookie,403);assert.equal(calls.length,beforeDenied)
+  await h.cmd('member.set',{operatorId:people.sales.id,version:2,role:'sales',teams:[]})
+  refused=true;const fallback=await send()
+  assert.equal(graph.length,1);assert.equal(installation.length,1);assert.equal(fallback.mailAttributions[0].route,'installation');assert.equal(fallback.mailAttributions[0].fallback,1)
+  assert.equal((await h.state(people.sales.cookie)).connections.find(c=>c.provider==='microsoft').status,'broken')
+  assert.match((await h.send('/app/proposal?id='+fallback.id,undefined,people.sales.cookie)).text,/Mailbox unavailable; sent through the installation sender/)
+  const fallbackAudit=(await h.send('/api/platter/audit?action=mail.accepted&subject='+fallback.id,undefined,h.owner)).value.rows[0]
+  assert.equal(fallbackAudit.mail_route,'installation');assert.equal(fallbackAudit.sender_address,h.auth.MAIL_FROM)
+  refused=false;await connect('gmail');timeout=true
+  const uncertain=await send();assert.equal(gmail.length,2);assert.equal(installation.length,1,'uncertain outbound mail never falls back and duplicates a possible send')
+  assert.equal(uncertain.mailAttributions[0].outcome,'uncertain');assert.equal(uncertain.mailAttributions[0].route,'gmail')
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  assert.equal(gmail.length,2);assert.equal(installation.length,1)
+  timeout=false;await connect('gmail');demoteDuringRefresh=true
+  const raced=await h.cmd('proposal.prepare',{...offer,clientId:client.id},people.sales.cookie),sentBefore=gmail.length
+  await h.cmd('proposal.send',{id:raced.id,version:1},people.sales.cookie,403)
+  assert.equal(gmail.length,sentBefore);assert.equal(installation.length,1,'loss of sending authority never falls back')
+  assert.equal((await h.state()).proposals.find(p=>p.id===raced.id).mailAttributions[0].outcome,'withheld')
+  assert.doesNotMatch(JSON.stringify(await h.state(people.sales.cookie)),/synthetic-platter-510[256]/)
+ }finally{await h.close()}
+})

@@ -2,6 +2,6 @@
 export default {
  product: 'proposals/platter',
  includeTables: ['oa_operators','oa_bootstrap','oa_invitation_cancellations'],
- excludeTables: ['p_member_invitations','p_connection_secrets','p_withdrawn_links','p_question_reply_keys','p_expiry_clock','p_guard','p_agent_keys','p_shares','p_mail','p_delivery_events','p_bounce_notice_transport','p_report_mail','rer_mail_event_receipts','rer_mail_event_states'],
+ excludeTables: ['p_mailbox_oauth','p_member_invitations','p_connection_secrets','p_withdrawn_links','p_question_reply_keys','p_expiry_clock','p_guard','p_agent_keys','p_shares','p_mail','p_delivery_events','p_bounce_notice_transport','p_report_mail','rer_mail_event_receipts','rer_mail_event_states'],
  requiredConfiguration: ['OWNER_EMAIL','SESSION_SECRET','SETUP_TOKEN','AUTH_ORIGIN','MAIL_PROVIDER','MAIL_FROM'],
 }

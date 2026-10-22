@@ -5,6 +5,7 @@ import { date, escape, field, panel } from './shared'
 export interface AuditNames { proposals: Map<string, string>; clients: Map<string, string>; people: Map<string, string>; keys: Map<string, string> }
 
 const verbs: Record<string, string> = {
+ 'mail.accepted':'sent mail accepted by the provider for','mail.uncertain':'recorded an uncertain sending result for','mail.withheld':'refused mail for',
  'team.create':'created the team','member.set':'changed membership for','member.zone':'changed the personal time zone of','member.invite':'issued the member invitation',
  'proposal.share':'changed collaborator access to','proposal.unlock':'unlocked a section in','template.save':'saved the template','template.start':'started a draft from a template:', 'template.locks':'changed section locks in',
  'folder.save':'changed the shared resource folder','library.save':'saved the library item','catalog.save':'saved the catalog item','catalog.insert':'copied a catalog price into',
@@ -56,7 +57,7 @@ function subject(row: any, names: AuditNames): string {
 export function auditPage(rows: any[], query: URLSearchParams, names: AuditNames) {
  const filters = `<form method="get" action="/app/audit">${field('Search activity', 'q', query.get('q'))}${field('Actor ID', 'actor', query.get('actor'))}${field('Action', 'action', query.get('action'))}${field('Subject ID', 'subject', query.get('subject'))}<button>Search audit log</button></form>`
  const csv = '/api/platter/audit.csv?' + query.toString()
- const line = (row: any) => `<li class="audit-row"><article><h3 class="audit-key">${escape(row.action)}</h3><p class="audit-what">${actor(row, names)} ${escape(spoken(row.action))}${subject(row, names)}</p><p class="audit-when">${date(row.occurred_at)}</p>${row.reason ? `<p class="preserve">${escape(row.reason)}</p>` : ''}<p class="audit-ids wrap">${escape(row.actor_role)} ${escape(row.actor_id)} · ${escape(row.subject)}</p></article></li>`
+ const line = (row: any) => `<li class="audit-row"><article><h3 class="audit-key">${escape(row.action)}</h3><p class="audit-what">${actor(row, names)} ${escape(spoken(row.action))}${subject(row, names)}</p><p class="audit-when">${date(row.occurred_at)}</p>${row.mail_route ? '<p>'+escape(row.mail_route==='installation'?'Installation sender':row.mail_route+' mailbox')+' · '+escape(row.sender_address)+'</p>' : ''}${row.reason ? `<p class="preserve">${escape(row.reason)}</p>` : ''}<p class="audit-ids wrap">${escape(row.actor_role)} ${escape(row.actor_id)} · ${escape(row.subject)}</p></article></li>`
  return panel('Search activity', '<p>Successful product actions recorded from this version onward. Times show in the installation time zone. Earlier activity has not been reconstructed. Search and the CSV use the ids under each line.</p>' + filters + `<p><a href="${escape(csv)}">Download audit CSV</a> · <a href="/app/audit">Clear search</a></p>`, 'audit-search')
   + panel('Recorded activity', rows.length ? `<ul class="records audit-log">${[...rows].reverse().map(line).join('')}</ul>` : '<p>No activity matches this search.</p>')
 }

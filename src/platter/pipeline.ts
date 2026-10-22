@@ -1,3 +1,4 @@
+import { revenueKeys } from './reports/recorded-revenue'
 import { need } from './model'
 
 export const nextActions = { approve: 'Approve revision', send: 'Send approved offer', 'await-client': 'Await client decision', 'export-deposit': 'Export deposit invoice', complete: 'Deposit invoice exported', withdrawn: 'Prepare a new revision', reopen: 'Review expiry or reopening', followup: 'Sales follow-up' }
@@ -10,6 +11,7 @@ function bound(params: URLSearchParams, key: string, money = false) {
  return money ? Math.round(Number(raw) * 100) : Number(raw)
 }
 export function pipeline(proposals: any[], params = new URLSearchParams(), now = Date.now(), followups?:any) {
+ const revenue=params.get('view')==='recorded-revenue';need(!params.get('view')||revenue,'Choose a report view');if(revenue)proposals=proposals.filter(p=>p.acceptance)
  const query = params.get('q') || ''
  need(query.length <= 200, 'Search must be at most 200 characters')
  const phrase = query.trim().replace(/\s+/g, ' ').toLowerCase()
@@ -24,7 +26,7 @@ export function pipeline(proposals: any[], params = new URLSearchParams(), now =
  need(minValue === undefined || maxValue === undefined || minValue <= maxValue, 'Minimum value exceeds maximum')
  need(minAge === undefined || maxAge === undefined || minAge <= maxAge, 'Minimum age exceeds maximum')
  let rows = proposals.map(p => ({
-  id: String(p.id), title: String(p.title), status: String(p.pipelineStatus ?? p.status), currency: String(p.currency),
+  ...(revenue?{recordedRevenue:p.recordedRevenue}:{}),id: String(p.id), title: String(p.title), status: String(p.pipelineStatus ?? p.status), currency: String(p.currency),
   valueCents: Number(p.acceptance ? p.acceptance.totalCents : Math.max(...p.options.map((o: any) => o.cents))),
   ownerId: p.sales_owner_id as string | null, owner: p.sales_owner_name || 'Not recorded',
   clientId: String(p.client_id), client: String(p.clientName), age: Math.max(0, Math.floor((now - p.created_at) / 86400000)),
@@ -40,7 +42,8 @@ export function pipeline(proposals: any[], params = new URLSearchParams(), now =
   return order * (direction === 'asc' ? 1 : -1) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id)
  })
  const totals = [...new Set(rows.map(r => r.currency))].sort().map(currency => ({ currency, count: rows.filter(r => r.currency === currency).length, valueCents: rows.filter(r => r.currency === currency).reduce((sum,r) => sum + r.valueCents, 0) }))
- return { rows, count: rows.length, totals, owners, clients, generatedAt: now }
+ if(revenue)for(const total of totals)for(const key of revenueKeys){const sum=rows.filter(r=>r.currency===total.currency).reduce((n,r)=>n+(r.recordedRevenue?.[key]??0),0);need(Number.isSafeInteger(sum),'Recorded revenue exceeds the exact reporting limit',409);Object.assign(total,{[key]:sum})}
+ return { ...(revenue?{view:'recorded-revenue'}:{}),rows, count: rows.length, totals, owners, clients, generatedAt: now }
 }
 
 /** Search only offer content and visible metadata; invitation and verification credentials never participate. */

@@ -1538,6 +1538,25 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   for(const [index,method] of ['check','wire','ach_credit'].entries())await h.cmd('payment.record',{id:p.id,amount:'1',receivedOn:'2026-10-21',method,reference:'synthetic-platter-'+(2600+index),consent:true},people.billing)
   const records=(await h.state(people.billing)).paymentRecords;assert.equal(records.length,4);assert.equal(records.find(r=>r.id===linked.id).heldCents,45000);assert.deepEqual((await h.state(people.sales)).paymentRecords,[])
   assert.equal((await h.state()).proposals.find(r=>r.id===p.id).acceptance.depositCents,60000,'refunds never rewrite the accepted deposit')
+  // Recorded revenue is a pipeline view, so CSV and scheduled email retain the same rows, scope and exact money.
+  const team=await h.cmd('team.create',{name:'Revenue team'})
+  for(const role of ['sales','manager','viewer'])await h.cmd('member.set',{operatorId:(await h.state(people[role])).actor.id,version:1,role,teams:[team.id]})
+  const client=await h.cmd('client.save',{name:'Synthetic second client',email:'revenue-client@synthetic-platter.example'}),second=await h.cmd('proposal.prepare',{...offer,title:'Sales owned revenue',clientId:client.id},people.sales)
+  await h.cmd('proposal.approve',{id:second.id,version:1,revision:1});const secondSend=await h.cmd('proposal.send',{id:second.id,version:2},people.sales),secondPath=new URL(secondSend.shareUrl).pathname,secondCookie=await verified(h,secondPath)
+  assert.equal((await h.send(secondPath+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},secondCookie)).status,200)
+  await h.cmd('payment.record',{id:second.id,amount:'7',receivedOn:'2026-10-21',method:'check',reference:'synthetic-platter-4200',consent:true},people.billing);await h.cmd('invoice.export',{id:p.id})
+  const query='view=recorded-revenue&sort=value&direction=desc',totals={currency:'USD',count:2,valueCents:480000,receivedCents:61000,refundedCents:40000,netReceivedCents:21000,uncertainRefundCents:5000,exportedDepositCents:60000}
+  for(const [role,cookie] of Object.entries({owner:h.owner,...people})){
+   const report=await h.send('/api/platter/pipeline?'+query,undefined,cookie)
+   if(role==='content_editor'){assert.equal(report.status,403);assert.equal((await h.send('/app?'+query,undefined,cookie)).status,403);assert.ok((await h.state(cookie)).proposals.every(p=>!Object.hasOwn(p,'recordedRevenue')));continue}
+   assert.equal(report.status,200,report.text);assert.equal(report.value.view,'recorded-revenue');assert.equal(report.value.count,['owner','admin','billing'].includes(role)?2:1)
+   if(['owner','admin','billing'].includes(role))assert.deepEqual(report.value.totals,[totals]);else{assert.deepEqual(report.value.rows.map(r=>r.id),[second.id]);assert.equal(report.value.totals[0].netReceivedCents,700)}
+   assert.doesNotMatch(report.text,/provider_charge|reference|recorded_by|internalPricing|synthetic-platter-2401/)
+  }
+  const csv=await h.send('/api/platter/pipeline.csv?'+query,undefined,h.owner);assert.equal(csv.status,200);assert.match(csv.text,/Received payments,Confirmed refunds,Net received,Unconfirmed refunds,Exported deposit CSV value/);assert.match(csv.text,/Total \(2 proposals\),,,,,USD,4800\.00,,?,610\.00,400\.00,210\.00,50\.00,600\.00/)
+  const scheduled=await h.cmd('report.schedule',{filters:query,cadence:'daily',hour:8,recipients:[h.auth.OWNER_EMAIL]});const due=(await h.state()).reportSchedules.find(r=>r.id===scheduled.id).nextRunAt,worker=await h.mf.getWorker();await worker.scheduled({scheduledTime:new Date(due),cron:'*/15 * * * *'});await worker.scheduled({scheduledTime:new Date(due),cron:'*/15 * * * *'})
+  const email=(await h.state()).reportOutbox;assert.equal(email.length,1);assert.match(email[0].subject,/recorded revenue/);assert.ok(email[0].body.includes(csv.text),'scheduled CSV equals the same filtered rows');assert.match(email[0].body,/Net received: \$210\.00 USD/);assert.match(email[0].body,/Unconfirmed refunds: \$50\.00 USD/)
+
  }finally{await h.close()}
 })
 

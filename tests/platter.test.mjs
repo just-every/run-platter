@@ -1481,7 +1481,7 @@ test('TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions a
 
 test('TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens',async()=>{
  const calls=[];let mailbox='sales@synthetic-platter.example'
- const h=await harness({outboundService:async request=>{const url=new URL(request.url);calls.push({url:url.href,authorization:request.headers.get('authorization')});if(url.hostname==='api.stripe.com')return Response.json({id:'synthetic-platter-2100'});if(url.hostname==='quickbooks.api.intuit.com')return Response.json({CompanyInfo:{CompanyName:'Synthetic company'}});if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-2101',email:mailbox,email_verified:true});if(url.hostname==='graph.microsoft.com')return Response.json({id:'synthetic-platter-2102',mail:mailbox});throw Error('Unexpected provider') }})
+ const h=await harness({outboundService:async request=>{const url=new URL(request.url);calls.push({url:url.href,authorization:request.headers.get('authorization')});if(url.hostname==='api.hubapi.com')return Response.json({portalId:'synthetic-platter-4100'});if(url.hostname==='login.salesforce.com')return Response.json({organization_id:'synthetic-platter-4101',user_id:'synthetic-platter-4102'});if(url.hostname==='www.googleapis.com')return Response.json({user:{permissionId:'synthetic-platter-4103',emailAddress:'owner@synthetic-platter.example'}});if(url.hostname==='slack.com')return Response.json({ok:true,team_id:'synthetic-platter-4104'});if(url.hostname==='api.stripe.com')return Response.json({id:'synthetic-platter-2100'});if(url.hostname==='quickbooks.api.intuit.com')return Response.json({CompanyInfo:{CompanyName:'Synthetic company'}});if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-2101',email:mailbox,email_verified:true});if(url.hostname==='graph.microsoft.com')return Response.json({id:'synthetic-platter-2102',mail:mailbox});throw Error('Unexpected provider') }})
  try{
   const people={};for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[]});people[role]={cookie,id,email}}
   const connect={provider:'quickbooks',version:0,realmId:'synthetic-platter-2103',token:'synthetic-platter-2104',consent:true}
@@ -1498,7 +1498,16 @@ test('TEAM-001 provider connections verify accounts, seal credentials, enforce a
   mailbox=people.sales.email;await h.cmd('provider.connect',{provider:'microsoft',version:0,token:'synthetic-platter-2106',consent:true},people.manager.cookie,403)
   assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_connections WHERE provider='microsoft'").first()).n,0)
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-2107',webhookSecret:'synthetic-platter-2108',consent:true})
-  for(const cookie of [h.owner,...Object.values(people).map(p=>p.cookie)]){const s=await h.state(cookie);assert.doesNotMatch(JSON.stringify(s),/synthetic-platter-210[45678]|sealed|webhookSecret/);const page=await h.send(cookie===h.owner?'/app/settings':'/app/team',undefined,cookie);assert.doesNotMatch(page.text,/synthetic-platter-210[45678]/)}
+  for(const provider of ['hubspot','salesforce','google_drive','slack']){
+   const input={provider,version:0,token:'synthetic-platter-4105',consent:true},before=calls.length
+   for(const role of ['manager','sales','content_editor','viewer','billing'])await h.cmd('provider.connect',input,people[role].cookie,403)
+   assert.equal(calls.length,before);await h.cmd('provider.connect',input,people.admin.cookie);const snapshot=JSON.stringify((await h.db.prepare('SELECT * FROM p_connections WHERE id=?').bind('workspace:'+provider).first()))
+   for(const role of ['manager','sales','content_editor','viewer','billing'])await h.cmd('provider.disconnect',{provider,version:1},people[role].cookie,403)
+   assert.equal(JSON.stringify(await h.db.prepare('SELECT * FROM p_connections WHERE id=?').bind('workspace:'+provider).first()),snapshot)
+   await h.cmd('provider.disconnect',{provider,version:1},people.admin.cookie);await h.cmd('provider.connect',{...input,version:2},h.owner);await h.cmd('provider.disconnect',{provider,version:3},h.owner)
+   assert.equal(await h.db.prepare('SELECT connection_id FROM p_connection_secrets WHERE connection_id=?').bind('workspace:'+provider).first(),null)
+  }
+  for(const cookie of [h.owner,...Object.values(people).map(p=>p.cookie)]){const s=await h.state(cookie);assert.doesNotMatch(JSON.stringify(s),/synthetic-platter-210[45678]|synthetic-platter-4105|sealed|webhookSecret/);const page=await h.send(cookie===h.owner?'/app/settings':'/app/team',undefined,cookie);assert.doesNotMatch(page.text,/synthetic-platter-210[45678]/)}
  }finally{await h.close()}
 })
 

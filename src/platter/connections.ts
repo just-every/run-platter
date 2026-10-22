@@ -39,7 +39,7 @@ export async function connectionState(env:Bindings,a:Actor){
  return rows.map(r=>({id:r.id,provider:r.provider,operatorId:r.operator_id,accountId:r.account_id,mailboxEmail:r.mailbox_email,status:r.status==='connected'&&!r.has_secret?'needs_reconnection':r.status,version:r.version,connectedAt:r.connected_at}))
 }
 export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
- const provider=String(p.provider??'');need(['stripe','quickbooks','gmail','microsoft'].includes(provider),'Choose a supported provider')
+ const provider=String(p.provider??'');need(['stripe','quickbooks','gmail','microsoft','hubspot','salesforce','google_drive','slack'].includes(provider),'Choose a supported provider')
  need((isMailbox(provider)?mailboxRoles:administrators).includes(a.role),isMailbox(provider)?'Your role cannot connect a mailbox':'Only owner and admins connect workspace providers',403)
  need(p.operatorId===undefined||p.operatorId===a.id,'Connect only your own mailbox',403)
  const db=env.DB,id=connectionId(provider,a)
@@ -62,6 +62,15 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
  }else if(provider==='quickbooks'){
   const realm=text(p.realmId,'the QuickBooks company id',100),result=await providerJson('https://quickbooks.api.intuit.com/v3/company/'+encodeURIComponent(realm)+'/companyinfo/'+encodeURIComponent(realm),token)
   need(result.CompanyInfo&&typeof result.CompanyInfo.CompanyName==='string','QuickBooks did not confirm this company');accountId=realm
+ }else if(provider==='hubspot'){
+  const result=await providerJson('https://api.hubapi.com/account-info/v3/details',token),value=result.portalId
+  need((typeof value==='string'&&value.length>0)||(typeof value==='number'&&Number.isSafeInteger(value)&&value>0),'HubSpot did not confirm the portal');accountId=text(String(value),'the verified HubSpot portal',200)
+ }else if(provider==='salesforce'){
+  const result=await providerJson('https://login.salesforce.com/services/oauth2/userinfo',token);accountId=text(result.organization_id,'the verified Salesforce organization',200);need(typeof result.user_id==='string'&&result.user_id.length>0,'Salesforce did not confirm the authorized user')
+ }else if(provider==='google_drive'){
+  const result=await providerJson('https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress,permissionId)',token);accountId=text(result.user?.permissionId,'the verified Drive account',200);need(typeof result.user?.emailAddress==='string','Drive did not confirm the account')
+ }else if(provider==='slack'){
+  const result=await providerJson('https://slack.com/api/auth.test',token);need(result.ok===true,'Slack refused this connection');accountId=text(result.team_id,'the verified Slack workspace',200)
  }else{
   const result=await providerJson(provider==='gmail'?'https://openidconnect.googleapis.com/v1/userinfo':'https://graph.microsoft.com/v1.0/me?$select=id,mail,userPrincipalName',token)
   if(provider==='gmail')need(result.email_verified===true,'Verify the provider mailbox first',403)

@@ -693,11 +693,13 @@ test('SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient q
    const result=await h.cmd('proposal.send',{id:p.id,version:2});proposals[name]={id:p.id,path:new URL(result.shareUrl).pathname}
   }
   const reminders=()=>sent.filter(m=>m.subject.startsWith('Reminder:'))
+  assert.deepEqual((await h.state()).proposals.find(p=>p.id===proposals.cap.id).deliveryPreview.reminders.map(r=>r.slot),['after:2','after:5'],'send preview excludes reminders beyond the cap')
   await tick('2030-03-10T13:00:00Z');assert.equal(reminders().length,0,'a 6 am Pacific due time waits, including across DST')
   await tick('2030-03-10T14:59:00Z');assert.equal(reminders().length,0)
   await Promise.all([tick('2030-03-10T15:00:00Z'),tick('2030-03-10T15:00:00Z')]);assert.equal(reminders().length,8)
   assert.ok(reminders().every(m=>m.provider==='gmail'&&m.from==='own-mailbox@synthetic-platter.example'))
   const first=(await h.state()).proposals.find(p=>p.id===proposals.cap.id).reminderRuns[0];assert.equal(first.queued_at,Date.parse('2030-03-10T15:00:00Z'));assert.equal(first.time_zone,'America/Los_Angeles');assert.equal(first.transport_status,'accepted');assert.doesNotMatch(first.message,/\/p\/[a-f0-9]{64}/)
+  assert.deepEqual((await h.state()).proposals.find(p=>p.id===proposals.cap.id).deliveryPreview.reminders.map(r=>r.slot),['after:5'],'only the remaining unclaimed capped date is previewed')
   await tick('2030-03-10T15:15:00Z');assert.equal(reminders().length,8,'a claimed slot and an uncertain send are never resent')
   const verified=async name=>{const path=proposals[name].path;assert.equal((await h.send(path+'/action?name=code.request',{})).status,200);const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code' ORDER BY created_at DESC").bind(proposals[name].id).first()).body.match(/\b\d{6}\b/)[0];const r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,200,r.text);return r.cookie}
   const acceptedCookie=await verified('accepted');assert.equal((await h.send(proposals.accepted.path+'/action?name=accept',{optionId:'one',name:'Synthetic client',consent:true},acceptedCookie)).status,200)
@@ -719,6 +721,7 @@ test('SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient q
   const ownReply=sent.findLast(m=>m.subject==='Answer to your question: cap');assert.equal(ownReply.provider,'microsoft');assert.equal(ownReply.from,'own-mailbox@synthetic-platter.example');assert.match(ownReply.body,/Yes, we can start earlier/)
   refused=true;await tick('2030-03-17T15:00:00Z')
   assert.equal(reminders().filter(m=>m.subject==='Reminder: cap').length,2,'scheduled cap excludes the ninth-day reminder')
+  assert.deepEqual((await h.state()).proposals.find(p=>p.id===proposals.cap.id).deliveryPreview.reminders,[])
   assert.equal(installation.filter(m=>m.subject==='Reminder: fallback').length,1,'revoked grant falls back once to the installation sender')
   const fallback=(await h.state()).proposals.find(p=>p.id===proposals.fallback.id);assert.equal(fallback.reminderRuns.length,3);assert.ok(fallback.mailAttributions.some(m=>m.route==='installation'&&m.fallback===1))
   refused=false;await connect('gmail')

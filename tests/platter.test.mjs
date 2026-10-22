@@ -1679,6 +1679,20 @@ test('TEAM-001 / APPROVE-003 native admins remain eligible named approvers and s
  const rule=await h.cmd('approval.rule',{version:1,name:'Named native admin',position:0,condition:{kind:'totalOver',cents:0,currency:'USD'},approvers:['person:'+actor.id]},admin);await audited(h,'approval.rule',actor.id,'admin',rule.id)
  const {p}=await draft(h);await h.cmd('proposal.send',{id:p.id,version:1},h.owner,409);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1},admin);await h.cmd('proposal.send',{id:p.id,version:2});await audited(h,'proposal.approve',actor.id,'admin',p.id)
  await h.cmd('approval.rule.delete',{id:rule.id,version:2},admin);await audited(h,'approval.rule.delete',actor.id,'admin',rule.id)
+ // Native ownership handoff remains owner-only, uses fresh email proof and revokes the former owner's bound sessions and agent credentials.
+ const people={native_admin:{cookie:admin,id:actor.id}},oldOwner=(await h.state()).actor,key=await h.cmd('agent.create',{label:'Synthetic ownership handoff'})
+ for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const address=role+'@synthetic-platter.example';await h.send('/auth/invite',{email:address,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(address),person=(await h.state(cookie)).actor;await h.cmd('member.set',{operatorId:person.id,role,version:0,teams:[]});people[role]={cookie,id:person.id,email:address}}
+ const authority=async()=>JSON.stringify([(await h.db.prepare('SELECT id,role,version FROM oa_operators ORDER BY id').all()).results,(await h.db.prepare('SELECT id,revoked_at FROM p_agent_keys ORDER BY id').all()).results])
+ const before=await authority()
+ for(const person of Object.values(people)){assert.equal((await h.send('/auth/operator/role',{operatorId:people.sales.id,role:'owner'},person.cookie)).status,403);await h.cmd('agent.revoke',{id:key.id},person.cookie,403);assert.equal(await authority(),before,'forbidden native ownership/key writes leave authority unchanged')}
+ const fresh=await h.signIn(oldOwner.email);const promoted=await h.send('/auth/operator/role',{operatorId:people.sales.id,role:'owner'},fresh);assert.equal(promoted.status,200,promoted.text)
+ const successor=await h.signIn(people.sales.email);assert.equal((await h.state(successor)).actor.role,'owner')
+ const demoted=await h.send('/auth/operator/role',{operatorId:oldOwner.id,role:'admin'},successor);assert.equal(demoted.status,200,demoted.text)
+ assert.equal((await h.send('/api/platter/state',undefined,fresh)).status,401)
+ assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,401)
+ assert.deepEqual((await h.db.prepare("SELECT id FROM oa_operators WHERE role='owner' AND status='active'").all()).results.map(p=>p.id),[people.sales.id]);assert.ok((await h.state(successor)).proposals.some(row=>row.id===p.id),'handoff retains existing proposals')
+ const previous=await h.signIn(oldOwner.email);assert.equal((await h.state(previous)).actor.role,'admin')
+ const handoffAudit=await h.send('/api/platter/audit?action=native.auth.operator.role',undefined,successor);assert.equal(handoffAudit.status,200);assert.ok(handoffAudit.value.rows.some(row=>row.actor_id===oldOwner.id&&row.actor_role==='owner'&&row.subject===people.sales.id));assert.ok(handoffAudit.value.rows.some(row=>row.actor_id===people.sales.id&&row.actor_role==='owner'&&row.subject===oldOwner.id))
 }))
 
 test('TEAM-001 / PRICE-006 optional and flat-package costs produce exact selected totals while verified client JSON, pages and PDFs exclude private state',async()=>{

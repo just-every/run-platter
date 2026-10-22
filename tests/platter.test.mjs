@@ -1686,7 +1686,7 @@ test('TEAM-001 / PRICE-006 optional and flat-package costs produce exact selecte
   const publicPage=await h.send(path,undefined,cookie);assert.doesNotMatch(publicPage.text,/Internal cost|3\.17|49\.51|80\.49/)
   assert.equal((await h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId=main',{headers:{cookie}})).status,409,'the unsigned PDF door stays closed after acceptance')
   await audited(h,'proposal.data',client.id,'client',p.id)
-  const foreign=await sent(h);assert.equal((await h.send(foreign.path+'/data.json',undefined,cookie)).status,401,'another invitation never inherits the mailbox session')
+  const foreign=await h.cmd('proposal.prepare',{...offer,clientId:client.id});await h.cmd('proposal.approve',{id:foreign.id,version:1,revision:1});const foreignPath=new URL((await h.cmd('proposal.send',{id:foreign.id,version:2})).shareUrl).pathname;assert.equal((await h.send(foreignPath+'/data.json',undefined,cookie)).status,401,'another invitation never inherits the mailbox session')
   // Converting a flat package into an itemized table preserves its previously entered private package cost.
   let flat=(await h.state()).proposals.find(r=>r.id===started.id);const item=await h.cmd('catalog.save',{name:'Synthetic add-on',sku:'synthetic-platter-3800',description:'Public item',unit:'each',unitPrice:'10',unitCost:'2'})
   await h.cmd('catalog.insert',{id:flat.id,version:1,catalogId:item.id,catalogVersion:1,optionId:'alternative',quantity:'1'});flat=(await h.state()).proposals.find(r=>r.id===started.id);assert.equal(flat.internalPricing.packages.find(o=>o.id==='alternative').costCents,8200)

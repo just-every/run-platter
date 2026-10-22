@@ -602,6 +602,8 @@ test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute s
    const audit=(await h.send('/api/platter/audit?action=mail.client-reply&subject='+proposal.id,undefined,h.owner)).value.rows
    assert.equal(audit.length,1);assert.equal(audit[0].actor_role,'client')
   }
+  const agent=await h.cmd('agent.create',{label:'Reply visibility check'})
+  const agentContext=await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+agent.token});assert.equal(agentContext.status,200);assert.doesNotMatch(agentContext.text,/Can we start next Monday/);assert.ok(agentContext.value.proposals.every(p=>p.mailReplies.length===0))
   assert.equal(installation.length,beforeReplies,'incoming replies cause no automatic outgoing mail')
   assert.doesNotMatch(JSON.stringify(await h.state(people.sales.cookie)),new RegExp(googleReply.split('@')[0]))
   const blocked=await h.cmd('proposal.prepare',{...offer,clientId:client.id},people.sales.cookie)

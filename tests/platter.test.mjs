@@ -1603,7 +1603,8 @@ test('TEAM-001 delegated invitations bind roles and teams to current inviter aut
  }finally{await h.close()}
 })
 
-test('TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices and private costs stay frozen in proposals',()=>run(async h=>{
+test('TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices and private costs stay frozen in proposals',async()=>{
+ const h=await harness({assetsDirectory:'public'});try{
  const team=await h.cmd('team.create',{name:'East'}),people={}
  for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[team.id]});people[role]=cookie}
  const input={name:'Synthetic service',sku:'synthetic-platter-3100',description:'Explicitly priced service',unit:'hour',unitPrice:'100',unitCost:'25'},catalog=[]
@@ -1628,4 +1629,5 @@ test('TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices an
  await h.cmd('catalog.insert',{id:fresh.id,version:2,catalogId:catalog[0].id,catalogVersion:1,optionId:'one',quantity:'1'},people.sales,409)
  await h.cmd('catalog.save',{...input,sku:input.sku+'-owner'},h.owner,409);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_priced_catalog').first()).n,3)
  await h.cmd('catalog.save',{...input,sku:'synthetic-platter-3101',unitCost:'0.00'});assert.equal((await h.state()).catalogItems.find(r=>r.sku==='synthetic-platter-3101').unitCostCents,0)
-}))
+ }finally{await h.close()}
+})

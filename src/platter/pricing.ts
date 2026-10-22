@@ -1,3 +1,4 @@
+import { discountedCents, percentBps } from './discounts'
 import { dollars, need, text } from './model'
 
 export interface PriceLine {
@@ -20,7 +21,7 @@ export function tableInputs(input: unknown): any[] {
  return tables
 }
 
-export function pricedOptions(options: { id: string; label: string; cents: number }[], input: unknown) {
+export function pricedOptions(options: { id: string; label: string; cents: number; discountBps?:number }[], input: unknown) {
  const tables=tableInputs(input)
  const priced = options.map(option => ({ ...option, tables: [] as PriceTable[] }))
  for (const table of tables) {
@@ -49,10 +50,9 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
   option.tables.push({ name: text(table.name, 'a table name'), lines, groups: [...groups].map(([name, subtotalCents]) => ({ name, subtotalCents })), subtotalCents })
  }
  return priced.map(({ tables, ...option }) => {
-  if (!tables.length) return option
-  const cents = boundedTotal(tables.reduce((sum, table) => sum + BigInt(table.subtotalCents), 0n))
-  need(cents > 0, 'Package total must be at least $0.01')
-  return { ...option, cents, tables }
+  const {discountBps=0,...publicOption}=option,gross=tables.length?boundedTotal(tables.reduce((sum,table)=>sum+BigInt(table.subtotalCents),0n)):option.cents,cents=discountedCents(gross,discountBps)
+  need(cents>0,'Package total after discount must be at least $0.01')
+  return {...publicOption,cents,...(tables.length?{tables}:{}),...(discountBps?{discount:{bps:discountBps,grossCents:gross,cents:gross-cents}}:{})}
  })
 }
 
@@ -89,8 +89,9 @@ export function packageInputs(input: unknown, tables: any[]) {
    need(typeof extra.editable === 'boolean', 'Choose whether quantity is client-editable')
    return { id, label: text(extra.label, 'an optional-item name'), unitCents: dollars(extra.unitPrice), min, max, quantity, editable: extra.editable }
   })
-  return { id, label: text(item.label, 'a package name'), cents: tables.some(t => t?.optionId === id) ? 1 : dollars(item.price, 'package:' + id), ...(optionalItems.length ? { optionalItems } : {}) }
+  const discountBps=percentBps(item.discountPercent,'a package discount',9999)
+  return { ...(discountBps?{discountBps}:{}),id, label: text(item.label, 'a package name'), cents: tables.some(t => t?.optionId === id) ? 1 : dollars(item.price, 'package:' + id), ...(optionalItems.length ? { optionalItems } : {}) }
  })
 }
 
-export const editablePackages = (options: any[]) => options.map(option => ({ id: option.id, label: option.label, price: (option.cents / 100).toFixed(2), optionalItems: (option.optionalItems ?? []).map((item: any) => ({ ...item, unitPrice: (item.unitCents / 100).toFixed(2) })) }))
+export const editablePackages = (options: any[]) => options.map(option => ({ id: option.id, label: option.label, price: ((option.discount?.grossCents??option.cents) / 100).toFixed(2),discountPercent:((option.discount?.bps??0)/100).toString(), optionalItems: (option.optionalItems ?? []).map((item: any) => ({ ...item, unitPrice: (item.unitCents / 100).toFixed(2) })) }))

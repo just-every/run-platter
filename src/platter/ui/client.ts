@@ -28,6 +28,7 @@ function clientDocument(view: any, token: string, feedback?: Feedback): Response
   let html = view.preview ? previewBanner(view) : ''
   if(!view.hiddenSections?.includes('scope')) html += panel('Scope of work', `<p class="preserve">${escape(view.scope)}</p>`)
   html += panel('Offer options', `${expanded?'<p>Package prices below exclude optional items. Your selection shows the final total and deposit.</p>':''}<p>${pricing} Deposit: ${escape(Number(view.deposit_bps) / 100)}% of the chosen option.</p>${optionPair(options, view.deposit_bps, view.acceptance?.optionId, currency)}${pricingTables(options,currency)}`)
+  if(options.some((o:any)=>o.discount))html+=panel('Package discounts',options.filter((o:any)=>o.discount).map((o:any)=>'<p>'+escape(o.label)+': '+escape(o.discount.bps/100)+'% off '+money(o.discount.grossCents,currency)+' = '+money(o.cents,currency)+'. The same percentage applies to selected optional items.</p>').join(''))
   if(!view.hiddenSections?.includes('terms')) html += panel('Terms',`<p class="preserve">${escape(view.terms||'No additional terms.')}</p>`)
   html += panel(view.status==='accepted'?'Signed agreement package attachments':'Proposal attachments',attachmentList(view.attachments??[],view.preview?'/app/preview/client/attachments/':`/p/${encodeURIComponent(token)}/attachments/`,view.preview?'?id='+encodeURIComponent(view.id)+'&revision='+encodeURIComponent(view.revision):''))
   html += clientExpiryPanel(view,publicForm)

@@ -1692,3 +1692,22 @@ test('TEAM-001 / PRICE-006 optional and flat-package costs produce exact selecte
   await h.cmd('catalog.insert',{id:flat.id,version:1,catalogId:item.id,catalogVersion:1,optionId:'alternative',quantity:'1'});flat=(await h.state()).proposals.find(r=>r.id===started.id);assert.equal(flat.internalPricing.packages.find(o=>o.id==='alternative').costCents,8200)
  }finally{await h.close()}
 })
+
+test('PRICE-004 / APPROVE-001 visible package discounts preserve exact optional totals, private margins, templates and public PDF/JSON custody',async()=>{
+ const h=await harness({assetsDirectory:'public'})
+ try{
+  const {client}=await draft(h),input={clientId:client.id,title:'Synthetic discounted package',scope:'Public scope',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'100',discountPercent:'20',optionalItems:[{id:'rush',label:'Rush',unitPrice:'10',min:1,max:5,quantity:2,editable:true}]}],pricingTables:[{optionId:'main',name:'Services',lines:[{name:'Work',description:'Public work',quantity:'1',unit:'project',unitPrice:'100'}]}]},p=await h.cmd('proposal.prepare',input)
+  let row=(await h.state()).proposals.find(r=>r.id===p.id);assert.deepEqual(row.options[0].discount,{bps:2000,grossCents:10000,cents:2000});assert.equal(row.options[0].cents,8000)
+  await h.cmd('pricing.cost',{id:p.id,version:1,lineKey:row.internalPricing.lines[0].key,unitCost:'40'});row=(await h.state()).proposals.find(r=>r.id===p.id);await h.cmd('pricing.cost',{id:p.id,version:2,lineKey:row.internalPricing.lines.find(l=>l.kind==='optional').key,unitCost:'3.17'});row=(await h.state()).proposals.find(r=>r.id===p.id);assert.deepEqual([row.internalPricing.total.revenueCents,row.internalPricing.total.costCents,row.internalPricing.total.marginCents],[8000,4000,4000])
+  const template=await h.cmd('template.save',{id:p.id,version:3,name:'Discounted starter'}),copy=await h.cmd('template.start',{id:template.id,version:1,clientId:client.id});assert.deepEqual((await h.state()).proposals.find(r=>r.id===copy.id).options,row.options)
+  const before=(await h.db.prepare('SELECT * FROM p_proposals ORDER BY id').all()).results
+  for(const discountPercent of ['100','-1','20.001','NaN'])await h.cmd('proposal.prepare',{...input,packages:[{id:'main',label:'Invalid',price:'100',discountPercent}]},h.owner,400)
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_proposals ORDER BY id').all()).results,before)
+  await h.cmd('proposal.approve',{id:p.id,version:3,revision:3});const path=new URL((await h.cmd('proposal.send',{id:p.id,version:4})).shareUrl).pathname,cookie=await verified(h,path),query='?optionId=main&add.rush=yes&qty.rush=3'
+  const data=await h.send(path+'/data.json'+query,undefined,cookie);assert.equal(data.status,200,data.text);assert.equal(data.value.selection.totalCents,10400);assert.equal(data.value.selection.discountCents,2600);assert.equal(data.value.selection.depositCents,2600);assert.doesNotMatch(data.text,/unitCost|internalPricing|margin/)
+  const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf'+query,{headers:{cookie}});assert.equal(pdf.status,200);const text=(await pdfPages(await pdf.arrayBuffer())).join(' ');assert.match(text,/Package discount: 20%/);assert.match(text,/104\.00/);assert.doesNotMatch(text,/Internal cost|3\.17/)
+  assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'main',items:[{id:'rush',quantity:3}],consent:true},cookie)).status,200)
+  row=(await h.state()).proposals.find(r=>r.id===p.id);assert.deepEqual([row.acceptance.totalCents,row.acceptance.depositCents,row.acceptance.selection.discountCents],[10400,2600,2600]);assert.deepEqual([row.internalPricing.total.revenueCents,row.internalPricing.total.costCents,row.internalPricing.total.marginCents],[10400,4951,5449]);assert.equal(row.internalPricing.lines.reduce((n,l)=>n+(l.selected?l.revenueCents:0),0),10400)
+  const tiny=await h.cmd('proposal.prepare',{clientId:client.id,title:'Cent allocation',scope:'Public scope',depositPercent:'25',packages:[{id:'main',label:'Tiny',price:'0.03',discountPercent:'33.33'}],pricingTables:[{optionId:'main',name:'Tiny lines',lines:['First','Second','Third'].map(name=>({name,description:'',quantity:'1',unit:'each',unitPrice:'0.01'}))}]});const small=(await h.state()).proposals.find(r=>r.id===tiny.id);assert.equal(small.options[0].cents,2);assert.deepEqual(small.internalPricing.lines.map(l=>l.revenueCents),[1,1,0])
+ }finally{await h.close()}
+})

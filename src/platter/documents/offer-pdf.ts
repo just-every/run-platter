@@ -40,6 +40,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  pdf.text(`Not signed, revision ${revision}`)
  pdf.gap()
  pdf.text(`Selected option: ${selected.label}`, 13)
+ if(selected.discount)pdf.text(`Package discount: ${selected.discount.bps/100}% off ${amount(selected.discount.grossCents,currency)}; discount ${amount(selected.discount.cents,currency)}`)
  pdf.text(`Selected option total: ${amount(selected.cents, currency)}`)
  pdf.text(`Deposit due: ${amount(deposit(selected.cents), currency)}`)
  if(selection.items.length){pdf.heading('Selected optional items');for(const item of selection.items)pdf.text(`${item.label}: ${item.quantity} x ${amount(item.unitCents,currency)} = ${amount(item.totalCents,currency)}`)}
@@ -61,6 +62,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
    for(const group of table.groups)pdf.text(`${group.name||'Ungrouped'} subtotal: ${amount(group.subtotalCents,currency)}`)
    pdf.text(`Table subtotal: ${amount(table.subtotalCents,currency)}`,12)
   }
+  if(option.discount)pdf.text(`Package discount: ${option.discount.bps/100}% off ${amount(option.discount.grossCents,currency)}; discount ${amount(option.discount.cents,currency)}`)
   if(option.tables?.length)pdf.text(`Package grand total: ${amount(option.cents,currency)}`,13)
  }
 

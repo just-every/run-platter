@@ -34,10 +34,11 @@ export function deliveryPanel(state: any, p: any): string {
       + '</dl></article></li>'
   }).join('')}</ol>` : empty('No invitation has been recorded for this proposal.')
   const attribution=(p.mailAttributions??[]).map((m:any)=>'<p>'+escape(m.actor_email)+' · '+escape(m.route==='installation'?'Installation sender':m.route+' mailbox')+' · '+escape(m.sender_address)+' · '+escape(m.outcome==='accepted'?'Accepted by provider':m.outcome)+(m.fallback?' · Mailbox unavailable; sent through the installation sender.':'')+'</p>').join('')
+  const replies=(p.mailReplies??[]).map((m:any)=>'<article><h3>Client email reply · revision '+escape(m.revision)+'</h3><p>'+escape(m.client_email)+' · '+date(m.received_at)+'</p><p class="preserve">'+escape(m.text)+'</p></article>').join('')
   const notice = state.bounceNotices?.find((n:any)=>n.proposal_id===p.id&&!n.closed_at)
   const correct = p.canSend && p.status === 'sent' && notice
     ? '<h3>Correct invitation address</h3>' + correction(notice.id, notice.recipient, proposalPath(p.id)) : ''
-  return panel('Invitation delivery', (state.mailTransport==='cloudflare'?'<p>Delivery events unavailable with this mail transport.</p>':'') + '<p>Invitations are listed newest first. Provider acceptance is separate from reported delivery; neither proves a person received or read the invitation.</p>' + attribution + list + correct)
+  return panel('Invitation delivery', (state.mailTransport==='cloudflare'?'<p>Delivery events unavailable with this mail transport.</p>':'') + '<p>Invitations are listed newest first. Provider acceptance is separate from reported delivery; neither proves a person received or read the invitation.</p>' + attribution + list + replies + correct)
 }
 
 export function bounceInbox(state: any): string {

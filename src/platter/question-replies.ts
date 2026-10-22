@@ -28,10 +28,8 @@ function json(bytes:Uint8Array):any {
  catch{need(false,'Invalid message',400)}
 }
 
-/** The dispatcher mounts this POST before the browser Origin gate. No session authority is inferred here. */
-export async function questionReplyResponse(request:Request,env:Bindings):Promise<Response> {
- try {
-  need(request.method==='POST','Use POST',405)
+export async function authenticatedReply(request:Request,env:Bindings){
+ need(request.method==='POST','Use POST',405)
   need(resendReplyAvailable(env),'Email replies are unavailable',503)
   const raw=await boundedBytes(request)
   need(await verifyWebhook({provider:'resend',rawBody:raw,headers:request.headers,key:env.MAIL_WEBHOOK_KEY,now:Date.now()}),'Invalid webhook signature',401)
@@ -61,6 +59,13 @@ export async function questionReplyResponse(request:Request,env:Bindings):Promis
   const token=targets[0].slice(0,64)
   // Keep the original plain-text reply, including quotations, only when it contains no capability.
   need(!message.text.toLowerCase().includes(token)&&!/[a-f0-9]{64}@/i.test(message.text),'Remove the private reply address from the message body',422)
+  return {message,token,email}
+}
+
+/** The dispatcher mounts this POST before the browser Origin gate. No session authority is inferred here. */
+export async function questionReplyResponse(request:Request,env:Bindings):Promise<Response> {
+ try {
+  const {message,token,email}=await authenticatedReply(request,env)
   const keyhash=await hash(token),now=Date.now()
   const key=await env.DB.prepare('SELECT k.*,q.proposal_id FROM p_question_reply_keys k JOIN p_questions q ON q.id=k.question_id WHERE k.keyhash=?').bind(keyhash).first<{id:string;question_id:string;proposal_id:string;owner_id:string;owner_version:number;expires_at:number;used_at:number|null}>()
   need(key&&key.used_at===null&&key.expires_at>now,'This reply capability is expired, rotated, or already used',409)

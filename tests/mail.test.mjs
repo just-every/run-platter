@@ -1,3 +1,4 @@
+import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { harness } from './harness.mjs'
@@ -509,8 +510,8 @@ test('APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign send
 
 test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail', async()=>{
  let address='mailbox@synthetic-platter.example',verified=true,aliasVerified=true,hasSmtp=true,hasScope=true,refused=false,timeout=false,demoteDuringRefresh=false
- const calls=[],gmail=[],graph=[],installation=[]
- const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5100',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5101',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5102',MICROSOFT_MAIL_CLIENT_ID:'synthetic-platter-5103',MICROSOFT_MAIL_CLIENT_SECRET:'synthetic-platter-5104'},outboundService:async request=>{
+ const inbound=inboundMailFixture(),calls=[],gmail=[],graph=[],installation=[]
+ const h=await harness({origin:'https://platter.example',auth:{...inbound.settings,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5100',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5101',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5102',MICROSOFT_MAIL_CLIENT_ID:'synthetic-platter-5103',MICROSOFT_MAIL_CLIENT_SECRET:'synthetic-platter-5104'},outboundService:async request=>{
   const url=new URL(request.url);calls.push({host:url.hostname,path:url.pathname,method:request.method})
   if(['oauth2.googleapis.com','login.microsoftonline.com'].includes(url.hostname)){
    const body=new URLSearchParams(await request.text())
@@ -534,6 +535,7 @@ test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute s
    return Response.json({id:'synthetic-platter-'+(5200+gmail.length)})
   }
   if(url.pathname==='/v1.0/me/sendMail'){const payload=await request.json();graph.push(payload);assert.equal(payload.message.from.emailAddress.address,address);return new Response(null,{status:202})}
+  if(url.hostname==='api.resend.com'&&request.method==='GET'){const message=inbound.messages.get(url.pathname.split('/').at(-1));assert.ok(message);return Response.json(message)}
   assert.equal(url.hostname,'api.resend.com');installation.push(await request.json());return Response.json({id:'synthetic-platter-'+(5300+installation.length)})
  }})
  try{
@@ -572,7 +574,7 @@ test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute s
   const client=await h.cmd('client.save',{name:'Northstar',email:recipient})
   const send=async()=>{
    const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id},people.sales.cookie)
-   await h.cmd('proposal.send',{id:p.id,version:1},people.sales.cookie)
+   await h.cmd('proposal.send',{id:p.id,version:1,mailRepliesConsent:true},people.sales.cookie)
    return (await h.state(people.sales.cookie)).proposals.find(r=>r.id===p.id)
   }
   const google=await send();assert.equal(gmail.length,1);assert.equal(installation.length,0)
@@ -583,6 +585,25 @@ test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute s
   const timeline=await h.send('/app/proposal?id='+google.id,undefined,people.sales.cookie);assert.match(timeline.text,/mailbox@synthetic-platter.example/);assert.match(timeline.text,/Accepted by provider/)
   await connect('microsoft')
   const microsoft=await send();assert.equal(graph.length,1);assert.equal(microsoft.mailAttributions[0].route,'microsoft');assert.equal(microsoft.mailAttributions[0].sender_address,address);assert.equal(microsoft.mailAttributions[0].outcome,'accepted')
+  const googleReply=gmail[0].match(/\r\nReply-To: ([^\r\n]+)/)[1],microsoftReply=graph[0].message.replyTo[0].emailAddress.address
+  assert.equal((await inbound.deliver(h,googleReply,recipient,'Wrong signature',{badSignature:true})).status,401)
+  assert.equal((await inbound.deliver(h,googleReply,'other@synthetic-platter.example','Wrong sender')).status,403)
+  assert.equal((await inbound.deliver(h,googleReply,recipient,'Private address '+googleReply)).status,422)
+  assert.equal((await inbound.deliver(h,googleReply,recipient,'Attachment',{message:{attachments:[{id:'synthetic-platter-5900',filename:'file.txt',size:10,content_type:'text/plain'}]}})).status,422)
+  assert.equal((await inbound.deliver(h,googleReply,recipient,'x'.repeat(10001))).status,422)
+  const beforeReplies=installation.length
+  for(const [proposal,replyTo] of [[google,googleReply],[microsoft,microsoftReply]]){
+   const receipts=await Promise.all(Array.from({length:proposal.id===microsoft.id?2:1},()=>inbound.deliver(h,replyTo,recipient,'Can we start next Monday?')))
+   assert.deepEqual(receipts.map(r=>r.status).sort(),proposal.id===microsoft.id?[201,409]:[201]);const receipt=receipts.find(r=>r.status===201);assert.equal((await receipt.submit()).status,409)
+   const saved=(await h.state(people.sales.cookie)).proposals.find(p=>p.id===proposal.id).mailReplies
+   assert.equal(saved.length,1);assert.equal(saved[0].text,'Can we start next Monday?');assert.equal(saved[0].client_email,recipient)
+   assert.match((await h.send('/app/proposal?id='+proposal.id,undefined,people.sales.cookie)).text,/Can we start next Monday\?/)
+   assert.ok(!(await h.state(people.other.cookie)).proposals.some(p=>p.id===proposal.id),'reply text inherits proposal scope')
+   const audit=(await h.send('/api/platter/audit?action=mail.client-reply&subject='+proposal.id,undefined,h.owner)).value.rows
+   assert.equal(audit.length,1);assert.equal(audit[0].actor_role,'client')
+  }
+  assert.equal(installation.length,beforeReplies,'incoming replies cause no automatic outgoing mail')
+  assert.doesNotMatch(JSON.stringify(await h.state(people.sales.cookie)),new RegExp(googleReply.split('@')[0]))
   const blocked=await h.cmd('proposal.prepare',{...offer,clientId:client.id},people.sales.cookie)
   await h.cmd('member.set',{operatorId:people.sales.id,version:1,role:'content_editor',teams:[]})
   const beforeDenied=calls.length;await h.cmd('proposal.send',{id:blocked.id,version:1},people.sales.cookie,403);assert.equal(calls.length,beforeDenied)
@@ -603,6 +624,14 @@ test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute s
   await h.cmd('proposal.send',{id:raced.id,version:1},people.sales.cookie,403)
   assert.equal(gmail.length,sentBefore);assert.equal(installation.length,1,'loss of sending authority never falls back')
   assert.equal((await h.state()).proposals.find(p=>p.id===raced.id).mailAttributions[0].outcome,'withheld')
+  await h.cmd('member.set',{operatorId:people.sales.id,version:4,role:'sales',teams:[]})
+  const rotated=await send(),oldReply=gmail.at(-1).match(/\r\nReply-To: ([^\r\n]+)/)[1]
+  await h.cmd('proposal.send',{id:rotated.id,version:rotated.version,mailRepliesConsent:true},people.sales.cookie)
+  assert.equal((await inbound.deliver(h,oldReply,recipient,'Old invitation')).status,409)
+  const current=(await h.state(people.sales.cookie)).proposals.find(p=>p.id===rotated.id),currentReply=gmail.at(-1).match(/\r\nReply-To: ([^\r\n]+)/)[1]
+  await h.cmd('proposal.withdraw',{id:current.id,version:current.version,reason:'Client request'},people.sales.cookie)
+  assert.equal((await inbound.deliver(h,currentReply,recipient,'Withdrawn invitation')).status,409)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_mail_replies WHERE proposal_id=?').bind(current.id).first()).n,0)
   assert.doesNotMatch(JSON.stringify(await h.state(people.sales.cookie)),/synthetic-platter-510[256]/)
  }finally{await h.close()}
 })

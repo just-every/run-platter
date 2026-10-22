@@ -1,3 +1,4 @@
+import { prepareClientReply } from './client-mail-replies'
 import { sendingActor, memberMailbox, sendMailbox, recordSender } from './mailboxes'
 import type { Bindings } from '../auth.server'
 import { operatorMail } from '../mail.server.mjs'
@@ -6,7 +7,7 @@ import { demoEffect } from '@runeditrun/rer/internal/modules/demo/index.mjs'
 // Local development captures mail for the outbox; a demo sends it through the demo guard instead.
 export const capturesMail=(env:Bindings)=>env.AUTH_LOCAL==='true'&&env.RER_DEMO!=='1'
 export const proposalMail=(title:string,shareUrl:string):[string,string]=>['Your proposal: '+title,`Review your proposal and verify your email before accepting:\n${shareUrl}`]
-export function queueMail(env:Bindings,proposalId:string,to:string,subject:string,body:string,senderId:string|null=null,replyTo:SealedReplyAddress|null=null,mailId=crypto.randomUUID(),requiresApproval=false){return env.DB.prepare('INSERT INTO p_mail(id,proposal_id,recipient,subject,body,status,created_at,sender_id,provider,reply_to,requires_approval,proposal_revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,(SELECT revision FROM p_proposals WHERE id=?))').bind(mailId,proposalId,to,subject,body,capturesMail(env)?'local':'pending',Date.now(),senderId,env.MAIL_PROVIDER??null,replyTo,requiresApproval?1:0,proposalId)}
+export function queueMail(env:Bindings,proposalId:string,to:string,subject:string,body:string,senderId:string|null=null,replyTo:SealedReplyAddress|null=null,mailId=crypto.randomUUID(),requiresApproval=false,replyConsent=false){return env.DB.prepare('INSERT INTO p_mail(id,proposal_id,recipient,subject,body,status,created_at,sender_id,provider,reply_to,requires_approval,reply_consent,proposal_revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,(SELECT revision FROM p_proposals WHERE id=?))').bind(mailId,proposalId,to,subject,body,capturesMail(env)?'local':'pending',Date.now(),senderId,env.MAIL_PROVIDER??null,replyTo,requiresApproval?1:0,replyConsent?1:0,proposalId)}
 // Claim before contacting the provider; an uncertain attempt is never resent blindly.
 export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string){if(capturesMail(env))return
  const sender=operatorMail(env)
@@ -17,7 +18,8 @@ export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string
   let route='installation',address=env.MAIL_FROM??'',fallback=false
   try{
    const actor=await sendingActor(env,row),mailbox=actor?await memberMailbox(env,actor):null
-   const replyTo=row.reply_to?await openReplyAddress(env,row.reply_to):undefined
+   const sealedReply=actor?await prepareClientReply(env,actor,row):row.reply_to
+   const replyTo=sealedReply?await openReplyAddress(env,sealedReply):undefined
    let result:{status:string;providerMessageId:string|null}|undefined
    if(mailbox&&!mailbox.broken&&actor){
     route=mailbox.connection.provider;address=mailbox.connection.mailbox_email

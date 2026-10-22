@@ -1,3 +1,4 @@
+import { clientMailReplyResponse } from './client-mail-replies'
 import { mailboxAuthorize, mailboxCallback } from './mailboxes'
 import { revenueReaders } from './reports/recorded-revenue'
 import { clientData } from './client-data'
@@ -45,6 +46,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
  let actor:Actor|undefined;const requestedBack=new URL(url.searchParams.get('returnTo')||'/app',env.AUTH_ORIGIN);const back=requestedBack.origin===env.AUTH_ORIGIN&&pages.has(requestedBack.pathname)?requestedBack.pathname+requestedBack.search:'/app';let context:any,submitted:Record<string,unknown>|undefined
  try{
   need(url.origin===env.AUTH_ORIGIN&&(!request.headers.has('host')||request.headers.get('host')===url.host),'Wrong application origin',403);need(['GET','POST'].includes(request.method),'Method not allowed',405)
+  if(path==='/api/platter/client-mail-replies')return await clientMailReplyResponse(request,env)
   if(path==='/api/platter/question-replies')return await questionReplyResponse(request,env)
   if(path==='/api/platter/mail/events')return await deliveryWebhook(request,env)
   if(request.method==='POST'&&!isAgent)need(request.headers.get('origin')===env.AUTH_ORIGIN&&request.headers.get('sec-fetch-site')!=='cross-site','Cross-site request refused',403)

@@ -1,3 +1,4 @@
+import { resendReplyAvailable } from './question-reply-mail'
 import type { Bindings } from '../auth.server'
 import { proposalMail, queueMail } from './mail'
 import { need, text, type Actor } from './model'
@@ -22,8 +23,11 @@ export function invitationMail(
   need(!missing, 'Fill the variable before sending: ' + (missing?.[1] ?? ''))
   body = message + '\n\n' + shareUrl
  }
+ const replies=input.mailRepliesConsent===true||input.mailRepliesConsent==='yes'
+ need(!replies||resendReplyAvailable(env),'Email replies are not configured',409)
+ if(replies)body+='\n\nYou may reply once from this invited address to add a plain-text message to the proposal. The full reply, including quoted text, is visible to the firm’s proposal collaborators. Remove private reply addresses and attachments before sending. A fresh invitation replaces this reply address.'
  return [
-  queueMail(env, offer.id, recipient, subject, body, actor.id, null, crypto.randomUUID(), true),
+  queueMail(env, offer.id, recipient, subject, body, actor.id, null, crypto.randomUUID(), true, replies),
   env.DB.prepare('INSERT INTO p_invitation_messages(id,proposal_id,revision,recipient,subject,message,queued_at,actor_id) VALUES(?,?,?,?,?,?,?,?)')
    .bind(crypto.randomUUID(), offer.id, offer.revision, recipient, subject, message, at, actor.id),
  ]

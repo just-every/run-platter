@@ -1602,3 +1602,30 @@ test('TEAM-001 delegated invitations bind roles and teams to current inviter aut
  assert.equal((await h.cmd('member.invite',{...stale,role:'content_editor',teams:[west.id]})).status,'invited');const recovered=await h.state(await joinInvite(stale.email));assert.equal(recovered.actor.role,'content_editor');assert.deepEqual(recovered.teams.map(t=>t.id),[west.id]);assert.ok((await h.send('/auth/confirm',{token:staleToken})).status>=400,'reissue revokes the earlier invitation')
  }finally{await h.close()}
 })
+
+test('TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices and private costs stay frozen in proposals',()=>run(async h=>{
+ const team=await h.cmd('team.create',{name:'East'}),people={}
+ for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[team.id]});people[role]=cookie}
+ const input={name:'Synthetic service',sku:'synthetic-platter-3100',description:'Explicitly priced service',unit:'hour',unitPrice:'100',unitCost:'25'},catalog=[]
+ for(const role of ['owner','admin','manager']){const cookie=role==='owner'?h.owner:people[role];catalog.push(await h.cmd('catalog.save',{...input,sku:input.sku+'-'+role},cookie))}
+ const before=(await h.db.prepare('SELECT * FROM p_priced_catalog ORDER BY id').all()).results
+ for(const role of ['sales','content_editor','viewer','billing'])await h.cmd('catalog.save',{...input,id:catalog[0].id,version:1},people[role],403)
+ assert.deepEqual((await h.db.prepare('SELECT * FROM p_priced_catalog ORDER BY id').all()).results,before)
+ for(const role of ['sales','content_editor'])assert.equal(Object.hasOwn((await h.state(people[role])).catalogItems[0],'unitCostCents'),false)
+ assert.deepEqual((await h.state(people.viewer)).catalogItems,[]);assert.equal((await h.send('/app/catalog',undefined,people.viewer)).status,403)
+ const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'}),p=await h.cmd('proposal.prepare',{...offer,title:'Synthetic catalog proposal',clientId:client.id},people.sales)
+ await h.cmd('catalog.insert',{id:p.id,version:1,catalogId:catalog[0].id,catalogVersion:1,optionId:'one',quantity:'2'},people.sales)
+ let current=(await h.state()).proposals.find(r=>r.id===p.id);assert.equal(current.options[0].cents,260000);assert.equal(current.options[1].cents,420000);assert.equal(current.internalPricing.lines.find(l=>l.name===input.name).unitCostCents,2500)
+ assert.equal((await h.state(people.manager)).proposals.find(r=>r.id===p.id).internalPricing.lines.find(l=>l.name===input.name).costCents,5000)
+ assert.equal(Object.hasOwn((await h.state(people.sales)).proposals.find(r=>r.id===p.id),'internalPricing'),false)
+ await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const path=new URL((await h.cmd('proposal.send',{id:p.id,version:3},people.sales)).shareUrl).pathname,frozen=(await h.db.prepare('SELECT snapshot FROM p_revisions WHERE proposal_id=? AND revision=2').bind(p.id).first()).snapshot
+ const cookie=await verified(h,path),publicPage=await h.send(path,undefined,cookie);assert.doesNotMatch(publicPage.text,/Internal cost|Margin|unit_cost_cents|unitCostCents/)
+ const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId=one',{headers:{host:new URL(h.origin).host,cookie}});assert.equal(pdf.status,200);assert.doesNotMatch((await pdfPages(new Uint8Array(await pdf.arrayBuffer()))).join('\n'),/Internal cost|Margin/)
+ await h.cmd('catalog.save',{...input,sku:input.sku+'-owner',id:catalog[0].id,version:1,unitPrice:'150',unitCost:'30'},people.manager)
+ current=(await h.state()).proposals.find(r=>r.id===p.id);assert.equal(current.options[0].cents,260000);assert.equal((await h.db.prepare('SELECT snapshot FROM p_revisions WHERE proposal_id=? AND revision=2').bind(p.id).first()).snapshot,frozen)
+ const fresh=await h.cmd('proposal.prepare',{...offer,title:'New catalog proposal',clientId:client.id},people.sales)
+ await h.cmd('catalog.insert',{id:fresh.id,version:1,catalogId:catalog[0].id,catalogVersion:2,optionId:'one',quantity:'2'},people.sales);assert.equal((await h.state()).proposals.find(r=>r.id===fresh.id).options[0].cents,270000)
+ await h.cmd('catalog.insert',{id:fresh.id,version:2,catalogId:catalog[0].id,catalogVersion:1,optionId:'one',quantity:'1'},people.sales,409)
+ await h.cmd('catalog.save',{...input,sku:input.sku+'-owner'},h.owner,409);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_priced_catalog').first()).n,3)
+ await h.cmd('catalog.save',{...input,sku:'synthetic-platter-3101',unitCost:'0.00'});assert.equal((await h.state()).catalogItems.find(r=>r.sku==='synthetic-platter-3101').unitCostCents,0)
+}))

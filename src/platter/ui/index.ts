@@ -1,3 +1,4 @@
+import { catalogPage } from './catalog'
 import { foldersPanel } from './folders'
 import { connectionsPanel } from './connections'
 import { workspacePanel } from './workspace'
@@ -28,6 +29,7 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
     let above = ''
     let layout = ''
     switch (url.pathname) {
+      case '/app/catalog': title='Catalog'; content=catalogPage(state); break
       case '/app/library': title='Content library'; content=libraryPage(state); break
       case '/app/team': title='Team'; content=teamPage(state)+foldersPanel(state)+connectionsPanel(state,true); break
       case '/app/approvals': title='Approvals'; content=approvalsPage(state); break

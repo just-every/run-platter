@@ -12,5 +12,5 @@ export function teamPage(s:any){
 }
 export function sharingPanel(s:any,p:any){
  if(!p.canSend)return ''
- return panel('Collaborators',form('proposal.share','/app/proposal',hidden('id',p.id)+field('Member email','collaboratorEmail','','type="email" required')+'<label>Access<select name="shared"><option value="yes">Share proposal</option><option value="no">Remove sharing</option></select></label><p>Sharing allows this member to view and edit this proposal. Only sending roles may send it.</p><button>Save collaborator</button>'))
+ return panel('Collaborators',form('proposal.share','/app/proposal',hidden('id',p.id)+field('Member email','collaboratorEmail','','type="email" required')+'<label>Access<select name="shared"><option value="yes">Share proposal</option><option value="no">Remove sharing</option></select></label><p>Sharing preserves the member’s role permissions. Sales and content editors gain access to this proposal; managers and viewers keep their team scope. Only sending roles may send it.</p><button>Save collaborator</button>'))
 }

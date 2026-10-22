@@ -1114,6 +1114,8 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
      const oauthForm=mailboxPage.locator('form').filter({has:mailboxPage.getByRole('button',{name:'Authorize '+label,exact:true})})
      await oauthForm.getByLabel('Sending address (optional)',{exact:true}).fill('connected@synthetic-platter.example')
      await oauthForm.getByRole('checkbox').check();await oauthForm.getByRole('button').click()
+     await capture(mailboxPage,provider+'-authorization')
+     await mailboxPage.getByRole('link',{name:'Continue to provider',exact:true}).click()
      await mailboxPage.getByRole('link',{name:'Authorize synthetic provider',exact:true}).click()
      assert.equal((await state(sales)).connections.find(c=>c.provider===provider).mailboxEmail,'connected@synthetic-platter.example')
      await capture(mailboxPage,provider+'-oauth-mailbox')

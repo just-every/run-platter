@@ -25,7 +25,7 @@ import { sendRequests, resolveSendRequest } from './send-requests'
 import { auditNames, auditRows, auditCsv, recordAudit } from './audit'
 import { auditPage } from './ui/audit'
 import { document } from './ui/shell'
-import { inZone } from './ui/shared'
+import { inZone, escape } from './ui/shared'
 import { installationZone } from './reports/report-state'
 import { runtimeBindings,type Bindings } from '../auth.server'
 import { principal,credentialCommand } from './credentials'
@@ -60,6 +60,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   if(path==='/api/platter/mailbox/authorize'){
    need(request.method==='POST'&&request.headers.get('origin')===env.AUTH_ORIGIN,'Authorize from this installation',403)
    const result=await mailboxAuthorize(env,actor,await body(request))
+   if(request.headers.get('content-type')?.includes('application/x-www-form-urlencoded'))return document('Connect your mailbox','<section><p>Continue to your provider to authorize this mailbox. You will return to Platter when authorization finishes.</p><a href="'+escape(result.url)+'" rel="noreferrer">Continue to provider</a></section>',{actor,path:'/app/team'})
    return new Response(null,{status:303,headers:{...headers,location:result.url}})
   }
   if(path==='/api/platter/mailbox/callback'){

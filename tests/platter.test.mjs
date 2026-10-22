@@ -749,7 +749,7 @@ test('SEND-010 / FOLLOW-002 withdrawal revokes every current public door, preser
  assert.ok((await h.send('/api/platter/followups',undefined,h.owner)).value.rows.some(r=>r.id===p.id))
  const before=(await h.state()).proposals.find(x=>x.id===p.id)
  await h.cmd('proposal.withdraw',{id:p.id,version:4,reason:'Sent to the wrong client'})
- for(const suffix of ['', '/action?name=accept','/action?name=code.request','/action?name=code.verify','/action?name=question.create','/action?name=suggestion.create','/action?name=expiry.reopen','/download.pdf?optionId=one','/attachments/any-file']){
+ for(const suffix of ['', '/action?name=accept','/action?name=code.request','/action?name=code.verify','/action?name=question.create','/action?name=suggestion.create','/action?name=expiry.reopen','/download.pdf?optionId=one','/data.json','/attachments/any-file']){
   const r=await h.send(path+suffix,suffix.includes('/action')?{name:'Avery',optionId:'one',consent:true,code:'123456'}:undefined,cookie)
   assert.equal(r.status,410,r.text);assert.match(r.text,/Proposal withdrawn/);assert.match(r.text,/owner@studio.example/)
   for(const secret of [offer.title,offer.scope,offer.optionOne,'2400','When can you begin?'])assert.ok(!r.text.includes(secret),'withdrawn response reveals none of the proposal')
@@ -1235,7 +1235,7 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  assert.ok(!(await h.send('/api/platter/followups',undefined,h.owner)).value.rows.some(r=>r.id===p.id))
  assert.ok(!(await h.send('/api/platter/questions',undefined,h.owner)).value.questions.some(q=>q.proposal_id===p.id))
  await h.cmd('followup.schedule',{id:p.id,action:'Call again',dueDate:'2027-03-11'},h.owner,409)
- for(const suffix of ['', '/action?name=accept','/action?name=decline','/action?name=code.request','/action?name=question.create','/action?name=expiry.reopen','/download.pdf?optionId=one','/attachments/any-file']){
+ for(const suffix of ['', '/action?name=accept','/action?name=decline','/action?name=code.request','/action?name=question.create','/action?name=expiry.reopen','/download.pdf?optionId=one','/data.json','/attachments/any-file']){
   const response=await h.send(path+suffix,suffix.includes('/action')?{name:'Avery',optionId:'one',consent:true,reason:'Changed reason',revision:1}:undefined,cookie)
   assert.equal(response.status,410,response.text);assert.ok(!response.text.includes(offer.scope));assert.ok(!response.text.includes('Budget'))
  }
@@ -1269,7 +1269,7 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  assert.equal(lost.pipelineStatus,'lost');assert.equal(lost.outcomes[0].kind,'lost');assert.equal(lost.outcomes[0].actor_role,'owner');assert.equal(lost.outcomes[0].reason,'Project cancelled');assert.equal(lost.withdrawals[0].notice,0)
  assert.deepEqual((await h.state()).outbox.map(m=>m.id),mailBefore,'marking lost sends no recipient notice by default')
  assert.ok(!(await h.send('/api/platter/followups',undefined,h.owner)).value.rows.some(r=>r.id===lost.id))
- for(const suffix of ['', '/action?name=accept','/action?name=code.request','/download.pdf?optionId=one','/attachments/any-file'])assert.equal((await h.send(other.path+suffix,suffix.includes('/action')?{name:'Avery',optionId:'one',consent:true}:undefined,otherCookie)).status,410)
+ for(const suffix of ['', '/action?name=accept','/action?name=code.request','/download.pdf?optionId=one','/data.json','/attachments/any-file'])assert.equal((await h.send(other.path+suffix,suffix.includes('/action')?{name:'Avery',optionId:'one',consent:true}:undefined,otherCookie)).status,410)
  const lostAudit=(await h.send('/api/platter/audit?action=proposal.lose',undefined,h.owner)).value.rows
  assert.equal(lostAudit.length,1);assert.equal(lostAudit[0].actor_id,(await h.state()).actor.id);assert.equal(lostAudit[0].occurred_at,lost.outcomes[0].occurred_at)
  await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:lost.id,version:lost.version})
@@ -1465,7 +1465,7 @@ test('TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions a
   assert.deepEqual((await h.state()).proposals.find(r=>r.id===duplicate.id).internalPricing,row.internalPricing)
   await h.cmd('proposal.approve',{id:p.id,version:3,revision:3});await h.cmd('proposal.send',{id:p.id,version:4},people.sales.cookie)
   row=await current();const path='/p/'+row.shareToken,cookie=await verified(h,path)
-  const publicPage=await h.send(path,undefined,cookie);assert.equal(publicPage.status,200);assert.ok(!publicPage.text.includes('Internal cost'));assert.ok(!publicPage.text.includes('unitCostCents'));assert.ok(!publicPage.text.includes('marginCents'))
+  const structured=await h.send(path+'/data.json',undefined,cookie);assert.equal(structured.status,200,structured.text);assert.doesNotMatch(structured.text,/unitCostCents|marginCents|internalPricing/);const publicPage=await h.send(path,undefined,cookie);assert.equal(publicPage.status,200);assert.ok(!publicPage.text.includes('Internal cost'));assert.ok(!publicPage.text.includes('unitCostCents'));assert.ok(!publicPage.text.includes('marginCents'))
   const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId=main',{headers:{cookie}});assert.equal(pdf.status,200)
   const publicText=(await pdfPages(await pdf.arrayBuffer())).join(' ');assert.ok(!/internal cost|margin/i.test(publicText));assert.match(publicText,/350.00/)
   await h.cmd('proposal.negotiate',{...input,id:p.id,version:5,scope:'A negotiated public scope'},people.sales.cookie)
@@ -1664,3 +1664,30 @@ test('TEAM-001 / APPROVE-003 native admins remain eligible named approvers and s
  const {p}=await draft(h);await h.cmd('proposal.send',{id:p.id,version:1},h.owner,409);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1},admin);await h.cmd('proposal.send',{id:p.id,version:2});await audited(h,'proposal.approve',actor.id,'admin',p.id)
  await h.cmd('approval.rule.delete',{id:rule.id,version:2},admin);await audited(h,'approval.rule.delete',actor.id,'admin',rule.id)
 }))
+
+test('TEAM-001 / PRICE-006 optional and flat-package costs produce exact selected totals while verified client JSON, pages and PDFs exclude private state',async()=>{
+ const h=await harness({assetsDirectory:'public'})
+ try{
+  const {client}=await draft(h),p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic selected package',scope:'Public delivery',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'100',optionalItems:[{id:'rush',label:'Rush delivery',unitPrice:'10',min:1,max:5,quantity:2,editable:true}]},{id:'alternative',label:'Alternative',price:'200'}],pricingTables:[{optionId:'main',name:'Services',lines:[{name:'Delivery work',description:'Public work',quantity:'1',unit:'project',unitPrice:'100'}]}]})
+  const current=async()=>(await h.state()).proposals.find(r=>r.id===p.id)
+  let row=await current();await h.cmd('pricing.cost',{id:p.id,version:1,lineKey:row.internalPricing.lines.find(l=>l.kind==='base'&&l.optionId==='main').key,unitCost:'40'})
+  row=await current();await h.cmd('pricing.cost',{id:p.id,version:2,lineKey:row.internalPricing.lines.find(l=>l.kind==='optional').key,unitCost:'3.17'})
+  row=await current();await h.cmd('pricing.cost',{id:p.id,version:3,lineKey:row.internalPricing.lines.find(l=>l.optionId==='alternative').key,unitCost:'80'})
+  row=await current();assert.deepEqual([row.internalPricing.total.revenueCents,row.internalPricing.total.costCents,row.internalPricing.total.marginCents],[10000,4000,6000]);const optional=row.internalPricing.lines.find(l=>l.kind==='optional');assert.deepEqual([optional.selected,optional.quantity,optional.costCents,optional.marginCents],[false,'2',634,1366]);assert.equal(row.internalPricing.packages[1].marginCents,12000)
+  const template=await h.cmd('template.save',{id:p.id,version:4,name:'Optional costing'}),started=await h.cmd('template.start',{id:template.id,version:1,clientId:client.id});assert.deepEqual((await h.state()).proposals.find(r=>r.id===started.id).internalPricing,row.internalPricing)
+  await h.cmd('proposal.approve',{id:p.id,version:4,revision:4});const path=new URL((await h.cmd('proposal.send',{id:p.id,version:5})).shareUrl).pathname
+  const unauthenticated=await h.send(path+'/data.json',undefined,h.owner);assert.equal(unauthenticated.status,401);assert.doesNotMatch(unauthenticated.text,/Synthetic selected package|Public delivery|unitCost|margin/)
+  const cookie=await verified(h,path),initial=await h.send(path+'/data.json',undefined,cookie);assert.equal(initial.status,200,initial.text);assert.equal(initial.value.selection.totalCents,10000)
+  assert.equal((await h.send(path+'/data.json',{},cookie)).status,405)
+  assert.equal((await h.send(path+'/action?name=accept',{name:'Casey Synthetic',optionId:'main',items:[{id:'rush',quantity:3}],consent:true},cookie)).status,200)
+  row=await current();assert.equal(row.acceptance.totalCents,13000);assert.deepEqual([row.internalPricing.total.revenueCents,row.internalPricing.total.costCents,row.internalPricing.total.marginCents,row.internalPricing.total.marginBps],[13000,4951,8049,6192]);assert.deepEqual([row.internalPricing.lines.find(l=>l.kind==='optional').quantity,row.internalPricing.lines.find(l=>l.kind==='optional').costCents],['3',951])
+  const data=await h.send(path+'/data.json',undefined,cookie);assert.equal(data.status,200,data.text);assert.equal(data.value.selection.totalCents,13000);assert.equal(data.value.acceptance.depositCents,3250);assert.equal(data.value.acceptance.name,'Casey Synthetic');assert.doesNotMatch(data.text,/internalPricing|unitCost|unit_cost|margin|owner_email|owner_id|outbox|session|token/)
+  const publicPage=await h.send(path,undefined,cookie);assert.doesNotMatch(publicPage.text,/Internal cost|3\.17|49\.51|80\.49/)
+  const file=await h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId=main',{headers:{cookie}});assert.equal(file.status,200);const publicPdf=(await pdfPages(await file.arrayBuffer())).join(' ');assert.match(publicPdf,/130\.00/);assert.doesNotMatch(publicPdf,/Internal cost|Margin|3\.17|49\.51|80\.49/)
+  await audited(h,'proposal.data',client.id,'client',p.id)
+  const foreign=await sent(h);assert.equal((await h.send(foreign.path+'/data.json',undefined,cookie)).status,401,'another invitation never inherits the mailbox session')
+  // Converting a flat package into an itemized table preserves its previously entered private package cost.
+  let flat=(await h.state()).proposals.find(r=>r.id===started.id);const item=await h.cmd('catalog.save',{name:'Synthetic add-on',sku:'synthetic-platter-3800',description:'Public item',unit:'each',unitPrice:'10',unitCost:'2'})
+  await h.cmd('catalog.insert',{id:flat.id,version:1,catalogId:item.id,catalogVersion:1,optionId:'alternative',quantity:'1'});flat=(await h.state()).proposals.find(r=>r.id===started.id);assert.equal(flat.internalPricing.packages.find(o=>o.id==='alternative').costCents,8200)
+ }finally{await h.close()}
+})

@@ -1,4 +1,4 @@
-import { costReaders, type CostPatch } from './internal-pricing'
+import { costReaders, flatCostKey, type CostPatch } from './internal-pricing'
 import { permitted } from './permissions'
 import { negotiatedView, pendingNegotiation } from './negotiation'
 import { editablePackages, pricingInput } from './pricing'
@@ -28,5 +28,6 @@ export async function catalogInsertion(db:D1Database,a:Actor,p:Record<string,unk
  const tables=pricingInput(options),existing=option.tables??[],line={name:item.name,description:item.description,unit:item.unit,quantity:String(p.quantity??'1'),unitPrice:(item.unit_cents/100).toFixed(2)},baseline=existing.length?[]:[{name:'Original package amount',description:'',unit:'project',quantity:'1',unitPrice:(option.cents/100).toFixed(2)}],tableName='Catalog items'
  tables.push({optionId:option.id,name:tableName,lines:[...baseline,line]})
  const key=await hash(JSON.stringify([option.id,existing.length,baseline.length,tableName,line.name,line.description,line.unit])),costs:CostPatch[]=item.unit_cost_cents===null?[]:[{key,cents:item.unit_cost_cents}]
+ if(baseline.length){const oldCost=await db.prepare('SELECT unit_cost_cents FROM p_internal_costs WHERE proposal_id=? AND revision=? AND line_key=?').bind(row.id,row.revision,await flatCostKey(option.id)).first<any>();if(oldCost)costs.push({key:await hash(JSON.stringify([option.id,0,0,tableName,baseline[0].name,baseline[0].description,baseline[0].unit])),cents:oldCost.unit_cost_cents})}
  return {fields:{id:row.id,version:original.version,clientId:row.client_id,title:row.title,scope:row.scope,terms:row.terms??'',sectionConditions:publicOffer.section_conditions??{},depositPercent:row.deposit_bps/100,packages:editablePackages(options),pricingTables:tables},costs}
 }

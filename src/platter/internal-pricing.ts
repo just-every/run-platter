@@ -18,23 +18,27 @@ export const saveTemplateCosts=(db:D1Database,id:string,revision:number,template
 export const startTemplateCosts=(db:D1Database,template:string,id:string)=>db.prepare('INSERT INTO p_internal_costs(proposal_id,revision,line_key,unit_cost_cents) SELECT ?,1,line_key,unit_cost_cents FROM p_template_costs WHERE template_id=?').bind(id,template)
 
 /** Private amounts never enter the public offer snapshot or its option objects. */
+export const flatCostKey=(optionId:string)=>hash(JSON.stringify(['package',optionId]))
+export const optionalCostKey=(optionId:string,itemId:string,label:string)=>hash(JSON.stringify(['optional',optionId,itemId,label]))
 export async function internalPricing(db:D1Database,row:any,a:Actor){
  if(!costReaders.includes(a.role))return undefined
  const options=typeof row.options==='string'?JSON.parse(row.options):row.options
- if(!options.some((o:any)=>o.tables?.length))return undefined
- const records=(await db.prepare('SELECT line_key,unit_cost_cents FROM p_internal_costs WHERE proposal_id=? AND revision=?').bind(row.id,row.revision).all<any>()).results
- const lines:any[]=[]
- for(const option of options)for(const [ti,table] of (option.tables??[]).entries())for(const [li,line] of table.lines.entries()){
-  const key=await hash(JSON.stringify([option.id,ti,li,table.name,line.name,line.description,line.unit])),record=records.find(r=>r.line_key===key),unitCostCents=record?.unit_cost_cents??null
-  const [whole,fraction='']=String(line.quantity).split('.'),mills=BigInt(whole)*1000n+BigInt(fraction.padEnd(3,'0'))
-  const extended=unitCostCents===null?null:(BigInt(unitCostCents)*mills+500n)/1000n
+ const [costs,accepted]=await Promise.all([db.prepare('SELECT line_key,unit_cost_cents FROM p_internal_costs WHERE proposal_id=? AND revision=?').bind(row.id,row.revision).all<any>(),db.prepare('SELECT option_id,snapshot FROM p_acceptances WHERE proposal_id=? AND revision=?').bind(row.id,row.revision).first<any>()])
+ const records=costs.results,acceptedItems=accepted?JSON.parse(accepted.snapshot).selection?.items??[]:[],lines:any[]=[]
+ const add=(key:string,option:any,table:string,name:string,quantity:string,unit:string,revenueCents:number,extra:any={})=>{
+  const record=records.find(r=>r.line_key===key),unitCostCents=record?.unit_cost_cents??null,[whole,fraction='']=quantity.split('.'),mills=BigInt(whole)*1000n+BigInt(fraction.padEnd(3,'0')),extended=unitCostCents===null?null:(BigInt(unitCostCents)*mills+500n)/1000n
   need(extended===null||extended<=BigInt(Number.MAX_SAFE_INTEGER),'Internal cost exceeds the supported range')
-  const costCents=extended===null?null:Number(extended),marginCents=costCents===null?null:line.lineTotalCents-costCents
-  lines.push({key,optionId:option.id,option:option.label,table:table.name,tableIndex:ti,lineIndex:li,name:line.name,quantity:line.quantity,unit:line.unit,revenueCents:line.lineTotalCents,unitCostCents,costCents,marginCents,marginBps:marginCents===null?null:marginRate(BigInt(marginCents),line.lineTotalCents)})
+  const costCents=extended===null?null:Number(extended),marginCents=costCents===null?null:revenueCents-costCents
+  lines.push({key,optionId:option.id,option:option.label,table,name,quantity,unit,revenueCents,unitCostCents,costCents,marginCents,marginBps:marginCents===null?null:marginRate(BigInt(marginCents),revenueCents),kind:'base',selected:true,...extra})
  }
- const packages=options.map((o:any)=>{const rows=lines.filter(l=>l.optionId===o.id),known=rows.length>0&&rows.every(l=>l.costCents!==null),cost=known?rows.reduce((n,l)=>n+BigInt(l.costCents),0n):null,margin=cost===null?null:BigInt(o.cents)-cost;return {id:o.id,label:o.label,revenueCents:o.cents,costCents:cost===null?null:exactInteger(cost),marginCents:margin===null?null:exactInteger(margin),marginBps:margin===null?null:marginRate(margin,o.cents)}})
-
- return {lines,packages}
+ for(const option of options){
+  if(!option.tables?.length)add(await flatCostKey(option.id),option,'Package amount',option.label,'1','package',option.cents)
+  for(const [ti,table] of (option.tables??[]).entries())for(const [li,line] of table.lines.entries())add(await hash(JSON.stringify([option.id,ti,li,table.name,line.name,line.description,line.unit])),option,table.name,line.name,String(line.quantity),line.unit,line.lineTotalCents,{tableIndex:ti,lineIndex:li})
+  for(const item of option.optionalItems??[]){const selected=accepted?.option_id===option.id?acceptedItems.find((i:any)=>i.id===item.id):null,quantity=selected?.quantity??item.quantity;add(await optionalCostKey(option.id,item.id,item.label),option,selected?'Selected optional items':'Optional items (not selected)',item.label,String(quantity),'each',item.unitCents*quantity,{kind:'optional',selected:Boolean(selected),itemId:item.id})}
+ }
+ const packages=options.map((o:any)=>{const rows=lines.filter(l=>l.optionId===o.id&&l.selected),revenue=o.cents+rows.filter(l=>l.kind==='optional').reduce((n,l)=>n+l.revenueCents,0),known=rows.length>0&&rows.every(l=>l.costCents!==null),cost=known?rows.reduce((n,l)=>n+BigInt(l.costCents),0n):null,margin=cost===null?null:BigInt(revenue)-cost;return{id:o.id,label:o.label,revenueCents:revenue,costCents:cost===null?null:exactInteger(cost),marginCents:margin===null?null:exactInteger(margin),marginBps:margin===null?null:marginRate(margin,revenue)}})
+ const defaultOptionId=accepted?.option_id??options[0]?.id
+ return {lines,packages,defaultOptionId,total:packages.find((p:any)=>p.id===defaultOptionId)}
 }
 
 export async function saveCost(env:Bindings,a:Actor,p:Record<string,unknown>,revise:(fields:Record<string,unknown>,patch:CostPatch[])=>Promise<unknown>){
@@ -60,5 +64,6 @@ export async function internalPricingPdf(env:Bindings,a:Actor,query:URLSearchPar
  pdf.document.setTitle('Internal pricing: '+row.title);pdf.document.setSubject('Internal use only')
  pdf.text('Internal pricing — firm use only',20);pdf.text(row.title,16);pdf.text('Revision '+row.revision)
  for(const line of detail.lines){pdf.heading(line.option+' / '+line.table+' / '+line.name);pdf.text('Revenue: '+money(line.revenueCents));pdf.text(line.costCents===null?'Cost and margin not recorded':`Internal cost: ${money(line.costCents)}; margin: ${money(line.marginCents)}${line.marginBps===null?'':` (${costPercent(line.marginBps)})`}`)}
+ for(const option of detail.packages){pdf.heading('Package total: '+option.label);pdf.text('Revenue: '+money(option.revenueCents));pdf.text(option.costCents===null?'Total cost and margin not recorded':'Total cost: '+money(option.costCents)+'; total margin: '+money(option.marginCents!))}
  return new Response(new Uint8Array(await pdf.document.save()).buffer,{headers:{'content-type':'application/pdf','content-disposition':'attachment; filename="internal-pricing.pdf"','cache-control':'no-store','x-content-type-options':'nosniff'}})
 }

@@ -18,18 +18,18 @@ export class PdfText {
  private readonly choices = new Map<string, PDFFont>()
  private readonly segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
- private constructor(readonly document: PDFDocument, private fonts: PDFFont[], private revision: number) {
+ private constructor(readonly document: PDFDocument, private fonts: PDFFont[], private revision: number, private footer?: string) {
   this.coverage = fonts.map(font => new Set(font.getCharacterSet()))
   this.newPage()
  }
 
- static async create(revision: number, fontBytes: (Uint8Array | ArrayBuffer)[] = []) {
+ static async create(revision: number, fontBytes: (Uint8Array | ArrayBuffer)[] = [], footer?: string) {
   need(fontBytes.length > 0, 'PDF fonts are unavailable.', 503)
   const document = await PDFDocument.create()
   document.registerFontkit(fontkit)
   const fonts: PDFFont[] = []
   for (const bytes of fontBytes) fonts.push(await document.embedFont(bytes, { subset: true }))
-  return new PdfText(document, fonts, revision)
+  return new PdfText(document, fonts, revision, footer)
  }
 
  private runs(text: string): Run[] {
@@ -64,7 +64,7 @@ export class PdfText {
  private newPage() {
   this.page = this.document.addPage(letter)
   this.page.drawLine({ start: { x: margin, y: 48 }, end: { x: letter[0] - margin, y: 48 }, thickness: 0.6, color: rgb(0.8, 0.83, 0.81) })
-  this.draw(`Not signed, revision ${this.revision}`, margin, 32, 9, muted)
+  this.draw(this.footer??`Not signed, revision ${this.revision}`, margin, 32, 9, muted)
   this.draw(`Page ${this.document.getPageCount()}`, letter[0] - margin - 48, 32, 9, muted)
   this.y = letter[1] - margin
  }

@@ -1,3 +1,4 @@
+import { documentFixture } from './document-fixture.mjs'
 import { templatesHttp } from './templates-http.mjs'
 import { followupJourney } from './followup-journey.mjs'
 import { test } from 'node:test'
@@ -2024,3 +2025,199 @@ test('TEAM-001 upgrading a pre-role database keeps former members as sales witho
   const future=await h.cmd('proposal.prepare',{...offer,clientId});const copied=(await h.state()).proposals.find(p=>p.id===future.id);assert.deepEqual(copied.deliveryDefaults,{remindersEnabled:true,reminderDays:[2,5,9],beforeExpiryDays:[3],reminderCap:3,paymentMethods:['card']});assert.equal(copied.expiry.days,60);assert.equal(copied.expiry.warningDays,1);assert.equal(copied.reminderSettings,null);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_reminder_authority').first()).n,0)
  }finally{await h.close()}
 })
+
+
+test('EDIT-001 document revisions preserve ordered blocks and brand through preview, restore, copies, templates, negotiation and exact client PDF', {timeout:120000},async()=>{
+ const h=await harness({assetsDirectory:'public'})
+ try{
+  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+  const client=await h.cmd('client.save',{name:'Synthetic Platter client',email:'synthetic-platter-1@example.com'}),document=documentFixture()
+  const fields={...offer,clientId:client.id,document,pricingTables:[{optionId:'one',name:'Placed services',lines:[{name:'Discovery',description:'A reviewed workshop',quantity:'2',unit:'hour',unitPrice:'10.01',group:''}]},{optionId:'one',name:'Unplaced contingency',lines:[{name:'Review',description:'',quantity:'1',unit:'hour',unitPrice:'10.00',group:''}]}]}
+  document.blocks.splice(4,0,{id:'pricing',type:'pricing',title:'Investment detail',text:'',optionId:'one',tableIndex:0})
+  const created=await h.cmd('proposal.prepare',fields)
+  let p=(await h.state()).proposals.find(p=>p.id===created.id)
+  assert.deepEqual(p.document,document)
+  await h.cmd('proposal.autosave',{...fields,document:undefined,id:p.id,version:1,pricingTables:[fields.pricingTables[1]]},h.owner,400)
+  assert.equal((await h.state()).proposals.find(v=>v.id===p.id).options[0].tables[0].name,'Placed services','native edits cannot silently rebind placed pricing to a different table')
+  const preview=await h.send(`/app/preview/client?id=${p.id}&revision=1&optionId=two`,undefined,h.owner)
+  assert.equal(preview.status,200);assert.match(preview.text,/Two perspectives/);assert.match(preview.text,/<strong>careful<\/strong>/);assert.match(preview.text,/Campaign timeline/)
+  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1})
+  const edited=structuredClone(document);edited.blocks.reverse();edited.blocks.find(b=>b.id==='story').text='A revised approach.'
+  const saved=await h.cmd('proposal.document',{id:p.id,version:2,document:edited})
+  p=(await h.state()).proposals.find(p=>p.id===created.id)
+  assert.equal(p.revision,2);assert.equal(p.status,'draft');assert.equal(p.approved_by,null);assert.deepEqual(p.document,edited)
+  await h.cmd('proposal.send',{id:p.id,version:saved.version},h.owner,409)
+  await h.cmd('proposal.document',{id:p.id,version:2,document},h.owner,409)
+  await h.cmd('proposal.restore',{id:p.id,version:saved.version,revision:1})
+  p=(await h.state()).proposals.find(p=>p.id===created.id);assert.deepEqual(p.document,document);assert.equal(p.revision,3)
+  const compare=await h.send(`/app/proposal?id=${p.id}&from=1&to=2`,undefined,h.owner);assert.match(compare.text,/Document blocks and brand/);assert.match(compare.text,/A revised approach/)
+  const copy=await h.cmd('proposal.duplicate',{id:p.id,version:p.version})
+  assert.deepEqual((await h.state()).proposals.find(p=>p.id===copy.id).document,document)
+  const template=await h.cmd('template.save',{id:p.id,version:p.version,name:'Document template'})
+  const start=await h.cmd('template.start',{id:template.id,version:template.version,clientId:client.id})
+  assert.deepEqual((await h.state()).proposals.find(p=>p.id===start.id).document,document)
+  await h.cmd('proposal.approve',{id:p.id,version:p.version,revision:p.revision});p=(await h.state()).proposals.find(p=>p.id===created.id)
+  const invitation=await h.cmd('proposal.send',{id:p.id,version:p.version}),path=new URL(invitation.shareUrl).pathname,cookie=await verified(h,path)
+  const data=(await h.send(path+'/data.json?optionId=one',undefined,cookie)).value
+  assert.deepEqual(data.document.blocks,document.blocks.filter(b=>b.id!=='extra'));assert.deepEqual(data.document.brand,document.brand)
+  const raw=await h.mf.dispatchFetch(h.origin+path+'/download.pdf',{method:'POST',headers:{origin:h.origin,cookie,'content-type':'application/json'},body:JSON.stringify({optionId:'one'})})
+  assert.equal(raw.status,200);const layout=await pdfPages(await raw.arrayBuffer(),true),pages=layout.map(p=>p.text),pdf=pages.join(' '),left=layout.flatMap(p=>p.items).find(i=>i.text.includes('First column content.')),right=layout.flatMap(p=>p.items).find(i=>i.text.includes('Second column content.'));assert.ok(left&&right&&right.x-left.x>200&&left.y===right.y,'PDF preserves the two-column layout')
+  for(const page of pages)assert.ok(page.includes('Not signed, revision 3'))
+  const titles=document.blocks.filter(b=>b.type!=='page_break'&&b.id!=='extra').map(b=>b.title);let at=-1;for(const title of titles){const next=pdf.indexOf(title,at+1);assert.ok(next>at,'PDF keeps block order for '+title);at=next}
+  assert.ok(!pdf.includes('Campaign timeline'));assert.ok(pdf.includes('First column content.'));assert.ok(pdf.includes('Second column content.'));assert.ok(pdf.includes('USD 20.02'))
+  p=(await h.state()).proposals.find(p=>p.id===created.id)
+  await h.cmd('proposal.document',{id:p.id,version:p.version,document:edited},h.owner,409)
+  await h.cmd('proposal.negotiate',{...fields,id:p.id,version:p.version,document:edited})
+  assert.deepEqual((await h.send(path+'/data.json?optionId=two',undefined,cookie)).value.document,document,'live sent document stays frozen during negotiation')
+  p=(await h.state()).proposals.find(p=>p.id===created.id)
+  await h.cmd('proposal.approve',{id:p.id,version:p.version,revision:p.revision});p=(await h.state()).proposals.find(p=>p.id===created.id)
+  const replaced=await h.cmd('proposal.send',{id:p.id,version:p.version}),nextPath=new URL(replaced.shareUrl).pathname,nextCookie=await verified(h,nextPath)
+  assert.equal((await h.send(path,undefined,cookie)).status,404)
+  assert.deepEqual((await h.send(nextPath+'/data.json?optionId=two',undefined,nextCookie)).value.document,edited)
+  assert.equal((await h.send(nextPath+'/action?name=accept',{name:'Synthetic Platter signer',optionId:'two',consent:true},nextCookie)).status,200)
+  const accepted=JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot)
+  assert.deepEqual(accepted.document,edited)
+  const agreementHtml=(await h.send(nextPath,undefined,nextCookie)).text,currentAccepted=(await h.state()).proposals.find(v=>v.id===created.id)
+  await h.cmd('proposal.duplicate',{id:created.id,version:currentAccepted.version})
+  assert.equal((await h.send(nextPath,undefined,nextCookie)).text,agreementHtml,'duplicating a branded accepted agreement preserves its exact response bytes')
+  await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1});const standard=await h.cmd('proposal.send',{id:copy.id,version:2}),standardPath=new URL(standard.shareUrl).pathname,standardCookie=await verified(h,standardPath)
+  assert.equal((await h.send(standardPath+'/action?name=accept',{name:'Synthetic standard signer',optionId:'one',consent:true},standardCookie)).status,200)
+  const standardAgreement=JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(copy.id).first()).snapshot);assert.ok(!standardAgreement.document.blocks.some(b=>b.id==='extra'),'accepted Standard document excludes the conditional timeline')
+
+ }finally{await h.close()}
+})
+
+test('EDIT-001 block saves enforce live proposal scope, stale versions, content bounds, safe brand values and locked terms',()=>run(async h=>{
+ const {client,p}=await draft(h),document=documentFixture()
+ const malformed=[{version:2,blocks:[]},{version:1,blocks:[...document.blocks,document.blocks[0]]},{version:1,blocks:[{id:'x',type:'script',text:'bad'}]},{version:1,blocks:Array.from({length:401},(_,i)=>({id:'b'+i,type:'text'}))},{...document,brand:{...document.brand,accent:'url(synthetic-platter-1)'}},{...document,brand:{...document.brand,ink:'#ffffff'}},{version:1,blocks:[{id:'x',type:'text',condition:'missing',text:'Hidden'}]},{version:1,blocks:[{id:'x',type:'pricing',optionId:'one',tableIndex:0}]},{version:1,blocks:[{id:'x',type:'text',text:'x'.repeat(10001)}]}]
+ const initial=(await h.state()).revisions.filter(r=>r.proposal_id===p.id)
+ for(const value of malformed)await h.cmd('proposal.document',{id:p.id,version:1,document:value},h.owner,400)
+ assert.deepEqual((await h.state()).revisions.filter(r=>r.proposal_id===p.id),initial,'invalid edits add no revision')
+ const key=await h.cmd('agent.create',{label:'Synthetic Platter draft helper'})
+ assert.equal((await h.send('/api/platter/agent/command',{name:'proposal.document',input:{id:p.id,version:1,document}},'',{authorization:'Bearer '+key.token})).status,403)
+ assert.equal((await h.send('/api/platter/command',{name:'proposal.document',input:{id:p.id,version:1,document}})).status,401)
+ await h.send('/auth/invite',{email:'synthetic-platter-2@example.com',displayName:'Unshared sales member',role:'member',returnTo:'/app'},h.owner)
+ const member=await h.signIn('synthetic-platter-2@example.com')
+ await h.cmd('proposal.document',{id:p.id,version:1,document},member,403)
+ const saved=await h.cmd('proposal.document',{id:p.id,version:1,document})
+ const template=await h.cmd('template.save',{id:p.id,version:saved.version,name:'Locked document'})
+ await h.cmd('template.locks',{id:template.id,version:template.version,sections:['terms']})
+ const started=await h.cmd('template.start',{id:template.id,version:template.version+1,clientId:client.id})
+ const reordered=structuredClone(document);reordered.blocks.reverse()
+ await h.cmd('proposal.share',{id:started.id,operatorId:(await h.state(member)).actor.id})
+ await h.cmd('proposal.document',{id:started.id,version:1,document:reordered},member)
+ const changed=structuredClone(reordered);changed.blocks.find(b=>b.type==='terms').text='Different legal terms.'
+ await h.cmd('proposal.document',{id:started.id,version:2,document:changed},h.owner,403)
+ const hidden=structuredClone(reordered);hidden.blocks.find(b=>b.type==='terms').condition='two'
+ await h.cmd('proposal.document',{id:started.id,version:2,document:hidden},h.owner,403)
+ const removed=structuredClone(reordered);removed.blocks=removed.blocks.filter(b=>b.type!=='terms')
+ await h.cmd('proposal.document',{id:started.id,version:2,document:removed},h.owner,403)
+ assert.deepEqual((await h.state()).proposals.find(p=>p.id===started.id).document,reordered)
+ await h.cmd('proposal.document',{id:started.id,version:2,document:changed},member,403)
+ await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
+ await h.cmd('approval.rule',{version:1,name:'Rich legal review',position:0,condition:{kind:'termsEdited'},approvers:['role:owner']})
+ assert.equal((await h.state()).proposals.find(p=>p.id===started.id).approval.required,false,'moving locked terms does not change legal text')
+ await h.cmd('proposal.unlock',{id:started.id,version:2,section:'terms'},member,403)
+ await h.cmd('proposal.unlock',{id:started.id,version:2,section:'terms'})
+ await h.cmd('proposal.document',{id:started.id,version:3,document:changed},member)
+ const legalReview=(await h.state()).proposals.find(p=>p.id===started.id);assert.equal(legalReview.approval.required,true);assert.equal(legalReview.approval.complete,false)
+ await h.cmd('proposal.send',{id:started.id,version:4},h.owner,409)
+}))
+
+test('EDIT-001 display media requires consent and live edit scope, stays private until placed and keeps exact bytes through copies and templates', {timeout:120000},async()=>{
+ const h=await harness({assetsDirectory:'public'})
+ try{
+  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+  const {client,p}=await draft(h),bytes=await readFile('public/brand/apple-touch-icon.png')
+  const upload=async(input={},cookie=h.owner)=>{const data=new FormData();data.set('id',p.id);data.set('version','1');data.set('consent','yes');for(const [key,value]of Object.entries(input))data.set(key,value);if(!data.has('file'))data.set('file',new File([bytes],'synthetic-platter-1.png',{type:'image/png'}));const request=new Request(h.origin+'/app/document-media',{method:'POST',headers:{origin:h.origin,cookie,accept:'application/json'},body:data});const r=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});return {status:r.status,text:await r.text()}}
+  assert.equal((await upload({consent:'no'})).status,400)
+  assert.equal((await upload({version:'999'})).status,409)
+  assert.equal((await upload({file:new File(['<svg onload="alert(1)">'],'synthetic-platter-2.png',{type:'image/png'})})).status,400)
+  assert.equal((await upload({file:new File([new Uint8Array(5*1024*1024+1)],'synthetic-platter-3.png',{type:'image/png'})})).status,413)
+  const result=await upload();assert.equal(result.status,200,result.text);const image=JSON.parse(result.text).media,unplaced=JSON.parse((await upload({file:new File([bytes],'synthetic-platter-unplaced.png',{type:'image/png'})})).text).media
+  const privatePath='/api/platter/document-media/'+p.id+'/'+image.id
+  assert.equal((await h.send(privatePath)).status,401)
+  assert.equal((await h.send(privatePath,undefined,h.owner)).status,404,'unplaced uploads are not document content')
+  const document=documentFixture();document.brand.logoId=image.id;document.blocks.splice(2,0,{id:'photo',type:'image',title:'The studio image',text:'A retained original.',assetId:image.id,alt:'Synthetic Platter studio mark'})
+  await h.cmd('proposal.document',{id:p.id,version:1,document})
+  const actual=await h.mf.dispatchFetch(h.origin+privatePath,{headers:{cookie:h.owner}});assert.equal(actual.status,200);assert.equal(actual.headers.get('content-disposition'),'inline');assert.deepEqual(Buffer.from(await actual.arrayBuffer()),bytes)
+  const other=await h.cmd('proposal.prepare',{...offer,clientId:client.id});await h.cmd('proposal.document',{id:other.id,version:1,document},h.owner,400)
+  const copy=await h.cmd('proposal.duplicate',{id:p.id,version:2});assert.equal((await h.send('/api/platter/document-media/'+copy.id+'/'+image.id,undefined,h.owner)).status,200);assert.deepEqual((await h.state()).proposals.find(p=>p.id===copy.id).documentMedia.map(f=>f.id),[image.id],'copies exclude files never placed in the source document')
+  const template=await h.cmd('template.save',{id:p.id,version:2,name:'Retained media template'}),started=await h.cmd('template.start',{id:template.id,version:1,clientId:client.id})
+  assert.equal((await h.send('/api/platter/document-media/'+started.id+'/'+image.id,undefined,h.owner)).status,200);assert.ok(!(await h.state()).proposals.find(p=>p.id===started.id).documentMedia.some(f=>f.id===unplaced.id),'templates cannot expose unplaced source uploads')
+  await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const sent=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(sent.shareUrl).pathname
+  const publicImage=await h.mf.dispatchFetch(h.origin+path+'/media/'+image.id);assert.equal(publicImage.status,200);assert.deepEqual(Buffer.from(await publicImage.arrayBuffer()),bytes)
+  const cookie=await verified(h,path),pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf',{method:'POST',headers:{origin:h.origin,cookie,'content-type':'application/json'},body:JSON.stringify({optionId:'two'})});assert.equal(pdf.status,200)
+  const pages=await pdfPages(await pdf.arrayBuffer());assert.ok(pages.join(' ').includes('The studio image'))
+  await h.cmd('proposal.send',{id:p.id,version:4});assert.equal((await h.send(path+'/media/'+image.id)).status,404,'rotated invitations lose media authority too')
+ }finally{await h.close()}
+})
+
+test('EDIT-001 Client-assigned required fields and typed signature blocks validate at signing and freeze exact values with the selected agreement',()=>run(async h=>{
+ const {client,p}=await draft(h),document=documentFixture()
+ document.blocks.push({id:'po',type:'field',title:'Purchase order',text:'Use the approved PO.',recipientRole:'client',fieldKind:'text',required:true},{id:'start',type:'field',title:'Project start',text:'',recipientRole:'client',fieldKind:'date',required:true},{id:'confirm',type:'field',title:'Confirm delivery address',text:'',recipientRole:'client',fieldKind:'checkbox',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
+ await h.cmd('proposal.document',{id:p.id,version:1,document})
+ const bound=(await h.state()).proposals.find(v=>v.id===p.id).document
+ assert.ok(bound.blocks.filter(b=>['field','signature'].includes(b.type)).every(b=>b.recipientId===client.id))
+ const other=await h.cmd('client.save',{name:'Second synthetic client',email:'synthetic-platter-3@example.com'}),copy=await h.cmd('proposal.duplicate',{id:p.id,version:2,clientId:other.id})
+ assert.ok((await h.state()).proposals.find(v=>v.id===copy.id).document.blocks.filter(b=>['field','signature'].includes(b.type)).every(b=>b.recipientId===other.id))
+ const template=await h.cmd('template.save',{id:p.id,version:2,name:'Client-assigned fields'}),started=await h.cmd('template.start',{id:template.id,version:1,clientId:other.id})
+ assert.ok((await h.state()).proposals.find(v=>v.id===started.id).document.blocks.filter(b=>['field','signature'].includes(b.type)).every(b=>b.recipientId===other.id))
+ await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const invitation=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(invitation.shareUrl).pathname,cookie=await verified(h,path)
+ const input={optionId:'two',name:'Synthetic Platter signer',consent:true,'field:po':'synthetic-platter-4','field:start':'2026-11-01','field:confirm':true,'signature:signature':'Synthetic Platter signer'}
+ for(const name of ['field:po','field:start','field:confirm','signature:signature']){const incomplete={...input};delete incomplete[name];const r=await h.send(path+'/action?name=accept',incomplete,cookie);assert.equal(r.status,400,r.text)}
+ assert.equal((await h.send(path+'/action?name=accept',{...input,'field:start':'2026-02-30'},cookie)).status,400)
+ assert.equal((await h.send(path+'/action?name=accept',{...input,'signature:signature':'A different name'},cookie)).status,400)
+ assert.equal((await h.send(path+'/action?name=accept',{...input,'field:other':'Not assigned'},cookie)).status,400)
+ assert.equal((await h.state()).proposals.find(v=>v.id===p.id).status,'sent')
+ assert.equal((await h.send(path+'/action?name=accept',input,cookie)).status,200)
+ const expected={po:'synthetic-platter-4',start:'2026-11-01',confirm:true,signature:'Synthetic Platter signer'}
+ const data=(await h.send(path+'/data.json',undefined,cookie)).value;assert.deepEqual(data.acceptance.fieldValues,expected)
+ assert.deepEqual((await h.state()).proposals.find(v=>v.id===p.id).acceptance.fieldValues,expected)
+ const agreement=(await h.send(path,undefined,cookie)).text;assert.match(agreement,/synthetic-platter-4/);assert.match(agreement,/2026-11-01/)
+ await h.send(path+'/action?name=accept',{...input,'field:po':'Changed'},cookie)
+ assert.deepEqual((await h.send(path+'/data.json',undefined,cookie)).value.acceptance.fieldValues,expected,'replay cannot rewrite accepted fields')
+}))
+
+test('EDIT-001 new sections inherit verified questions and opt-in tracked edits without changing the sent document or bypassing review',()=>run(async h=>{
+ const {client,p}=await draft(h),document=documentFixture();await h.cmd('proposal.document',{id:p.id,version:1,document});await h.cmd('proposal.approve',{id:p.id,version:2,revision:2})
+ const invitation=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(invitation.shareUrl).pathname,cookie=await verified(h,path)
+ const question={revision:2,section:'block:story',text:'Can the plan include a handoff?'}
+ assert.equal((await h.send(path+'/action?name=question.create',question)).status,401)
+ assert.equal((await h.send(path+'/action?name=question.create',{...question,section:'block:missing'},cookie)).status,400)
+ assert.equal((await h.send(path+'/action?name=question.create',{...question,section:'block:extra'},cookie)).status,400,'hidden conditional sections are not question targets for this selection')
+ assert.equal((await h.send(path+'/action?name=question.create',question,cookie)).status,200)
+ let current=(await h.state()).proposals.find(v=>v.id===p.id)
+ assert.equal(current.questions[0].block_id,'story');assert.equal(current.questions[0].block_title,'Our approach')
+ await h.cmd('question.answer',{id:p.id,questionId:current.questions[0].id,text:'Yes, the handoff is included.',requestId:crypto.randomUUID()})
+ assert.match((await h.send(path,undefined,cookie)).text,/Yes, the handoff is included/)
+ const suggested={revision:2,section:'block:story:text',original:'clear',replacement:'weekly'}
+ assert.equal((await h.send(path+'/action?name=suggestion.create',suggested,cookie)).status,409,'new sections default to suggestions off')
+ await h.cmd('suggestions.allow',{id:p.id,version:4,section:suggested.section,enabled:true})
+ assert.equal((await h.send(path+'/action?name=suggestion.create',suggested)).status,401)
+ assert.equal((await h.send(path+'/action?name=suggestion.create',{...suggested,section:'block:pricing:cents'},cookie)).status,400)
+ assert.equal((await h.send(path+'/action?name=suggestion.create',suggested,cookie)).status,200)
+ current=(await h.state()).proposals.find(v=>v.id===p.id)
+ await h.cmd('suggestion.resolve',{id:p.id,version:current.version,suggestionId:current.suggestions[0].id,decision:'accepted'})
+ const negotiated=(await h.state()).proposals.find(v=>v.id===p.id)
+ assert.equal(negotiated.status,'draft');assert.equal(negotiated.approved_by,null);assert.ok(negotiated.document.blocks.find(b=>b.id==='story').text.includes('weekly'))
+ assert.deepEqual((await h.send(path+'/data.json?optionId=two',undefined,cookie)).value.document,document,'client offer remains the exact sent document')
+ await h.cmd('proposal.send',{id:p.id,version:negotiated.version},h.owner,409)
+}))
+
+test('EDIT-011 server-confirmed quantity edits retain document content, clear approval and enforce bounds, scope and exact version',()=>run(async h=>{
+ const client=await h.cmd('client.save',{name:'Synthetic Platter client',email:'synthetic-platter-1@example.com'}),document=documentFixture(),created=await h.cmd('proposal.prepare',{...offer,clientId:client.id,document,pricingTables:[{optionId:'one',name:'Reference services',lines:[{name:'Discovery',description:'Reviewed service',quantity:'2',unit:'hour',unitPrice:'10.01',group:''}]}]})
+ const input={id:created.id,version:1,optionId:'one',tableIndex:0,lineIndex:0,quantity:'3'}
+ for(const quantity of ['0','-1','NaN','1.0001','1000001'])await h.cmd('proposal.quantity',{...input,quantity},h.owner,400)
+ await h.cmd('proposal.quantity',{...input,lineIndex:1},h.owner,400)
+ await h.cmd('proposal.quantity',{...input,optionId:'missing'},h.owner,400)
+ await h.cmd('proposal.quantity',{...input,version:999},h.owner,409)
+ const before=(await h.state()).revisions.filter(r=>r.proposal_id===created.id)
+ await h.cmd('proposal.approve',{id:created.id,version:1,revision:1})
+ const changed=await h.cmd('proposal.quantity',{...input,version:2})
+ assert.equal(changed.option.cents,3003);assert.equal(changed.version,3);assert.equal(changed.revision,2)
+ const current=(await h.state()).proposals.find(p=>p.id===created.id);assert.deepEqual(current.document,document);assert.equal(current.options[0].tables[0].lines[0].quantity,'3');assert.equal(current.approved_by,null);assert.equal(current.status,'draft')
+ assert.deepEqual((await h.state()).revisions.filter(r=>r.proposal_id===created.id&&r.revision===1),before)
+ await h.cmd('proposal.quantity',{...input,version:2},h.owner,409)
+ await h.send('/auth/invite',{email:'synthetic-platter-2@example.com',displayName:'Unshared member',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('synthetic-platter-2@example.com');await h.cmd('proposal.quantity',{...input,version:3},member,403)
+}))

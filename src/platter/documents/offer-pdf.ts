@@ -54,7 +54,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   if(block.title)pdf.heading(block.title)
   if(block.type==='field'||block.type==='signature'){pdf.text((block.type==='signature'?'Client signature (not signed)':(block.required?'Required ':'Optional ')+block.fieldKind+' field')+': '+block.title);if(block.text)pdf.text(block.text)}
   else if(block.type==='image'||block.type==='video'){need(media,'Document media is unavailable',503);await pdf.image(await media(block.type==='video'?block.posterId!:block.assetId!));if(block.type==='video')pdf.text('Video: '+(block.alt??block.title));if(block.text)pdf.text(block.text)}
-  else if(block.type==='pricing'){const o=options.find((o:any)=>o.id===block.optionId),t=o?.tables?.[block.tableIndex??0];if(t){pdf.heading(t.name);for(const l of t.lines){pdf.text(`${l.name}: ${l.quantity} ${l.unit} x ${amount(Math.round(Number(l.unitPrice)*100),currency)} = ${amount(l.lineTotalCents,currency)}`);if(l.description)pdf.text(l.description)}pdf.text(`Table subtotal: ${amount(t.subtotalCents,currency)}`)}}
+  else if(block.type==='pricing'){const o=options.find((o:any)=>o.id===block.optionId),t=o?.tables?.[block.tableIndex??0];if(t){pdf.heading(t.name);for(const l of t.lines){pdf.text(`${l.group?l.group+': ':''}${l.name}: ${l.quantity} ${l.unit} x ${amount(Math.round(Number(l.unitPrice)*100),currency)} = ${amount(l.lineTotalCents,currency)}`);if(l.description)pdf.text(l.description)}for(const g of t.groups)pdf.text(`${g.name||'Ungrouped'} subtotal: ${amount(g.subtotalCents,currency)}`);pdf.text(`Table subtotal: ${amount(t.subtotalCents,currency)}`)}}
   else {pdf.text(block.text.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'));if(block.second)pdf.text(block.second.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'))}
  }
 
@@ -69,7 +69,8 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   pdf.text(`${option.id === optionId ? 'Selected option' : 'Option'}: ${option.label}`, 12)
   pdf.text(`Total: ${amount(option.cents, currency)}`)
   pdf.text(`Deposit due: ${amount(deposit(option.cents), currency)}`)
-  for(const table of option.tables??[]){
+  for(const [tableIndex,table] of (option.tables??[]).entries()){
+   if(doc.blocks.some(b=>b.type==='pricing'&&b.optionId===option.id&&b.tableIndex===tableIndex))continue
    pdf.heading(table.name)
    for(const line of table.lines){pdf.text(`${line.group ? line.group+': ' : ''}${line.name}`,12);if(line.description)pdf.text(line.description);pdf.text(`${line.quantity} ${line.unit} x ${amount(Number(line.unitPrice.replace('.','')),currency)} = ${amount(line.lineTotalCents,currency)}`)}
    for(const group of table.groups)pdf.text(`${group.name||'Ungrouped'} subtotal: ${amount(group.subtotalCents,currency)}`)

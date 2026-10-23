@@ -71,9 +71,9 @@
     try{
      const response=await fetch('/api/platter/command',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'proposal.document',input:{id:form.elements.id.value,version,document:JSON.parse(written)}})});
      const result=await response.json();if(!response.ok)throw new Error(result.error??'Could not save the document.');
-     form.elements.version.value=String(result.version);form.dataset.revision=String(result.revision);saved=written;form.dataset.saveState=dirty()?'unsaved':'saved';
+     window.platterRevisionSaved?.(form.elements.id.value,version,result);form.elements.version.value=String(result.version);form.dataset.revision=String(result.revision);saved=written;form.dataset.saveState=dirty()?'unsaved':'saved';
      status.replaceChildren(document.createTextNode('Saved revision '+result.revision+'. '));const link=element('a',{href:location.pathname+location.search},'Reload proposal to review and approve');status.append(link);
-     // Other forms still name the earlier revision. Keep their version guards intact.
+     // Every save still binds a single exact server version; conflicting requests pause.
      if(!dirty())payload.value=written;else status.textContent='Saving latest document changes…';
     }catch(reason){halted=true;form.dataset.saveState='error';error.textContent=reason.message+' Your edits remain here. Reload only after copying any changes you need to keep.';status.textContent='Document not saved. Automatic saving paused.';}
     finally{pending=false;if(dirty()&&!halted)timer=setTimeout(save,800);}

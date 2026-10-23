@@ -227,7 +227,8 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.deepEqual(restoredAuditView,beforeAuditView,'TEAM-004 restores the complete audit view including reasons and sender routes/addresses')
     assert.deepEqual(business(restoredState),before)
     assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).document,documentFixture(),'EDIT-001 ordered document and brand survive the public CLI archive exactly')
-    const restoredDocumentPage=await h.send('/app/proposal?id='+proposal.id,undefined,restoredOwner);assert.match(restoredDocumentPage.text,/Two perspectives/)
+    const completedRestoreSetup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(completedRestoreSetup.status,303)
+    const restoredDocumentPage=await h.send('/app/proposal?id='+proposal.id,undefined,restoredOwner);assert.equal(restoredDocumentPage.status,200);assert.match(restoredDocumentPage.text,/Two perspectives/)
     assert.equal(archived.filter(item=>item.table==='p_personal_templates').length,1,'EDIT-002 personal template snapshot and defaults survive CLI restore')
     assert.deepEqual(restoredState.followupActions,actionsBefore,'FOLLOW-002 logged actions survive public CLI restore exactly')
     assert.deepEqual(restoredState.followups.rows.map(({sentAt,...r})=>r),followupsBefore,'FOLLOW-002 open and completed actions survive public CLI restore')
@@ -580,6 +581,7 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
   await checkout(source);await checkout(target)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
   h=await harness({root:source,assetsDirectory:'public'})
+  const completedSetup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(completedSetup.status,303)
   const fields={clientId:(await h.cmd('client.save',{name:'Synthetic Platter client',email:'synthetic-platter-1@example.com'})).id,title:'Document custody',scope:'A reviewed project.',optionOne:'Studio',priceOne:'1000',optionTwo:'Campaign',priceTwo:'2000',depositPercent:'25'},created=await h.cmd('proposal.prepare',fields)
   const bytes=await readFile('public/brand/apple-touch-icon.png'),form=new FormData();form.set('id',created.id);form.set('version','1');form.set('consent','yes');form.set('file',new File([bytes],'synthetic-platter-1.png',{type:'image/png'}))
   const request=new Request(h.origin+'/app/document-media',{method:'POST',headers:{origin:h.origin,cookie:h.owner,accept:'application/json'},body:form}),upload=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});assert.equal(upload.status,200);const media=(await upload.json()).media

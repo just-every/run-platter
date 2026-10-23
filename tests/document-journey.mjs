@@ -46,7 +46,7 @@ export async function documentJourney(){
     fixture.blocks.splice(4,0,{id:'photo',type:'image',title:'Studio image',text:'A retained image.',assetId:image.id,alt:'Synthetic Platter studio mark'},{id:'film',type:'video',title:'Studio film',text:'An uploaded introduction.',assetId:video.id,posterId:image.id,alt:'Synthetic Platter introduction'},{id:'pricing',type:'pricing',title:'Investment detail',text:'',optionId:'one',tableIndex:0})
     fixture.blocks.push({id:'po',type:'field',title:'Purchase order',text:'Use the approved PO.',recipientRole:'client',fieldKind:'text',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
     await editor.locator('.document-brand-kit summary').click()
-    for(const [key,value] of Object.entries(fixture.brand)){const node=editor.locator(`[data-brand=${key}]`);if(key==='font')await node.selectOption(value);else await node.fill(value)}
+    for(const [key,value] of Object.entries(fixture.brand)){const node=editor.locator(`[data-brand=${key}]`);if(key==='font'||key==='logoId')await node.selectOption(value);else await node.fill(value)}
     await editor.getByRole('button',{name:'Apply brand kit'}).click()
     for(const block of fixture.blocks){
      await editor.locator('[data-block-type]').selectOption(block.type);await editor.getByRole('button',{name:'Add block',exact:true}).click()

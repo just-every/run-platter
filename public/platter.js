@@ -1,3 +1,8 @@
+// Synchronize disjoint editors in this tab after a successful exact-version save.
+window.platterRevisionSaved=(id,previous,result)=>{
+ for(const form of document.forms){const record=form.querySelector('input[name="id"]'),version=form.querySelector('input[name="version"]');if(record?.value!==id||version?.value!==String(previous))continue;version.value=String(result.version);if(form.dataset.documentEditor!==undefined)form.dataset.revision=String(result.revision);const revision=form.querySelector('input[name="revision"]');if(revision)revision.value=String(result.revision);}
+ for(const link of document.querySelectorAll('a[href^="/app/preview?"]')){const url=new URL(link.href);if(url.searchParams.get('id')===id){url.searchParams.set('revision',String(result.revision));link.href=url.pathname+url.search;}}
+};
 // Persist only explicitly enabled internal form drafts within this tab.
 (() => {
   const scope = document.body.dataset.draftScope;

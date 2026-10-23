@@ -57,6 +57,15 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='reminder-template.save')return saveReminderTemplate(db,a,p)
  if(name.startsWith('reminder.'))return reminderCommand(env,a,name,p)
  if(name.startsWith('dispute.'))return disputeCommand(env,a,name,p)
+ if(name==='proposal.quantity'){
+  need(a.role!=='agent','A person edits pricing quantities',403)
+  const original=await proposal(db,p.id);exact(original,p);const current=negotiatedView(original,await pendingNegotiation(db,original.id)),content=snapshot(current),tables=pricingInput(content.options),offered=tables.filter(t=>t.optionId===p.optionId),ti=Number(p.tableIndex),li=Number(p.lineIndex)
+  need(Number.isInteger(ti)&&ti>=0&&Number.isInteger(li)&&li>=0&&offered[ti]?.lines[li],'Choose a current pricing line')
+  offered[ti].lines[li].quantity=String(p.quantity)
+  const result=await command(env,a,'proposal.revise',{id:original.id,version:original.version,clientId:current.client_id,title:current.title,scope:current.scope,terms:current.terms??'',sectionConditions:content.section_conditions??{},depositPercent:current.deposit_bps/100,packages:editablePackages(content.options),pricingTables:tables})
+  const updated=negotiatedView(await proposal(db,original.id),await pendingNegotiation(db,original.id)),option=snapshot(updated).options.find((o:any)=>o.id===p.optionId)
+  return {...result,option:{id:option.id,label:option.label,cents:option.cents,priceCents:option.discount?.grossCents??option.cents},quantity:offered[ti].lines[li].quantity}
+ }
  if(name==='proposal.document'){
   need(a.role!=='agent','A person edits document blocks',403)
   const original=await proposal(db,p.id);exact(original,p)

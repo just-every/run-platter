@@ -18,7 +18,7 @@ export function ownerQuestions(state:any,p:any) {
 export function clientQuestions(view:any,publicForm:(name:string,body:string)=>string) {
  if(!view.verified)return ['sent','expired'].includes(view.status)?panel('Questions for the owner','<p>Verify your email to ask about scope, pricing, or terms.</p>'):''
  const questions:QuestionThread[]=view.questions??[]
- const create=['sent','expired'].includes(view.status)?publicForm('question.create',hidden('revision',view.revision)+'<label>Question about<select name="section" required><option value="scope">Scope</option><option value="pricing">Pricing</option><option value="terms">Terms</option>'+documentOf(view).blocks.filter(b=>b.type!=='page_break').map(b=>'<option value="block:'+escape(b.id)+'">'+escape(b.title||b.type)+'</option>').join('')+'</select></label>'+area('Your question','text','','required maxlength="10000"')+'<button>Send question to owner</button>'):''
+ const create=['sent','expired'].includes(view.status)?publicForm('question.create',hidden('revision',view.revision)+'<label>Question about<select name="section" aria-label="Question about" required><option value="scope">Scope</option><option value="pricing">Pricing</option><option value="terms">Terms</option>'+documentOf(view).blocks.filter(b=>b.type!=='page_break').map(b=>'<option value="block:'+escape(b.id)+'">'+escape(b.title||b.type)+'</option>').join('')+'</select></label>'+area('Your question','text','','required maxlength="10000"')+'<button>Send question to owner</button>'):''
  return questions.length||create?panel(view.status==='accepted'?'Agreement question history':'Questions for the owner',questions.map(q=>thread(q)).join('')+create):''
 }
 

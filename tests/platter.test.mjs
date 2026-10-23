@@ -2075,6 +2075,9 @@ test('EDIT-001 document revisions preserve ordered blocks and brand through prev
   assert.equal((await h.send(nextPath+'/action?name=accept',{name:'Synthetic Platter signer',optionId:'two',consent:true},nextCookie)).status,200)
   const accepted=JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot)
   assert.deepEqual(accepted.document,edited)
+  const agreementHtml=(await h.send(nextPath,undefined,nextCookie)).text,currentAccepted=(await h.state()).proposals.find(v=>v.id===created.id)
+  await h.cmd('proposal.duplicate',{id:created.id,version:currentAccepted.version})
+  assert.equal((await h.send(nextPath,undefined,nextCookie)).text,agreementHtml,'duplicating a branded accepted agreement preserves its exact response bytes')
  }finally{await h.close()}
 })
 

@@ -32,7 +32,7 @@
     const duplicate=button('Duplicate block','⧉',()=>{checkpoint();doc.blocks.splice(doc.blocks.findIndex(b=>b.id===block.id)+1,0,{...block,id:crypto.randomUUID()});render();schedule();});duplicate.node.disabled=locked;bar.append(duplicate.tip);
     const remove=button('Delete block','×',()=>{checkpoint();const position=doc.blocks.findIndex(b=>b.id===block.id);doc.blocks.splice(position,1);render();const next=container.querySelectorAll('[data-block-id]')[Math.min(position,doc.blocks.length-1)];(next?.querySelector('input,textarea,button')??form.querySelector('[data-block-add]')).focus();schedule();});remove.node.disabled=locked;bar.append(remove.tip);card.append(bar);
     card.addEventListener('dragover',event=>{if(dragged&&dragged!==block.id){event.preventDefault();event.dataTransfer.dropEffect='move';}});
-    card.addEventListener('drop',event=>{if(!dragged||dragged===block.id)return;event.preventDefault();const from=doc.blocks.findIndex(b=>b.id===dragged);if(from<0)return;const to=doc.blocks.findIndex(b=>b.id===block.id)-(from<doc.blocks.findIndex(b=>b.id===block.id)?1:0),id=dragged;dragged=undefined;place(id,to);});
+    card.addEventListener('drop',event=>{if(!dragged||dragged===block.id)return;event.preventDefault();const from=doc.blocks.findIndex(b=>b.id===dragged);if(from<0)return;const target=doc.blocks.findIndex(b=>b.id===block.id),bounds=card.getBoundingClientRect(),after=event.clientY>bounds.top+bounds.height/2,to=target+(after?1:0)-(from<target+(after?1:0)?1:0),id=dragged;dragged=undefined;place(id,to);});
     if(block.type!=='page_break'){
      card.append(control('Block heading','title',block.title,v=>block.title=v));
      if(['field','signature'].includes(block.type)){

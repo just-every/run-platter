@@ -21,7 +21,7 @@ export function documentBlocks(view:any,mediaBase='',suffix=''){
   else if(b.type==='image')body+='<figure><img src="'+media(b.assetId!)+'" alt="'+escape(b.alt)+'" loading="lazy" decoding="async" width="1280" height="720">'+(b.text?'<figcaption>'+escape(b.text)+'</figcaption>':'')+'</figure>'
   else if(b.type==='video')body+='<video controls preload="none" poster="'+media(b.posterId!)+'" aria-label="'+escape(b.alt)+'" width="1280" height="720"><source src="'+media(b.assetId!)+'"><a href="'+media(b.assetId!)+'">Download video</a></video>'+richText(b.text)
   else if(b.type==='pricing'){const option=(view.options??[]).find((o:any)=>o.id===b.optionId),table=option?.tables?.[b.tableIndex??0];body+=table?pricingTables([{...option,tables:[table]}],view.currency):'<p>Pricing table unavailable.</p>'}
-  else if(b.type==='columns')body+='<div class="document-columns"><div>'+richText(b.text)+'</div><div>'+richText(b.second??'')+'</div></div>'
+  else if(b.type==='columns')body+='<div class="document-column-grid"><div>'+richText(b.text)+'</div><div>'+richText(b.second??'')+'</div></div>'
   else if(b.type==='quote')body+='<blockquote>'+richText(b.text)+'</blockquote>'
   else body+=richText(b.text)
   return '<section class="document-block document-'+escape(b.type)+'" data-document-block="'+escape(b.id)+'">'+body+'</section>'

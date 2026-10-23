@@ -106,7 +106,7 @@ export async function documentJourney(){
     const clientOrder=await client.locator('[data-document-block]').evaluateAll(nodes=>nodes.map(n=>n.dataset.documentBlock));assert.deepEqual(clientOrder,reordered)
     const brand=await client.locator('.proposal-document').evaluate(node=>({ink:getComputedStyle(node).color,paper:getComputedStyle(node).backgroundColor}));assert.deepEqual(brand,{ink:'rgb(28, 28, 36)',paper:'rgb(255, 255, 255)'})
     assert.equal(await client.locator('.document-text strong').innerText(),'careful')
-    assert.equal(await client.locator('.document-columns>div').count(),2)
+    assert.equal(await client.locator('.document-column-grid>div').count(),2)
     assert.ok(await client.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'client document has no horizontal overflow')
     await client.locator('.proposal-document').scrollIntoViewIfNeeded();if(screenshots)await client.screenshot({path:join(screenshots,`EDIT-001-client-${width}.png`)})
     const pdf=await clientContext.request.post(app.origin+path+'/download.pdf',{headers:{origin:app.origin},data:{optionId:'two'}});assert.equal(pdf.status(),200)

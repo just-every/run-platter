@@ -10,3 +10,5 @@ Base's pages.
 - `inter/`: Inter, variable weight (the site's text, with tabular figures). Upstream: https://github.com/rsms/inter.
 - `kalam/`: Kalam 400 and 700 (the site's handwritten notes). Upstream: https://github.com/itfoundry/kalam.
 - `great-vibes/`: Great Vibes (typed signatures on the site's certificate drawing). Upstream: https://github.com/googlefonts/great-vibes.
+
+`./pdf/inter.ttf` and `./pdf/source-serif-4.ttf` are static regular-weight instances of the corresponding WOFF2 files above (Source Serif optical size 20). They use the same SIL Open Font License in each source folder, and keep branded PDFs independent of runtime WOFF2 decoding.

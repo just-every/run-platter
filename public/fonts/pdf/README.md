@@ -11,3 +11,5 @@ Sources:
 - https://unifoundry.com/LICENSE.txt
 
 The font license and embedding exception are in LICENSE.txt.
+
+Branded documents also use static regular-weight Inter and Source Serif 4 instances generated from the already shipped WOFF2 faces. Their SIL Open Font License files remain in `../inter/OFL.txt` and `../source-serif-4/OFL.txt`; the corresponding `inter.ttf` and `source-serif-4.ttf` files preserve the chosen web font in PDFs.

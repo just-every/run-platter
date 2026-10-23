@@ -1,3 +1,10 @@
+// Serialize writes from this tab's document, pricing and details editors.
+(() => {const locks=new Map();window.platterWithSaveLock=async(id,write)=>{const previous=locks.get(id)??Promise.resolve();let release;const gate=new Promise(resolve=>release=resolve),tail=previous.then(()=>gate);locks.set(id,tail);await previous;try{return await write()}finally{release();if(locks.get(id)===tail)locks.delete(id)}}})();
+// Synchronize disjoint editors in this tab after a successful exact-version save.
+window.platterRevisionSaved=(id,previous,result)=>{
+ for(const form of document.forms){const record=form.querySelector('input[name="id"]'),version=form.querySelector('input[name="version"]');if(record?.value!==id||version?.value!==String(previous))continue;version.value=String(result.version);if(form.dataset.documentEditor!==undefined)form.dataset.revision=String(result.revision);const revision=form.querySelector('input[name="revision"]');if(revision)revision.value=String(result.revision);}
+ for(const link of document.querySelectorAll('a[href^="/app/preview?"]')){const url=new URL(link.href);if(url.searchParams.get('id')===id){url.searchParams.set('revision',String(result.revision));link.href=url.pathname+url.search;}}
+};
 // Persist only explicitly enabled internal form drafts within this tab.
 (() => {
   const scope = document.body.dataset.draftScope;
@@ -113,4 +120,45 @@
     });
   }
   if (window.matchMedia('(max-width: 600px)').matches) for (const shelf of document.querySelectorAll('details.shelf[open]')) shelf.open = false;
+})();
+
+
+// Once a proposal has document content, its native details and table controls
+// participate in the same revision-guarded autosave. New blank proposals still
+// need an explicit Prepare action; starting a negotiation stays explicit too.
+(() => {
+ for(const form of document.querySelectorAll('form.composer')){
+  if(!form.elements.id||new URL(form.action).searchParams.get('name')!=='proposal.revise')continue;
+  const documentForm=Array.from(document.querySelectorAll('[data-document-editor]')).find(f=>f.elements.id.value===form.elements.id.value);
+  if(!documentForm)continue;
+  const active=()=>{try{const doc=JSON.parse(documentForm.elements.document.value);return doc.blocks.length>0||Boolean(doc.brand)}catch{return false}};
+  const status=document.createElement('p');status.setAttribute('role','status');status.setAttribute('aria-live','polite');status.dataset.composerAutosave='';status.hidden=true;form.append(status);
+  let timer,pending=false,needsSave=false,paused=false,applying=false,manualSubmission=false;
+  const schedule=()=>{if(applying||!active()||paused)return;needsSave=true;status.hidden=false;status.textContent='Unsaved proposal changes.';status.dataset.saveState='unsaved';clearTimeout(timer);timer=setTimeout(save,900);};
+  async function save(){
+   if(pending||paused||!needsSave)return;
+   if(!form.checkValidity()){status.textContent='Complete the required fields to autosave this proposal.';return;}
+   if(['unsaved','saving'].includes(documentForm.dataset.saveState)){timer=setTimeout(save,250);return;}
+   if(documentForm.dataset.saveState==='error'){status.textContent='Resolve the document save before saving proposal details.';return;}
+   pending=true;needsSave=false;status.textContent='Saving proposal…';status.dataset.saveState='saving';
+   try{await window.platterWithSaveLock(form.elements.id.value,async()=>{
+    form.dispatchEvent(new Event('platter:serialize'));
+    const input=Object.fromEntries(new FormData(form)),version=input.version;
+    const response=await fetch('/api/platter/command',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'proposal.autosave',input})}),result=await response.json();
+    if(!response.ok)throw new Error(result.error??'Could not autosave this proposal.');
+    window.platterRevisionSaved?.(input.id,version,result);
+    applying=true;
+    for(const option of result.options){const price=form.querySelector(`[data-package-id="${option.id}"] [data-package-field="price"]`);if(price&&(price.readOnly||!needsSave)){price.value=((option.discount?.grossCents??option.cents)/100).toFixed(2);price.dispatchEvent(new Event('input',{bubbles:true}));}}
+    applying=false;if(!needsSave)form.dispatchEvent(new Event('platter:pricing-saved'));
+    const title=document.querySelector('main>h1');if(title)title.textContent=result.title;
+    status.textContent='Saved revision '+result.revision+'. Reload the proposal to review and approve.';status.dataset.saveState=needsSave?'unsaved':'saved';
+   });}catch(error){applying=false;paused=true;needsSave=true;status.textContent=error.message+' Automatic saving paused. Fix the fields and use Save revision, or reload before continuing.';status.dataset.saveState='error';}
+   finally{pending=false;if(needsSave&&!paused)timer=setTimeout(save,900);}
+  }
+  form.addEventListener('input',event=>{if((event.target.matches('[data-pricing-field="quantity"]')&&event.target.closest('[data-saved-line]')&&form.dataset.pricingStructureDirty!=='yes')||event.target.readOnly)return;schedule();});
+  form.addEventListener('change',event=>{if((event.target.matches('[data-pricing-field="quantity"]')&&event.target.closest('[data-saved-line]')&&form.dataset.pricingStructureDirty!=='yes')||event.target.readOnly)return;schedule();});
+  form.addEventListener('click',event=>{if(event.target.closest('[data-package-action],[data-pricing-action]'))setTimeout(schedule,0);});
+  form.addEventListener('submit',()=>{clearTimeout(timer);manualSubmission=true});documentForm.addEventListener('platter:document-saved',()=>{if(needsSave&&!paused){clearTimeout(timer);timer=setTimeout(save,0)}});
+  window.addEventListener('beforeunload',event=>{if(!manualSubmission&&(needsSave||pending)){event.preventDefault();event.returnValue='';}});
+ }
 })();

@@ -9,7 +9,7 @@
   // An optional item is a visibility condition until no package offers its id.
   const dropItems=ids=>{for(const id of ids)if(!editor.querySelector(`[data-optional-item][data-item-id="${id}"]`))for(const select of visibility())select.querySelector(`option[value="item:${id}"]`)?.remove();};
   const serialize=()=>{payload.name='packages';payload.value=JSON.stringify(Array.from(editor.querySelectorAll('[data-package-id]'),pack=>({id:pack.dataset.packageId,label:field(pack,'label').value,price:field(pack,'price').value,discountPercent:field(pack,'discountPercent')?.value??'0',optionalItems:Array.from(pack.querySelectorAll('[data-optional-item]'),item=>Object.fromEntries([['id',item.dataset.itemId],...['label','unitPrice','min','max','quantity','editable'].map(key=>{const node=item.querySelector(`[data-item-field="${key}"]`);return [key,key==='editable'?node.checked:node.value]})]))})));};
-  form.addEventListener('submit',serialize);
+  form.addEventListener('submit',serialize);form.addEventListener('platter:serialize',serialize);
   editor.addEventListener('click',event=>{
    const button=event.target.closest('[data-package-action]');if(!button)return;
    const pack=button.closest('[data-package-id]'),pricing=form.querySelector('[data-pricing-editor]');

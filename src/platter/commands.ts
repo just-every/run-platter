@@ -1,3 +1,4 @@
+import { proposalDocument, documentOf } from './documents/blocks'
 import { saveReminderTemplate } from './reminder-messages'
 import { reminderCommand } from './reminders'
 import { disputeCommand } from './disputes'
@@ -45,7 +46,8 @@ export function proposalFields(p:Record<string,unknown>){
  const terms=p.terms??'';need(typeof terms==='string'&&terms.length<=10000,'Terms must be text up to 10000 characters')
  const options=p.packages===undefined?null:packageInputs(p.packages,tables)
  const conditions=sectionConditions(p.sectionConditions??Object.fromEntries(['scope','terms'].filter(k=>p[k+'Option']).map(k=>[k,p[k+'Option']])),options??[{id:'one'},{id:'two'}])
- return{section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)}
+ const priced=pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)
+ return{document:proposalDocument(p.document,priced),section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:priced}
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
@@ -54,6 +56,12 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='reminder-template.save')return saveReminderTemplate(db,a,p)
  if(name.startsWith('reminder.'))return reminderCommand(env,a,name,p)
  if(name.startsWith('dispute.'))return disputeCommand(env,a,name,p)
+ if(name==='proposal.document'){
+  need(a.role!=='agent','A person edits document blocks',403)
+  const original=await proposal(db,p.id);exact(original,p)
+  const current=negotiatedView(original,await pendingNegotiation(db,original.id)),content=snapshot(current)
+  return command(env,a,'proposal.revise',{id:original.id,version:original.version,clientId:current.client_id,title:current.title,scope:current.scope,terms:current.terms??'',sectionConditions:content.section_conditions??{},depositPercent:current.deposit_bps/100,packages:editablePackages(content.options),pricingTables:pricingInput(content.options),document:p.document})
+ }
  if(name==='catalog.save')return saveCatalog(db,a,p)
  if(name==='catalog.insert'){const addition=await catalogInsertion(db,a,p);return command(env,a,'proposal.revise',addition.fields,undefined,addition.costs)}
  if(name==='proposal.unlock'||name==='template.locks')return sectionLockCommand(db,a,name,p)
@@ -95,6 +103,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   if(p.pricingTables===undefined){const pending=await pendingNegotiation(db,current.id);const content=pending?JSON.parse(pending.snapshot):current;p={...p,pricingTables:pricingInput(typeof content.options==='string'?JSON.parse(content.options):content.options)}}
   if(p.sectionConditions===undefined&&p.scopeOption===undefined&&p.termsOption===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,sectionConditions:pending?JSON.parse(pending.snapshot).section_conditions??{}:current.section_conditions}}
   if(p.terms===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,terms:pending?JSON.parse(pending.snapshot).terms??'':current.terms}}
+  if(p.document===undefined)p={...p,document:documentOf(negotiatedView(current,await pendingNegotiation(db,current.id)))}
   await assertSectionLocks(db,negotiatedView(current,await pendingNegotiation(db,current.id)),proposalFields(p))
   if(name==='proposal.negotiate'||await pendingNegotiation(db,current.id))return negotiationCommand(env,a,name,p,current,{...proposalFields(p),...(restoredAttachments!==undefined?{attachments:restoredAttachments}:{}),internalCosts,costSourceRevision})
  }
@@ -104,7 +113,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   const id=old?.id??crypto.randomUUID(),revision=(old?.revision??0)+1,currency=old?.currency??'USD',attachments=old?restoredAttachments??JSON.parse(old.attachments):await vendorDocuments(db),row={id,...f,revision,currency,attachments};const writes:D1PreparedStatement[]=[]
   if(old){writes.push(db.prepare("UPDATE p_proposals SET client_id=?,title=?,scope=?,terms=?,attachments=?,version=version+1,revision=?,status='draft',deposit_bps=?,options=?,prepared_by=?,approved_by=NULL,approved_at=NULL WHERE id=?").bind(f.client_id,f.title,f.scope,f.terms,JSON.stringify(attachments),revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,id),db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(id))}
   else writes.push(db.prepare("INSERT INTO p_proposals(id,client_id,title,scope,version,revision,status,deposit_bps,options,prepared_by,created_at,currency,sales_owner_id,sales_owner_name,terms,attachments) VALUES(?,?,?,?,1,?,'draft',?,?,?,?,?,?,?,?,?)").bind(id,f.client_id,f.title,f.scope,revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency,a.id,a.email,f.terms,JSON.stringify(attachments)))
-  writes.push(db.prepare('UPDATE p_proposals SET section_conditions=? WHERE id=?').bind(JSON.stringify(f.section_conditions),id))
+  writes.push(db.prepare('UPDATE p_proposals SET section_conditions=?,document=? WHERE id=?').bind(JSON.stringify(f.section_conditions),JSON.stringify(f.document),id))
   writes.push(db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,?,?,?,?,?)').bind(id,revision,JSON.stringify(snapshot(row)),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency))
   if(!old)writes.push(...await defaultStatements(db,id))
   if(old)writes.push(copyCosts(db,id,costSourceRevision??old.revision,id,revision))

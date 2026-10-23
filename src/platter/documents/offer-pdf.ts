@@ -1,3 +1,4 @@
+import { documentOf } from './blocks'
 import { offerSelection } from '../selection'
 import { selectedContent } from '../conditional'
 import { need } from '../model'
@@ -44,6 +45,15 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  pdf.text(`Selected option total: ${amount(selected.cents, currency)}`)
  pdf.text(`Deposit due: ${amount(deposit(selected.cents), currency)}`)
  if(selection.items.length){pdf.heading('Selected optional items');for(const item of selection.items)pdf.text(`${item.label}: ${item.quantity} x ${amount(item.unitCents,currency)} = ${amount(item.totalCents,currency)}`)}
+
+ const doc=documentOf(view)
+ if(doc.brand?.name)pdf.heading(doc.brand.name)
+ for(const block of doc.blocks){
+  if(block.type==='page_break'){pdf.pageBreak();continue}
+  if(block.title)pdf.heading(block.title)
+  if(block.type==='pricing'){const o=options.find((o:any)=>o.id===block.optionId),t=o?.tables?.[block.tableIndex??0];if(t){pdf.heading(t.name);for(const l of t.lines){pdf.text(`${l.name}: ${l.quantity} ${l.unit} x ${amount(Math.round(Number(l.unitPrice)*100),currency)} = ${amount(l.lineTotalCents,currency)}`);if(l.description)pdf.text(l.description)}pdf.text(`Table subtotal: ${amount(t.subtotalCents,currency)}`)}}
+  else {pdf.text(block.text.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'));if(block.second)pdf.text(block.second.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'))}
+ }
 
  if(!view.hiddenSections.includes('scope')) { pdf.heading('Scope of work'); pdf.text(String(view.scope ?? '')) }
  if(!view.hiddenSections.includes('terms')) { pdf.heading('Terms'); pdf.text(view.terms ? String(view.terms) : 'No additional terms.') }

@@ -1,3 +1,4 @@
+import { blockEditor, documentBlocks } from './blocks'
 import { reminderPanel } from './reminders'
 import { disputesPanel } from './disputes'
 import { catalogPanel } from './catalog'
@@ -87,6 +88,7 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
     const note = frozen ? `${pricing} This offer is frozen. Its scope, options, and prices can no longer be revised.${fresh ? ' A fresh invitation replaces any previous client link and verification session while keeping the offer frozen.' : ''}` : pricing
     html += `<div class="composer-page frozen">${offerCards(p)}${exceptionBand(state, p, feedback, `negotiate-${p.id}`) ?? notices(feedback)}${receipt(sum, fresh + share, note)}</div>`
   }
+  html += !frozen&&person?blockEditor(p):documentBlocks(p)
   const itemised = pricingTables(p.options ?? [], p.currency)
   const dossier: string[] = [disputesPanel(state,p),catalogPanel(state,p),sectionLocksPanel(state,p),paymentsPanel(state,p),internalPricingPanel(p,selection.get('costOption')),approvalPanel(p),sharingPanel(state,p),followupPanel(state, p), withdrawalPanel(state, p), itemised ? `<section class="panel wide"><h2>Itemised pricing</h2>${itemised}</section>` : '', panel('Offer record', people(state, p)), proposalAttachments(state, p), p.status === 'withdrawn' ? '' : pdfPanel(state, p), expiryPanel(state, p), reminderPanel(state,p)]
   if (['sent', 'expired', 'withdrawn'].includes(p.status) && person) dossier.push(`<section class="panel wide"><h2>Negotiate a new revision</h2><p>The sent offer stays frozen. Prepare changed terms for a new approval before replacing the client invitation.</p>${composerForm(state, p, 'negotiate', `negotiate-${p.id}`, 'Prepare negotiated revision')}</section>`)

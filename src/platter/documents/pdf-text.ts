@@ -77,6 +77,8 @@ export class PdfText {
   this.y = Math.max(bottom, this.y - height)
  }
 
+ pageBreak(){this.newPage()}
+
  heading(text: string) {
   this.room(48)
   this.gap(12)

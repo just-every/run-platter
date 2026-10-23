@@ -100,6 +100,8 @@ export async function documentJourney(){
     // Same rendered document under the member-only client preview.
     const preview=await context.request.get(`${app.origin}/app/preview/client?id=${id}&revision=${p.revision}&optionId=two`)
     assert.equal(preview.status(),200);assert.match(await preview.text(),/Client testimonial/)
+    const previewPage=await context.newPage()
+    try{await previewPage.goto(`${app.origin}/app/preview/client?id=${id}&revision=${p.revision}&optionId=two&width=${width}`);assert.deepEqual(await previewPage.locator('[data-document-block]').evaluateAll(nodes=>nodes.map(n=>n.dataset.documentBlock)),reordered);const previewImage=previewPage.locator('.document-image img');await previewImage.scrollIntoViewIfNeeded();await previewPage.waitForFunction(()=>document.querySelector('.document-image img').naturalWidth>0);assert.equal(await previewPage.getByLabel('Purchase order',{exact:true}).isDisabled(),true);assert.equal(await previewPage.getByLabel('Type your full name for Client signature',{exact:true}).isDisabled(),true);if(screenshots)await previewPage.screenshot({path:join(screenshots,`EDIT-001-preview-${width}.png`)})}finally{await previewPage.close()}
     clientContext=await browser.newContext({viewport:{width,height:900}})
     assert.equal((await clientContext.request.get(`${app.origin}/app/preview/client?id=${id}&revision=${p.revision}`)).status(),401)
     await post('proposal.approve',{id,version:p.version,revision:p.revision});p=(await state()).proposals.find(p=>p.id===id)
@@ -109,6 +111,8 @@ export async function documentJourney(){
     const code=(await state()).outbox.find(row=>row.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
     await client.getByLabel('Email verification code',{exact:true}).fill(code);await client.getByRole('button',{name:'Verify email',exact:true}).click()
     await client.goto(app.origin+path+'?optionId=two')
+    await client.goto(app.origin+path+'?optionId=one');assert.equal(await client.getByRole('heading',{name:'Campaign timeline',exact:true}).count(),0)
+    await client.locator('select[name=optionId]').selectOption('two');await client.getByRole('button',{name:'Review package',exact:true}).click();assert.equal(await client.getByRole('heading',{name:'Campaign timeline',exact:true}).count(),1)
     const picture=client.locator('.document-image img');await picture.scrollIntoViewIfNeeded();await client.waitForFunction(()=>document.querySelector('.document-image img').naturalWidth>0)
     const film=client.locator('.document-video video');await film.scrollIntoViewIfNeeded();await film.evaluate(node=>node.play());await client.waitForFunction(()=>document.querySelector('.document-video video').currentTime>0);await film.evaluate(node=>node.pause())
     const clientOrder=await client.locator('[data-document-block]').evaluateAll(nodes=>nodes.map(n=>n.dataset.documentBlock));assert.deepEqual(clientOrder,reordered)

@@ -2080,6 +2080,10 @@ test('EDIT-001 document revisions preserve ordered blocks and brand through prev
   const agreementHtml=(await h.send(nextPath,undefined,nextCookie)).text,currentAccepted=(await h.state()).proposals.find(v=>v.id===created.id)
   await h.cmd('proposal.duplicate',{id:created.id,version:currentAccepted.version})
   assert.equal((await h.send(nextPath,undefined,nextCookie)).text,agreementHtml,'duplicating a branded accepted agreement preserves its exact response bytes')
+  await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1});const standard=await h.cmd('proposal.send',{id:copy.id,version:2}),standardPath=new URL(standard.shareUrl).pathname,standardCookie=await verified(h,standardPath)
+  assert.equal((await h.send(standardPath+'/action?name=accept',{name:'Synthetic standard signer',optionId:'one',consent:true},standardCookie)).status,200)
+  const standardAgreement=JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(copy.id).first()).snapshot);assert.ok(!standardAgreement.document.blocks.some(b=>b.id==='extra'),'accepted Standard document excludes the conditional timeline')
+
  }finally{await h.close()}
 })
 

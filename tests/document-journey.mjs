@@ -41,7 +41,7 @@ export async function documentJourney(){
      }
     }
     await editor.getByRole('button',{name:'Save document',exact:true}).click()
-    await page.waitForFunction(()=>document.querySelector('[data-document-status]').textContent.startsWith('Saved revision'))
+    await page.waitForFunction(()=>document.querySelector('[data-document-editor]').dataset.saveState==='saved')
     // The public state agrees with what the editor built from blank.
     let p=(await state()).proposals.find(p=>p.id===id)
     assert.equal(p.document.blocks.length,fixture.blocks.length);assert.deepEqual(p.document.brand,fixture.brand)
@@ -50,8 +50,8 @@ export async function documentJourney(){
     assert.equal(await blocks.nth(1).getByRole('tooltip').filter({hasText:'Move down'}).isVisible(),true,'keyboard tooltip appears immediately')
     await blocks.nth(1).getByRole('button',{name:'Move down',exact:true}).press('Enter')
     const beforeDrag=await blocks.evaluateAll(nodes=>nodes.map(n=>n.dataset.blockId))
-    const handle=blocks.last().getByRole('button',{name:'Drag block',exact:true})
-    await handle.dragTo(blocks.first())
+    const handle=blocks.nth(2).getByRole('button',{name:'Drag block',exact:true})
+    await handle.dragTo(blocks.nth(1).locator('.document-block-bar'))
     await page.waitForFunction(expected=>Array.from(document.querySelectorAll('[data-block-id]'),n=>n.dataset.blockId).join(',')!==expected,beforeDrag.join(','))
     const reordered=await blocks.evaluateAll(nodes=>nodes.map(n=>n.dataset.blockId));assert.notDeepEqual(reordered,originalOrder)
     const count=await blocks.count();await blocks.nth(1).getByRole('button',{name:'Duplicate block',exact:true}).click();assert.equal(await blocks.count(),count+1)
@@ -59,7 +59,7 @@ export async function documentJourney(){
     await editor.getByRole('button',{name:'Undo',exact:true}).click();assert.equal(await blocks.count(),count+1)
     await editor.getByRole('button',{name:'Undo',exact:true}).click();assert.equal(await blocks.count(),count)
     await editor.getByRole('button',{name:'Save document',exact:true}).click()
-    await page.waitForFunction(()=>document.querySelector('[data-document-status]').textContent.startsWith('Saved revision'))
+    await page.waitForFunction(()=>document.querySelector('[data-document-editor]').dataset.saveState==='saved')
     p=(await state()).proposals.find(p=>p.id===id)
     assert.deepEqual(p.document.blocks.map(b=>b.id),reordered)
     const savedDocument=p.document

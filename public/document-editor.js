@@ -7,7 +7,7 @@
   const element=(tag,attrs={},text)=>{const node=document.createElement(tag);for(const [key,value] of Object.entries(attrs))node.setAttribute(key,value);if(text!==undefined)node.textContent=text;return node;};
   const checkpoint=()=>{const value=JSON.stringify(doc);if(history.at(-1)!==value)history.push(value);if(history.length>20)history.shift();undo.disabled=!history.length;};
   const dirty=()=>JSON.stringify(doc)!==saved;
-  const schedule=()=>{payload.value=JSON.stringify(doc);status.textContent='Unsaved document changes.';clearTimeout(timer);if(!halted)timer=setTimeout(save,800);};
+  const schedule=()=>{form.dataset.saveState='unsaved';payload.value=JSON.stringify(doc);status.textContent='Unsaved document changes.';clearTimeout(timer);if(!halted)timer=setTimeout(save,800);};
   const control=(label,key,value,oninput,tag='input')=>{
    const wrap=element('label',{},label),node=element(tag,{'data-block-field':key,'aria-label':label});
    if(tag==='textarea'){node.rows=4;node.maxLength=10000;}else node.maxLength=200;
@@ -56,17 +56,17 @@
   form.querySelector('[data-brand-apply]').addEventListener('click',()=>{const fields=Array.from(form.querySelectorAll('[data-brand]'));if(fields.some(f=>!f.reportValidity()))return;checkpoint();doc.brand=Object.fromEntries(fields.map(node=>[node.dataset.brand,node.value]));schedule();});
   async function save(){
    clearTimeout(timer);if(pending)return savePromise;if(!dirty())return;
-   pending=true;halted=false;error.textContent='';status.textContent='Saving document…';
+   pending=true;form.dataset.saveState='saving';halted=false;error.textContent='';status.textContent='Saving document…';
    const written=JSON.stringify(doc),version=form.elements.version.value;
    savePromise=(async()=>{
     try{
      const response=await fetch('/api/platter/command',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'proposal.document',input:{id:form.elements.id.value,version,document:JSON.parse(written)}})});
      const result=await response.json();if(!response.ok)throw new Error(result.error??'Could not save the document.');
-     form.elements.version.value=String(result.version);form.dataset.revision=String(result.revision);saved=written;
+     form.elements.version.value=String(result.version);form.dataset.revision=String(result.revision);saved=written;form.dataset.saveState=dirty()?'unsaved':'saved';
      status.replaceChildren(document.createTextNode('Saved revision '+result.revision+'. '));const link=element('a',{href:location.pathname+location.search},'Reload proposal to review and approve');status.append(link);
      // Other forms still name the earlier revision. Keep their version guards intact.
-     if(!dirty())payload.value=written;
-    }catch(reason){halted=true;error.textContent=reason.message+' Your edits remain here. Reload only after copying any changes you need to keep.';status.textContent='Document not saved. Automatic saving paused.';}
+     if(!dirty())payload.value=written;else status.textContent='Saving latest document changes…';
+    }catch(reason){halted=true;form.dataset.saveState='error';error.textContent=reason.message+' Your edits remain here. Reload only after copying any changes you need to keep.';status.textContent='Document not saved. Automatic saving paused.';}
     finally{pending=false;if(dirty()&&!halted)timer=setTimeout(save,800);}
    })();return savePromise;
   }

@@ -86,7 +86,7 @@ export async function documentJourney(){
     await page.reload();assert.deepEqual(await blocks.evaluateAll(nodes=>nodes.map(n=>n.dataset.blockId)),reordered)
     assert.deepEqual((await state()).proposals.find(p=>p.id===id).document,savedDocument)
     await editor.getByRole('button',{name:'Add block',exact:true}).scrollIntoViewIfNeeded()
-    const tipControl=blocks.first().getByRole('button',{name:'Drag block',exact:true}),tooltip=blocks.first().getByRole('tooltip').filter({hasText:'Drag block'});await page.getByRole('heading',{name:'Document blocks',exact:true}).click();await tipControl.hover();await page.waitForTimeout(100);assert.equal(await tooltip.isVisible(),false,'hover tooltip waits about 300ms');await tooltip.waitFor({state:'visible'});await tipControl.focus();assert.equal(await tooltip.isVisible(),true)
+    const tipControl=blocks.first().getByRole('button',{name:'Drag block',exact:true}),tooltip=blocks.first().getByRole('tooltip').filter({hasText:'Drag block'});await page.getByRole('heading',{name:'Document blocks',exact:true}).click();await tipControl.hover();await page.waitForTimeout(100);assert.equal(await tooltip.isVisible(),false,'hover tooltip waits about 300ms');await tooltip.waitFor({state:'visible',timeout:600});await tipControl.focus();assert.equal(await tooltip.isVisible(),true)
     if(screenshots)await page.screenshot({path:join(screenshots,`EDIT-001-editor-${width}.png`)})
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'editor has no horizontal overflow')
     // Same rendered document under the member-only client preview.

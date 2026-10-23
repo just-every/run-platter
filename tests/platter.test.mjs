@@ -2098,7 +2098,8 @@ test('EDIT-001 block saves enforce live proposal scope, stale versions, content 
  await h.cmd('template.locks',{id:template.id,version:template.version,sections:['terms']})
  const started=await h.cmd('template.start',{id:template.id,version:template.version+1,clientId:client.id})
  const reordered=structuredClone(document);reordered.blocks.reverse()
- await h.cmd('proposal.document',{id:started.id,version:1,document:reordered})
+ await h.cmd('proposal.share',{id:started.id,operatorId:(await h.state(member)).actor.id})
+ await h.cmd('proposal.document',{id:started.id,version:1,document:reordered},member)
  const changed=structuredClone(reordered);changed.blocks.find(b=>b.type==='terms').text='Different legal terms.'
  await h.cmd('proposal.document',{id:started.id,version:2,document:changed},h.owner,403)
  const hidden=structuredClone(reordered);hidden.blocks.find(b=>b.type==='terms').condition='two'
@@ -2106,6 +2107,15 @@ test('EDIT-001 block saves enforce live proposal scope, stale versions, content 
  const removed=structuredClone(reordered);removed.blocks=removed.blocks.filter(b=>b.type!=='terms')
  await h.cmd('proposal.document',{id:started.id,version:2,document:removed},h.owner,403)
  assert.deepEqual((await h.state()).proposals.find(p=>p.id===started.id).document,reordered)
+ await h.cmd('proposal.document',{id:started.id,version:2,document:changed},member,403)
+ await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
+ await h.cmd('approval.rule',{version:1,name:'Rich legal review',position:0,condition:{kind:'termsEdited'},approvers:['role:owner']})
+ assert.equal((await h.state()).proposals.find(p=>p.id===started.id).approval.required,false,'moving locked terms does not change legal text')
+ await h.cmd('proposal.unlock',{id:started.id,version:2,section:'terms'},member,403)
+ await h.cmd('proposal.unlock',{id:started.id,version:2,section:'terms'})
+ await h.cmd('proposal.document',{id:started.id,version:3,document:changed},member)
+ const legalReview=(await h.state()).proposals.find(p=>p.id===started.id);assert.equal(legalReview.approval.required,true);assert.equal(legalReview.approval.complete,false)
+ await h.cmd('proposal.send',{id:started.id,version:4},h.owner,409)
 }))
 
 test('EDIT-001 display media requires consent and live edit scope, stays private until placed and keeps exact bytes through copies and templates', {timeout:120000},async()=>{

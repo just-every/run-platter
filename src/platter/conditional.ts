@@ -35,6 +35,6 @@ export function selectedContent(view: any, optionId: string, items: Chosen = [])
 
 /** Accepted records contain only the text selected, never excluded section text. */
 export function agreementContent(view: any, optionId: string, items: Chosen = []): any {
- const {section_conditions, hiddenSections, ...content} = selectedContent(view, optionId, items)
+ const {section_conditions, hiddenSections, documentConditional, ...content} = selectedContent(view, optionId, items)
  return content
 }

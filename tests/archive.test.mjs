@@ -147,6 +147,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const starterSnapshot = (await h.state()).proposals.find(p => p.id === starterBefore.id)
     assert.match(starterSnapshot.scope, /Northstar Coffee/)
     assert.ok(starterSnapshot.options.every(o => o.tables[0].lines.length === 2))
+    await h.cmd('tracking.settings',{id:pending.id,enabled:true,alerts:false,quietMinutes:30,retentionDays:90})
     const followupsBefore=(await h.state()).followups.rows.map(({sentAt,...r})=>r)
     const actionsBefore=(await h.state()).followupActions
     const {packageFixture,packageSelection:packageItems,packageExpected}=await import('./packages-fixture.mjs')
@@ -174,6 +175,13 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const templateSource=(await h.state()).proposals.find(p=>p.id===work.id)
     const template=await h.cmd('template.save',{id:work.id,version:templateSource.version,name:'Restorable campaign'})
     const beforeVendorDocuments=(await h.state()).vendorDocuments
+    await h.cmd('tracking.settings',{id:proposal.id,enabled:true,alerts:false,quietMinutes:30,retentionDays:90})
+    assert.equal((await h.send(path,undefined,verified.cookie)).status,200)
+    const engagementBefore=(await h.send('/api/platter/engagement?id='+proposal.id,undefined,h.owner)).value
+    assert.equal(engagementBefore.views.length,1)
+    const identified=await h.send(suggestPath+'/stakeholder',{name:'Riley Procurement',email:'riley@synthetic-platter.example',consent:'yes'});assert.equal(identified.status,200)
+    const stakeholderChallenge=identified.text.match(/name="challengeId" value="([^"]+)"/)[1],stakeholderMail=(await h.state()).outbox.find(m=>m.subject==='Verify your stakeholder mailbox'),stakeholderCode=stakeholderMail.body.match(/\b\d{6}\b/)[0]
+    assert.equal((await h.send(suggestPath+'/stakeholder',{challengeId:stakeholderChallenge,code:stakeholderCode})).status,200)
     const before=business(await h.state())
     const acceptedThread=before.proposals.find(p=>p.id===proposal.id).questions
     const openThread=before.proposals.find(p=>p.id===pending.id).questions
@@ -205,6 +213,10 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal(archived.filter(item=>item.table==='p_question_answers').length,1,'FOLLOW-004 retains the answer')
     assert.equal(archived.filter(item=>item.table==='p_question_reply_keys').length,0,'FOLLOW-004 reply credentials are not archived')
     assert.deepEqual(archived.filter(item=>item.table==='p_audit').map(item=>item.row).sort((a,b)=>a.occurred_at-b.occurred_at||a.id.localeCompare(b.id)),beforeAudit,'TEAM-004 audit survives the public CLI archive exactly')
+    assert.equal(archived.filter(item=>item.table==='p_tracking_views').length,1)
+    assert.equal(archived.filter(item=>item.table==='p_tracking_stakeholders').length,1)
+    assert.equal(archived.filter(item=>item.table==='p_tracking_challenges').length,0,'mailbox verification capabilities stay local')
+    assert.equal(archived.filter(item=>item.table==='p_tracking_transport').length,0,'tracking transport capabilities stay local')
     const requests=archived.filter(item=>item.table==='p_send_requests').map(item=>item.row)
     assert.equal(requests.length,2)
     for(const row of requests)assert.deepEqual(row,Object.fromEntries(Object.keys(row).map(field=>[field,beforeRequests.find(r=>r.id===row.id)[field]])),'AI-003 request and resolution custody survives the CLI archive')
@@ -224,6 +236,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const restoredState=await h.state(restoredOwner)
     const retainedAuditIds=new Set(beforeAuditView.map(row=>row.id)),restoredAuditView=(await h.send('/api/platter/audit',undefined,restoredOwner)).value.rows.filter(row=>retainedAuditIds.has(row.id))
     assert.deepEqual(restoredAuditView,beforeAuditView,'TEAM-004 restores the complete audit view including reasons and sender routes/addresses')
+    assert.deepEqual((await h.send('/api/platter/engagement?id='+proposal.id,undefined,restoredOwner)).value,engagementBefore,'engagement settings and views survive the public CLI exactly')
     assert.deepEqual(business(restoredState),before)
     assert.equal(archived.filter(item=>item.table==='p_personal_templates').length,1,'EDIT-002 personal template snapshot and defaults survive CLI restore')
     assert.deepEqual(restoredState.followupActions,actionsBefore,'FOLLOW-002 logged actions survive public CLI restore exactly')

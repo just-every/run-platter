@@ -1,3 +1,4 @@
+import { selectedDocument } from './documents/blocks'
 import { permitted, scope, senders } from './permissions'
 import { currentTime } from './expiry-time'
 import type { Bindings } from '../auth.server'
@@ -12,13 +13,13 @@ export interface QuestionAnswer {
 }
 export interface QuestionThread {
  id:string; proposal_id:string; revision:number; client_id:string; client_email:string;
- section:QuestionSection; text:string; created_at:number; title:string; clientName:string;
+ section:QuestionSection; block_id?:string|null; block_title?:string|null; text:string; created_at:number; title:string; clientName:string;
  answers:QuestionAnswer[]; status:'open'|'answered'
 }
 export interface QuestionGuard { sql:string; values:any[] }
 type ClientContext = {
  verified:boolean; token:string;
- row:{id:string; revision:number; client_id:string; clientEmail:string; status:string; title:string};
+ row:{id:string; revision:number; client_id:string; clientEmail:string; status:string; title:string;document?:unknown};
  share:{session_hash:string|null}
 }
 
@@ -61,8 +62,9 @@ export async function createQuestion(env:Bindings,c:ClientContext,input:Record<s
  need(c.verified&&c.share.session_hash,'Verify your email before asking a question',401)
  need(c.row.status==='sent','Ask questions on the current sent proposal',409)
  need(Number(input.revision)===c.row.revision,'This offer changed. Reload before asking.',409)
- const section=String(input.section)
- need(['scope','pricing','terms'].includes(section),'Choose scope, pricing, or terms')
+ const requested=String(input.section),block=requested.startsWith('block:')?selectedDocument(c.row.document,(c as any).optionId,(c as any).selection?.items??[]).blocks.find(b=>b.id===requested.slice(6)&&b.type!=='page_break'):undefined
+ need(['scope','pricing','terms'].includes(requested)||block,'Choose a current visible proposal section')
+ const section=block?'scope':requested
  const body=text(input.text,'your question',10000),id=crypto.randomUUID(),db=env.DB,at=await currentTime(db)
  const owners=(await db.prepare("SELECT id,email,version FROM oa_operators WHERE role='owner' AND status='active' ORDER BY id").all<{id:string;email:string;version:number}>()).results
  need(owners.length,'An active owner is required to receive questions',409)
@@ -71,8 +73,8 @@ export async function createQuestion(env:Bindings,c:ClientContext,input:Record<s
  const ownerChecks=owners.map(()=>"EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND email=? AND version=? AND role='owner' AND status='active')").join(' AND ')
  try { await db.batch([
   db.prepare(`INSERT INTO p_guard(ok) VALUES((${guard}) AND (${ownerChecks}))`).bind(c.token,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,c.share.session_hash,at,...owners.flatMap(o=>[o.id,o.email,o.version])),
-  db.prepare('INSERT INTO p_questions(id,proposal_id,revision,client_id,client_email,section,text,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(id,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,section,body,at),
-  ...(await Promise.all(owners.map(owner=>prepareReplyNotice(env,owner,{id,proposal_id:c.row.id,revision:c.row.revision,section,text:body,title:c.row.title})))).flat(),
+  db.prepare('INSERT INTO p_questions(id,proposal_id,revision,client_id,client_email,section,text,created_at,block_id,block_title) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,section,body,at,block?.id??null,block?.title||block?.type||null),
+  ...(await Promise.all(owners.map(owner=>prepareReplyNotice(env,owner,{id,proposal_id:c.row.id,revision:c.row.revision,section:block?.title||block?.type||section,text:body,title:c.row.title})))).flat(),
   audit(db,c.row.client_id,'client','question.create',id,at),
   db.prepare('DELETE FROM p_guard')
  ]) }catch(error){if(String(error).includes('CHECK constraint'))fail('The invitation, owner, or proposal changed. Reload before asking.',409);throw error}

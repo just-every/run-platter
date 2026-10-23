@@ -1,3 +1,4 @@
+import { documentText } from './documents/blocks'
 import { revenueKeys } from './reports/recorded-revenue'
 import { need } from './model'
 
@@ -48,7 +49,7 @@ export function pipeline(proposals: any[], params = new URLSearchParams(), now =
 
 /** Search only offer content and visible metadata; invitation and verification credentials never participate. */
 function proposalText(p: any): string[] {
- return [p.title, p.clientName, p.clientEmail, p.sales_owner_name, p.pipelineStatus ?? p.status, p.scope, p.terms,
+ return [documentText(p.document),p.title, p.clientName, p.clientEmail, p.sales_owner_name, p.pipelineStatus ?? p.status, p.scope, p.terms,
   ...p.options.flatMap((option: any) => [option.label,
    ...(option.optionalItems ?? []).flatMap((item: any) => [item.label, item.description]),
    ...(option.tables ?? []).flatMap((table: any) => [table.name, ...table.lines.flatMap((line: any) => [line.name, line.description, line.group, line.unit])]),

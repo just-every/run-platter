@@ -42,7 +42,7 @@ export async function documentJourney(){
     await uploadForm.getByLabel('Display media file').setInputFiles({name:'synthetic-platter-2.webm',mimeType:'video/webm',buffer:Buffer.from(videoBytes)})
     await uploadForm.locator('[name=consent]').check();await uploadForm.getByRole('button',{name:'Upload display media',exact:true}).click()
     const editor=page.locator('[data-document-editor]'),blocks=editor.locator('[data-block-id]'),fixture=documentFixture(),assets=(await state()).proposals.find(p=>p.id===id).documentMedia,image=assets.find(f=>f.mediaType==='image/png'),video=assets.find(f=>f.mediaType==='video/webm')
-    fixture.brand.logoId=image.id
+    fixture.brand={...fixture.brand,accent:'#075a70',ink:'#173c38',paper:'#fffdf5',font:width===1440?'serif':'sans',logoId:image.id}
     fixture.blocks.splice(4,0,{id:'photo',type:'image',title:'Studio image',text:'A retained image.',assetId:image.id,alt:'Synthetic Platter studio mark'},{id:'film',type:'video',title:'Studio film',text:'An uploaded introduction.',assetId:video.id,posterId:image.id,alt:'Synthetic Platter introduction'},{id:'pricing',type:'pricing',title:'Investment detail',text:'',optionId:'one',tableIndex:0})
     fixture.blocks.push({id:'po',type:'field',title:'Purchase order',text:'Use the approved PO.',recipientRole:'client',fieldKind:'text',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
     await editor.locator('.document-brand-kit summary').click()
@@ -51,6 +51,7 @@ export async function documentJourney(){
     for(const block of fixture.blocks){
      await editor.locator('[data-block-type]').selectOption(block.type);await editor.getByRole('button',{name:'Add block',exact:true}).click()
      const card=blocks.last()
+     if(block.type==='cover')assert.equal(await card.getByLabel('Block heading',{exact:true}).inputValue(),fixture.brand.cover,'new covers use the applied brand default')
      if(block.type!=='page_break'){
       await card.getByLabel('Block heading',{exact:true}).fill(block.title)
       if(['image','video'].includes(block.type)){await card.getByLabel('Media description',{exact:true}).fill(block.alt);await card.getByLabel('Caption',{exact:true}).fill(block.text)}
@@ -111,7 +112,7 @@ export async function documentJourney(){
     const picture=client.locator('.document-image img');await picture.scrollIntoViewIfNeeded();await client.waitForFunction(()=>document.querySelector('.document-image img').naturalWidth>0)
     const film=client.locator('.document-video video');await film.scrollIntoViewIfNeeded();await film.evaluate(node=>node.play());await client.waitForFunction(()=>document.querySelector('.document-video video').currentTime>0);await film.evaluate(node=>node.pause())
     const clientOrder=await client.locator('[data-document-block]').evaluateAll(nodes=>nodes.map(n=>n.dataset.documentBlock));assert.deepEqual(clientOrder,reordered)
-    const brand=await client.locator('.proposal-document').evaluate(node=>({ink:getComputedStyle(node).color,paper:getComputedStyle(node).backgroundColor}));assert.deepEqual(brand,{ink:'rgb(28, 28, 36)',paper:'rgb(255, 255, 255)'})
+    const brand=await client.locator('.proposal-document').evaluate(node=>({ink:getComputedStyle(node).color,paper:getComputedStyle(node).backgroundColor,font:getComputedStyle(node).fontFamily,accent:getComputedStyle(node.querySelector('h2')).color}));assert.equal(brand.ink,'rgb(23, 60, 56)');assert.equal(brand.paper,'rgb(255, 253, 245)');assert.equal(brand.accent,'rgb(7, 90, 112)');assert.ok(brand.font.includes(width===1440?'Source Serif 4':'Inter'),'the chosen brand font renders')
     assert.equal(await client.locator('.document-text strong').innerText(),'careful')
     assert.equal(await client.locator('.document-column-grid>div').count(),2)
     assert.ok(await client.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'client document has no horizontal overflow')

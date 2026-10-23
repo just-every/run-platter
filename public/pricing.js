@@ -38,7 +38,7 @@
     editor.addEventListener('click', event => {
       const button = event.target.closest('button[data-pricing-action]');
       if (!button || !editor.contains(button)) return;
-      quantityStructureDirty=true;
+      quantityStructureDirty=true;form.dataset.pricingStructureDirty='yes';
       const option = button.closest('[data-pricing-option]');
       const table = button.closest('[data-pricing-table]');
       switch (button.dataset.pricingAction) {
@@ -76,19 +76,20 @@
       syncPrices();
     });
 
-    let quantityTimer,quantityPending=false,quantityHalted=false,quantityStructureDirty=false;const quantities=new Set();
+    let quantityTimer,quantityPending=false,quantityHalted=false,quantityStructureDirty=false,quantityDirty=false;const quantities=new Set();
+    const documentActive=()=>{const own=Array.from(document.querySelectorAll('[data-document-editor]')).find(f=>f.elements.id.value===form.elements.id?.value);if(!own)return false;try{const doc=JSON.parse(own.elements.document.value);return doc.blocks.length>0||Boolean(doc.brand)}catch{return false}};
     const confirmation=editor.querySelector('[data-pricing-confirmation]');
     const saveQuantity=async input=>{
       if(quantityHalted||quantityStructureDirty||!form.elements.id||!input.isConnected)return;if(quantityPending){quantities.add(input);return;}
-      const option=input.closest('[data-pricing-option]'),table=input.closest('[data-pricing-table]'),line=input.closest('[data-pricing-line]'),version=form.elements.version.value;
-      const tableIndex=Array.from(option.querySelectorAll('[data-pricing-table]')).indexOf(table),lineIndex=Array.from(table.querySelectorAll('[data-pricing-line]')).indexOf(line);
+      const option=input.closest('[data-pricing-option]'),table=input.closest('[data-pricing-table]'),line=input.closest('[data-pricing-line]');
       quantityPending=true;confirmation.textContent='Confirming quantity with the server…';
-      try{const response=await fetch('/api/platter/command',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'proposal.quantity',input:{id:form.elements.id.value,version,optionId:option.dataset.pricingOption,tableIndex,lineIndex,quantity:input.value}})}),result=await response.json();if(!response.ok)throw new Error(result.error??'Could not save quantity');window.platterRevisionSaved?.(form.elements.id.value,version,result);const price=form.querySelector(`[data-package-id="${result.option.id}"] [data-package-field="price"]`);if(price){price.value=(result.option.priceCents/100).toFixed(2);price.dispatchEvent(new Event('input',{bubbles:true}));}confirmation.textContent=result.option.label+' server-confirmed total: $'+(result.option.cents/100).toFixed(2)+' USD · revision '+result.revision;confirmation.dataset.confirmedVersion=String(result.version);}
+      try{await window.platterWithSaveLock(form.elements.id.value,async()=>{if(quantityStructureDirty||!input.isConnected)return;const version=form.elements.version.value,tableIndex=Array.from(option.querySelectorAll('[data-pricing-table]')).indexOf(table),lineIndex=Array.from(table.querySelectorAll('[data-pricing-line]')).indexOf(line);const response=await fetch('/api/platter/command',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'proposal.quantity',input:{id:form.elements.id.value,version,optionId:option.dataset.pricingOption,tableIndex,lineIndex,quantity:input.value}})}),result=await response.json();if(!response.ok)throw new Error(result.error??'Could not save quantity');window.platterRevisionSaved?.(form.elements.id.value,version,result);const price=form.querySelector(`[data-package-id="${result.option.id}"] [data-package-field="price"]`);if(price){price.value=(result.option.priceCents/100).toFixed(2);price.dispatchEvent(new Event('input',{bubbles:true}));}confirmation.textContent=result.option.label+' server-confirmed total: $'+(result.option.cents/100).toFixed(2)+' USD · revision '+result.revision;confirmation.dataset.confirmedVersion=String(result.version);quantityDirty=input.value!==String(result.quantity)||quantities.size>0;});}
       catch(error){quantityHalted=true;confirmation.textContent=error.message+' Quantity was not confirmed. Reload before continuing.';}
       finally{quantityPending=false;if(quantities.size&&!quantityHalted){const [next]=quantities;quantities.delete(next);quantityTimer=setTimeout(()=>saveQuantity(next),120);}}
     };
-    editor.addEventListener('input',event=>{if(!event.target.matches('[data-pricing-field="quantity"]')||!event.target.closest('[data-saved-line]')||!form.elements.id||quantityStructureDirty)return;quantities.add(event.target);clearTimeout(quantityTimer);quantityTimer=setTimeout(()=>{const [next]=quantities;quantities.delete(next);saveQuantity(next)},120);});
-    form.addEventListener('submit',()=>{clearTimeout(quantityTimer);serialize();});
+    editor.addEventListener('input',event=>{if(!event.target.matches('[data-pricing-field="quantity"]')||!event.target.closest('[data-saved-line]')||!form.elements.id||quantityStructureDirty||!documentActive())return;quantityDirty=true;quantities.add(event.target);clearTimeout(quantityTimer);quantityTimer=setTimeout(()=>{const [next]=quantities;quantities.delete(next);saveQuantity(next)},120);});
+    form.addEventListener('submit',()=>{clearTimeout(quantityTimer);quantityDirty=false;serialize();});form.addEventListener('platter:serialize',serialize);form.addEventListener('platter:pricing-saved',()=>{quantityStructureDirty=false;quantityDirty=false;delete form.dataset.pricingStructureDirty;quantities.clear();for(const line of editor.querySelectorAll('[data-pricing-line]'))line.dataset.savedLine='';});
+    window.addEventListener('beforeunload',event=>{if(quantityDirty||quantityPending){event.preventDefault();event.returnValue='';}});
     editor.querySelector('[data-pricing-controls]').disabled = false;
     editor.querySelector('[data-pricing-enhancement]').hidden = false;
     syncPrices();

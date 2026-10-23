@@ -2032,11 +2032,13 @@ test('EDIT-001 document revisions preserve ordered blocks and brand through prev
  try{
   const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
   const client=await h.cmd('client.save',{name:'Synthetic Platter client',email:'synthetic-platter-1@example.com'}),document=documentFixture()
-  const fields={...offer,clientId:client.id,document,pricingTables:[{optionId:'one',name:'Placed services',lines:[{name:'Discovery',description:'A reviewed workshop',quantity:'2',unit:'hour',unitPrice:'10.01',group:''}]}]}
+  const fields={...offer,clientId:client.id,document,pricingTables:[{optionId:'one',name:'Placed services',lines:[{name:'Discovery',description:'A reviewed workshop',quantity:'2',unit:'hour',unitPrice:'10.01',group:''}]},{optionId:'one',name:'Unplaced contingency',lines:[{name:'Review',description:'',quantity:'1',unit:'hour',unitPrice:'10.00',group:''}]}]}
   document.blocks.splice(4,0,{id:'pricing',type:'pricing',title:'Investment detail',text:'',optionId:'one',tableIndex:0})
   const created=await h.cmd('proposal.prepare',fields)
   let p=(await h.state()).proposals.find(p=>p.id===created.id)
   assert.deepEqual(p.document,document)
+  await h.cmd('proposal.autosave',{...fields,document:undefined,id:p.id,version:1,pricingTables:[fields.pricingTables[1]]},h.owner,400)
+  assert.equal((await h.state()).proposals.find(v=>v.id===p.id).options[0].tables[0].name,'Placed services','native edits cannot silently rebind placed pricing to a different table')
   const preview=await h.send(`/app/preview/client?id=${p.id}&revision=1&optionId=two`,undefined,h.owner)
   assert.equal(preview.status,200);assert.match(preview.text,/Two perspectives/);assert.match(preview.text,/<strong>careful<\/strong>/);assert.match(preview.text,/Campaign timeline/)
   await h.cmd('proposal.approve',{id:p.id,version:1,revision:1})

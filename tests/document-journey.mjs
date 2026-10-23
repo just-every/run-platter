@@ -65,6 +65,13 @@ export async function documentJourney(){
     // The public state agrees with what the editor built from blank.
     let p=(await state()).proposals.find(p=>p.id===id)
     assert.equal(p.document.blocks.length,fixture.blocks.length);assert.deepEqual(p.document.brand,fixture.brand)
+    const composer=page.locator('form.composer'),autosave=composer.locator('[data-composer-autosave]')
+    await composer.locator('[name=scope]').fill('The reviewed project scope, with an autosaved handoff.')
+    await page.waitForFunction(()=>document.querySelector('[data-composer-autosave]').dataset.saveState==='saved')
+    assert.equal((await state()).proposals.find(p=>p.id===id).scope,'The reviewed project scope, with an autosaved handoff.')
+    await composer.locator('[data-pricing-option="one"] [data-pricing-field="unitPrice"]').first().fill('11.01')
+    await page.waitForFunction(()=>document.querySelector('[data-composer-autosave]').dataset.saveState==='saved')
+    assert.equal((await state()).proposals.find(p=>p.id===id).options[0].cents,2202,'pricing edits autosave through server arithmetic')
     const originalOrder=p.document.blocks.map(b=>b.id)
     await blocks.nth(1).getByRole('button',{name:'Move down',exact:true}).focus()
     assert.equal(await blocks.nth(1).getByRole('tooltip').filter({hasText:'Move down'}).isVisible(),true,'keyboard tooltip appears immediately')

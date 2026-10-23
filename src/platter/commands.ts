@@ -57,6 +57,11 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='reminder-template.save')return saveReminderTemplate(db,a,p)
  if(name.startsWith('reminder.'))return reminderCommand(env,a,name,p)
  if(name.startsWith('dispute.'))return disputeCommand(env,a,name,p)
+ if(name==='proposal.autosave'){
+  need(a.role!=='agent','A person autosaves the proposal editor',403)
+  const result=await command(env,a,'proposal.revise',p),current=negotiatedView(await proposal(db,result.id),await pendingNegotiation(db,result.id))
+  return {...result,title:current.title,options:snapshot(current).options}
+ }
  if(name==='proposal.quantity'){
   need(a.role!=='agent','A person edits pricing quantities',403)
   const original=await proposal(db,p.id);exact(original,p);const current=negotiatedView(original,await pendingNegotiation(db,original.id)),content=snapshot(current),tables=pricingInput(content.options),offered=tables.filter(t=>t.optionId===p.optionId),ti=Number(p.tableIndex),li=Number(p.lineIndex)
@@ -114,6 +119,8 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   if(p.sectionConditions===undefined&&p.scopeOption===undefined&&p.termsOption===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,sectionConditions:pending?JSON.parse(pending.snapshot).section_conditions??{}:current.section_conditions}}
   if(p.terms===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,terms:pending?JSON.parse(pending.snapshot).terms??'':current.terms}}
   if(p.document===undefined)p={...p,document:documentOf(negotiatedView(current,await pendingNegotiation(db,current.id)))}
+  const nextFields=proposalFields(p),oldContent=negotiatedView(current,await pendingNegotiation(db,current.id)),oldOptions=snapshot(oldContent).options
+  for(const block of documentOf(oldContent).blocks.filter(b=>b.type==='pricing')){const retained=nextFields.document.blocks.find(b=>b.id===block.id&&b.type==='pricing'&&b.optionId===block.optionId&&b.tableIndex===block.tableIndex);if(retained)need((oldOptions.find((o:any)=>o.id===block.optionId)?.tables?.length??0)===(nextFields.options.find((o:any)=>o.id===block.optionId)?.tables?.length??0),'Remove or reassign placed document pricing blocks before changing the number of tables')}
   await validateDocumentMedia(db,proposalFields(p).document,current.id)
   await assertSectionLocks(db,negotiatedView(current,await pendingNegotiation(db,current.id)),proposalFields(p))
   if(name==='proposal.negotiate'||await pendingNegotiation(db,current.id))return negotiationCommand(env,a,name,p,current,{...proposalFields(p),...(restoredAttachments!==undefined?{attachments:restoredAttachments}:{}),internalCosts,costSourceRevision})

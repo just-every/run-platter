@@ -82,7 +82,7 @@ export async function authorizeCommand(db:D1Database,a:Actor,name:string,p:Recor
  if(name.startsWith('member.')||name.startsWith('team.')||name==='proposal.share')return
  const id=p.id
  if(name.startsWith('expiry.')){await permitted(db,a,id,'send');return}
- const edit=['proposal.quantity','proposal.document','proposal.revise','proposal.negotiate','proposal.restore','attachments.refresh','suggestions.allow','suggestion.resolve','pdf.downloads']
+ const edit=['proposal.autosave','proposal.quantity','proposal.document','proposal.revise','proposal.negotiate','proposal.restore','attachments.refresh','suggestions.allow','suggestion.resolve','pdf.downloads']
  if(edit.includes(name)){await permitted(db,a,id,'edit');return}
  if(['proposal.send','proposal.withdraw','proposal.lose','question.answer','question.email'].includes(name)||name.startsWith('followup.')){await permitted(db,a,id,'send');return}
  if(name==='proposal.approve'||name==='proposal.reject'){await permitted(db,a,id,'approve');return}

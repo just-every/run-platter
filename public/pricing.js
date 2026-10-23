@@ -27,8 +27,10 @@
           tables.push({
             optionId: option.dataset.pricingOption,
             name: value(table, 'name'),
-            lines: Array.from(table.querySelectorAll('[data-pricing-line]'), line =>
-              Object.fromEntries(['name', 'description', 'quantity', 'unit', 'unitPrice', 'group'].map(key => [key, value(line, key)]))),
+            lines: Array.from(table.querySelectorAll('[data-pricing-line]'), line => ({
+              ...Object.fromEntries(['name', 'description', 'quantity', 'unit', 'unitPrice', 'group'].map(key => [key, value(line, key)])),
+              ...(line.dataset.catalogId ? { catalogId: line.dataset.catalogId } : {}),
+            })),
           });
         }
       }

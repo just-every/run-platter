@@ -4,7 +4,7 @@ import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { harness } from './harness.mjs'
 import { browserEdge } from './browser-edge.mjs'
-import { financeFake, financeConfig, financeOffer, financeAccept, stripeEvent } from './finance-fixture.mjs'
+import { financeFake, financeConfig, financeOffer, financeAccept, financeVerify, stripeEvent } from './finance-fixture.mjs'
 import { pdfPages } from './pdf-document.mjs'
 export async function financeJourney(){
  const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
@@ -86,6 +86,15 @@ export async function financeJourney(){
    fake.stripe.set('synthetic-platter-6460',{id:'synthetic-platter-6460',status:'paid',currency:'usd',amount:145590,arrival_date:receiptSecond});fake.stripe.set('balance_transactions',{has_more:false,data:transactions})
    await page.goto(edge.origin+'/app/payments');const payoutForm=page.locator('form').filter({has:page.getByRole('button',{name:'Reconcile Stripe payout',exact:true})});await payoutForm.getByLabel('Paid Stripe payout id').fill('synthetic-platter-6460');await payoutForm.getByRole('checkbox').check();await payoutForm.getByRole('button',{name:'Reconcile Stripe payout',exact:true}).click()
    const clearing=page.locator('section').filter({has:page.getByRole('heading',{name:'Stripe clearing',exact:true})});assert.match(await clearing.innerText(),/44.10 USD/);assert.match(await clearing.innerText(),/1,455.90 USD/);assert.match(await clearing.innerText(),/0.00 USD/);await capture(page,'fees-and-payout-cleared')
+   const catalog=await cmd('catalog.save',{sku:'synthetic-platter-6470',name:'Mapped browser service',unit:'project',unitPrice:'1000'});await cmd('accounting.catalog',{catalogId:catalog.id,itemId:'synthetic-platter-6101',taxCode:'TAX',incomeAccount:'synthetic-platter-6102'})
+   const mapped=await cmd('proposal.prepare',{...financeOffer,clientId:client.id,title:'Browser catalog binding'})
+   await cmd('catalog.insert',{id:mapped.id,version:1,optionId:'one',catalogId:catalog.id,catalogVersion:1,quantity:'1'})
+   await page.goto(edge.origin+'/app/proposal?id='+mapped.id);await page.locator('[name=scope]').fill('A revised scope retaining the catalog item.');await page.getByRole('button',{name:'Save revision',exact:true}).click()
+   const revised=(await getState()).proposals.find(r=>r.id===mapped.id);assert.ok(revised.options[0].tables.flatMap(t=>t.lines).some(l=>l.catalogId===catalog.id),'saving the pricing editor retains the accounting catalog binding');await capture(page,'catalog-invoice-binding')
+   await cmd('proposal.approve',{id:mapped.id,version:revised.version,revision:revised.revision});const approved=(await getState()).proposals.find(r=>r.id===mapped.id),mappedPath=new URL((await cmd('proposal.send',{id:mapped.id,version:approved.version})).shareUrl).pathname,mappedCookie=await financeVerify({state:getState,send:h.send},mappedPath)
+   assert.equal((await h.send(mappedPath+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},mappedCookie)).status,200)
+   const mappedAmount=(await getState()).finance.amounts.find(r=>r.proposal_id===mapped.id);assert.ok(fake.invoices.get(mappedAmount.external_id).Line.some(l=>l.Description.includes('Mapped browser service')&&l.SalesItemLineDetail.TaxCodeRef.value==='TAX'))
+
 
   }finally{await clientContext.close();await context.close();await h.close();await edge.close()}
  }}finally{await browser.close()}

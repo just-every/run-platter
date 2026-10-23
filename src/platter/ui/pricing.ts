@@ -4,7 +4,7 @@ const textInput = (label: string, key: string, value: unknown = '', extra = ''):
   `<label>${escape(label)}<input data-pricing-field="${key}" value="${escape(value)}" ${extra}></label>`
 
 function lineEditor(line: any = {}): string {
-  return `<fieldset data-pricing-line><legend>Line item</legend>${textInput('Item name', 'name', line.name, 'required maxlength="200"')}
+  return `<fieldset data-pricing-line data-catalog-id="${escape(line.catalogId)}"><legend>Line item</legend>${textInput('Item name', 'name', line.name, 'required maxlength="200"')}
     <label>Description<textarea data-pricing-field="description" rows="3" maxlength="2000">${escape(line.description)}</textarea></label>
     ${textInput('Quantity', 'quantity', line.quantity ?? '1', 'required inputmode="decimal" pattern="(?=.*[1-9])[0-9]+([.][0-9]{1,3})?" title="Enter a positive quantity with up to three decimal places, at most 1000000."')}
     ${textInput('Unit', 'unit', line.unit, 'required maxlength="40" placeholder="e.g. hours, guests, items"')}

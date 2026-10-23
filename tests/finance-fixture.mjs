@@ -4,7 +4,7 @@ export const financeOffer={title:'Synthetic scheduled project',scope:'Synthetic 
 export const financeSchedule={netDays:15,milestones:[{id:'design',label:'Design approval',date:null,amount:{kind:'percent',bps:3000}},{id:'delivery',label:'Delivery',date:'2028-03-15',amount:{kind:'balance'}}],recurring:[{id:'support',label:'Monthly support',startOn:'2028-04-01',interval:'monthly',amount:{kind:'percent',bps:1000}}]}
 export const financeConfig={authority:'quickbooks',version:0,itemId:'synthetic-platter-6101',taxCode:'NON',incomeAccount:'synthetic-platter-6102',clearingAccount:'synthetic-platter-6103',feeAccount:'synthetic-platter-6104',bankAccount:'synthetic-platter-6105',remittance:'Checks payable to Synthetic Studio; quote the invoice number. Contact the firm for wire instructions.',consent:true}
 export function financeFake(){
- const calls=[],invoices=new Map(),customers=new Map(),payments=new Map(),stripe=new Map(),journals=new Map(),requests=new Map()
+ const calls=[],invoices=new Map(),customers=new Map(),payments=new Map(),stripe=new Map(),journals=new Map(),refunds=new Map(),requests=new Map()
  let count=6200,uncertain=false
  const outboundService=async request=>{
   const url=new URL(request.url),body=request.method==='POST'?(request.headers.get('content-type')?.includes('application/json')?await request.json():Object.fromEntries(new URLSearchParams(await request.text()))):null;calls.push({method:request.method,url:url.href,body})
@@ -15,24 +15,25 @@ export function financeFake(){
   }
   assert.equal(url.hostname,'quickbooks.api.intuit.com')
   if(url.pathname.includes('/companyinfo/'))return Response.json({CompanyInfo:{CompanyName:'Synthetic Studio'}})
-  if(url.pathname.includes('/item/'))return Response.json({Item:{Id:financeConfig.itemId,IncomeAccountRef:{value:financeConfig.incomeAccount}}})
+  if(url.pathname.includes('/item/'))return Response.json({Item:{Id:url.pathname.split('/').at(-1),IncomeAccountRef:{value:financeConfig.incomeAccount}}})
   if(url.pathname.endsWith('/query')){const query=url.searchParams.get('query');return Response.json({QueryResponse:{Customer:[...customers.values()].filter(c=>query.includes(c.DisplayName))}})}
   if(request.method==='GET'&&url.pathname.includes('/invoice/'))return Response.json({Invoice:invoices.get(url.pathname.split('/').at(-1))})
   if(request.method==='POST'){
    const key=url.searchParams.get('requestid');assert.ok(key,'QBO uses provider request id')
    if(requests.has(key))return Response.json(requests.get(key))
-   if(uncertain){uncertain=false;throw Error('Synthetic uncertain provider edge')}
-   const entity=url.pathname.endsWith('/customer')?'Customer':url.pathname.endsWith('/invoice')?'Invoice':url.pathname.endsWith('/payment')?'Payment':url.pathname.endsWith('/transfer')?'Transfer':'JournalEntry',Id='synthetic-platter-'+(++count)
+   const loseResponse=uncertain;uncertain=false
+   const entity=url.pathname.endsWith('/customer')?'Customer':url.pathname.endsWith('/invoice')?'Invoice':url.pathname.endsWith('/payment')?'Payment':url.pathname.endsWith('/transfer')?'Transfer':url.pathname.endsWith('/refundreceipt')?'RefundReceipt':'JournalEntry',Id='synthetic-platter-'+(++count)
    const value={Id,...body}
    if(entity==='Invoice'){value.TotalAmt=body.Line.reduce((n,l)=>n+l.Amount,0);value.Balance=value.TotalAmt;invoices.set(Id,value)}
    if(entity==='Customer')customers.set(Id,value)
    if(entity==='Payment'){payments.set(Id,value);for(const line of body.Line??[]){const invoice=invoices.get(line.LinkedTxn[0].TxnId);assert.ok(invoice,'payment links the authority invoice');invoice.Balance=Math.round((invoice.Balance-line.Amount)*100)/100}}
+   if(entity==='RefundReceipt')refunds.set(Id,value)
    if(entity==='JournalEntry'||entity==='Transfer')journals.set(Id,value)
-   const response={[entity]:value};requests.set(key,response);return Response.json(response)
+   const response={[entity]:value};requests.set(key,response);if(loseResponse)throw Error('Synthetic lost provider response after committing the record');return Response.json(response)
   }
   throw Error('Unexpected accounting operation '+request.method+' '+url.pathname)
  }
- return {calls,invoices,customers,payments,stripe,journals,outboundService,uncertainNext:()=>{uncertain=true}}
+ return {calls,invoices,customers,payments,stripe,journals,refunds,outboundService,uncertainNext:()=>{uncertain=true}}
 }
 export async function financeConnect(h){
  await h.cmd('provider.connect',{provider:'quickbooks',version:0,realmId:'synthetic-platter-6100',token:'synthetic-platter-6107',consent:true})

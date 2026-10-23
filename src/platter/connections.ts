@@ -21,7 +21,7 @@ export async function openCredential(env:Bindings,id:string,sealed:string){
 }
 export async function providerCredential(env:Bindings,id:string){
  const row=await env.DB.prepare("SELECT c.*,s.sealed FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.status='connected'").bind(id).first<any>()
- need(row,'Connect this provider again before using it',409)
+ need(row&&!row.broken_at,'Connect this provider again before using it',409)
  try{
   const secret=await openCredential(env,id,row.sealed)
   need(secret.accountId===row.account_id&&secret.provider===row.provider,'Provider credential binding changed',409)
@@ -31,10 +31,10 @@ export async function providerCredential(env:Bindings,id:string){
 export async function providerJson(url:string,token:string){
  try{
   const response=await fetch(url,{headers:{authorization:'Bearer '+token,accept:'application/json'},redirect:'manual'})
-  need(response.ok,'The provider refused the connection check',400)
+  if(!response.ok)throw Object.assign(new Error('Provider refused'),{providerStatus:response.status})
   const body=await response.text();need(body.length<=262144,'The provider response was too large',400)
   const value=JSON.parse(body);need(value&&typeof value==='object','The provider response was invalid',400);return value
- }catch{fail('The provider connection check failed. Confirm the token and account, then try again.',400)}
+ }catch(error){throw Object.assign(new Error('The provider connection check failed. Confirm the token and account, then try again.'),{status:400,...(Number.isInteger((error as any)?.providerStatus)?{providerStatus:(error as any).providerStatus}:{})})}
 }
 export async function connectionState(env:Bindings,a:Actor){
  if(!mailboxRoles.includes(a.role))return []

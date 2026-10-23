@@ -30,7 +30,7 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
     let above = ''
     let layout = ''
     switch (url.pathname) {
-      case '/app/payments': title='Payments and accounting'; content=financePage(state); break
+      case '/app/payments': title='Payments and accounting'; content=financePage(state,url.searchParams.get('view')); break
       case '/app/payment-terms': title='Payment terms'; content=paymentTermsPage(state,url.searchParams.get('id')??''); break
       case '/app/catalog': title='Catalog'; content=catalogPage(state); break
       case '/app/library': title='Content library'; content=libraryPage(state); break

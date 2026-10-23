@@ -37,9 +37,10 @@ export async function applyEvent(env:Bindings,eventId:string){
   source=await providerJson('https://api.stripe.com/v1/charges/'+encodeURIComponent(dispute.charge),secret.token)
  }else source=await providerJson('https://api.stripe.com/v1/'+(event.event_type.startsWith('payment_intent.')?'payment_intents/':'charges/')+encodeURIComponent(event.object_id),secret.token)
  need(source&&typeof source.id==='string','Stripe did not confirm the payment',409)
+ if(!dispute)need(source.id===event.object_id&&source.object===(event.event_type.startsWith('payment_intent.')?'payment_intent':'charge'),'Stripe returned a different payment object',409)
  if(event.event_type.startsWith('payment_intent.')&&source.latest_charge){
   const charge=await providerJson('https://api.stripe.com/v1/charges/'+encodeURIComponent(typeof source.latest_charge==='string'?source.latest_charge:source.latest_charge.id),secret.token)
-  need(charge.payment_intent===source.id,'Stripe charge does not belong to this payment',409)
+  need(charge.object==='charge'&&charge.id===(typeof source.latest_charge==='string'?source.latest_charge:source.latest_charge.id)&&charge.payment_intent===source.id,'Stripe charge does not belong to this payment',409)
   source=charge
  }
  const metadata=source.metadata??{},amountId=metadata.platter_amount_id,proposalId=metadata.platter_proposal_id
@@ -49,11 +50,14 @@ export async function applyEvent(env:Bindings,eventId:string){
  need(amount&&amount.proposal_id===proposalId&&String(amount.revision)===String(metadata.platter_revision)&&source.currency?.toUpperCase()===amount.currency&&Number.isSafeInteger(source.amount)&&source.amount>0&&source.amount<=amount.cents,'Stripe payment does not match the accepted amount, currency and revision',409)
  const refunded=source.amount_refunded??0
  need(Number.isSafeInteger(refunded)&&refunded>=0&&refunded<=source.amount,'Stripe refund amount is invalid',409)
- const state=source.disputed||dispute&&!['won','lost'].includes(dispute.status)?'disputed':refunded===source.amount?'refunded':refunded>0?'partially_refunded':source.paid===true||source.status==='succeeded'?'succeeded':['processing','pending','requires_action'].includes(source.status)?'processing':'failed'
- const canonical=source.payment_intent??source.id,chargeId=source.object==='charge'||source.paid!==undefined?source.id:null
+ const canonical=source.payment_intent??source.id,chargeId=source.object==='charge'?source.id:null
  const prior=await db.prepare('SELECT * FROM p_provider_payments WHERE id=?').bind(canonical).first<any>();need(!prior||prior.account_id===secret.accountId&&prior.amount_id===amountId,'Provider payment binding changed',409)
+ if(dispute)need(dispute.object==='dispute'&&dispute.charge===chargeId&&dispute.currency===source.currency&&Number.isSafeInteger(dispute.amount)&&dispute.amount>0&&dispute.amount<=source.amount&&['warning_needs_response','warning_under_review','warning_closed','needs_response','under_review','charge_refunded','won','lost'].includes(dispute.status),'Stripe dispute does not match the payment',409)
+ const disputeStatus=dispute?.status??prior?.dispute_status??null,disputed=disputeStatus?disputeStatus!=='won':Boolean(source.disputed)
+ const succeeded=source.object==='charge'?source.paid===true&&source.status==='succeeded'&&source.captured===true:source.status==='succeeded'
+ const state=disputed?'disputed':refunded===source.amount?'refunded':refunded>0?'partially_refunded':succeeded?'succeeded':['processing','pending','requires_action','requires_capture'].includes(source.status)||source.status==='succeeded'&&source.captured===false?'processing':'failed'
  const writes=[
-  db.prepare("INSERT INTO p_provider_payments(id,account_id,amount_id,charge_id,state,cents,refunded_cents,last_event) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET charge_id=COALESCE(excluded.charge_id,p_provider_payments.charge_id),state=excluded.state,cents=excluded.cents,refunded_cents=excluded.refunded_cents,last_event=excluded.last_event WHERE excluded.account_id=p_provider_payments.account_id AND excluded.amount_id=p_provider_payments.amount_id AND (SELECT created_at FROM p_financial_events WHERE id=excluded.last_event)>=(SELECT created_at FROM p_financial_events WHERE id=p_provider_payments.last_event)").bind(canonical,secret.accountId,amountId,chargeId,state,source.amount,refunded,eventId),
+  db.prepare("INSERT INTO p_provider_payments(id,account_id,amount_id,charge_id,state,cents,refunded_cents,dispute_status,last_event) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET charge_id=COALESCE(excluded.charge_id,p_provider_payments.charge_id),state=excluded.state,cents=excluded.cents,refunded_cents=excluded.refunded_cents,dispute_status=COALESCE(excluded.dispute_status,p_provider_payments.dispute_status),last_event=excluded.last_event WHERE excluded.account_id=p_provider_payments.account_id AND excluded.amount_id=p_provider_payments.amount_id AND (SELECT created_at FROM p_financial_events WHERE id=excluded.last_event)>=(SELECT created_at FROM p_financial_events WHERE id=p_provider_payments.last_event)").bind(canonical,secret.accountId,amountId,chargeId,state,source.amount,refunded,disputeStatus,eventId),
   db.prepare("UPDATE p_financial_events SET state='processed',amount_id=?,payment_state=? WHERE id=?").bind(amountId,state,eventId),
   db.prepare('UPDATE p_amounts SET version=version+1 WHERE id=?').bind(amountId),
  ]

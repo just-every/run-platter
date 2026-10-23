@@ -2,7 +2,7 @@ import { discountedCents, percentBps } from './discounts'
 import { dollars, need, text } from './model'
 
 export interface PriceLine {
- name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number
+ catalogId?:string; name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number
 }
 export interface PriceTable {
  name: string; lines: PriceLine[]; groups: { name: string; subtotalCents: number }[]; subtotalCents: number
@@ -44,7 +44,7 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
    need(typeof group === 'string' && group.length <= 200, 'Group must be text up to 200 characters')
    const name = text(line.name, 'a line name'), unit = text(line.unit, 'a unit', 40)
    groups.set(group.trim(), boundedTotal(BigInt(groups.get(group.trim()) ?? 0) + BigInt(lineTotalCents)))
-   return { name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents }
+   return { ...(line.catalogId?{catalogId:text(line.catalogId,'a catalog item',200)}:{}),name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents }
   })
   const subtotalCents = boundedTotal(lines.reduce((sum, line) => sum + BigInt(line.lineTotalCents), 0n))
   option.tables.push({ name: text(table.name, 'a table name'), lines, groups: [...groups].map(([name, subtotalCents]) => ({ name, subtotalCents })), subtotalCents })
@@ -60,7 +60,7 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
 export function pricingInput(options: any[]) {
  return options.flatMap(option => (option.tables ?? []).map((table: PriceTable) => ({
   optionId: option.id, name: table.name,
-  lines: table.lines.map(({ name, description, quantity, unit, unitPrice, group }) => ({ name, description, quantity, unit, unitPrice, group })),
+  lines: table.lines.map(({ catalogId,name, description, quantity, unit, unitPrice, group }) => ({ ...(catalogId?{catalogId}:{}),name, description, quantity, unit, unitPrice, group })),
  })))
 }
 

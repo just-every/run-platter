@@ -1,3 +1,5 @@
+import { remittanceInstructions } from '../payments/remittance'
+import { invoiceLines, mapCatalog } from './catalog'
 import type { Bindings } from '../../auth.server'
 import { providerCredential, providerJson } from '../connections'
 import { commit, need, text, hash, type Actor } from '../model'
@@ -28,6 +30,7 @@ export async function accountingWrite(env:Bindings,kind:string,subject:string,pa
  try{
   await live(env)
   const response=await fetch(base(account)+entity.toLowerCase()+'?requestid='+encodeURIComponent(id),{method:'POST',redirect:'manual',headers:{authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json'},body})
+  if([401,403].includes(response.status))await db.prepare("UPDATE p_connections SET broken_at=? WHERE id='workspace:quickbooks' AND account_id=? AND status='connected'").bind(Date.now(),account).run()
   if(response.ok){const raw=await response.text();if(raw.length<=262144){const value=JSON.parse(raw);if(typeof value[entity]?.Id==='string')external=value[entity].Id}}
  }catch{/* Provider receipt is uncertain. Keep it for reconciliation. */}
  await db.prepare("UPDATE p_accounting_requests SET status=?,external_id=? WHERE id=? AND status='claimed'").bind(external?'succeeded':'held',external,id).run()
@@ -61,7 +64,8 @@ export async function syncAccounting(env:Bindings,id?:string){
    let external=amount.external_id
    if(external)need(amount.external_account===account,'Invoice belongs to another accounting account',409)
    if(!external){
-    const payload={DocNumber:'PL-'+(await hash(amount.id)).slice(0,24),CustomerRef:{value:customerId},TxnDate:amount.issue_on,DueDate:amount.due_on,CurrencyRef:{value:amount.currency},PrivateNote:'Platter scheduled amount '+amount.id,CustomerMemo:{value:settings.remittance},Line:[{Amount:amount.cents/100,Description:amount.label,DetailType:'SalesItemLineDetail',SalesItemLineDetail:{ItemRef:{value:settings.item_id},Qty:1,UnitPrice:amount.cents/100,TaxCodeRef:{value:settings.tax_code}}}]}
+    const accepted=await db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(amount.proposal_id).first<any>(),lines=await invoiceLines(env,accepted,amount,settings,token,account)
+    const payload={DocNumber:'PL-'+(await hash(amount.id)).slice(0,18),CustomerRef:{value:customerId},TxnDate:amount.issue_on,DueDate:amount.due_on,CurrencyRef:{value:amount.currency},PrivateNote:'Platter scheduled amount '+amount.id,CustomerMemo:{value:await remittanceInstructions(db)},Line:lines}
     const receipt=await accountingWrite(env,'invoice',amount.id,payload,'Invoice')
     need(receipt.status==='succeeded','Invoice creation held for provider reconciliation',409);external=receipt.external_id
     await db.prepare("UPDATE p_amounts SET external_id=?,external_account=?,issued_at=?,accounting_status='issued' WHERE id=? AND external_id IS NULL").bind(external,account,await currentTime(db),amount.id).run()
@@ -75,17 +79,48 @@ export async function syncAccounting(env:Bindings,id?:string){
    const offline=(await db.prepare("SELECT p.*,a.cents AS allocated_cents FROM p_payment_records p JOIN p_payment_allocations a ON a.payment_id=p.id WHERE a.amount_id=? AND p.method!='stripe' ORDER BY p.recorded_at,p.id").bind(amount.id).all<any>()).results
    for(const payment of offline)await postPayment(env,amount,customerId,payment.id,payment.allocated_cents,payment.received_on,payment.reference)
    const online=(await db.prepare("SELECT * FROM p_provider_payments WHERE amount_id=? AND state IN ('succeeded','partially_refunded','refunded','disputed')").bind(amount.id).all<any>()).results
-   for(const payment of online)await postPayment(env,amount,customerId,payment.id,payment.cents,today,payment.charge_id??payment.id,true)
-  }catch(error){await db.prepare("UPDATE p_amounts SET accounting_status='held',mismatch=? WHERE id=? AND accounting_status!='mismatch'").bind((error as Error).message.slice(0,300),amount.id).run()}
+   for(const payment of online)await postPayment(env,amount,customerId,'stripe:'+(payment.charge_id??payment.id),payment.cents,today,payment.charge_id??payment.id,true)
+   const verifiedBindings=(await db.prepare("SELECT p.* FROM p_payment_records p JOIN p_payment_allocations a ON a.payment_id=p.id WHERE a.amount_id=? AND p.method='stripe' AND NOT EXISTS(SELECT 1 FROM p_provider_payments e WHERE e.charge_id=p.provider_charge)").bind(amount.id).all<any>()).results
+   for(const payment of verifiedBindings)await postPayment(env,amount,customerId,'stripe:'+payment.provider_charge,payment.cents,localDate(payment.recorded_at,await installationZone(db)),payment.provider_charge,true)
+   const refunds=(await db.prepare("SELECT r.* FROM p_refunds r JOIN p_payment_allocations a ON a.payment_id=r.payment_id WHERE a.amount_id=? AND r.status='succeeded' AND r.provider_refund IS NOT NULL").bind(amount.id).all<any>()).results
+   for(const refund of refunds){
+    const accepted=await db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(amount.proposal_id).first<any>(),lines=await invoiceLines(env,accepted,{...amount,cents:refund.cents,label:'Refund '+amount.label},settings,token,account)
+    const receipt=await accountingWrite(env,'refund',refund.id,{CustomerRef:{value:customerId},DepositToAccountRef:{value:settings.clearing_account},CurrencyRef:{value:amount.currency},TxnDate:localDate(refund.completed_at,await installationZone(db)),PaymentRefNum:refund.provider_refund.slice(0,21),PrivateNote:'Refund of invoice '+external+'; Stripe '+refund.provider_refund,Line:lines},'RefundReceipt')
+    need(receipt.status==='succeeded','Refund credit held for provider reconciliation',409)
+    await db.prepare("INSERT OR IGNORE INTO p_clearing_postings(id,authority,account_id,source_id,kind,cents,clearing_delta,fee_delta,bank_delta,external_id) VALUES(?,?,?,?, 'refund',?,?,0,0,?)").bind(receipt.id,settings.authority,account,refund.provider_refund,refund.cents,-refund.cents,receipt.external_id).run()
+   }
+
+  }catch(error){const broken=[401,403].includes((error as any)?.providerStatus);if(broken)await db.prepare("UPDATE p_connections SET broken_at=? WHERE id='workspace:quickbooks' AND account_id=? AND status='connected'").bind(Date.now(),account).run();await db.prepare("UPDATE p_amounts SET accounting_status='held',mismatch=? WHERE id=? AND accounting_status!='mismatch'").bind((error as Error).message.slice(0,300),amount.id).run();if(broken)break}
  }
 }
 async function postPayment(env:Bindings,amount:any,customerId:string,id:string,n:number,date:string,reference:string,stripe=false){
- const settings=await accountingSettings(env),receipt=await accountingWrite(env,'payment',id,{CustomerRef:{value:customerId},DepositToAccountRef:{value:stripe?settings.clearing_account:settings.bank_account},TotalAmt:n/100,CurrencyRef:{value:amount.currency},TxnDate:date,PaymentRefNum:reference,Line:[{Amount:n/100,LinkedTxn:[{TxnId:amount.external_id??(await env.DB.prepare('SELECT external_id FROM p_amounts WHERE id=?').bind(amount.id).first<any>()).external_id,TxnType:'Invoice'}]}]},'Payment')
+ const settings=await accountingSettings(env),invoiceId=amount.external_id??(await env.DB.prepare('SELECT external_id FROM p_amounts WHERE id=?').bind(amount.id).first<any>()).external_id
+ let receipt=await env.DB.prepare("SELECT * FROM p_accounting_requests WHERE authority=? AND account_id=? AND kind='payment' AND subject=?").bind(settings.authority,settings.account_id,id).first<any>()
+ if(receipt){
+  const body=JSON.parse(receipt.payload);need(receipt.status==='succeeded'&&body.TotalAmt===n/100&&body.CustomerRef?.value===customerId&&body.Line?.[0]?.LinkedTxn?.[0]?.TxnId===invoiceId,'Payment posting held for provider reconciliation',409)
+ }else{
+  const {token,account}=await live(env),current=await providerJson(base(account)+'invoice/'+encodeURIComponent(invoiceId),token)
+  need(current.Invoice?.Id===invoiceId&&cents(current.Invoice.Balance)>=n,'Accounting already shows payment; match its evidence before posting this receipt',409)
+  receipt=await accountingWrite(env,'payment',id,{CustomerRef:{value:customerId},DepositToAccountRef:{value:stripe?settings.clearing_account:settings.bank_account},TotalAmt:n/100,CurrencyRef:{value:amount.currency},TxnDate:date,PaymentRefNum:reference.slice(0,21),PrivateNote:'Platter payment '+reference,Line:[{Amount:n/100,LinkedTxn:[{TxnId:invoiceId,TxnType:'Invoice'}]}]},'Payment')
+ }
  need(receipt.status==='succeeded','Payment posting held for provider reconciliation',409)
- if(stripe)await env.DB.prepare("INSERT OR IGNORE INTO p_clearing_postings(id,authority,account_id,source_id,kind,cents,clearing_delta,fee_delta,bank_delta,external_id) VALUES(?,?,?,?, 'gross',?,?,0,0,?)").bind(receipt.id,settings.authority,settings.account_id,id,n,n,receipt.external_id).run()
+ if(stripe)await env.DB.prepare("INSERT OR IGNORE INTO p_clearing_postings(id,authority,account_id,source_id,kind,cents,clearing_delta,fee_delta,bank_delta,external_id) VALUES(?,?,?,?, 'gross',?,?,0,0,?)").bind(receipt.id,settings.authority,settings.account_id,reference,n,n,receipt.external_id).run()
 }
 export async function accountingCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  need(financeRoles.includes(a.role),'Only owner, admins and billing reconcile accounting',403)
+ if(name==='accounting.match'){
+  need(['owner','admin'].includes(a.role),'Only owner and admins match uncertain invoice writes',403)
+  need(p.consent===true||p.consent==='yes','Explicitly confirm the exact provider invoice')
+  const {settings,account,token}=await live(env),amount=await env.DB.prepare('SELECT * FROM p_amounts WHERE id=?').bind(text(p.amountId,'a scheduled amount',300)).first<any>()
+  need(amount&&!amount.external_id,'Choose an issued amount with no confirmed provider binding',409)
+  const request=await env.DB.prepare("SELECT * FROM p_accounting_requests WHERE authority=? AND account_id=? AND kind='invoice' AND subject=? AND status IN ('held','claimed')").bind(settings.authority,account,amount.id).first<any>()
+  need(request,'No uncertain invoice creation is recorded',409)
+  const external=text(p.invoiceId,'the provider invoice id',200),invoice=(await providerJson(base(account)+'invoice/'+encodeURIComponent(external),token)).Invoice,expected=JSON.parse(request.payload)
+  need(invoice?.Id===external&&invoice.DocNumber===expected.DocNumber&&invoice.CustomerRef?.value===expected.CustomerRef?.value&&invoice.CurrencyRef?.value===amount.currency&&cents(invoice.TotalAmt)===amount.cents&&invoice.TxnDate===amount.issue_on&&invoice.DueDate===amount.due_on,'The provider invoice does not match the retained exact request',409)
+  await commit(env.DB,a,[env.DB.prepare("UPDATE p_amounts SET external_id=?,external_account=?,issued_at=?,accounting_status='synced',mismatch=NULL WHERE id=?").bind(external,account,await currentTime(env.DB),amount.id),env.DB.prepare("UPDATE p_accounting_requests SET external_id=?,status='succeeded' WHERE id=?").bind(external,request.id)],false,{sql:"EXISTS(SELECT 1 FROM p_amounts WHERE id=? AND external_id IS NULL AND version=?)",values:[amount.id,amount.version]})
+  return{id:amount.proposal_id,amountId:amount.id,matched:true}
+ }
+ if(name==='accounting.catalog')return mapCatalog(env,a,p,await live(env))
  if(name==='accounting.configure'){
   need(a.role==='owner','Only the owner chooses invoice authority and posting accounts',403)
   need(p.consent===true||p.consent==='yes','Explicitly authorize customer, invoice and payment transmission to this accounting company')
@@ -103,5 +138,5 @@ export async function accountingCommand(env:Bindings,a:Actor,name:string,p:Recor
  }
  if(name==='accounting.pause'){need(['owner','admin'].includes(a.role),'Only owner and admins pause synchronization',403);await commit(env.DB,a,[env.DB.prepare('UPDATE p_accounting_settings SET enabled=0,version=version+1 WHERE singleton=1'),env.DB.prepare('DELETE FROM p_accounting_authority')]);return{paused:true}}
  if(name==='accounting.milestone'){const result=await markMilestone(env,a,p);await syncAccounting(env,result.id);return result}
- need(name==='accounting.sync','Unknown accounting action',404);await syncAccounting(env,p.id?text(p.id,'a proposal'):undefined);return{synced:true}
+ need(name==='accounting.sync','Unknown accounting action',404);await syncAccounting(env,p.id?text(p.id,'a proposal'):undefined);return{requested:true,message:'Reconciliation finished. Review held or mismatched amounts below.'}
 }

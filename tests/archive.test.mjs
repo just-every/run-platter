@@ -578,14 +578,17 @@ test('PRICE-007 / PAY-004 / PAY-007 / ACCT-001 / ACCT-004 public CLI retains fro
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
   h=await harness({root:source,outboundService:fake.outboundService})
+  await h.cmd('payment.remittance',{version:0,instructions:financeConfig.remittance,consent:true})
   await financeConnect(h)
-  const {p}=await financeAccept(h),amount=(await h.state()).finance.amounts.find(r=>r.proposal_id===p.id&&r.kind==='deposit')
+  const item=await h.cmd('catalog.save',{sku:'synthetic-platter-6175',name:'Archived mapped item',unit:'project',unitPrice:'10000'})
+  await h.cmd('accounting.catalog',{catalogId:item.id,itemId:'synthetic-platter-6101',taxCode:'NON',incomeAccount:'synthetic-platter-6102'})
+  const {p}=await financeAccept(h,{pricingTables:[{optionId:'one',name:'Services',lines:[{catalogId:item.id,name:'Archived mapped item',quantity:'1',unit:'project',unitPrice:'10000'}]}]}),amount=(await h.state()).finance.amounts.find(r=>r.proposal_id===p.id&&r.kind==='deposit')
   await h.cmd('payment.record',{id:p.id,amountId:amount.id,method:'ach_credit',amount:'1',reference:'synthetic-platter-6170',receivedOn:new Date().toISOString().slice(0,10),requestId:'synthetic-platter-6171',consent:true})
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-6108',webhookSecret:'synthetic-platter-6109',consent:true})
   const id='synthetic-platter-6172';fake.stripe.set(id,{id,object:'payment_intent',status:'processing',currency:'usd',amount:299900,metadata:{platter_amount_id:amount.id,platter_proposal_id:p.id,platter_revision:'1'}})
   await stripeEvent(h,{id:'synthetic-platter-6173',type:'payment_intent.processing',created:100,data:{object:{id}}})
   const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
-  const tables=['p_amounts','p_payment_allocations','p_financial_events','p_provider_payments','p_accounting_requests','p_accounting_customers','p_offline_requests','p_clearing_postings','p_accounting_settings']
+  const tables=['p_remittance_settings','p_accounting_catalog','p_amounts','p_payment_allocations','p_financial_events','p_provider_payments','p_accounting_requests','p_accounting_customers','p_offline_requests','p_clearing_postings','p_accounting_settings']
   const before=await h.state(),rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
   await h.close();h=undefined
   const archive=join(temporary,'finance.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8')

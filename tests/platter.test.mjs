@@ -2068,36 +2068,70 @@ test('PRICE-007 selection-driven net terms, milestones and retainer freeze throu
 })
 
 test('ACCT-001 / ACCT-004 / PAY-007 issue-day QuickBooks bindings survive reconnect and replay; offline milestone closes overdue and provider edits flag mismatches',async()=>{
- const {financeFake,financeConnect,financeAccept}=await import('./finance-fixture.mjs'),fake=financeFake(),h=await harness({outboundService:fake.outboundService})
+ const {financeFake,financeConnect,financeAccept,financeSchedule}=await import('./finance-fixture.mjs'),fake=financeFake();let revokeOnQuery=false,refuseInvoice=false;const h=await harness({outboundService:async request=>{const url=new URL(request.url);if(revokeOnQuery&&url.pathname.endsWith('/query')){revokeOnQuery=false;await h.cmd('provider.disconnect',{provider:'quickbooks',version:3})}if(refuseInvoice&&url.pathname.includes('/invoice/'))return new Response(null,{status:401});return fake.outboundService(request)}})
  try{
   await financeConnect(h)
-  const {p}=await financeAccept(h)
+  const {p}=await financeAccept(h,{paymentSchedule:{...financeSchedule,netDays:30}})
   assert.equal(fake.customers.size,1);assert.equal(fake.invoices.size,1)
   let state=await h.state(),rows=state.finance.amounts.filter(r=>r.proposal_id===p.id),milestone=rows.find(r=>r.schedule_key==='design'),deposit=rows.find(r=>r.kind==='deposit')
   assert.equal(deposit.external_id,[...fake.invoices.keys()][0]);assert.equal(rows.filter(r=>r.external_id).length,1)
-  const invoice=fake.invoices.get(deposit.external_id);assert.equal(invoice.Line[0].SalesItemLineDetail.TaxCodeRef.value,'NON')
-  await h.cmd('provider.disconnect',{provider:'quickbooks',version:1})
+  const invoice=fake.invoices.get(deposit.external_id);assert.equal(invoice.Line[0].SalesItemLineDetail.TaxCodeRef.value,'NON');assert.match(invoice.CustomerMemo.value,/Checks payable/)
+  await h.cmd('provider.disconnect',{provider:'quickbooks',version:1});const stopped=fake.calls.length;await h.cmd('accounting.sync',{});assert.equal(fake.calls.length,stopped,'disconnected accounting jobs make no provider call')
   await h.cmd('provider.connect',{provider:'quickbooks',version:2,realmId:'synthetic-platter-6100',token:'synthetic-platter-6110',consent:true})
   await h.cmd('accounting.sync',{});await h.cmd('accounting.sync',{});assert.equal(fake.invoices.size,1);assert.equal(fake.customers.size,1)
   await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET observed_at=excluded.observed_at').bind(Date.UTC(2028,2,1,12)).run()
   await h.cmd('accounting.milestone',{amountId:milestone.id});assert.equal(fake.invoices.size,2)
-  state=await h.state();milestone=state.finance.amounts.find(r=>r.id===milestone.id);assert.equal(milestone.issue_on,'2028-03-01');assert.equal(milestone.due_on,'2028-03-16')
-  await h.db.prepare('UPDATE p_expiry_clock SET observed_at=?').bind(Date.UTC(2028,2,17,12)).run()
+  state=await h.state();milestone=state.finance.amounts.find(r=>r.id===milestone.id);assert.equal(milestone.issue_on,'2028-03-01');assert.equal(milestone.due_on,'2028-03-31');assert.equal(fake.invoices.get(milestone.external_id).TxnDate,'2028-03-01');assert.equal(fake.invoices.get(milestone.external_id).DueDate,'2028-03-31')
+  await h.db.prepare('UPDATE p_expiry_clock SET observed_at=?').bind(Date.UTC(2028,2,31,12)).run();assert.equal((await h.state()).finance.amounts.find(r=>r.id===milestone.id).overdueCents,0)
+  await h.db.prepare('UPDATE p_expiry_clock SET observed_at=?').bind(Date.UTC(2028,3,1,12)).run()
   assert.equal((await h.state()).finance.amounts.find(r=>r.id===milestone.id).overdueCents,300000)
   assert.equal((await h.state()).followups.rows.find(r=>r.id===p.id).reason,'payment')
   await h.send('/auth/invite',{email:'billing@finance.synthetic-platter.example',displayName:'Billing',role:'member',returnTo:'/app'},h.owner)
   const billing=await h.signIn('billing@finance.synthetic-platter.example'),actor=(await h.state(billing)).actor
   await h.cmd('member.set',{operatorId:actor.id,version:0,role:'billing',teams:[]})
-  const payment={id:p.id,amountId:milestone.id,method:'check',amount:'3000',reference:'synthetic-platter-6111',receivedOn:'2028-03-17',requestId:'synthetic-platter-6112',consent:true}
+  const payment={id:p.id,amountId:milestone.id,method:'check',amount:'3000',reference:'synthetic-platter-6111',receivedOn:'2028-04-01',requestId:'synthetic-platter-6112',consent:true}
   const recorded=await h.cmd('payment.record',payment,billing),calls=fake.calls.length
-  assert.equal((await h.cmd('payment.record',payment,billing)).id,recorded.id);assert.equal(fake.calls.length,calls)
+  assert.equal((await h.cmd('payment.record',payment,billing)).id,recorded.id);assert.equal(fake.calls.length,calls);assert.equal((await h.cmd('payment.record',{...payment,requestId:'synthetic-platter-6180'},billing)).id,recorded.id)
   state=await h.state();const paid=state.finance.amounts.find(r=>r.id===milestone.id);assert.equal(paid.paidCents,300000);assert.equal(paid.overdueCents,0);assert.equal(fake.payments.size,1);assert.ok(!(await h.state()).followups.rows.some(r=>r.id===p.id&&r.dueDate===milestone.due_on))
   await h.cmd('payment.record',{...payment,reference:'different'},billing,409)
   fake.invoices.get(deposit.external_id).TotalAmt+=1
   await h.cmd('accounting.sync',{})
   const mismatch=(await h.state()).finance.amounts.find(r=>r.id===deposit.id);assert.equal(mismatch.accounting_status,'mismatch');assert.match(mismatch.mismatch,/differs/)
+  fake.invoices.get(deposit.external_id).TotalAmt-=1;fake.invoices.get(deposit.external_id).Balance=0;await h.cmd('accounting.sync',{});assert.equal((await h.state()).finance.amounts.find(r=>r.id===deposit.id).paidCents,300000)
+  fake.invoices.get(deposit.external_id).TotalAmt+=1;await h.cmd('accounting.sync',{})
   const page=await h.send('/app/payments',undefined,billing);assert.equal(page.status,200);assert.match(page.text,/Invoice amount differs/);assert.match(page.text,/Remittance|Reconciliation/)
   await h.cmd('accounting.configure',{authority:'stripe',version:1},billing,403)
+  let delivery=(await h.state()).finance.amounts.find(r=>r.proposal_id===p.id&&r.schedule_key==='delivery');assert.ok(delivery.external_id);fake.invoices.get(delivery.external_id).Balance=0
+  await h.cmd('accounting.sync',{});assert.equal((await h.state()).finance.amounts.find(r=>r.id===delivery.id).state,'paid','QuickBooks Payments state reads back against the milestone')
+  const worker=await h.mf.getWorker();await worker.scheduled({scheduledTime:new Date(Date.UTC(2028,4,1,12)),cron:'*/15 * * * *'})
+  const retainers=(await h.state()).finance.amounts.filter(r=>r.proposal_id===p.id&&r.kind==='recurring'&&r.external_id);assert.deepEqual(retainers.map(r=>r.issue_on).sort(),['2028-04-01','2028-05-01']);assert.ok(!(await h.state()).finance.amounts.some(r=>r.proposal_id===p.id&&r.issue_on==='2028-06-01'))
+  const item=await h.cmd('catalog.save',{sku:'synthetic-platter-6181',name:'Mapped service',unit:'project',unitPrice:'10000',unitCost:'1000'})
+  await h.cmd('accounting.catalog',{catalogId:item.id,itemId:'synthetic-platter-6182',taxCode:'TAX',incomeAccount:'synthetic-platter-6102'})
+  const mapped=await financeAccept(h,{title:'Mapped catalog invoice',paymentSchedule:null,pricingTables:[{optionId:'one',name:'Services',lines:[{catalogId:item.id,name:'Mapped service',quantity:'1',unit:'project',unitPrice:'10000'},{name:'Custom service',quantity:'1',unit:'project',unitPrice:'10000'}]}]})
+  const mappedAmount=(await h.state()).finance.amounts.find(r=>r.proposal_id===mapped.p.id),mappedLines=fake.invoices.get(mappedAmount.external_id).Line
+  assert.deepEqual(mappedLines.map(l=>[l.Amount,l.SalesItemLineDetail.ItemRef.value,l.SalesItemLineDetail.TaxCodeRef.value]),[[3000,'synthetic-platter-6182','TAX'],[3000,'synthetic-platter-6101','NON']])
+
+  // A successful provider write whose response is lost is held, never posted twice.
+  fake.uncertainNext();const pending=await financeAccept(h,{title:'Uncertain invoice proof',paymentSchedule:null})
+  let held=(await h.state()).finance.amounts.find(r=>r.proposal_id===pending.p.id)
+  assert.equal(held.accounting_status,'held');assert.equal(held.external_id,null)
+  const invoiceCount=fake.invoices.size,postCount=fake.calls.filter(c=>c.method==='POST').length
+  await h.cmd('accounting.sync',{id:pending.p.id});await h.cmd('accounting.sync',{id:pending.p.id});assert.equal(fake.invoices.size,invoiceCount);assert.equal(fake.calls.filter(c=>c.method==='POST').length,postCount)
+  const external=[...fake.invoices.values()].find(r=>r.PrivateNote.endsWith(held.id)).Id
+  await h.cmd('accounting.match',{amountId:held.id,invoiceId:external,consent:true},billing,403)
+  await h.cmd('accounting.match',{amountId:held.id,invoiceId:deposit.external_id,consent:true},h.owner,409)
+  await h.cmd('accounting.match',{amountId:held.id,invoiceId:external,consent:true})
+  held=(await h.state()).finance.amounts.find(r=>r.id===held.id);assert.equal(held.external_id,external);await h.cmd('accounting.sync',{id:pending.p.id});assert.equal(fake.invoices.size,invoiceCount)
+  assert.equal(fake.calls.filter(c=>c.method==='POST').length,postCount)
+  const freshClient=await h.cmd('client.save',{name:'Authority race client',email:'race@finance.synthetic-platter.example'}),beforeRace=fake.calls.filter(c=>c.method==='POST').length
+  revokeOnQuery=true;const raced=await financeAccept(h,{clientId:freshClient.id,title:'Disconnected during customer read',paymentSchedule:null})
+  assert.equal(fake.calls.filter(c=>c.method==='POST').length,beforeRace,'disconnect during preflight stops all subsequent provider writes')
+  assert.equal((await h.state()).connections.find(c=>c.provider==='quickbooks').status,'disconnected')
+  await h.cmd('provider.connect',{provider:'quickbooks',version:4,realmId:'synthetic-platter-6100',token:'synthetic-platter-6184',consent:true});await h.cmd('accounting.sync',{id:raced.p.id})
+  refuseInvoice=true;await h.cmd('accounting.sync',{id:raced.p.id});assert.equal((await h.state()).connections.find(c=>c.provider==='quickbooks').status,'broken')
+  const brokenCalls=fake.calls.length;await h.cmd('accounting.sync',{});assert.equal(fake.calls.length,brokenCalls,'broken grants stop jobs until explicit reconnection')
+
+
  }finally{await h.close()}
 })
 
@@ -2106,26 +2140,31 @@ test('PAY-004 signed Stripe evidence handles ACH processing, duplicate and out-o
  try{
   const {p}=await financeAccept(h),amount=(await h.state()).finance.amounts.find(r=>r.proposal_id===p.id&&r.kind==='deposit')
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-6108',webhookSecret:'synthetic-platter-6109',consent:true})
-  const id='synthetic-platter-6113',metadata={platter_amount_id:amount.id,platter_proposal_id:p.id,platter_revision:'1'}
+  const id='synthetic-platter-6113',chargeId='synthetic-platter-6122',metadata={platter_amount_id:amount.id,platter_proposal_id:p.id,platter_revision:'1'}
   fake.stripe.set(id,{id,object:'payment_intent',status:'processing',currency:'usd',amount:300000,metadata})
-  const event=(n,type,created)=>({id:'synthetic-platter-'+n,type,created,data:{object:{id}}})
+  const event=(n,type,created,objectId=id)=>({id:'synthetic-platter-'+n,type,created,data:{object:{id:objectId}}})
+  fake.stripe.set(id,{...fake.stripe.get(id),status:'requires_payment_method'});await stripeEvent(h,event(6132,'payment_intent.payment_failed',1));assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).payments[0].state,'failed')
+  fake.stripe.set(id,{...fake.stripe.get(id),status:'processing'})
   const processing=event(6114,'payment_intent.processing',100)
   assert.equal((await stripeEvent(h,processing)).value.state,'processed')
   let row=(await h.state()).finance.amounts.find(r=>r.id===amount.id);assert.equal(row.state,'processing');assert.equal(row.paidCents,0)
-  assert.equal((await stripeEvent(h,processing)).status,200);assert.equal((await h.db.prepare('SELECT count(*) n FROM p_financial_events').first()).n,1)
-  fake.stripe.set(id,{...fake.stripe.get(id),status:'succeeded'})
+  assert.equal((await stripeEvent(h,processing)).status,200);assert.equal((await h.db.prepare('SELECT count(*) n FROM p_financial_events').first()).n,2)
+  fake.stripe.set(id,{...fake.stripe.get(id),status:'succeeded',latest_charge:chargeId});fake.stripe.set(chargeId,{id:chargeId,object:'charge',paid:true,captured:true,status:'succeeded',amount:300000,amount_refunded:0,currency:'usd',payment_intent:id,metadata})
   assert.equal((await stripeEvent(h,event(6115,'payment_intent.succeeded',200))).value.state,'processed')
   row=(await h.state()).finance.amounts.find(r=>r.id===amount.id);assert.equal(row.state,'paid');assert.equal(row.paidCents,300000)
   assert.equal((await stripeEvent(h,event(6116,'payment_intent.processing',50))).value.state,'processed');assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).paidCents,300000)
   assert.equal((await stripeEvent(h,event(6117,'payment_intent.succeeded',300),'synthetic-platter-6199')).status,401)
   assert.equal((await stripeEvent(h,{...event(6118,'payment_intent.succeeded',300),account:'another-company'})).status,403)
-  fake.stripe.set(id,{...fake.stripe.get(id),amount_refunded:10000})
-  assert.equal((await stripeEvent(h,event(6119,'charge.refunded',300))).value.state,'processed')
+  fake.stripe.set(chargeId,{...fake.stripe.get(chargeId),amount_refunded:10000})
+  assert.equal((await stripeEvent(h,event(6119,'charge.refunded',300,chargeId))).value.state,'processed')
   assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).payments[0].state,'partially_refunded')
-  fake.stripe.set(id,{...fake.stripe.get(id),amount_refunded:300000})
-  await stripeEvent(h,event(6120,'charge.refunded',400));assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).payments[0].state,'refunded')
-  fake.stripe.set(id,{...fake.stripe.get(id),amount_refunded:0,disputed:true})
-  await stripeEvent(h,event(6121,'charge.succeeded',500));assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).state,'disputed')
+  fake.stripe.set(chargeId,{...fake.stripe.get(chargeId),amount_refunded:300000})
+  await stripeEvent(h,event(6120,'charge.refunded',400,chargeId));assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).payments[0].state,'refunded')
+  fake.stripe.set(chargeId,{...fake.stripe.get(chargeId),amount_refunded:0,disputed:true})
+  await stripeEvent(h,event(6121,'charge.succeeded',500,chargeId));assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).state,'disputed')
+  const disputeId='synthetic-platter-6123';fake.stripe.set(disputeId,{id:disputeId,object:'dispute',charge:chargeId,amount:300000,currency:'usd',status:'won'})
+  await stripeEvent(h,event(6124,'charge.dispute.closed',600,disputeId));assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).payments[0].state,'succeeded')
+  fake.stripe.set(chargeId,{...fake.stripe.get(chargeId),captured:false,disputed:false});await stripeEvent(h,event(6125,'charge.succeeded',700,chargeId));assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).payments[0].state,'processing','an uncaptured authorization is never succeeded')
   const before=(await h.db.prepare('SELECT count(*) n FROM p_provider_payments').first()).n;assert.equal(before,1)
  }finally{await h.close()}
 })
@@ -2134,32 +2173,56 @@ test('ACCT-006 QuickBooks posts gross payments, verified fees, one net payout an
  const {financeFake,financeConnect,financeAccept,stripeEvent}=await import('./finance-fixture.mjs'),fake=financeFake(),h=await harness({outboundService:fake.outboundService})
  try{
   await financeConnect(h);await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-6108',webhookSecret:'synthetic-platter-6109',consent:true})
-  const charges=[]
+  const charges=[],receiptSecond=Math.floor(Date.now()/1000)
   for(const [i,dollars] of [1000,500].entries()){
    const {p}=await financeAccept(h,{priceOne:String(dollars),depositPercent:'100',paymentSchedule:null}),amount=(await h.state()).finance.amounts.find(r=>r.proposal_id===p.id),id='synthetic-platter-'+(6140+i)
-   fake.stripe.set(id,{id,object:'charge',paid:true,status:'succeeded',amount:dollars*100,amount_refunded:0,currency:'usd',metadata:{platter_amount_id:amount.id,platter_proposal_id:p.id,platter_revision:'1'}});charges.push(id)
+   fake.stripe.set(id,{id,object:'charge',paid:true,captured:true,status:'succeeded',amount:dollars*100,amount_refunded:0,currency:'usd',metadata:{platter_amount_id:amount.id,platter_proposal_id:p.id,platter_revision:'1'}});charges.push(id)
+   if(i===0)await h.cmd('payment.bind',{id:p.id,chargeId:id,consent:true})
    const response=await stripeEvent(h,{id:'synthetic-platter-'+(6142+i),type:'charge.succeeded',created:100+i,data:{object:{id}}});assert.equal(response.value.state,'processed')
   }
   assert.equal(fake.payments.size,2);assert.ok([...fake.invoices.values()].every(r=>r.Balance===0))
   const payout='synthetic-platter-6144',tx=[{id:'synthetic-platter-6145',type:'charge',source:charges[0],amount:100000,fee:2930,net:97070,currency:'usd'},{id:'synthetic-platter-6146',type:'charge',source:charges[1],amount:50000,fee:1480,net:48520,currency:'usd'}]
-  fake.stripe.set(payout,{id:payout,status:'paid',currency:'usd',amount:145590});fake.stripe.set('balance_transactions',{has_more:false,data:tx})
+  fake.stripe.set(payout,{id:payout,status:'paid',currency:'usd',amount:145590,arrival_date:receiptSecond});fake.stripe.set('balance_transactions',{has_more:false,data:tx.map(t=>({...t,created:receiptSecond}))})
   await h.cmd('accounting.payout',{payoutId:payout,consent:true})
   let postings=(await h.state()).finance.postings
   assert.equal(postings.reduce((n,r)=>n+r.fee_delta,0),4410);assert.equal(postings.reduce((n,r)=>n+r.bank_delta,0),145590);assert.equal(postings.reduce((n,r)=>n+r.clearing_delta,0),0)
+  const feeDebits=[...fake.journals.values()].flatMap(r=>r.Line??[]).filter(l=>l.JournalEntryLineDetail.PostingType==='Debit'&&l.JournalEntryLineDetail.AccountRef.value==='synthetic-platter-6104')
+  assert.equal(Math.round(feeDebits.reduce((n,l)=>n+l.Amount,0)*100),4410)
+  const transfers=[...fake.journals.values()].filter(r=>r.FromAccountRef)
+  assert.equal(transfers.length,1);assert.equal(transfers[0].Amount,1455.90);assert.equal(transfers[0].FromAccountRef.value,'synthetic-platter-6103');assert.equal(transfers[0].ToAccountRef.value,'synthetic-platter-6105')
+
+  await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET observed_at=excluded.observed_at').bind(Date.now()+86400000).run()
   const posts=fake.calls.filter(c=>c.method==='POST').length
   await h.cmd('accounting.payout',{payoutId:payout,consent:true});assert.equal(fake.calls.filter(c=>c.method==='POST').length,posts);assert.equal((await h.state()).finance.postings.length,postings.length)
   const payment=(await h.state()).paymentRecords.find(r=>r.provider_charge===charges[0])
-  const refund=await h.cmd('payment.refund',{paymentId:payment.id,amount:'100',requestId:'synthetic-platter-6147',reason:'Synthetic returned work',consent:true});assert.equal(refund.status,'succeeded')
+  const refund=await h.cmd('payment.refund',{paymentId:payment.id,amount:'100',requestId:'synthetic-platter-6147',reason:'Synthetic returned work',consent:true});assert.equal(refund.status,'succeeded');assert.equal(fake.refunds.size,1);assert.equal([...fake.refunds.values()][0].Line.reduce((n,l)=>n+l.Amount,0),100)
   const saved=await h.db.prepare('SELECT provider_refund FROM p_refunds WHERE id=?').bind(refund.id).first()
   // A subsequent charge funds the next net payout after the refund.
   const {p}=await financeAccept(h,{priceOne:'200',depositPercent:'100',paymentSchedule:null}),amount=(await h.state()).finance.amounts.find(r=>r.proposal_id===p.id),id='synthetic-platter-6148'
-  fake.stripe.set(id,{id,object:'charge',paid:true,status:'succeeded',amount:20000,amount_refunded:0,currency:'usd',metadata:{platter_amount_id:amount.id,platter_proposal_id:p.id,platter_revision:'1'}})
+  fake.stripe.set(id,{id,object:'charge',paid:true,captured:true,status:'succeeded',amount:20000,amount_refunded:0,currency:'usd',metadata:{platter_amount_id:amount.id,platter_proposal_id:p.id,platter_revision:'1'}})
   await stripeEvent(h,{id:'synthetic-platter-6149',type:'charge.succeeded',created:200,data:{object:{id}}})
-  const next='synthetic-platter-6150';fake.stripe.set(next,{id:next,status:'paid',currency:'usd',amount:9390});fake.stripe.set('balance_transactions',{has_more:false,data:[{id:'synthetic-platter-6151',type:'charge',source:id,amount:20000,fee:610,net:19390,currency:'usd'},{id:'synthetic-platter-6152',type:'refund',source:saved.provider_refund,amount:-10000,fee:0,net:-10000,currency:'usd'}]})
+  const next='synthetic-platter-6150';fake.stripe.set(next,{id:next,status:'paid',currency:'usd',amount:9390,arrival_date:receiptSecond});fake.stripe.set('balance_transactions',{has_more:false,data:[{id:'synthetic-platter-6151',type:'charge',source:id,amount:20000,fee:610,net:19390,currency:'usd'},{id:'synthetic-platter-6152',type:'refund',source:saved.provider_refund,amount:-10000,fee:0,net:-10000,currency:'usd'}].map(t=>({...t,created:receiptSecond}))})
   await h.cmd('accounting.payout',{payoutId:next,consent:true})
   postings=(await h.state()).finance.postings;assert.equal(postings.reduce((n,r)=>n+r.clearing_delta,0),0);assert.equal(postings.reduce((n,r)=>n+r.bank_delta,0),154980);assert.equal(postings.filter(r=>r.kind==='payout').length,2);assert.equal(postings.find(r=>r.kind==='refund').clearing_delta,-10000)
+  const providerGross=Math.round([...fake.payments.values()].reduce((n,p)=>n+p.TotalAmt,0)*100),providerFees=Math.round([...fake.journals.values()].flatMap(r=>r.Line??[]).filter(l=>l.JournalEntryLineDetail.PostingType==='Debit'&&l.JournalEntryLineDetail.AccountRef.value==='synthetic-platter-6104').reduce((n,l)=>n+l.Amount,0)*100),providerBank=Math.round([...fake.journals.values()].filter(r=>r.FromAccountRef).reduce((n,r)=>n+r.Amount,0)*100),providerRefund=Math.round([...fake.refunds.values()].flatMap(r=>r.Line).reduce((n,l)=>n+l.Amount,0)*100)
+  assert.equal(providerGross-providerFees-providerBank-providerRefund,0,'the provider books, not just the local journal, clear to zero')
+
   // An incomplete provider list is held before any write.
   fake.stripe.set('balance_transactions',{has_more:true,data:tx});const before=fake.calls.filter(c=>c.method==='POST').length
   await h.cmd('accounting.payout',{payoutId:payout,consent:true},h.owner,409);assert.equal(fake.calls.filter(c=>c.method==='POST').length,before)
  }finally{await h.close()}
 })
+
+test('PAY-007 remittance instructions publish without a provider account and stay exact in retained invoice exports',()=>run(async h=>{
+ const {financeAccept}=await import('./finance-fixture.mjs'),{p}=await financeAccept(h,{paymentSchedule:null})
+ const instructions='Checks payable to Synthetic Studio. Check reference 1037. Contact billing for wire or ACH credit remittance.'
+ await h.cmd('payment.remittance',{version:0,instructions,consent:false},h.owner,400)
+ await h.cmd('payment.remittance',{version:0,instructions,consent:true})
+ const invoice=await h.cmd('invoice.export',{id:p.id}),file=await h.send('/api/platter/invoices/'+invoice.id+'.csv',undefined,h.owner);assert.equal(file.status,200);assert.ok(file.text.includes(instructions))
+ const amount=(await h.state()).finance.amounts.find(r=>r.proposal_id===p.id)
+ for(const [i,method] of ['check','wire','ach_credit'].entries())await h.cmd('payment.record',{id:p.id,amountId:amount.id,amount:'1',method,reference:'synthetic-platter-'+(6400+i),receivedOn:new Date().toISOString().slice(0,10),requestId:'synthetic-platter-'+(6410+i),consent:true})
+ assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).paidCents,300)
+ await h.cmd('payment.remittance',{version:1,instructions:'New remittance for future invoices only.',consent:true})
+ const retained=await h.cmd('invoice.export',{id:p.id});assert.equal(retained.id,invoice.id);assert.equal((await h.send('/api/platter/invoices/'+invoice.id+'.csv',undefined,h.owner)).text,file.text)
+ assert.deepEqual((await h.state()).connections,[],'offline recording and remittance need no provider account')
+}))

@@ -38,6 +38,10 @@ export async function financeJourney(){
    await page.goto(edge.origin+'/app/payment-terms?id='+started.id);await page.getByLabel('Deposit percentage',{exact:true}).fill('25');await page.getByRole('button',{name:'Save payment terms',exact:true}).click()
    assert.equal((await getState()).templates.find(t=>t.id===template.id).snapshot.deposit_bps,3000)
    await capture(page,'independent-template-terms')
+   await page.goto(edge.origin+'/app/payments')
+   const remittance=page.locator('form').filter({has:page.getByRole('button',{name:'Publish remittance instructions',exact:true})})
+   await remittance.getByLabel('Client-visible check and wire instructions').fill(financeConfig.remittance);await remittance.getByRole('checkbox').check();await remittance.getByRole('button',{name:'Publish remittance instructions',exact:true}).click()
+   assert.deepEqual((await getState()).connections,[]);await capture(page,'remittance-without-provider')
    await cmd('provider.connect',{provider:'quickbooks',version:0,realmId:'synthetic-platter-6100',token:'synthetic-platter-6107',consent:true})
    await page.goto(edge.origin+'/app/payments')
    for(const [name,value] of Object.entries({itemId:financeConfig.itemId,taxCode:financeConfig.taxCode,incomeAccount:financeConfig.incomeAccount,clearingAccount:financeConfig.clearingAccount,feeAccount:financeConfig.feeAccount,bankAccount:financeConfig.bankAccount,remittance:financeConfig.remittance}))await page.locator('[name='+name+']').fill(value)
@@ -55,6 +59,7 @@ export async function financeJourney(){
    await clientPage.getByLabel('Your full name').fill('Synthetic Client');await clientPage.locator('[name=consent]').check();await clientPage.getByRole('button',{name:'Accept proposal',exact:true}).click();assert.match(await clientPage.locator('main').innerText(),/Proposal accepted/);await capture(clientPage,'accepted-schedule')
    let state=await getState(),milestone=state.finance.amounts.find(r=>r.proposal_id===p.id&&r.label==='Design approval')
    assert.equal(fake.invoices.size,1)
+   await page.goto(edge.origin+'/app/proposal?id='+p.id);await capture(page,'accepted-proposal-payment-panel')
    await page.goto(edge.origin+'/app/payments');await capture(page,'reconciliation-scheduled')
    await page.getByRole('button',{name:'Mark Design approval done',exact:true}).click();assert.equal(fake.invoices.size,2)
    state=await getState();milestone=state.finance.amounts.find(r=>r.id===milestone.id)
@@ -62,6 +67,8 @@ export async function financeJourney(){
    await page.reload();const record=page.locator('article').filter({has:page.getByRole('heading',{name:'Synthetic scheduled project · Design approval',exact:true})})
    await record.getByRole('combobox',{name:'Received payment method'}).selectOption('check');await record.getByLabel('Payment reference or check number').fill('synthetic-platter-6160');await record.getByLabel('Date received').fill(new Date().toISOString().slice(0,10));await record.getByRole('checkbox').check();await capture(page,'overdue-payment');await record.getByRole('button',{name:'Record received payment',exact:true}).click()
    state=await getState();milestone=state.finance.amounts.find(r=>r.id===milestone.id);assert.equal(milestone.paidCents,312000);assert.equal(milestone.overdueCents,0);assert.equal(fake.payments.size,1);await capture(page,'offline-paid')
+   await page.getByRole('link',{name:'Overdue amounts',exact:true}).click();assert.equal(await page.getByRole('heading',{name:'Synthetic scheduled project · Design approval',exact:true}).count(),0);await capture(page,'overdue-list-closed')
+   await page.getByRole('link',{name:'All amounts',exact:true}).click()
    const deposit=state.finance.amounts.find(r=>r.proposal_id===p.id&&r.kind==='deposit');fake.invoices.get(deposit.external_id).TotalAmt+=1
    await page.getByRole('button',{name:'Reconcile accounting',exact:true}).click();assert.match(await page.locator('main').innerText(),/Invoice amount differs/);await capture(page,'provider-mismatch')
   }finally{await clientContext.close();await context.close();await h.close();await edge.close()}

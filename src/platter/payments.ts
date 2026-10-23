@@ -1,8 +1,11 @@
-import { recordOffline } from './payments/offline'
+import { setRemittance } from './payments/remittance'
+import { syncAccounting } from './accounting/quickbooks'
+import { ensureAmounts, amountRows } from './accounting/amounts'
+import { recordOffline, allocateOffline } from './payments/offline'
 import { applyEvent } from './payments/events'
 import type { Bindings } from '../auth.server'
 import { providerCredential, providerJson } from './connections'
-import { commit, dollars, need, text, type Actor } from './model'
+import { commit, dollars, hash, need, text, type Actor } from './model'
 const finance=['owner','admin','billing']
 export async function paymentState(env:Bindings,a:Actor){
  if(!finance.includes(a.role))return []
@@ -11,31 +14,33 @@ export async function paymentState(env:Bindings,a:Actor){
 }
 async function chargeFor(env:Bindings,id:string){
  const {secret}=await providerCredential(env,'workspace:stripe'),charge=await providerJson('https://api.stripe.com/v1/charges/'+encodeURIComponent(id),secret.token)
- need(charge.id===id&&charge.paid===true&&charge.status==='succeeded'&&Number.isSafeInteger(charge.amount)&&charge.amount>0&&Number.isSafeInteger(charge.amount_refunded)&&charge.amount_refunded>=0&&charge.amount_refunded<=charge.amount,'Stripe did not confirm a refundable successful charge',409)
+ need(charge.id===id&&charge.paid===true&&charge.captured!==false&&charge.status==='succeeded'&&Number.isSafeInteger(charge.amount)&&charge.amount>0&&Number.isSafeInteger(charge.amount_refunded)&&charge.amount_refunded>=0&&charge.amount_refunded<=charge.amount,'Stripe did not confirm a refundable successful charge',409)
  return {charge,token:secret.token,accountId:secret.accountId}
 }
 export async function paymentCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  need(finance.includes(a.role),'Only owner, admins and billing manage payments and refunds',403)
  const db=env.DB
+ if(name==='payment.remittance')return setRemittance(db,a,p)
+ if(name==='payment.allocate')return allocateOffline(env,a,p)
  if(name==='payment.reconcile'){await applyEvent(env,text(p.eventId,'a held Stripe event'));return{reconciled:true}}
- if(name==='payment.record'&&p.amountId)return recordOffline(env,a,p)
  if(name==='payment.record'){
-  const id=text(p.id,'a proposal'),accepted=await db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(id).first<any>();need(accepted,'Accept the proposal before recording payment',409)
-  const method=String(p.method);need(['check','wire','ach_credit'].includes(method),'Choose check, wire or ACH credit')
-  const receivedOn=text(p.receivedOn,'the payment date',10);need(/^\d{4}-\d{2}-\d{2}$/.test(receivedOn)&&Number.isFinite(Date.parse(receivedOn+'T00:00:00Z'))&&new Date(receivedOn+'T00:00:00Z').toISOString().slice(0,10)===receivedOn,'Use a valid payment date')
-  const cents=dollars(p.amount,'a payment amount'),reference=text(p.reference,'a payment reference',200),recordId=crypto.randomUUID()
-  need(p.consent===true||p.consent==='yes','Confirm that the money was received')
-  await commit(db,a,[db.prepare('INSERT INTO p_payment_records(id,proposal_id,revision,currency,cents,method,reference,received_on,recorded_by,recorded_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(recordId,id,accepted.revision,accepted.currency,cents,method,reference,receivedOn,a.id,Date.now())])
-  return {id:recordId,proposalId:id,recorded:true}
+  await ensureAmounts(env,String(p.id??''))
+  if(!p.amountId){const issued=(await amountRows(env,String(p.id??''))).filter(r=>r.state!=='scheduled');need(issued.length===1,'Choose the scheduled invoice for this received payment',409);p={...p,amountId:issued[0].id}}
+  if(!p.requestId)p={...p,requestId:'receipt-'+await hash(JSON.stringify([p.id,p.amountId,p.method,p.receivedOn,p.amount,p.reference]))}
+  return recordOffline(env,a,p)
  }
  if(name==='payment.bind'){
   const id=text(p.id,'a proposal'),accepted=await db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(id).first<any>();need(accepted,'Accept the proposal before linking its deposit',409)
   need(p.consent===true||p.consent==='yes','Confirm this Stripe charge belongs to the accepted deposit')
   const chargeId=text(p.chargeId,'the Stripe charge id',200),{charge,accountId}=await chargeFor(env,chargeId)
   need(charge.currency?.toUpperCase()===accepted.currency&&charge.amount===accepted.deposit_cents&&charge.metadata?.platter_proposal_id===id&&String(charge.metadata?.platter_revision)===String(accepted.revision),'The verified Stripe charge must match this accepted deposit, currency and revision',409)
-  const old=await db.prepare('SELECT * FROM p_payment_records WHERE provider_charge=?').bind(chargeId).first<any>();if(old){need(old.proposal_id===id,'Charge already belongs to another proposal',409);return{id:old.id,proposalId:id}}
+  await ensureAmounts(env,id)
+  const amount=await db.prepare("SELECT id FROM p_amounts WHERE proposal_id=? AND kind='deposit'").bind(id).first<any>()
+  const old=await db.prepare('SELECT * FROM p_payment_records WHERE provider_charge=?').bind(chargeId).first<any>()
+  if(old){need(old.proposal_id===id&&old.reference===accountId,'Charge already belongs to another proposal or account',409);if(amount)await commit(db,a,[db.prepare('INSERT OR IGNORE INTO p_payment_allocations(payment_id,amount_id,cents) VALUES(?,?,?)').bind(old.id,amount.id,old.cents)]);await syncAccounting(env,id);return{id:old.id,proposalId:id}}
   const recordId=crypto.randomUUID()
-  await commit(db,a,[db.prepare("INSERT INTO p_payment_records(id,proposal_id,revision,currency,cents,method,provider_charge,reference,recorded_by,recorded_at) VALUES(?,?,?,?,?,'stripe',?,?,?,?)").bind(recordId,id,accepted.revision,accepted.currency,accepted.deposit_cents,chargeId,accountId,a.id,Date.now())])
+  await commit(db,a,[db.prepare("INSERT INTO p_payment_records(id,proposal_id,revision,currency,cents,method,provider_charge,reference,recorded_by,recorded_at) VALUES(?,?,?,?,?,'stripe',?,?,?,?)").bind(recordId,id,accepted.revision,accepted.currency,accepted.deposit_cents,chargeId,accountId,a.id,Date.now()),...(amount?[db.prepare('INSERT INTO p_payment_allocations(payment_id,amount_id,cents) VALUES(?,?,?)').bind(recordId,amount.id,accepted.deposit_cents)]:[])])
+  await syncAccounting(env,id)
   return {id:recordId,proposalId:id}
  }
  need(name==='payment.refund','Unknown payment action',404)
@@ -55,5 +60,6 @@ export async function paymentCommand(env:Bindings,a:Actor,name:string,p:Record<s
   if(response.ok){const value:any=await response.json();if(value.charge===payment.provider_charge&&value.amount===cents&&typeof value.id==='string'&&value.id.length<=200){providerId=value.id;status=value.status==='succeeded'?'succeeded':value.status==='pending'?'pending_provider':'needs_review'}}
  }catch{/* Keep the reservation for explicit provider reconciliation. */}
  await db.prepare('UPDATE p_refunds SET status=?,provider_refund=?,completed_at=? WHERE id=? AND status=\'reserved\'').bind(status,providerId,Date.now(),requestId).run()
+ if(status==='succeeded')await syncAccounting(env,payment.proposal_id)
  return {id:requestId,proposalId:payment.proposal_id,status,message:status==='succeeded'?'Stripe confirmed the refund.':'Refund held for provider reconciliation. Check Stripe before taking further action.'}
 }

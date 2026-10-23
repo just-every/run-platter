@@ -54,6 +54,7 @@ export function proposalFields(p:Record<string,unknown>){
  for(const o of priced)scheduleAmounts(schedule,o.cents,Math.round(o.cents*deposit/100))
  return{section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:priced}
 }
+async function checkCatalogRefs(db:D1Database,fields:any){for(const option of fields.options)for(const table of option.tables??[])for(const line of table.lines)if(line.catalogId)need(await db.prepare('SELECT 1 FROM p_priced_catalog WHERE id=?').bind(line.catalogId).first(),'Choose an existing catalog item')}
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  if(name==='schedule.save')return command(env,a,'proposal.revise',await termsFields(env,a,p))
  await authorizeCommand(db,a,name,p)
@@ -106,11 +107,12 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   if(p.sectionConditions===undefined&&p.scopeOption===undefined&&p.termsOption===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,sectionConditions:pending?JSON.parse(pending.snapshot).section_conditions??{}:current.section_conditions}}
   if(p.terms===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,terms:pending?JSON.parse(pending.snapshot).terms??'':current.terms}}
   if(p.paymentSchedule===undefined){const displayed=negotiatedView(current,await pendingNegotiation(db,current.id));p={...p,paymentSchedule:scheduleOf(typeof displayed.options==='string'?JSON.parse(displayed.options):displayed.options)}}
+  await checkCatalogRefs(db,proposalFields(p))
   await assertSectionLocks(db,negotiatedView(current,await pendingNegotiation(db,current.id)),proposalFields(p))
   if(name==='proposal.negotiate'||await pendingNegotiation(db,current.id))return negotiationCommand(env,a,name,p,current,{...proposalFields(p),...(restoredAttachments!==undefined?{attachments:restoredAttachments}:{}),internalCosts,costSourceRevision})
  }
  if(name==='proposal.prepare'||name==='proposal.revise'){
-  const f=proposalFields(p);need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(f.client_id).first(),'Client not found',404)
+  const f=proposalFields(p);await checkCatalogRefs(db,f);need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(f.client_id).first(),'Client not found',404)
   const old=name==='proposal.revise'?await proposal(db,p.id):null;if(old){exact(old,p);need(['draft','approved'].includes(old.status),'Sent and accepted proposals are frozen',409)}
   const id=old?.id??crypto.randomUUID(),revision=(old?.revision??0)+1,currency=old?.currency??'USD',attachments=old?restoredAttachments??JSON.parse(old.attachments):await vendorDocuments(db),row={id,...f,revision,currency,attachments};const writes:D1PreparedStatement[]=[]
   if(old){writes.push(db.prepare("UPDATE p_proposals SET client_id=?,title=?,scope=?,terms=?,attachments=?,version=version+1,revision=?,status='draft',deposit_bps=?,options=?,prepared_by=?,approved_by=NULL,approved_at=NULL WHERE id=?").bind(f.client_id,f.title,f.scope,f.terms,JSON.stringify(attachments),revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,id),db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(id))}

@@ -27,10 +27,10 @@ export async function ensureAmounts(env:Bindings,id?:string,at?:number){
 export async function amountRows(env:Bindings,proposalId?:string){
  const db=env.DB,now=await currentTime(db),today=localDate(now,await installationZone(db))
  const rows=(await db.prepare('SELECT a.*,p.title FROM p_amounts a JOIN p_proposals p ON p.id=a.proposal_id'+(proposalId?' WHERE a.proposal_id=?':'')+' ORDER BY a.proposal_id,a.issue_on,a.id').bind(...(proposalId?[proposalId]:[])).all<any>()).results
- const records=(await db.prepare('SELECT a.*,p.method,p.provider_charge FROM p_payment_allocations a JOIN p_payment_records p ON p.id=a.payment_id').all<any>()).results
+ const records=(await db.prepare("SELECT a.*,p.method,p.provider_charge,(SELECT COALESCE(SUM(r.cents),0) FROM p_refunds r WHERE r.payment_id=p.id AND r.status='succeeded') AS refunded_cents FROM p_payment_allocations a JOIN p_payment_records p ON p.id=a.payment_id").all<any>()).results
  const online=(await db.prepare('SELECT * FROM p_provider_payments').all<any>()).results
  return rows.map(r=>{
-  const payments=online.filter(p=>p.amount_id===r.id),offline=records.filter(p=>p.amount_id===r.id&&p.method!=='stripe').reduce((n,p)=>n+p.cents,0),linked=records.filter(p=>p.amount_id===r.id&&p.method==='stripe'&&!payments.some(o=>o.charge_id===p.provider_charge)).reduce((n,p)=>n+p.cents,0)
+  const payments=online.filter(p=>p.amount_id===r.id),offline=records.filter(p=>p.amount_id===r.id&&p.method!=='stripe').reduce((n,p)=>n+p.cents,0),linked=records.filter(p=>p.amount_id===r.id&&p.method==='stripe'&&!payments.some(o=>o.charge_id===p.provider_charge)).reduce((n,p)=>n+p.cents-p.refunded_cents,0)
   const providerPaid=payments.filter(p=>['succeeded','partially_refunded'].includes(p.state)).reduce((n,p)=>n+p.cents-p.refunded_cents,0)
   const paid=Math.max(r.remote_paid_cents,offline+linked+providerPaid),due=Math.max(0,r.cents-paid),issued=Boolean(r.issue_on&&r.issue_on<=today)
   return {...r,...(paid>r.cents?{mismatch:'Payments exceed the accepted scheduled amount',accounting_status:'mismatch'}:{}),payments,offlineCents:offline,paidCents:paid,dueCents:issued?due:0,overdueCents:issued&&r.due_on<today?due:0,state:due===0?'paid':payments.some(p=>p.state==='disputed')?'disputed':payments.some(p=>p.state==='processing')?'processing':payments.some(p=>p.state==='failed')?'failed':issued?'due':'scheduled'}
@@ -38,7 +38,7 @@ export async function amountRows(env:Bindings,proposalId?:string){
 }
 export const amountTotals=(rows:any[])=>({dueCents:rows.reduce((n,r)=>n+r.dueCents,0),paidCents:rows.reduce((n,r)=>n+r.paidCents,0),overdueCents:rows.reduce((n,r)=>n+r.overdueCents,0),scheduledCents:rows.filter(r=>r.state==='scheduled').reduce((n,r)=>n+r.cents,0)})
 export async function markMilestone(env:Bindings,a:Actor,p:Record<string,unknown>){
- need(financeRoles.includes(a.role),'Only owner, admins and billing issue milestones',403)
+ need(a.role==='owner','Only the owner marks milestone events done',403)
  const row=await env.DB.prepare('SELECT * FROM p_amounts WHERE id=?').bind(text(p.amountId,'a scheduled amount',300)).first<any>()
  need(row&&row.kind==='milestone','Choose a milestone',404);need(!row.issue_on,'This milestone already has an issue day',409)
  const today=localDate(await currentTime(env.DB),await installationZone(env.DB))

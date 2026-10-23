@@ -2,7 +2,7 @@ import { need, text } from '../model'
 import { offerSelection } from '../selection'
 export type Amount = {kind:'percent';bps:number}|{kind:'fixed';cents:number}|{kind:'balance'}
 export type Schedule = {netDays:number;milestones:{id:string;label:string;amount:Amount;date:string|null}[];recurring:{id:string;label:string;amount:Amount;startOn:string;interval:'monthly'}[]}
-export function calendar(value:unknown){const v=text(value,'a calendar date',10);need(/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v+'T00:00:00Z'))&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v,'Use a valid YYYY-MM-DD date');return v}
+export function calendar(value:unknown){const v=text(value,'a calendar date',10);need(/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v+'T00:00:00Z'))&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v,'Use a valid YYYY-MM-DD date');need(v>='0100-01-01'&&v<='9998-12-31','Choose a date between years 0100 and 9998');return v}
 export function scheduleInput(value:unknown):Schedule|null {
  if(value===undefined||value===null||value==='')return null
  let v:any=value;if(typeof v==='string'){try{v=JSON.parse(v)}catch{need(false,'Use valid payment schedule JSON')}}

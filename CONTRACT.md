@@ -863,9 +863,7 @@ One timing rule holds for every invoice authority (`ACCT-004`: Platter with Stri
 
 *Acceptance:* With QuickBooks Online as the invoice authority, accept a proposal with a $2,000.00 deposit, a $6,000.00 net-30 event milestone and a $1,500.00 monthly retainer starting 1 April: the QuickBooks Online fake holds only the deposit invoice. Mark the milestone done on 1 March: the fake now holds one milestone invoice dated 1 March and due 31 March, and that invoice is the one emailed under `PAY-008`. On 1 April exactly one retainer invoice appears, and on 1 May a second. Run the same journey with Xero, Pantry and Platter's own Stripe invoices as the authority and see the same invoices on the same days.
 
-*Status:* missing. No invoices are created for scheduled amounts; the only invoice is the owner's deposit CSV export after acceptance.
-
-### CRM sync
+*Status:* partial. tests/platter.test.mjs — “ACCT-007 QuickBooks issues the exact deposit, net-30 event milestone and monthly periods once on their issue days” proves only the $2,000.00 deposit at acceptance, the $6,000.00 event milestone issued 1 March and due 31 March, one $1,500.00 April invoice and one May invoice, repeat cron idempotency and no June invoice early. Gap: Other invoice authorities (Platter/Stripe, Xero and Pantry), charged schedule execution and PAY-008 invoice email/pay-link proof remain. QuickBooks is the implemented authority; the other authorities are not claimed.
 
 #### CRM-001 — HubSpot two-way deal sync.
 
@@ -1398,13 +1396,13 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 
 ## Status
 
-Judged from the code and tests at commit `e18d5edb39594a7c321a421a1f1c9b86a4e85608` (23 October 2026).
+Judged from the code and tests at commit `2515475192488365294295d41de9775041beb2a0` (23 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 28 | 35 | 65 | 128 |
-| All | 40 | 35 | 65 | 140 |
+| Target and push further | 28 | 36 | 64 | 128 |
+| All | 40 | 36 | 64 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1499,7 +1497,7 @@ Judged from the code and tests at commit `e18d5edb39594a7c321a421a1f1c9b86a4e856
 | `ACCT-004` | One invoice authority and reconciliation | target | partial | `tests/platter.test.mjs` — “ACCT-001 / ACCT-004 / PAY-007 issue-day QuickBooks bindings survive reconnect and replay; offline milestone closes overdue and provider edits flag mismatches” proves one QuickBooks authority/company, one external ID per scheduled amount, no early invoice, reconnect/replay without duplicates, provider-edited amount mismatches and explicit exact-request recovery after a lost response. `tests/site.test.mjs` — “PRICE-007 / PAY-007 / ACCT-001 / ACCT-004 payment terms, template isolation, client schedule and invoice reconciliation at desktop and phone widths” proves the reconciliation view at 1440/390; `tests/archive.test.mjs` — “PRICE-007 / PAY-004 / PAY-007 / ACCT-001 / ACCT-004 public CLI retains frozen schedules, invoice bindings, allocations and events without restored sync authority” proves retained bindings and fresh restore authorization. | Platter/Stripe, Xero and Pantry authority implementations remain; unmatched provider payments and uncertain payment writes need explicit reconciliation. Changing an installation’s authority/company after a retained accounting request is refused. Conservative default pending ct approval: the original authority/company stays locked after its first retained request, uncertain invoice matching is owner/admin only, and restored archives require fresh explicit owner-authorized sync. ACCT-002, ACCT-003 and PAY-009 inherit this binding and custody default before their provider doors ship. |
 | `ACCT-005` | Invoice and payment export files | target | partial | `src/platter/invoices.ts`, `tests/platter.test.mjs` | A currency-tagged Xero deposit CSV only; no QuickBooks files, sandbox-verified USD imports, payment or schedule export. |
 | `ACCT-006` | Stripe payouts, fees and clearing in accounting | target | partial | `tests/platter.test.mjs` — “ACCT-006 QuickBooks posts gross payments, verified fees, one net payout and next-payout refund through clearing without duplicate writes” proves QuickBooks invoices paid gross at $1,000.00 and $500.00, fees $29.30 and $14.80, one $1,455.90 clearing-to-bank transfer, a zero clearing balance, a $100.00 refund credit and the next matching net payout, with no repeated writes. The shared 1440/390 finance screen exposes clearing totals. | the required Xero fake journey, dispute amounts/fees, external-provider refund reconciliation and PAY-009 processors remain. Unsupported payout components and incomplete transaction lists are held before posting; no automatic money movement is performed. |
-| `ACCT-007` | Invoices created on their issue day, never ahead | target | missing |  | No invoices are created for scheduled amounts; the only invoice is the owner's deposit CSV export after acceptance. |
+| `ACCT-007` | Invoices created on their issue day, never ahead | target | partial | `tests/platter.test.mjs` — “ACCT-007 QuickBooks issues the exact deposit, net-30 event milestone and monthly periods once on their issue days” proves only the $2,000.00 deposit at acceptance, the $6,000.00 event milestone issued 1 March and due 31 March, one $1,500.00 April invoice and one May invoice, repeat cron idempotency and no June invoice early. | Other invoice authorities (Platter/Stripe, Xero and Pantry), charged schedule execution and PAY-008 invoice email/pay-link proof remain. QuickBooks is the implemented authority; the other authorities are not claimed. |
 | `CRM-001` | HubSpot two-way deal sync | target | missing |  | No HubSpot connection. |
 | `CRM-002` | Salesforce two-way opportunity sync | target | missing |  | No Salesforce connection. |
 | `CRM-003` | Orbit two-way deal sync | target | missing |  | No Orbit connection. |

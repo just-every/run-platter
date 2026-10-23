@@ -96,6 +96,7 @@ export async function documentJourney(){
     assert.equal((await clientContext.request.get(`${app.origin}/app/preview/client?id=${id}&revision=${p.revision}`)).status(),401)
     await post('proposal.approve',{id,version:p.version,revision:p.revision});p=(await state()).proposals.find(p=>p.id===id)
     const invitation=await post('proposal.send',{id,version:p.version}),path=new URL(invitation.shareUrl).pathname,client=await clientContext.newPage()
+    await page.goto(app.origin+'/app/proposal?id='+id);await page.getByRole('button',{name:'Allow Our approach — text suggestions',exact:true}).click()
     await client.goto(app.origin+path+'?optionId=two');await client.getByRole('button',{name:'Send verification code',exact:true}).click()
     const code=(await state()).outbox.find(row=>row.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
     await client.getByLabel('Email verification code',{exact:true}).fill(code);await client.getByRole('button',{name:'Verify email',exact:true}).click()
@@ -113,6 +114,13 @@ export async function documentJourney(){
     for(const page of pages)assert.ok(page.includes('Not signed, revision '+p.revision))
     let at=-1;for(const block of savedDocument.blocks.filter(b=>b.type!=='page_break')){const next=text.indexOf(block.title,at+1);assert.ok(next>at,'PDF keeps editor order for '+block.title);at=next}
     const approved=(await state()).proposals.find(p=>p.id===id);assert.deepEqual(approved.document,savedDocument)
+    await client.getByLabel('Question about',{exact:true}).selectOption({label:'Our approach'});await client.getByLabel('Your question',{exact:true}).fill('Does the approach include a handoff?');await client.getByRole('button',{name:'Send question to owner',exact:true}).click()
+    await page.goto(app.origin+'/app/proposal?id='+id);await page.getByLabel('Answer this question',{exact:true}).fill('Yes, the handoff is included.');await page.getByRole('button',{name:'Send answer to client',exact:true}).click()
+    await client.reload();assert.ok((await client.locator('main').innerText()).includes('Yes, the handoff is included.'))
+    await client.getByLabel('Existing text',{exact:true}).fill('clear');await client.getByLabel('Suggested replacement',{exact:true}).fill('weekly');await client.getByRole('button',{name:'Submit text suggestion',exact:true}).click()
+    await page.goto(app.origin+'/app/proposal?id='+id);await page.getByRole('button',{name:'Accept suggestion',exact:true}).click()
+    const pending=(await state()).proposals.find(p=>p.id===id);assert.equal(pending.approved_by,null);assert.ok(pending.document.blocks.find(b=>b.title==='Our approach').text.includes('weekly'))
+    const stillSent=await clientContext.request.get(app.origin+path+'/data.json?optionId=two');assert.deepEqual((await stillSent.json()).document,savedDocument,'suggestions do not rewrite the live client document')
     await client.getByLabel('Purchase order',{exact:true}).fill('synthetic-platter-3')
     await client.getByLabel('Type your full name for Client signature',{exact:true}).fill('Synthetic Platter signer')
     await client.getByLabel('Your full name',{exact:true}).fill('Synthetic Platter signer');await client.locator('input[name=consent]').check();await client.getByRole('button',{name:'Accept proposal',exact:true}).click()

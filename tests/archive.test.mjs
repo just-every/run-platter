@@ -583,8 +583,11 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   await h.cmd('provider.connect',{provider:'slack',version:0,token:'synthetic-platter-7102',consent:true})
   await h.cmd('notification.route',{provider:'slack',event:'signed',kind:'channel',destination:'synthetic-platter-7101',consent:true})
   await h.cmd('notification.request',{id:p.id,version:1,consent:true});await h.cmd('notification.expiry',{id:p.id,version:1,consent:true})
-  const tables=['p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results])))
-  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,1)
+  const expiry=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archived sender notice',scope:'Exact expiry scope',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+  await h.cmd('expiry.set',{id:expiry.id,version:1,mode:'days',days:4,warningDays:1});await h.cmd('notification.expiry',{id:expiry.id,version:2,consent:true});await h.cmd('proposal.approve',{id:expiry.id,version:3,revision:1});await h.cmd('proposal.send',{id:expiry.id,version:4})
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+2*86400000),cron:'*/15 * * * *'})
+  const tables=['p_sender_notice_runs','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results])))
+  assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,3)
   await h.close();h=undefined
   const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'))
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')

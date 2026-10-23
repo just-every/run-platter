@@ -600,3 +600,50 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.deepEqual(calls,[],'restored historical requests and routes cannot reactivate outbound work')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('Scoped API credentials stay local while agent activity and exact approval links survive public CLI restore', {timeout:240000}, async()=>{
+ const temporary=await mkdtemp(join(tmpdir(),'platter-api-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
+ let h
+ try{
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source})
+  const client=await h.cmd('client.save',{name:'Archive API client',email:'archive@synthetic-platter.example'})
+  const key=await h.cmd('api.key.create',{label:'synthetic-platter-11',scopes:['templates.read','proposals.write','proposals.read']})
+  const headers={authorization:'Bearer '+key.token}
+  const templates=await h.send('/api/platter/v1/templates',undefined,'',headers);assert.equal(templates.status,200)
+  const template=templates.value.items.find(t=>t.id==='starter:consultancy')
+  const prepared=await h.send('/api/platter/v1/proposals',{templateId:template.id,templateVersion:template.version,clientId:client.id},'',headers);assert.equal(prepared.status,200)
+  await h.cmd('proposal.approve',{id:prepared.value.id,version:1,revision:1})
+  await h.cmd('agent.pause',{id:key.id,paused:true})
+  assert.equal((await h.send('/api/platter/v1/proposals',undefined,'',headers)).status,423)
+  const discoveryKey=await h.cmd('agent.create',{label:'synthetic-platter-16'})
+  await h.cmd('agent.discovery-consent',{id:discoveryKey.id,enabled:true})
+  const item=await h.cmd('catalog.save',{sku:'synthetic-platter-17',name:'Discovery workshop',description:'Workshop',unit:'project',unitPrice:'125'})
+  const discovery=await h.send('/api/platter/agent/command',{name:'proposal.discovery',input:{clientId:client.id,title:'Retained discovery',depositPercent:25,sources:[{id:'call',kind:'transcript',text:'Context: owner-only background.\nRequirement: Discovery workshop.'},{id:'email',kind:'email',text:'Assumption: Client attends.\nRequirement: Helicopter transport.'}],packages:[{id:'one',label:'First format',catalogIds:[item.id]},{id:'two',label:'Second format',catalogIds:[item.id]}]}},'',{authorization:'Bearer '+discoveryKey.token})
+  assert.equal(discovery.status,200,discovery.text)
+  const discoverySource=await h.cmd('discovery.read',{id:discovery.value.id,revision:1})
+  const activity=(await h.send('/api/platter/agents/ledger',undefined,h.owner)).value.rows
+  assert.equal(activity.length,3);assert.equal(activity.find(r=>r.action==='api.proposals.write').approvals.length,1)
+  const proposal=(await h.state()).proposals.find(p=>p.id===prepared.value.id),identity={auth:h.auth,owner:h.owner}
+  await h.close();h=null
+  const original=join(temporary,'original.rer'),again=join(temporary,'again.rer')
+  await command(source,['export','--output',original,'--no-queue'])
+  const bytes=await readFile(original,'utf8'),parts=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part')
+  const rows=parts(bytes).flatMap(p=>p.items).filter(i=>i.kind==='row')
+  assert.equal(rows.filter(r=>['p_agent_keys','p_api_key_scopes'].includes(r.table)).length,0)
+  for(const secret of [key.token,discoveryKey.token,createHash('sha256').update(key.token).digest('hex'),createHash('sha256').update(discoveryKey.token).digest('hex'),'synthetic-platter-11','synthetic-platter-16'])assert.ok(!bytes.includes(secret),'credential material and label stay local')
+  assert.equal(rows.filter(r=>r.table==='p_agent_activity').length,3)
+  assert.equal(rows.filter(r=>r.table==='p_discovery_drafts').length,1)
+  await command(restored,['import','--input',original,'--yes','--no-queue'])
+  await command(restored,['export','--output',again,'--no-queue'])
+  assert.deepEqual(parts(await readFile(again,'utf8')),parts(bytes),'exact business parts survive restore')
+  h=await harness({root:restored,...identity});const owner=await h.signIn(h.auth.OWNER_EMAIL)
+  assert.deepEqual((await h.send('/api/platter/agents/ledger',undefined,owner)).value.rows,activity)
+  assert.deepEqual(await h.cmd('discovery.read',{id:discovery.value.id,revision:1},owner),discoverySource)
+  assert.deepEqual((await h.cmd('api.key.list',{},owner)).keys,[])
+  assert.equal((await h.send('/api/platter/v1/proposals',undefined,'',headers)).status,401)
+  const actual=(await h.state(owner)).proposals.find(p=>p.id===proposal.id)
+  for(const field of ['title','scope','options','status','revision','approved_by','approved_at'])assert.deepEqual(actual[field],proposal[field])
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

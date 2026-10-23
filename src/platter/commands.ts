@@ -1,4 +1,6 @@
 import { notificationCommand } from './notifications/commands'
+import { discoveryDraft, readDiscovery } from './agents/discovery'
+import { apiCredentialCommand } from './credentials'
 import { saveReminderTemplate } from './reminder-messages'
 import { reminderCommand } from './reminders'
 import { disputeCommand } from './disputes'
@@ -48,7 +50,10 @@ export function proposalFields(p:Record<string,unknown>){
  const conditions=sectionConditions(p.sectionConditions??Object.fromEntries(['scope','terms'].filter(k=>p[k+'Option']).map(k=>[k,p[k+'Option']])),options??[{id:'one'},{id:'two'}])
  return{section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)}
 }
-export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
+export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,draftCustody?:{writes:(id:string,revision:number)=>D1PreparedStatement[];guard:{sql:string;values:any[]}}):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
+ if(name==='discovery.read')return readDiscovery(db,a,p)
+ if(name==='proposal.discovery'){const draft=await discoveryDraft(db,a,p);const made=await command(env,a,'proposal.prepare',draft.fields,undefined,undefined,undefined,draft.custody);return {...made,citations:draft.citations,unmatched:draft.unmatched}}
+ if(name.startsWith('api.key.'))return apiCredentialCommand(db,a,name,p)
  await authorizeCommand(db,a,name,p)
  if(name.startsWith('notification.'))return notificationCommand(env,a,name,p)
  if(name.startsWith('team.')||name.startsWith('member.')||name==='proposal.share')return teamCommand(db,a,name,p)
@@ -111,7 +116,8 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   if(!old)writes.push(...await defaultStatements(db,id))
   if(old)writes.push(copyCosts(db,id,costSourceRevision??old.revision,id,revision))
   if(internalCosts)writes.push(...patchCosts(db,id,revision,internalCosts))
-  await commit(db,a,writes,false,old?{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))",values:[id,old.version]}:undefined);return{id,revision,version:(old?.version??0)+1}
+  if(draftCustody)writes.push(...draftCustody.writes(id,revision))
+  await commit(db,a,writes,false,old?{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))",values:[id,old.version]}:draftCustody?.guard);return{id,revision,version:(old?.version??0)+1}
  }
  if(name==='invoice.export')return exportInvoice(db,a,p)
  if(name==='proposal.approve'||name==='proposal.send'){

@@ -2094,6 +2094,9 @@ test('ACCT-001 / ACCT-004 / PAY-007 issue-day QuickBooks bindings survive reconn
   assert.equal((await h.cmd('payment.record',payment,billing)).id,recorded.id);assert.equal(fake.calls.length,calls);assert.equal((await h.cmd('payment.record',{...payment,requestId:'synthetic-platter-6180'},billing)).id,recorded.id)
   state=await h.state();const paid=state.finance.amounts.find(r=>r.id===milestone.id);assert.equal(paid.paidCents,300000);assert.equal(paid.overdueCents,0);assert.equal(fake.payments.size,1);assert.ok(!(await h.state()).followups.rows.some(r=>r.id===p.id&&r.dueDate===milestone.due_on))
   await h.cmd('payment.record',{...payment,reference:'different'},billing,409)
+  const expectedCustomer=fake.invoices.get(deposit.external_id).CustomerRef.value,identityPosts=fake.calls.filter(c=>c.method==='POST').length
+  fake.invoices.get(deposit.external_id).CustomerRef.value='synthetic-platter-6480';await h.cmd('accounting.sync',{});assert.match((await h.state()).finance.amounts.find(r=>r.id===deposit.id).mismatch,/customer differs/);assert.equal(fake.calls.filter(c=>c.method==='POST').length,identityPosts)
+  fake.invoices.get(deposit.external_id).CustomerRef.value=expectedCustomer
   fake.invoices.get(deposit.external_id).TotalAmt+=1
   await h.cmd('accounting.sync',{})
   const mismatch=(await h.state()).finance.amounts.find(r=>r.id===deposit.id);assert.equal(mismatch.accounting_status,'mismatch');assert.match(mismatch.mismatch,/differs/)
@@ -2226,3 +2229,26 @@ test('PAY-007 remittance instructions publish without a provider account and sta
  const retained=await h.cmd('invoice.export',{id:p.id});assert.equal(retained.id,invoice.id);assert.equal((await h.send('/api/platter/invoices/'+invoice.id+'.csv',undefined,h.owner)).text,file.text)
  assert.deepEqual((await h.state()).connections,[],'offline recording and remittance need no provider account')
 }))
+
+test('ACCT-007 QuickBooks issues the exact deposit, net-30 event milestone and monthly periods once on their issue days',async()=>{
+ const {financeFake,financeConnect,financeAccept}=await import('./finance-fixture.mjs'),fake=financeFake(),h=await harness({outboundService:fake.outboundService})
+ try{
+  await financeConnect(h)
+  const {p}=await financeAccept(h,{priceOne:'8000',depositPercent:'25',paymentSchedule:{netDays:30,milestones:[{id:'delivery',label:'Delivery complete',date:null,amount:{kind:'fixed',cents:600000}}],recurring:[{id:'retainer',label:'Monthly retainer',startOn:'2028-04-01',interval:'monthly',amount:{kind:'fixed',cents:150000}}]}})
+  assert.equal(fake.invoices.size,1);assert.equal([...fake.invoices.values()][0].TotalAmt,2000)
+  const worker=await h.mf.getWorker(),advance=async at=>worker.scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+  await advance('2028-03-01T12:00:00Z');assert.equal(fake.invoices.size,1)
+  const milestone=(await h.state()).finance.amounts.find(r=>r.proposal_id===p.id&&r.kind==='milestone')
+  await h.cmd('accounting.milestone',{amountId:milestone.id})
+  const issued=(await h.state()).finance.amounts.find(r=>r.id===milestone.id),invoice=fake.invoices.get(issued.external_id)
+  assert.deepEqual([invoice.TotalAmt,invoice.TxnDate,invoice.DueDate],[6000,'2028-03-01','2028-03-31'])
+  await advance('2028-03-31T12:00:00Z');assert.equal(fake.invoices.size,2)
+  await advance('2028-04-01T12:00:00Z');await advance('2028-04-01T12:00:00Z');assert.equal(fake.invoices.size,3)
+  let months=(await h.state()).finance.amounts.filter(r=>r.proposal_id===p.id&&r.kind==='recurring'&&r.external_id)
+  assert.deepEqual(months.map(r=>[r.issue_on,fake.invoices.get(r.external_id).TotalAmt]),[['2028-04-01',1500]])
+  await advance('2028-05-01T12:00:00Z');await advance('2028-05-01T12:00:00Z');assert.equal(fake.invoices.size,4)
+  months=(await h.state()).finance.amounts.filter(r=>r.proposal_id===p.id&&r.kind==='recurring'&&r.external_id)
+  assert.deepEqual(months.map(r=>[r.issue_on,fake.invoices.get(r.external_id).TotalAmt]),[['2028-04-01',1500],['2028-05-01',1500]])
+  assert.ok(!(await h.state()).finance.amounts.some(r=>r.proposal_id===p.id&&r.issue_on==='2028-06-01'))
+ }finally{await h.close()}
+})

@@ -72,7 +72,7 @@ export async function syncAccounting(env:Bindings,id?:string){
    }
    const invoice=await providerJson(base(account)+'invoice/'+encodeURIComponent(external),token),remote=invoice.Invoice
    need(remote?.Id===external&&remote.CurrencyRef?.value===amount.currency,'Accounting invoice binding changed',409)
-   const mismatch=cents(remote.TotalAmt)!==amount.cents?'Invoice amount differs from accepted schedule':null
+   const mismatch=remote.CustomerRef?.value!==customerId?'Invoice customer differs from accepted agreement':remote.DocNumber!=='PL-'+(await hash(amount.id)).slice(0,18)?'Invoice number differs from retained binding':remote.TxnDate!==amount.issue_on||remote.DueDate!==amount.due_on?'Invoice dates differ from accepted terms':cents(remote.TotalAmt)!==amount.cents?'Invoice amount differs from accepted schedule':null
    const paid=Math.max(0,cents(remote.TotalAmt)-cents(remote.Balance))
    await db.prepare("UPDATE p_amounts SET remote_paid_cents=?,mismatch=?,accounting_status=? WHERE id=?").bind(mismatch?0:paid,mismatch,mismatch?'mismatch':'synced',amount.id).run()
    if(mismatch)continue

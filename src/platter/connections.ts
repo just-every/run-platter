@@ -63,7 +63,7 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
   webhookSecret=text(p.webhookSecret,'the Stripe webhook signing secret',8192)
   const result=await providerJson('https://api.stripe.com/v1/account',token);accountId=text(result.id,'the verified provider account',200)
  }else if(provider==='quickbooks'){
-  const realm=text(p.realmId,'the QuickBooks company id',100),result=await providerJson('https://quickbooks.api.intuit.com/v3/company/'+encodeURIComponent(realm)+'/companyinfo/'+encodeURIComponent(realm),token)
+  const realm=text(p.realmId,'the QuickBooks company id',100);need(/^[A-Za-z0-9_-]+$/.test(realm),'Use an opaque QuickBooks company id');const result=await providerJson('https://quickbooks.api.intuit.com/v3/company/'+encodeURIComponent(realm)+'/companyinfo/'+encodeURIComponent(realm),token)
   need(result.CompanyInfo&&typeof result.CompanyInfo.CompanyName==='string','QuickBooks did not confirm this company');accountId=realm
  }else if(provider==='hubspot'){
   const result=await providerJson('https://api.hubapi.com/account-info/v3/details',token),value=result.portalId

@@ -3,7 +3,7 @@ import { providerCredential, providerJson } from '../connections'
 import { commit, need, text, type Actor } from '../model'
 import { accountingSettings, accountingWrite, syncAccounting } from './quickbooks'
 import { financeRoles } from './amounts'
-import { localDate, currentTime } from '../expiry-time'
+import { localDate } from '../expiry-time'
 import { installationZone } from '../reports/report-state'
 const integer=(n:any)=>Number.isSafeInteger(n)
 export async function clearingCommand(env:Bindings,a:Actor,p:Record<string,unknown>){

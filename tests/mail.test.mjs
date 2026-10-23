@@ -207,6 +207,23 @@ test('FOLLOW-004 verified client questions, native answers and one-use authentic
  }finally{await h.close()}
 })
 
+test('client questions are limited per invitation, and a refused question stores nothing and mails no one', {timeout:60000}, async()=>{
+ const h=await harness()
+ try{
+  const invite=async()=>{const id=await approved(h),path=new URL((await h.cmd('proposal.send',{id,version:2})).shareUrl).pathname;assert.equal((await h.send(path+'/action?name=code.request',{})).status,200);const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(id).first()).body.match(/\b\d{6}\b/)[0],r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,200,r.text);return {id,path,cookie:r.cookie}}
+  const ask=(c,section,text)=>h.send(c.path+'/action?name=question.create',{revision:1,section,text},c.cookie)
+  const recorded=async id=>({questions:(await h.db.prepare('SELECT COUNT(*) AS n FROM p_questions WHERE proposal_id=?').bind(id).first()).n,notices:(await h.db.prepare("SELECT COUNT(*) AS n FROM p_mail WHERE proposal_id=? AND recipient=? AND subject LIKE 'Client question:%'").bind(id,h.auth.OWNER_EMAIL).first()).n})
+  const first=await invite();let accepted=0,refused
+  for(let i=0;i<50&&!refused;i++){const r=await ask(first,['scope','pricing','terms'][i%3],'Can we start next week?');if(r.status===200)accepted++;else refused=r}
+  assert.equal(refused?.status,429,'repeated questions on one invitation are refused')
+  assert.ok(accepted>=3,'the client can still ask about every section')
+  assert.deepEqual(await recorded(first.id),{questions:accepted,notices:accepted})
+  assert.equal((await ask(first,'terms','A different question')).status,429)
+  assert.deepEqual(await recorded(first.id),{questions:accepted,notices:accepted},'a refused question stores nothing and queues no owner mail')
+  const second=await invite();assert.equal((await ask(second,'scope','Can we start next week?')).status,200,'another invitation keeps its own allowance')
+ }finally{await h.close()}
+})
+
 test('MAIL-001 local proposal and verification mail are captured without provider contact', async () => {
   let calls = 0
   const h = await harness({ outboundService: () => { calls++; return new Response(null, { status: 502 }) } })

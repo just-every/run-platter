@@ -7,6 +7,9 @@ import { dispatchMail, queueMail } from './mail'
 import { prepareReplyNotice } from './question-reply-mail'
 
 export type QuestionSection = 'scope' | 'pricing' | 'terms'
+/** One sent revision accepts this many questions in any rolling day, bounding stored threads and owner notices. */
+const QUESTION_LIMIT=20,QUESTION_WINDOW=24*60*60*1000
+const limitMessage='This proposal has reached its limit of '+QUESTION_LIMIT+' questions in 24 hours. Try again later.'
 export interface QuestionAnswer {
  id:string; question_id:string; text:string; owner_id:string; owner_email:string;
  source:'app'|'email'; created_at:number
@@ -66,18 +69,21 @@ export async function createQuestion(env:Bindings,c:ClientContext,input:Record<s
  need(['scope','pricing','terms'].includes(requested)||block,'Choose a current visible proposal section')
  const section=block?'scope':requested
  const body=text(input.text,'your question',10000),id=crypto.randomUUID(),db=env.DB,at=await currentTime(db)
+ const budget={sql:`(SELECT COUNT(*) FROM p_questions WHERE proposal_id=? AND revision=? AND created_at>?)<${QUESTION_LIMIT}`,values:[c.row.id,c.row.revision,at-QUESTION_WINDOW]}
+ const withinBudget=async()=>Boolean((await db.prepare(`SELECT ${budget.sql} AS ok`).bind(...budget.values).first<{ok:number}>())?.ok)
+ need(await withinBudget(),limitMessage,429)
  const owners=(await db.prepare("SELECT id,email,version FROM oa_operators WHERE role='owner' AND status='active' ORDER BY id").all<{id:string;email:string;version:number}>()).results
  need(owners.length,'An active owner is required to receive questions',409)
  // Commit binds the exact invitation, verified session, client, sent revision, and notified owner mailboxes.
  const guard=`EXISTS(SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id JOIN p_clients c ON c.id=p.client_id WHERE s.token=? AND s.proposal_id=? AND s.revision=p.revision AND p.revision=? AND p.client_id=? AND lower(COALESCE(s.recipient,c.email))=lower(?) AND s.session_hash=? AND s.session_expires>MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0)) AND p.status='sent')`
  const ownerChecks=owners.map(()=>"EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND email=? AND version=? AND role='owner' AND status='active')").join(' AND ')
  try { await db.batch([
-  db.prepare(`INSERT INTO p_guard(ok) VALUES((${guard}) AND (${ownerChecks}))`).bind(c.token,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,c.share.session_hash,at,...owners.flatMap(o=>[o.id,o.email,o.version])),
+  db.prepare(`INSERT INTO p_guard(ok) VALUES((${guard}) AND (${ownerChecks}) AND ${budget.sql})`).bind(c.token,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,c.share.session_hash,at,...owners.flatMap(o=>[o.id,o.email,o.version]),...budget.values),
   db.prepare('INSERT INTO p_questions(id,proposal_id,revision,client_id,client_email,section,text,created_at,block_id,block_title) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,section,body,at,block?.id??null,block?.title||block?.type||null),
   ...(await Promise.all(owners.map(owner=>prepareReplyNotice(env,owner,{id,proposal_id:c.row.id,revision:c.row.revision,section:block?.title||block?.type||section,text:body,title:c.row.title})))).flat(),
   audit(db,c.row.client_id,'client','question.create',id,at),
   db.prepare('DELETE FROM p_guard')
- ]) }catch(error){if(String(error).includes('CHECK constraint'))fail('The invitation, owner, or proposal changed. Reload before asking.',409);throw error}
+ ]) }catch(error){if(String(error).includes('CHECK constraint')){need(await withinBudget(),limitMessage,429);fail('The invitation, owner, or proposal changed. Reload before asking.',409)}throw error}
  await dispatchMail(env,c.row.id)
  return {id:c.row.id,questionId:id,message:'Question sent to the owner.'}
 }

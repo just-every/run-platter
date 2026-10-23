@@ -1,4 +1,5 @@
-import { documentOf } from './documents/blocks'
+import { documentMediaIds } from './documents/media'
+import { documentOf, bindDocument } from './documents/blocks'
 import { agentDeliveryDefaults } from './reminder-message-defaults'
 import { assertTemplateLocks } from './section-locks'
 import { folderGuard, resourceScope, resourceEditors, requireAudienceConsent } from './folders'
@@ -50,11 +51,12 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   if(existing?.shared===1)await requireAudienceConsent(db,existing.folder_id,folderId,input.shareConsent)
   const templateName = text(input.name, 'a template name')
   const { id: _id, client_id: _client, revision: _revision, ...content } = snapshot(displayed)
+  if(content.document)content.document=bindDocument(content.document)
   if(existing)await assertTemplateLocks(db,existing,content)
   const [pdf, savedExpiry, sections] = await Promise.all([
    db.prepare('SELECT enabled FROM p_pdf_settings WHERE proposal_id=?').bind(source.id).first<any>(),
    db.prepare('SELECT mode,period_days,expires_on,time_zone,warning_days FROM p_expiry WHERE proposal_id=?').bind(source.id).first<any>(),
-   db.prepare('SELECT section FROM p_suggestion_sections WHERE proposal_id=? AND revision=? ORDER BY section').bind(source.id, displayed.revision).all<{ section: string }>(),
+   db.prepare('SELECT section FROM p_suggestion_sections WHERE proposal_id=? AND revision=? UNION ALL SELECT section FROM p_block_suggestion_sections WHERE proposal_id=? AND revision=? ORDER BY section').bind(source.id, displayed.revision,source.id,displayed.revision).all<{ section: string }>(),
   ])
   const expiry = savedExpiry ? { ...savedExpiry, expires_on: savedExpiry.mode === 'date' ? savedExpiry.expires_on : null }
    : { mode: 'never', period_days: null, expires_on: null, time_zone: await installationZone(db), warning_days: null }
@@ -65,6 +67,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
    : [db.prepare('INSERT INTO p_personal_templates(name,snapshot,pdf_enabled,expiry,suggestion_sections,id,owner_id,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,1,?,?)').bind(...values, id, a.id, at, at)]
   writes.push(db.prepare('UPDATE p_personal_templates SET shared=?,folder_id=? WHERE id=?').bind(shared?1:0,folderId,id))
   writes.push(db.prepare('INSERT OR IGNORE INTO p_template_locks(template_id,section) SELECT ?,section FROM p_proposal_locks WHERE proposal_id=?').bind(id,source.id))
+  const mediaIds=documentMediaIds(documentOf(displayed))
+  writes.push(db.prepare('DELETE FROM p_template_document_media WHERE template_id=?').bind(id),db.prepare('INSERT INTO p_template_document_media(template_id,file_id) SELECT ?,file_id FROM p_document_media WHERE proposal_id=? AND file_id IN ('+(mediaIds.map(()=>'?').join(',')||'NULL')+')').bind(id,source.id,...mediaIds))
   writes.push(...saveTemplateCosts(db,source.id,displayed.revision,id),...templateDefaults(db,source.id,id))
   await commit(db, a, writes, false, {
    sql: 'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND '+folder.sql+' AND '+previous.sql+(existing?' AND EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?)':''),
@@ -89,7 +93,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  const templateLocks=starter?[]:(await db.prepare('SELECT section FROM p_template_locks WHERE template_id=?').bind(template.id).all<any>()).results.map(l=>l.section)
  need(!templateLocks.includes('title')||title===content.title,'The template title is locked',403)
  const attachments = copyAttachments(content.attachments ?? [])
- const row = { ...content, id, client_id: clientId, title, revision: 1, attachments }
+ const row = { ...content, document:bindDocument(content.document,clientId), id, client_id: clientId, title, revision: 1, attachments }
  const preparer = a.role === 'agent' ? `agent:${a.keyId}` : a.email
  await commit(db, a, [
   db.prepare(`INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,
@@ -98,12 +102,13 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
    .bind(id, clientId, title, row.scope, row.terms ?? '', row.deposit_bps, JSON.stringify(row.options), preparer, at, 'USD', a.id, a.email, JSON.stringify(attachments)),
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) VALUES(?,?,?)').bind(id,template.id,template.version),
   ...(!starter?[db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_template_locks WHERE template_id=?').bind(id,template.id)]:[]),
+  ...(!starter?[db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_template_document_media WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify(resolved.settings)),
   db.prepare('UPDATE p_proposals SET section_conditions=?,document=? WHERE id=?').bind(JSON.stringify(row.section_conditions ?? {}),JSON.stringify(documentOf(row)), id),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)').bind(id, JSON.stringify(snapshot(row)), preparer, at, 'USD'),
   db.prepare('INSERT INTO p_pdf_settings(proposal_id,enabled) VALUES(?,?)').bind(id, template.pdf_enabled),
   db.prepare('INSERT INTO p_expiry(proposal_id,mode,period_days,expires_on,time_zone,warning_days) VALUES(?,?,?,?,?,?)').bind(id, expiry.mode, expiry.period_days, expiry.expires_on, expiry.time_zone, expiry.warning_days),
-  ...sections.map(section => db.prepare('INSERT INTO p_suggestion_sections(proposal_id,revision,section) VALUES(?,1,?)').bind(id, section)),
+  ...sections.map(section => db.prepare(`INSERT INTO ${section.startsWith('block:')?'p_block_suggestion_sections':'p_suggestion_sections'}(proposal_id,revision,section) VALUES(?,1,?)`).bind(id, section)),
  ], false, {
   sql: (starter ? '' : 'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND (owner_id=? OR shared=1) AND version=?) AND ') + 'EXISTS(SELECT 1 FROM p_clients WHERE id=?) AND '+access.sql,
   values: [...(starter ? [] : [template.id, a.id, template.version]), clientId,...access.values],

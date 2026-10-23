@@ -21,13 +21,13 @@ function clientDocument(view: any, token: string, feedback?: Feedback): Response
   const selectedId = view.acceptance?.optionId ?? view.preview?.selection.option.id ?? view.selectedOptionId ?? 'one'
   const endpoint = view.preview ? '/app/preview/client/action?name=' : `/p/${encodeURIComponent(token)}/action?name=`
   const items=selectionChoices(view.selection),itemsQuery=items.length?'&amp;items='+encodeURIComponent(JSON.stringify(items)):''
-  const publicForm = (name: string, body: string): string => `<form method="post" action="${endpoint}${name}&amp;optionId=${encodeURIComponent(selectedId)}${itemsQuery}">${hidden('items',JSON.stringify(items))}${view.preview ? `<fieldset disabled>${body}</fieldset>` : body}</form>`
+  const publicForm = (name: string, body: string): string => `<form${name==='accept'?' id="platter-acceptance"':''} method="post" action="${endpoint}${name}&amp;optionId=${encodeURIComponent(selectedId)}${itemsQuery}">${hidden('items',JSON.stringify(items))}${view.preview ? `<fieldset disabled>${body}</fieldset>` : body}</form>`
   const options = view.options ?? []
   const currency = view.currency ?? 'AUD'
-  const expanded=hasExpandedSelection(options),conditional=expanded||Object.keys(sectionConditions(view.section_conditions)).length>0
+  const expanded=hasExpandedSelection(options),conditional=Boolean(view.documentConditional)||expanded||Object.keys(sectionConditions(view.section_conditions)).length>0
   const pricing = currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'
   let html = view.preview ? previewBanner(view) : ''
-  html += documentBlocks(view)
+  html += documentBlocks(view,view.preview?'/app/preview/client/media/':`/p/${encodeURIComponent(token)}/media/`,view.preview?'?'+view.preview.query:(view.selectedOptionId?'?optionId='+encodeURIComponent(view.selectedOptionId)+(items.length?'&items='+encodeURIComponent(JSON.stringify(items)):''):''))
   if(!view.hiddenSections?.includes('scope')) html += panel('Scope of work', `<p class="preserve">${escape(view.scope)}</p>`)
   html += panel('Offer options', `${expanded?'<p>Package prices below exclude optional items. Your selection shows the final total and deposit.</p>':''}<p>${pricing} Deposit: ${escape(Number(view.deposit_bps) / 100)}% of the chosen option.</p>${optionPair(options, view.deposit_bps, view.acceptance?.optionId, currency)}${pricingTables(options,currency)}`)
   if(options.some((o:any)=>o.discount))html+=panel('Package discounts',options.filter((o:any)=>o.discount).map((o:any)=>'<p>'+escape(o.label)+': '+escape(o.discount.bps/100)+'% off '+money(o.discount.grossCents,currency)+' = '+money(o.cents,currency)+'. The same percentage applies to selected optional items.</p>').join(''))

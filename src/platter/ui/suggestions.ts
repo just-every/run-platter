@@ -1,9 +1,10 @@
+import { documentTextTargets } from '../documents/blocks'
 import { area, date, escape, form, hidden, panel, proposalPath } from './shared'
 const tracked=(rows:any[])=>rows.map(s=>`<article><h3>${escape(s.section)} suggestion</h3><p>${date(s.created_at)} · Revision ${escape(s.revision)}</p><p class="preserve"><del>${escape(s.original)}</del><br><ins>${escape(s.replacement)}</ins></p><p>${escape(s.decision??'Awaiting review')}${s.resulting_revision?` · Revision ${escape(s.resulting_revision)}`:''}</p></article>`).join('')
 export function suggestionsPanel(state:any,p:any){
- if(!['owner','member'].includes(state.actor?.role))return ''
+ if(!p.canEdit)return ''
  const live=p.sentRevision??p.revision,path=proposalPath(p.id)
- const controls=p.status==='sent'||p.negotiating?['scope','terms'].map(section=>{
+ const controls=p.status==='sent'||p.negotiating?['scope','terms',...documentTextTargets(p).map(t=>t.section)].map(section=>{
   const enabled=p.suggestionSections.some((s:any)=>s.revision===live&&s.section===section)
   return form('suggestions.allow',path,hidden('id',p.id)+hidden('version',p.version)+hidden('section',section)+hidden('enabled',enabled?'no':'yes')+`<button>${enabled?'Close':'Allow'} ${section} suggestions</button>`)
  }).join(''):''

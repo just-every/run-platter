@@ -1,3 +1,4 @@
+import { validateDocumentMedia } from './documents/media'
 import { proposalDocument, documentOf } from './documents/blocks'
 import { saveReminderTemplate } from './reminder-messages'
 import { reminderCommand } from './reminders'
@@ -47,7 +48,7 @@ export function proposalFields(p:Record<string,unknown>){
  const options=p.packages===undefined?null:packageInputs(p.packages,tables)
  const conditions=sectionConditions(p.sectionConditions??Object.fromEntries(['scope','terms'].filter(k=>p[k+'Option']).map(k=>[k,p[k+'Option']])),options??[{id:'one'},{id:'two'}])
  const priced=pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)
- return{document:proposalDocument(p.document,priced),section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:priced}
+ return{document:proposalDocument(p.document,priced,String(p.clientId??'')),section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:priced}
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
@@ -104,12 +105,13 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   if(p.sectionConditions===undefined&&p.scopeOption===undefined&&p.termsOption===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,sectionConditions:pending?JSON.parse(pending.snapshot).section_conditions??{}:current.section_conditions}}
   if(p.terms===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,terms:pending?JSON.parse(pending.snapshot).terms??'':current.terms}}
   if(p.document===undefined)p={...p,document:documentOf(negotiatedView(current,await pendingNegotiation(db,current.id)))}
+  await validateDocumentMedia(db,proposalFields(p).document,current.id)
   await assertSectionLocks(db,negotiatedView(current,await pendingNegotiation(db,current.id)),proposalFields(p))
   if(name==='proposal.negotiate'||await pendingNegotiation(db,current.id))return negotiationCommand(env,a,name,p,current,{...proposalFields(p),...(restoredAttachments!==undefined?{attachments:restoredAttachments}:{}),internalCosts,costSourceRevision})
  }
  if(name==='proposal.prepare'||name==='proposal.revise'){
   const f=proposalFields(p);need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(f.client_id).first(),'Client not found',404)
-  const old=name==='proposal.revise'?await proposal(db,p.id):null;if(old){exact(old,p);need(['draft','approved'].includes(old.status),'Sent and accepted proposals are frozen',409)}
+  const old=name==='proposal.revise'?await proposal(db,p.id):null;await validateDocumentMedia(db,f.document,old?.id);if(old){exact(old,p);need(['draft','approved'].includes(old.status),'Sent and accepted proposals are frozen',409)}
   const id=old?.id??crypto.randomUUID(),revision=(old?.revision??0)+1,currency=old?.currency??'USD',attachments=old?restoredAttachments??JSON.parse(old.attachments):await vendorDocuments(db),row={id,...f,revision,currency,attachments};const writes:D1PreparedStatement[]=[]
   if(old){writes.push(db.prepare("UPDATE p_proposals SET client_id=?,title=?,scope=?,terms=?,attachments=?,version=version+1,revision=?,status='draft',deposit_bps=?,options=?,prepared_by=?,approved_by=NULL,approved_at=NULL WHERE id=?").bind(f.client_id,f.title,f.scope,f.terms,JSON.stringify(attachments),revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,id),db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(id))}
   else writes.push(db.prepare("INSERT INTO p_proposals(id,client_id,title,scope,version,revision,status,deposit_bps,options,prepared_by,created_at,currency,sales_owner_id,sales_owner_name,terms,attachments) VALUES(?,?,?,?,1,?,'draft',?,?,?,?,?,?,?,?,?)").bind(id,f.client_id,f.title,f.scope,revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency,a.id,a.email,f.terms,JSON.stringify(attachments)))

@@ -1,13 +1,13 @@
 // Small native-control editor. Server owns validation, scope, locks and revisions.
 (() => {
- const names={cover:'Cover page',heading:'Heading',text:'Text',columns:'Columns',pricing:'Pricing table',quote:'Quote or testimonial',bio:'Team bio',case_study:'Case study',terms:'Terms',page_break:'Page break'};
+ const names={cover:'Cover page',heading:'Heading',text:'Text',columns:'Columns',pricing:'Pricing table',quote:'Quote or testimonial',bio:'Team bio',case_study:'Case study',image:'Image',video:'Video',terms:'Terms',field:'Form field',signature:'Signature block',page_break:'Page break'};
  for(const form of document.querySelectorAll('[data-document-editor]')){
   const payload=form.elements.document,container=form.querySelector('[data-document-blocks]'),status=form.querySelector('[data-document-status]'),error=form.querySelector('[data-document-error]'),undo=form.querySelector('[data-block-undo]');
-  let doc=JSON.parse(payload.value),options=JSON.parse(form.dataset.options),history=[],saved=JSON.stringify(doc),pending=false,timer,halted=false,dragged,savePromise;
+  let doc=JSON.parse(payload.value),options=JSON.parse(form.dataset.options),media=JSON.parse(form.dataset.media??'[]'),history=[],saved=JSON.stringify(doc),pending=false,timer,halted=false,dragged,savePromise;
   const element=(tag,attrs={},text)=>{const node=document.createElement(tag);for(const [key,value] of Object.entries(attrs))node.setAttribute(key,value);if(text!==undefined)node.textContent=text;return node;};
   const checkpoint=()=>{const value=JSON.stringify(doc);if(history.at(-1)!==value)history.push(value);if(history.length>20)history.shift();undo.disabled=!history.length;};
   const dirty=()=>JSON.stringify(doc)!==saved;
-  const schedule=()=>{form.dataset.saveState='unsaved';payload.value=JSON.stringify(doc);status.textContent='Unsaved document changes.';clearTimeout(timer);if(!halted)timer=setTimeout(save,800);};
+  const schedule=()=>{if(!dirty()&&!pending){form.dataset.saveState='saved';status.textContent='Revision '+form.dataset.revision+' saved. No unsaved document changes.';return;}form.dataset.saveState='unsaved';payload.value=JSON.stringify(doc);status.textContent='Unsaved document changes.';clearTimeout(timer);if(!halted)timer=setTimeout(save,800);};
   const control=(label,key,value,oninput,tag='input')=>{
    const wrap=element('label',{},label),node=element(tag,{'data-block-field':key,'aria-label':label});
    if(tag==='textarea'){node.rows=4;node.maxLength=10000;}else node.maxLength=200;
@@ -33,7 +33,16 @@
     card.addEventListener('drop',event=>{if(!dragged||dragged===block.id)return;event.preventDefault();const from=doc.blocks.findIndex(b=>b.id===dragged);if(from<0)return;checkpoint();const [item]=doc.blocks.splice(from,1),to=doc.blocks.findIndex(b=>b.id===block.id);doc.blocks.splice(to,0,item);dragged=undefined;render();schedule();});
     if(block.type!=='page_break'){
      card.append(control('Block heading','title',block.title,v=>block.title=v));
-     if(block.type==='pricing'){
+     if(['field','signature'].includes(block.type)){
+      const label=element('label',{},'Assigned recipient'),select=element('select',{'aria-label':'Assigned recipient'});select.append(element('option',{value:'client'},'Client recipient'));label.append(select);card.append(label);
+      if(block.type==='field'){const wrap=element('label',{},'Field type'),kind=element('select',{'aria-label':'Field type'});for(const [id,name] of [['text','Text'],['date','Date'],['checkbox','Checkbox']]){const option=element('option',{value:id},name);option.selected=block.fieldKind===id;kind.append(option);}kind.addEventListener('change',()=>{checkpoint();block.fieldKind=kind.value;schedule();});wrap.append(kind);card.append(wrap);const required=element('label',{class:'choice'},'Required field'),check=element('input',{type:'checkbox','aria-label':'Required field'});check.checked=block.required;check.addEventListener('change',()=>{checkpoint();block.required=check.checked;schedule();});required.prepend(check);card.append(required);}
+      card.append(control('Instructions','text',block.text,v=>block.text=v,'textarea'));
+     }else if(['image','video'].includes(block.type)){
+      const choice=(label,key,files)=>{const wrap=element('label',{},label),select=element('select',{'aria-label':label});for(const file of files){const option=element('option',{value:file.id},file.filename);option.selected=block[key]===file.id;select.append(option);}select.addEventListener('change',()=>{checkpoint();block[key]=select.value;schedule();});wrap.append(select);return wrap;};
+      card.append(choice('Media file','assetId',media.filter(f=>f.mediaType.startsWith(block.type==='image'?'image/':'video/'))),control('Media description','alt',block.alt,v=>block.alt=v));
+      if(block.type==='video')card.append(choice('Video poster','posterId',media.filter(f=>f.mediaType.startsWith('image/'))));
+      card.append(control('Caption','text',block.text,v=>block.text=v,'textarea'));
+     }else if(block.type==='pricing'){
       const wrap=element('label',{},'Placed pricing table'),select=element('select',{'aria-label':'Placed pricing table'});select.append(element('option',{value:''},'Choose a saved pricing table'));
       for(const o of options)for(const [i,t] of (o.tables??[]).entries()){const opt=element('option',{value:o.id+':'+i},o.label+' · '+t.name);opt.selected=block.optionId===o.id&&block.tableIndex===i;select.append(opt);}
       select.addEventListener('change',()=>{checkpoint();const split=select.value.lastIndexOf(':');block.optionId=select.value.slice(0,split);block.tableIndex=Number(select.value.slice(split+1));schedule();});wrap.append(select);card.append(wrap,element('p',{class:'muted'},'Create and save itemised pricing in the proposal composer first. This block places that exact table in the document.'));
@@ -49,13 +58,13 @@
    undo.disabled=!history.length;
   }
   const brandDefaults={name:'',accent:'#7c144a',ink:'#1c1c24',paper:'#ffffff',font:'serif',cover:''};
-  const fillBrand=()=>{for(const node of form.querySelectorAll('[data-brand]'))node.value=(doc.brand??brandDefaults)[node.dataset.brand];};
-  fillBrand();render();
-  form.querySelector('[data-block-add]').addEventListener('click',()=>{if(doc.blocks.length>=400){error.textContent='A document supports up to 400 blocks.';return;}checkpoint();const type=form.querySelector('[data-block-type]').value,block={id:crypto.randomUUID(),type,title:type==='cover'?doc.brand?.cover??'':'',text:''};if(type==='columns')block.second='';if(type==='pricing'){const o=options.find(o=>o.tables?.length);if(!o){error.textContent='Create and save an itemised pricing table in the composer before placing it.';return;}block.optionId=o.id;block.tableIndex=0;}doc.blocks.push(block);render();container.lastElementChild.querySelector('input,textarea,button')?.focus();schedule();});
+  const fillBrand=()=>{for(const node of form.querySelectorAll('[data-brand]'))node.value=(doc.brand??brandDefaults)[node.dataset.brand]??'';};
+  fillBrand();render();form.dataset.saveState='saved';
+  form.querySelector('[data-block-add]').addEventListener('click',()=>{if(doc.blocks.length>=400){error.textContent='A document supports up to 400 blocks.';return;}checkpoint();const type=form.querySelector('[data-block-type]').value,block={id:crypto.randomUUID(),type,title:type==='cover'?doc.brand?.cover??'':'',text:''};if(['field','signature'].includes(type)){block.recipientRole='client';block.title=type==='field'?'Client detail':'Client signature';if(type==='field'){block.fieldKind='text';block.required=false;}}if(['image','video'].includes(type)){const file=media.find(f=>f.mediaType.startsWith(type==='image'?'image/':'video/')),poster=media.find(f=>f.mediaType.startsWith('image/'));if(!file||(type==='video'&&!poster)){error.textContent='Upload the display media and, for video, an image poster first.';return;}block.assetId=file.id;block.alt=file.filename;if(type==='video')block.posterId=poster.id;}if(type==='columns')block.second='';if(type==='pricing'){const o=options.find(o=>o.tables?.length);if(!o){error.textContent='Create and save an itemised pricing table in the composer before placing it.';return;}block.optionId=o.id;block.tableIndex=0;}doc.blocks.push(block);render();container.lastElementChild.querySelector('input,textarea,button')?.focus();schedule();});
   undo.addEventListener('click',()=>{const previous=history.pop();if(!previous)return;doc=JSON.parse(previous);render();fillBrand();schedule();});
-  form.querySelector('[data-brand-apply]').addEventListener('click',()=>{const fields=Array.from(form.querySelectorAll('[data-brand]'));if(fields.some(f=>!f.reportValidity()))return;checkpoint();doc.brand=Object.fromEntries(fields.map(node=>[node.dataset.brand,node.value]));schedule();});
+  form.querySelector('[data-brand-apply]').addEventListener('click',()=>{const fields=Array.from(form.querySelectorAll('[data-brand]'));if(fields.some(f=>!f.reportValidity()))return;checkpoint();doc.brand=Object.fromEntries(fields.filter(node=>node.dataset.brand!=='logoId'||node.value).map(node=>[node.dataset.brand,node.value]));schedule();});
   async function save(){
-   clearTimeout(timer);if(pending)return savePromise;if(!dirty())return;
+   clearTimeout(timer);if(pending)return savePromise;if(!dirty()){form.dataset.saveState='saved';status.textContent='Revision '+form.dataset.revision+' saved. No unsaved document changes.';return;}
    pending=true;form.dataset.saveState='saving';halted=false;error.textContent='';status.textContent='Saving document…';
    const written=JSON.stringify(doc),version=form.elements.version.value;
    savePromise=(async()=>{

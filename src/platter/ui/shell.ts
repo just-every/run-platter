@@ -7,7 +7,7 @@ const tabs = [['/app', 'Proposals'], ['/app/clients', 'Clients'], ['/app/import'
 const icons = '<link rel="icon" href="/favicon.ico" sizes="32x32"><link rel="icon" href="/brand/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">'
 // Each part of the app's stylesheet is linked from the head so all load at once (an @import chain loads them in turn).
 const parts = ['shell', 'forms', 'panels', 'composer', 'line', 'document'].map(part => `<link rel="stylesheet" href="/app/${part}.css">`).join('')
-const policy = "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
+const policy = "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; media-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
 
 function clock(now: number, zone: string): string {
   const part = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).formatToParts(now).map(p => [p.type, p.value]))

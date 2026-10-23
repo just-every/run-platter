@@ -573,3 +573,33 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.deepEqual(restoredCalls,[],'the restored scheduler makes no provider call')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority', {timeout:240000},async()=>{
+ const temporary=await mkdtemp(join(tmpdir(),'platter-doc-archive-')),source=join(temporary,'source'),target=join(temporary,'target');let h
+ try{
+  await checkout(source);await checkout(target)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source,assetsDirectory:'public'})
+  const fields={clientId:(await h.cmd('client.save',{name:'Synthetic Platter client',email:'synthetic-platter-1@example.com'})).id,title:'Document custody',scope:'A reviewed project.',optionOne:'Studio',priceOne:'1000',optionTwo:'Campaign',priceTwo:'2000',depositPercent:'25'},created=await h.cmd('proposal.prepare',fields)
+  const bytes=await readFile('public/brand/apple-touch-icon.png'),form=new FormData();form.set('id',created.id);form.set('version','1');form.set('consent','yes');form.set('file',new File([bytes],'synthetic-platter-1.png',{type:'image/png'}))
+  const request=new Request(h.origin+'/app/document-media',{method:'POST',headers:{origin:h.origin,cookie:h.owner,accept:'application/json'},body:form}),upload=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});assert.equal(upload.status,200);const media=(await upload.json()).media
+  const document=documentFixture();document.brand.logoId=media.id;document.blocks.push({id:'image',type:'image',title:'Retained image',text:'Exact original.',assetId:media.id,alt:'Synthetic studio mark'},{id:'po',type:'field',title:'Purchase order',text:'',recipientRole:'client',fieldKind:'text',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
+  await h.cmd('proposal.document',{id:created.id,version:1,document});await h.cmd('proposal.approve',{id:created.id,version:2,revision:2})
+  const invitation=await h.cmd('proposal.send',{id:created.id,version:3}),path=new URL(invitation.shareUrl).pathname
+  await h.send(path+'/action?name=code.request',{});const code=(await h.state()).outbox.find(r=>r.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],verified=await h.send(path+'/action?name=code.verify',{code})
+  await h.send(path+'/action?name=question.create',{revision:2,section:'block:story',text:'Is delivery included?'},verified.cookie)
+  await h.cmd('suggestions.allow',{id:created.id,version:4,section:'block:story:text',enabled:true})
+  assert.equal((await h.send(path+'/action?name=suggestion.create',{revision:2,section:'block:story:text',original:'clear',replacement:'weekly'},verified.cookie)).status,200)
+  assert.equal((await h.send(path+'/action?name=accept',{optionId:'two',name:'Synthetic signer',consent:true,'field:po':'synthetic-platter-2','signature:signature':'Synthetic signer'},verified.cookie)).status,200)
+  let before=(await h.state()).proposals.find(p=>p.id===created.id)
+  const template=await h.cmd('template.save',{id:created.id,version:before.version,name:'Retained document'})
+  const identity={auth:h.auth,owner:h.owner};await h.close();h=undefined
+  const archive=join(temporary,'document.rer');await command(source,['export','--output',archive,'--no-queue']);await command(target,['import','--input',archive,'--yes','--no-queue'])
+  h=await harness({root:target,...identity,assetsDirectory:'public'});const owner=await h.signIn(h.auth.OWNER_EMAIL),after=(await h.state(owner)).proposals.find(p=>p.id===created.id)
+  for(const key of ['document','documentMedia','acceptance','questions','suggestions','suggestionSections'])assert.deepEqual(after[key],before[key],'public CLI retains '+key)
+  const image=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+created.id+'/'+media.id,{headers:{cookie:owner}});assert.equal(image.status,200);assert.deepEqual(Buffer.from(await image.arrayBuffer()),bytes)
+  assert.equal((await h.send(path+'/media/'+media.id,undefined,verified.cookie)).status,404,'restore never reinstates invitation/media authority')
+  const started=await h.cmd('template.start',{id:template.id,version:template.version,clientId:fields.clientId},owner)
+  assert.equal((await h.send('/api/platter/document-media/'+started.id+'/'+media.id,undefined,owner)).status,200,'template media mapping survives the same CLI round trip')
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

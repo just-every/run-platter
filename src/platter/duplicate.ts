@@ -1,4 +1,5 @@
-import { documentOf } from './documents/blocks'
+import { copyDocumentMedia } from './documents/media'
+import { documentOf, bindDocument } from './documents/blocks'
 import { copyDefaults } from './workspace'
 import { copyCosts } from './internal-pricing'
 import type { Bindings } from '../auth.server'
@@ -23,7 +24,7 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
  const id = crypto.randomUUID(), at = await currentTime(db)
  const attachments = copyAttachments(typeof displayed.attachments === 'string' ? JSON.parse(displayed.attachments) : displayed.attachments)
  const options = typeof displayed.options === 'string' ? JSON.parse(displayed.options) : displayed.options
- const row = { document:documentOf(displayed), id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '', section_conditions: displayed.section_conditions??{},
+ const row = { document:bindDocument(displayed.document,clientId), id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '', section_conditions: displayed.section_conditions??{},
   revision: 1, deposit_bps: displayed.deposit_bps, options, currency: displayed.currency, attachments }
  await commit(db, a, [
   db.prepare(`INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,
@@ -32,7 +33,7 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
    .bind(id, clientId, title, row.scope, row.terms, row.deposit_bps, JSON.stringify(options), a.email, at, row.currency, a.id, a.email, JSON.stringify(attachments)),
   db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_proposal_locks WHERE proposal_id=?').bind(id,source.id),
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) SELECT ?,template_id,template_version FROM p_template_sources WHERE proposal_id=?').bind(id,source.id),
-  copyCosts(db,source.id,displayed.revision,id,1),copyDefaults(db,source.id,id),
+  copyDocumentMedia(db,source.id,id,documentOf(displayed)),copyCosts(db,source.id,displayed.revision,id,1),copyDefaults(db,source.id,id),
   db.prepare('UPDATE p_proposals SET section_conditions=?,document=? WHERE id=?').bind(typeof row.section_conditions==='string'?row.section_conditions:JSON.stringify(row.section_conditions),JSON.stringify(documentOf(row)),id),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)')
    .bind(id, JSON.stringify(snapshot(row)), a.email, at, row.currency),

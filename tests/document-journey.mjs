@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir } from 'node:fs/promises'
+import { mkdir,readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { installedApp } from './site-harness.mjs'
@@ -26,7 +26,25 @@ export async function documentJourney(){
     await page.getByRole('link',{name:'Proposals',exact:true}).click();await page.locator('select[name=clientId]').selectOption({label:'Synthetic Platter client'})
     for(const [name,value] of Object.entries({title:'A considered proposal',scope:'The reviewed project scope.',optionOne:'Studio',priceOne:'1000',optionTwo:'Campaign',priceTwo:'2000',depositPercent:'25'}))await page.locator(`[name=${name}]`).fill(value)
     await page.getByRole('button',{name:'Prepare proposal',exact:true}).click();await page.getByRole('link',{name:'A considered proposal',exact:true}).click()
-    const id=new URL(page.url()).searchParams.get('id'),editor=page.locator('[data-document-editor]'),blocks=editor.locator('[data-block-id]'),fixture=documentFixture()
+    const id=new URL(page.url()).searchParams.get('id')
+    // Add a real priced table through the existing composer before placing it.
+    await page.locator('[data-pricing-option="one"] [data-pricing-action="add-table"]').click()
+    const table=page.locator('[data-pricing-option="one"] [data-pricing-table]')
+    await table.locator('[data-pricing-field="name"]').first().fill('Placed services')
+    const line=table.locator('[data-pricing-line]');for(const [key,value]of Object.entries({name:'Discovery',description:'A reviewed workshop',quantity:'2',unit:'hour',unitPrice:'10.01'}))await line.locator(`[data-pricing-field="${key}"]`).fill(value)
+    await page.getByRole('button',{name:'Save revision',exact:true}).click()
+    const uploadForm=page.locator('form[action="/app/document-media"]')
+    await page.getByText('Upload display media',{exact:true}).first().click()
+    await uploadForm.getByLabel('Display media file').setInputFiles({name:'synthetic-platter-1.png',mimeType:'image/png',buffer:await readFile('public/brand/apple-touch-icon.png')})
+    await uploadForm.locator('[name=consent]').check();await uploadForm.getByRole('button',{name:'Upload display media',exact:true}).click()
+    const videoBytes=await page.evaluate(async()=>{const canvas=document.createElement('canvas');canvas.width=320;canvas.height=180;const ctx=canvas.getContext('2d'),stream=canvas.captureStream(10),recorder=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8'}),chunks=[];let frame=0;const interval=setInterval(()=>{ctx.fillStyle=frame++%2?'#7c144a':'#ffd45a';ctx.fillRect(0,0,320,180)},40);return new Promise(resolve=>{recorder.ondataavailable=e=>chunks.push(e.data);recorder.onstop=async()=>{clearInterval(interval);stream.getTracks().forEach(t=>t.stop());resolve(Array.from(new Uint8Array(await new Blob(chunks,{type:'video/webm'}).arrayBuffer())))};recorder.start();setTimeout(()=>recorder.stop(),500)})})
+    await page.getByText('Upload display media',{exact:true}).first().click()
+    await uploadForm.getByLabel('Display media file').setInputFiles({name:'synthetic-platter-2.webm',mimeType:'video/webm',buffer:Buffer.from(videoBytes)})
+    await uploadForm.locator('[name=consent]').check();await uploadForm.getByRole('button',{name:'Upload display media',exact:true}).click()
+    const editor=page.locator('[data-document-editor]'),blocks=editor.locator('[data-block-id]'),fixture=documentFixture(),assets=(await state()).proposals.find(p=>p.id===id).documentMedia,image=assets.find(f=>f.mediaType==='image/png'),video=assets.find(f=>f.mediaType==='video/webm')
+    fixture.brand.logoId=image.id
+    fixture.blocks.splice(4,0,{id:'photo',type:'image',title:'Studio image',text:'A retained image.',assetId:image.id,alt:'Synthetic Platter studio mark'},{id:'film',type:'video',title:'Studio film',text:'An uploaded introduction.',assetId:video.id,posterId:image.id,alt:'Synthetic Platter introduction'},{id:'pricing',type:'pricing',title:'Investment detail',text:'',optionId:'one',tableIndex:0})
+    fixture.blocks.push({id:'po',type:'field',title:'Purchase order',text:'Use the approved PO.',recipientRole:'client',fieldKind:'text',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
     await editor.locator('.document-brand-kit summary').click()
     for(const [key,value] of Object.entries(fixture.brand)){const node=editor.locator(`[data-brand=${key}]`);if(key==='font')await node.selectOption(value);else await node.fill(value)}
     await editor.getByRole('button',{name:'Apply brand kit'}).click()
@@ -35,7 +53,9 @@ export async function documentJourney(){
      const card=blocks.last()
      if(block.type!=='page_break'){
       await card.getByLabel('Block heading',{exact:true}).fill(block.title)
-      if(!['heading','pricing'].includes(block.type))await card.getByLabel(block.type==='columns'?'First column':'Block text',{exact:true}).fill(block.text)
+      if(['image','video'].includes(block.type)){await card.getByLabel('Media description',{exact:true}).fill(block.alt);await card.getByLabel('Caption',{exact:true}).fill(block.text)}
+      else if(['field','signature'].includes(block.type)){await card.getByLabel('Instructions',{exact:true}).fill(block.text);if(block.type==='field'){await card.getByLabel('Field type',{exact:true}).selectOption(block.fieldKind);if(block.required)await card.getByLabel('Required field',{exact:true}).check()}}
+      else if(!['heading','pricing'].includes(block.type))await card.getByLabel(block.type==='columns'?'First column':'Block text',{exact:true}).fill(block.text)
       if(block.second)await card.getByLabel('Second column',{exact:true}).fill(block.second)
       if(block.condition)await card.getByLabel('Block visibility',{exact:true}).selectOption(block.condition)
      }
@@ -80,6 +100,8 @@ export async function documentJourney(){
     const code=(await state()).outbox.find(row=>row.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
     await client.getByLabel('Email verification code',{exact:true}).fill(code);await client.getByRole('button',{name:'Verify email',exact:true}).click()
     await client.goto(app.origin+path+'?optionId=two')
+    const picture=client.locator('.document-image img');await picture.scrollIntoViewIfNeeded();await client.waitForFunction(()=>document.querySelector('.document-image img').naturalWidth>0)
+    const film=client.locator('.document-video video');await film.scrollIntoViewIfNeeded();await film.evaluate(node=>node.play());await client.waitForFunction(()=>document.querySelector('.document-video video').currentTime>0);await film.evaluate(node=>node.pause())
     const clientOrder=await client.locator('[data-document-block]').evaluateAll(nodes=>nodes.map(n=>n.dataset.documentBlock));assert.deepEqual(clientOrder,reordered)
     const brand=await client.locator('.proposal-document').evaluate(node=>({ink:getComputedStyle(node).color,paper:getComputedStyle(node).backgroundColor}));assert.deepEqual(brand,{ink:'rgb(28, 28, 36)',paper:'rgb(255, 255, 255)'})
     assert.equal(await client.locator('.proposal-document strong').innerText(),'careful')
@@ -91,6 +113,13 @@ export async function documentJourney(){
     for(const page of pages)assert.ok(page.includes('Not signed, revision '+p.revision))
     let at=-1;for(const block of savedDocument.blocks.filter(b=>b.type!=='page_break')){const next=text.indexOf(block.title,at+1);assert.ok(next>at,'PDF keeps editor order for '+block.title);at=next}
     const approved=(await state()).proposals.find(p=>p.id===id);assert.deepEqual(approved.document,savedDocument)
+    await client.getByLabel('Purchase order',{exact:true}).fill('synthetic-platter-3')
+    await client.getByLabel('Type your full name for Client signature',{exact:true}).fill('Synthetic Platter signer')
+    await client.getByLabel('Your full name',{exact:true}).fill('Synthetic Platter signer');await client.locator('input[name=consent]').check();await client.getByRole('button',{name:'Accept proposal',exact:true}).click()
+    assert.equal(await client.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1)
+    const accepted=(await state()).proposals.find(p=>p.id===id).acceptance,po=savedDocument.blocks.find(b=>b.type==='field').id,signature=savedDocument.blocks.find(b=>b.type==='signature').id
+    assert.deepEqual(accepted.fieldValues,{[po]:'synthetic-platter-3',[signature]:'Synthetic Platter signer'})
+    if(screenshots){await client.locator('.document-signature').scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-001-signed-fields-${width}.png`)})}
     assert.deepEqual(errors,[])
    }finally{await clientContext?.close();await context.close();await app.close();app=undefined}
   }

@@ -1,5 +1,6 @@
 import fontkit from '@pdf-lib/fontkit'
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
+import type { ProposalDocument } from './blocks'
 import { need } from '../model'
 
 type Run = { text: string; font: PDFFont }
@@ -14,22 +15,26 @@ const bottom = 64
 export class PdfText {
  private page!: PDFPage
  private y = 0
+ private ink=ink
+ private accent=accent
+ private paper=rgb(1,1,1)
  private readonly coverage: Set<number>[]
  private readonly choices = new Map<string, PDFFont>()
  private readonly segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
- private constructor(readonly document: PDFDocument, private fonts: PDFFont[], private revision: number, private footer?: string) {
+ private constructor(readonly document: PDFDocument, private fonts: PDFFont[], private revision: number, private footer?: string,brand?:ProposalDocument['brand']) {
+  const color=(hex:string)=>rgb(...[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255) as [number,number,number]);if(brand){this.ink=color(brand.ink);this.accent=color(brand.accent);this.paper=color(brand.paper)}
   this.coverage = fonts.map(font => new Set(font.getCharacterSet()))
   this.newPage()
  }
 
- static async create(revision: number, fontBytes: (Uint8Array | ArrayBuffer)[] = [], footer?: string) {
+ static async create(revision: number, fontBytes: (Uint8Array | ArrayBuffer)[] = [], footer?: string,brand?:ProposalDocument['brand']) {
   need(fontBytes.length > 0, 'PDF fonts are unavailable.', 503)
   const document = await PDFDocument.create()
   document.registerFontkit(fontkit)
   const fonts: PDFFont[] = []
   for (const bytes of fontBytes) fonts.push(await document.embedFont(bytes, { subset: true }))
-  return new PdfText(document, fonts, revision, footer)
+  return new PdfText(document, fonts, revision, footer,brand)
  }
 
  private runs(text: string): Run[] {
@@ -63,9 +68,10 @@ export class PdfText {
 
  private newPage() {
   this.page = this.document.addPage(letter)
+  this.page.drawRectangle({x:0,y:0,width:letter[0],height:letter[1],color:this.paper})
   this.page.drawLine({ start: { x: margin, y: 48 }, end: { x: letter[0] - margin, y: 48 }, thickness: 0.6, color: rgb(0.8, 0.83, 0.81) })
-  this.draw(this.footer??`Not signed, revision ${this.revision}`, margin, 32, 9, muted)
-  this.draw(`Page ${this.document.getPageCount()}`, letter[0] - margin - 48, 32, 9, muted)
+  this.draw(this.footer??`Not signed, revision ${this.revision}`, margin, 32, 9, this.ink)
+  this.draw(`Page ${this.document.getPageCount()}`, letter[0] - margin - 48, 32, 9, this.ink)
   this.y = letter[1] - margin
  }
 
@@ -77,16 +83,18 @@ export class PdfText {
   this.y = Math.max(bottom, this.y - height)
  }
 
+ async image(bytes:Uint8Array,maxHeight=320){const image=bytes[0]===137?await this.document.embedPng(bytes):await this.document.embedJpg(bytes);const scale=Math.min((letter[0]-margin*2)/image.width,maxHeight/image.height,1),width=image.width*scale,height=image.height*scale;this.room(height+12);this.y-=height;this.page.drawImage(image,{x:margin,y:this.y,width,height});this.gap(12)}
+
  pageBreak(){this.newPage()}
 
  heading(text: string) {
   this.room(48)
   this.gap(12)
-  this.text(text, 13, accent)
+  this.text(text, 13, this.accent)
   this.gap(3)
  }
 
- text(value: string, size = 10.5, color = ink) {
+ text(value: string, size = 10.5, color = this.ink) {
   // Tabs and line endings keep their document meaning; other unsupported
   // characters are rejected by the coverage check rather than substituted.
   const paragraphs = value.replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n')

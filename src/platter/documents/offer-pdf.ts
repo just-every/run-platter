@@ -11,7 +11,7 @@ function amount(cents: number, currency: string) {
 }
 
 /** Render the current offer only. Caller owns authorization and revision selection. */
-export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Array | ArrayBuffer)[] = [], items: unknown = []): Promise<Uint8Array> {
+export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Array | ArrayBuffer)[] = [], items: unknown = [],media?:(id:string)=>Promise<Uint8Array>): Promise<Uint8Array> {
  const options = typeof view.options === 'string' ? JSON.parse(view.options) : view.options
  need(Array.isArray(options), 'Offer options are missing')
  const selection = offerSelection(options,view.deposit_bps,optionId,items), selected = selection.option
@@ -27,7 +27,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   need(Number.isSafeInteger(cents) && cents >= 0 && Number.isSafeInteger(cents * depositBps), 'Invalid offer price')
   return Math.round(cents * depositBps / 10000)
  }
- const pdf = await PdfText.create(revision, fontBytes)
+ const pdf = await PdfText.create(revision, fontBytes,undefined,documentOf(view).brand)
  pdf.document.setTitle(String(view.title ?? ''))
  pdf.document.setSubject(`Not signed, revision ${revision}`)
  pdf.document.setCreator('Platter')
@@ -47,11 +47,14 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  if(selection.items.length){pdf.heading('Selected optional items');for(const item of selection.items)pdf.text(`${item.label}: ${item.quantity} x ${amount(item.unitCents,currency)} = ${amount(item.totalCents,currency)}`)}
 
  const doc=documentOf(view)
+ if(doc.brand?.logoId){need(media,'Document media is unavailable',503);await pdf.image(await media(doc.brand.logoId),80)}
  if(doc.brand?.name)pdf.heading(doc.brand.name)
  for(const block of doc.blocks){
   if(block.type==='page_break'){pdf.pageBreak();continue}
   if(block.title)pdf.heading(block.title)
-  if(block.type==='pricing'){const o=options.find((o:any)=>o.id===block.optionId),t=o?.tables?.[block.tableIndex??0];if(t){pdf.heading(t.name);for(const l of t.lines){pdf.text(`${l.name}: ${l.quantity} ${l.unit} x ${amount(Math.round(Number(l.unitPrice)*100),currency)} = ${amount(l.lineTotalCents,currency)}`);if(l.description)pdf.text(l.description)}pdf.text(`Table subtotal: ${amount(t.subtotalCents,currency)}`)}}
+  if(block.type==='field'||block.type==='signature'){pdf.text((block.type==='signature'?'Client signature (not signed)':(block.required?'Required ':'Optional ')+block.fieldKind+' field')+': '+block.title);if(block.text)pdf.text(block.text)}
+  else if(block.type==='image'||block.type==='video'){need(media,'Document media is unavailable',503);await pdf.image(await media(block.type==='video'?block.posterId!:block.assetId!));if(block.type==='video')pdf.text('Video: '+(block.alt??block.title));if(block.text)pdf.text(block.text)}
+  else if(block.type==='pricing'){const o=options.find((o:any)=>o.id===block.optionId),t=o?.tables?.[block.tableIndex??0];if(t){pdf.heading(t.name);for(const l of t.lines){pdf.text(`${l.name}: ${l.quantity} ${l.unit} x ${amount(Math.round(Number(l.unitPrice)*100),currency)} = ${amount(l.lineTotalCents,currency)}`);if(l.description)pdf.text(l.description)}pdf.text(`Table subtotal: ${amount(t.subtotalCents,currency)}`)}}
   else {pdf.text(block.text.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'));if(block.second)pdf.text(block.second.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'))}
  }
 

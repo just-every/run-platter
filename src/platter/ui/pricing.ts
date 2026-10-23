@@ -4,7 +4,7 @@ const textInput = (label: string, key: string, value: unknown = '', extra = ''):
   `<label>${escape(label)}<input data-pricing-field="${key}" value="${escape(value)}" ${extra}></label>`
 
 function lineEditor(line: any = {}): string {
-  return `<fieldset data-pricing-line><legend>Line item</legend>${textInput('Item name', 'name', line.name, 'required maxlength="200"')}
+  return `<fieldset data-pricing-line${line.lineTotalCents!==undefined?' data-saved-line':''}><legend>Line item</legend>${textInput('Item name', 'name', line.name, 'required maxlength="200"')}
     <label>Description<textarea data-pricing-field="description" rows="3" maxlength="2000">${escape(line.description)}</textarea></label>
     ${textInput('Quantity', 'quantity', line.quantity ?? '1', 'required inputmode="decimal" pattern="(?=.*[1-9])[0-9]+([.][0-9]{1,3})?" title="Enter a positive quantity with up to three decimal places, at most 1000000."')}
     ${textInput('Unit', 'unit', line.unit, 'required maxlength="40" placeholder="e.g. hours, guests, items"')}
@@ -26,7 +26,7 @@ export function pricingEditor(options: any[]): string {
     <div hidden data-pricing-enhancement><fieldset disabled data-pricing-controls><legend>Pricing tables</legend>
     <p>Add tables for itemised pricing. A package with tables uses their combined total. Totals are calculated when you save.</p>
     ${(options.length?options:[{id:'one'},{id:'two'}]).map((option:any,index:number)=>`<fieldset data-pricing-option="${escape(option.id)}"><legend>${escape(option.label||`Option ${index+1}`)}</legend><p data-pricing-derived hidden>The package price is calculated from its pricing tables.</p><div data-pricing-tables>${(option.tables??[]).map(tableEditor).join('')}</div><button type="button" class="secondary" data-pricing-action="add-table">Add table</button></fieldset>`).join('')}
-    <p class="muted" data-pricing-status role="status" aria-live="polite"></p></fieldset></div>
+    <p data-pricing-confirmation role="status" aria-live="polite"></p><p class="muted" data-pricing-status role="status" aria-live="polite"></p></fieldset></div>
     <template data-pricing-option-template><fieldset data-pricing-option=""><legend>Package</legend><p data-pricing-derived hidden>The package price is calculated from its pricing tables.</p><div data-pricing-tables></div><button type="button" class="secondary" data-pricing-action="add-table">Add table</button></fieldset></template>
     <template data-pricing-table-template>${tableEditor({ lines: [{}] })}</template>
     <template data-pricing-line-template>${lineEditor()}</template>

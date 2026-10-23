@@ -1,3 +1,4 @@
+import { documentFixture } from './document-fixture.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { pricingFixture, pricingExpected } from './pricing-fixture.mjs'
 import { test } from 'node:test'
@@ -40,7 +41,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const key=await h.cmd('agent.create',{label:'Excluded secret'})
     assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,200)
     const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
-    const offer={clientId:client.id,title:'Campaign agreement',scope:'Studio photographs and usage licence',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'}
+    const offer={document:documentFixture(),clientId:client.id,title:'Campaign agreement',scope:'Studio photographs and usage licence',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'}
     const finish=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(finish.status,303)
     const upload=async(fields,filename,bytes)=>{const form=new FormData();for(const [key,value] of Object.entries(fields))form.set(key,String(value));form.set('file',new File([bytes],filename,{type:'application/pdf'}));const request=new Request(h.origin+'/app/attachment',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner},body:form});const r=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});assert.equal(r.status,200);assert.match(await r.text(),/Document saved/)}
     const attachmentBytes=new Uint8Array(120000).map((_,i)=>i%256)
@@ -225,6 +226,9 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const retainedAuditIds=new Set(beforeAuditView.map(row=>row.id)),restoredAuditView=(await h.send('/api/platter/audit',undefined,restoredOwner)).value.rows.filter(row=>retainedAuditIds.has(row.id))
     assert.deepEqual(restoredAuditView,beforeAuditView,'TEAM-004 restores the complete audit view including reasons and sender routes/addresses')
     assert.deepEqual(business(restoredState),before)
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).document,documentFixture(),'EDIT-001 ordered document and brand survive the public CLI archive exactly')
+    const completedRestoreSetup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(completedRestoreSetup.status,303)
+    const restoredDocumentPage=await h.send('/app/proposal?id='+proposal.id,undefined,restoredOwner);assert.equal(restoredDocumentPage.status,200);assert.match(restoredDocumentPage.text,/Two perspectives/)
     assert.equal(archived.filter(item=>item.table==='p_personal_templates').length,1,'EDIT-002 personal template snapshot and defaults survive CLI restore')
     assert.deepEqual(restoredState.followupActions,actionsBefore,'FOLLOW-002 logged actions survive public CLI restore exactly')
     assert.deepEqual(restoredState.followups.rows.map(({sentAt,...r})=>r),followupsBefore,'FOLLOW-002 open and completed actions survive public CLI restore')
@@ -347,8 +351,8 @@ test('PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores first-re
     ? item.row.id===original.row.id
     : item.row.proposal_id===original.row.proposal_id&&item.row.revision===original.row.revision))
    assert.equal(matches.length,1,original.table+' retained exactly once by its primary key')
-   const {currency,previous_sent_revision,sales_owner_id,sales_owner_name,terms,attachments,section_conditions,...unchanged}=matches[0].row
-   if(original.table==='p_proposals'){assert.deepEqual(JSON.parse(section_conditions),{},'EDIT-009 legacy proposals remain unconditional');assert.equal(terms,'');assert.deepEqual(JSON.parse(attachments),[]);assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision');assert.equal(sales_owner_id,null);assert.equal(sales_owner_name,null,'legacy sales ownership is not inferred')}
+   const {currency,document,previous_sent_revision,sales_owner_id,sales_owner_name,terms,attachments,section_conditions,...unchanged}=matches[0].row
+   if(original.table==='p_proposals'){assert.deepEqual(JSON.parse(document),{},'EDIT-001 legacy proposals have no added blocks');assert.deepEqual(JSON.parse(section_conditions),{},'EDIT-009 legacy proposals remain unconditional');assert.equal(terms,'');assert.deepEqual(JSON.parse(attachments),[]);assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision');assert.equal(sales_owner_id,null);assert.equal(sales_owner_name,null,'legacy sales ownership is not inferred')}
    assert.equal(currency,'AUD');assert.deepEqual(unchanged,original.row,original.table+' first-release bytes and amounts unchanged')
   }
  } finally {await h?.close();await rm(temporary,{recursive:true,force:true})}
@@ -598,5 +602,39 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   for(const table of ['p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+10*86400000),cron:'*/15 * * * *'})
   assert.deepEqual(calls,[],'restored historical requests and routes cannot reactivate outbound work')
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})
+
+test('EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority', {timeout:240000},async()=>{
+ const temporary=await mkdtemp(join(tmpdir(),'platter-doc-archive-')),source=join(temporary,'source'),target=join(temporary,'target');let h
+ try{
+  await checkout(source);await checkout(target)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source,assetsDirectory:'public'})
+  const completedSetup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(completedSetup.status,303)
+  const fields={clientId:(await h.cmd('client.save',{name:'Synthetic Platter client',email:'synthetic-platter-1@example.com'})).id,title:'Document custody',scope:'A reviewed project.',optionOne:'Studio',priceOne:'1000',optionTwo:'Campaign',priceTwo:'2000',depositPercent:'25'},created=await h.cmd('proposal.prepare',fields)
+  const bytes=await readFile('public/brand/apple-touch-icon.png'),form=new FormData();form.set('id',created.id);form.set('version','1');form.set('consent','yes');form.set('file',new File([bytes],'synthetic-platter-1.png',{type:'image/png'}))
+  const request=new Request(h.origin+'/app/document-media',{method:'POST',headers:{origin:h.origin,cookie:h.owner,accept:'application/json'},body:form}),upload=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});assert.equal(upload.status,200);const media=(await upload.json()).media
+  const videoBytes=await readFile('fixtures/editor/synthetic-platter-1.webm'),videoForm=new FormData();videoForm.set('id',created.id);videoForm.set('version','1');videoForm.set('consent','yes');videoForm.set('file',new File([videoBytes],'synthetic-platter-1.webm',{type:'video/webm'}))
+  const videoRequest=new Request(h.origin+'/app/document-media',{method:'POST',headers:{origin:h.origin,cookie:h.owner,accept:'application/json'},body:videoForm}),videoUpload=await h.mf.dispatchFetch(videoRequest.url,{method:'POST',headers:videoRequest.headers,body:await videoRequest.arrayBuffer()});assert.equal(videoUpload.status,200);const video=(await videoUpload.json()).media
+  const document=documentFixture();document.brand.logoId=media.id;document.blocks.push({id:'image',type:'image',title:'Retained image',text:'Exact original.',assetId:media.id,alt:'Synthetic studio mark'},{id:'film',type:'video',title:'Retained film',text:'Exact video original.',assetId:video.id,posterId:media.id,alt:'Synthetic studio film'},{id:'po',type:'field',title:'Purchase order',text:'',recipientRole:'client',fieldKind:'text',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
+  await h.cmd('proposal.document',{id:created.id,version:1,document});await h.cmd('proposal.approve',{id:created.id,version:2,revision:2})
+  const invitation=await h.cmd('proposal.send',{id:created.id,version:3}),path=new URL(invitation.shareUrl).pathname
+  await h.send(path+'/action?name=code.request',{});const code=(await h.state()).outbox.find(r=>r.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],verified=await h.send(path+'/action?name=code.verify',{code})
+  await h.send(path+'/action?name=question.create',{revision:2,section:'block:story',text:'Is delivery included?'},verified.cookie)
+  await h.cmd('suggestions.allow',{id:created.id,version:4,section:'block:story:text',enabled:true})
+  assert.equal((await h.send(path+'/action?name=suggestion.create',{revision:2,section:'block:story:text',original:'clear',replacement:'weekly'},verified.cookie)).status,200)
+  assert.equal((await h.send(path+'/action?name=accept',{optionId:'two',name:'Synthetic signer',consent:true,'field:po':'synthetic-platter-2','signature:signature':'Synthetic signer'},verified.cookie)).status,200)
+  let before=(await h.state()).proposals.find(p=>p.id===created.id)
+  const template=await h.cmd('template.save',{id:created.id,version:before.version,name:'Retained document'})
+  const identity={auth:h.auth,owner:h.owner};await h.close();h=undefined
+  const archive=join(temporary,'document.rer');await command(source,['export','--output',archive,'--no-queue']);await command(target,['import','--input',archive,'--yes','--no-queue'])
+  h=await harness({root:target,...identity,assetsDirectory:'public'});const owner=await h.signIn(h.auth.OWNER_EMAIL),after=(await h.state(owner)).proposals.find(p=>p.id===created.id)
+  for(const key of ['document','documentMedia','acceptance','questions','suggestions','suggestionSections'])assert.deepEqual(after[key],before[key],'public CLI retains '+key)
+  const image=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+created.id+'/'+media.id,{headers:{cookie:owner}});assert.equal(image.status,200);assert.deepEqual(Buffer.from(await image.arrayBuffer()),bytes)
+  const restoredVideo=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+created.id+'/'+video.id,{headers:{cookie:owner}});assert.equal(restoredVideo.status,200);assert.deepEqual(Buffer.from(await restoredVideo.arrayBuffer()),videoBytes,'video bytes survive the public CLI exactly')
+  assert.equal((await h.send(path+'/media/'+media.id,undefined,verified.cookie)).status,404,'restore never reinstates invitation/media authority')
+  const started=await h.cmd('template.start',{id:template.id,version:template.version,clientId:fields.clientId},owner)
+  assert.equal((await h.send('/api/platter/document-media/'+started.id+'/'+media.id,undefined,owner)).status,200,'template media mapping survives the same CLI round trip')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

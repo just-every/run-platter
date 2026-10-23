@@ -1,3 +1,4 @@
+import { documentJourney } from './document-journey.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { templatesJourney } from './templates-journey.mjs'
 import { test } from 'node:test'
@@ -1188,3 +1189,5 @@ test('APPROVE-002 email preview and decision links work under a member session a
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths', {timeout:180000}, documentJourney)

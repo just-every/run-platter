@@ -2115,7 +2115,7 @@ test('EDIT-001 display media requires consent and live edit scope, stays private
   assert.equal((await upload({version:'999'})).status,409)
   assert.equal((await upload({file:new File(['<svg onload="alert(1)">'],'synthetic-platter-2.png',{type:'image/png'})})).status,400)
   assert.equal((await upload({file:new File([new Uint8Array(5*1024*1024+1)],'synthetic-platter-3.png',{type:'image/png'})})).status,413)
-  const result=await upload();assert.equal(result.status,200,result.text);const image=JSON.parse(result.text).media
+  const result=await upload();assert.equal(result.status,200,result.text);const image=JSON.parse(result.text).media,unplaced=JSON.parse((await upload({file:new File([bytes],'synthetic-platter-unplaced.png',{type:'image/png'})})).text).media
   const privatePath='/api/platter/document-media/'+p.id+'/'+image.id
   assert.equal((await h.send(privatePath)).status,401)
   assert.equal((await h.send(privatePath,undefined,h.owner)).status,404,'unplaced uploads are not document content')
@@ -2123,9 +2123,9 @@ test('EDIT-001 display media requires consent and live edit scope, stays private
   await h.cmd('proposal.document',{id:p.id,version:1,document})
   const actual=await h.mf.dispatchFetch(h.origin+privatePath,{headers:{cookie:h.owner}});assert.equal(actual.status,200);assert.equal(actual.headers.get('content-disposition'),'inline');assert.deepEqual(Buffer.from(await actual.arrayBuffer()),bytes)
   const other=await h.cmd('proposal.prepare',{...offer,clientId:client.id});await h.cmd('proposal.document',{id:other.id,version:1,document},h.owner,400)
-  const copy=await h.cmd('proposal.duplicate',{id:p.id,version:2});assert.equal((await h.send('/api/platter/document-media/'+copy.id+'/'+image.id,undefined,h.owner)).status,200)
+  const copy=await h.cmd('proposal.duplicate',{id:p.id,version:2});assert.equal((await h.send('/api/platter/document-media/'+copy.id+'/'+image.id,undefined,h.owner)).status,200);assert.deepEqual((await h.state()).proposals.find(p=>p.id===copy.id).documentMedia.map(f=>f.id),[image.id],'copies exclude files never placed in the source document')
   const template=await h.cmd('template.save',{id:p.id,version:2,name:'Retained media template'}),started=await h.cmd('template.start',{id:template.id,version:1,clientId:client.id})
-  assert.equal((await h.send('/api/platter/document-media/'+started.id+'/'+image.id,undefined,h.owner)).status,200)
+  assert.equal((await h.send('/api/platter/document-media/'+started.id+'/'+image.id,undefined,h.owner)).status,200);assert.ok(!(await h.state()).proposals.find(p=>p.id===started.id).documentMedia.some(f=>f.id===unplaced.id),'templates cannot expose unplaced source uploads')
   await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const sent=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(sent.shareUrl).pathname
   const publicImage=await h.mf.dispatchFetch(h.origin+path+'/media/'+image.id);assert.equal(publicImage.status,200);assert.deepEqual(Buffer.from(await publicImage.arrayBuffer()),bytes)
   const cookie=await verified(h,path),pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf',{method:'POST',headers:{origin:h.origin,cookie,'content-type':'application/json'},body:JSON.stringify({optionId:'two'})});assert.equal(pdf.status,200)
@@ -2184,4 +2184,21 @@ test('EDIT-001 new sections inherit verified questions and opt-in tracked edits 
  assert.equal(negotiated.status,'draft');assert.equal(negotiated.approved_by,null);assert.ok(negotiated.document.blocks.find(b=>b.id==='story').text.includes('weekly'))
  assert.deepEqual((await h.send(path+'/data.json?optionId=two',undefined,cookie)).value.document,document,'client offer remains the exact sent document')
  await h.cmd('proposal.send',{id:p.id,version:negotiated.version},h.owner,409)
+}))
+
+test('EDIT-011 server-confirmed quantity edits retain document content, clear approval and enforce bounds, scope and exact version',()=>run(async h=>{
+ const client=await h.cmd('client.save',{name:'Synthetic Platter client',email:'synthetic-platter-1@example.com'}),document=documentFixture(),created=await h.cmd('proposal.prepare',{...offer,clientId:client.id,document,pricingTables:[{optionId:'one',name:'Reference services',lines:[{name:'Discovery',description:'Reviewed service',quantity:'2',unit:'hour',unitPrice:'10.01',group:''}]}]})
+ const input={id:created.id,version:1,optionId:'one',tableIndex:0,lineIndex:0,quantity:'3'}
+ for(const quantity of ['0','-1','NaN','1.0001','1000001'])await h.cmd('proposal.quantity',{...input,quantity},h.owner,400)
+ await h.cmd('proposal.quantity',{...input,lineIndex:1},h.owner,400)
+ await h.cmd('proposal.quantity',{...input,optionId:'missing'},h.owner,400)
+ await h.cmd('proposal.quantity',{...input,version:999},h.owner,409)
+ const before=(await h.state()).revisions.filter(r=>r.proposal_id===created.id)
+ await h.cmd('proposal.approve',{id:created.id,version:1,revision:1})
+ const changed=await h.cmd('proposal.quantity',{...input,version:2})
+ assert.equal(changed.option.cents,3003);assert.equal(changed.version,3);assert.equal(changed.revision,2)
+ const current=(await h.state()).proposals.find(p=>p.id===created.id);assert.deepEqual(current.document,document);assert.equal(current.options[0].tables[0].lines[0].quantity,'3');assert.equal(current.approved_by,null);assert.equal(current.status,'draft')
+ assert.deepEqual((await h.state()).revisions.filter(r=>r.proposal_id===created.id&&r.revision===1),before)
+ await h.cmd('proposal.quantity',{...input,version:2},h.owner,409)
+ await h.send('/auth/invite',{email:'synthetic-platter-2@example.com',displayName:'Unshared member',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('synthetic-platter-2@example.com');await h.cmd('proposal.quantity',{...input,version:3},member,403)
 }))

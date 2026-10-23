@@ -570,3 +570,39 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.deepEqual(restoredCalls,[],'the restored scheduler makes no provider call')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('PRICE-007 / PAY-004 / PAY-007 / ACCT-001 / ACCT-004 public CLI retains frozen schedules, invoice bindings, allocations and events without restored sync authority',{timeout:180000},async()=>{
+ const {financeFake,financeConnect,financeAccept,stripeEvent,financeConfig}=await import('./finance-fixture.mjs'),fake=financeFake(),temporary=await mkdtemp(join(tmpdir(),'platter-finance-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
+ let h
+ try{
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source,outboundService:fake.outboundService})
+  await financeConnect(h)
+  const {p}=await financeAccept(h),amount=(await h.state()).finance.amounts.find(r=>r.proposal_id===p.id&&r.kind==='deposit')
+  await h.cmd('payment.record',{id:p.id,amountId:amount.id,method:'ach_credit',amount:'1',reference:'synthetic-platter-6170',receivedOn:new Date().toISOString().slice(0,10),requestId:'synthetic-platter-6171',consent:true})
+  await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-6108',webhookSecret:'synthetic-platter-6109',consent:true})
+  const id='synthetic-platter-6172';fake.stripe.set(id,{id,object:'payment_intent',status:'processing',currency:'usd',amount:299900,metadata:{platter_amount_id:amount.id,platter_proposal_id:p.id,platter_revision:'1'}})
+  await stripeEvent(h,{id:'synthetic-platter-6173',type:'payment_intent.processing',created:100,data:{object:{id}}})
+  const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
+  const tables=['p_amounts','p_payment_allocations','p_financial_events','p_provider_payments','p_accounting_requests','p_accounting_customers','p_offline_requests','p_clearing_postings','p_accounting_settings']
+  const before=await h.state(),rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
+  await h.close();h=undefined
+  const archive=join(temporary,'finance.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8')
+  for(const credential of ['synthetic-platter-6107','synthetic-platter-6108','synthetic-platter-6109'])assert.ok(!bytes.includes(credential),'credentials excluded')
+  await command(restored,['import','--input',archive,'--yes'])
+  let allowProvider=false
+  h=await harness({root:restored,unclaimed:true,outboundService:async request=>{assert.ok(allowProvider,'restoration cannot call any provider');return fake.outboundService(request)}})
+  const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
+  for(const [i,table] of tables.entries())assert.deepEqual(canonical((await h.db.prepare('SELECT * FROM '+table).all()).results),rows[i],table)
+  assert.deepEqual(after.proposals.find(r=>r.id===p.id).acceptance.schedule,before.proposals.find(r=>r.id===p.id).acceptance.schedule)
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_accounting_authority').first()).n,0)
+  const calls=fake.calls.length;await h.cmd('accounting.sync',{},owner);assert.equal(fake.calls.length,calls,'no provider calls without fresh authorization')
+  allowProvider=true
+  await h.cmd('provider.connect',{provider:'quickbooks',version:1,realmId:'synthetic-platter-6100',token:'synthetic-platter-6174',consent:true},owner)
+  const reconnectedCalls=fake.calls.length;await h.cmd('accounting.sync',{},owner);assert.equal(fake.calls.length,reconnectedCalls,'reconnection alone cannot restore sync authority')
+  await h.cmd('accounting.configure',{...financeConfig,version:1},owner)
+  const writes=fake.calls.filter(c=>c.method==='POST').length;await h.cmd('accounting.sync',{},owner);assert.equal(fake.calls.filter(c=>c.method==='POST').length,writes,'retained successful requests cannot duplicate provider invoices or payments')
+  assert.equal(fake.invoices.size,1)
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

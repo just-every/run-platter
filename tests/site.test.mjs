@@ -1151,3 +1151,5 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
 })
 
 test('FOLLOW-001 / FOLLOW-006 sender controls, template delivery overrides, preview dates, manual email and inactive copies at desktop and phone widths', {timeout:120000}, async()=>{const {remindersJourney}=await import('./reminders-journey.mjs');await remindersJourney()})
+
+test('PRICE-007 / PAY-007 / ACCT-001 / ACCT-004 payment terms, template isolation, client schedule and invoice reconciliation at desktop and phone widths',{timeout:180000},async()=>{const {financeJourney}=await import('./finance-journey.mjs');await financeJourney()})

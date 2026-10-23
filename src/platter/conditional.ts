@@ -1,3 +1,4 @@
+import { chosenSchedule, scheduleText } from './payments/schedule'
 import { need } from './model'
 
 /** Each section shows for every selection, for one package id, or (`item:<id>`) only while that optional item is added. */
@@ -24,11 +25,14 @@ export function sectionConditions(value: unknown, options?: Offered[]): SectionC
 /** A package condition holds for that package; an item condition holds while the chosen package's item is added, at any allowed quantity. */
 export function selectedContent(view: any, optionId: string, items: Chosen = []) {
  const conditions = sectionConditions(view.section_conditions)
+ const schedule=view.options?chosenSchedule(view,optionId,items as any[]):[]
+ const paymentText=scheduleText(schedule,view.currency??'AUD')
  const shown = (condition?: string) => !condition || (itemOf(condition) ? items.some(item => item.id === itemOf(condition)) : condition === optionId)
  return { ...view,
   scope: shown(conditions.scope) ? view.scope : '',
-  terms: shown(conditions.terms) ? view.terms : '',
-  hiddenSections: Object.entries(conditions).filter(([, condition]) => !shown(condition)).map(([section]) => section),
+  terms: (shown(conditions.terms) ? view.terms??'' : '')+(paymentText?'\n\n'+paymentText:''),
+  ...(schedule.length?{schedule}:{}),
+  hiddenSections: Object.entries(conditions).filter(([section, condition]) => !(section==='terms'&&schedule.length)&&!shown(condition)).map(([section]) => section),
  }
 }
 

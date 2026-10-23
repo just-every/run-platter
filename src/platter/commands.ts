@@ -1,3 +1,7 @@
+import { clearingCommand } from './accounting/clearing'
+import { termsFields } from './payments/terms-command'
+import { accountingCommand } from './accounting/quickbooks'
+import { scheduleInput, scheduleOf, scheduleAmounts } from './payments/schedule'
 import { saveReminderTemplate } from './reminder-messages'
 import { reminderCommand } from './reminders'
 import { disputeCommand } from './disputes'
@@ -45,9 +49,13 @@ export function proposalFields(p:Record<string,unknown>){
  const terms=p.terms??'';need(typeof terms==='string'&&terms.length<=10000,'Terms must be text up to 10000 characters')
  const options=p.packages===undefined?null:packageInputs(p.packages,tables)
  const conditions=sectionConditions(p.sectionConditions??Object.fromEntries(['scope','terms'].filter(k=>p[k+'Option']).map(k=>[k,p[k+'Option']])),options??[{id:'one'},{id:'two'}])
- return{section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)}
+ const schedule=scheduleInput(p.paymentSchedule)
+ const priced=pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables).map(o=>({...o,...(schedule?{paymentSchedule:schedule}:{})}))
+ for(const o of priced)scheduleAmounts(schedule,o.cents,Math.round(o.cents*deposit/100))
+ return{section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:priced}
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
+ if(name==='schedule.save')return command(env,a,'proposal.revise',await termsFields(env,a,p))
  await authorizeCommand(db,a,name,p)
  if(name.startsWith('team.')||name.startsWith('member.')||name==='proposal.share')return teamCommand(db,a,name,p)
  if(name.startsWith('approval.')||name==='proposal.approve'||name==='proposal.reject')return approvalCommand(env,a,name,p)
@@ -58,6 +66,8 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='catalog.insert'){const addition=await catalogInsertion(db,a,p);return command(env,a,'proposal.revise',addition.fields,undefined,addition.costs)}
  if(name==='proposal.unlock'||name==='template.locks')return sectionLockCommand(db,a,name,p)
  if(name==='folder.save')return folderCommand(db,a,p)
+ if(name==='accounting.payout')return clearingCommand(env,a,p)
+ if(name.startsWith('accounting.'))return accountingCommand(env,a,name,p)
  if(name.startsWith('payment.'))return paymentCommand(env,a,name,p)
  if(name.startsWith('provider.'))return connectionCommand(env,a,name,p)
  if(name==='workspace.defaults')return workspaceCommand(db,a,p)
@@ -95,6 +105,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   if(p.pricingTables===undefined){const pending=await pendingNegotiation(db,current.id);const content=pending?JSON.parse(pending.snapshot):current;p={...p,pricingTables:pricingInput(typeof content.options==='string'?JSON.parse(content.options):content.options)}}
   if(p.sectionConditions===undefined&&p.scopeOption===undefined&&p.termsOption===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,sectionConditions:pending?JSON.parse(pending.snapshot).section_conditions??{}:current.section_conditions}}
   if(p.terms===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,terms:pending?JSON.parse(pending.snapshot).terms??'':current.terms}}
+  if(p.paymentSchedule===undefined){const displayed=negotiatedView(current,await pendingNegotiation(db,current.id));p={...p,paymentSchedule:scheduleOf(typeof displayed.options==='string'?JSON.parse(displayed.options):displayed.options)}}
   await assertSectionLocks(db,negotiatedView(current,await pendingNegotiation(db,current.id)),proposalFields(p))
   if(name==='proposal.negotiate'||await pendingNegotiation(db,current.id))return negotiationCommand(env,a,name,p,current,{...proposalFields(p),...(restoredAttachments!==undefined?{attachments:restoredAttachments}:{}),internalCosts,costSourceRevision})
  }

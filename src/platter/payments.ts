@@ -1,3 +1,5 @@
+import { recordOffline } from './payments/offline'
+import { applyEvent } from './payments/events'
 import type { Bindings } from '../auth.server'
 import { providerCredential, providerJson } from './connections'
 import { commit, dollars, need, text, type Actor } from './model'
@@ -15,6 +17,8 @@ async function chargeFor(env:Bindings,id:string){
 export async function paymentCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  need(finance.includes(a.role),'Only owner, admins and billing manage payments and refunds',403)
  const db=env.DB
+ if(name==='payment.reconcile'){await applyEvent(env,text(p.eventId,'a held Stripe event'));return{reconciled:true}}
+ if(name==='payment.record'&&p.amountId)return recordOffline(env,a,p)
  if(name==='payment.record'){
   const id=text(p.id,'a proposal'),accepted=await db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(id).first<any>();need(accepted,'Accept the proposal before recording payment',409)
   const method=String(p.method);need(['check','wire','ach_credit'].includes(method),'Choose check, wire or ACH credit')

@@ -1,3 +1,4 @@
+import { paymentTermsPage, financePage } from './finance'
 import { catalogPage } from './catalog'
 import { foldersPanel } from './folders'
 import { connectionsPanel } from './connections'
@@ -29,6 +30,8 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
     let above = ''
     let layout = ''
     switch (url.pathname) {
+      case '/app/payments': title='Payments and accounting'; content=financePage(state); break
+      case '/app/payment-terms': title='Payment terms'; content=paymentTermsPage(state,url.searchParams.get('id')??''); break
       case '/app/catalog': title='Catalog'; content=catalogPage(state); break
       case '/app/library': title='Content library'; content=libraryPage(state); break
       case '/app/team': title='Team'; content=teamPage(state)+foldersPanel(state)+connectionsPanel(state,true); break
@@ -38,13 +41,14 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
       case '/app/proposal': {
         const id = url.searchParams.get('id') ?? ''
         title = state.proposals?.find((p: any) => String(p.id) === id)?.title ?? 'Proposal'; above = proposalEyebrow(state, id); layout = 'proposal-page'
-        content = proposalPage(state, id, url.searchParams, feedback); break
+        content = proposalPage(state, id, url.searchParams, feedback)+'<p><a href="/app/payment-terms?id='+encodeURIComponent(id)+'">Payment terms and schedule</a></p>'; break
       }
       case '/app/clients': title = 'Clients'; above = eyebrow(`Clients · ${count((state.clients ?? []).length, 'client')} on file`); layout = 'clients-page'; content = clientsPage(state); break
       case '/app/import': title = 'Client import'; above = eyebrow('Move in · clients, contacts and catalog'); content = importPage(state, feedback); break
       case '/app/access': title = 'Agent access'; above = eyebrow('Agents · keys and send requests'); content = accessPage(state); break
       default: return renderMissing()
     }
+    if(['owner','admin','billing'].includes(state.actor?.role))content='<p><a href="/app/payments">Payments and accounting</a></p>'+content
     if (content === null) return renderMissing()
     if (state.actor?.role === 'owner' && url.pathname === '/app/proposal' && state.outbox?.length) {
       content += panel('Local development mail', `<p>Messages captured locally for this installation.</p><ul class="records">${state.outbox.map((message: any) => `<li><article><h3>${escape(message.subject)}</h3><p>To: ${escape(message.recipient)} · ${escape(message.status)}</p><p class="preserve">${escape(message.body)}</p></article></li>`).join('')}</ul>`)

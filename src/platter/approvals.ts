@@ -22,7 +22,7 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
   if(c.kind==='totalOver')return row.currency===c.currency&&total>BigInt(c.cents)
   if(c.kind==='discountOver')return options.some((o:any)=>(o.discount?.bps??0)>c.bps)
   if(c.kind==='termsEdited')return row.revision>1&&Boolean(first)&&String(row.terms??'')!==String(JSON.parse(first.snapshot).terms??'')
-  if(c.kind==='paymentTerms')return row.deposit_bps<c.minimumDepositBps||(c.standardTerms!==null&&String(row.terms??'')!==c.standardTerms)
+  if(c.kind==='paymentTerms')return row.deposit_bps<c.minimumDepositBps||(c.standardTerms!==null&&String(row.terms??'')!==c.standardTerms)||Boolean(options[0]?.paymentSchedule&&(options[0].paymentSchedule.netDays>0||options[0].paymentSchedule.milestones.length||options[0].paymentSchedule.recurring.length))
   if(c.kind==='template')return Boolean(origin)
   if(c.kind==='marginBelow'){
    costing??=await internalPricing(db,row,{id:'internal-rule-evaluation',email:'',role:'owner'})

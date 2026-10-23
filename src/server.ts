@@ -1,3 +1,4 @@
+import { syncAccounting } from './platter/accounting/quickbooks'
 import { withDemo } from '@runeditrun/rer/internal/modules/demo/index.mjs'
 import { platterResponse } from './platter/http'
 import { runReminders } from './platter/reminders'
@@ -46,6 +47,7 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
   // REPORT-005 scheduled report email, built as of the trigger's own time.
   async scheduled(controller, env) {
     await runExpiry(runtimeBindings(env), controller.scheduledTime)
+    await syncAccounting(runtimeBindings(env))
     await runReminders(runtimeBindings(env), controller.scheduledTime)
     await runDueReports(runtimeBindings(env), controller.scheduledTime)
   },

@@ -193,7 +193,7 @@ test('FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposal
   const field=sort==='age'?'age':sort
   for(let i=1;i<rows.length;i++)assert.ok(sort==='age'?rows[i-1][field]<=rows[i][field]:rows[i-1][field].localeCompare(rows[i][field])<=0)
  }
- for(const query of ['sort=invalid','status=paid','minValue=1.234','minAge=-1','minValue=20&maxValue=10'])assert.equal((await h.send('/api/platter/pipeline?'+query,undefined,h.owner)).status,400)
+ for(const query of ['sort=invalid','status=invalid','minValue=1.234','minAge=-1','minValue=20&maxValue=10'])assert.equal((await h.send('/api/platter/pipeline?'+query,undefined,h.owner)).status,400)
  assert.equal((await h.send('/api/platter/pipeline',undefined,people[1].cookie)).value.count,fixture.filter(p=>p.owner===people[1].id).length)
  assert.equal((await h.send('/api/platter/pipeline')).status,401)
  const owned=fixture.find(p=>p.status==='awaiting-approval'&&p.owner===people[1].id)
@@ -205,6 +205,16 @@ test('FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposal
  assert.equal((await report()).rows.find(p=>p.id===agent.value.id).ownerId,people[0].id,'agent draft belongs to the recorded key owner')
  const accepted=fixture.find(p=>p.status==='accepted');await h.cmd('invoice.export',{id:accepted.id})
  assert.equal((await report()).rows.find(p=>p.id===accepted.id).nextAction,'complete')
+ // PAY-004 extends the same named thirty-proposal fixture without changing its recorded owners.
+ const paidOffer=await h.cmd('proposal.prepare',{...offer,clientId:clients[0].id,title:'Paid reporting fixture',depositPercent:'100'},people[1].cookie)
+ await h.cmd('proposal.approve',{id:paidOffer.id,version:1,revision:1});const paidPath=new URL((await h.cmd('proposal.send',{id:paidOffer.id,version:2},people[1].cookie)).shareUrl).pathname,paidCookie=await verified(h,paidPath)
+ assert.equal((await h.send(paidPath+'/action?name=accept',{name:'Synthetic payer',optionId:'one',consent:true},paidCookie)).status,200)
+ const amount=(await h.state()).finance.amounts.find(r=>r.proposal_id===paidOffer.id)
+ await h.cmd('payment.record',{id:paidOffer.id,amountId:amount.id,amount:'2400',method:'wire',reference:'synthetic-platter-6130',receivedOn:new Date().toISOString().slice(0,10),requestId:'synthetic-platter-6131',consent:true})
+ const paidReport=await report('status=paid&sort=value&direction=desc');assert.equal(paidReport.count,1);assert.equal(paidReport.rows[0].id,paidOffer.id);assert.equal(paidReport.rows[0].ownerId,people[1].id);assert.deepEqual(paidReport.totals,[{currency:'USD',count:1,valueCents:240000}])
+ assert.equal((await h.send('/api/platter/pipeline?status=paid',undefined,people[1].cookie)).value.count,1)
+ assert.equal((await h.send('/api/platter/pipeline?status=paid',undefined,people[2].cookie)).value.count,0)
+
  const team=await h.cmd('team.create',{name:'Report team'})
  await h.cmd('member.set',{operatorId:people[1].id,version:0,role:'sales',teams:[team.id]})
  for(const role of ['manager','viewer','admin']){
@@ -2022,5 +2032,134 @@ test('TEAM-001 upgrading a pre-role database keeps former members as sales witho
   const report=await h.send('/api/platter/pipeline',undefined,cookie);assert.equal(report.status,200);assert.equal(report.value.count,1);assert.equal(report.value.rows[0].id,ownId)
   const upgraded=await h.state();assert.deepEqual(upgraded.workspaceDefaults,{remindersEnabled:true,reminderDays:[2,5,9],beforeExpiryDays:[3],reminderCap:3,expiryDays:60,warningDays:1,paymentMethods:['card'],version:0});assert.equal(upgraded.proposals.find(p=>p.id===ownId).reminderSettings,null);assert.equal(upgraded.proposals.find(p=>p.id===ownId).deliveryDefaults,undefined);assert.equal(upgraded.proposals.find(p=>p.id===ownId).expiry.mode,'never')
   const future=await h.cmd('proposal.prepare',{...offer,clientId});const copied=(await h.state()).proposals.find(p=>p.id===future.id);assert.deepEqual(copied.deliveryDefaults,{remindersEnabled:true,reminderDays:[2,5,9],beforeExpiryDays:[3],reminderCap:3,paymentMethods:['card']});assert.equal(copied.expiry.days,60);assert.equal(copied.expiry.warningDays,1);assert.equal(copied.reminderSettings,null);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_reminder_authority').first()).n,0)
+ }finally{await h.close()}
+})
+
+test('PRICE-007 selection-driven net terms, milestones and retainer freeze through preview, PDF, templates, copies and restoration',async()=>{
+ const h=await harness({assetsDirectory:'public'});try{
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+ const {financeOffer,financeSchedule,financeVerify}=await import('./finance-fixture.mjs')
+ const client=await h.cmd('client.save',{name:'Schedule client',email:'schedule@synthetic-platter.example'})
+ const input={...financeOffer,clientId:client.id,paymentSchedule:financeSchedule,packages:[{id:'one',label:'Core',price:'10000',optionalItems:[{id:'extra',label:'Extra service',unitPrice:'100',min:1,max:10,quantity:1,editable:true}]},{id:'two',label:'Expanded',price:'20000'}]}
+ const p=await h.cmd('proposal.prepare',input)
+ const template=await h.cmd('template.save',{id:p.id,version:1,name:'Schedule template'})
+ const started=await h.cmd('template.start',{id:template.id,version:1,clientId:client.id}),copy=await h.cmd('proposal.duplicate',{id:started.id,version:1})
+ await h.cmd('schedule.save',{id:started.id,version:1,depositPercent:25,paymentSchedule:financeSchedule})
+ let state=await h.state();assert.equal(state.templates.find(t=>t.id===template.id).snapshot.deposit_bps,3000);assert.equal(state.proposals.find(r=>r.id===started.id).deposit_bps,2500);assert.deepEqual(state.proposals.find(r=>r.id===copy.id).options[0].paymentSchedule,financeSchedule)
+ await h.cmd('proposal.restore',{id:started.id,version:2,revision:1})
+ state=await h.state();const restored=state.proposals.find(r=>r.id===started.id);assert.equal(restored.deposit_bps,3000);assert.deepEqual(restored.options[0].paymentSchedule,financeSchedule);assert.equal(restored.approved_by,null)
+ const comparison=await h.send('/app/proposal?id='+started.id+'&from=1&to=2',undefined,h.owner);assert.match(comparison.text,/Deposit percentage/);assert.match(comparison.text,/<ins>25<\/ins>/)
+ const selected=encodeURIComponent(JSON.stringify([{id:'extra',quantity:4}]))
+ for(const width of [1440,390]){
+  const preview=await h.send('/app/preview/client?id='+p.id+'&revision=1&width='+width+'&optionId=one&items='+selected,undefined,h.owner)
+  assert.equal(preview.status,200,preview.text);assert.match(preview.text,/Design approval: USD 3120.00/);assert.match(preview.text,/Delivery: USD 4160.00/);assert.match(preview.text,/Monthly support: USD 1040.00/);assert.match(preview.text,/net 15/)
+ }
+ await h.cmd('proposal.approve',{id:p.id,version:1,revision:1})
+ const shared=await h.cmd('proposal.send',{id:p.id,version:2}),path=new URL(shared.shareUrl).pathname,cookie=await financeVerify(h,path)
+ const page=await h.send(path+'?optionId=one&items='+selected,undefined,cookie);assert.match(page.text,/Design approval: USD 3120.00/)
+ const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId=one&items='+selected,{headers:{cookie}});assert.equal(pdf.status,200);const content=(await pdfPages(await pdf.arrayBuffer())).join(' ');assert.match(content,/Design approval: USD 3120.00/);assert.match(content,/Delivery: USD 4160.00/);assert.match(content,/2028-04-01/);assert.match(content,/net 15/)
+ const response=await h.send(path+'/action?name=accept',{name:'Synthetic Client',optionId:'one',items:[{id:'extra',quantity:4}],consent:true},cookie);assert.equal(response.status,200,response.text)
+ const accepted=(await h.state()).proposals.find(r=>r.id===p.id).acceptance;assert.deepEqual(accepted.schedule.map(r=>r.cents),[312000,312000,416000,104000]);assert.equal(accepted.totalCents,1040000)
+ const frozen=(await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot
+ await h.cmd('schedule.save',{id:p.id,version:4,paymentSchedule:financeSchedule},h.owner,409);assert.equal((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot,frozen)
+ const data=await h.send(path+'/data.json',undefined,cookie);assert.deepEqual(data.value.schedule,accepted.schedule)
+ await h.cmd('proposal.prepare',{...input,paymentSchedule:{...financeSchedule,milestones:[{id:'bad',label:'Too much',amount:{kind:'percent',bps:10000}}]}},h.owner,400)
+ }finally{await h.close()}
+})
+
+test('ACCT-001 / ACCT-004 / PAY-007 issue-day QuickBooks bindings survive reconnect and replay; offline milestone closes overdue and provider edits flag mismatches',async()=>{
+ const {financeFake,financeConnect,financeAccept}=await import('./finance-fixture.mjs'),fake=financeFake(),h=await harness({outboundService:fake.outboundService})
+ try{
+  await financeConnect(h)
+  const {p}=await financeAccept(h)
+  assert.equal(fake.customers.size,1);assert.equal(fake.invoices.size,1)
+  let state=await h.state(),rows=state.finance.amounts.filter(r=>r.proposal_id===p.id),milestone=rows.find(r=>r.schedule_key==='design'),deposit=rows.find(r=>r.kind==='deposit')
+  assert.equal(deposit.external_id,[...fake.invoices.keys()][0]);assert.equal(rows.filter(r=>r.external_id).length,1)
+  const invoice=fake.invoices.get(deposit.external_id);assert.equal(invoice.Line[0].SalesItemLineDetail.TaxCodeRef.value,'NON')
+  await h.cmd('provider.disconnect',{provider:'quickbooks',version:1})
+  await h.cmd('provider.connect',{provider:'quickbooks',version:2,realmId:'synthetic-platter-6100',token:'synthetic-platter-6110',consent:true})
+  await h.cmd('accounting.sync',{});await h.cmd('accounting.sync',{});assert.equal(fake.invoices.size,1);assert.equal(fake.customers.size,1)
+  await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET observed_at=excluded.observed_at').bind(Date.UTC(2028,2,1,12)).run()
+  await h.cmd('accounting.milestone',{amountId:milestone.id});assert.equal(fake.invoices.size,2)
+  state=await h.state();milestone=state.finance.amounts.find(r=>r.id===milestone.id);assert.equal(milestone.issue_on,'2028-03-01');assert.equal(milestone.due_on,'2028-03-16')
+  await h.db.prepare('UPDATE p_expiry_clock SET observed_at=?').bind(Date.UTC(2028,2,17,12)).run()
+  assert.equal((await h.state()).finance.amounts.find(r=>r.id===milestone.id).overdueCents,300000)
+  assert.equal((await h.state()).followups.rows.find(r=>r.id===p.id).reason,'payment')
+  await h.send('/auth/invite',{email:'billing@finance.synthetic-platter.example',displayName:'Billing',role:'member',returnTo:'/app'},h.owner)
+  const billing=await h.signIn('billing@finance.synthetic-platter.example'),actor=(await h.state(billing)).actor
+  await h.cmd('member.set',{operatorId:actor.id,version:0,role:'billing',teams:[]})
+  const payment={id:p.id,amountId:milestone.id,method:'check',amount:'3000',reference:'synthetic-platter-6111',receivedOn:'2028-03-17',requestId:'synthetic-platter-6112',consent:true}
+  const recorded=await h.cmd('payment.record',payment,billing),calls=fake.calls.length
+  assert.equal((await h.cmd('payment.record',payment,billing)).id,recorded.id);assert.equal(fake.calls.length,calls)
+  state=await h.state();const paid=state.finance.amounts.find(r=>r.id===milestone.id);assert.equal(paid.paidCents,300000);assert.equal(paid.overdueCents,0);assert.equal(fake.payments.size,1);assert.ok(!(await h.state()).followups.rows.some(r=>r.id===p.id&&r.dueDate===milestone.due_on))
+  await h.cmd('payment.record',{...payment,reference:'different'},billing,409)
+  fake.invoices.get(deposit.external_id).TotalAmt+=1
+  await h.cmd('accounting.sync',{})
+  const mismatch=(await h.state()).finance.amounts.find(r=>r.id===deposit.id);assert.equal(mismatch.accounting_status,'mismatch');assert.match(mismatch.mismatch,/differs/)
+  const page=await h.send('/app/payments',undefined,billing);assert.equal(page.status,200);assert.match(page.text,/Invoice amount differs/);assert.match(page.text,/Remittance|Reconciliation/)
+  await h.cmd('accounting.configure',{authority:'stripe',version:1},billing,403)
+ }finally{await h.close()}
+})
+
+test('PAY-004 signed Stripe evidence handles ACH processing, duplicate and out-of-order events, refunds and disputes without accepting forged or foreign payments',async()=>{
+ const {financeFake,financeAccept,stripeEvent}=await import('./finance-fixture.mjs'),fake=financeFake(),h=await harness({outboundService:fake.outboundService})
+ try{
+  const {p}=await financeAccept(h),amount=(await h.state()).finance.amounts.find(r=>r.proposal_id===p.id&&r.kind==='deposit')
+  await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-6108',webhookSecret:'synthetic-platter-6109',consent:true})
+  const id='synthetic-platter-6113',metadata={platter_amount_id:amount.id,platter_proposal_id:p.id,platter_revision:'1'}
+  fake.stripe.set(id,{id,object:'payment_intent',status:'processing',currency:'usd',amount:300000,metadata})
+  const event=(n,type,created)=>({id:'synthetic-platter-'+n,type,created,data:{object:{id}}})
+  const processing=event(6114,'payment_intent.processing',100)
+  assert.equal((await stripeEvent(h,processing)).value.state,'processed')
+  let row=(await h.state()).finance.amounts.find(r=>r.id===amount.id);assert.equal(row.state,'processing');assert.equal(row.paidCents,0)
+  assert.equal((await stripeEvent(h,processing)).status,200);assert.equal((await h.db.prepare('SELECT count(*) n FROM p_financial_events').first()).n,1)
+  fake.stripe.set(id,{...fake.stripe.get(id),status:'succeeded'})
+  assert.equal((await stripeEvent(h,event(6115,'payment_intent.succeeded',200))).value.state,'processed')
+  row=(await h.state()).finance.amounts.find(r=>r.id===amount.id);assert.equal(row.state,'paid');assert.equal(row.paidCents,300000)
+  assert.equal((await stripeEvent(h,event(6116,'payment_intent.processing',50))).value.state,'processed');assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).paidCents,300000)
+  assert.equal((await stripeEvent(h,event(6117,'payment_intent.succeeded',300),'synthetic-platter-6199')).status,401)
+  assert.equal((await stripeEvent(h,{...event(6118,'payment_intent.succeeded',300),account:'another-company'})).status,403)
+  fake.stripe.set(id,{...fake.stripe.get(id),amount_refunded:10000})
+  assert.equal((await stripeEvent(h,event(6119,'charge.refunded',300))).value.state,'processed')
+  assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).payments[0].state,'partially_refunded')
+  fake.stripe.set(id,{...fake.stripe.get(id),amount_refunded:300000})
+  await stripeEvent(h,event(6120,'charge.refunded',400));assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).payments[0].state,'refunded')
+  fake.stripe.set(id,{...fake.stripe.get(id),amount_refunded:0,disputed:true})
+  await stripeEvent(h,event(6121,'charge.succeeded',500));assert.equal((await h.state()).finance.amounts.find(r=>r.id===amount.id).state,'disputed')
+  const before=(await h.db.prepare('SELECT count(*) n FROM p_provider_payments').first()).n;assert.equal(before,1)
+ }finally{await h.close()}
+})
+
+test('ACCT-006 QuickBooks posts gross payments, verified fees, one net payout and next-payout refund through clearing without duplicate writes',async()=>{
+ const {financeFake,financeConnect,financeAccept,stripeEvent}=await import('./finance-fixture.mjs'),fake=financeFake(),h=await harness({outboundService:fake.outboundService})
+ try{
+  await financeConnect(h);await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-6108',webhookSecret:'synthetic-platter-6109',consent:true})
+  const charges=[]
+  for(const [i,dollars] of [1000,500].entries()){
+   const {p}=await financeAccept(h,{priceOne:String(dollars),depositPercent:'100',paymentSchedule:null}),amount=(await h.state()).finance.amounts.find(r=>r.proposal_id===p.id),id='synthetic-platter-'+(6140+i)
+   fake.stripe.set(id,{id,object:'charge',paid:true,status:'succeeded',amount:dollars*100,amount_refunded:0,currency:'usd',metadata:{platter_amount_id:amount.id,platter_proposal_id:p.id,platter_revision:'1'}});charges.push(id)
+   const response=await stripeEvent(h,{id:'synthetic-platter-'+(6142+i),type:'charge.succeeded',created:100+i,data:{object:{id}}});assert.equal(response.value.state,'processed')
+  }
+  assert.equal(fake.payments.size,2);assert.ok([...fake.invoices.values()].every(r=>r.Balance===0))
+  const payout='synthetic-platter-6144',tx=[{id:'synthetic-platter-6145',type:'charge',source:charges[0],amount:100000,fee:2930,net:97070,currency:'usd'},{id:'synthetic-platter-6146',type:'charge',source:charges[1],amount:50000,fee:1480,net:48520,currency:'usd'}]
+  fake.stripe.set(payout,{id:payout,status:'paid',currency:'usd',amount:145590});fake.stripe.set('balance_transactions',{has_more:false,data:tx})
+  await h.cmd('accounting.payout',{payoutId:payout,consent:true})
+  let postings=(await h.state()).finance.postings
+  assert.equal(postings.reduce((n,r)=>n+r.fee_delta,0),4410);assert.equal(postings.reduce((n,r)=>n+r.bank_delta,0),145590);assert.equal(postings.reduce((n,r)=>n+r.clearing_delta,0),0)
+  const posts=fake.calls.filter(c=>c.method==='POST').length
+  await h.cmd('accounting.payout',{payoutId:payout,consent:true});assert.equal(fake.calls.filter(c=>c.method==='POST').length,posts);assert.equal((await h.state()).finance.postings.length,postings.length)
+  const payment=(await h.state()).paymentRecords.find(r=>r.provider_charge===charges[0])
+  const refund=await h.cmd('payment.refund',{paymentId:payment.id,amount:'100',requestId:'synthetic-platter-6147',reason:'Synthetic returned work',consent:true});assert.equal(refund.status,'succeeded')
+  const saved=await h.db.prepare('SELECT provider_refund FROM p_refunds WHERE id=?').bind(refund.id).first()
+  // A subsequent charge funds the next net payout after the refund.
+  const {p}=await financeAccept(h,{priceOne:'200',depositPercent:'100',paymentSchedule:null}),amount=(await h.state()).finance.amounts.find(r=>r.proposal_id===p.id),id='synthetic-platter-6148'
+  fake.stripe.set(id,{id,object:'charge',paid:true,status:'succeeded',amount:20000,amount_refunded:0,currency:'usd',metadata:{platter_amount_id:amount.id,platter_proposal_id:p.id,platter_revision:'1'}})
+  await stripeEvent(h,{id:'synthetic-platter-6149',type:'charge.succeeded',created:200,data:{object:{id}}})
+  const next='synthetic-platter-6150';fake.stripe.set(next,{id:next,status:'paid',currency:'usd',amount:9390});fake.stripe.set('balance_transactions',{has_more:false,data:[{id:'synthetic-platter-6151',type:'charge',source:id,amount:20000,fee:610,net:19390,currency:'usd'},{id:'synthetic-platter-6152',type:'refund',source:saved.provider_refund,amount:-10000,fee:0,net:-10000,currency:'usd'}]})
+  await h.cmd('accounting.payout',{payoutId:next,consent:true})
+  postings=(await h.state()).finance.postings;assert.equal(postings.reduce((n,r)=>n+r.clearing_delta,0),0);assert.equal(postings.reduce((n,r)=>n+r.bank_delta,0),154980);assert.equal(postings.filter(r=>r.kind==='payout').length,2);assert.equal(postings.find(r=>r.kind==='refund').clearing_delta,-10000)
+  // An incomplete provider list is held before any write.
+  fake.stripe.set('balance_transactions',{has_more:true,data:tx});const before=fake.calls.filter(c=>c.method==='POST').length
+  await h.cmd('accounting.payout',{payoutId:payout,consent:true},h.owner,409);assert.equal(fake.calls.filter(c=>c.method==='POST').length,before)
  }finally{await h.close()}
 })

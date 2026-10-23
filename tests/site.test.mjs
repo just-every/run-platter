@@ -552,7 +552,7 @@ test('EDIT-014 client selects and downloads revision 2 at desktop and phone; own
     await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click();await page.getByRole('radio',{name:/Full campaign/}).check();await capture('client-selection')
     const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Download unsigned proposal PDF'}).click(),page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/download.pdf')).then(async r=>assert.equal(r.status(),200,r.status()===200?'PDF response':await r.text()))])
     const pages=await pdfPages(await readFile(await download.path()));assert.ok(pages.every(p=>p.includes('Not signed, revision 2')));assert.ok(pages.join(' ').includes('Selected option total: USD 4,200.00'));assert.ok(pages.join(' ').includes('Deposit due: USD 1,050.00'))
-    await page.goto(app.origin+'/app/proposal?id='+made.id);assert.match(await page.getByRole('list',{name:'PDF download timeline'}).innerText(),/Revision 2.*two/);await capture('owner-timeline')
+    await page.goto(app.origin+'/app/proposal?id='+made.id);assert.match(await page.getByRole('list',{name:'PDF download timeline'}).innerText(),/Revision 2.*two/);assert.match(await page.getByRole('list',{name:'Engagement timeline'}).innerText(),/Unsigned PDF download.*revision 2.*two/);await capture('owner-timeline')
     await page.getByRole('button',{name:'Turn off client PDF downloads'}).click();await capture('owner-disabled')
     await page.goto(clientUrl);assert.equal(await page.getByRole('button',{name:'Download unsigned proposal PDF'}).count(),0);await capture('client-disabled')
     assert.equal((await context.request.get(clientUrl+'/download.pdf?optionId=two')).status(),403)
@@ -1151,3 +1151,46 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
 })
 
 test('FOLLOW-001 / FOLLOW-006 sender controls, template delivery overrides, preview dates, manual email and inactive copies at desktop and phone widths', {timeout:120000}, async()=>{const {remindersJourney}=await import('./reminders-journey.mjs');await remindersJourney()})
+
+test('TRACK-001 and TRACK-004 client disclosure, first-party measurement and private owner controls work at desktop and phone widths', {timeout:180000}, async()=>{
+ let app,browser
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const owner=await browser.newContext({viewport:{width,height:900}}),client=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await owner.newPage(),viewer=await client.newPage(),hosts=new Set()
+    client.on('request',r=>hosts.add(new URL(r.url()).origin))
+    const cmd=async(name,input)=>{const r=await owner.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    const capture=async(p,name)=>{await p.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),JSON.stringify(await p.evaluate(()=>({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,overflow:[...document.querySelectorAll('main *')].filter(n=>n.getBoundingClientRect().right>innerWidth+1).map(n=>({tag:n.tagName,class:n.className,width:n.getBoundingClientRect().width})).slice(0,20)}))));const iconOnly=await p.locator('button,a[role="button"]').evaluateAll(nodes=>nodes.filter(n=>!n.textContent.trim()&&!n.getAttribute('data-tooltip')).map(n=>n.outerHTML));assert.deepEqual(iconOnly,[],'all controls have visible text or an explicit tooltip');if(screenshots){await p.screenshot({path:join(screenshots,`TRACK-${name}-${width}.png`),fullPage:true});if(name.startsWith('owner')||name==='stakeholder-approver'){await p.getByRole('heading',{name:'Client engagement',exact:true}).scrollIntoViewIfNeeded();await p.screenshot({path:join(screenshots,`TRACK-${name}-viewport-${width}.png`)})}}}
+    assert.equal((await owner.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const c=await cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),p=await cmd('proposal.prepare',{clientId:c.id,title:'Measured campaign',scope:'Case study: Northstar campaign. '+Array(90).fill('Studio photographs and campaign usage rights.').join('\n'),optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'})
+    await cmd('proposal.approve',{id:p.id,version:1,revision:1});const share=await cmd('proposal.send',{id:p.id,version:2})
+    await page.goto(app.origin+'/app/proposal?id='+p.id)
+    await page.getByLabel('Measure views',{exact:true}).selectOption('yes');await page.getByLabel('Email open alerts',{exact:true}).selectOption('yes');await page.getByLabel('Engagement retention in days').fill('90');await page.getByRole('button',{name:'Save engagement settings'}).click()
+    await capture(page,'owner-settings')
+    await viewer.goto(share.shareUrl);assert.match(await viewer.locator('main').innerText(),/Views of this page are measured/)
+    await viewer.getByRole('heading',{name:'Scope of work',exact:true}).scrollIntoViewIfNeeded();await viewer.evaluate(()=>document.querySelector('[data-engagement-section="scope"]').closest('section').scrollIntoView())
+    await viewer.waitForTimeout(5000)
+    await viewer.evaluate(()=>document.querySelector('[data-engagement-section="pricing"]').closest('section').scrollIntoView())
+    await viewer.waitForTimeout(4000)
+    await capture(viewer,'client-disclosure')
+    await page.goto(app.origin+'/app/proposal?id='+p.id)
+    assert.match(await page.getByRole('list',{name:'Engagement timeline'}).innerText(),/avery@northstar.example[\s\S]*not mailbox verified/)
+    await capture(page,'owner-timeline')
+    await page.goto(app.origin+'/app?status=viewed&sort=value');assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'1');assert.match(await page.locator('[data-pipeline-total="USD"]').innerText(),/4,200.00 USD/);assert.match(await page.getByRole('list',{name:'Sales follow-ups'}).innerText(),/Viewed but not signed/)
+    await capture(page,'viewed-pipeline')
+    const data=await (await owner.request.get(app.origin+'/api/platter/engagement?id='+p.id)).json();assert.ok(data.views[0].reading.some(r=>r.section==='scope'&&r.milliseconds>=4000));assert.ok(data.views[0].reading.some(r=>r.section==='pricing'&&r.milliseconds>=2000));assert.deepEqual([...hosts],[app.origin])
+    assert.equal((await client.request.get(app.origin+'/api/platter/engagement?id='+p.id)).status(),401)
+    await viewer.getByLabel('Your stakeholder name',{exact:true}).fill('Riley Procurement');await viewer.getByLabel('Your stakeholder email',{exact:true}).fill('riley@synthetic-platter.example');await viewer.getByRole('checkbox',{name:/Send me a verification code/}).check();await viewer.getByRole('button',{name:'Identify stakeholder',exact:true}).click()
+    const forwarded=(await (await owner.request.get(app.origin+'/api/platter/state')).json()).outbox.find(m=>m.subject==='Verify your stakeholder mailbox');await viewer.getByLabel('Stakeholder verification code').fill(forwarded.body.match(/\b\d{6}\b/)[0]);await capture(viewer,'forwarded-verification');await viewer.getByRole('button',{name:'Verify stakeholder mailbox',exact:true}).click();assert.match(await viewer.locator('main').innerText(),/Mailbox verified/)
+    await page.goto(app.origin+'/app/proposal?id='+p.id);assert.match(await page.getByRole('list',{name:'Verified stakeholders'}).innerText(),/Riley Procurement/);await page.getByRole('button',{name:'Add approver recipient',exact:true}).click();assert.match(await page.getByRole('list',{name:'Verified stakeholders'}).innerText(),/approver/);await capture(page,'stakeholder-approver')
+    await page.goto(app.origin+'/app/proposal?id='+p.id);await page.getByRole('button',{name:'Erase engagement data'}).click();assert.equal(await page.getByRole('list',{name:'Engagement timeline'}).count(),0)
+    await page.getByLabel('Measure views',{exact:true}).selectOption('no');await page.getByLabel('Email open alerts',{exact:true}).selectOption('no');await page.getByRole('button',{name:'Save engagement settings'}).click();await viewer.goto(share.shareUrl);assert.equal(await viewer.locator('[data-engagement-view]').count(),0);await capture(viewer,'measurement-off')
+   }finally{await owner.close();await client.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

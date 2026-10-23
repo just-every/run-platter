@@ -921,8 +921,11 @@ test('AUTO-003 signed events reach Slack channels and approval requests reach ve
   assert.equal((await h.send(url.pathname+url.search,undefined,h.owner)).status,200)
   assert.equal((await h.send(url.pathname+url.search)).status,303)
   assert.doesNotMatch(signed[0].value.text,/Synthetic client|Northstar|2400|@/)
+  await h.cmd('notification.route',{provider:'slack',event:'followup',kind:'channel',destination:'synthetic-platter-7003',consent:true})
+  const follow=await h.prepare('Private follow-up title');await h.cmd('followup.schedule',{id:follow.id,dueDate:'2030-03-01',action:'Private next action'})
+  await h.tick(Date.now());const updates=h.chats.filter(c=>c.value.text?.startsWith('Follow-up updated'));assert.equal(updates.length,1);assert.doesNotMatch(updates[0].value.text,/Private/)
   await h.cmd('provider.disconnect',{provider:'slack',version:1})
-  assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_notification_outbox WHERE status='sent'").first()).n,3)
+  assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_notification_outbox WHERE status='sent'").first()).n,4)
  }finally{await h.close()}
 })
 

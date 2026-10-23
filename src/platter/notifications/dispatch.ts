@@ -28,15 +28,15 @@ export async function chatJson(url:string,token:string,body?:unknown) {
  const value=JSON.parse(raw);need(value&&value.ok!==false,'Chat provider refused the request',409);return value
 }
 export async function routeAvailable(env:Bindings,r:any) {
- return Boolean(await env.DB.prepare("SELECT 1 FROM p_notification_route_authority a JOIN p_connections c ON c.id=? WHERE a.route_id=? AND c.status='connected' AND c.version=? AND c.broken_at IS NULL AND EXISTS(SELECT 1 FROM p_connection_secrets s WHERE s.connection_id=c.id)").bind('workspace:'+r.provider,r.id,r.connection_version).first())
+ return Boolean(await env.DB.prepare("SELECT 1 FROM p_notification_route_authority a JOIN p_connections c ON c.id=? WHERE a.route_id=? AND c.status='connected' AND c.version=? AND c.broken_at IS NULL AND EXISTS(SELECT 1 FROM p_connection_secrets s WHERE s.connection_id=c.id) AND EXISTS(SELECT 1 FROM p_notification_routes r WHERE r.id=a.route_id AND (r.operator_id IS NULL OR EXISTS(SELECT 1 FROM oa_operators o WHERE o.id=r.operator_id AND o.status='active' AND o.email=r.recipient_email)))").bind('workspace:'+r.provider,r.id,r.connection_version).first())
 }
 export async function flushNotifications(env:Bindings) {
  const db=env.DB,rows=(await db.prepare("SELECT * FROM p_notification_outbox WHERE status='pending' ORDER BY created_at,id LIMIT 100").all<any>()).results
  for(const row of rows){
   const allowed=async()=>{
    if(row.event_key.startsWith('expiry:')){const { activeExpiryNotice }=await import('./expiry');if(!await activeExpiryNotice(env,row))return false}
-   if(row.request_id){const r=await db.prepare('SELECT r.* FROM p_approval_requests r JOIN p_notification_authority a ON a.request_id=r.id WHERE r.id=?').bind(row.request_id).first<any>();if(!r||!await activeRequest(env,r))return false}
-   if(row.route_id){const r=await db.prepare('SELECT * FROM p_notification_routes WHERE id=?').bind(row.route_id).first<any>();if(!r||!await routeAvailable(env,r))return false}
+   if(row.request_id){const r=await db.prepare('SELECT r.* FROM p_approval_requests r JOIN p_notification_authority a ON a.request_id=r.id WHERE r.id=?').bind(row.request_id).first<any>();if(!r||!await activeRequest(env,r))return false;if(row.recipient){const person=await actorById(db,r.approver_id);if(person?.email!==row.recipient)return false}}
+   if(row.route_id){const r=await db.prepare('SELECT * FROM p_notification_routes WHERE id=?').bind(row.route_id).first<any>();if(!r||!await routeAvailable(env,r))return false;if(r.kind==='direct'){const person=await actorById(db,r.operator_id);if(!person)return false;try{await permitted(db,person,row.proposal_id)}catch{return false}}}
    return true
   }
   if(!await allowed()){await db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE id=? AND status='pending'").bind(row.id).run();continue}

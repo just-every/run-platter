@@ -11,7 +11,7 @@ import { activeRequest, chatJson, flushNotifications, notificationWrite } from '
 
 export async function requestRows(env:Bindings,a:Actor,id:string){
  await permitted(env.DB,a,id)
- return (await env.DB.prepare('SELECT r.*,o.display_name AS approver_name,o.email AS approver_email FROM p_approval_requests r JOIN oa_operators o ON o.id=r.approver_id WHERE r.proposal_id=? ORDER BY r.requested_at,r.id').bind(id).all<any>()).results
+ return (await env.DB.prepare('SELECT r.*,o.display_name AS approver_name,o.email AS approver_email FROM p_approval_requests r JOIN oa_operators o ON o.id=r.approver_id WHERE r.proposal_id=? AND (r.requester_id=? OR r.approver_id=? OR ?=1) ORDER BY r.requested_at,r.id').bind(id,a.id,a.id,administrators.includes(a.role)?1:0).all<any>()).results
 }
 export async function notificationCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  const db=env.DB,at=await currentTime(db)
@@ -25,14 +25,14 @@ export async function notificationCommand(env:Bindings,a:Actor,name:string,p:Rec
   need(event!=='approval'||kind==='direct','Approval requests require a verified direct recipient')
   const destination=text(p.destination,'a provider destination',200);need(/^[A-Za-z0-9_:@.\-]+$/.test(destination),'Use a provider destination identifier')
   const {connection,secret}=await providerCredential(env,'workspace:'+provider)
-  let operatorId:string|null=null
+  let operatorId:string|null=null,recipientEmail:string|null=null
   if(kind==='direct'){
-   const person=await actorById(db,text(p.operatorId,'a notification recipient'));need(person,'Choose an active person');operatorId=person.id
+   const person=await actorById(db,text(p.operatorId,'a notification recipient'));need(person,'Choose an active person');operatorId=person.id;recipientEmail=person.email
    if(provider==='slack'){const result=await chatJson('https://slack.com/api/users.info?user='+encodeURIComponent(destination),secret.token);need(!result.user?.deleted&&result.user?.team_id===connection.account_id&&result.user?.profile?.email?.toLowerCase()===person.email.toLowerCase(),'The Slack user must match the active member')}
    else {const result=await chatJson('https://graph.microsoft.com/v1.0/chats/'+encodeURIComponent(destination)+'?$expand=members',secret.token);need(result.chatType==='oneOnOne'&&result.members?.some((m:any)=>m.email?.toLowerCase()===person.email.toLowerCase())&&result.members?.some((m:any)=>m.userId===connection.account_id),'The Teams chat must include the connected user and active member')}
   }else {const result=await chatJson('https://slack.com/api/conversations.info?channel='+encodeURIComponent(destination),secret.token);need(result.channel?.id===destination&&result.channel?.is_member===true&&!result.channel?.is_archived,'Connect a joined active Slack channel')}
   const id=crypto.randomUUID()
-  await commit(db,a,[db.prepare('INSERT INTO p_notification_routes(id,event,provider,kind,destination,operator_id,connection_version,configured_by,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(id,event,provider,kind,destination,operatorId,connection.version,a.id,at),db.prepare('INSERT INTO p_notification_route_authority(route_id) VALUES(?)').bind(id)],false,{sql:"EXISTS(SELECT 1 FROM p_connections WHERE id=? AND version=? AND status='connected')",values:[connection.id,connection.version]})
+  await commit(db,a,[db.prepare('INSERT INTO p_notification_routes(id,event,provider,kind,destination,operator_id,recipient_email,connection_version,configured_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,event,provider,kind,destination,operatorId,recipientEmail,connection.version,a.id,at),db.prepare('INSERT INTO p_notification_route_authority(route_id) VALUES(?)').bind(id)],false,{sql:"EXISTS(SELECT 1 FROM p_connections WHERE id=? AND version=? AND status='connected')",values:[connection.id,connection.version]})
   return {id}
  }
  if(name==='notification.route.remove'){

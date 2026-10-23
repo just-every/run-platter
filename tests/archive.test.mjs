@@ -590,7 +590,7 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
   for(const table of ['p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0,table+' stays local')
   await command(restored,['import','--input',archive,'--yes'])
-  const calls=[];h=await harness({root:restored,assetsDirectory:'public',outboundService:request=>{calls.push(request.url);return Response.json({ok:true})}})
+  const calls=[];h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:request=>{calls.push(request.url);return Response.json({ok:true})}})
   for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results,before[table],table+' retains exact business history')
   for(const table of ['p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+10*86400000),cron:'*/15 * * * *'})

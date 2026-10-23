@@ -8,7 +8,7 @@ CREATE TABLE p_approval_requests (
 CREATE TABLE p_notification_routes (
  id TEXT PRIMARY KEY, event TEXT NOT NULL CHECK(event IN ('approval','signed','followup')),
  provider TEXT NOT NULL CHECK(provider IN ('slack','teams')), kind TEXT NOT NULL CHECK(kind IN ('channel','direct')),
- destination TEXT NOT NULL, operator_id TEXT REFERENCES oa_operators(id), connection_version INTEGER NOT NULL,
+ destination TEXT NOT NULL, operator_id TEXT REFERENCES oa_operators(id), recipient_email TEXT, connection_version INTEGER NOT NULL,
  configured_by TEXT NOT NULL REFERENCES oa_operators(id), created_at INTEGER NOT NULL
 );
 CREATE TABLE p_notification_authority (request_id TEXT PRIMARY KEY REFERENCES p_approval_requests(id));

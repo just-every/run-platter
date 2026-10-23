@@ -2061,7 +2061,7 @@ test('EDIT-001 document revisions preserve ordered blocks and brand through prev
   const data=(await h.send(path+'/data.json?optionId=one',undefined,cookie)).value
   assert.deepEqual(data.document.blocks,document.blocks.filter(b=>b.id!=='extra'));assert.deepEqual(data.document.brand,document.brand)
   const raw=await h.mf.dispatchFetch(h.origin+path+'/download.pdf',{method:'POST',headers:{origin:h.origin,cookie,'content-type':'application/json'},body:JSON.stringify({optionId:'one'})})
-  assert.equal(raw.status,200);const pages=await pdfPages(await raw.arrayBuffer()),pdf=pages.join(' ')
+  assert.equal(raw.status,200);const layout=await pdfPages(await raw.arrayBuffer(),true),pages=layout.map(p=>p.text),pdf=pages.join(' '),left=layout.flatMap(p=>p.items).find(i=>i.text.includes('First column content.')),right=layout.flatMap(p=>p.items).find(i=>i.text.includes('Second column content.'));assert.ok(left&&right&&right.x-left.x>200&&left.y===right.y,'PDF preserves the two-column layout')
   for(const page of pages)assert.ok(page.includes('Not signed, revision 3'))
   const titles=document.blocks.filter(b=>b.type!=='page_break'&&b.id!=='extra').map(b=>b.title);let at=-1;for(const title of titles){const next=pdf.indexOf(title,at+1);assert.ok(next>at,'PDF keeps block order for '+title);at=next}
   assert.ok(!pdf.includes('Campaign timeline'));assert.ok(pdf.includes('First column content.'));assert.ok(pdf.includes('Second column content.'));assert.ok(pdf.includes('USD 20.02'))

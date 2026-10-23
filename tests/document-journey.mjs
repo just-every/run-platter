@@ -117,7 +117,7 @@ export async function documentJourney(){
     assert.ok(await client.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'client document has no horizontal overflow')
     await client.locator('.proposal-document').scrollIntoViewIfNeeded();if(screenshots)await client.screenshot({path:join(screenshots,`EDIT-001-client-${width}.png`)})
     const pdf=await clientContext.request.post(app.origin+path+'/download.pdf',{headers:{origin:app.origin},data:{optionId:'two'}});assert.equal(pdf.status(),200)
-    const pages=await pdfPages(await pdf.body()),text=pages.join(' ')
+    const layout=await pdfPages(await pdf.body(),true),pages=layout.map(p=>p.text),text=pages.join(' ');assert.ok(layout.every(p=>p.width===612&&p.height===792));assert.equal(layout.reduce((n,p)=>n+p.imageCount,0),3,'PDF carries the logo, uploaded image and video still')
     for(const page of pages)assert.ok(page.includes('Not signed, revision '+p.revision))
     let at=-1;for(const block of savedDocument.blocks.filter(b=>b.type!=='page_break')){const next=text.indexOf(block.title,at+1);assert.ok(next>at,'PDF keeps editor order for '+block.title);at=next}
     const approved=(await state()).proposals.find(p=>p.id===id);assert.deepEqual(approved.document,savedDocument)

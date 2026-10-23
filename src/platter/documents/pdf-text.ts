@@ -15,6 +15,9 @@ const bottom = 64
 export class PdfText {
  private page!: PDFPage
  private y = 0
+ private pageIndex=-1
+ private textX=margin
+ private textWidth=letter[0]-margin*2
  private ink=ink
  private accent=accent
  private paper=rgb(1,1,1)
@@ -67,6 +70,9 @@ export class PdfText {
  }
 
  private newPage() {
+  this.pageIndex++
+  const existing=this.document.getPages()[this.pageIndex]
+  if(existing){this.page=existing;this.y=letter[1]-margin;return}
   this.page = this.document.addPage(letter)
   this.page.drawRectangle({x:0,y:0,width:letter[0],height:letter[1],color:this.paper})
   this.page.drawLine({ start: { x: margin, y: 48 }, end: { x: letter[0] - margin, y: 48 }, thickness: 0.6, color: rgb(0.8, 0.83, 0.81) })
@@ -85,6 +91,18 @@ export class PdfText {
 
  async image(bytes:Uint8Array,maxHeight=320){const image=bytes[0]===137?await this.document.embedPng(bytes):await this.document.embedJpg(bytes);const scale=Math.min((letter[0]-margin*2)/image.width,maxHeight/image.height,1),width=image.width*scale,height=image.height*scale;this.room(height+12);this.y-=height;this.page.drawImage(image,{x:margin,y:this.y,width,height});this.gap(12)}
 
+ columns(left:string,right:string){
+  const start=this.pageIndex,startY=this.y
+  this.textWidth=(letter[0]-margin*2-24)/2
+  this.text(left)
+  const leftEnd=this.pageIndex,leftY=this.y
+  this.pageIndex=start;this.page=this.document.getPages()[start];this.y=startY;this.textX=margin+this.textWidth+24
+  this.text(right)
+  const rightEnd=this.pageIndex,rightY=this.y,end=Math.max(leftEnd,rightEnd)
+  this.pageIndex=end;this.page=this.document.getPages()[end];this.y=leftEnd===rightEnd?Math.min(leftY,rightY):end===leftEnd?leftY:rightY
+  this.textX=margin;this.textWidth=letter[0]-margin*2;this.gap()
+ }
+
  pageBreak(){this.newPage()}
 
  heading(text: string) {
@@ -98,7 +116,7 @@ export class PdfText {
   // Tabs and line endings keep their document meaning; other unsupported
   // characters are rejected by the coverage check rather than substituted.
   const paragraphs = value.replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n')
-  const width = letter[0] - 2 * margin
+  const width = this.textWidth
   const leading = Math.max(15, size * 1.45)
   for (const paragraph of paragraphs) {
    const characters = Array.from(this.segmenter.segment(paragraph), entry => entry.segment)
@@ -140,7 +158,7 @@ export class PdfText {
     const line = characters.slice(start, end).join('')
     this.room(leading)
     this.y -= leading
-    this.draw(line, margin, this.y, size, color)
+    this.draw(line, this.textX, this.y, size, color)
     start = end
    }
   }

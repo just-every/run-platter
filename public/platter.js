@@ -152,7 +152,7 @@ window.platterRevisionSaved=(id,previous,result)=>{
     applying=false;if(!needsSave)form.dispatchEvent(new Event('platter:pricing-saved'));
     const title=document.querySelector('main>h1');if(title)title.textContent=result.title;
     status.textContent='Saved revision '+result.revision+'. Reload the proposal to review and approve.';status.dataset.saveState=needsSave?'unsaved':'saved';
-   });}catch(error){applying=false;paused=true;status.textContent=error.message+' Automatic saving paused. Fix the fields and use Save revision, or reload before continuing.';status.dataset.saveState='error';}
+   });}catch(error){applying=false;paused=true;needsSave=true;status.textContent=error.message+' Automatic saving paused. Fix the fields and use Save revision, or reload before continuing.';status.dataset.saveState='error';}
    finally{pending=false;if(needsSave&&!paused)timer=setTimeout(save,900);}
   }
   form.addEventListener('input',event=>{if((event.target.matches('[data-pricing-field="quantity"]')&&event.target.closest('[data-saved-line]')&&form.dataset.pricingStructureDirty!=='yes')||event.target.readOnly)return;schedule();});

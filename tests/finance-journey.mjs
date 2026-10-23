@@ -4,7 +4,7 @@ import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { harness } from './harness.mjs'
 import { browserEdge } from './browser-edge.mjs'
-import { financeFake, financeConfig, financeOffer } from './finance-fixture.mjs'
+import { financeFake, financeConfig, financeOffer, financeAccept, stripeEvent } from './finance-fixture.mjs'
 import { pdfPages } from './pdf-document.mjs'
 export async function financeJourney(){
  const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
@@ -71,6 +71,22 @@ export async function financeJourney(){
    await page.getByRole('link',{name:'All amounts',exact:true}).click()
    const deposit=state.finance.amounts.find(r=>r.proposal_id===p.id&&r.kind==='deposit');fake.invoices.get(deposit.external_id).TotalAmt+=1
    await page.getByRole('button',{name:'Reconcile accounting',exact:true}).click();assert.match(await page.locator('main').innerText(),/Invoice amount differs/);await capture(page,'provider-mismatch')
+   const doors={cmd,state:getState,send:h.send},paid=await financeAccept(doors,{title:'Paid filter proof',priceOne:'10',depositPercent:'100',paymentSchedule:null}),paidAmount=(await getState()).finance.amounts.find(r=>r.proposal_id===paid.p.id)
+   await cmd('payment.record',{id:paid.p.id,amountId:paidAmount.id,method:'wire',amount:'10',reference:'synthetic-platter-6420',receivedOn:new Date().toISOString().slice(0,10),requestId:'synthetic-platter-6421',consent:true})
+   await page.goto(edge.origin+'/app');await page.getByLabel('Status',{exact:true}).selectOption('paid');await page.getByLabel('Sort by',{exact:true}).selectOption('value');await page.getByRole('button',{name:'Filter pipeline',exact:true}).click()
+   assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'1');assert.deepEqual(await page.locator('[data-proposal-id]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('data-proposal-id'))),[paid.p.id]);assert.match(await page.locator('[data-pipeline-total="USD"]').innerText(),/10.00 USD/);await capture(page,'paid-pipeline')
+   await cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-6108',webhookSecret:'synthetic-platter-6109',consent:true})
+   const transactions=[],receiptSecond=Math.floor(Date.now()/1000)
+   for(const [i,dollars] of [1000,500].entries()){
+    const item=await financeAccept(doors,{title:'Clearing proof '+i,priceOne:String(dollars),depositPercent:'100',paymentSchedule:null}),amount=(await getState()).finance.amounts.find(r=>r.proposal_id===item.p.id),chargeId='synthetic-platter-'+(6430+i)
+    fake.stripe.set(chargeId,{id:chargeId,object:'charge',paid:true,captured:true,status:'succeeded',amount:dollars*100,amount_refunded:0,currency:'usd',metadata:{platter_amount_id:amount.id,platter_proposal_id:item.p.id,platter_revision:'1'}})
+    assert.equal((await stripeEvent(h,{id:'synthetic-platter-'+(6440+i),type:'charge.succeeded',created:receiptSecond+i,data:{object:{id:chargeId}}})).value.state,'processed')
+    transactions.push({id:'synthetic-platter-'+(6450+i),type:'charge',source:chargeId,amount:dollars*100,fee:i?1480:2930,net:dollars*100-(i?1480:2930),currency:'usd',created:receiptSecond})
+   }
+   fake.stripe.set('synthetic-platter-6460',{id:'synthetic-platter-6460',status:'paid',currency:'usd',amount:145590,arrival_date:receiptSecond});fake.stripe.set('balance_transactions',{has_more:false,data:transactions})
+   await page.goto(edge.origin+'/app/payments');const payoutForm=page.locator('form').filter({has:page.getByRole('button',{name:'Reconcile Stripe payout',exact:true})});await payoutForm.getByLabel('Paid Stripe payout id').fill('synthetic-platter-6460');await payoutForm.getByRole('checkbox').check();await payoutForm.getByRole('button',{name:'Reconcile Stripe payout',exact:true}).click()
+   const clearing=page.locator('section').filter({has:page.getByRole('heading',{name:'Stripe clearing',exact:true})});assert.match(await clearing.innerText(),/44.10 USD/);assert.match(await clearing.innerText(),/1,455.90 USD/);assert.match(await clearing.innerText(),/0.00 USD/);await capture(page,'fees-and-payout-cleared')
+
   }finally{await clientContext.close();await context.close();await h.close();await edge.close()}
  }}finally{await browser.close()}
 }

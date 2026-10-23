@@ -3,6 +3,7 @@
  const names={cover:'Cover page',heading:'Heading',text:'Text',columns:'Columns',pricing:'Pricing table',quote:'Quote or testimonial',bio:'Team bio',case_study:'Case study',image:'Image',video:'Video',terms:'Terms',field:'Form field',signature:'Signature block',page_break:'Page break'};
  for(const form of document.querySelectorAll('[data-document-editor]')){
   const payload=form.elements.document,container=form.querySelector('[data-document-blocks]'),status=form.querySelector('[data-document-status]'),error=form.querySelector('[data-document-error]'),undo=form.querySelector('[data-block-undo]');
+  const showError=message=>{error.textContent=message;error.hidden=!message;};
   let doc=JSON.parse(payload.value),options=JSON.parse(form.dataset.options),media=JSON.parse(form.dataset.media??'[]'),history=[],saved=JSON.stringify(doc),pending=false,timer,halted=false,dragged,savePromise;
   const element=(tag,attrs={},text)=>{const node=document.createElement(tag);for(const [key,value] of Object.entries(attrs))node.setAttribute(key,value);if(text!==undefined)node.textContent=text;return node;};
   const checkpoint=()=>{const value=JSON.stringify(doc);if(history.at(-1)!==value)history.push(value);if(history.length>20)history.shift();undo.disabled=!history.length;};
@@ -62,12 +63,12 @@
   const brandDefaults={name:'',accent:'#7c144a',ink:'#1c1c24',paper:'#ffffff',font:'serif',cover:''};
   const fillBrand=()=>{for(const node of form.querySelectorAll('[data-brand]'))node.value=(doc.brand??brandDefaults)[node.dataset.brand]??'';};
   fillBrand();render();form.dataset.saveState='saved';
-  form.querySelector('[data-block-add]').addEventListener('click',()=>{if(doc.blocks.length>=400){error.textContent='A document supports up to 400 blocks.';return;}checkpoint();const type=form.querySelector('[data-block-type]').value,block={id:crypto.randomUUID(),type,title:type==='cover'?doc.brand?.cover??'':'',text:''};if(['field','signature'].includes(type)){block.recipientRole='client';block.title=type==='field'?'Client detail':'Client signature';if(type==='field'){block.fieldKind='text';block.required=false;}}if(['image','video'].includes(type)){const file=media.find(f=>f.mediaType.startsWith(type==='image'?'image/':'video/')),poster=media.find(f=>f.mediaType.startsWith('image/'));if(!file||(type==='video'&&!poster)){error.textContent='Upload the display media and, for video, an image poster first.';return;}block.assetId=file.id;block.alt=file.filename;if(type==='video')block.posterId=poster.id;}if(type==='columns')block.second='';if(type==='pricing'){const o=options.find(o=>o.tables?.length);if(!o){error.textContent='Create and save an itemised pricing table in the composer before placing it.';return;}block.optionId=o.id;block.tableIndex=0;}doc.blocks.push(block);render();container.lastElementChild.querySelector('input,textarea,button')?.focus();schedule();});
+  form.querySelector('[data-block-add]').addEventListener('click',()=>{if(doc.blocks.length>=400){showError('A document supports up to 400 blocks.');return;}checkpoint();const type=form.querySelector('[data-block-type]').value,block={id:crypto.randomUUID(),type,title:type==='cover'?doc.brand?.cover??'':'',text:''};if(['field','signature'].includes(type)){block.recipientRole='client';block.title=type==='field'?'Client detail':'Client signature';if(type==='field'){block.fieldKind='text';block.required=false;}}if(['image','video'].includes(type)){const file=media.find(f=>f.mediaType.startsWith(type==='image'?'image/':'video/')),poster=media.find(f=>f.mediaType.startsWith('image/'));if(!file||(type==='video'&&!poster)){showError('Upload the display media and, for video, an image poster first.');return;}block.assetId=file.id;block.alt=file.filename;if(type==='video')block.posterId=poster.id;}if(type==='columns')block.second='';if(type==='pricing'){const o=options.find(o=>o.tables?.length);if(!o){showError('Create and save an itemised pricing table in the composer before placing it.');return;}block.optionId=o.id;block.tableIndex=0;}doc.blocks.push(block);render();container.lastElementChild.querySelector('input,textarea,button')?.focus();schedule();});
   undo.addEventListener('click',()=>{const previous=history.pop();if(!previous)return;doc=JSON.parse(previous);render();fillBrand();schedule();});
   form.querySelector('[data-brand-apply]').addEventListener('click',()=>{const fields=Array.from(form.querySelectorAll('[data-brand]'));if(fields.some(f=>!f.reportValidity()))return;checkpoint();doc.brand=Object.fromEntries(fields.filter(node=>node.dataset.brand!=='logoId'||node.value).map(node=>[node.dataset.brand,node.value]));schedule();});
   async function save(){
    clearTimeout(timer);if(pending)return savePromise;if(!dirty()){form.dataset.saveState='saved';status.textContent='Revision '+form.dataset.revision+' saved. No unsaved document changes.';return;}
-   pending=true;form.dataset.saveState='saving';halted=false;error.textContent='';status.textContent='Saving document…';
+   pending=true;form.dataset.saveState='saving';halted=false;showError('');status.textContent='Saving document…';
    const written=JSON.stringify(doc);
    savePromise=(async()=>{
     try{await window.platterWithSaveLock(form.elements.id.value,async()=>{
@@ -79,7 +80,7 @@
      // Every save still binds a single exact server version; conflicting requests pause.
      if(!dirty())payload.value=written;else status.textContent='Saving latest document changes…';
      form.dispatchEvent(new Event('platter:document-saved'));
-    });}catch(reason){halted=true;form.dataset.saveState='error';error.textContent=reason.message+' Your edits remain here. Reload only after copying any changes you need to keep.';status.textContent='Document not saved. Automatic saving paused.';}
+    });}catch(reason){halted=true;form.dataset.saveState='error';showError(reason.message+' Your edits remain here. Reload only after copying any changes you need to keep.');status.textContent='Document not saved. Automatic saving paused.';}
     finally{pending=false;if(dirty()&&!halted)timer=setTimeout(save,800);}
    })();return savePromise;
   }

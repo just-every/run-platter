@@ -1,3 +1,4 @@
+import { documentOf } from './blocks'
 import { offerSelection } from '../selection'
 import { selectedContent } from '../conditional'
 import { need } from '../model'
@@ -10,7 +11,7 @@ function amount(cents: number, currency: string) {
 }
 
 /** Render the current offer only. Caller owns authorization and revision selection. */
-export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Array | ArrayBuffer)[] = [], items: unknown = []): Promise<Uint8Array> {
+export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Array | ArrayBuffer)[] = [], items: unknown = [],media?:(id:string)=>Promise<Uint8Array>): Promise<Uint8Array> {
  const options = typeof view.options === 'string' ? JSON.parse(view.options) : view.options
  need(Array.isArray(options), 'Offer options are missing')
  const selection = offerSelection(options,view.deposit_bps,optionId,items), selected = selection.option
@@ -26,7 +27,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   need(Number.isSafeInteger(cents) && cents >= 0 && Number.isSafeInteger(cents * depositBps), 'Invalid offer price')
   return Math.round(cents * depositBps / 10000)
  }
- const pdf = await PdfText.create(revision, fontBytes)
+ const pdf = await PdfText.create(revision, fontBytes,undefined,documentOf(view).brand)
  pdf.document.setTitle(String(view.title ?? ''))
  pdf.document.setSubject(`Not signed, revision ${revision}`)
  pdf.document.setCreator('Platter')
@@ -45,6 +46,19 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  pdf.text(`Deposit due: ${amount(deposit(selected.cents), currency)}`)
  if(selection.items.length){pdf.heading('Selected optional items');for(const item of selection.items)pdf.text(`${item.label}: ${item.quantity} x ${amount(item.unitCents,currency)} = ${amount(item.totalCents,currency)}`)}
 
+ const doc=documentOf(view)
+ if(doc.brand?.logoId){need(media,'Document media is unavailable',503);await pdf.image(await media(doc.brand.logoId),80)}
+ if(doc.brand?.name)pdf.heading(doc.brand.name)
+ for(const block of doc.blocks){
+  if(block.type==='page_break'){pdf.pageBreak();continue}
+  if(block.title)pdf.heading(block.title)
+  if(block.type==='field'||block.type==='signature'){pdf.text((block.type==='signature'?'Client signature (not signed)':(block.required?'Required ':'Optional ')+block.fieldKind+' field')+': '+block.title);if(block.text)pdf.text(block.text)}
+  else if(block.type==='image'||block.type==='video'){need(media,'Document media is unavailable',503);await pdf.image(await media(block.type==='video'?block.posterId!:block.assetId!));if(block.type==='video')pdf.text('Video: '+(block.alt??block.title));if(block.text)pdf.text(block.text)}
+  else if(block.type==='pricing'){const o=options.find((o:any)=>o.id===block.optionId),t=o?.tables?.[block.tableIndex??0];if(t){pdf.heading(t.name);for(const l of t.lines){pdf.text(`${l.group?l.group+': ':''}${l.name}: ${l.quantity} ${l.unit} x ${amount(Math.round(Number(l.unitPrice)*100),currency)} = ${amount(l.lineTotalCents,currency)}`);if(l.description)pdf.text(l.description)}for(const g of t.groups)pdf.text(`${g.name||'Ungrouped'} subtotal: ${amount(g.subtotalCents,currency)}`);pdf.text(`Table subtotal: ${amount(t.subtotalCents,currency)}`)}}
+  else if(block.type==='columns')pdf.columns(block.text.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'),(block.second??'').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'))
+  else {pdf.text(block.text.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'));if(block.second)pdf.text(block.second.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'))}
+ }
+
  if(!view.hiddenSections.includes('scope')) { pdf.heading('Scope of work'); pdf.text(String(view.scope ?? '')) }
  if(!view.hiddenSections.includes('terms')) { pdf.heading('Terms'); pdf.text(view.terms ? String(view.terms) : 'No additional terms.') }
 
@@ -56,7 +70,8 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   pdf.text(`${option.id === optionId ? 'Selected option' : 'Option'}: ${option.label}`, 12)
   pdf.text(`Total: ${amount(option.cents, currency)}`)
   pdf.text(`Deposit due: ${amount(deposit(option.cents), currency)}`)
-  for(const table of option.tables??[]){
+  for(const [tableIndex,table] of (option.tables??[]).entries()){
+   if(doc.blocks.some(b=>b.type==='pricing'&&b.optionId===option.id&&b.tableIndex===tableIndex))continue
    pdf.heading(table.name)
    for(const line of table.lines){pdf.text(`${line.group ? line.group+': ' : ''}${line.name}`,12);if(line.description)pdf.text(line.description);pdf.text(`${line.quantity} ${line.unit} x ${amount(Number(line.unitPrice.replace('.','')),currency)} = ${amount(line.lineTotalCents,currency)}`)}
    for(const group of table.groups)pdf.text(`${group.name||'Ungrouped'} subtotal: ${amount(group.subtotalCents,currency)}`)

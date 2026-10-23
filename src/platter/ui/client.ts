@@ -1,3 +1,4 @@
+import { documentBlocks, documentBrandCss } from './blocks'
 import { hasExpandedSelection, itemChoices, selectedSummary, selectionChoices } from './packages'
 import { pricingTables } from './pricing'
 import { sectionConditions } from '../conditional'
@@ -20,12 +21,13 @@ function clientDocument(view: any, token: string, feedback?: Feedback): Response
   const selectedId = view.acceptance?.optionId ?? view.preview?.selection.option.id ?? view.selectedOptionId ?? 'one'
   const endpoint = view.preview ? '/app/preview/client/action?name=' : `/p/${encodeURIComponent(token)}/action?name=`
   const items=selectionChoices(view.selection),itemsQuery=items.length?'&amp;items='+encodeURIComponent(JSON.stringify(items)):''
-  const publicForm = (name: string, body: string): string => `<form method="post" action="${endpoint}${name}&amp;optionId=${encodeURIComponent(selectedId)}${itemsQuery}">${hidden('items',JSON.stringify(items))}${view.preview ? `<fieldset disabled>${body}</fieldset>` : body}</form>`
+  const publicForm = (name: string, body: string): string => `<form${name==='accept'?' id="platter-acceptance"':''} method="post" action="${endpoint}${name}&amp;optionId=${encodeURIComponent(selectedId)}${itemsQuery}">${hidden('items',JSON.stringify(items))}${view.preview ? `<fieldset disabled>${body}</fieldset>` : body}</form>`
   const options = view.options ?? []
   const currency = view.currency ?? 'AUD'
-  const expanded=hasExpandedSelection(options),conditional=expanded||Object.keys(sectionConditions(view.section_conditions)).length>0
+  const expanded=hasExpandedSelection(options),conditional=Boolean(view.documentConditional)||expanded||Object.keys(sectionConditions(view.section_conditions)).length>0
   const pricing = currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'
   let html = view.preview ? previewBanner(view) : ''
+  html += documentBlocks(view,view.preview?'/app/preview/client/media/':`/p/${encodeURIComponent(token)}/media/`,view.preview?'?'+view.preview.query:(view.selectedOptionId?'?optionId='+encodeURIComponent(view.selectedOptionId)+(items.length?'&items='+encodeURIComponent(JSON.stringify(items)):''):''))
   if(!view.hiddenSections?.includes('scope')) html += panel('Scope of work', `<p class="preserve">${escape(view.scope)}</p>`)
   html += panel('Offer options', `${expanded?'<p>Package prices below exclude optional items. Your selection shows the final total and deposit.</p>':''}<p>${pricing} Deposit: ${escape(Number(view.deposit_bps) / 100)}% of the chosen option.</p>${optionPair(options, view.deposit_bps, view.acceptance?.optionId, currency)}${pricingTables(options,currency)}`)
   if(options.some((o:any)=>o.discount))html+=panel('Package discounts',options.filter((o:any)=>o.discount).map((o:any)=>'<p>'+escape(o.label)+': '+escape(o.discount.bps/100)+'% off '+money(o.discount.grossCents,currency)+' = '+money(o.cents,currency)+'. The same percentage applies to selected optional items.</p>').join(''))
@@ -50,5 +52,5 @@ function clientDocument(view: any, token: string, feedback?: Feedback): Response
     html += panel('Accept this proposal', '<p>Your email is verified. Choose one option and confirm your acceptance below.</p>' + publicForm('accept', `<fieldset><legend>Choose one option</legend>${options.filter((o:any)=>!conditional||o.id===selectedId).map((option: any) => `<label class="choice option-choice"><input type="radio" name="optionId" value="${escape(option.id)}"${conditional||view.preview?.selection.option.id===option.id?' checked':''} required><span>${escape(option.label)} — ${money(expanded&&option.id===selectedId?(view.selection?.option?.cents??view.acceptance?.totalCents??option.cents):option.cents,currency)}<br><span class="muted">Deposit due: ${money(offerSelection(options,view.deposit_bps,option.id,expanded&&option.id===selectedId?items:[]).deposit,currency)}</span></span></label>`).join('')}</fieldset>` + field('Your full name', 'name', '', 'required autocomplete="name"') + '<label class="choice"><input type="checkbox" name="consent" value="yes" required><span>I accept the scope of work, chosen option, total price, and deposit shown above.</span></label><p>Acceptance is permanent. Check your chosen option before continuing.</p><button>Accept proposal</button>' + (view.pdfDownloadsEnabled ? `<p>Choose an option above to download the unsigned revision.</p><button formnovalidate formaction="${view.preview?'/app/preview/client/download.pdf':`/p/${encodeURIComponent(token)}/download.pdf`}">Download unsigned proposal PDF</button>` : '')))
   }
   if(view.status!=='accepted'&&view.verified)html+=panel('Decline this proposal','<p>Declining closes this offer and revokes its client links. The firm can send a new revision for a fresh decision.</p>'+publicForm('decline',hidden('revision',view.revision)+field('Decline reason','reason','','required maxlength="1000"')+'<button class="secondary">Decline proposal</button>'))
-  return document(view.title, html, { client: true, feedback, eyebrow: `<p class="eyebrow">Proposal · Revision ${escape(view.revision)}${view.status === 'accepted' ? ' · accepted' : ''}</p>` })
+  return document(view.title, html, { client: true, styles:documentBrandCss(view), feedback, eyebrow: `<p class="eyebrow">Proposal · Revision ${escape(view.revision)}${view.status === 'accepted' ? ' · accepted' : ''}</p>` })
 }

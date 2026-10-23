@@ -1,3 +1,4 @@
+import { legalText } from './documents/blocks'
 import { percentBps } from './discounts'
 import { internalPricing, costReaders } from './internal-pricing'
 import { starterTemplates } from './starter-templates'
@@ -21,7 +22,7 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
   const c=r.condition
   if(c.kind==='totalOver')return row.currency===c.currency&&total>BigInt(c.cents)
   if(c.kind==='discountOver')return options.some((o:any)=>(o.discount?.bps??0)>c.bps)
-  if(c.kind==='termsEdited')return row.revision>1&&Boolean(first)&&String(row.terms??'')!==String(JSON.parse(first.snapshot).terms??'')
+  if(c.kind==='termsEdited')return row.revision>1&&Boolean(first)&&legalText(row)!==legalText(JSON.parse(first.snapshot))
   if(c.kind==='paymentTerms')return row.deposit_bps<c.minimumDepositBps||(c.standardTerms!==null&&String(row.terms??'')!==c.standardTerms)
   if(c.kind==='template')return Boolean(origin)
   if(c.kind==='marginBelow'){

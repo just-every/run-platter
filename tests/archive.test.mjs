@@ -180,10 +180,17 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const template=await h.cmd('template.save',{id:work.id,version:templateSource.version,name:'Restorable campaign'})
     const beforeVendorDocuments=(await h.state()).vendorDocuments
     await h.cmd('tracking.settings',{enabled:'yes',alerts:'yes',retentionDays:90,quietMinutes:30,consent:'yes'})
-    assert.equal((await h.send(path,undefined,verified.cookie)).status,200)
+    const measuredPage=await h.send(path,undefined,verified.cookie);assert.equal(measuredPage.status,200)
+    const measuredView=measuredPage.text.match(/data-engagement-view="([^"]+)"/)[1]
+    assert.equal((await h.send(path+'/engagement',{viewId:measuredView,section:'pricing',milliseconds:0,optionId:'two'},verified.cookie)).status,200)
     await h.cmd('tracking.hold',{id:proposal.id,held:'yes',reason:'Synthetic archive hold'})
     const beforeTracking=(await h.state()).tracking
     assert.equal(beforeTracking.views.length,1);assert.equal(beforeTracking.alerts.length,1);assert.equal(beforeTracking.holds.length,1)
+    const engagementBefore=(await h.send('/api/platter/engagement?id='+proposal.id,undefined,h.owner)).value
+    const identified=await h.send(suggestPath+'/stakeholder',{name:'Riley Procurement',email:'riley@synthetic-platter.example',consent:'yes'});assert.equal(identified.status,200,identified.text)
+    const challengeId=identified.text.match(/name="challengeId" value="([^"]+)"/)[1],stakeholderMail=(await h.state()).outbox.find(m=>m.subject==='Verify your stakeholder mailbox'),stakeholderCode=stakeholderMail.body.match(/\b\d{6}\b/)[0]
+    assert.equal((await h.send(suggestPath+'/stakeholder',{challengeId,code:stakeholderCode})).status,200)
+    const stakeholderBefore=(await h.send('/api/platter/engagement?id='+pending.id,undefined,h.owner)).value.stakeholders
     const before=business(await h.state())
     const acceptedThread=before.proposals.find(p=>p.id===proposal.id).questions
     const openThread=before.proposals.find(p=>p.id===pending.id).questions
@@ -217,6 +224,8 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal(archived.filter(item=>item.table==='p_question_answers').length,1,'FOLLOW-004 retains the answer')
     assert.equal(archived.filter(item=>item.table==='p_question_reply_keys').length,0,'FOLLOW-004 reply credentials are not archived')
     assert.deepEqual(archived.filter(item=>item.table==='p_audit').map(item=>item.row).sort((a,b)=>a.occurred_at-b.occurred_at||a.id.localeCompare(b.id)),beforeAudit,'TEAM-004 audit survives the public CLI archive exactly')
+    assert.equal(archived.filter(item=>item.table==='p_tracking_stakeholders').length,1)
+    for(const table of ['p_tracking_challenges','p_tracking_transport'])assert.equal(archived.filter(item=>item.table===table).length,0,'Engagement capabilities stay local')
     const requests=archived.filter(item=>item.table==='p_send_requests').map(item=>item.row)
     assert.equal(requests.length,2)
     for(const row of requests)assert.deepEqual(row,Object.fromEntries(Object.keys(row).map(field=>[field,beforeRequests.find(r=>r.id===row.id)[field]])),'AI-003 request and resolution custody survives the CLI archive')
@@ -238,6 +247,10 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal(restoredState.tracking.settings.enabled,false);assert.equal(restoredState.tracking.settings.alerts,false);assert.equal(restoredState.tracking.settings.retention_days,90)
     const retainedAuditIds=new Set(beforeAuditView.map(row=>row.id)),restoredAuditView=(await h.send('/api/platter/audit',undefined,restoredOwner)).value.rows.filter(row=>retainedAuditIds.has(row.id))
     assert.deepEqual(restoredAuditView,beforeAuditView,'TEAM-004 restores the complete audit view including reasons and sender routes/addresses')
+    const restoredEngagement=(await h.send('/api/platter/engagement?id='+proposal.id,undefined,restoredOwner)).value
+    assert.deepEqual(restoredEngagement.views,engagementBefore.views,'Exact view, reading and choices survive public CLI restore')
+    assert.equal(restoredEngagement.settings.enabled,false,'Restore requires fresh measurement consent')
+    assert.deepEqual((await h.send('/api/platter/engagement?id='+pending.id,undefined,restoredOwner)).value.stakeholders,stakeholderBefore,'Verified stakeholder records survive without mailbox capabilities')
     assert.deepEqual(business(restoredState),before)
     assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).document,documentFixture(),'EDIT-001 ordered document and brand survive the public CLI archive exactly')
     const completedRestoreSetup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(completedRestoreSetup.status,303)

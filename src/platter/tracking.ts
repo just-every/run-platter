@@ -2,7 +2,7 @@ import { createPortability } from '@runeditrun/rer/modules/portability'
 import archivePolicy from './archive-policy.mjs'
 import { scope, senders } from './permissions'
 import type { Bindings } from '../auth.server'
-import { need, proposal, text, commit, type Actor } from './model'
+import { need, proposal, text, commit, hash, type Actor } from './model'
 import { currentTime } from './expiry-time'
 
 export async function trackingSettings(db:D1Database){
@@ -12,6 +12,8 @@ export async function trackingSettings(db:D1Database){
 }
 export async function purgeTracking(db:D1Database,at=Date.now()){
  const settings=await trackingSettings(db),cutoff=at-settings.retention_days*86400000
+ await db.prepare('DELETE FROM p_tracking_challenges WHERE expires_at<=?').bind(at).run()
+ await db.prepare('DELETE FROM p_tracking_stakeholders WHERE verified_at<? AND NOT EXISTS(SELECT 1 FROM p_tracking_holds h WHERE h.proposal_id=p_tracking_stakeholders.proposal_id)').bind(cutoff).run()
  await db.batch(['p_views','p_tracking_alerts'].map(table=>db.prepare(`DELETE FROM ${table} WHERE ${table==='p_views'?'viewed_at':'alerted_at'}<? AND NOT EXISTS(SELECT 1 FROM p_tracking_holds h WHERE h.proposal_id=${table}.proposal_id)`).bind(cutoff)))
 }
 export async function trackingCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
@@ -38,7 +40,7 @@ export async function trackingCommand(env:Bindings,a:Actor,name:string,p:Record<
  const portability=await createPortability({db,policy:archivePolicy})
  const fence=[...await portability.redactionStatements(),...await portability.invalidateTransfersStatements()]
  // The hold and archive checkpoint are committed atomically with the erasure.
- await commit(db,a,[db.prepare('INSERT INTO p_guard(ok) VALUES(NOT EXISTS(SELECT 1 FROM p_tracking_holds WHERE proposal_id=?))').bind(row.id),...fence,...['p_views','p_tracking_alerts'].map(table=>db.prepare(`DELETE FROM ${table} WHERE proposal_id=?`).bind(row.id))])
+ await commit(db,a,[db.prepare('INSERT INTO p_guard(ok) VALUES(NOT EXISTS(SELECT 1 FROM p_tracking_holds WHERE proposal_id=?))').bind(row.id),...fence,...['p_tracking_challenges','p_tracking_stakeholders','p_views','p_tracking_alerts'].map(table=>db.prepare(`DELETE FROM ${table} WHERE proposal_id=?`).bind(row.id))])
  return {id:row.id}
 }
 function coarse(value:unknown){return typeof value==='string'?value.replace(/[\x00-\x1f]/g,'').slice(0,100):null}
@@ -51,7 +53,9 @@ export async function recordView(env:Bindings,c:any,request:Request){
  const id=crypto.randomUUID(),values=[id,c.row.id,c.row.revision,c.row.clientEmail,c.verified?1:0,at,coarse(cf?.city),coarse(cf?.region),countryName,device]
  const writes=[db.prepare('INSERT INTO p_views(id,proposal_id,revision,recipient,verified,viewed_at,city,region,country,device) SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM p_tracking_authority WHERE singleton=1)').bind(...values)]
  if(settings.alerts)writes.push(db.prepare("INSERT INTO p_tracking_alerts SELECT ?,?,?,(SELECT actor_id FROM p_invitation_messages WHERE proposal_id=? AND revision=? AND recipient=? ORDER BY queued_at DESC,rowid DESC LIMIT 1),?,CASE WHEN EXISTS(SELECT 1 FROM p_tracking_alerts WHERE proposal_id=? AND recipient=?) THEN 'return' ELSE 'first' END WHERE EXISTS(SELECT 1 FROM p_tracking_authority WHERE singleton=1 AND alerts=1) AND NOT EXISTS(SELECT 1 FROM p_tracking_alerts WHERE proposal_id=? AND recipient=? AND alerted_at>?)").bind(crypto.randomUUID(),c.row.id,c.row.clientEmail,c.row.id,c.row.revision,c.row.clientEmail,at,c.row.id,c.row.clientEmail,c.row.id,c.row.clientEmail,at-settings.quiet_minutes*60000))
+ writes.push(db.prepare('INSERT INTO p_tracking_transport(view_id,share_hash) SELECT ?,? WHERE EXISTS(SELECT 1 FROM p_views WHERE id=?)').bind(id,await hash(c.token),id))
  await db.batch(writes)
+ return {id}
 }
 export async function trackingState(db:D1Database,a:Actor){
  if(a.role!=='owner')return undefined

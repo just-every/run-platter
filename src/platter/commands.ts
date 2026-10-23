@@ -1,3 +1,4 @@
+import { stakeholderRecipient } from './tracking/index'
 import { trackingCommand } from './tracking'
 import { collaborationCommand } from './collaboration'
 import { replaceSigner } from './signer-replacement'
@@ -64,6 +65,7 @@ export function proposalFields(p:Record<string,unknown>){
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
+ if(name==='tracking.recipient')return stakeholderRecipient(env,a,p)
  if(name.startsWith('tracking.'))return trackingCommand(env,a,name,p)
  if(name.startsWith('collaboration.'))return collaborationCommand(env,a,name,p)
  if(name==='signer.replace')return replaceSigner(env,a,p)

@@ -200,3 +200,14 @@ for(const button of document.querySelectorAll('[data-embed-url]'))button.addEven
  };
  refresh();
 })();
+
+// Measure only disclosed, explicitly enabled client pages, never member previews.
+(() => {
+ const view=document.querySelector('[data-engagement-view]');if(!view)return;
+ const totals=new Map();let previous=performance.now();
+ const sections=[...document.querySelectorAll('[data-engagement-section]')];
+ function tick(){const now=performance.now(),elapsed=now-previous;previous=now;if(document.visibilityState!=='visible')return;let best=null,pixels=0;for(const heading of sections){const rect=heading.closest('section').getBoundingClientRect(),height=Math.max(0,Math.min(innerHeight,rect.bottom)-Math.max(0,rect.top));if(height>pixels){best=heading.dataset.engagementSection;pixels=height;}}if(best)totals.set(best,(totals.get(best)||0)+elapsed);}
+ function selection(){const optionId=document.querySelector('input[name="optionId"]:checked')?.value||document.querySelector('select[name="optionId"]')?.value||view.dataset.engagementOption;const added=[...document.querySelectorAll('input[name^="add."]:checked')];const items=added.length?added.map(input=>({id:input.name.slice(4),quantity:Number([...document.querySelectorAll('input[name^="qty."]')].find(q=>q.name==='qty.'+input.name.slice(4))?.value||1)})):JSON.parse(view.dataset.engagementItems);return {optionId,items};}
+ function flush(){tick();for(const [section,ms] of totals){fetch(view.dataset.engagementEndpoint,{method:'POST',headers:{'content-type':['application','json'].join('/')},credentials:'same-origin',keepalive:true,body:JSON.stringify({viewId:view.dataset.engagementView,section,milliseconds:Math.floor(ms),...selection()})}).catch(()=>{});}}
+ setInterval(flush,1000);document.addEventListener('change',flush);document.addEventListener('visibilitychange',flush);window.addEventListener('pagehide',flush);
+})();

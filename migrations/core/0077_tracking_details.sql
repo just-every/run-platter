@@ -1,0 +1,5 @@
+CREATE TABLE p_tracking_transport(view_id TEXT PRIMARY KEY REFERENCES p_views(id) ON DELETE CASCADE,share_hash TEXT NOT NULL);
+CREATE TABLE p_tracking_reading(view_id TEXT NOT NULL REFERENCES p_views(id) ON DELETE CASCADE,section TEXT NOT NULL,milliseconds INTEGER NOT NULL,PRIMARY KEY(view_id,section));
+CREATE TABLE p_tracking_choices(view_id TEXT NOT NULL REFERENCES p_views(id) ON DELETE CASCADE,option_id TEXT NOT NULL,items TEXT NOT NULL,observed_at INTEGER NOT NULL,PRIMARY KEY(view_id,option_id,items));
+CREATE TABLE p_tracking_stakeholders(id TEXT PRIMARY KEY,proposal_id TEXT NOT NULL REFERENCES p_proposals(id),revision INTEGER NOT NULL,name TEXT NOT NULL,email TEXT NOT NULL,verified_at INTEGER NOT NULL,role TEXT NOT NULL DEFAULT 'stakeholder',UNIQUE(proposal_id,revision,email));
+CREATE TABLE p_tracking_challenges(id TEXT PRIMARY KEY,proposal_id TEXT NOT NULL REFERENCES p_proposals(id),revision INTEGER NOT NULL,name TEXT NOT NULL,email TEXT NOT NULL,code_hash TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL);

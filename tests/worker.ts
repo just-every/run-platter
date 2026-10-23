@@ -1,3 +1,4 @@
+import { runNotifications } from '../src/platter/notifications/scheduled'
 import { memberAuthOptions,memberAuthHandler } from '../src/platter/member-invitations'
 // Real production handlers. Auth mail is captured at its mailbox edge; proposal
 // mail uses the configured real adapter with outbound HTTP faked by the harness.
@@ -16,4 +17,4 @@ export default {async fetch(request:Request,env:Bindings){
   return withAuthAudit(request,env,async()=>await memberAuthHandler(request,env,auth),auth)
  }
  return await authResponse(request,env)??await platterResponse(request,env)??new Response('Not found',{status:404})
-},async scheduled(controller:ScheduledController,env:Bindings){await runExpiry(runtimeBindings(env),controller.scheduledTime);await runReminders(runtimeBindings(env),controller.scheduledTime);await runDueReports(runtimeBindings(env),controller.scheduledTime)}}
+},async scheduled(controller:ScheduledController,env:Bindings){await runExpiry(runtimeBindings(env),controller.scheduledTime);await runReminders(runtimeBindings(env),controller.scheduledTime);await runDueReports(runtimeBindings(env),controller.scheduledTime);await runNotifications(runtimeBindings(env))}}

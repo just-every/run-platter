@@ -1151,3 +1151,40 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
 })
 
 test('FOLLOW-001 / FOLLOW-006 sender controls, template delivery overrides, preview dates, manual email and inactive copies at desktop and phone widths', {timeout:120000}, async()=>{const {remindersJourney}=await import('./reminders-journey.mjs');await remindersJourney()})
+
+
+test('APPROVE-002 email preview and decision links work under a member session at desktop and phone widths', {timeout:120000},async()=>{
+ let app,browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  const screenshots=process.env.PLATTER_SCREENSHOTS;if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp({scheduled:true});const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage()
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic approver'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
+    const client=await cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
+    const p=await cmd('proposal.prepare',{clientId:client.id,title:'Notification preview',scope:'Scope reviewed from an email notification',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+    await cmd('notification.request',{id:p.id,version:1,consent:true})
+    const mail=await app.db.prepare('SELECT * FROM p_notification_outbox WHERE proposal_id=?').bind(p.id).first()
+    const preview=mail.body.match(/https?:\/\/[^\s]+\/app\/preview[^\s]+/)[0]
+    assert.equal((await page.goto(preview+'&width='+width)).status(),200)
+    await page.frameLocator('iframe[title="Client-page preview"]').getByRole('heading',{name:'Notification preview',exact:true}).waitFor()
+    assert.match(await page.locator('main').innerText(),/Revision 1/)
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'preview fits the viewport')
+    if(screenshots)await page.screenshot({path:join(screenshots,'APPROVE-002-preview-'+width+'.png'),fullPage:true})
+    const decision=mail.body.match(/Review and decide: (https?:\/\/[^\s]+)/)[1]
+    assert.equal((await page.goto(decision)).status(),200)
+    const iconOnly=await page.locator('button,a[role="button"]').evaluateAll(nodes=>nodes.filter(n=>!n.textContent.trim()).map(n=>n.outerHTML));assert.deepEqual(iconOnly,[],'the notification destination has no icon-only controls')
+    await page.getByLabel('Rejection note',{exact:true}).fill('Please revise this exact offer')
+    await page.getByRole('button',{name:'Reject revision',exact:true}).click()
+    await page.getByText('Rejected. Save a new revision before requesting approval again.',{exact:true}).waitFor()
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'decision fits the viewport')
+    if(screenshots)await page.screenshot({path:join(screenshots,'APPROVE-002-decision-'+width+'.png'),fullPage:true})
+    const decisions=(await app.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(p.id).all()).results;assert.equal(decisions.length,1);assert.equal(decisions[0].revision,1);assert.equal(decisions[0].note,'Please revise this exact offer')
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

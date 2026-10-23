@@ -42,7 +42,7 @@ export async function connectionState(env:Bindings,a:Actor){
  return rows.map(r=>({id:r.id,provider:r.provider,operatorId:r.operator_id,accountId:r.account_id,mailboxEmail:r.mailbox_email,status:r.status==='connected'&&!r.has_secret?'needs_reconnection':r.broken_at?'broken':r.status,version:r.version,connectedAt:r.connected_at}))
 }
 export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
- const provider=String(p.provider??'');need(['stripe','quickbooks','gmail','microsoft','hubspot','salesforce','google_drive','slack'].includes(provider),'Choose a supported provider')
+ const provider=String(p.provider??'');need(['stripe','quickbooks','gmail','microsoft','hubspot','salesforce','google_drive','slack','teams'].includes(provider),'Choose a supported provider')
  need((isMailbox(provider)?mailboxRoles:administrators).includes(a.role),isMailbox(provider)?'Your role cannot connect a mailbox':'Only owner and admins connect workspace providers',403)
  need(p.operatorId===undefined||p.operatorId===a.id,'Connect only your own mailbox',403)
  const db=env.DB,id=connectionId(provider,a)
@@ -72,6 +72,8 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
   const result=await providerJson('https://login.salesforce.com/services/oauth2/userinfo',token);accountId=text(result.organization_id,'the verified Salesforce organization',200);need(typeof result.user_id==='string'&&result.user_id.length>0,'Salesforce did not confirm the authorized user')
  }else if(provider==='google_drive'){
   const result=await providerJson('https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress,permissionId)',token);accountId=text(result.user?.permissionId,'the verified Drive account',200);need(typeof result.user?.emailAddress==='string','Drive did not confirm the account')
+ }else if(provider==='teams'){
+  const result=await providerJson('https://graph.microsoft.com/v1.0/me?$select=id',token);accountId=text(result.id,'the verified Teams user',200)
  }else if(provider==='slack'){
   const result=await providerJson('https://slack.com/api/auth.test',token);need(result.ok===true,'Slack refused this connection');accountId=text(result.team_id,'the verified Slack workspace',200)
  }else{

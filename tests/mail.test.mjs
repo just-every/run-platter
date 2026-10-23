@@ -823,3 +823,137 @@ test('SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdra
 test('FOLLOW-001 / FOLLOW-006 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority', {timeout:120000}, async()=>{const {remindersHttp}=await import('./reminders-http.mjs');await remindersHttp()})
 
 test('FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority', {timeout:120000}, async()=>{const {reminderMessagesHttp}=await import('./reminders-http.mjs');await reminderMessagesHttp()})
+
+
+async function notificationFixture(options={}) {
+ const messages=[],chats=[];let uncertain=false
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7000'},outboundService:async request=>{
+  const url=new URL(request.url)
+  if(url.hostname==='api.resend.com'){messages.push(await request.json());return Response.json({id:'synthetic-platter-7001'})}
+  if(url.pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-7002'})
+  if(url.pathname==='/api/users.info')return Response.json({ok:true,user:{team_id:'synthetic-platter-7002',profile:{email:h.auth.OWNER_EMAIL}}})
+  if(url.pathname==='/api/conversations.info')return Response.json({ok:true,channel:{id:'synthetic-platter-7003',is_member:true}})
+  if(url.pathname==='/api/conversations.open')return Response.json({ok:true,channel:{id:'synthetic-platter-7004'}})
+  if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-7005'})
+  if(url.pathname==='/v1.0/chats/synthetic-platter-7006')return Response.json({chatType:'oneOnOne',members:[{email:h.auth.OWNER_EMAIL},{userId:'synthetic-platter-7005'}]})
+  const value=await request.json();chats.push({url:request.url,value});if(uncertain)throw Error('Synthetic lost receipt')
+  return Response.json({ok:true,id:'synthetic-platter-7007'})
+ }})
+ await finishSetup(h)
+ const client=await h.cmd('client.save',{name:'Synthetic client',email:recipient})
+ const prepare=async title=>h.cmd('proposal.prepare',{...offer,title,clientId:client.id})
+ const tick=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+ const connect=async provider=>h.cmd('provider.connect',{provider,version:0,token:'synthetic-platter-7008',consent:true})
+ return {...h,messages,chats,prepare,tick,connect,client,uncertain:value=>{uncertain=value}}
+}
+
+test('APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once', {timeout:120000},async()=>{
+ const h=await notificationFixture()
+ try{
+  await h.connect('slack');const actor=(await h.state()).actor
+  await h.cmd('notification.route',{provider:'slack',event:'approval',kind:'direct',destination:'synthetic-platter-7009',operatorId:actor.id,consent:true})
+  const p=await h.prepare('Approval notice'),request={id:p.id,version:1,reminderDays:2,consent:true}
+  const result=await h.cmd('notification.request',request),again=await h.cmd('notification.request',request)
+  assert.deepEqual(again,result);assert.equal(h.messages.length,1);assert.equal(h.chats.length,1)
+  const email=h.messages[0],slack=h.chats[0].value
+  assert.deepEqual(email.to,[h.auth.OWNER_EMAIL]);assert.equal(slack.channel,'synthetic-platter-7004')
+  assert.match(email.text,/Default approval/);assert.match(slack.text,/Revision 1/)
+  const preview=email.text.match(/https:\/\/[^\s]+\/app\/preview[^\s]+/)[0]
+  assert.ok(slack.text.includes(preview));assert.equal((await h.send(new URL(preview).pathname+new URL(preview).search)).status,401)
+  const opened=await h.send(new URL(preview).pathname+new URL(preview).search,undefined,h.owner);assert.equal(opened.status,200);assert.match(opened.text,/Revision 1/)
+  const r=(await h.cmd('notification.requests',{id:p.id})).requests[0]
+  assert.equal(r.approver_id,actor.id);assert.equal(r.requester_id,actor.id)
+  await h.tick(r.remind_at-1);assert.equal(h.messages.length,1)
+  await Promise.all([h.tick(r.remind_at),h.tick(r.remind_at)])
+  assert.equal(h.messages.filter(m=>m.subject==='Approval overdue').length,1);assert.equal(h.chats.length,2)
+  await h.cmd('notification.decide',{requestId:r.id,version:1,decision:'approved',note:'Reviewed exact revision from Slack'})
+  assert.equal((await h.state()).proposals.find(p=>p.id===r.proposal_id).status,'approved')
+  const decision=await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(p.id).first();assert.equal(decision.note,'Reviewed exact revision from Slack');assert.equal(decision.revision,1)
+  const other=await h.prepare('Reject email'),otherRequest=await h.cmd('notification.request',{id:other.id,version:1,consent:true})
+  await h.cmd('notification.decide',{requestId:otherRequest.requests[0],version:1,decision:'rejected',note:'Please correct the terms from email'})
+  assert.equal((await h.state()).proposals.find(p=>p.id===other.id).approval.rejected,true)
+  await h.tick(r.remind_at+5*86400000);assert.equal(h.messages.filter(m=>m.subject==='Approval overdue').length,1)
+ }finally{await h.close()}
+})
+
+test('APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests', {timeout:120000},async()=>{
+ const h=await notificationFixture()
+ try{
+  await h.connect('slack');const actor=(await h.state()).actor
+  const route=await h.cmd('notification.route',{provider:'slack',event:'approval',kind:'direct',destination:'synthetic-platter-7009',operatorId:actor.id,consent:true})
+  const p=await h.prepare('Stale approval')
+  await h.cmd('notification.request',{id:p.id,version:1},h.owner,400);assert.equal(h.messages.length,0)
+  const result=await h.cmd('notification.request',{id:p.id,version:1,consent:true}),requestId=result.requests[0]
+  await h.cmd('proposal.revise',{...offer,clientId:h.client.id,id:p.id,version:1,scope:'Revised scope'})
+  await h.cmd('notification.decide',{requestId,version:2,decision:'approved',note:'Stale'},h.owner,409)
+  await h.tick(Date.now()+3*86400000);assert.equal(h.messages.length,1,'a changed revision suppresses overdue delivery')
+  const q=await h.prepare('Uncertain chat');h.uncertain(true)
+  await h.cmd('notification.request',{id:q.id,version:1,consent:true});assert.equal(h.chats.length,2)
+  await h.cmd('notification.request',{id:q.id,version:1,consent:true});assert.equal(h.chats.length,2,'a lost provider receipt is never retried')
+  assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_notification_outbox WHERE status='uncertain'").first()).n,1)
+  await h.cmd('notification.route.remove',{id:route.id});await h.tick(Date.now()+4*86400000);assert.equal(h.chats.length,2,'revoked route consent suppresses chat reminders')
+  await h.send('/auth/invite',{email:'stranger@synthetic-platter.example',role:'member',displayName:'Stranger'},h.owner)
+  // A real member session has no authority over this owner's draft.
+  const cookie=await h.signIn('stranger@synthetic-platter.example')
+  await h.cmd('notification.requests',{id:q.id},cookie,403)
+  await h.cmd('notification.decide',{requestId,version:2,decision:'approved',note:'Unauthorized'},cookie,403)
+  assert.doesNotMatch(JSON.stringify(await h.state()),/synthetic-platter-7008/)
+ }finally{await h.close()}
+})
+
+test('AUTO-003 signed events reach Slack channels and approval requests reach verified Teams direct chats with session protected links', {timeout:120000},async()=>{
+ const h=await notificationFixture()
+ try{
+  await h.connect('slack');await h.connect('teams');const actor=(await h.state()).actor
+  await h.cmd('notification.route',{provider:'slack',event:'signed',kind:'channel',destination:'synthetic-platter-7003',consent:true})
+  await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-7006',operatorId:actor.id,consent:true})
+  const p=await h.prepare('Signed event'),request=await h.cmd('notification.request',{id:p.id,version:1,consent:true})
+  assert.equal(h.chats.length,1);assert.match(h.chats[0].url,/graph.microsoft.com/);assert.match(h.chats[0].value.body.content,/app\/preview/)
+  await h.cmd('notification.decide',{requestId:request.requests[0],version:1,decision:'approved',note:'Approved in Teams'})
+  const sent=await h.cmd('proposal.send',{id:p.id,version:2}),path=new URL(sent.shareUrl).pathname
+  await h.send(path+'/action?name=code.request',{})
+  const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(p.id).first()).body.match(/\b\d{6}\b/)[0]
+  const verified=await h.send(path+'/action?name=code.verify',{code});assert.equal(verified.status,200)
+  assert.equal((await h.send(path+'/action?name=accept',{optionId:'one',name:'Synthetic client',consent:true},verified.cookie)).status,200)
+  await Promise.all([h.tick(Date.now()),h.tick(Date.now())])
+  const signed=h.chats.filter(c=>c.value.text?.startsWith('Proposal signed'));assert.equal(signed.length,1);assert.equal(signed[0].value.channel,'synthetic-platter-7003')
+  const link=signed[0].value.text.match(/https:\/\/[^\s]+/)[0],url=new URL(link)
+  assert.equal((await h.send(url.pathname+url.search,undefined,h.owner)).status,200)
+  assert.equal((await h.send(url.pathname+url.search)).status,303)
+  assert.doesNotMatch(signed[0].value.text,/Synthetic client|Northstar|2400|@/)
+  await h.cmd('provider.disconnect',{provider:'slack',version:1})
+  assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_notification_outbox WHERE status='sent'").first()).n,3)
+ }finally{await h.close()}
+})
+
+test('FOLLOW-003 sender expiry notices create dated follow-ups independently of signer warnings and follow extensions, workspace defaults and terminal states', {timeout:120000},async()=>{
+ const h=await notificationFixture()
+ try{
+  await h.tick('2030-03-01T12:00:00Z')
+  const defaults=await h.db.prepare('SELECT * FROM p_sender_notice_defaults').first();assert.deepEqual([defaults.enabled,defaults.lead_days,defaults.renewal_enabled,defaults.renewal_days],[1,3,1,30])
+  const create=async(title,enabled)=>{
+   const p=await h.prepare(title);await h.cmd('expiry.set',{id:p.id,version:1,mode:'days',days:14,warningDays:1})
+   await h.cmd('notification.expiry',{id:p.id,version:2,enabled,consent:true})
+   await h.cmd('proposal.approve',{id:p.id,version:3,revision:1});const sent=await h.cmd('proposal.send',{id:p.id,version:4})
+   return {...p,path:new URL(sent.shareUrl).pathname}
+  }
+  const normal=await create('Normal'),extended=await create('Extended'),accepted=await create('Accepted'),withdrawn=await create('Withdrawn')
+  await h.cmd('notification.defaults',{version:0,enabled:false,leadDays:3,renewalEnabled:true,renewalDays:30})
+  const disabled=await create('Disabled')
+  await h.cmd('expiry.set',{id:extended.id,version:5,mode:'date',date:'2030-03-22',warningDays:1})
+  await h.send(accepted.path+'/action?name=code.request',{})
+  const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(accepted.id).first()).body.match(/\b\d{6}\b/)[0],verified=await h.send(accepted.path+'/action?name=code.verify',{code})
+  assert.equal((await h.send(accepted.path+'/action?name=accept',{optionId:'one',name:'Synthetic client',consent:true},verified.cookie)).status,200)
+  await h.cmd('proposal.withdraw',{id:withdrawn.id,version:5,reason:'Closed',notice:false})
+  const notices=()=>h.messages.filter(m=>m.subject==='Proposal expiry approaching')
+  await h.tick('2030-03-11T23:59:59Z');assert.equal(notices().length,0)
+  await Promise.all([h.tick('2030-03-12T00:00:00Z'),h.tick('2030-03-12T00:00:00Z')]);assert.equal(notices().length,1);assert.deepEqual(notices()[0].to,[h.auth.OWNER_EMAIL])
+  const followup=(await h.send('/api/platter/followups',undefined,h.owner)).value.rows.find(r=>r.id===normal.id);assert.equal(followup.dueDate,'2030-03-12');assert.equal(followup.action,'Review approaching expiry')
+  assert.equal((await h.db.prepare('SELECT deadline_at FROM p_expiry WHERE proposal_id=?').bind(normal.id).first()).deadline_at,Date.parse('2030-03-15T00:00:00Z'))
+  await h.tick('2030-03-14T00:00:00Z');assert.equal(h.messages.filter(m=>m.subject.startsWith('Expiry warning:')).length,2,'signer warnings remain independent for enabled and disabled sender notices')
+  await h.tick('2030-03-19T00:00:00Z');assert.equal(notices().length,2);assert.match(notices()[1].text,/2030-03-22/)
+  const runs=(await h.db.prepare('SELECT * FROM p_sender_notice_runs ORDER BY notice_date').all()).results;assert.deepEqual(runs.map(r=>r.notice_date),['2030-03-12','2030-03-19'])
+  await h.send('/auth/invite',{email:'sales@synthetic-platter.example',role:'member',displayName:'Sales'},h.owner);const cookie=await h.signIn('sales@synthetic-platter.example')
+  await h.cmd('notification.defaults',{version:1,enabled:true,leadDays:2,renewalEnabled:true,renewalDays:20},cookie,403)
+ }finally{await h.close()}
+})

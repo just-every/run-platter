@@ -1,7 +1,7 @@
 name: Clone journey
 on:
   schedule:
-    - cron: '23 15 * * *'
+    - cron: '43 18 * * *'
   push:
     tags: ['v*']
   workflow_dispatch:

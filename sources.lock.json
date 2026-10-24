@@ -173,6 +173,10 @@
       "sha256": "dcde06f22f657b3b248c19d69e9fc6f077de750c1767d8f851cca0228b6aff0d",
       "executable": false
     },
+    "fixtures/first-release-aud-rows.json": {
+      "sha256": "6e3e9dd0f975ec59cb2d388d1d5ef8d3350c0d375e98628da45e39769b0b71f9",
+      "executable": false
+    },
     "fixtures/first-release-aud.ndjson": {
       "sha256": "294e83d17762bb412476f243930ecdfdd1a6a1a31d39dfbcf3107b90aaea8188",
       "executable": false
@@ -2922,7 +2926,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "5a93d78bfcf9cd693dd31c3188ad10100b85f8bdc3690004fb7f9606c51524f0",
+      "sha256": "3333194eb182e41fbd3fcd4d0913c26ca779fb379d62ab18ea0512e302a42a26",
       "executable": false
     },
     "tests/browser-edge.mjs": {

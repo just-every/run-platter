@@ -1,0 +1,111 @@
+[
+  {
+    "index": 0,
+    "kind": "row",
+    "row": {
+      "claim_id": "fab3dfcf-912a-4117-b009-e6315c82c858",
+      "claimed_at": 1792401427545,
+      "singleton": 1
+    },
+    "table": "oa_bootstrap"
+  },
+  {
+    "index": 0,
+    "kind": "row",
+    "row": {
+      "created_at": 1792401427545,
+      "display_name": "Jordan Venue",
+      "email": "owner@studio.example",
+      "id": "fab3dfcf-912a-4117-b009-e6315c82c858",
+      "role": "owner",
+      "status": "active",
+      "version": 1
+    },
+    "table": "oa_operators"
+  },
+  {
+    "index": 0,
+    "kind": "row",
+    "row": {
+      "accepted_at": 1792401427612,
+      "consent": "I accept the selected option, scope and deposit.",
+      "deposit_cents": 105000,
+      "email": "avery@northstar.example",
+      "name": "Avery Chen",
+      "option_id": "two",
+      "proposal_id": "11197e0f-9eb5-4763-ac16-a0b44ef55073",
+      "revision": 1,
+      "snapshot": "{\"id\":\"11197e0f-9eb5-4763-ac16-a0b44ef55073\",\"client_id\":\"b5a5673c-9273-4c0a-bab0-74f7d0925843\",\"title\":\"Legacy AUD campaign agreement\",\"scope\":\"Studio photographs and usage licence.\",\"revision\":1,\"deposit_bps\":2500,\"options\":[{\"id\":\"one\",\"label\":\"Studio essentials\",\"cents\":240000},{\"id\":\"two\",\"label\":\"Full campaign\",\"cents\":420000}],\"clientName\":\"Northstar Coffee\",\"clientEmail\":\"avery@northstar.example\",\"approvedBy\":\"owner@studio.example\",\"approvedAt\":1792401427569}",
+      "total_cents": 420000
+    },
+    "table": "p_acceptances"
+  },
+  {
+    "index": 0,
+    "kind": "row",
+    "row": {
+      "actor_id": "fab3dfcf-912a-4117-b009-e6315c82c858",
+      "approved_at": 1792401427569,
+      "id": "7f56896b-63af-48b0-a216-5eed86afd76f",
+      "proposal_id": "11197e0f-9eb5-4763-ac16-a0b44ef55073",
+      "revision": 1
+    },
+    "table": "p_approvals"
+  },
+  {
+    "index": 0,
+    "kind": "row",
+    "row": {
+      "email": "avery@northstar.example",
+      "id": "b5a5673c-9273-4c0a-bab0-74f7d0925843",
+      "name": "Northstar Coffee",
+      "version": 1
+    },
+    "table": "p_clients"
+  },
+  {
+    "index": 0,
+    "kind": "row",
+    "row": {
+      "csv": "*ContactName,EmailAddress,POAddressLine1,*InvoiceNumber,Reference,*InvoiceDate,*DueDate,*Description,*Quantity,*UnitAmount,*AccountCode,*TaxType,Currency\r\nNorthstar Coffee,avery@northstar.example,,PL-11197E0F9EB54763AC16A0B44EF55073,Legacy AUD campaign agreement,19/10/2026,19/10/2026,Deposit: Legacy AUD campaign agreement,1,1050.00,200,GST Free Income,AUD\r\n",
+      "exported_at": 1792401427622,
+      "exported_by": "owner@studio.example",
+      "id": "8eaa14ca-ffd2-4e34-b526-9df1afa1c6e2",
+      "number": "PL-11197E0F9EB54763AC16A0B44EF55073",
+      "proposal_id": "11197e0f-9eb5-4763-ac16-a0b44ef55073"
+    },
+    "table": "p_invoices"
+  },
+  {
+    "index": 0,
+    "kind": "row",
+    "row": {
+      "approved_at": 1792401427569,
+      "approved_by": "owner@studio.example",
+      "client_id": "b5a5673c-9273-4c0a-bab0-74f7d0925843",
+      "created_at": 1792401427564,
+      "deposit_bps": 2500,
+      "id": "11197e0f-9eb5-4763-ac16-a0b44ef55073",
+      "options": "[{\"id\":\"one\",\"label\":\"Studio essentials\",\"cents\":240000},{\"id\":\"two\",\"label\":\"Full campaign\",\"cents\":420000}]",
+      "prepared_by": "owner@studio.example",
+      "revision": 1,
+      "scope": "Studio photographs and usage licence.",
+      "status": "accepted",
+      "title": "Legacy AUD campaign agreement",
+      "version": 4
+    },
+    "table": "p_proposals"
+  },
+  {
+    "index": 0,
+    "kind": "row",
+    "row": {
+      "prepared_at": 1792401427564,
+      "prepared_by": "owner@studio.example",
+      "proposal_id": "11197e0f-9eb5-4763-ac16-a0b44ef55073",
+      "revision": 1,
+      "snapshot": "{\"id\":\"11197e0f-9eb5-4763-ac16-a0b44ef55073\",\"client_id\":\"b5a5673c-9273-4c0a-bab0-74f7d0925843\",\"title\":\"Legacy AUD campaign agreement\",\"scope\":\"Studio photographs and usage licence.\",\"revision\":1,\"deposit_bps\":2500,\"options\":[{\"id\":\"one\",\"label\":\"Studio essentials\",\"cents\":240000},{\"id\":\"two\",\"label\":\"Full campaign\",\"cents\":420000}]}"
+    },
+    "table": "p_revisions"
+  }
+]

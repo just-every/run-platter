@@ -329,7 +329,8 @@ test('PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores re-expor
  try {
   const input=join(temporary,'first-release-aud.rer'),records=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(item=>item.kind==='part').flatMap(part=>part.items).filter(item=>item.kind==='row')
   await writeFile(input,await readFile('fixtures/first-release-aud.ndjson'),{mode:0o600})
-  const legacy=records(await readFile(input,'utf8')),accepted=legacy.find(item=>item.table==='p_acceptances').row,invoice=legacy.find(item=>item.table==='p_invoices').row,oldProposal=legacy.find(item=>item.table==='p_proposals').row
+  // Keep the original business-row expectations separate from the fresh archive inventory.
+  const legacy=JSON.parse(await readFile('fixtures/first-release-aud-rows.json','utf8')),accepted=legacy.find(item=>item.table==='p_acceptances').row,invoice=legacy.find(item=>item.table==='p_invoices').row,oldProposal=legacy.find(item=>item.table==='p_proposals').row
   const ownerEmail=legacy.find(item=>item.table==='oa_operators').row.email
   await checkout(target)
   await command(target,['import','--input',input,'--yes','--no-queue'])

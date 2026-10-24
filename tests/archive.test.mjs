@@ -286,11 +286,27 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const standard=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=one`,undefined,restoredOwner),premium=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=two`,undefined,restoredOwner)
     assert.match(standard.text,/403\.89/);assert.match(standard.text,/Project services/);assert.equal(standard.status,200);assert.equal(premium.status,200);assert.ok(!standard.text.includes('Premium timeline: four weeks.'));assert.ok(premium.text.includes('Premium timeline: four weeks.'),'EDIT-009 restored conditions remain functional')
     await h.close();h=null
+    await command(restored,['import','--input',old,'--yes','--no-queue'],4)
+  } finally { if(h)await h.close();await rm(temporary,{recursive:true,force:true}) }
+})
+
+test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal', {timeout:240000}, async()=>{
+ const temporary=await mkdtemp(join(tmpdir(),'platter-erasure-')),source=join(temporary,'source'),erased=join(temporary,'erased');let h
+ try{
+  for(const path of [source,erased])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source})
+  const p=await h.cmd('client.save',{name:'Temporary joiner',email:'synthetic-platter-8200@example.com'}),client=await h.cmd('client.save',{name:'Retained client',email:'synthetic-platter-8201@example.com'})
+  const proposal=await h.cmd('proposal.prepare',{clientId:client.id,title:'Retained agreement',scope:'Retained business record',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+  await h.cmd('proposal.approve',{id:proposal.id,version:1,revision:1});const sent=await h.cmd('proposal.send',{id:proposal.id,version:2}),path=new URL(sent.shareUrl).pathname
+  await h.send(path+'/action?name=code.request',{});const code=(await h.state()).outbox.find(x=>x.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],verified=await h.send(path+'/action?name=code.verify',{code})
+  assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'two',consent:true},verified.cookie)).status,200);await h.cmd('invoice.export',{id:proposal.id})
+  const identity={auth:h.auth,owner:h.owner};await h.close();h=null
+  const old=join(temporary,'before.rer'),later=join(temporary,'later.rer');await command(source,['export','--output',old,'--no-queue']);const bytes=await readFile(old,'utf8')
     const corrupt=join(temporary,'corrupt.rer');await writeFile(corrupt,bytes.replace('Temporary joiner','Changed joiner'),{mode:0o600})
-    // These operations own different checkouts. Finish all three before using
+    // These operations own different checkouts. Finish both before using
     // the erasure journal; keep every refusal and custody assertion intact.
     const independent=await Promise.allSettled([
-      command(restored,['import','--input',old,'--yes','--no-queue'],4),
       // Checksum damage is a transfer failure (1); policy conflicts remain 4.
       command(erased,['import','--input',corrupt,'--yes','--no-queue'],1),
       (async()=>{h=await harness({root:source,...identity});try{await h.cmd('client.erase',{id:p.id,confirmName:'Temporary joiner'},await h.signIn(h.auth.OWNER_EMAIL))}finally{await h.close();h=null}await command(source,['export','--output',later,'--no-queue'])})(),
@@ -301,7 +317,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const proxy=await getPlatformProxy({configPath:join(erased,'wrangler.jsonc'),persist:{path:join(erased,'.wrangler/state/v3')},remoteBindings:false})
     try { assert.equal(await proxy.env.DB.prepare('SELECT name FROM p_clients WHERE id=?').bind(p.id).first(),null);assert.equal((await proxy.env.DB.prepare('SELECT total_cents,deposit_cents FROM p_acceptances WHERE proposal_id=?').bind(proposal.id).first()).deposit_cents,105000);assert.match((await proxy.env.DB.prepare('SELECT csv FROM p_invoices WHERE proposal_id=?').bind(proposal.id).first()).csv,/1050\.00/) }
     finally { await proxy.dispose() }
-  } finally { if(h)await h.close();await rm(temporary,{recursive:true,force:true}) }
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
 test('PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new proposals and acceptances use USD without conversion', { timeout: 180_000 }, async () => {
@@ -624,6 +640,7 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
   const videoRequest=new Request(h.origin+'/app/document-media',{method:'POST',headers:{origin:h.origin,cookie:h.owner,accept:'application/json'},body:videoForm}),videoUpload=await h.mf.dispatchFetch(videoRequest.url,{method:'POST',headers:videoRequest.headers,body:await videoRequest.arrayBuffer()});assert.equal(videoUpload.status,200);const video=(await videoUpload.json()).media
   const document=documentFixture();document.brand.logoId=media.id;document.blocks.push({id:'image',type:'image',title:'Retained image',text:'Exact original.',assetId:media.id,alt:'Synthetic studio mark'},{id:'film',type:'video',title:'Retained film',text:'Exact video original.',assetId:video.id,posterId:media.id,alt:'Synthetic studio film'},{id:'pricing',type:'pricing',title:'Services',text:'Reusable pricing',optionId:'one',tableIndex:0},{id:'po',type:'field',title:'Purchase order',text:'',recipientRole:'client',fieldKind:'text',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
   document.blocks.push({id:'gallery',type:'gallery',title:'Retained gallery',text:'',images:[{assetId:media.id,alt:'Archived studio mark'}]},{id:'loom',type:'embed',title:'Retained external content',text:'',url:'https://www.loom.com/embed/'+'a'.repeat(32),posterId:media.id,alt:'Archived external poster',consent:true})
+  document.blocks.push({id:'booking',type:'embed',title:'Retained booking',text:'',url:'https://calendly.com/synthetic-platter-1/review',posterId:media.id,alt:'Booking poster',consent:true},{id:'pdf-preview',type:'embed',title:'Retained PDF preview',text:'',url:'https://drive.google.com/file/d/synthetic-platter-1/preview',posterId:media.id,alt:'PDF poster',consent:true})
   await h.cmd('proposal.document',{id:created.id,version:1,document});await h.cmd('proposal.approve',{id:created.id,version:2,revision:2})
   const invitation=await h.cmd('proposal.send',{id:created.id,version:3}),path=new URL(invitation.shareUrl).pathname
   await h.send(path+'/action?name=code.request',{});const code=(await h.state()).outbox.find(r=>r.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],verified=await h.send(path+'/action?name=code.verify',{code})

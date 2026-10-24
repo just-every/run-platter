@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir,readFile } from 'node:fs/promises'
+import { mkdir,readFile,writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { installedApp } from './site-harness.mjs'
@@ -44,10 +44,12 @@ export async function documentJourney(){
     await page.getByText('Upload display media',{exact:true}).first().click()
     await uploadForm.getByLabel('Display media file').setInputFiles({name:'synthetic-platter-3.png',mimeType:'image/png',buffer:await readFile('public/brand/apple-touch-icon.png')})
     await uploadForm.locator('[name=consent]').check();await uploadForm.getByRole('button',{name:'Upload display media',exact:true}).click()
+    await page.goto(app.origin+'/app/settings');await page.getByLabel('External content',{exact:true}).selectOption('yes');await page.getByRole('button',{name:'Save external content policy',exact:true}).click();if(screenshots)await page.screenshot({path:join(screenshots,`EDIT-006-policy-${width}.png`)});await page.goto(app.origin+'/app/proposal?id='+id)
     const editor=page.locator('[data-document-editor]'),blocks=editor.locator('[data-block-id]'),fixture=documentFixture(),assets=(await state()).proposals.find(p=>p.id===id).documentMedia,image=assets.find(f=>f.mediaType==='image/png'),video=assets.find(f=>f.mediaType==='video/webm'),secondImage=assets.find(f=>f.filename==='synthetic-platter-3.png')
     fixture.brand={...fixture.brand,accent:'#075a70',ink:'#173c38',paper:'#fffdf5',font:width===1440?'serif':'sans',logoId:image.id}
     fixture.blocks.splice(4,0,{id:'photo',type:'image',title:'Studio image',text:'A retained image.',assetId:image.id,alt:'Synthetic Platter studio mark'},{id:'film',type:'video',title:'Studio film',text:'An uploaded introduction.',assetId:video.id,posterId:image.id,alt:'Synthetic Platter introduction'},{id:'pricing',type:'pricing',title:'Investment detail',text:'',optionId:'one',tableIndex:0})
     fixture.blocks.push({id:'gallery',type:'gallery',title:'Studio gallery',text:'A gallery caption.',images:[{assetId:image.id,alt:'Gallery studio mark'},{assetId:secondImage.id,alt:'Second gallery mark'}]},{id:'loom',type:'embed',title:'External introduction',text:'Click to load.',url:'https://www.loom.com/share/'+'a'.repeat(32),posterId:image.id,alt:'Loom introduction',consent:true})
+    fixture.blocks.push({id:'booking',type:'embed',title:'Book a review',text:'Choose when to connect.',url:'https://calendly.com/synthetic-platter-1/review',posterId:image.id,alt:'Review booking',consent:true},{id:'pdf-preview',type:'embed',title:'PDF preview',text:'Choose when to connect.',url:'https://drive.google.com/file/d/synthetic-platter-1/preview',posterId:image.id,alt:'PDF supporting document',consent:true})
     fixture.blocks.push({id:'po',type:'field',title:'Purchase order',text:'Use the approved PO.',recipientRole:'client',fieldKind:'text',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
     await editor.locator('.document-brand-kit summary').click()
     for(const [key,value] of Object.entries(fixture.brand)){const node=editor.locator(`[data-brand=${key}]`);if(key==='font'||key==='logoId')await node.selectOption(value);else await node.fill(value)}
@@ -112,6 +114,10 @@ export async function documentJourney(){
     assert.equal((await clientContext.request.get(`${app.origin}/app/preview/client?id=${id}&revision=${p.revision}`)).status(),401)
     await post('proposal.approve',{id,version:p.version,revision:p.revision});p=(await state()).proposals.find(p=>p.id===id)
     const invitation=await post('proposal.send',{id,version:p.version}),path=new URL(invitation.shareUrl).pathname,client=await clientContext.newPage()
+    const providerRequests=[];let consented=false
+    const providerHosts=['www.youtube-nocookie.com','player.vimeo.com','www.loom.com','fast.wistia.net','calendly.com','drive.google.com']
+    clientContext.on('request',request=>{if(providerHosts.includes(new URL(request.url()).hostname))providerRequests.push({url:request.url(),consented})})
+    await clientContext.route(url=>providerHosts.includes(url.hostname),async route=>{await route.fulfill({contentType:'text/html',body:'<html><body><p>Recorded provider edge</p></body></html>'})})
     await page.goto(app.origin+'/app/proposal?id='+id);await page.getByRole('button',{name:'Allow Our approach — text suggestions',exact:true}).click()
     await client.goto(app.origin+path+'?optionId=two');await client.getByRole('button',{name:'Send verification code',exact:true}).click()
     const code=(await state()).outbox.find(row=>row.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
@@ -123,10 +129,18 @@ export async function documentJourney(){
     const film=client.locator('.document-video video');await film.scrollIntoViewIfNeeded();await film.evaluate(node=>node.play());await client.waitForFunction(()=>document.querySelector('.document-video video').currentTime>0);await film.evaluate(node=>node.pause())
     const gallery=client.locator('.document-gallery img');assert.equal(await gallery.count(),2);await gallery.first().scrollIntoViewIfNeeded();await client.waitForFunction(()=>document.querySelector('.document-gallery img').naturalWidth>0);assert.equal(await gallery.first().getAttribute('alt'),'Gallery studio mark')
     assert.equal(await client.locator('.document-embed iframe').count(),0,'external content is not loaded before consent')
-    if(screenshots){await client.locator('.document-embed').scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-006-consent-${width}.png`)})}
-    let loaded=0;await client.route('https://www.loom.com/**',async route=>{loaded++;await route.fulfill({contentType:'text/html',body:'<html><body><p>Recorded Loom edge</p></body></html>'})})
-    await client.getByRole('button',{name:'Load external content',exact:true}).click();await client.frameLocator('.document-embed iframe').getByText('Recorded Loom edge').waitFor();assert.equal(loaded,1);assert.equal(await client.locator('.document-embed iframe').getAttribute('sandbox'),'allow-scripts allow-same-origin allow-forms allow-presentation');assert.equal(await client.locator('.document-embed iframe').getAttribute('referrerpolicy'),'no-referrer')
-    if(screenshots){await client.locator('.document-gallery').scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-006-gallery-${width}.png`)});await client.locator('.document-embed').scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-006-embed-${width}.png`)})}
+    if(screenshots){await client.locator('.document-embed').first().scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-006-consent-${width}.png`)})}
+    assert.deepEqual(providerRequests,[],'no provider request occurs before viewer consent');assert.deepEqual(await clientContext.cookies('https://www.loom.com'),[]);assert.equal(await client.evaluate(()=>localStorage.length+sessionStorage.length),0);consented=true
+    for(const embed of await client.locator('.document-embed').all()){
+     await embed.getByRole('button',{name:'Load external content',exact:true}).click();await embed.frameLocator('iframe').getByText('Recorded provider edge').waitFor()
+     assert.equal(await embed.locator('iframe').getAttribute('sandbox'),'allow-scripts allow-same-origin allow-forms allow-presentation');assert.equal(await embed.locator('iframe').getAttribute('referrerpolicy'),'no-referrer')
+    }
+    assert.equal(providerRequests.length,3);assert.ok(providerRequests.every(r=>r.consented));if(screenshots)await writeFile(join(screenshots,`EDIT-006-requests-${width}.json`),JSON.stringify({beforeConsent:[],afterConsent:providerRequests},null,2))
+    if(screenshots){await client.locator('.document-gallery').scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-006-gallery-${width}.png`)});for(const [index,embed]of(await client.locator('.document-embed').all()).entries()){await embed.scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-006-embed-${index}-${width}.png`)})}}
+    consented=false;await client.reload();assert.equal(await client.locator('.document-embed iframe').count(),0,'reload requires fresh viewer consent');assert.equal(providerRequests.length,3,'reload makes no provider request')
+    await page.goto(app.origin+'/app/settings');await page.getByLabel('External content',{exact:true}).selectOption('no');await page.getByRole('button',{name:'Save external content policy',exact:true}).click();await client.reload();assert.equal(await client.getByText('External content is disabled by the workspace administrator.',{exact:true}).count(),3);assert.equal(await client.getByRole('button',{name:'Load external content',exact:true}).count(),0);assert.equal(providerRequests.length,3)
+    if(screenshots){await client.locator('.document-embed').first().scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-006-disabled-${width}.png`)})}
+    await page.getByLabel('External content',{exact:true}).selectOption('yes');await page.getByRole('button',{name:'Save external content policy',exact:true}).click();await client.reload();await page.goto(app.origin+'/app/proposal?id='+id)
     const clientOrder=await client.locator('[data-document-block]').evaluateAll(nodes=>nodes.map(n=>n.dataset.documentBlock));assert.deepEqual(clientOrder,reordered)
     const brand=await client.locator('.proposal-document').evaluate(node=>({ink:getComputedStyle(node).color,paper:getComputedStyle(node).backgroundColor,font:getComputedStyle(node).fontFamily,accent:getComputedStyle(node.querySelector('h2')).color}));assert.equal(brand.ink,'rgb(23, 60, 56)');assert.equal(brand.paper,'rgb(255, 253, 245)');assert.equal(brand.accent,'rgb(7, 90, 112)');assert.ok(brand.font.includes(width===1440?'Source Serif 4':'Inter'),'the chosen brand font renders')
     assert.equal(await client.locator('.document-text strong').innerText(),'careful')
@@ -134,7 +148,9 @@ export async function documentJourney(){
     assert.ok(await client.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'client document has no horizontal overflow')
     await client.locator('.proposal-document').scrollIntoViewIfNeeded();if(screenshots)await client.screenshot({path:join(screenshots,`EDIT-001-client-${width}.png`)})
     const pdf=await clientContext.request.post(app.origin+path+'/download.pdf',{headers:{origin:app.origin},data:{optionId:'two'}});assert.equal(pdf.status(),200)
-    const layout=await pdfPages(await pdf.body(),true),pages=layout.map(p=>p.text),text=pages.join(' ');assert.ok(layout.every(p=>p.width===612&&p.height===792));assert.equal(layout.reduce((n,p)=>n+p.imageCount,0),6,'PDF carries the logo, uploaded image, video still, two gallery images and external poster')
+    const pdfBytes=await pdf.body(),layout=await pdfPages(pdfBytes,true),pages=layout.map(p=>p.text),text=pages.join(' ');assert.ok(layout.every(p=>p.width===612&&p.height===792));assert.equal(layout.reduce((n,p)=>n+p.imageCount,0),8,'PDF carries the logo, uploaded image, video still, two gallery images and three external posters')
+    const {getDocument}=await import('pdfjs-dist/legacy/build/pdf.mjs'),parsed=await getDocument({data:new Uint8Array(pdfBytes),isEvalSupported:false}).promise
+    try{const urls=[];for(let index=1;index<=parsed.numPages;index++)urls.push(...(await(await parsed.getPage(index)).getAnnotations()).map(a=>a.url));for(const block of savedDocument.blocks.filter(b=>b.type==='embed'))assert.ok(urls.includes(block.url),'PDF contains a still and actionable link for '+block.title);assert.ok(urls.some(url=>url?.startsWith(app.origin+path+'/media/')),'uploaded video has an actionable local playback link')}finally{await parsed.destroy()}
     for(const page of pages)assert.ok(page.includes('Not signed, revision '+p.revision))
     let at=-1;for(const block of savedDocument.blocks.filter(b=>b.type!=='page_break')){const next=text.indexOf(block.title,at+1);assert.ok(next>at,'PDF keeps editor order for '+block.title);at=next}
     const approved=(await state()).proposals.find(p=>p.id===id);assert.deepEqual(approved.document,savedDocument)

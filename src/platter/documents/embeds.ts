@@ -21,7 +21,8 @@ export function embedUrl(value:unknown):string {
  if(['fast.wistia.net','fast.wistia.com'].includes(host)){
   const id=path.match(/^\/embed\/iframe\/([a-z0-9]{10})$/)?.[1];need(id,'Choose a Wistia embed link');return 'https://fast.wistia.net/embed/iframe/'+id
  }
+ if(host==='drive.google.com'){const id=path.match(/^\/file\/d\/([A-Za-z0-9_-]{10,100})\/(?:view|preview)$/)?.[1];need(id,'Choose a Google Drive PDF preview link');return 'https://drive.google.com/file/d/'+id+'/preview'}
  if(host==='calendly.com'&&/^\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/?$/.test(path))return 'https://calendly.com'+path.replace(/\/$/,'')
- need(false,'This embed host or path is not allowed. Use YouTube, Vimeo, Loom, Wistia or Calendly.')
+ need(false,'This embed host or path is not allowed. Use YouTube, Vimeo, Loom, Wistia, Calendly or Google Drive PDF previews.')
 }
-export const embedFrameSources="https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://fast.wistia.net https://calendly.com"
+export const embedFrameSources="https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://fast.wistia.net https://calendly.com https://drive.google.com"

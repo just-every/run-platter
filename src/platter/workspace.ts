@@ -28,7 +28,9 @@ export async function workspaceCommand(db:D1Database,a:Actor,p:Record<string,unk
  let methods:any=p.paymentMethods??(p.methodsProvided==='yes'||methodFields.length?methodFields.filter(k=>p[k]==='yes').map(k=>k.slice(7)):old.paymentMethods)
  if(typeof methods==='string'){try{methods=JSON.parse(methods)}catch{need(false,'Choose payment methods')}}
  need(Array.isArray(methods)&&methods.length<=4&&methods.every((m:any)=>['card','ach','apple_pay','google_pay'].includes(m))&&new Set(methods).size===methods.length,'Choose distinct supported payment methods')
- const settings={remindersEnabled:enabled,reminderDays:dayList(p.reminderDays,old.reminderDays),beforeExpiryDays:dayList(p.beforeExpiryDays,old.beforeExpiryDays),reminderCap:cap,expiryDays:expiry,warningDays:warning,paymentMethods:methods}
+ need(p.externalContentEnabled===undefined||[true,false,'yes','no'].includes(p.externalContentEnabled as any),'Choose whether external content is allowed')
+ const external=p.externalContentEnabled===undefined?old.externalContentEnabled:p.externalContentEnabled===true||p.externalContentEnabled==='yes'
+ const settings={...(external!==undefined?{externalContentEnabled:external}:{}),remindersEnabled:enabled,reminderDays:dayList(p.reminderDays,old.reminderDays),beforeExpiryDays:dayList(p.beforeExpiryDays,old.beforeExpiryDays),reminderCap:cap,expiryDays:expiry,warningDays:warning,paymentMethods:methods}
  await commit(db,a,[db.prepare('INSERT INTO p_workspace_defaults(singleton,settings) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET settings=excluded.settings,version=p_workspace_defaults.version+1').bind(JSON.stringify(settings))],true,{sql:'COALESCE((SELECT version FROM p_workspace_defaults WHERE singleton=1),0)=?',values:[old.version]})
  return {id:'workspace'}
 }

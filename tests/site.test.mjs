@@ -1191,3 +1191,47 @@ test('APPROVE-002 email preview and decision links work under a member session a
 })
 
 test('EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths', {timeout:180000}, documentJourney)
+
+test('EDIT-003 linked and detached library insertion, frozen sending and scoped usage at desktop and phone widths',{timeout:180000},async()=>{
+ let app,browser
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp()
+   const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),request=context.request
+    const bootstrap=await request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic owner'},maxRedirects:0});assert.equal(bootstrap.status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const r=await request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    const state=async()=>{const r=await request.get(app.origin+'/api/platter/state');assert.equal(r.status(),200);return r.json()}
+    const capture=async name=>{await page.evaluate(()=>document.fonts.ready);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no overflow '+name);if(screenshots)await page.screenshot({path:join(screenshots,`EDIT-003-${name}-${width}.png`),fullPage:true})}
+    await page.goto(app.origin+'/app/library');await page.getByLabel('Item title',{exact:true}).fill('Synthetic case study');await page.getByLabel('Content type',{exact:true}).selectOption('case_study');await page.getByLabel('Library text',{exact:true}).fill('Original client story');await page.getByRole('button',{name:'Create library item',exact:true}).click();assert.equal(await page.getByRole('alert').count(),0)
+    const client=await cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
+    const make=title=>cmd('proposal.prepare',{title,clientId:client.id,scope:'Synthetic project scope',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+    const linked=await make('Linked draft'),detached=await make('Detached draft'),sent=await make('Sent story')
+    for(const [p,mode] of [[linked,'linked'],[detached,'detached'],[sent,'linked']]){
+     await page.goto(app.origin+'/app/proposal?id='+p.id)
+     const insertion=page.locator('section').filter({has:page.getByRole('heading',{name:'Insert library content',exact:true})})
+     await insertion.getByLabel('Copy mode',{exact:true}).selectOption(mode);await insertion.getByRole('checkbox').check();await insertion.getByRole('button',{name:'Insert library item',exact:true}).click();assert.equal(await page.getByRole('alert').count(),0)
+     assert.equal(await page.getByLabel('Block text',{exact:true}).inputValue(),'Original client story')
+     // Every icon-only block tool has the seed's delayed hover and immediate focus tooltip.
+     const tool=page.getByRole('button',{name:'Duplicate block',exact:true});await tool.focus();assert.equal(await tool.evaluate(el=>getComputedStyle(document.getElementById(el.getAttribute('aria-describedby'))).visibility),'visible')
+     await tool.hover();await page.waitForTimeout(350);assert.equal(await tool.evaluate(el=>getComputedStyle(document.getElementById(el.getAttribute('aria-describedby'))).visibility),'visible')
+     if(mode==='linked'&&p.id===linked.id)await capture('insertion')
+    }
+    let p=(await state()).proposals.find(p=>p.id===sent.id);await cmd('proposal.approve',{id:p.id,version:p.version,revision:p.revision});p=(await state()).proposals.find(p=>p.id===sent.id);await cmd('proposal.send',{id:p.id,version:p.version})
+    await page.goto(app.origin+'/app/library');const edit=page.locator('form:has(input[name=id])').first();await edit.getByLabel('Library text',{exact:true}).fill('Updated client story');await edit.getByRole('button',{name:'Save library item',exact:true}).click();assert.equal(await page.getByRole('alert').count(),0)
+    const content=await page.locator('main').innerText();for(const title of ['Linked draft','Detached draft','Sent story'])assert.ok(content.includes(title));assert.match(content,/detached/);assert.match(content,/frozen/);assert.match(content,/Changed/);await capture('usage')
+    for(const [proposal,text] of [[linked,'Updated client story'],[detached,'Original client story'],[sent,'Original client story']]){
+     await page.goto(app.origin+'/app/proposal?id='+proposal.id)
+     if(proposal.id===sent.id)assert.match(await page.locator('[aria-label="Proposal document"]').innerText(),new RegExp(text))
+     else assert.equal(await page.getByLabel('Block text',{exact:true}).inputValue(),text)
+     await capture(proposal.id===linked.id?'linked':proposal.id===detached.id?'detached':'frozen')
+    }
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

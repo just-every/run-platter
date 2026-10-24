@@ -117,7 +117,7 @@ export async function documentJourney(){
     const providerRequests=[];let consented=false
     const providerHosts=['www.youtube-nocookie.com','player.vimeo.com','www.loom.com','fast.wistia.net','calendly.com','drive.google.com']
     clientContext.on('request',request=>{if(new URL(request.url()).origin!==app.origin)providerRequests.push({url:request.url(),consented})})
-    await clientContext.route(url=>url.origin!==app.origin),async route=>{await route.fulfill({contentType:'text/html',body:'<html><body><p>Recorded provider edge</p></body></html>'})})
+    await clientContext.route(url=>url.origin!==app.origin,async route=>{await route.fulfill({contentType:'text/html',body:'<html><body><p>Recorded provider edge</p></body></html>'})})
     await page.goto(app.origin+'/app/proposal?id='+id);await page.getByRole('button',{name:'Allow Our approach — text suggestions',exact:true}).click()
     await client.goto(app.origin+path+'?optionId=two');await client.getByRole('button',{name:'Send verification code',exact:true}).click()
     const code=(await state()).outbox.find(row=>row.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]

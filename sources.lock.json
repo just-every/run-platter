@@ -174,7 +174,7 @@
       "executable": false
     },
     "fixtures/first-release-aud.ndjson": {
-      "sha256": "c5c0095d3765b12c81256dd3e47c3fc8d34730f58dfc5684f10e2492d4371278",
+      "sha256": "294e83d17762bb412476f243930ecdfdd1a6a1a31d39dfbcf3107b90aaea8188",
       "executable": false
     },
     "HOMEPAGE-VARIANTS.md": {
@@ -2922,7 +2922,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "d7562a1346d08bd167312b258c02809e911de72efa560f842c9dbe77955c945b",
+      "sha256": "5a93d78bfcf9cd693dd31c3188ad10100b85f8bdc3690004fb7f9606c51524f0",
       "executable": false
     },
     "tests/browser-edge.mjs": {

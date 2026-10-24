@@ -323,7 +323,7 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores first-release AUD bytes and new proposals and acceptances use USD without conversion', { timeout: 180_000 }, async () => {
+test('PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores re-exported first-release AUD bytes and new proposals and acceptances use USD without conversion', { timeout: 180_000 }, async () => {
  const temporary=await mkdtemp(join(tmpdir(),'platter-currency-')),target=join(temporary,'target')
  let h
  try {

@@ -1,3 +1,4 @@
+import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { documentFixture } from './document-fixture.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { pricingFixture, pricingExpected } from './pricing-fixture.mjs'
@@ -15,12 +16,14 @@ const exec = promisify(execFile)
 const cli = resolve('node_modules/@runeditrun/rer/global/rer.mjs')
 const command = async (cwd, args, expected = 0) => {
   let result
+  const started=performance.now()
   // These commands own a separate checkout, not the parent verify operation.
   const env = { ...process.env, CI: 'true', WRANGLER_SEND_METRICS: 'false' }
   delete env.RER_LOCAL_OPERATION
   delete env.RER_LOCAL_STATE_PATH
   try { result = { ...await exec(process.execPath, [cli, ...args], { cwd, env, maxBuffer: 2e6 }), code: 0 } }
   catch (error) { result = error }
+  console.log('Archive CLI '+args[0]+' completed in '+Math.round(performance.now()-started)+' ms')
   assert.equal(result.code, expected, `${args[0]}: ${result.stdout ?? ''} ${result.stderr ?? ''}`)
 }
 async function checkout(root) {
@@ -286,7 +289,6 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const standard=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=one`,undefined,restoredOwner),premium=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=two`,undefined,restoredOwner)
     assert.match(standard.text,/403\.89/);assert.match(standard.text,/Project services/);assert.equal(standard.status,200);assert.equal(premium.status,200);assert.ok(!standard.text.includes('Premium timeline: four weeks.'));assert.ok(premium.text.includes('Premium timeline: four weeks.'),'EDIT-009 restored conditions remain functional')
     await h.close();h=null
-    await command(restored,['import','--input',old,'--yes','--no-queue'],4)
   } finally { if(h)await h.close();await rm(temporary,{recursive:true,force:true}) }
 })
 
@@ -314,6 +316,7 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
     for(const result of independent)if(result.status==='rejected')throw result.reason
     await command(erased,['import','--input',old,'--journal',later,'--yes','--no-queue'],4)
     await command(erased,['import','--input',later,'--yes','--no-queue'])
+    await command(erased,['import','--input',later,'--yes','--no-queue'],4)
     const proxy=await getPlatformProxy({configPath:join(erased,'wrangler.jsonc'),persist:{path:join(erased,'.wrangler/state/v3')},remoteBindings:false})
     try { assert.equal(await proxy.env.DB.prepare('SELECT name FROM p_clients WHERE id=?').bind(p.id).first(),null);assert.equal((await proxy.env.DB.prepare('SELECT total_cents,deposit_cents FROM p_acceptances WHERE proposal_id=?').bind(proposal.id).first()).deposit_cents,105000);assert.match((await proxy.env.DB.prepare('SELECT csv FROM p_invoices WHERE proposal_id=?').bind(proposal.id).first()).csv,/1050\.00/) }
     finally { await proxy.dispose() }
@@ -655,14 +658,17 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
   const libraryDraft=await h.cmd('proposal.prepare',{...fields,title:'Retained library copies',pricingTables:[]})
   let libraryVersion=1
   for(const item of richItems)for(const mode of ['linked','detached'])await h.cmd('library.insert',{id:libraryDraft.id,version:libraryVersion++,itemId:item.id,itemVersion:1,mode,consent:true})
+  const searchable=await PDFDocument.create(),searchFont=await searchable.embedFont(StandardFonts.Helvetica);searchable.addPage().drawText('Synthetic Platter retained PDF search',{font:searchFont,x:48,y:700,size:12});const searchBytes=await searchable.save(),searchForm=new FormData();searchForm.set('id',libraryDraft.id);searchForm.set('version',String(libraryVersion));searchForm.set('file',new File([searchBytes],'synthetic-platter-8400.pdf',{type:'application/pdf'}));const searchRequest=new Request(h.origin+'/app/attachment',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:searchForm}),searchUpload=await h.mf.dispatchFetch(searchRequest.url,{method:'POST',headers:searchRequest.headers,body:await searchRequest.arrayBuffer()});assert.equal(searchUpload.status,200)
   const libraryBefore=(await h.state()).libraryItems,libraryDocBefore=(await h.state()).proposals.find(p=>p.id===libraryDraft.id)
+  const folder=await h.cmd('folder.save',{kind:'proposal',name:'Archived proposal folder',teams:[],shareConsent:true});await h.cmd('proposal.folder',{id:created.id,version:before.version,folderId:folder.id,shareConsent:true});before=(await h.state()).proposals.find(p=>p.id===created.id)
   const identity={auth:h.auth,owner:h.owner};await h.close();h=undefined
   const archive=join(temporary,'document.rer');await command(source,['export','--output',archive,'--no-queue']);await command(target,['import','--input',archive,'--yes','--no-queue'])
   h=await harness({root:target,...identity,assetsDirectory:'public'});const owner=await h.signIn(h.auth.OWNER_EMAIL),after=(await h.state(owner)).proposals.find(p=>p.id===created.id)
-  for(const key of ['document','documentMedia','acceptance','questions','suggestions','suggestionSections'])assert.deepEqual(after[key],before[key],'public CLI retains '+key)
+  for(const key of ['document','documentMedia','acceptance','questions','suggestions','suggestionSections','folderId','folderVersion'])assert.deepEqual(after[key],before[key],'public CLI retains '+key)
   assert.deepEqual((await h.state(owner)).libraryItems,libraryBefore,'rich item payloads, tags, usages and change times survive the public CLI')
   assert.deepEqual((await h.state(owner)).proposals.find(p=>p.id===libraryDraft.id).document,libraryDocBefore.document)
   for(const item of richItems)await h.cmd('library.save',{id:item.id,version:1,title:'Restored '+item.kind,kind:item.kind},owner)
+  const restoredSearch=await h.send('/api/platter/pipeline?q='+encodeURIComponent('Synthetic Platter retained PDF search'),undefined,owner);assert.equal(restoredSearch.status,200);assert.deepEqual(restoredSearch.value.rows.map(p=>p.id),[libraryDraft.id],'PDF content remains searchable after public CLI restore')
   const restoredLibrary=(await h.state(owner)).proposals.find(p=>p.id===libraryDraft.id)
   for(const [index,item] of richItems.entries()){assert.equal(restoredLibrary.document.blocks[index*2].title,'Restored '+item.kind);assert.equal(restoredLibrary.document.blocks[index*2+1].title,'Archived '+item.kind)}
   for(const [file,original] of [[media,bytes],[video,videoBytes]]){const response=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+libraryDraft.id+'/'+file.id,{headers:{cookie:owner}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),original)}

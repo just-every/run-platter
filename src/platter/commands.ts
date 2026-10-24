@@ -7,7 +7,7 @@ import { reminderCommand } from './reminders'
 import { disputeCommand } from './disputes'
 import { catalogInsertion, saveCatalog } from './catalog'
 import { assertSectionLocks, sectionLockCommand } from './section-locks'
-import { folderCommand } from './folders'
+import { folderCommand, fileProposal } from './folders'
 import { paymentCommand } from './payments'
 import { connectionCommand } from './connections'
 import { defaultStatements, workspaceCommand } from './workspace'
@@ -83,6 +83,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='catalog.save')return saveCatalog(db,a,p)
  if(name==='catalog.insert'){const addition=await catalogInsertion(db,a,p);return command(env,a,'proposal.revise',addition.fields,undefined,addition.costs)}
  if(name==='proposal.unlock'||name==='template.locks')return sectionLockCommand(db,a,name,p)
+ if(name==='proposal.folder')return fileProposal(db,a,p)
  if(name==='folder.save')return folderCommand(db,a,p)
  if(name.startsWith('payment.'))return paymentCommand(env,a,name,p)
  if(name.startsWith('provider.'))return connectionCommand(env,a,name,p)

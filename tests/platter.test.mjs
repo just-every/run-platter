@@ -1,3 +1,4 @@
+import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { richLibraryPropagation, richLibrarySource } from './library-fixture.mjs'
 import { documentFixture } from './document-fixture.mjs'
 import { templatesHttp } from './templates-http.mjs'
@@ -1115,18 +1116,19 @@ test('PRICE-002 / SIGN-008 / TEAM-004 signed-upload selections use sent prices, 
 test('EDIT-002 / MOB-001 five starter and personal templates start independent drafts, guard ownership and versions, and retain agent approval boundaries',async()=>{const h=await harness({assetsDirectory:'public'});try{await templatesHttp(h)}finally{await h.close()}})
 
 
-test('EDIT-016 body phrase search returns only two of 500 proposals through the owner HTTP pipeline', {timeout:120000}, ()=>run(async h=>{
+test('EDIT-016 body phrase search returns exactly three of 500 proposals including an uploaded PDF with live folder permissions', {timeout:120000}, ()=>run(async h=>{
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
  const client=await h.cmd('client.save',{name:'Search client',email:'search@studio.example'}),matches=[];let pricedId,oldLink
  for(let n=0;n<500;n++){
   const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:`Proposal ${String(n).padStart(3,'0')}`,scope:n===0?'Delivery includes literal [50%_budget] review.':offer.scope,terms:n===1?'Confirm literal [50%_budget] review before delivery.':'',...(n===2?{pricingTables:[{optionId:'one',name:'Services',lines:[{name:'Painting',description:'Weatherproof copper finish',quantity:'1',unit:'project',unitPrice:'1200'}]}]}:{})})
   if(n<2)matches.push(p.id)
-  if(n===2)pricedId=p.id
+  if(n===2){pricedId=p.id;const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica);pdf.addPage().drawText('literal [50%_budget] review',{font,x:48,y:700,size:12});const form=new FormData();form.set('id',p.id);form.set('version','1');form.set('file',new File([await pdf.save()],'synthetic-platter-8300.pdf',{type:'application/pdf'}));const request=new Request(h.origin+'/app/attachment',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:form}),uploaded=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});assert.equal(uploaded.status,200);const indexed=(await h.state()).proposals.find(row=>row.id===p.id);assert.match(indexed.attachmentText,/literal \[50%_budget\] review/,'uploaded PDF bytes are indexed as content');matches.push(p.id)}
   if(n===0){await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:p.id,version:2});oldLink=new URL(share.shareUrl).pathname;const cookie=await verified(h,oldLink);assert.equal((await h.send(oldLink+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)}
  }
  const started=performance.now(),r=await h.send('/api/platter/pipeline?q='+encodeURIComponent('LITERAL   [50%_budget] REVIEW'),undefined,h.owner)
- console.log('EDIT-016 500-proposal HTTP search elapsed ms:',Math.round(performance.now()-started))
- assert.equal(r.status,200,r.text);assert.deepEqual(new Set(r.value.rows.map(p=>p.id)),new Set(matches));assert.equal(r.value.count,2)
- assert.deepEqual(r.value.totals,[{currency:'USD',count:2,valueCents:660000}])
+ const elapsed=performance.now()-started;console.log('EDIT-016 500-proposal HTTP search elapsed ms:',Math.round(elapsed));assert.ok(elapsed<1000,'the exact three-result 500-proposal search completes within one second')
+ assert.equal(r.status,200,r.text);assert.deepEqual(new Set(r.value.rows.map(p=>p.id)),new Set(matches));assert.equal(r.value.count,3)
+ assert.deepEqual(r.value.totals,[{currency:'USD',count:3,valueCents:1080000}])
  const priced=await h.send('/api/platter/pipeline?q='+encodeURIComponent('weatherproof copper finish'),undefined,h.owner);assert.equal(priced.status,200);assert.deepEqual(priced.value.rows.map(p=>p.id),[pricedId])
  const credential=await h.send('/api/platter/pipeline?q='+oldLink.split('/').at(-1),undefined,h.owner);assert.equal(credential.status,200);assert.equal(credential.value.count,0,'invitation credentials never participate in search')
  const source=(await h.state()).proposals.find(p=>p.id===matches[1]),template=await h.cmd('template.save',{id:source.id,version:source.version,name:'Body-search template'}),hidden=await h.cmd('template.save',{id:source.id,version:source.version,name:'Personal template excluded from another member'})
@@ -1142,6 +1144,15 @@ test('EDIT-016 body phrase search returns only two of 500 proposals through the 
  result=await h.send('/api/platter/template-search?q='+encodeURIComponent('literal [50%_budget] review'),undefined,member);assert.deepEqual(result.value.rows,[],'revoked team membership removes search access on the next request')
  assert.equal((await h.send('/api/platter/template-search?q='+encodeURIComponent('x'.repeat(201)),undefined,h.owner)).status,400)
  assert.equal((await h.send('/api/platter/template-search')).status,401)
+ for(const filter of ['maxValue=1','minAge=1','owner='+encodeURIComponent(memberId)])assert.deepEqual((await h.send('/api/platter/template-search?q='+encodeURIComponent('literal [50%_budget] review')+'&'+filter,undefined,h.owner)).value.rows,[],'template metadata filters combine with body text')
+ const proposalFolder=await h.cmd('folder.save',{kind:'proposal',name:'Search review folder',teams:[team.id],shareConsent:true})
+ for(const id of matches){await h.cmd('proposal.share',{id,operatorId:memberId});const row=(await h.state()).proposals.find(p=>p.id===id);await h.cmd('proposal.folder',{id,version:row.version,folderId:proposalFolder.id,shareConsent:true})}
+ const folderQuery='/api/platter/pipeline?'+new URLSearchParams({q:'literal [50%_budget] review',folder:proposalFolder.id})
+ assert.deepEqual((await h.send(folderQuery,undefined,member)).value.rows,[],'outside-team members find no filed proposal by text or folder')
+ assert.ok(!(await h.state(member)).resourceFolders.some(f=>f.id===proposalFolder.id));assert.equal((await h.send('/app/proposal?id='+matches[0],undefined,member)).status,403)
+ await h.cmd('team.member',{operatorId:memberId,teamId:team.id});assert.deepEqual(new Set((await h.send(folderQuery,undefined,member)).value.rows.map(p=>p.id)),new Set(matches),'folder access still requires existing proposal permissions and live team membership')
+ const currentMember=(await h.state()).teamPeople.find(p=>p.id===memberId);await h.cmd('member.set',{operatorId:memberId,role:'sales',version:currentMember.version,teams:[]});assert.deepEqual((await h.send(folderQuery,undefined,member)).value.rows,[],'revocation immediately removes folder search and detail access')
+
 
 }))
 

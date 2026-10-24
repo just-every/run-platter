@@ -27,7 +27,7 @@ export function pipeline(proposals: any[], params = new URLSearchParams(), now =
  need(minValue === undefined || maxValue === undefined || minValue <= maxValue, 'Minimum value exceeds maximum')
  need(minAge === undefined || maxAge === undefined || minAge <= maxAge, 'Minimum age exceeds maximum')
  let rows = proposals.map(p => ({
-  ...(revenue?{recordedRevenue:p.recordedRevenue}:{}),id: String(p.id), title: String(p.title), status: String(p.pipelineStatus ?? p.status), currency: String(p.currency),
+  ...(revenue?{recordedRevenue:p.recordedRevenue}:{}),folderId:p.folderId??null,id: String(p.id), title: String(p.title), status: String(p.pipelineStatus ?? p.status), currency: String(p.currency),
   valueCents: Number(p.acceptance ? p.acceptance.totalCents : Math.max(...p.options.map((o: any) => o.cents))),
   ownerId: p.sales_owner_id as string | null, owner: p.sales_owner_name || 'Not recorded',
   clientId: String(p.client_id), client: String(p.clientName), age: Math.max(0, Math.floor((now - p.created_at) / 86400000)),
@@ -37,7 +37,7 @@ export function pipeline(proposals: any[], params = new URLSearchParams(), now =
  }))
  const owners = [...new Map(rows.map(r => [r.ownerId || 'unrecorded', { id: r.ownerId || 'unrecorded', name: r.owner }])).values()].sort((a,b) => a.name.localeCompare(b.name))
  const clients = [...new Map(rows.map(r => [r.clientId, { id: r.clientId, name: r.client }])).values()].sort((a,b) => a.name.localeCompare(b.name))
- rows = rows.filter(r => matching.has(r.id) && (!due||(due==='yes')===r.dueFollowup) && (!status || r.status === status) && (!params.get('owner') || (r.ownerId || 'unrecorded') === params.get('owner')) && (!params.get('client') || r.clientId === params.get('client')) && (!nextAction || r.nextAction === nextAction) && (minValue === undefined || r.valueCents >= minValue) && (maxValue === undefined || r.valueCents <= maxValue) && (minAge === undefined || r.age >= minAge) && (maxAge === undefined || r.age <= maxAge))
+ rows = rows.filter(r => matching.has(r.id) && (!params.get('folder')||r.folderId===params.get('folder')) && (!due||(due==='yes')===r.dueFollowup) && (!status || r.status === status) && (!params.get('owner') || (r.ownerId || 'unrecorded') === params.get('owner')) && (!params.get('client') || r.clientId === params.get('client')) && (!nextAction || r.nextAction === nextAction) && (minValue === undefined || r.valueCents >= minValue) && (maxValue === undefined || r.valueCents <= maxValue) && (minAge === undefined || r.age >= minAge) && (maxAge === undefined || r.age <= maxAge))
  rows.sort((a,b) => {
   const order = sort === 'value' ? a.currency.localeCompare(b.currency) || a.valueCents - b.valueCents : sort === 'age' ? a.age - b.age : sort === 'dueDate' ? (a.dueDate??'9999').localeCompare(b.dueDate??'9999') : String(a[sort as 'status' | 'owner' | 'client' | 'nextAction']).localeCompare(String(b[sort as 'status' | 'owner' | 'client' | 'nextAction']))
   return order * (direction === 'asc' ? 1 : -1) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id)
@@ -49,7 +49,7 @@ export function pipeline(proposals: any[], params = new URLSearchParams(), now =
 
 /** Search only offer content and visible metadata; invitation and verification credentials never participate. */
 function proposalText(p: any): string[] {
- return [documentText(p.document),p.title, p.clientName, p.clientEmail, p.sales_owner_name, p.pipelineStatus ?? p.status, p.scope, p.terms,
+ return [p.attachmentText,documentText(p.document),p.title, p.clientName, p.clientEmail, p.sales_owner_name, p.pipelineStatus ?? p.status, p.scope, p.terms,
   ...p.options.flatMap((option: any) => [option.label,
    ...(option.optionalItems ?? []).flatMap((item: any) => [item.label, item.description]),
    ...(option.tables ?? []).flatMap((table: any) => [table.name, ...table.lines.flatMap((line: any) => [line.name, line.description, line.group, line.unit])]),
@@ -58,8 +58,8 @@ function proposalText(p: any): string[] {
 }
 
 /** Call only with templates already filtered by live ownership and folder scope. */
-export function searchTemplates(templates:any[],query:string){
+export function searchTemplates(templates:any[],query:string,params=new URLSearchParams()){
  need(query.length<=200,'Search must be at most 200 characters')
  const phrase=query.trim().replace(/\s+/g,' ').toLowerCase()
- return templates.filter(t=>!phrase||[t.name,...proposalText(t.snapshot)].some(value=>String(value).replace(/\s+/g,' ').toLowerCase().includes(phrase)))
+ return templates.filter(t=>!phrase||[t.name,t.ownerName,...proposalText({...t.snapshot,attachmentText:t.attachmentText})].some(value=>String(value).replace(/\s+/g,' ').toLowerCase().includes(phrase))).filter(t=>{const value=Math.max(...t.snapshot.options.map((o:any)=>o.cents)),age=Math.floor((Date.now()-t.created_at)/86400000);return (!params.get('owner')||t.owner_id===params.get('owner'))&&(!params.get('folder')||t.folder_id===params.get('folder'))&&(bound(params,'minValue',true)===undefined||value>=bound(params,'minValue',true)!)&&(bound(params,'maxValue',true)===undefined||value<=bound(params,'maxValue',true)!)&&(bound(params,'minAge')===undefined||age>=bound(params,'minAge')!)&&(bound(params,'maxAge')===undefined||age<=bound(params,'maxAge')!)})
 }

@@ -1,3 +1,4 @@
+import { folderSelect } from './folders'
 import { libraryInsertion } from './library'
 import { blockEditor, documentBlocks } from './blocks'
 import { reminderPanel } from './reminders'
@@ -39,7 +40,7 @@ export function proposalsPage(state: any, selection = new URLSearchParams(), fee
   const prepare = canPrepare ? `<section class="prepare" aria-labelledby="prepare-title"><h2 id="prepare-title">Prepare a proposal</h2>` + (state.clients?.length
     ? composerShelf(state) + composerForm(state, undefined, 'prepare', 'composer-new') + (exceptionBand(state, undefined, feedback, 'composer-new') ?? '') + receipt('<p class="receipt-sum muted">The client chooses one of the two options and pays the deposit percentage of it.</p>', '<button form="composer-new">Prepare proposal</button>')
     : '<p>Add a client before preparing a proposal.</p>' + (owner ? '<a href="/app/clients">Manage clients</a>' : '<p>Ask the owner to add a client.</p>')) + '</section>' : ''
-  return (exceptions ? `<div class="exceptions">${exceptions}</div>` : '') + (['owner','admin','manager','sales','viewer','billing'].includes(state.actor?.role)?panel('Report views','<a href="/app?view=recorded-revenue">Recorded revenue</a>'+ (state.actor?.role!=='billing'?' · <a href="/app">Proposal pipeline</a>':'')):'') + followupQueuePanel(state, selection.get('owner')) + (owner ? pipelinePanel(proposals, selection, state.followups) + reportSchedulesPanel(state, selection) : panel('Your proposals', list)) + personalTemplates(state,selection.get('q')??'') + starterTemplatesPanel(state) + prepare
+  return (exceptions ? `<div class="exceptions">${exceptions}</div>` : '') + (['owner','admin','manager','sales','viewer','billing'].includes(state.actor?.role)?panel('Report views','<a href="/app?view=recorded-revenue">Recorded revenue</a>'+ (state.actor?.role!=='billing'?' · <a href="/app">Proposal pipeline</a>':'')):'') + followupQueuePanel(state, selection.get('owner')) + (owner ? pipelinePanel(proposals, selection, state.followups) + reportSchedulesPanel(state, selection) : panel('Your proposals', list)) + personalTemplates(state,selection.get('q')??'',selection) + starterTemplatesPanel(state) + prepare
 }
 
 /** The tracked-caps line over the heading: stage, status, revision and client. */
@@ -89,6 +90,7 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
     const note = frozen ? `${pricing} This offer is frozen. Its scope, options, and prices can no longer be revised.${fresh ? ' A fresh invitation replaces any previous client link and verification session while keeping the offer frozen.' : ''}` : pricing
     html += `<div class="composer-page frozen">${offerCards(p)}${exceptionBand(state, p, feedback, `negotiate-${p.id}`) ?? notices(feedback)}${receipt(sum, fresh + share, note)}</div>`
   }
+  if(['owner','admin'].includes(state.actor.role))html+=panel('Proposal folder',form('proposal.folder',proposalPath(p.id),hidden('id',p.id)+hidden('version',p.version)+hidden('folderVersion',p.folderVersion)+folderSelect(state,'proposal',p.folderId)+'<label><input type="checkbox" name="shareConsent" value="yes" required>I confirm this folder audience. Existing proposal permissions still apply.</label><button>File proposal</button>'))
   html += !frozen&&person?blockEditor(p):documentBlocks(p,'/api/platter/document-media/'+encodeURIComponent(p.id)+'/')
   const itemised = pricingTables(p.options ?? [], p.currency)
   const dossier: string[] = [libraryInsertion(state,p),disputesPanel(state,p),catalogPanel(state,p),sectionLocksPanel(state,p),paymentsPanel(state,p),internalPricingPanel(p,selection.get('costOption')),approvalPanel(p),sharingPanel(state,p),followupPanel(state, p), withdrawalPanel(state, p), itemised ? `<section class="panel wide"><h2>Itemised pricing</h2>${itemised}</section>` : '', panel('Offer record', people(state, p)), proposalAttachments(state, p), p.status === 'withdrawn' ? '' : pdfPanel(state, p), expiryPanel(state, p), reminderPanel(state,p)]

@@ -1,3 +1,4 @@
+import { pdfSearchText } from './documents/pdf-search'
 import { permitted } from './permissions'
 import { copyAttachments, prepareAttachment, saveVendorDocument, vendorDocuments, type AttachmentKind } from './attachments'
 import { commit, exact, need, proposal, snapshot, type Actor } from './model'
@@ -11,7 +12,11 @@ export async function attachmentUpload(db:D1Database,a:Actor,form:FormData){
  if(kind){const attachment=await saveVendorDocument(db,a,kind as AttachmentKind,upload);return {id:undefined,attachment}}
  const row=await permitted(db,a,form.get('id'),'edit');exact(row,{version:form.get('version')})
  need(row.status==='draft'||row.status==='approved','Upload attachments before sending',409)
+ need(file.size<=10*1024*1024,'Attachments are limited to 10 MiB',413)
+ let searchText:string|undefined
+ if(file.type.toLowerCase()==='application/pdf')searchText=await pdfSearchText(upload.bytes)
  const prepared=await prepareAttachment(db,upload),attachments=[...copyAttachments(JSON.parse(row.attachments)),prepared.attachment]
+ if(searchText!==undefined)prepared.writes.push(db.prepare('INSERT INTO p_attachment_search(file_id,content) VALUES(?,?)').bind(prepared.attachment.id,searchText))
  return saveRevision(db,a,row,attachments,prepared.writes)
 }
 export async function refreshVendorDocuments(db:D1Database,a:Actor,input:Record<string,unknown>){

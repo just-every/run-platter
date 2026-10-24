@@ -16,11 +16,12 @@ import { installationZone } from './reports/report-state'
 export async function templateState(db: D1Database, a: Actor) {
  need(['owner','admin','manager','sales','content_editor','agent','viewer','billing'].includes(a.role), 'Personal template access is required', 403)
  if(['viewer','billing'].includes(a.role))return []
- const access=resourceScope(a,'r'),rows=(await db.prepare('SELECT r.* FROM p_personal_templates r WHERE (r.owner_id=? OR r.shared=1) AND '+access.sql+' ORDER BY r.updated_at DESC,r.id').bind(a.id,...access.values).all<any>()).results
+ const access=resourceScope(a,'r'),rows=(await db.prepare("SELECT r.*,COALESCE(NULLIF(o.display_name,''),o.email) AS ownerName FROM p_personal_templates r JOIN oa_operators o ON o.id=r.owner_id WHERE (r.owner_id=? OR r.shared=1) AND "+access.sql+' ORDER BY r.updated_at DESC,r.id').bind(a.id,...access.values).all<any>()).results
+ const search=(await db.prepare('SELECT file_id,content FROM p_attachment_search').all<any>()).results
  const locks=(await db.prepare('SELECT * FROM p_template_locks ORDER BY section').all<any>()).results
  const delivery=(await db.prepare('SELECT * FROM p_template_defaults').all<any>()).results
  const messages=(await db.prepare('SELECT * FROM p_template_reminder_messages').all<any>()).results
- return rows.map(row => ({reminderTemplateId:messages.some(m=>m.template_id===row.id)?messages.find(m=>m.template_id===row.id).message_id:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}').reminderTemplateId??null,deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:a.role==='agent'?agentDeliveryDefaults(JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}')):JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, snapshot: JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
+ return rows.map(row => ({reminderTemplateId:messages.some(m=>m.template_id===row.id)?messages.find(m=>m.template_id===row.id).message_id:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}').reminderTemplateId??null,deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:a.role==='agent'?agentDeliveryDefaults(JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}')):JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, attachmentText:(JSON.parse(row.snapshot).attachments??[]).map((f:any)=>search.find(s=>s.file_id===f.id)?.content??'').join('\n'),snapshot:JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
 }
 
 async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false) {

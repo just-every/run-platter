@@ -232,6 +232,12 @@ test('EDIT-016 / REPORT-001 desktop and phone pipeline filters, value sort, tota
     await page.getByLabel('Minimum value',{exact:true}).fill('100000');await page.getByRole('button',{name:'Filter pipeline'}).click();assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'0');await capture('empty')
     await page.getByRole('link',{name:'Clear filters',exact:true}).click();assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'3')
     await page.getByRole('link',{name:'Brand identity',exact:true}).click();assert.equal(await page.locator('[name="title"]').inputValue(),'Brand identity')
+    const team=await command('team.create',{name:'Search review team'})
+    await page.goto(app.origin+'/app/team');const folderForm=page.locator('form').filter({has:page.locator('select[name=kind]')});await folderForm.locator('[name=kind]').selectOption('proposal');await folderForm.getByLabel('Folder name',{exact:true}).fill('Campaign review folder');await folderForm.getByRole('checkbox',{name:'Search review team',exact:true}).check();await folderForm.getByRole('checkbox',{name:/I authorize this folder/}).check();await folderForm.getByRole('button',{name:'Create shared folder',exact:true}).click();await capture('proposal-folder-settings')
+    const folders=(await(await context.request.get(app.origin+'/api/platter/state')).json()).resourceFolders,folder=folders.find(f=>f.name==='Campaign review folder')
+    await page.goto(app.origin+'/app/proposal?id='+fixture[0].id);const filing=page.locator('form[action*="name=proposal.folder"]');await filing.getByLabel('Resource folder',{exact:true}).selectOption(folder.id);await filing.getByRole('checkbox',{name:/I confirm this folder audience/}).check();await filing.getByRole('button',{name:'File proposal',exact:true}).click();await capture('filed-proposal')
+    await page.goto(app.origin+'/app');await page.getByLabel('Proposal folder',{exact:true}).selectOption(folder.id);await page.getByRole('button',{name:'Filter pipeline',exact:true}).click();assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'1');assert.equal(await page.locator('[data-proposal-id]').getAttribute('data-proposal-id'),fixture[0].id);await capture('folder-search')
+
    }finally{await context.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}

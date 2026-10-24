@@ -1,1 +1,0 @@
-document.querySelectorAll('form').forEach(form=>{const select=form.querySelector('select[name=itemId]'),version=form.querySelector('input[name=itemVersion]');if(select&&version)select.addEventListener('change',()=>{version.value=select.selectedOptions[0].dataset.version})})

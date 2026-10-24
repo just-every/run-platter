@@ -29,8 +29,9 @@ async function documentWrites(db:D1Database,a:Actor,row:any,document:any,at:numb
 export async function insertLibrary(db:D1Database,a:Actor,p:Record<string,unknown>){
  need(['owner','admin','manager','sales','content_editor'].includes(a.role),'Your role cannot insert library content',403)
  const row=await permitted(db,a,p.id,'edit');exact(row,p)
- const item=await db.prepare('SELECT * FROM p_library_items WHERE id=?').bind(text(p.itemId,'a library item')).first<any>();need(item,'Library item not found',404)
- need(item.version===Number(p.itemVersion),'Library item changed. Reload before inserting.',409)
+ const ref=typeof p.itemRef==='string'?p.itemRef.split(':'):[],itemId=p.itemId??ref[0],itemVersion=p.itemVersion??ref[1]
+ const item=await db.prepare('SELECT * FROM p_library_items WHERE id=?').bind(text(itemId,'a library item')).first<any>();need(item,'Library item not found',404)
+ need(item.version===Number(itemVersion),'Library item changed. Reload before inserting.',409)
  const access=await folderGuard(db,a,item.folder_id,'library')
  need(['linked','detached'].includes(String(p.mode)),'Choose a linked or detached copy')
  need(p.consent===true||p.consent==='yes','Authorize sharing this content with the proposal recipients')
@@ -46,11 +47,12 @@ export async function libraryUsage(db:D1Database,a:Actor,itemId:string){
  return rows.flatMap(row=>{
   const block=documentOf(row).blocks.find(b=>b.id===row.block_id),pending=row.pending_snapshot?documentOf(JSON.parse(row.pending_snapshot)).blocks.find(b=>b.id===row.block_id):undefined
   if(!block&&!pending)return []
-  return [{proposalId:row.proposal_id,title:row.proposal_title,blockId:row.block_id,mode:row.linked&&matches(pending??block,row)?'linked':'detached',frozen:!row.pending_snapshot&&!['draft','approved'].includes(row.status),itemVersion:row.item_version}]
+  return [{proposalId:row.proposal_id,title:row.proposal_title,blockId:row.block_id,mode:row.linked&&matches(pending??block,row)?'linked':'detached',frozen:row.status==='accepted'||(!pending&&!['draft','approved'].includes(row.status)),itemVersion:row.item_version}]
  })
 }
 
 export async function propagateLibrary(db:D1Database,a:Actor,old:any,next:any,at:number){
+ if(old.title===next.title&&old.content===next.content&&old.kind===next.kind)return []
  const uses=(await db.prepare('SELECT p.*,u.proposal_id,u.block_id,u.item_id,u.linked,u.item_version,u.title AS source_title,u.content,u.kind FROM p_library_uses u JOIN p_proposals p ON p.id=u.proposal_id WHERE u.item_id=? AND u.linked=1').bind(old.id).all<any>()).results
  const writes:D1PreparedStatement[]=[]
  for(const id of new Set(uses.map(u=>u.proposal_id))){

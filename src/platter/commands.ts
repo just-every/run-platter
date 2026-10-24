@@ -1,3 +1,4 @@
+import { detachChangedLibraryCopies } from './library-links'
 import { notificationCommand } from './notifications/commands'
 import { validateDocumentMedia } from './documents/media'
 import { proposalDocument, documentOf } from './documents/blocks'
@@ -136,7 +137,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   writes.push(db.prepare('UPDATE p_proposals SET section_conditions=?,document=? WHERE id=?').bind(JSON.stringify(f.section_conditions),JSON.stringify(f.document),id))
   writes.push(db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,?,?,?,?,?)').bind(id,revision,JSON.stringify(snapshot(row)),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency))
   if(!old)writes.push(...await defaultStatements(db,id))
-  if(old)writes.push(copyCosts(db,id,costSourceRevision??old.revision,id,revision))
+  if(old)writes.push(copyCosts(db,id,costSourceRevision??old.revision,id,revision),detachChangedLibraryCopies(db,id,f.document))
   if(internalCosts)writes.push(...patchCosts(db,id,revision,internalCosts))
   await commit(db,a,writes,false,old?{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))",values:[id,old.version]}:undefined);return{id,revision,version:(old?.version??0)+1}
  }

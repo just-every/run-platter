@@ -499,7 +499,9 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   const templateFolder=await h.cmd('folder.save',{name:'East templates',kind:'template',teams:[team.id],shareConsent:true}),libraryFolder=await h.cmd('folder.save',{name:'East library',kind:'library',teams:[team.id],shareConsent:true})
   const shared=await h.cmd('template.save',{id:p.id,version:2,name:'Shared locked cost template',shared:true,folderId:templateFolder.id,shareConsent:true});await h.cmd('template.locks',{id:shared.id,version:1,sections:['terms']})
   const lockedCopy=await h.cmd('template.start',{id:shared.id,version:2,clientId:client.id},people.sales.cookie)
-  await h.cmd('library.save',{title:'Synthetic case study',kind:'case_study',content:'An archived text library item',folderId:libraryFolder.id})
+  const archivedLibrary=await h.cmd('library.save',{title:'Synthetic case study',kind:'case_study',content:'An archived text library item',folderId:libraryFolder.id})
+  const libraryCopy=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archived library uses',scope:'Library custody',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+  for(const [index,mode] of ['linked','detached'].entries())await h.cmd('library.insert',{id:libraryCopy.id,version:index+1,itemId:archivedLibrary.id,itemVersion:1,mode,consent:true})
   await h.cmd('proposal.approve',{id:p.id,version:2,revision:2},people.manager.cookie)
   const paid=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic paid proposal',scope:'Synthetic scope',optionOne:'First',priceOne:'2400',optionTwo:'Second',priceTwo:'4200',depositPercent:'25'})
   const catalog=await h.cmd('catalog.save',{name:'Archived service',sku:'synthetic-platter-3300',description:'Reviewed service',unit:'hour',unitPrice:'100',unitCost:'25'});await h.cmd('catalog.insert',{id:paid.id,version:1,catalogId:catalog.id,catalogVersion:1,optionId:'one',quantity:'2'})
@@ -540,7 +542,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   const deliveryTemplate=await h.cmd('template.save',{id:futureReminder.id,version:(await h.state()).proposals.find(r=>r.id===futureReminder.id).version,name:'Archived delivery sources'});await h.cmd('template.delivery',{id:deliveryTemplate.id,version:1,remindersSource:'inherit',expirySource:'override',expiryDays:14,warningSource:'inherit',reminderTemplateId:reminderMessage.id})
   const pendingOAuth=await h.send('/api/platter/mailbox/authorize',{provider:'gmail',consent:true},people.sales.cookie);assert.equal(pendingOAuth.status,303)
   const beforeRevenue=await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,h.owner);assert.equal(beforeRevenue.status,200)
-  const before=await h.state(),tables=['p_reminder_templates','p_template_reminder_messages','p_delivery_changes','p_reminder_policy','p_reminder_settings','p_reminder_runs','p_reminder_optouts','p_mail_reply_cap_notices','p_mail_replies','p_mail_attributions','p_report_schedules','p_report_runs','p_template_sources','p_disputes','p_dispute_packets','p_dispute_packet_parts','p_dispute_authorizations','p_dispute_submissions','p_dispute_documents','p_priced_catalog','p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
+  const before=await h.state(),tables=['p_reminder_templates','p_template_reminder_messages','p_delivery_changes','p_reminder_policy','p_reminder_settings','p_reminder_runs','p_reminder_optouts','p_mail_reply_cap_notices','p_mail_replies','p_mail_attributions','p_report_schedules','p_report_runs','p_template_sources','p_disputes','p_dispute_packets','p_dispute_packet_parts','p_dispute_authorizations','p_dispute_submissions','p_dispute_documents','p_priced_catalog','p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_library_uses','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
   const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
   await h.close();h=undefined
@@ -572,6 +574,9 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+10*86400000),cron:'*/15 * * * *'})
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_reminder_runs').first()).n,retainedReminders,'restored reminders never resume or replay outbound email')
   assert.deepEqual(restoredCalls,[],'the restored scheduler makes no provider call')
+  await h.cmd('library.save',{id:archivedLibrary.id,version:1,title:'Synthetic case study',kind:'case_study',content:'Restored linked story'},owner)
+  const restoredLibrary=(await h.state(owner)).proposals.find(r=>r.id===libraryCopy.id)
+  assert.equal(restoredLibrary.document.blocks[0].text,'Restored linked story');assert.equal(restoredLibrary.document.blocks[1].text,'An archived text library item')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 

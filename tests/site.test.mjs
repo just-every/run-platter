@@ -107,7 +107,7 @@ test('PRICE-008 legacy AUD agreement and new USD owner/client screens show exact
   browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
-   app=await installedApp({businessFixture:'fixtures/first-release-aud.rer'})
+   app=await installedApp({businessFixture:'fixtures/first-release-aud.ndjson'})
    const context=await browser.newContext({viewport:{width,height:900}})
    try {
     const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`PRICE-008-${name}-${width}.png`),fullPage:true})}
@@ -737,7 +737,7 @@ test('EDIT-018 desktop and phone preview exact client content, switch widths and
   browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
-   app=await installedApp({businessFixture:'fixtures/first-release-aud.rer'});const context=await browser.newContext({viewport:{width,height:900}})
+   app=await installedApp({businessFixture:'fixtures/first-release-aud.ndjson'});const context=await browser.newContext({viewport:{width,height:900}})
    try{
     const page=await context.newPage()
     assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)

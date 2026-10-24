@@ -2154,6 +2154,7 @@ test('EDIT-001 display media requires consent and live edit scope, stays private
  const h=await harness({assetsDirectory:'public'})
  try{
   const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+  assert.notEqual((await h.state()).workspaceDefaults.externalContentEnabled,true,'external content defaults off')
   await h.cmd('workspace.defaults',{version:0,externalContentEnabled:true})
   const {client,p}=await draft(h),bytes=await readFile('public/brand/apple-touch-icon.png')
   const upload=async(input={},cookie=h.owner)=>{const data=new FormData();data.set('id',p.id);data.set('version','1');data.set('consent','yes');for(const [key,value]of Object.entries(input))data.set(key,value);if(!data.has('file'))data.set('file',new File([bytes],'synthetic-platter-1.png',{type:'image/png'}));const request=new Request(h.origin+'/app/document-media',{method:'POST',headers:{origin:h.origin,cookie,accept:'application/json'},body:data});const r=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});return {status:r.status,text:await r.text()}}
@@ -2180,6 +2181,7 @@ test('EDIT-001 display media requires consent and live edit scope, stays private
   const memberChange=structuredClone(document);memberChange.blocks.at(-1).url='https://www.loom.com/embed/'+'c'.repeat(32)
   await h.cmd('proposal.document',{id:p.id,version:2,document:memberChange},member,403)
   assert.deepEqual((await h.state()).proposals.find(row=>row.id===p.id).document,document,'a shared editor cannot change an external provider block')
+  assert.equal((await h.state()).revisions.find(r=>r.proposal_id===p.id&&r.revision===2).snapshot.document.blocks.at(-1).consent,true,'author consent is retained in the immutable revision')
   const actual=await h.mf.dispatchFetch(h.origin+privatePath,{headers:{cookie:h.owner}});assert.equal(actual.status,200);assert.equal(actual.headers.get('content-disposition'),'inline');assert.deepEqual(Buffer.from(await actual.arrayBuffer()),bytes)
   const other=await h.cmd('proposal.prepare',{...offer,clientId:client.id});await h.cmd('proposal.document',{id:other.id,version:1,document},h.owner,400)
   const copy=await h.cmd('proposal.duplicate',{id:p.id,version:2});assert.equal((await h.send('/api/platter/document-media/'+copy.id+'/'+image.id,undefined,h.owner)).status,200);assert.deepEqual((await h.state()).proposals.find(p=>p.id===copy.id).documentMedia.map(f=>f.id),[image.id],'copies exclude files never placed in the source document')
@@ -2193,10 +2195,10 @@ test('EDIT-001 display media requires consent and live edit scope, stays private
   try{const links=[];for(let i=1;i<=parsed.numPages;i++)links.push(...await (await parsed.getPage(i)).getAnnotations());assert.ok(links.some(a=>a.url===document.blocks.at(-1).url),'PDF has an actionable playback annotation')}finally{await parsed.destroy()}
   await h.cmd('workspace.defaults',{version:1,externalContentEnabled:false},member,403)
   await h.cmd('workspace.defaults',{version:1,externalContentEnabled:false})
-  const disabled=await h.send(path,undefined,cookie);assert.match(disabled.text,/External content is disabled/);assert.ok(!disabled.text.includes('data-embed-url'))
+  const disabled=await h.send(path,undefined,cookie);assert.match(disabled.text,/Loom content is disabled/);assert.ok(!disabled.text.includes('data-embed-url'))
   assert.equal((await h.send('/api/platter/audit?action=workspace.defaults',undefined,h.owner)).value.rows.length,2,'external policy changes are audited')
   await h.cmd('workspace.defaults',{version:2,externalContentEnabled:true})
-  const html=await h.send(path,undefined,cookie);assert.match(html.headers.get('content-security-policy'),/frame-src 'self' https:\/\/www.youtube-nocookie.com/);assert.ok(!html.text.includes('<iframe'),'providers are unloaded by default');assert.match(html.text,/data-external-embed/);assert.match(html.text,/Gallery studio mark/)
+  const html=await h.send(path,undefined,cookie);assert.equal(html.headers.get('content-security-policy').split(';').map(s=>s.trim()).find(s=>s.startsWith('frame-src ')),"frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://fast.wistia.net https://calendly.com https://drive.google.com");assert.ok(!html.text.includes('<iframe'),'providers are unloaded by default');assert.match(html.text,/data-external-embed/);assert.match(html.text,/Gallery studio mark/)
 
   await h.cmd('proposal.send',{id:p.id,version:4});assert.equal((await h.send(path+'/media/'+image.id)).status,404,'rotated invitations lose media authority too')
   for(const [url,canonical]of [['https://youtu.be/abcdefghijk?autoplay=1','https://www.youtube-nocookie.com/embed/abcdefghijk'],['https://vimeo.com/123456','https://player.vimeo.com/video/123456'],['https://loom.com/share/'+'b'.repeat(32)+'?sid=ignored','https://www.loom.com/embed/'+'b'.repeat(32)],['https://fast.wistia.com/embed/iframe/abcdefghij','https://fast.wistia.net/embed/iframe/abcdefghij'],['https://calendly.com/synthetic-platter-1/meeting?email=ignored','https://calendly.com/synthetic-platter-1/meeting'],['https://drive.google.com/file/d/synthetic-platter-1/view?usp=sharing','https://drive.google.com/file/d/synthetic-platter-1/preview']]){
@@ -2204,6 +2206,28 @@ test('EDIT-001 display media requires consent and live edit scope, stays private
    const copy=await h.cmd('proposal.duplicate',{id:p.id,version:5}),placed=structuredClone(document);placed.blocks.at(-1).url=url
    await h.cmd('proposal.document',{id:copy.id,version:1,document:placed});const saved=(await h.state()).proposals.find(p=>p.id===copy.id);assert.equal(saved.document.blocks.at(-1).url,canonical,'only canonical playback paths reach client frames')
   }
+
+
+  const auditBefore=(await h.send('/api/platter/audit?action=workspace.defaults',undefined,h.owner)).value.rows
+  for(const role of ['manager','sales','content_editor','viewer','billing','admin']){
+   const person=(await h.state()).teamPeople.find(row=>row.id===memberId)
+   await h.cmd('member.set',{operatorId:memberId,version:person.version,role,teams:[]})
+   if(role==='admin'){
+    await h.cmd('workspace.defaults',{version:3,externalContentEnabled:false},member)
+    await h.cmd('workspace.defaults',{version:4,externalContentEnabled:true},member)
+    const copy=await h.cmd('proposal.duplicate',{id:p.id,version:5}),placed=structuredClone(document);placed.blocks.at(-1).url='https://vimeo.com/654321'
+    await h.cmd('proposal.document',{id:copy.id,version:1,document:placed},member)
+    assert.equal((await h.state()).proposals.find(row=>row.id===copy.id).document.blocks.at(-1).url,'https://player.vimeo.com/video/654321','admins may change external blocks')
+   }else{
+    await h.cmd('workspace.defaults',{version:3,externalContentEnabled:false},member,403)
+    await h.cmd('proposal.document',{id:p.id,version:5,document:memberChange},member,403)
+   }
+  }
+  const key=await h.cmd('agent.create',{label:'synthetic-platter-9000'})
+  for(const name of ['workspace.defaults','proposal.document'])assert.equal((await h.send('/api/platter/agent/command',{name,input:{id:p.id,version:5,externalContentEnabled:false,document:memberChange}},'',{authorization:'Bearer '+key.token})).status,403)
+  const auditAfter=(await h.send('/api/platter/audit?action=workspace.defaults',undefined,h.owner)).value.rows
+  assert.equal(auditAfter.length,auditBefore.length+2,'every successful admin setting change is audited and denied changes add none')
+  assert.equal(auditAfter.filter(row=>row.actor_role==='admin').length,2)
 
  }finally{await h.close()}
 })

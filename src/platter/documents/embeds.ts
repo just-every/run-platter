@@ -26,3 +26,9 @@ export function embedUrl(value:unknown):string {
  need(false,'This embed host or path is not allowed. Use YouTube, Vimeo, Loom, Wistia, Calendly or Google Drive PDF previews.')
 }
 export const embedFrameSources="https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://fast.wistia.net https://calendly.com https://drive.google.com"
+
+/** Name the blocked provider without creating links or loading remote content. */
+export function embedProvider(url:string):string {
+ const names:Record<string,string>={'www.youtube-nocookie.com':'YouTube','player.vimeo.com':'Vimeo','www.loom.com':'Loom','fast.wistia.net':'Wistia','calendly.com':'Calendly','drive.google.com':'Google Drive'}
+ return names[new URL(url).hostname]??new URL(url).hostname
+}

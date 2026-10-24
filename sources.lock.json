@@ -1102,11 +1102,11 @@
       "executable": false
     },
     "rer-project.json": {
-      "sha256": "b6ceede45f9fbdbb7b6aaa586ee413c153db5b35d83b9c5947adbebc8dd303a7",
+      "sha256": "e2f9f03a276ff3951b9bf9f6ac305f6d91d3209bf7a4a63def38ebf8cc6e5d2b",
       "executable": false
     },
     "rer-setup.json": {
-      "sha256": "1485443be6fc9f15dba303aa11127cfb5851eba31e3cdd95cf7ae36cfecafb7f",
+      "sha256": "b42f939665afc4d08d08662b44d0650abf74d80034198c1977b8ddd250c44185",
       "executable": false
     },
     "RUN-LOCALLY.md": {
@@ -1230,7 +1230,7 @@
       "executable": false
     },
     "scripts/installer/local.mjs": {
-      "sha256": "d35af244b081312da367e23bce8e087a7a5cf5806d0821c8433d03849a0e4ab6",
+      "sha256": "3a113c2a32bfee9c8c61c16797233bf6c43fe2f3f0ea9fa060c26d692cbadd81",
       "executable": false
     },
     "scripts/installer/seed.mjs": {

@@ -87,8 +87,13 @@
         {
           "value": "rer",
           "label": "RER managed mail"
+        },
+        {
+          "value": "development",
+          "label": "Local development (no mail)"
         }
-      ]
+      ],
+      "help": "Local development sends no email. For hosting, choose a configured provider and a verified sender."
     },
     {
       "name": "MAIL_FROM",
@@ -124,8 +129,7 @@
           },
           "required": true
         }
-      ],
-      "localDefault": "local@platter.test"
+      ]
     },
     {
       "name": "MAIL_RELAY_URL",
@@ -173,10 +177,7 @@
           },
           "required": true
         }
-      ],
-      "localDefault": {
-        "generate": "hex"
-      }
+      ]
     },
     {
       "name": "MAIL_ACCOUNT_ID",

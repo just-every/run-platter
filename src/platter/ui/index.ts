@@ -32,7 +32,7 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
     let layout = ''
     switch (url.pathname) {
       case '/app/catalog': title='Catalog'; content=catalogPage(state); break
-      case '/app/library': title='Content library'; content=libraryPage(state); break
+      case '/app/library': title='Content library'; content=libraryPage(state,url.searchParams); break
       case '/app/team': title='Team'; content=teamPage(state)+foldersPanel(state)+connectionsPanel(state,true); break
       case '/app/approvals': title='Approvals'; content=approvalsPage(state); break
       case '/app/settings': title = 'Vendor documents'; above = eyebrow('Settings · defaults for new proposals'); content = vendorSettings(state)+workspacePanel(state)+connectionsPanel(state,false); break

@@ -30,7 +30,7 @@ export async function negotiationCommand(env: Bindings, actor: Actor, name: stri
    db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(offer.id),
    db.prepare('INSERT INTO p_negotiations(proposal_id,revision,snapshot,prepared_by,prepared_at) VALUES(?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,snapshot=excluded.snapshot,prepared_by=excluded.prepared_by,prepared_at=excluded.prepared_at,approved_by=NULL,approved_at=NULL').bind(offer.id, revision, saved, actor.email, at),
    db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,?,?,?,?,?)').bind(offer.id, revision, saved, actor.email, at, offer.currency),
-   detachChangedLibraryCopies(db,offer.id,documentOf(fields)),
+   ...await detachChangedLibraryCopies(db,offer.id,documentOf(fields),fields.options),
    copyCosts(db,offer.id,fields.costSourceRevision??pending?.revision??offer.revision,offer.id,revision),...patchCosts(db,offer.id,revision,fields.internalCosts??[]),
   ], false, guard)
   return { id: offer.id, revision, version: offer.version + 1 }

@@ -1,3 +1,4 @@
+import { richLibraryPropagation, richLibrarySource } from './library-fixture.mjs'
 import { documentFixture } from './document-fixture.mjs'
 import { templatesHttp } from './templates-http.mjs'
 import { followupJourney } from './followup-journey.mjs'
@@ -2258,6 +2259,8 @@ test('EDIT-003 linked draft copies propagate atomically while detached, sent and
  await h.cmd('library.save',{id:item.id,version:4,title:'Updated case study',kind:'case_study',content:'Later library text'})
  assert.equal((await read(linked.id)).document.blocks[0].text,'Final library story','restoring matching text never silently relinks a manually detached copy')
  const afterAcceptance=await read(frozen.id);assert.deepEqual(afterAcceptance,acceptedView,'the accepted proposal stays byte-identical after later library edits')
+ await richLibraryPropagation(h,client.id)
+
 }))
 
 test('EDIT-003 insertion enforces live role, folder and proposal scope, consent, stale versions and locked terms without writes',()=>run(async h=>{
@@ -2266,8 +2269,11 @@ test('EDIT-003 insertion enforces live role, folder and proposal scope, consent,
  const sales=await h.signIn('sales-library@synthetic-platter.example'),person=(await h.state(sales)).actor
  const input={id:p.id,version:1,itemId:item.id,itemVersion:1,mode:'linked',consent:true}
  const before=await h.state();await h.cmd('library.insert',input,sales,403);assert.deepEqual(await h.state(),before)
+ for(const consent of [false,undefined,'no']){const refused={...input,consent};await h.cmd('library.insert',refused,h.owner,400);assert.deepEqual(await h.state(),before,'absent or revoked insertion consent writes nothing')}
  await h.cmd('library.insert',{...input,consent:false},h.owner,400);await h.cmd('library.insert',{...input,itemVersion:2},h.owner,409)
  await h.cmd('proposal.share',{id:p.id,operatorId:person.id});await h.cmd('library.insert',input,sales)
+ await h.cmd('proposal.share',{id:p.id,operatorId:person.id,shared:false})
+ const revokedBefore=await h.state();await h.cmd('library.insert',{...input,version:2},sales,403);assert.deepEqual(await h.state(),revokedBefore,'revoked editor authority refuses insertion despite earlier consent')
  const current=(await h.state()).proposals.find(n=>n.id===p.id),template=await h.cmd('template.save',{id:p.id,version:current.version,name:'Locked terms'})
  await h.cmd('template.locks',{id:template.id,version:1,sections:['terms']})
  const locked=await h.cmd('template.start',{id:template.id,version:2,clientId:client.id})
@@ -2289,6 +2295,10 @@ test('EDIT-003 insertion enforces live role, folder and proposal scope, consent,
  const lockBefore=await h.state()
  await h.cmd('library.save',{id:lockedLink.id,version:1,title:'New terms',kind:'terms',content:'Must not bypass a terms lock'},h.owner,403)
  assert.deepEqual(await h.state(),lockBefore,'locked-term refusal rolls back the library edit, propagation and every revision')
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+ const {source}=await richLibrarySource(h,client.id),capture={title:'Shared image',kind:'image',sourceRef:source.id+':image',shareConsent:true}
+ const privateSource=await h.state();await h.cmd('library.save',capture,editor,403);assert.deepEqual(await h.state(),privateSource,'library editing rights do not expose an out-of-scope source proposal')
+ await h.cmd('proposal.share',{id:source.id,operatorId:editorId});await h.cmd('library.save',capture,editor)
  for(const role of ['viewer','billing']){
   const email=role+'-library@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)
   const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[]})

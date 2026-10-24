@@ -5,6 +5,7 @@
 .mv-term pre{margin:0;white-space:pre-wrap;word-break:normal;overflow-wrap:normal;font:500 14px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
 .mv-prompt{color:#9A9AA6}
 .mv-arg{white-space:nowrap}
+.mv-comment{color:#9A9AA6}
 .mv-ready{color:#7FD08A}
 .mv-spread{--row:44px;--tok:50px;--gap:150px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:var(--gap);margin-top:52px;position:relative}
 .mv-doc{grid-column:1;grid-row:1;background:#F7F7F9;border:1px solid #DCDAE0;border-radius:8px;box-shadow:0 6px 20px rgb(28 28 36 / .08);position:relative}

@@ -1,16 +1,16 @@
 # Getting started
 
-Run Platter on your own computer first. You need Git, an internet connection for the first install, and 15 GiB of free space. RER selects the project's pinned Node version and installs its dependencies.
+Run Platter on your own computer first. You need an internet connection for the first install and 15 GiB of free space. Git is required; rer brings Node and pnpm. RER selects the project's pinned Node version and installs its dependencies.
 
 ## Launch Platter
 
-One line installs the RER launcher, clones the source and launches Platter:
+One line installs the RER launcher, clones the source into `run-platter` and launches Platter:
 
 ```sh
-npx -y @runeditrun/rer dev just-every/run-platter
+curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-platter
 ```
 
-To start it again later, run `cd run-platter && rer dev`.
+Already have Node 22 or later? `npx -y @runeditrun/rer dev just-every/run-platter` does the same. If the installer prints a line that puts `rer` on your PATH, run that line too. To start it again later, run the same line from the same folder, or `cd run-platter && rer dev`.
 
 The first launch can take a few minutes. RER prepares local storage and a local owner account. Open the private **RER_OPEN** link printed in your terminal on this computer. Keep that link private: it signs you in as the owner. If a launch is interrupted, run `rer dev` again to resume.
 

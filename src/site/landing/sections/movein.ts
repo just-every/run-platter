@@ -10,9 +10,13 @@ const rows: [string, string, string][] = [
 const tokens: [string, string, string][] = [['Prepared for', '[Client.Company]', '{client.company}'], ['Hi', '[Client.FirstName],', '{client.first_name}'], ['—', '[Sender.FirstName]', '{sender.first_name}']]
 const tickCell = `<span class="ok-ic" aria-label="linked">${check}</span>`
 
+// The one start line every Run Edit Run page shows (the installer, then rer dev), then the npx alternative; each word stays whole.
+const args = (line: string) => line.split(' ').map(arg => `<span class="mv-arg">${escape(arg)}</span>`).join(' ')
+
 export const moveInSection = (): string => `<section id="move-in" class="sec movein">
 <div class="mv-top">${head(['Moving in', 'Fernhill Design Studio', 'Sat Oct 3'], 'Your PandaDoc templates,', 'now editable pages.', t('Ben downloaded his templates from PandaDoc as Word files. Platter made them editable, turned the tokens into fields and matched the quote rows to his catalog.'))}
-<figure class="mv-term" aria-label="Run Platter yourself"><span class="mv-lights" aria-hidden="true"><i></i><i></i><i></i></span><pre><code><span class="mv-prompt">$</span> ${run.clone.split(' ').map(arg => `<span class="mv-arg">${escape(arg)}</span>`).join(' ')}
+<figure class="mv-term" aria-label="Run Platter yourself"><span class="mv-lights" aria-hidden="true"><i></i><i></i><i></i></span><pre><code><span class="mv-prompt">$</span> ${args(`curl -fsSL https://runeditrun.com/install.sh | sh -s -- ${run.clone.slice('npx -y @runeditrun/rer '.length)}`)}
+<span class="mv-comment"># ${args(`Already have Node 22 or later? ${run.clone}`)}</span>
 <span class="mv-ready">✓ Platter is ready</span></code></pre></figure></div>
 <div class="mv-spread">
 <article class="mv-doc" aria-label="Word download from PandaDoc"><p class="mv-file">${line('Brand refresh · Good / Better / Best.docx')}</p>

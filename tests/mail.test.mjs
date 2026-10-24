@@ -255,6 +255,37 @@ test('MAIL-001 local proposal and verification mail are captured without provide
   } finally { await h.close() }
 })
 
+test('MAIL-001 Managed relay sends proposal invitations and verification codes through its assigned endpoint', async () => {
+  const calls = []
+  const relay = 'https://mail.synthetic-platter.example/send'
+  const h = await harness({origin: 'https://platter.example',
+    auth: {AUTH_LOCAL: 'false', MAIL_PROVIDER: 'rer', MAIL_RELAY_URL: relay, MAIL_API_KEY: 'synthetic-platter-9001'},
+    outboundService: async request => {
+      assert.equal(request.url, relay)
+      assert.equal(request.headers.get('authorization'), 'Bearer synthetic-platter-9001')
+      const body = await request.json()
+      assert.equal(Object.hasOwn(body, 'from'), false)
+      assert.equal(Object.hasOwn(body, 'installationId'), false)
+      calls.push(body)
+      return Response.json({messageId: '<synthetic-platter-' + (9002 + calls.length) + '@relay.example>'}, {status: 202})
+    },
+  })
+  try {
+    await finishSetup(h)
+    const id = await approved(h)
+    const sent = await h.cmd('proposal.send', {id, version: 2})
+    assert.equal(calls[0].to, recipient)
+    assert.ok(calls[0].text.includes(sent.shareUrl))
+    assert.equal((await h.state()).proposals.find(p => p.id === id).delivery, 'accepted')
+    const path = new URL(sent.shareUrl).pathname
+    assert.equal((await h.send(path + '/action?name=code.request', {})).status, 200)
+    const code = calls[1].text.match(/\b\d{6}\b/)?.[0]
+    assert.ok(code)
+    assert.equal((await h.send(path + '/action?name=code.verify', {code})).status, 200)
+    assert.ok((await mailRows(h)).every(row => row.status === 'accepted'))
+  } finally { await h.close() }
+})
+
 test('MAIL-001 hosted mail commits and claims before provider acceptance; timeout is uncertain and never resent', { timeout: 60000 }, async () => {
   const calls = []
   let timeoutNext = false

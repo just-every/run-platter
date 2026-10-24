@@ -21,5 +21,18 @@
   ],
   "assets": {
     "binding": "ASSETS"
+  },
+  "vars": {
+    "AUTH_LOCAL": "false",
+    "AUTH_ORIGIN": "",
+    "MAIL_PROVIDER": "resend",
+    "MAIL_FROM": "",
+    "MAIL_RELAY_URL": "",
+    "MAIL_ACCOUNT_ID": "",
+    "OWNER_EMAIL": "",
+    "IDENTITY_PROVIDER": "",
+    "GOOGLE_MAIL_CLIENT_ID": "",
+    "MICROSOFT_MAIL_CLIENT_ID": "",
+    "QUESTION_REPLY_DOMAIN": ""
   }
 }

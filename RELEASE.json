@@ -1,0 +1,319 @@
+{
+  "version": "0.1.0",
+  "publicReleaseNotes": "Platter prepares its first installable listing with hosted deployment metadata, Managed mail support and retained source provenance. It provides two-option proposals, owner approval, email-verified acceptance and deposit invoice export. See CONTRACT.md for published guarantees and unfinished target work.",
+  "migrations": [
+    {
+      "id": "0001_owner.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0002_outbox.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0003_portability.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0004_first_run.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0005_identity_providers.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0006_provider_control.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0007_dependencies.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0008_owner_claim.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0009_idp_owner.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0010_provider_pins.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0011_dependency_setup.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0012_dependency_approval.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0013_erasure.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0014_owner_signin.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0015_platter.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0016_client_import.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0017_currency.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0018_negotiations.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0019_sales_owner.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0020_audit.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0021_mcp_requests.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0022_suggestions.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0023_attachments.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0024_delivery.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0025_business_csv.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0026_paper_acceptance.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0027_report_schedules.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0028_client_pdf.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0029_expiry.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0030_questions.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0031_question_replies.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0032_withdrawals.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0033_followups.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0034_conditional_sections.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0035_package_selections.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0036_personal_templates.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0037_test_mail_quota.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0038_invitation_messages.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0039_outcomes.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0039_team_permissions.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0040_approval_policy.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0041_content_library.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0042_internal_costs.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0043_workspace_defaults.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0044_provider_connections.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0045_payment_records.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0046_shared_resources.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0047_section_locks.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0048_member_invitations.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0049_priced_catalog.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0050_dispute_responses.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0051_template_rule_sources.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0052_dispute_packets.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0053_invitation_revocation.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0054_mailbox_sending.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0055_client_mail_replies.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0056_client_reply_custody.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0057_reminders.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0058_delivery_settings.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0059_reminder_messages.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0060_notifications.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0061_proposal_documents.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0063_library_uses.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0064_library_resources.sql",
+      "buyerSteps": "None."
+    },
+    {
+      "id": "0065_proposal_search.sql",
+      "buyerSteps": "None."
+    }
+  ],
+  "breaking": false,
+  "agentUpdateInstructions": "Use the pinned rer commands and the committed setup manifest. Review deployment inputs and recovery instructions before installation.",
+  "contractChanges": {
+    "HTTP-001": {
+      "change": "added",
+      "summary": "Every proposal, client, import and invoice handler checks a native Base owner or member session, or a revocable owner-bound agent key, before it reads or writes."
+    },
+    "ACCESS-001": {
+      "change": "added",
+      "summary": "An owner issues an agent key with a label and a 30-day expiry, stored only as a hash and bound to that owner's current account version."
+    },
+    "PROP-001": {
+      "change": "added",
+      "summary": "Every approval names one exact revision."
+    },
+    "PROP-002": {
+      "change": "added",
+      "summary": "Sending freezes the approved revision: its scope, options and prices can no longer be edited in place."
+    },
+    "SIGN-001": {
+      "change": "added",
+      "summary": "A client invitation grants access only to its own frozen offer."
+    },
+    "SIGN-002": {
+      "change": "added",
+      "summary": "Acceptance requires a verified mailbox, a typed full name, one offered option and explicit consent."
+    },
+    "INV-001": {
+      "change": "added",
+      "summary": "An owner exports the accepted deposit as an invoice record."
+    },
+    "IMPORT-001": {
+      "change": "added",
+      "summary": "The client CSV kit previews the exact source bytes without writing, and applies only the file whose fingerprint was reviewed."
+    },
+    "ERASE-001": {
+      "change": "added",
+      "summary": "An owner erases a client by typing the exact client name."
+    },
+    "PORT-001": {
+      "change": "added",
+      "summary": "RER archives preserve clients, proposals, revisions, approvals, immutable acceptances and deposit invoices."
+    },
+    "MAIL-001": {
+      "change": "added",
+      "summary": "Local proposal and verification mail is captured without a provider."
+    },
+    "SITE-001": {
+      "change": "added",
+      "summary": "The public run site is built with `rer build --site`."
+    }
+  },
+  "extensionPointChanges": []
+}

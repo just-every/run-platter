@@ -3,5 +3,32 @@
   "projectId": "just-every/run-platter",
   "name": "Platter",
   "sourceRepository": "https://github.com/just-every/run-platter",
-  "license": "MIT"
+  "license": "MIT",
+  "deployment": {
+    "target": "cloudflare-workers",
+    "artifactFile": "platter-worker-artifact.json"
+  },
+  "operations": {
+    "setup": "pnpm install --frozen-lockfile",
+    "build": "pnpm run build && pnpm delivery:spec",
+    "verify": "pnpm check:deployment-spec && pnpm verify",
+    "artifact": "node scripts/delivery/base/cli.mjs artifact --config packaging.json",
+    "recovery": "Follow docs/BACKUP-RESTORE.md and OPERATIONS.md. Pause writes and scheduled work, retain exact source and private deployment settings, export the installation, and restore into fresh empty resources. Preserve all applied migration names and bytes. Reconnect providers, reconcile uncertain sends and payments, verify owner access and re-export data before routing traffic."
+  },
+  "verification": {
+    "migrationDirectories": [
+      "migrations/core"
+    ],
+    "guidanceFiles": [
+      "AGENTS.md",
+      "OPERATIONS.md"
+    ],
+    "testPatterns": [
+      "tests/*.test.mjs"
+    ]
+  },
+  "setup": {
+    "path": "rer-setup.json",
+    "sha256": "2b70894ec910f12367f997b19cf40cb47d5e8154a5d9c4304f4214a22f79264d"
+  }
 }

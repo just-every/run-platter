@@ -27,7 +27,9 @@
     "deps": "rer install",
     "rer": "rer",
     "test:platter": "node --test --test-concurrency=1 tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
-    "test:archive": "node --test tests/archive.test.mjs"
+    "test:archive": "node --test tests/archive.test.mjs",
+    "delivery:spec": "node scripts/build-deployment-spec.mjs",
+    "check:deployment-spec": "node scripts/build-deployment-spec.mjs --check"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",
@@ -43,7 +45,7 @@
     "@cloudflare/vite-plugin": "1.54.5",
     "@cloudflare/workers-types": "5.20260908.1",
     "@playwright/test": "1.63.0",
-    "@runeditrun/rer": "0.2.63",
+    "@runeditrun/rer": "0.2.80",
     "@types/node": "22.20.5",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",

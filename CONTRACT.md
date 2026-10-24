@@ -1396,7 +1396,7 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 | 11 Change | Paid by card that afternoon | PAY-001 | contract, not yet in code |  |
 | 12 Move-in | PandaDoc Word templates become editable pages; tokens become fields; rows matched to the catalog | MIG-001, MIG-007, EDIT-005, EDIT-004, CAT-001 | contract, not yet in code | only the client CSV move-in exists (`src/platter/movein/index.ts`, IMPORT-001) |
 | 12 Move-in | Catalog CSV with bundles as packages; bulk PDFs kept with their certificates | MIG-001, CAT-001 | partly | `src/platter/movein/business-import.ts` (catalog metadata import) |
-| 12 Move-in | Also moves in from Proposify, Better Proposals, Qwilr and Ignition | MIG-002, MIG-003, MIG-004 | contract, not yet in code |  |
+| 12 Move-in | Planned move-in support for Proposify, Better Proposals, Qwilr and Ignition | MIG-002, MIG-003, MIG-004 | contract, not yet in code |  |
 
 ## Status
 

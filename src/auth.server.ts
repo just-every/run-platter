@@ -38,8 +38,9 @@ export interface Bindings {
  OWNER_EMAIL: string
  SESSION_SECRET: string
  SETUP_TOKEN?: string
- MAIL_PROVIDER?: 'development' | 'resend' | 'sendgrid' | 'cloudflare'
+ MAIL_PROVIDER?: 'development' | 'resend' | 'sendgrid' | 'cloudflare' | 'rer'
  MAIL_FROM?: string
+ MAIL_RELAY_URL?: string
  MAIL_API_KEY?: string
  QUESTION_REPLY_DOMAIN?: string
  MAIL_WEBHOOK_KEY?: string

@@ -1098,11 +1098,11 @@
       "executable": false
     },
     "rer-project.json": {
-      "sha256": "808f49ad14c00b205232ef45d385ef65e85f5c73868181353d139f11f578b374",
+      "sha256": "b6ceede45f9fbdbb7b6aaa586ee413c153db5b35d83b9c5947adbebc8dd303a7",
       "executable": false
     },
     "rer-setup.json": {
-      "sha256": "2b70894ec910f12367f997b19cf40cb47d5e8154a5d9c4304f4214a22f79264d",
+      "sha256": "1485443be6fc9f15dba303aa11127cfb5851eba31e3cdd95cf7ae36cfecafb7f",
       "executable": false
     },
     "RUN-LOCALLY.md": {

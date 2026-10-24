@@ -56,3 +56,10 @@ function proposalText(p: any): string[] {
   ]),
  ].filter((value): value is string => typeof value === 'string')
 }
+
+/** Call only with templates already filtered by live ownership and folder scope. */
+export function searchTemplates(templates:any[],query:string){
+ need(query.length<=200,'Search must be at most 200 characters')
+ const phrase=query.trim().replace(/\s+/g,' ').toLowerCase()
+ return templates.filter(t=>!phrase||[t.name,...proposalText(t.snapshot)].some(value=>String(value).replace(/\s+/g,' ').toLowerCase().includes(phrase)))
+}

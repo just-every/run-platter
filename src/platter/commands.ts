@@ -123,6 +123,8 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   if(p.terms===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,terms:pending?JSON.parse(pending.snapshot).terms??'':current.terms}}
   if(p.document===undefined)p={...p,document:documentOf(negotiatedView(current,await pendingNegotiation(db,current.id)))}
   const nextFields=proposalFields(p),oldContent=negotiatedView(current,await pendingNegotiation(db,current.id)),oldOptions=snapshot(oldContent).options
+  const external=(document:any)=>document.blocks.filter((b:any)=>b.type==='embed').sort((a:any,b:any)=>a.id.localeCompare(b.id))
+  if(JSON.stringify(external(nextFields.document))!==JSON.stringify(external(documentOf(oldContent))))need(['owner','admin'].includes(a.role),'Only owner and admins change external content',403)
   for(const block of documentOf(oldContent).blocks.filter(b=>b.type==='pricing')){const retained=nextFields.document.blocks.find(b=>b.id===block.id&&b.type==='pricing'&&b.optionId===block.optionId&&b.tableIndex===block.tableIndex);if(retained)need((oldOptions.find((o:any)=>o.id===block.optionId)?.tables?.length??0)===(nextFields.options.find((o:any)=>o.id===block.optionId)?.tables?.length??0),'Remove or reassign placed document pricing blocks before changing the number of tables')}
   await validateDocumentMedia(db,proposalFields(p).document,current.id)
   await assertSectionLocks(db,negotiatedView(current,await pendingNegotiation(db,current.id)),proposalFields(p))

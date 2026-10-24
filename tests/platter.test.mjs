@@ -1129,6 +1129,20 @@ test('EDIT-016 body phrase search returns only two of 500 proposals through the 
  assert.deepEqual(r.value.totals,[{currency:'USD',count:2,valueCents:660000}])
  const priced=await h.send('/api/platter/pipeline?q='+encodeURIComponent('weatherproof copper finish'),undefined,h.owner);assert.equal(priced.status,200);assert.deepEqual(priced.value.rows.map(p=>p.id),[pricedId])
  const credential=await h.send('/api/platter/pipeline?q='+oldLink.split('/').at(-1),undefined,h.owner);assert.equal(credential.status,200);assert.equal(credential.value.count,0,'invitation credentials never participate in search')
+ const source=(await h.state()).proposals.find(p=>p.id===matches[1]),template=await h.cmd('template.save',{id:source.id,version:source.version,name:'Body-search template'}),hidden=await h.cmd('template.save',{id:source.id,version:source.version,name:'Personal template excluded from another member'})
+ let result=await h.send('/api/platter/template-search?q='+encodeURIComponent('LITERAL   [50%_budget] REVIEW'),undefined,h.owner);assert.equal(result.status,200);assert.deepEqual(new Set(result.value.rows.map(t=>t.id)),new Set([template.id,hidden.id]),'template body text uses the same literal phrase semantics')
+ await h.send('/auth/invite',{email:'synthetic-platter-7@example.com',displayName:'Unshared sales member',role:'member',returnTo:'/app'},h.owner)
+ const member=await h.signIn('synthetic-platter-7@example.com');result=await h.send('/api/platter/template-search?q='+encodeURIComponent('literal [50%_budget] review'),undefined,member);assert.equal(result.status,200);assert.deepEqual(result.value.rows,[],'personal template search does not grant another member access')
+ const team=await h.cmd('team.create',{name:'Template search team'}),folder=await h.cmd('folder.save',{kind:'template',name:'Team search folder',teams:[team.id],shareConsent:true})
+ const shared=await h.cmd('template.save',{id:source.id,version:source.version,name:'Restricted shared search template',shared:true,folderId:folder.id,shareConsent:true})
+ result=await h.send('/api/platter/template-search?q='+encodeURIComponent('literal [50%_budget] review'),undefined,member);assert.deepEqual(result.value.rows,[],'team folder search excludes nonmembers')
+ const memberId=(await h.state(member)).actor.id;await h.cmd('team.member',{operatorId:memberId,teamId:team.id})
+ result=await h.send('/api/platter/template-search?q='+encodeURIComponent('literal [50%_budget] review'),undefined,member);assert.deepEqual(result.value.rows.map(t=>t.id),[shared.id],'live team membership grants exactly the shared template')
+ const memberRecord=(await h.state()).teamPeople.find(p=>p.id===memberId);await h.cmd('member.set',{operatorId:memberId,role:'sales',version:memberRecord.version,teams:[]})
+ result=await h.send('/api/platter/template-search?q='+encodeURIComponent('literal [50%_budget] review'),undefined,member);assert.deepEqual(result.value.rows,[],'revoked team membership removes search access on the next request')
+ assert.equal((await h.send('/api/platter/template-search?q='+encodeURIComponent('x'.repeat(201)),undefined,h.owner)).status,400)
+ assert.equal((await h.send('/api/platter/template-search')).status,401)
+
 }))
 
 
@@ -2140,7 +2154,20 @@ test('EDIT-001 display media requires consent and live edit scope, stays private
   assert.equal((await h.send(privatePath)).status,401)
   assert.equal((await h.send(privatePath,undefined,h.owner)).status,404,'unplaced uploads are not document content')
   const document=documentFixture();document.brand.logoId=image.id;document.blocks.splice(2,0,{id:'photo',type:'image',title:'The studio image',text:'A retained original.',assetId:image.id,alt:'Synthetic Platter studio mark'})
+  document.blocks.push({id:'gallery',type:'gallery',title:'Image gallery',text:'Retained gallery.',images:[{assetId:image.id,alt:'Gallery studio mark'}]},{id:'loom',type:'embed',title:'External introduction',text:'Click to load.',url:'https://www.loom.com/share/'+'a'.repeat(32),posterId:image.id,alt:'Loom introduction',consent:true})
+  const initialRevisions=(await h.state()).revisions
+  for(const url of ['https://www.loom.com.evil.example/embed/'+'a'.repeat(32),'http://www.loom.com/share/'+'a'.repeat(32),'https://user:pass@www.loom.com/share/'+'a'.repeat(32),'https://www.loom.com:444/share/'+'a'.repeat(32),'https://www.loom.com/other/'+'a'.repeat(32),'javascript:alert(1)']){const invalid=structuredClone(document);invalid.blocks.at(-1).url=url;await h.cmd('proposal.document',{id:p.id,version:1,document:invalid},h.owner,400)}
+  for(const change of [{consent:false},{posterId:'missing'}]){const invalid=structuredClone(document);Object.assign(invalid.blocks.at(-1),change);await h.cmd('proposal.document',{id:p.id,version:1,document:invalid},h.owner,400)}
+  const invalidGallery=structuredClone(document);invalidGallery.blocks.find(b=>b.id==='gallery').images[0].assetId='missing';await h.cmd('proposal.document',{id:p.id,version:1,document:invalidGallery},h.owner,400)
+  invalidGallery.blocks.find(b=>b.id==='gallery').images=[null];await h.cmd('proposal.document',{id:p.id,version:1,document:invalidGallery},h.owner,400)
+  assert.deepEqual((await h.state()).revisions,initialRevisions,'refused external content never writes a revision')
+  document.blocks.at(-1).url='https://www.loom.com/embed/'+'a'.repeat(32)
   await h.cmd('proposal.document',{id:p.id,version:1,document})
+  await h.send('/auth/invite',{email:'synthetic-platter-6@example.com',displayName:'Shared editor',role:'member',returnTo:'/app'},h.owner)
+  const member=await h.signIn('synthetic-platter-6@example.com'),memberId=(await h.state(member)).actor.id;await h.cmd('proposal.share',{id:p.id,operatorId:memberId})
+  const memberChange=structuredClone(document);memberChange.blocks.at(-1).url='https://www.loom.com/embed/'+'c'.repeat(32)
+  await h.cmd('proposal.document',{id:p.id,version:2,document:memberChange},member,403)
+  assert.deepEqual((await h.state()).proposals.find(row=>row.id===p.id).document,document,'a shared editor cannot change an external provider block')
   const actual=await h.mf.dispatchFetch(h.origin+privatePath,{headers:{cookie:h.owner}});assert.equal(actual.status,200);assert.equal(actual.headers.get('content-disposition'),'inline');assert.deepEqual(Buffer.from(await actual.arrayBuffer()),bytes)
   const other=await h.cmd('proposal.prepare',{...offer,clientId:client.id});await h.cmd('proposal.document',{id:other.id,version:1,document},h.owner,400)
   const copy=await h.cmd('proposal.duplicate',{id:p.id,version:2});assert.equal((await h.send('/api/platter/document-media/'+copy.id+'/'+image.id,undefined,h.owner)).status,200);assert.deepEqual((await h.state()).proposals.find(p=>p.id===copy.id).documentMedia.map(f=>f.id),[image.id],'copies exclude files never placed in the source document')
@@ -2149,8 +2176,18 @@ test('EDIT-001 display media requires consent and live edit scope, stays private
   await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const sent=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(sent.shareUrl).pathname
   const publicImage=await h.mf.dispatchFetch(h.origin+path+'/media/'+image.id);assert.equal(publicImage.status,200);assert.deepEqual(Buffer.from(await publicImage.arrayBuffer()),bytes)
   const cookie=await verified(h,path),pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf',{method:'POST',headers:{origin:h.origin,cookie,'content-type':'application/json'},body:JSON.stringify({optionId:'two'})});assert.equal(pdf.status,200)
-  const pages=await pdfPages(await pdf.arrayBuffer());assert.ok(pages.join(' ').includes('The studio image'))
+  const pdfBytes=await pdf.arrayBuffer(),pages=await pdfPages(pdfBytes.slice(0));assert.ok(pages.join(' ').includes('The studio image'));assert.ok(pages.join(' ').includes(document.blocks.at(-1).url),'PDF names the canonical external playback URL')
+  const {getDocument}=await import('pdfjs-dist/legacy/build/pdf.mjs'),parsed=await getDocument({data:new Uint8Array(pdfBytes),isEvalSupported:false}).promise
+  try{const links=[];for(let i=1;i<=parsed.numPages;i++)links.push(...await (await parsed.getPage(i)).getAnnotations());assert.ok(links.some(a=>a.url===document.blocks.at(-1).url),'PDF has an actionable playback annotation')}finally{await parsed.destroy()}
+  const html=await h.send(path,undefined,cookie);assert.match(html.headers.get('content-security-policy'),/frame-src 'self' https:\/\/www.youtube-nocookie.com/);assert.ok(!html.text.includes('<iframe'),'providers are unloaded by default');assert.match(html.text,/data-external-embed/);assert.match(html.text,/Gallery studio mark/)
+
   await h.cmd('proposal.send',{id:p.id,version:4});assert.equal((await h.send(path+'/media/'+image.id)).status,404,'rotated invitations lose media authority too')
+  for(const [url,canonical]of [['https://youtu.be/abcdefghijk?autoplay=1','https://www.youtube-nocookie.com/embed/abcdefghijk'],['https://vimeo.com/123456','https://player.vimeo.com/video/123456'],['https://loom.com/share/'+'b'.repeat(32)+'?sid=ignored','https://www.loom.com/embed/'+'b'.repeat(32)],['https://fast.wistia.com/embed/iframe/abcdefghij','https://fast.wistia.net/embed/iframe/abcdefghij'],['https://calendly.com/synthetic-platter-1/meeting?email=ignored','https://calendly.com/synthetic-platter-1/meeting']]){
+   // Use this proposal's own uploaded poster, copied through the duplication door.
+   const copy=await h.cmd('proposal.duplicate',{id:p.id,version:5}),placed=structuredClone(document);placed.blocks.at(-1).url=url
+   await h.cmd('proposal.document',{id:copy.id,version:1,document:placed});const saved=(await h.state()).proposals.find(p=>p.id===copy.id);assert.equal(saved.document.blocks.at(-1).url,canonical,'only canonical playback paths reach client frames')
+  }
+
  }finally{await h.close()}
 })
 

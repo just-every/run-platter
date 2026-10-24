@@ -41,9 +41,13 @@ export async function documentJourney(){
     await page.getByText('Upload display media',{exact:true}).first().click()
     await uploadForm.getByLabel('Display media file').setInputFiles({name:'synthetic-platter-2.webm',mimeType:'video/webm',buffer:Buffer.from(videoBytes)})
     await uploadForm.locator('[name=consent]').check();await uploadForm.getByRole('button',{name:'Upload display media',exact:true}).click()
-    const editor=page.locator('[data-document-editor]'),blocks=editor.locator('[data-block-id]'),fixture=documentFixture(),assets=(await state()).proposals.find(p=>p.id===id).documentMedia,image=assets.find(f=>f.mediaType==='image/png'),video=assets.find(f=>f.mediaType==='video/webm')
+    await page.getByText('Upload display media',{exact:true}).first().click()
+    await uploadForm.getByLabel('Display media file').setInputFiles({name:'synthetic-platter-3.png',mimeType:'image/png',buffer:await readFile('public/brand/apple-touch-icon.png')})
+    await uploadForm.locator('[name=consent]').check();await uploadForm.getByRole('button',{name:'Upload display media',exact:true}).click()
+    const editor=page.locator('[data-document-editor]'),blocks=editor.locator('[data-block-id]'),fixture=documentFixture(),assets=(await state()).proposals.find(p=>p.id===id).documentMedia,image=assets.find(f=>f.mediaType==='image/png'),video=assets.find(f=>f.mediaType==='video/webm'),secondImage=assets.find(f=>f.filename==='synthetic-platter-3.png')
     fixture.brand={...fixture.brand,accent:'#075a70',ink:'#173c38',paper:'#fffdf5',font:width===1440?'serif':'sans',logoId:image.id}
     fixture.blocks.splice(4,0,{id:'photo',type:'image',title:'Studio image',text:'A retained image.',assetId:image.id,alt:'Synthetic Platter studio mark'},{id:'film',type:'video',title:'Studio film',text:'An uploaded introduction.',assetId:video.id,posterId:image.id,alt:'Synthetic Platter introduction'},{id:'pricing',type:'pricing',title:'Investment detail',text:'',optionId:'one',tableIndex:0})
+    fixture.blocks.push({id:'gallery',type:'gallery',title:'Studio gallery',text:'A gallery caption.',images:[{assetId:image.id,alt:'Gallery studio mark'},{assetId:secondImage.id,alt:'Second gallery mark'}]},{id:'loom',type:'embed',title:'External introduction',text:'Click to load.',url:'https://www.loom.com/share/'+'a'.repeat(32),posterId:image.id,alt:'Loom introduction',consent:true})
     fixture.blocks.push({id:'po',type:'field',title:'Purchase order',text:'Use the approved PO.',recipientRole:'client',fieldKind:'text',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
     await editor.locator('.document-brand-kit summary').click()
     for(const [key,value] of Object.entries(fixture.brand)){const node=editor.locator(`[data-brand=${key}]`);if(key==='font'||key==='logoId')await node.selectOption(value);else await node.fill(value)}
@@ -55,6 +59,8 @@ export async function documentJourney(){
      if(block.type!=='page_break'){
       await card.getByLabel('Block heading',{exact:true}).fill(block.title)
       if(['image','video'].includes(block.type)){await card.getByLabel('Media description',{exact:true}).fill(block.alt);await card.getByLabel('Caption',{exact:true}).fill(block.text)}
+      else if(block.type==='gallery'){await card.getByLabel('Include synthetic-platter-3.png',{exact:true}).check();await card.getByLabel('Description for synthetic-platter-3.png',{exact:true}).fill(block.images[1].alt);await card.getByLabel('Description for synthetic-platter-1.png',{exact:true}).fill(block.images[0].alt);await card.getByLabel('Gallery caption',{exact:true}).fill(block.text)}
+      else if(block.type==='embed'){await card.getByLabel('External content URL',{exact:true}).fill(block.url);await card.getByLabel('External content description',{exact:true}).fill(block.alt);await card.getByLabel('Authorize external content',{exact:true}).check();await card.getByLabel('Caption',{exact:true}).fill(block.text)}
       else if(['field','signature'].includes(block.type)){await card.getByLabel('Instructions',{exact:true}).fill(block.text);if(block.type==='field'){await card.getByLabel('Field type',{exact:true}).selectOption(block.fieldKind);if(block.required)await card.getByLabel('Required field',{exact:true}).check()}}
       else if(!['heading','pricing'].includes(block.type))await card.getByLabel(block.type==='columns'?'First column':'Block text',{exact:true}).fill(block.text)
       if(block.second)await card.getByLabel('Second column',{exact:true}).fill(block.second)
@@ -62,7 +68,7 @@ export async function documentJourney(){
      }
     }
     await editor.getByRole('button',{name:'Save document',exact:true}).click()
-    await page.waitForFunction(()=>document.querySelector('[data-document-editor]').dataset.saveState==='saved')
+    await page.waitForFunction(()=>document.querySelector('[data-document-editor]').dataset.saveState==='saved'&&!['unsaved','saving'].includes(document.querySelector('[data-composer-autosave]')?.dataset.saveState))
     // The public state agrees with what the editor built from blank.
     let p=(await state()).proposals.find(p=>p.id===id)
     assert.equal(p.document.blocks.length,fixture.blocks.length);assert.deepEqual(p.document.brand,fixture.brand)
@@ -87,7 +93,7 @@ export async function documentJourney(){
     await editor.getByRole('button',{name:'Undo',exact:true}).click();assert.equal(await blocks.count(),count+1)
     await editor.getByRole('button',{name:'Undo',exact:true}).click();assert.equal(await blocks.count(),count)
     await editor.getByRole('button',{name:'Save document',exact:true}).click()
-    await page.waitForFunction(()=>document.querySelector('[data-document-editor]').dataset.saveState==='saved')
+    await page.waitForFunction(()=>document.querySelector('[data-document-editor]').dataset.saveState==='saved'&&!['unsaved','saving'].includes(document.querySelector('[data-composer-autosave]')?.dataset.saveState))
     p=(await state()).proposals.find(p=>p.id===id)
     assert.deepEqual(p.document.blocks.map(b=>b.id),reordered)
     const savedDocument=p.document
@@ -99,7 +105,7 @@ export async function documentJourney(){
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'editor has no horizontal overflow')
     // Same rendered document under the member-only client preview.
     const preview=await context.request.get(`${app.origin}/app/preview/client?id=${id}&revision=${p.revision}&optionId=two`)
-    assert.equal(preview.status(),200);assert.match(await preview.text(),/Client testimonial/)
+    assert.equal(preview.status(),200,await preview.text());assert.match(await preview.text(),/Client testimonial/)
     const previewPage=await context.newPage()
     try{await previewPage.goto(`${app.origin}/app/preview/client?id=${id}&revision=${p.revision}&optionId=two&width=${width}`);assert.deepEqual(await previewPage.locator('[data-document-block]').evaluateAll(nodes=>nodes.map(n=>n.dataset.documentBlock)),reordered);const previewImage=previewPage.locator('.document-image img');await previewImage.scrollIntoViewIfNeeded();await previewPage.waitForFunction(()=>document.querySelector('.document-image img').naturalWidth>0);assert.equal(await previewPage.getByLabel('Purchase order',{exact:true}).isDisabled(),true);assert.equal(await previewPage.getByLabel('Type your full name for Client signature',{exact:true}).isDisabled(),true);if(screenshots)await previewPage.screenshot({path:join(screenshots,`EDIT-001-preview-${width}.png`)})}finally{await previewPage.close()}
     clientContext=await browser.newContext({viewport:{width,height:900}})
@@ -115,6 +121,12 @@ export async function documentJourney(){
     await client.locator('select[name=optionId]').selectOption('two');await client.getByRole('button',{name:'Review package',exact:true}).click();assert.equal(await client.getByRole('heading',{name:'Campaign timeline',exact:true}).count(),1)
     const picture=client.locator('.document-image img');await picture.scrollIntoViewIfNeeded();await client.waitForFunction(()=>document.querySelector('.document-image img').naturalWidth>0)
     const film=client.locator('.document-video video');await film.scrollIntoViewIfNeeded();await film.evaluate(node=>node.play());await client.waitForFunction(()=>document.querySelector('.document-video video').currentTime>0);await film.evaluate(node=>node.pause())
+    const gallery=client.locator('.document-gallery img');assert.equal(await gallery.count(),2);await gallery.first().scrollIntoViewIfNeeded();await client.waitForFunction(()=>document.querySelector('.document-gallery img').naturalWidth>0);assert.equal(await gallery.first().getAttribute('alt'),'Gallery studio mark')
+    assert.equal(await client.locator('.document-embed iframe').count(),0,'external content is not loaded before consent')
+    if(screenshots){await client.locator('.document-embed').scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-006-consent-${width}.png`)})}
+    let loaded=0;await client.route('https://www.loom.com/**',async route=>{loaded++;await route.fulfill({contentType:'text/html',body:'<html><body><p>Recorded Loom edge</p></body></html>'})})
+    await client.getByRole('button',{name:'Load external content',exact:true}).click();await client.frameLocator('.document-embed iframe').getByText('Recorded Loom edge').waitFor();assert.equal(loaded,1);assert.equal(await client.locator('.document-embed iframe').getAttribute('sandbox'),'allow-scripts allow-same-origin allow-forms allow-presentation');assert.equal(await client.locator('.document-embed iframe').getAttribute('referrerpolicy'),'no-referrer')
+    if(screenshots){await client.locator('.document-gallery').scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-006-gallery-${width}.png`)});await client.locator('.document-embed').scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-006-embed-${width}.png`)})}
     const clientOrder=await client.locator('[data-document-block]').evaluateAll(nodes=>nodes.map(n=>n.dataset.documentBlock));assert.deepEqual(clientOrder,reordered)
     const brand=await client.locator('.proposal-document').evaluate(node=>({ink:getComputedStyle(node).color,paper:getComputedStyle(node).backgroundColor,font:getComputedStyle(node).fontFamily,accent:getComputedStyle(node.querySelector('h2')).color}));assert.equal(brand.ink,'rgb(23, 60, 56)');assert.equal(brand.paper,'rgb(255, 253, 245)');assert.equal(brand.accent,'rgb(7, 90, 112)');assert.ok(brand.font.includes(width===1440?'Source Serif 4':'Inter'),'the chosen brand font renders')
     assert.equal(await client.locator('.document-text strong').innerText(),'careful')
@@ -122,7 +134,7 @@ export async function documentJourney(){
     assert.ok(await client.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'client document has no horizontal overflow')
     await client.locator('.proposal-document').scrollIntoViewIfNeeded();if(screenshots)await client.screenshot({path:join(screenshots,`EDIT-001-client-${width}.png`)})
     const pdf=await clientContext.request.post(app.origin+path+'/download.pdf',{headers:{origin:app.origin},data:{optionId:'two'}});assert.equal(pdf.status(),200)
-    const layout=await pdfPages(await pdf.body(),true),pages=layout.map(p=>p.text),text=pages.join(' ');assert.ok(layout.every(p=>p.width===612&&p.height===792));assert.equal(layout.reduce((n,p)=>n+p.imageCount,0),3,'PDF carries the logo, uploaded image and video still')
+    const layout=await pdfPages(await pdf.body(),true),pages=layout.map(p=>p.text),text=pages.join(' ');assert.ok(layout.every(p=>p.width===612&&p.height===792));assert.equal(layout.reduce((n,p)=>n+p.imageCount,0),6,'PDF carries the logo, uploaded image, video still, two gallery images and external poster')
     for(const page of pages)assert.ok(page.includes('Not signed, revision '+p.revision))
     let at=-1;for(const block of savedDocument.blocks.filter(b=>b.type!=='page_break')){const next=text.indexOf(block.title,at+1);assert.ok(next>at,'PDF keeps editor order for '+block.title);at=next}
     const approved=(await state()).proposals.find(p=>p.id===id);assert.deepEqual(approved.document,savedDocument)

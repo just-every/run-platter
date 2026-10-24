@@ -1,14 +1,15 @@
+import { embedUrl } from './embeds'
 import { need } from '../model'
 
-export const blockTypes = ['cover','heading','text','image','video','columns','pricing','quote','bio','case_study','terms','field','signature','page_break'] as const
+export const blockTypes = ['cover','heading','text','image','video','gallery','embed','columns','pricing','quote','bio','case_study','terms','field','signature','page_break'] as const
 export type BlockType = typeof blockTypes[number]
-export interface ProposalBlock { id:string; type:BlockType; title:string; text:string; second?:string; optionId?:string; tableIndex?:number; condition?:string; assetId?:string; posterId?:string; alt?:string; fieldKind?:'text'|'date'|'checkbox'; required?:boolean; recipientRole?:'client'; recipientId?:string }
+export interface ProposalBlock { id:string; type:BlockType; title:string; text:string; second?:string; optionId?:string; tableIndex?:number; condition?:string; assetId?:string; posterId?:string; alt?:string; images?:{assetId:string;alt:string}[]; url?:string; consent?:boolean; fieldKind?:'text'|'date'|'checkbox'; required?:boolean; recipientRole?:'client'; recipientId?:string }
 export interface ProposalDocument { version:1; blocks:ProposalBlock[]; brand?:{name:string; accent:string; ink:string; paper:string; font:'sans'|'serif'; cover:string;logoId?:string} }
 const string=(value:unknown,max:number,label:string)=>{need(typeof value==='string'&&value.length<=max&& !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value),'Enter '+label+' (up to '+max+' characters)');return value}
 const color=(value:unknown)=>{need(typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value),'Use six-digit brand colors');return value.toLowerCase()}
 const luminance=(hex:string)=>{const parts=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4);return parts[0]*0.2126+parts[1]*0.7152+parts[2]*0.0722}
 const contrast=(a:string,b:string)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05)}
-/** Versioned, bounded data only. No HTML, URLs, executable styles or external resources. */
+/** Versioned, bounded data only. No HTML or executable styles. External frames use canonical allowlisted URLs. */
 export function proposalDocument(value:unknown,options?:any[],clientId?:string):ProposalDocument {
  let parsed:any=value??{version:1,blocks:[]}
  if(typeof parsed==='string'){try{parsed=JSON.parse(parsed)}catch{need(false,'Invalid proposal document')}}
@@ -22,6 +23,15 @@ export function proposalDocument(value:unknown,options?:any[],clientId?:string):
   const block:ProposalBlock={id:b.id,type:b.type,title:string(b.title??'',200,'a block heading'),text:string(b.text??'',10000,'block text')}
   if(['field','signature'].includes(b.type)){need(b.recipientRole==='client','Assign every field and signature to the Client recipient role');block.recipientRole='client';if(clientId||b.recipientId)block.recipientId=string(clientId??b.recipientId,200,'a recipient id');if(b.type==='field'){need(['text','date','checkbox'].includes(b.fieldKind),'Choose text, date or checkbox');need(typeof b.required==='boolean','Choose whether this field is required');block.fieldKind=b.fieldKind;block.required=b.required}need(block.title.trim(),'Name each field or signature block')}
   if(['image','video'].includes(b.type)){block.assetId=string(b.assetId??'',80,'a media file id');need(/^[a-zA-Z0-9_-]+$/.test(block.assetId),'Choose a media file');block.alt=string(b.alt??'',1000,'an image description');need(block.alt.trim(),'Describe the image or video');if(b.type==='video'){block.posterId=string(b.posterId??'',80,'a video poster id');need(/^[a-zA-Z0-9_-]+$/.test(block.posterId),'Choose a video poster')}}
+  if(b.type==='gallery'){
+   need(Array.isArray(b.images)&&b.images.length>=1&&b.images.length<=12,'Choose between 1 and 12 gallery images')
+   const seen=new Set<string>();block.images=b.images.map((image:any)=>{need(image&&typeof image==='object'&&!Array.isArray(image),'Choose a valid gallery image');const assetId=string(image.assetId??'',80,'a gallery file id'),alt=string(image.alt??'',1000,'a gallery image description');need(/^[a-zA-Z0-9_-]+$/.test(assetId)&&!seen.has(assetId)&&alt.trim(),'Choose distinct gallery files and describe every image');seen.add(assetId);return {assetId,alt}})
+  }
+  if(b.type==='embed'){
+   block.url=embedUrl(b.url);need(b.consent===true,'Confirm external display consent');block.consent=true
+   block.posterId=string(b.posterId??'',80,'an embed poster id');need(/^[a-zA-Z0-9_-]+$/.test(block.posterId),'Choose an uploaded embed poster')
+   block.alt=string(b.alt??'',1000,'an embed description');need(block.alt.trim(),'Describe the external content')
+  }
   if(b.type==='columns')block.second=string(b.second??'',10000,'the second column')
   if(b.type==='pricing'){
    need(typeof b.optionId==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(b.optionId)&&Number.isInteger(b.tableIndex)&&b.tableIndex>=0,'Choose a pricing table')
@@ -40,7 +50,7 @@ export function proposalDocument(value:unknown,options?:any[],clientId?:string):
 export function documentOf(row:any){return proposalDocument(row.document)}
 export function documentFields(row:any){const doc=documentOf(row);return doc.blocks.length||doc.brand?{document:doc}:{}}
 export function selectedDocument(value:unknown,optionId:string,items:{id:string}[]=[]){const doc=proposalDocument(value);return {...doc,blocks:doc.blocks.filter(b=>!b.condition||(b.condition.startsWith('item:')?items.some(i=>'item:'+i.id===b.condition):b.condition===optionId))}}
-export function documentText(value:unknown){const doc=proposalDocument(value);return doc.blocks.map(b=>[b.type,b.title,b.text,b.second??''].filter(Boolean).join('\n')).join('\n\n')}
+export function documentText(value:unknown){const doc=proposalDocument(value);return doc.blocks.map(b=>[b.type,b.title,b.text,b.second??'',b.alt??'',...(b.images??[]).map(image=>image.alt)].filter(Boolean).join('\n')).join('\n\n')}
 
 /** The single Client slot is rebound deliberately when a person chooses a new client. */
 export function bindDocument(value:unknown,clientId?:string){const doc=proposalDocument(value);return {...doc,blocks:doc.blocks.map(block=>{if(!['field','signature'].includes(block.type))return block;const {recipientId,...rest}=block;return {...rest,...(clientId?{recipientId:clientId}:{})}})}}

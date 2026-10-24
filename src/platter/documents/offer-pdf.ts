@@ -11,7 +11,7 @@ function amount(cents: number, currency: string) {
 }
 
 /** Render the current offer only. Caller owns authorization and revision selection. */
-export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Array | ArrayBuffer)[] = [], items: unknown = [],media?:(id:string)=>Promise<Uint8Array>): Promise<Uint8Array> {
+export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Array | ArrayBuffer)[] = [], items: unknown = [],media?:(id:string)=>Promise<Uint8Array>,mediaLink?:(id:string)=>string): Promise<Uint8Array> {
  const options = typeof view.options === 'string' ? JSON.parse(view.options) : view.options
  need(Array.isArray(options), 'Offer options are missing')
  const selection = offerSelection(options,view.deposit_bps,optionId,items), selected = selection.option
@@ -53,7 +53,9 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   if(block.type==='page_break'){pdf.pageBreak();continue}
   if(block.title)pdf.heading(block.title)
   if(block.type==='field'||block.type==='signature'){pdf.text((block.type==='signature'?'Client signature (not signed)':(block.required?'Required ':'Optional ')+block.fieldKind+' field')+': '+block.title);if(block.text)pdf.text(block.text)}
-  else if(block.type==='image'||block.type==='video'){need(media,'Document media is unavailable',503);await pdf.image(await media(block.type==='video'?block.posterId!:block.assetId!));if(block.type==='video')pdf.text('Video: '+(block.alt??block.title));if(block.text)pdf.text(block.text)}
+  else if(block.type==='image'||block.type==='video'){need(media,'Document media is unavailable',503);await pdf.image(await media(block.type==='video'?block.posterId!:block.assetId!));if(block.type==='video'){pdf.text('Video: '+(block.alt??block.title));if(mediaLink)pdf.link(mediaLink(block.assetId!))}if(block.text)pdf.text(block.text)}
+  else if(block.type==='gallery'){need(media,'Document media is unavailable',503);for(const image of block.images??[]){await pdf.image(await media(image.assetId));pdf.text(image.alt)}if(block.text)pdf.text(block.text)}
+  else if(block.type==='embed'){need(media,'Document media is unavailable',503);await pdf.image(await media(block.posterId!));pdf.text(block.alt??block.title);pdf.link(block.url!);if(block.text)pdf.text(block.text)}
   else if(block.type==='pricing'){const o=options.find((o:any)=>o.id===block.optionId),t=o?.tables?.[block.tableIndex??0];if(t){pdf.heading(t.name);for(const l of t.lines){pdf.text(`${l.group?l.group+': ':''}${l.name}: ${l.quantity} ${l.unit} x ${amount(Math.round(Number(l.unitPrice)*100),currency)} = ${amount(l.lineTotalCents,currency)}`);if(l.description)pdf.text(l.description)}for(const g of t.groups)pdf.text(`${g.name||'Ungrouped'} subtotal: ${amount(g.subtotalCents,currency)}`);pdf.text(`Table subtotal: ${amount(t.subtotalCents,currency)}`)}}
   else if(block.type==='columns')pdf.columns(block.text.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'),(block.second??'').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'))
   else {pdf.text(block.text.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'));if(block.second)pdf.text(block.second.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'))}

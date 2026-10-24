@@ -1,5 +1,5 @@
 import fontkit from '@pdf-lib/fontkit'
-import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
+import { PDFDocument, PDFString, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
 import type { ProposalDocument } from './blocks'
 import { need } from '../model'
 
@@ -13,6 +13,7 @@ const bottom = 64
 
 /** Paginated text with exact font coverage checks, including grapheme-safe URL wrapping. */
 export class PdfText {
+ private linkTarget?:string
  private page!: PDFPage
  private y = 0
  private pageIndex=-1
@@ -62,11 +63,13 @@ export class PdfText {
   return this.runs(text).reduce((width, run) => width + run.font.widthOfTextAtSize(run.text, size), 0)
  }
 
- private draw(text: string, x: number, y: number, size: number, color = ink) {
+ private draw(text: string, x: number, y: number, size: number, color = ink, link=false) {
+  const linkX=x
   for (const run of this.runs(text)) {
    this.page.drawText(run.text, { x, y, size, font: run.font, color })
    x += run.font.widthOfTextAtSize(run.text, size)
   }
+  if(this.linkTarget&&link){const annotation=this.document.context.obj({Type:'Annot',Subtype:'Link',Rect:[linkX,y-2,x,y+size],Border:[0,0,0],A:{Type:'Action',S:'URI',URI:PDFString.of(this.linkTarget)}});this.page.node.addAnnot(this.document.context.register(annotation))}
  }
 
  private newPage() {
@@ -103,6 +106,7 @@ export class PdfText {
   this.textX=margin;this.textWidth=letter[0]-margin*2;this.gap()
  }
 
+ link(url:string){this.linkTarget=url;try{this.text(url)}finally{this.linkTarget=undefined}}
  pageBreak(){this.newPage()}
 
  heading(text: string) {
@@ -158,7 +162,7 @@ export class PdfText {
     const line = characters.slice(start, end).join('')
     this.room(leading)
     this.y -= leading
-    this.draw(line, this.textX, this.y, size, color)
+    this.draw(line, this.textX, this.y, size, color,true)
     start = end
    }
   }

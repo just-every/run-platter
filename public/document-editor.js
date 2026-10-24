@@ -1,6 +1,6 @@
 // Small native-control editor. Server owns validation, scope, locks and revisions.
 (() => {
- const names={cover:'Cover page',heading:'Heading',text:'Text',columns:'Columns',pricing:'Pricing table',quote:'Quote or testimonial',bio:'Team bio',case_study:'Case study',image:'Image',video:'Video',terms:'Terms',field:'Form field',signature:'Signature block',page_break:'Page break'};
+ const names={cover:'Cover page',heading:'Heading',text:'Text',columns:'Columns',pricing:'Pricing table',quote:'Quote or testimonial',bio:'Team bio',case_study:'Case study',image:'Image',video:'Video',gallery:'Image gallery',embed:'External embed',terms:'Terms',field:'Form field',signature:'Signature block',page_break:'Page break'};
  for(const form of document.querySelectorAll('[data-document-editor]')){
   const payload=form.elements.document,container=form.querySelector('[data-document-blocks]'),status=form.querySelector('[data-document-status]'),error=form.querySelector('[data-document-error]'),undo=form.querySelector('[data-block-undo]');
   const showError=message=>{error.textContent=message;error.hidden=!message;};
@@ -11,7 +11,7 @@
   const schedule=()=>{if(!dirty()&&!pending){form.dataset.saveState='saved';status.textContent='Revision '+form.dataset.revision+' saved. No unsaved document changes.';return;}form.dataset.saveState='unsaved';payload.value=JSON.stringify(doc);status.textContent='Unsaved document changes.';clearTimeout(timer);if(!halted)timer=setTimeout(save,800);};
   const control=(label,key,value,oninput,tag='input')=>{
    const wrap=element('label',{},label),node=element(tag,{'data-block-field':key,'aria-label':label});
-   if(tag==='textarea'){node.rows=4;node.maxLength=10000;}else node.maxLength=200;
+   if(tag==='textarea'){node.rows=4;node.maxLength=10000;}else node.maxLength=['url','alt'].includes(key)?1000:200;
    node.value=value??'';node.addEventListener('input',()=>{checkpoint();oninput(node.value);schedule();});wrap.append(node);return wrap;
   };
   const button=(label,symbol,action)=>{const tip=element('span',{class:'document-tool'}),node=element('button',{type:'button',class:'secondary','aria-label':label},symbol),tooltip=element('span',{role:'tooltip',class:'document-tooltip'},label);tooltip.id='tip-'+crypto.randomUUID();node.setAttribute('aria-describedby',tooltip.id);node.addEventListener('click',action);tip.append(node,tooltip);return {tip,node};};
@@ -22,7 +22,7 @@
    container.replaceChildren();
    if(!doc.blocks.length)container.append(element('p',{class:'empty-document'},'No blocks yet. Choose a block type and add your first section.'));
    for(const [index,block] of doc.blocks.entries()){
-    const locked=form.dataset.lockTerms==='yes'&&block.type==='terms';
+    const locked=(form.dataset.lockTerms==='yes'&&block.type==='terms')||(block.type==='embed'&&form.dataset.externalEdit!=='yes');
     const card=element('section',{class:'document-editor-block','data-block-id':block.id,'aria-label':names[block.type]+' block '+(index+1)}),bar=element('div',{class:'document-block-bar'}),title=element('h3',{},(index+1)+'. '+names[block.type]);
     bar.append(title);
     const drag=button('Drag block','⠿',()=>{status.textContent='Drag this handle onto another block, or use Move up and Move down.';});drag.node.draggable=true;drag.node.dataset.blockDrag='';
@@ -30,7 +30,7 @@
     drag.node.addEventListener('dragstart',event=>{dragged=block.id;event.dataTransfer.setData('text/plain',block.id);event.dataTransfer.effectAllowed='move';card.classList.add('document-dragging');});
     drag.node.addEventListener('dragend',()=>{dragged=undefined;card.classList.remove('document-dragging');});bar.append(drag.tip);
     for(const [label,symbol,direction] of [['Move up','↑',-1],['Move down','↓',1]]){const b=button(label,symbol,()=>moved(block.id,direction));b.node.dataset.move=String(direction);b.node.disabled=index+direction<0||index+direction>=doc.blocks.length;bar.append(b.tip);}
-    const duplicate=button('Duplicate block','⧉',()=>{checkpoint();doc.blocks.splice(doc.blocks.findIndex(b=>b.id===block.id)+1,0,{...block,id:crypto.randomUUID()});render();schedule();});duplicate.node.disabled=locked;bar.append(duplicate.tip);
+    const duplicate=button('Duplicate block','⧉',()=>{checkpoint();doc.blocks.splice(doc.blocks.findIndex(b=>b.id===block.id)+1,0,{...structuredClone(block),id:crypto.randomUUID()});render();schedule();});duplicate.node.disabled=locked;bar.append(duplicate.tip);
     const remove=button('Delete block','×',()=>{checkpoint();const position=doc.blocks.findIndex(b=>b.id===block.id);doc.blocks.splice(position,1);render();const next=container.querySelectorAll('[data-block-id]')[Math.min(position,doc.blocks.length-1)];(next?.querySelector('input,textarea,button')??form.querySelector('[data-block-add]')).focus();schedule();});remove.node.disabled=locked;bar.append(remove.tip);card.append(bar);
     card.addEventListener('dragover',event=>{if(dragged&&dragged!==block.id){event.preventDefault();event.dataTransfer.dropEffect='move';}});
     card.addEventListener('drop',event=>{if(!dragged||dragged===block.id)return;event.preventDefault();const from=doc.blocks.findIndex(b=>b.id===dragged);if(from<0)return;const target=doc.blocks.findIndex(b=>b.id===block.id),bounds=card.getBoundingClientRect(),after=event.clientY>bounds.top+bounds.height/2,to=target+(after?1:0)-(from<target+(after?1:0)?1:0),id=dragged;dragged=undefined;place(id,to);});
@@ -45,6 +45,14 @@
       card.append(choice('Media file','assetId',media.filter(f=>f.mediaType.startsWith(block.type==='image'?'image/':'video/'))),control('Media description','alt',block.alt,v=>block.alt=v));
       if(block.type==='video')card.append(choice('Video poster','posterId',media.filter(f=>f.mediaType.startsWith('image/'))));
       card.append(control('Caption','text',block.text,v=>block.text=v,'textarea'));
+     }else if(block.type==='gallery'){
+      for(const file of media.filter(f=>f.mediaType.startsWith('image/'))){const wrap=element('label',{class:'choice'},file.filename),check=element('input',{type:'checkbox','aria-label':'Include '+file.filename});check.checked=block.images.some(i=>i.assetId===file.id);check.addEventListener('change',()=>{checkpoint();block.images=block.images.filter(i=>i.assetId!==file.id);if(check.checked)block.images.push({assetId:file.id,alt:file.filename});render();schedule();});wrap.prepend(check);card.append(wrap);}
+      for(const image of block.images)card.append(control('Description for '+media.find(f=>f.id===image.assetId)?.filename,'alt',image.alt,v=>image.alt=v));
+      card.append(control('Gallery caption','text',block.text,v=>block.text=v,'textarea'));
+     }else if(block.type==='embed'){
+      card.append(control('External content URL','url',block.url,v=>block.url=v));
+      const wrap=element('label',{},'Embed poster'),select=element('select',{'aria-label':'Embed poster'});for(const file of media.filter(f=>f.mediaType.startsWith('image/'))){const option=element('option',{value:file.id},file.filename);option.selected=block.posterId===file.id;select.append(option);}select.addEventListener('change',()=>{checkpoint();block.posterId=select.value;schedule();});wrap.append(select);card.append(wrap,control('External content description','alt',block.alt,v=>block.alt=v));
+      const label=element('label',{class:'choice'},'I authorize this external content for proposal recipients. Each viewer chooses whether to load the provider.'),check=element('input',{type:'checkbox','aria-label':'Authorize external content'});check.checked=block.consent===true;check.addEventListener('change',()=>{checkpoint();block.consent=check.checked;schedule();});label.prepend(check);card.append(label,control('Caption','text',block.text,v=>block.text=v,'textarea'));
      }else if(block.type==='pricing'){
       const wrap=element('label',{},'Placed pricing table'),select=element('select',{'aria-label':'Placed pricing table'});select.append(element('option',{value:''},'Choose a saved pricing table'));
       for(const o of options)for(const [i,t] of (o.tables??[]).entries()){const opt=element('option',{value:o.id+':'+i},o.label+' · '+t.name);opt.selected=block.optionId===o.id&&block.tableIndex===i;select.append(opt);}
@@ -55,7 +63,7 @@
      const conditions=new Map();for(const o of options){conditions.set(o.id,'Only '+o.label);for(const i of o.optionalItems??[])conditions.set('item:'+i.id,'Only with '+i.label);}
      for(const [id,label] of conditions){const opt=element('option',{value:id},label);opt.selected=block.condition===id;select.append(opt);}select.addEventListener('change',()=>{checkpoint();if(select.value)block.condition=select.value;else delete block.condition;schedule();});wrap.append(select);card.append(wrap);
     }
-    if(locked){card.append(element('p',{class:'muted'},'Terms are locked. You can move this section; ask an owner, admin or team manager to unlock it before changing its content.'));for(const node of card.querySelectorAll('input,textarea,select'))node.disabled=true;}
+    if(locked){card.append(element('p',{class:'muted'},block.type==='embed'?'Only the owner or an admin changes external content.':'Terms are locked. You can move this section; ask an owner, admin or team manager to unlock it before changing its content.'));for(const node of card.querySelectorAll('input,textarea,select'))node.disabled=true;}
     container.append(card);
    }
    undo.disabled=!history.length;
@@ -63,7 +71,7 @@
   const brandDefaults={name:'',accent:'#7c144a',ink:'#1c1c24',paper:'#ffffff',font:'serif',cover:''};
   const fillBrand=()=>{for(const node of form.querySelectorAll('[data-brand]'))node.value=(doc.brand??brandDefaults)[node.dataset.brand]??'';};
   fillBrand();render();form.dataset.saveState='saved';
-  form.querySelector('[data-block-add]').addEventListener('click',()=>{if(doc.blocks.length>=400){showError('A document supports up to 400 blocks.');return;}checkpoint();const type=form.querySelector('[data-block-type]').value,block={id:crypto.randomUUID(),type,title:type==='cover'?doc.brand?.cover??'':'',text:''};if(['field','signature'].includes(type)){block.recipientRole='client';block.title=type==='field'?'Client detail':'Client signature';if(type==='field'){block.fieldKind='text';block.required=false;}}if(['image','video'].includes(type)){const file=media.find(f=>f.mediaType.startsWith(type==='image'?'image/':'video/')),poster=media.find(f=>f.mediaType.startsWith('image/'));if(!file||(type==='video'&&!poster)){showError('Upload the display media and, for video, an image poster first.');return;}block.assetId=file.id;block.alt=file.filename;if(type==='video')block.posterId=poster.id;}if(type==='columns')block.second='';if(type==='pricing'){const o=options.find(o=>o.tables?.length);if(!o){showError('Create and save an itemised pricing table in the composer before placing it.');return;}block.optionId=o.id;block.tableIndex=0;}doc.blocks.push(block);render();container.lastElementChild.querySelector('input,textarea,button')?.focus();schedule();});
+  form.querySelector('[data-block-add]').addEventListener('click',()=>{if(doc.blocks.length>=400){showError('A document supports up to 400 blocks.');return;}checkpoint();const type=form.querySelector('[data-block-type]').value,block={id:crypto.randomUUID(),type,title:type==='cover'?doc.brand?.cover??'':'',text:''};if(['field','signature'].includes(type)){block.recipientRole='client';block.title=type==='field'?'Client detail':'Client signature';if(type==='field'){block.fieldKind='text';block.required=false;}}if(['image','video'].includes(type)){const file=media.find(f=>f.mediaType.startsWith(type==='image'?'image/':'video/')),poster=media.find(f=>f.mediaType.startsWith('image/'));if(!file||(type==='video'&&!poster)){showError('Upload the display media and, for video, an image poster first.');return;}block.assetId=file.id;block.alt=file.filename;if(type==='video')block.posterId=poster.id;}if(['gallery','embed'].includes(type)){const image=media.find(f=>f.mediaType.startsWith('image/'));if(!image){showError('Upload an image for this gallery or external poster first.');return;}if(type==='gallery')block.images=[{assetId:image.id,alt:image.filename}];else{block.posterId=image.id;block.alt='External content';block.url='';block.consent=false;}}if(type==='columns')block.second='';if(type==='pricing'){const o=options.find(o=>o.tables?.length);if(!o){showError('Create and save an itemised pricing table in the composer before placing it.');return;}block.optionId=o.id;block.tableIndex=0;}doc.blocks.push(block);render();container.lastElementChild.querySelector('input,textarea,button')?.focus();schedule();});
   undo.addEventListener('click',()=>{const previous=history.pop();if(!previous)return;doc=JSON.parse(previous);render();fillBrand();schedule();});
   form.querySelector('[data-brand-apply]').addEventListener('click',()=>{const fields=Array.from(form.querySelectorAll('[data-brand]'));if(fields.some(f=>!f.reportValidity()))return;checkpoint();doc.brand=Object.fromEntries(fields.filter(node=>node.dataset.brand!=='logoId'||node.value).map(node=>[node.dataset.brand,node.value]));schedule();});
   async function save(){

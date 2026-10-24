@@ -162,3 +162,8 @@ window.platterRevisionSaved=(id,previous,result)=>{
   window.addEventListener('beforeunload',event=>{if(!manualSubmission&&(needsSave||pending)){event.preventDefault();event.returnValue='';}});
  }
 })();
+
+// Third parties receive no request until the viewer explicitly loads the frame.
+for(const button of document.querySelectorAll('[data-embed-url]'))button.addEventListener('click',()=>{
+ const frame=document.createElement('iframe');frame.src=button.dataset.embedUrl;frame.title=button.dataset.embedTitle;frame.setAttribute('sandbox','allow-scripts allow-same-origin allow-forms allow-presentation');frame.setAttribute('allow','fullscreen');frame.referrerPolicy='no-referrer';frame.loading='lazy';button.closest('[data-external-embed]').replaceChildren(frame);
+});

@@ -202,6 +202,8 @@ test('EDIT-016 / REPORT-001 desktop and phone pipeline filters, value sort, tota
      if(status==='approved')await command('proposal.approve',{id:made.id,version:1,revision:1})
      fixture.push({...made,title,price,status})
     }
+    const source=fixture[1];await command('template.save',{id:source.id,version:2,name:'Campaign body template'})
+    const unrelated=fixture[0];await command('template.save',{id:unrelated.id,version:1,name:'Unrelated personal template'})
     await page.goto(app.origin+'/app')
     assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'3');assert.match(await page.locator('[data-pipeline-total="USD"]').innerText(),/13,400\.00 USD/)
     await capture('all')
@@ -212,6 +214,7 @@ test('EDIT-016 / REPORT-001 desktop and phone pipeline filters, value sort, tota
     await page.getByRole('button',{name:'Filter pipeline'}).click()
     assert.deepEqual(await page.locator('[data-proposal-id]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('data-proposal-id'))),[fixture[2].id,fixture[1].id])
     assert.equal(await page.getByLabel('Search proposal text',{exact:true}).inputValue(),'CREATIVE   [campaign]')
+    assert.equal(await page.getByRole('heading',{name:'Campaign body template',exact:true}).count(),1);assert.equal(await page.getByRole('heading',{name:'Unrelated personal template',exact:true}).count(),0);assert.equal(await page.locator('[data-template-search-count]').getAttribute('data-template-search-count'),'1')
     const csvHref=await page.getByRole('link',{name:'Download pipeline CSV',exact:true}).getAttribute('href')
     const csv=await(await context.request.get(app.origin+csvHref)).text()
     assert.ok(csv.includes('Seasonal product photography'));assert.ok(csv.includes('Campaign launch'));assert.ok(!csv.includes('Brand identity'));assert.ok(csv.includes('Total (2 proposals),,,,,USD,11000.00'))

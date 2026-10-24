@@ -1,3 +1,4 @@
+import { searchTemplates } from '../pipeline'
 import { reminderMessageChoice } from './reminder-messages'
 import { resourceEditors } from '../folders'
 import { folderSelect } from './folders'
@@ -14,11 +15,12 @@ function templateDelivery(state:any,t:any){
  +source('warning','Warning source')+field('Template warning days (empty for no warning)','warningDays',t.expiry.warning_days??'','type="number" min="1" max="36500"')+'<button>Save template delivery defaults</button>')+'</details>'
 }
 
-export function personalTemplates(state: any): string {
+export function personalTemplates(state: any,query=''): string {
  if (!['owner','admin','manager','sales','content_editor'].includes(state.actor?.role) || !state.templates?.length) return ''
  const clients = (state.clients ?? []).map((c: any) => `<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('')
- const group=(shared:boolean)=>{const rows=state.templates.filter((t:any)=>Boolean(t.shared)===shared);if(!rows.length)return '';return panel(shared?'Shared templates':'Personal templates','<p>Start an independent draft for a client. Later template changes do not change that draft.</p>'+rows.map((t:any)=>`<article><h3>${escape(t.name)}</h3><p>Version ${escape(t.version)} · ${shared?'shared template':'your personal template'}</p>`+(clients?form('template.start','/app',hidden('id',t.id)+hidden('version',t.version)+`<label>Client for ${escape(t.name)}<select name="clientId" required>${clients}</select></label>`+field('New proposal title (optional)','title','','maxlength="200"')+`<button>Start from ${escape(t.name)}</button>`):'<p>Add a client to use this template.</p>')+(resourceEditors.includes(state.actor.role)&&(t.shared||t.owner_id===state.actor.id)?form('template.locks','/app',hidden('id',t.id)+hidden('version',t.version)+'<fieldset><legend>Locked sections for '+escape(t.name)+'</legend>'+['title','scope','terms','pricing','deposit'].map(section=>'<label><input type="checkbox" name="lock:'+section+'" value="yes"'+(t.lockedSections?.includes(section)?' checked':'')+'>'+section+'</label>').join('')+'</fieldset><button>Save template locks</button>'):'')+templateDelivery(state,t)+'</article>').join(''))}
- return group(false)+group(true)
+ const matching=searchTemplates(state.templates,query)
+ const group=(shared:boolean)=>{const rows=matching.filter((t:any)=>Boolean(t.shared)===shared);if(!rows.length)return '';return panel(shared?'Shared templates':'Personal templates','<p>Start an independent draft for a client. Later template changes do not change that draft.</p>'+rows.map((t:any)=>`<article><h3>${escape(t.name)}</h3><p>Version ${escape(t.version)} · ${shared?'shared template':'your personal template'}</p>`+(clients?form('template.start','/app',hidden('id',t.id)+hidden('version',t.version)+`<label>Client for ${escape(t.name)}<select name="clientId" required>${clients}</select></label>`+field('New proposal title (optional)','title','','maxlength="200"')+`<button>Start from ${escape(t.name)}</button>`):'<p>Add a client to use this template.</p>')+(resourceEditors.includes(state.actor.role)&&(t.shared||t.owner_id===state.actor.id)?form('template.locks','/app',hidden('id',t.id)+hidden('version',t.version)+'<fieldset><legend>Locked sections for '+escape(t.name)+'</legend>'+['title','scope','terms','pricing','deposit'].map(section=>'<label><input type="checkbox" name="lock:'+section+'" value="yes"'+(t.lockedSections?.includes(section)?' checked':'')+'>'+section+'</label>').join('')+'</fieldset><button>Save template locks</button>'):'')+templateDelivery(state,t)+'</article>').join(''))}
+ return (query?panel('Template search', '<p data-template-search-count="'+matching.length+'">'+matching.length+' template'+(matching.length===1?' matches':'s match')+' this phrase. Other pipeline filters apply to proposals.</p>'):'')+group(false)+group(true)
 }
 
 export function savePersonalTemplate(state: any, p: any): string {

@@ -1,3 +1,5 @@
+import { templateState } from './templates'
+import { searchTemplates } from './pipeline'
 import { negotiatedView, pendingNegotiation } from './negotiation'
 import { uploadDocumentMedia, documentMedia } from './documents/media'
 import { selectedContent } from './conditional'
@@ -92,6 +94,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    if(path==='/api/platter/questions')return json({questions:await openQuestions(env.DB,actor)})
    if(path==='/api/platter/send-requests')return json({requests:await sendRequests(env.DB,actor)})
    if(path==='/api/platter/pipeline.csv'){need(administrators.includes(actor.role),'Only owner and admins export the pipeline report',403);const s=await state(env,actor),csv=pipelineCsv(pipeline(s.proposals,url.searchParams,await currentTime(env.DB),s.followups));await recordAudit(env.DB,actor,'report.export','pipeline');return new Response(csv,{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="platter-pipeline.csv"'}})}
+   if(path==='/api/platter/template-search'){const rows=searchTemplates(await templateState(env.DB,actor),url.searchParams.get('q')??'');return json({count:rows.length,rows:rows.map(t=>({id:t.id,name:t.name,version:t.version,shared:Boolean(t.shared),folderId:t.folder_id}))})}
    if(path==='/api/platter/pipeline'){need((url.searchParams.get('view')==='recorded-revenue'?revenueReaders:reporters).includes(actor.role),'Your role cannot view this report',403);const s=await state(env,actor);return json(pipeline(s.proposals,url.searchParams,await currentTime(env.DB),s.followups))}
    if(path==='/api/platter/state'||path==='/api/platter/agent/context')return json(await state(env,actor))
    const file=path.match(/^\/api\/platter\/invoices\/([\w-]+)\.csv$/);if(file){need(actor.role==='owner','Only the owner downloads exports',403);const row=await env.DB.prepare('SELECT csv FROM p_invoices WHERE id=?').bind(file[1]).first<any>();need(row,'Export not found',404);await recordAudit(env.DB,actor,'invoice.download',file[1]);return new Response(row.csv,{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="platter-deposit.csv"'}})}

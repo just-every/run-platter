@@ -6,15 +6,14 @@ export function paymentTerms(row:any):any {
  return typeof value==='string'?JSON.parse(value):value??null
 }
 const bps=(v:unknown)=>{const s=String(v??'');need(/^\d+(\.\d{1,2})?$/.test(s),'Enter a percentage with at most two decimals');const n=Math.round(Number(s)*100);need(n>0&&n<=10000,'Percentage must be above zero and at most 100');return n}
-const day=(v:unknown)=>{const s=String(v??'');need(/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s,'Enter a valid schedule date');return s}
+const day=(v:unknown)=>{const s=String(v??'');need(/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s&&s>='0100-01-01'&&s<='9998-12-31','Enter a valid schedule date');return s}
 export function scheduleInput(p:Record<string,any>):any {
  if(p.scheduleEnabled==='no')return null
  let v=p.paymentTerms
- if(p.scheduleEnabled==='yes')v={depositFixed:p.depositKind==='fixed'?p.depositAmount:null,netDays:p.netDays,milestones:[1,2].filter(i=>p['milestoneLabel'+i]).map(i=>({label:p['milestoneLabel'+i],percent:p['milestonePercent'+i],...(p['milestoneKind'+i]==='event'?{event:p['milestoneWhen'+i]}:{date:p['milestoneWhen'+i]})})),retainer:p.retainerPercent?{percent:p.retainerPercent,startsOn:p.retainerStartsOn,months:p.retainerMonths}:null}
+ if(p.scheduleEnabled==='yes')v={depositFixed:p.depositKind==='fixed'?p.depositAmount:null,netDays:p.netDays,milestones:Array.from({length:12},(_,i)=>i+1).filter(i=>p['milestoneLabel'+i]).map(i=>({label:p['milestoneLabel'+i],percent:p['milestonePercent'+i],...(p['milestoneKind'+i]==='event'?{event:p['milestoneWhen'+i]}:{date:p['milestoneWhen'+i]})})),retainer:p.retainerPercent?{percent:p.retainerPercent,startsOn:p.retainerStartsOn,months:p.retainerMonths}:null}
  if(v===undefined||v===null||v==='')return null
  if(typeof v==='string'){try{v=JSON.parse(v)}catch{need(false,'Invalid payment terms')}}
  need(v&&typeof v==='object'&&!Array.isArray(v),'Invalid payment terms')
- // Canonical stored terms are accepted only through the internal copy paths.
  need([15,30].includes(Number(v.netDays)),'Choose net 15 or net 30')
  need(Array.isArray(v.milestones)&&v.milestones.length<=12,'Use at most twelve milestones')
  const milestones=v.milestones.map((m:any)=>{need(m&&typeof m==='object'&&Boolean(m.date)!==Boolean(m.event),'Give each milestone a date or event');return{label:text(m.label,'a milestone label'),bps:bps(m.percent),...(m.date?{date:day(m.date)}:{event:text(m.event,'a milestone event')})}})
@@ -30,9 +29,9 @@ export function depositCents(total:number,bps:number,terms:any):number {return p
 export function paymentSchedule(total:number,deposit:number,t:any):any {
  if(!t)return undefined
  need(deposit<=total,'The fixed deposit exceeds the selected package total')
- const rows:any[]=[{kind:'deposit',label:'Deposit',event:'Acceptance',amountCents:deposit,netDays:t.netDays}]
- const balance=total-deposit;let allocated=0
- for(const [i,m] of t.milestones.entries()){const amount=i===t.milestones.length-1?balance-allocated:Math.round(balance*m.bps/10000);allocated+=amount;rows.push({kind:'milestone',label:m.label,...(m.date?{date:m.date}:{event:m.event}),amountCents:amount,netDays:t.netDays})}
+ const rows:any[]=[{kind:'deposit',label:'Deposit',event:'Acceptance',amountCents:deposit,netDays:0}]
+ const balance=total-deposit;let allocated=0,allocatedBps=0
+ for(const [i,m] of t.milestones.entries()){allocatedBps+=m.bps;const amount=Math.round(balance*allocatedBps/10000)-allocated;allocated+=amount;rows.push({kind:'milestone',label:m.label,...(m.date?{date:m.date}:{event:m.event}),amountCents:amount,netDays:t.netDays})}
  if(t.retainer){const r=t.retainer,[y,m,d]=r.startsOn.split('-').map(Number),amount=Math.round(total*r.bps/10000);for(let i=0;i<r.months;i++){const month=new Date(Date.UTC(y,m-1+i,1));const last=new Date(Date.UTC(month.getUTCFullYear(),month.getUTCMonth()+1,0)).getUTCDate();month.setUTCDate(Math.min(d,last));rows.push({kind:'retainer',label:'Monthly retainer',date:month.toISOString().slice(0,10),amountCents:amount,netDays:t.netDays})}}
  return {netDays:t.netDays,rows}
 }

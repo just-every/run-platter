@@ -14,6 +14,16 @@ For example, a Brand photography offer can have Essentials at $2,400.00 and Camp
 
 Browser members and [agents](AGENT-ACCESS.md) can prepare or revise drafts. The owner controls approval, sending and invoice export.
 
+## Payment terms and schedules
+
+In the composer, the owner, an admin or a manager of the proposal's team can choose **Include schedule**. Use the deposit percentage or choose a fixed deposit amount in the proposal's currency. A fixed deposit must fit every offered package.
+
+Add milestone labels, their percentages of the balance after the deposit, and a calendar date or named event such as Design approval. Milestone percentages must sum to 100. Choose net 15 or net 30 for milestone and retainer payments. Deposits remain due at acceptance. An optional monthly retainer uses a percentage of the selected package value, a first date and a month count; it is additional to the package price. Dates such as January 31 become February 28 in a shorter month.
+
+Review package and optional-item quantities in the client preview. The same server calculation supplies the client page, unsigned PDF and frozen agreement JSON. A template copies its terms into each new draft; changing that draft's deposit from 30% to 25% leaves the template unchanged. Revision restore, duplication and installation archives retain the terms. Legacy offers without a schedule keep their original percentage-deposit snapshots.
+
+These schedules are informational. Saving or accepting one creates no automatic charge, invoice or message. Existing payment-term rules require an explicit review of a structured schedule, and changing the schedule clears prior approval.
+
 ## Approve the revision
 
 Check the client's email, scope, both offered prices and deposit percentage. Choose **Approve this revision** when they are correct. The proposal records who approved it and when.

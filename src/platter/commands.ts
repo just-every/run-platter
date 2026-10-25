@@ -48,12 +48,12 @@ import { negotiationCommand, pendingNegotiation, negotiatedView } from './negoti
 export function proposalFields(p:Record<string,unknown>){
  const tables=tableInputs(p.pricingTables)
  const price=(id:string,value:unknown)=>tables.some(t=>t&&t.optionId===id)?1:dollars(value,'package:'+id)
- const deposit=Number(p.depositPercent);need(Number.isFinite(deposit)&&Number.isInteger(deposit*100)&&deposit>0&&deposit<=100,'Deposit must be from 0.01 to 100 percent')
+ const schedule=scheduleInput(p),deposit=Number(schedule?.depositFixedCents!=null&&(p.depositPercent===undefined||p.depositPercent==='')?100:p.depositPercent);need(Number.isFinite(deposit)&&Number.isInteger(deposit*100)&&deposit>0&&deposit<=100,'Deposit must be from 0.01 to 100 percent')
  const terms=p.terms??'';need(typeof terms==='string'&&terms.length<=10000,'Terms must be text up to 10000 characters')
  const options=p.packages===undefined?null:packageInputs(p.packages,tables)
  const conditions=sectionConditions(p.sectionConditions??Object.fromEntries(['scope','terms'].filter(k=>p[k+'Option']).map(k=>[k,p[k+'Option']])),options??[{id:'one'},{id:'two'}])
  const priced=pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)
- return{payment_terms:scheduleInput(p),document:proposalDocument(p.document,priced,String(p.clientId??'')),section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:priced}
+ return{payment_terms:schedule,document:proposalDocument(p.document,priced,String(p.clientId??'')),section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:priced}
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
@@ -131,7 +131,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   if(p.paymentTerms===undefined&&p.scheduleEnabled===undefined)p={...p,paymentTerms:editableTerms(negotiatedView(current,await pendingNegotiation(db,current.id)))}
   if(p.document===undefined)p={...p,document:documentOf(negotiatedView(current,await pendingNegotiation(db,current.id)))}
   const nextFields=proposalFields(p),oldContent=negotiatedView(current,await pendingNegotiation(db,current.id)),oldOptions=snapshot(oldContent).options
-  if(JSON.stringify(paymentTerms(oldContent))!==JSON.stringify(nextFields.payment_terms))need(['owner','admin','manager'].includes(a.role),'Only owner, admins and scoped managers edit payment schedules',403)
+  if(JSON.stringify(paymentTerms(oldContent))!==JSON.stringify(nextFields.payment_terms)||Boolean(paymentTerms(oldContent))&&oldContent.deposit_bps!==nextFields.deposit_bps)need(['owner','admin','manager'].includes(a.role),'Only owner, admins and scoped managers edit payment schedules',403)
   const external=(document:any)=>document.blocks.filter((b:any)=>b.type==='embed').sort((a:any,b:any)=>a.id.localeCompare(b.id))
   if(JSON.stringify(external(nextFields.document))!==JSON.stringify(external(documentOf(oldContent))))need(['owner','admin'].includes(a.role),'Only owner and admins change external content',403)
   for(const block of documentOf(oldContent).blocks.filter(b=>b.type==='pricing')){const retained=nextFields.document.blocks.find(b=>b.id===block.id&&b.type==='pricing'&&b.optionId===block.optionId&&b.tableIndex===block.tableIndex);if(retained)need((oldOptions.find((o:any)=>o.id===block.optionId)?.tables?.length??0)===(nextFields.options.find((o:any)=>o.id===block.optionId)?.tables?.length??0),'Remove or reassign placed document pricing blocks before changing the number of tables')}

@@ -56,9 +56,9 @@ export function composerForm(state: any, proposal: any, mode: ComposerMode, id: 
     : `<div class="tiers">${columns}</div>`
   const details = `<div class="details-row"><label>Client<select name="clientId" required><option value="">Choose a client</option>${clients}</select><span class="field-note" data-client-email>${escape(chosen?.email ?? '')}</span></label>`
     + field('Proposal title', 'title', proposal?.title, 'required maxlength="200"')
-    + field('Deposit percentage', 'depositPercent', proposal ? Number(proposal.deposit_bps) / 100 : '', 'required inputmode="decimal" placeholder="25"') + '</div>'
+    + field('Deposit percentage', 'depositPercent', proposal ? Number(proposal.deposit_bps) / 100 : '', 'inputmode="decimal" placeholder="25"') + '</div>'
   const command = mode === 'negotiate' ? 'proposal.negotiate' : mode === 'revise' ? 'proposal.revise' : 'proposal.prepare'
-  const body = (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + tiers + `<h2 class="shelf-title">Details</h2>` + details + scheduleEditor(proposal) + (currency === 'USD' ? `<div class="itemised">${pricingEditor(options)}</div>` : '') + (inlineButton ? `<div class="composer-actions"><button>${inlineButton}</button></div>` : '')
+  const body = (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + tiers + `<h2 class="shelf-title">Details</h2>` + details + (['owner','admin','manager'].includes(state.actor?.role)?scheduleEditor(proposal):'<fieldset disabled><legend>Payment schedule (owner, admin or team manager)</legend>'+scheduleEditor(proposal)+'</fieldset>') + (currency === 'USD' ? `<div class="itemised">${pricingEditor(options)}</div>` : '') + (inlineButton ? `<div class="composer-actions"><button>${inlineButton}</button></div>` : '')
   return form(command, proposal ? proposalPath(proposal.id) : '/app', body, proposal ? `proposal-${proposal.id}-${proposal.version}` : 'proposal-new')
     .replace('<form ', `<form id="${escape(id)}" class="composer" `)
 }

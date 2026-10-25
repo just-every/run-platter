@@ -6,6 +6,10 @@ import { currentTime } from './expiry-time'
 import { administrators, permitted } from './permissions'
 import { commit, exact, need, text, type Actor } from './model'
 
+// Match the retained consent to every part of the bounded stage map.
+const consentMatch=`EXISTS(SELECT 1 FROM p_crm_outcome_consents s JOIN p_audit audit ON audit.id=s.audit_id WHERE s.proposal_id=b.proposal_id AND s.binding_version=b.version AND s.revision=b.revision AND s.account_id=b.account_id AND s.connection_version=b.connection_version AND s.deal_id=b.deal_id AND s.pipeline_id=b.pipeline_id AND s.won_stage=b.won_stage AND s.lost_stage=b.lost_stage AND audit.action='outcome.crm.authorize' AND audit.subject=b.proposal_id AND audit.actor_id=b.actor_id)`
+const liveBinding=`EXISTS(SELECT 1 FROM p_crm_outcome_authority a JOIN p_proposals p ON p.id=a.proposal_id JOIN p_connections c ON c.id='workspace:hubspot' WHERE a.proposal_id=b.proposal_id AND a.binding_version=b.version AND p.revision=b.revision AND EXISTS(SELECT 1 FROM oa_operators o LEFT JOIN p_members m ON m.operator_id=o.id WHERE o.id=b.actor_id AND o.status='active' AND CASE WHEN o.role IN ('owner','admin') THEN o.role ELSE COALESCE(m.role,'sales') END IN ('owner','admin')) AND NOT EXISTS(SELECT 1 FROM p_negotiations n WHERE n.proposal_id=p.id) AND c.account_id=b.account_id AND c.version=b.connection_version AND c.status='connected' AND c.broken_at IS NULL AND EXISTS(SELECT 1 FROM p_connection_secrets secret WHERE secret.connection_id=c.id)) AND EXISTS(SELECT 1 FROM oa_operators actor LEFT JOIN p_members member ON member.operator_id=actor.id WHERE actor.id=b.actor_id AND actor.status='active' AND CASE WHEN actor.role IN ('owner','admin') THEN actor.role ELSE COALESCE(member.role,'sales') END IN ('owner','admin')) AND ${consentMatch}`
+
 export async function outcomeSettings(db:D1Database){
  const saved=await db.prepare('SELECT version,reasons FROM p_outcome_settings WHERE singleton=1').first<any>()
  return {version:saved?.version??0,reasons:saved?JSON.parse(saved.reasons) as string[]:[]}
@@ -27,7 +31,7 @@ export async function saveOutcomeSettings(db:D1Database,a:Actor,p:Record<string,
 }
 export async function crmOutcomeState(db:D1Database,a:Actor){
  if(!administrators.includes(a.role))return undefined
- return {bindings:(await db.prepare('SELECT b.*,EXISTS(SELECT 1 FROM p_crm_outcome_authority a WHERE a.proposal_id=b.proposal_id AND a.binding_version=b.version) AS authorized FROM p_crm_outcome_bindings b').all<any>()).results,attempts:(await db.prepare('SELECT * FROM p_crm_outcome_attempts ORDER BY attempted_at').all<any>()).results}
+ return {bindings:(await db.prepare(`SELECT b.*,(${liveBinding}) AS authorized FROM p_crm_outcome_bindings b`).all<any>()).results,attempts:(await db.prepare('SELECT * FROM p_crm_outcome_attempts ORDER BY attempted_at').all<any>()).results}
 }
 const identifier=(value:unknown,label:string)=>{const id=text(value,label,200);need(/^[A-Za-z0-9_-]+$/.test(id),'Use a provider identifier made of letters, numbers, hyphens or underscores');return id}
 export async function configureCrmOutcome(env:Bindings,a:Actor,p:Record<string,unknown>){
@@ -42,6 +46,8 @@ export async function configureCrmOutcome(env:Bindings,a:Actor,p:Record<string,u
   await commit(db,a,[db.prepare('DELETE FROM p_crm_outcome_authority WHERE proposal_id=?').bind(row.id),db.prepare('UPDATE p_crm_outcome_bindings SET version=version+1 WHERE proposal_id=?').bind(row.id),db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),a.id,a.role,'outcome.crm.revoke',row.id,at)],false,guard);return {saved:true}
  }
  need(['draft','approved','sent'].includes(row.status),'Authorize CRM outcomes on an open proposal',409)
+ need(!await db.prepare('SELECT 1 FROM p_negotiations WHERE proposal_id=?').bind(row.id).first(),'Send the negotiated revision before authorizing its CRM outcome',409)
+ guard.sql+=' AND NOT EXISTS(SELECT 1 FROM p_negotiations WHERE proposal_id=?)';guard.values.push(row.id)
  need(!await db.prepare('SELECT 1 FROM (SELECT * FROM p_outcomes UNION ALL SELECT * FROM p_outcome_records) WHERE proposal_id=? AND revision=?').bind(row.id,row.revision).first(),'Authorize the destination before recording the outcome',409)
  need(p.consent===true||p.consent==='yes','Explicitly authorize this proposal outcome to update the selected CRM deal')
  const {connection,secret}=await providerCredential(env,'workspace:hubspot'),deal=identifier(p.dealId,'the HubSpot deal id'),pipeline=identifier(p.pipelineId,'the HubSpot pipeline id'),won=identifier(p.wonStage,'the Closed won stage id'),lost=identifier(p.lostStage,'the Closed lost stage id')
@@ -52,7 +58,8 @@ export async function configureCrmOutcome(env:Bindings,a:Actor,p:Record<string,u
  need(valid(lost,'0.0')||valid(lost,'0'),'HubSpot must confirm the selected Closed lost stage')
  need(String(remote.id)===deal&&String(remote.properties?.pipeline)===pipeline,'Choose a deal in the confirmed pipeline')
  guard.sql+=" AND EXISTS(SELECT 1 FROM p_connections WHERE id='workspace:hubspot' AND version=? AND status='connected' AND broken_at IS NULL)";guard.values.push(connection.version)
- await commit(db,a,[db.prepare('INSERT INTO p_crm_outcome_bindings(proposal_id,revision,version,account_id,connection_version,deal_id,pipeline_id,won_stage,lost_stage,actor_id,configured_at) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,version=excluded.version,account_id=excluded.account_id,connection_version=excluded.connection_version,deal_id=excluded.deal_id,pipeline_id=excluded.pipeline_id,won_stage=excluded.won_stage,lost_stage=excluded.lost_stage,actor_id=excluded.actor_id,configured_at=excluded.configured_at').bind(row.id,row.revision,version,connection.account_id,connection.version,deal,pipeline,won,lost,a.id,at),db.prepare('INSERT INTO p_crm_outcome_authority(proposal_id,binding_version) VALUES(?,?) ON CONFLICT(proposal_id) DO UPDATE SET binding_version=excluded.binding_version').bind(row.id,version),db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),a.id,a.role,'outcome.crm.authorize',row.id,at)],false,guard)
+ const auditId=crypto.randomUUID()
+ await commit(db,a,[db.prepare('INSERT INTO p_crm_outcome_bindings(proposal_id,revision,version,account_id,connection_version,deal_id,pipeline_id,won_stage,lost_stage,actor_id,configured_at) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,version=excluded.version,account_id=excluded.account_id,connection_version=excluded.connection_version,deal_id=excluded.deal_id,pipeline_id=excluded.pipeline_id,won_stage=excluded.won_stage,lost_stage=excluded.lost_stage,actor_id=excluded.actor_id,configured_at=excluded.configured_at').bind(row.id,row.revision,version,connection.account_id,connection.version,deal,pipeline,won,lost,a.id,at),db.prepare('INSERT INTO p_crm_outcome_authority(proposal_id,binding_version) VALUES(?,?) ON CONFLICT(proposal_id) DO UPDATE SET binding_version=excluded.binding_version').bind(row.id,version),db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(auditId,a.id,a.role,'outcome.crm.authorize',row.id,at),db.prepare('INSERT INTO p_crm_outcome_consents(audit_id,proposal_id,revision,binding_version,account_id,connection_version,deal_id,pipeline_id,won_stage,lost_stage) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(auditId,row.id,row.revision,version,connection.account_id,connection.version,deal,pipeline,won,lost)],false,guard)
  return {saved:true}
 }
 /** A failed or uncertain write is retained and never automatically replayed. */
@@ -62,7 +69,7 @@ export async function synchronizeOutcome(env:Bindings,id:string){
  const available=async()=>{
   const actor=await actorById(db,binding.actor_id);if(!actor||!administrators.includes(actor.role))return false
   try{await permitted(db,actor,id,'send')}catch{return false}
-  return Boolean(await db.prepare("SELECT 1 FROM p_crm_outcome_authority a JOIN p_connections c ON c.id='workspace:hubspot' JOIN p_proposals p ON p.id=a.proposal_id WHERE a.proposal_id=? AND a.binding_version=? AND p.revision=? AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL AND EXISTS(SELECT 1 FROM p_connection_secrets s WHERE s.connection_id=c.id)").bind(id,binding.version,row.revision,binding.account_id,binding.connection_version).first())
+  return Boolean(await db.prepare(`SELECT 1 FROM p_crm_outcome_bindings b WHERE b.proposal_id=? AND b.version=? AND b.revision=? AND ${liveBinding}`).bind(id,binding.version,row.revision).first())
  }
  if(!await available())return
  const stage=outcome.kind==='won'?binding.won_stage:binding.lost_stage,at=await currentTime(db),claim=await db.prepare("INSERT INTO p_crm_outcome_attempts(proposal_id,revision,kind,account_id,deal_id,stage_id,status,attempted_at) VALUES(?,?,?,?,?,?,'sending',?) ON CONFLICT DO NOTHING").bind(id,row.revision,outcome.kind,binding.account_id,binding.deal_id,stage,at).run()

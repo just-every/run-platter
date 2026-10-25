@@ -44,11 +44,21 @@ window.platterRevisionSaved=(id,previous,result)=>{
 // The server prices acceptance itself; this only mirrors what the saved revision will show.
 (() => {
   // The server's own rule: up to two decimals, written plain or with US thousands commas and a leading $.
-  const cents = value => {
+  const cents = (value, allowZero = false) => {
     const written = value.trim(), plain = /^\$?\s*\d{1,3}(,\d{3}){1,2}(\.\d{1,2})?$/.test(written) ? written.replace(/[$,\s]/g, '') : written.replace(/^\$\s*/, '');
     if (!/^\d{1,8}(\.\d{1,2})?$/.test(plain)) return null;
     const amount = Math.round(Number(plain) * 100);
-    return amount > 0 && amount <= 1000000000 ? amount : null;
+    return amount >= (allowZero ? 0 : 1) && amount <= 1000000000 ? amount : null;
+  };
+  // The price field is the amount before the package reduction, after table reductions.
+  const netPrice = (tier, gross) => {
+    if (gross === null) return null;
+    const percent = tier.querySelector('[data-package-field="discountPercent"]')?.value.trim() || '0';
+    const fixed = cents(tier.querySelector('[data-package-field="discountAmount"]')?.value || '0', true);
+    if (!/^\d{1,2}(\.\d{1,2})?$/.test(percent) || fixed === null) return null;
+    const [whole, fraction = ''] = percent.split('.'), bps = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+    const net = Number((BigInt(gross) * BigInt(10000 - bps) + 5000n) / 10000n) - fixed;
+    return net > 0 ? net : null;
   };
   const show = value => value === null ? '—' : '$' + (value / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   for (const form of document.querySelectorAll('form.composer')) {
@@ -59,10 +69,10 @@ window.platterRevisionSaved=(id,previous,result)=>{
       for (const tier of form.querySelectorAll('.tier[data-tier]')) {
         const id = tier.dataset.tier, field = tier.querySelector('.tier-price input');
         if (!field) continue;
-        const price = cents(field.value);
+        const gross = cents(field.value), price = netPrice(tier, gross);
         field.classList.toggle('invalid', field.value.trim() !== '' && price === null);
         const figure = tier.querySelector('.money-figure');
-        if (figure) figure.textContent = price === null ? field.value.trim() : show(price);
+        if (figure) figure.textContent = gross === null ? field.value.trim() : show(gross);
         const deposit = price === null || !valid ? null : Math.round(price * percent * 100 / 10000);
         tier.querySelector('[data-line="deposit"]').textContent = show(deposit);
         tier.querySelector('[data-line="balance"]').textContent = show(deposit === null ? null : price - deposit);

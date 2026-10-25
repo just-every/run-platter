@@ -1242,11 +1242,13 @@ test('SEND-006 self-test mail uses only the active sign-in address, previews an 
 
 
 test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval',async()=>{
- const patches=[],reads=[],crm={timeout:false,revoke:null};let h
- h=await harness({outboundService:async request=>{const url=new URL(request.url);assert.equal(url.hostname,'api.hubapi.com');if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-9900'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9901',stages:[{id:'synthetic-platter-9902',metadata:{isClosed:'true',probability:'1.0'}},{id:'synthetic-platter-9903',metadata:{isClosed:'true',probability:'0.0'}}]}]});const id=url.pathname.split('/').at(-1);if(request.method==='GET'){reads.push(id);if(crm.revoke){const revoke=crm.revoke;crm.revoke=null;await revoke()}return Response.json({id,properties:{pipeline:'synthetic-platter-9901'}})}assert.equal(request.method,'PATCH');const body=await request.json();patches.push({id,body});if(crm.timeout)throw Error('Synthetic uncertain CRM response');return Response.json({id,properties:body.properties})}})
+ const patches=[],reads=[],crm={timeout:false,revoke:null,pipeline:'synthetic-platter-9901'};let h
+ h=await harness({outboundService:async request=>{const url=new URL(request.url);assert.equal(url.hostname,'api.hubapi.com');if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-9900'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9901',stages:[{id:'synthetic-platter-9902',metadata:{isClosed:'true',probability:'1.0'}},{id:'synthetic-platter-9903',metadata:{isClosed:'true',probability:'0.0'}},{id:'synthetic-platter-9982',metadata:{isClosed:'true',probability:'1.0'}},{id:'synthetic-platter-9983',metadata:{isClosed:'true',probability:'0.0'}}]}]});const id=url.pathname.split('/').at(-1);if(request.method==='GET'){reads.push(id);if(crm.revoke){const revoke=crm.revoke;crm.revoke=null;await revoke()}return Response.json({id,properties:{pipeline:crm.pipeline}})}assert.equal(request.method,'PATCH');const body=await request.json();patches.push({id,body});if(crm.timeout)throw Error('Synthetic uncertain CRM response');return Response.json({id,properties:body.properties})}})
  try{
  await h.cmd('provider.connect',{provider:'hubspot',version:0,token:'synthetic-platter-9904',consent:true})
- const bind=async(id,version)=>h.cmd('outcome.crm',{id,version,bindingVersion:0,dealId:'synthetic-platter-'+id.replaceAll('-',''),pipelineId:'synthetic-platter-9901',wonStage:'synthetic-platter-9902',lostStage:'synthetic-platter-9903',consent:true})
+ let destination=9910
+ const bindingInput=(id,version,bindingVersion=0,extra={})=>({id,version,bindingVersion,dealId:'synthetic-platter-'+destination++,pipelineId:'synthetic-platter-9901',wonStage:'synthetic-platter-9902',lostStage:'synthetic-platter-9903',consent:true,...extra})
+ const bind=async(id,version,bindingVersion=0,extra={})=>h.cmd('outcome.crm',bindingInput(id,version,bindingVersion,extra))
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
  const {p,path,client}=await sent(h),cookie=await verified(h,path)
  const current=async id=>(await h.state()).proposals.find(x=>x.id===id)
@@ -1291,6 +1293,7 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  assert.equal((await h.send(newPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},newCookie)).status,200)
  assert.equal((await h.send(newPath+'/action?name=decline',{revision:2,reason:'Too late'},newCookie)).status,409)
  assert.equal((await current(p.id)).pipelineStatus,'accepted');assert.deepEqual((await current(p.id)).outcomes,after.outcomes)
+ assert.equal((await h.state()).crmOutcomes.bindings.find(r=>r.proposal_id===p.id).authorized,0,'the new sent revision does not inherit CRM consent');await h.cmd('outcome.crm.sync',{id:p.id});assert.equal(patches.length,1,'a new acceptance cannot replay the prior revision outcome')
 
  const otherDraft=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Cancelled campaign'});await h.cmd('proposal.approve',{id:otherDraft.id,version:1,revision:1});const otherShare=await h.cmd('proposal.send',{id:otherDraft.id,version:2});const other={p:otherDraft,path:new URL(otherShare.shareUrl).pathname},otherCookie=await verified(h,other.path)
  await h.send('/auth/invite',{email:'outcomes-member@studio.example',displayName:'Sales colleague',role:'member',returnTo:'/app'},h.owner)
@@ -1353,6 +1356,50 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  crm.revoke=()=>h.cmd('outcome.crm',{id:initialRace.id,version:3,bindingVersion:0,enabled:false})
  await h.cmd('outcome.crm',{...authorizeRace,id:initialRace.id,bindingVersion:0},h.owner,409)
  assert.ok(!(await h.state()).crmOutcomes.bindings.some(r=>r.proposal_id===initialRace.id),'revoking an initial in-flight request leaves execution off')
+ const protectedState=async()=>({state:await h.state(),consents:(await h.db.prepare('SELECT * FROM p_crm_outcome_consents ORDER BY audit_id').all()).results,audit:(await h.send('/api/platter/audit',undefined,h.owner)).value})
+ const scoped=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Outcome administrative boundaries'},member);await h.cmd('proposal.approve',{id:scoped.id,version:1,revision:1});await h.cmd('proposal.send',{id:scoped.id,version:2})
+ const memberId=(await h.state(member)).actor.id
+ await h.cmd('proposal.share',{id:scoped.id,operatorId:memberId})
+ for(const role of ['sales','manager','content_editor','viewer','billing']){
+  const person=(await h.state()).teamPeople.find(r=>r.id===memberId)
+  await h.cmd('member.set',{operatorId:memberId,version:person.version,role,teams:[]})
+  const unchanged=await protectedState(),calls=reads.length,writeCount=patches.length
+  await h.cmd('outcome.settings',{version:1,reasons:['Changed']},member,403)
+  await h.cmd('proposal.win',{id:scoped.id,version:3,reason:'Signed outside'},member,403)
+  await h.cmd('outcome.crm',bindingInput(scoped.id,3),member,403)
+  await h.cmd('outcome.crm.sync',{id:scoped.id},member,403)
+  assert.deepEqual(await protectedState(),unchanged,role+' cannot change reason settings, override won, or grant CRM authority');assert.equal(reads.length,calls);assert.equal(patches.length,writeCount)
+ }
+ const person=(await h.state()).teamPeople.find(r=>r.id===memberId)
+ await h.cmd('member.set',{operatorId:memberId,version:person.version,role:'admin',teams:[]})
+ await h.cmd('outcome.settings',{version:1,reasons:['Budget','Timing','Signed outside']},member)
+ await h.cmd('proposal.win',{id:scoped.id,version:3,reason:'Signed outside'},member)
+ assert.equal((await current(scoped.id)).outcomes[0].actor_role,'admin')
+ const noCrm=async(id,baseline)=>{await h.cmd('outcome.crm.sync',{id});assert.equal(patches.length,baseline);assert.ok(!(await h.state()).crmOutcomes.attempts.some(r=>r.proposal_id===id),'unconsented revisions do not claim a remote write')}
+ for(const restore of [false,true]){
+  const made=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:restore?'Restored consent remains off':'Revised consent remains off'});await bind(made.id,1)
+  await h.cmd('proposal.revise',{...offer,clientId:client.id,id:made.id,version:1,scope:'Changed after CRM consent'})
+  if(restore)await h.cmd('proposal.restore',{id:made.id,version:2,revision:1})
+  let row=await current(made.id);assert.equal((await h.state()).crmOutcomes.bindings.find(r=>r.proposal_id===made.id).authorized,0)
+  const baseline=patches.length;await noCrm(made.id,baseline)
+  await h.cmd('proposal.approve',{id:row.id,version:row.version,revision:row.revision});row=await current(row.id);await h.cmd('proposal.send',{id:row.id,version:row.version});row=await current(row.id)
+  await h.cmd('proposal.lose',{id:row.id,version:row.version,reason:'Budget'});await noCrm(row.id,baseline)
+ }
+ const source=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Consent stays with its source'});await bind(source.id,1)
+ const copied=await h.cmd('proposal.duplicate',{id:source.id,version:1}),copyBaseline=patches.length
+ assert.ok(!(await h.state()).crmOutcomes.bindings.some(r=>r.proposal_id===copied.id));await h.cmd('proposal.approve',{id:copied.id,version:1,revision:1});await h.cmd('proposal.send',{id:copied.id,version:2});await h.cmd('proposal.lose',{id:copied.id,version:3,reason:'Budget'});await noCrm(copied.id,copyBaseline)
+ const mapped=await make('Exact CRM destination and stage consent');await bind(mapped.id,3)
+ const original=(await h.state()).crmOutcomes.bindings.find(r=>r.proposal_id===mapped.id)
+ const reconfigure=bindingInput(mapped.id,3,1,{dealId:'synthetic-platter-9992',wonStage:'synthetic-platter-9982',lostStage:'synthetic-platter-9983'})
+ const mappingBefore=await protectedState(),calls=reads.length
+ await h.cmd('outcome.crm',{...reconfigure,consent:false},h.owner,400);assert.deepEqual(await protectedState(),mappingBefore);assert.equal(reads.length,calls,'changed destination and map require explicit consent before provider reads')
+ crm.pipeline='synthetic-platter-9993';await h.cmd('outcome.crm',reconfigure,h.owner,400);crm.pipeline='synthetic-platter-9901';assert.deepEqual(await protectedState(),mappingBefore,'an unverified destination cannot replace the consented mapping')
+ await h.cmd('outcome.crm',reconfigure)
+ const history=(await h.db.prepare('SELECT s.*,a.actor_id,a.action FROM p_crm_outcome_consents s JOIN p_audit a ON a.id=s.audit_id WHERE s.proposal_id=? ORDER BY s.binding_version').bind(mapped.id).all()).results
+ assert.equal(history.length,2);assert.equal(history[0].deal_id,original.deal_id);assert.equal(history[0].revision,1);assert.equal(history[1].deal_id,reconfigure.dealId);assert.equal(history[1].won_stage,reconfigure.wonStage);assert.equal(history[1].lost_stage,reconfigure.lostStage);const author=(await h.state()).actor.id;assert.ok(history.every(r=>r.action==='outcome.crm.authorize'&&r.actor_id===author))
+ const mapBaseline=patches.length;await h.cmd('proposal.lose',{id:mapped.id,version:3,reason:'Budget'});assert.equal(patches.length,mapBaseline+1);assert.deepEqual(patches.at(-1),{id:reconfigure.dealId,body:{properties:{dealstage:reconfigure.lostStage}}})
+ const moved=await make('Destination moved after consent');await bind(moved.id,3);const movedBaseline=patches.length;crm.pipeline='synthetic-platter-9993';await h.cmd('proposal.lose',{id:moved.id,version:3,reason:'Budget'});crm.pipeline='synthetic-platter-9901';assert.equal(patches.length,movedBaseline);assert.equal((await h.state()).crmOutcomes.attempts.find(r=>r.proposal_id===moved.id).status,'withheld');await h.cmd('outcome.crm.sync',{id:moved.id});assert.equal(patches.length,movedBaseline,'a repaired destination never retries a held write')
+ const reconnect=await make('Reconnected provider requires fresh consent');await bind(reconnect.id,3);await h.cmd('provider.connect',{provider:'hubspot',version:1,token:'synthetic-platter-9994',consent:true});assert.equal((await h.state()).crmOutcomes.bindings.find(r=>r.proposal_id===reconnect.id).authorized,0);const reconnectBaseline=patches.length;await h.cmd('proposal.lose',{id:reconnect.id,version:3,reason:'Budget'});await noCrm(reconnect.id,reconnectBaseline)
  assert.ok((await h.send('/api/platter/audit?action=outcome.crm.authorize',undefined,h.owner)).value.rows.some(r=>r.subject===won.id))
 
  }finally{await h.close()}

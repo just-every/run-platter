@@ -39,7 +39,7 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
    const mills = BigInt(whole) * 1000n + BigInt(fraction.padEnd(3, '0'))
    need(mills > 0n && mills <= 1000000000n, 'Quantity must be from 0.001 to 1,000,000')
    const cents = dollars(line.unitPrice)
-   const grossCents = boundedTotal((mills * BigInt(cents) + 500n) / 1000n),discountBps=percentBps(line.discountPercent,'a line discount',9999),discountFixedCents=fixedDiscount(line.discountAmount),groupDiscountBps=percentBps(line.groupDiscountPercent,'a group discount',9999),groupDiscountFixedCents=fixedDiscount(line.groupDiscountAmount),lineTotalCents=scopedNet(grossCents,discountBps,discountFixedCents)
+   const grossCents = boundedTotal((mills * BigInt(cents) + 500n) / 1000n),discountBps=percentBps(line.discountPercent,'a line discount'),discountFixedCents=fixedDiscount(line.discountAmount),groupDiscountBps=percentBps(line.groupDiscountPercent,'a group discount'),groupDiscountFixedCents=fixedDiscount(line.groupDiscountAmount),lineTotalCents=scopedNet(grossCents,discountBps,discountFixedCents)
    const description = line.description ?? '', group = line.group ?? ''
    need(typeof description === 'string' && description.length <= 2000, 'Description must be text up to 2000 characters')
    need(typeof group === 'string' && group.length <= 200, 'Group must be text up to 200 characters')

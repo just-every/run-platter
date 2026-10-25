@@ -8,8 +8,8 @@ const reached: Record<string, number> = { draft: 0, approved: 1, sent: 2, expire
 
 function track(row: any): string {
   const at = row.nextAction === 'complete' ? 4 : reached[row.status] ?? 0
-  const stalled = ['expired', 'withdrawn', 'declined', 'lost', 'won'].includes(row.status)
-  return `<ol class="track${stalled ? ' stalled' : ''}" aria-label="Progress">${stages.map((stage, i) => `<li class="${i < at ? 'done' : i === at ? 'now' : ''}"><span>${stage}</span></li>`).join('')}</ol>`
+  const stalled = ['expired', 'withdrawn', 'declined', 'lost'].includes(row.status),displayStages=row.status==='won'?['Prepared','Approved','Sent','Won override']:stages
+  return `<ol class="track${stalled ? ' stalled' : ''}" aria-label="Progress">${displayStages.map((stage, i) => `<li class="${i < at ? 'done' : i === at ? 'now' : ''}"><span>${stage}</span></li>`).join('')}</ol>`
 }
 
 export function pipelinePanel(proposals: any[], params: URLSearchParams, followups?:any) {

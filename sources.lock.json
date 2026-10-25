@@ -2318,7 +2318,7 @@
       "executable": false
     },
     "src/platter/discounts.ts": {
-      "sha256": "ff5f5d52a8f04a89734a917ce81b87bc331e03944f1f755707b521d22032fef2",
+      "sha256": "2094c9bebafe6abc113c050e957a9cd5ff2de3df5731928d1f320773e80252ee",
       "executable": false
     },
     "src/platter/disputes.ts": {
@@ -2554,7 +2554,7 @@
       "executable": false
     },
     "src/platter/pricing.ts": {
-      "sha256": "3667e0fbd40aac93098871d33a75831b1b158a1af0ab926fd4a122ae79c70a80",
+      "sha256": "3c5c39a9c470cd46c775f38a9079f5abbf5f436ea24a924e1846d34bc736cf91",
       "executable": false
     },
     "src/platter/question-replies.ts": {
@@ -2754,7 +2754,7 @@
       "executable": false
     },
     "src/platter/ui/pipeline.ts": {
-      "sha256": "8d603bc11d9025cae3422f61a278c140d2995d49f8c497517e06033254e49e8f",
+      "sha256": "3713c9d32174a1b258beeacebb379842d6348bced27d07045780e6b548df3d85",
       "executable": false
     },
     "src/platter/ui/preview.ts": {
@@ -2814,11 +2814,11 @@
       "executable": false
     },
     "src/platter/ui/withdrawal.ts": {
-      "sha256": "cafe9fe233fe2c091ea4bc9411dec354f3cfd3367e8f5603f794f5f9fbb4c4a1",
+      "sha256": "8ac894e52d694cd5ff66d70aa75e183d76daad9b63c107a435931fa0cf4d806d",
       "executable": false
     },
     "src/platter/ui/workspace.ts": {
-      "sha256": "27958d57919ca3fd934c1af23929ea2ce84c5e06bb66e1eae2cd5425a68a1a4b",
+      "sha256": "9c54c745985acf1a18cb619ff6998cf61b10e389b6dde495e63b17816bd4243f",
       "executable": false
     },
     "src/platter/withdrawal.ts": {
@@ -3014,7 +3014,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "7a96244c5c1f74fb1e86c9da49d2a3bc3d24080a9e9aa4a98ab7eeda8208997a",
+      "sha256": "0ae72159c9555bf7dbbf31a0aa3676937791ae38e72135b128f2f0d173217be9",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

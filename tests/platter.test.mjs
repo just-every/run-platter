@@ -2071,6 +2071,12 @@ test('PRICE-004 / APPROVE-001 visible package discounts preserve exact optional 
   assert.equal(current.options[0].cents,180000);assert.deepEqual(current.options[0].tables[0].lines.map(l=>l.lineTotalCents),[90000,90000,50000]);assert.equal(current.internalPricing.total.revenueCents,180000);assert.equal(current.approval.required,true)
   await h.cmd('proposal.send',{id:scoped.id,version:1},h.owner,409)
   await h.cmd('proposal.approve',{id:scoped.id,version:1,revision:1});await h.cmd('proposal.send',{id:scoped.id,version:2})
+  for(const [linePatch,packagePatch,totalCents,review] of [[{groupDiscountPercent:'20'},{discountAmount:'0'},210000,true],[{groupDiscountPercent:'0',groupDiscountAmount:'500'},{discountAmount:'0'},200000,true],[{groupDiscountPercent:'0',discountPercent:'20'},{discountAmount:'0'},230000,true],[{groupDiscountPercent:'10'},{discountAmount:'0'},230000,false],[{groupDiscountPercent:'100'},{discountAmount:'0'},50000,true]]){
+   const fields={...advanced,packages:[{...advanced.packages[0],...packagePatch}],pricingTables:[{...advanced.pricingTables[0],lines:advanced.pricingTables[0].lines.map((l,i)=>i===0?{...l,...linePatch}:l)}]},candidate=await h.cmd('proposal.prepare',fields),candidateRow=(await h.state()).proposals.find(r=>r.id===candidate.id)
+   assert.equal(candidateRow.options[0].cents,totalCents);assert.equal(candidateRow.approval.required,review)
+   if(review)await h.cmd('proposal.send',{id:candidate.id,version:1},h.owner,409)
+   else await h.cmd('proposal.send',{id:candidate.id,version:1})
+  }
   const variant={...advanced,packages:[{...advanced.packages[0],showDiscount:false}],pricingTables:[{...advanced.pricingTables[0],lines:advanced.pricingTables[0].lines.map((l,i)=>i===0?{...l,discountPercent:'20',discountAmount:'10'}:l)}]}
   const hidden=await h.cmd('proposal.prepare',variant);current=(await h.state()).proposals.find(r=>r.id===hidden.id)
   assert.equal(current.options[0].cents,161100);assert.equal(current.approval.required,true);assert.equal(current.internalPricing.total.revenueCents,161100)
@@ -2080,9 +2086,12 @@ test('PRICE-004 / APPROVE-001 visible package discounts preserve exact optional 
   const hiddenData=await h.send(hiddenPath+'/data.json',undefined,hiddenCookie);assert.equal(hiddenData.value.selection.totalCents,161100);assert.doesNotMatch(hiddenData.text,/grossCents|discountCents|discountBps|fixedCents|unitPrice/);assert.equal(hiddenData.value.options[0].tables[0].lines.reduce((n,l)=>n+l.lineTotalCents,0),161100)
   const hiddenPage=await h.send(hiddenPath,undefined,hiddenCookie);assert.doesNotMatch(hiddenPage.text,/Package discount:|Package discounts|Unit price/)
   const hiddenPdf=await h.mf.dispatchFetch(h.origin+hiddenPath+'/download.pdf?optionId=main',{headers:{cookie:hiddenCookie}});assert.equal(hiddenPdf.status,200);assert.doesNotMatch((await pdfPages(await hiddenPdf.arrayBuffer())).join(' '),/Package discount:|1000[.]00/)
+  await h.cmd('proposal.approve',{id:duplicate.id,version:1,revision:1});const acceptedHiddenPath=new URL((await h.cmd('proposal.send',{id:duplicate.id,version:2})).shareUrl).pathname,acceptedHiddenCookie=await verified(h,acceptedHiddenPath)
+  assert.equal((await h.send(acceptedHiddenPath+'/action?name=accept',{name:'Synthetic client',optionId:'main',consent:true},acceptedHiddenCookie)).status,200)
+  const acceptedHiddenData=await h.send(acceptedHiddenPath+'/data.json',undefined,acceptedHiddenCookie);assert.equal(acceptedHiddenData.value.acceptance.totalCents,161100);assert.doesNotMatch(acceptedHiddenData.text,/grossCents|discountCents|discountBps|fixedCents|unitPrice/)
   const savedRows=(await h.db.prepare('SELECT * FROM p_proposals ORDER BY id').all()).results
   for(const patch of [{discountAmount:'3000'},{discountAmount:'-1'},{discountExpiresOn:'2099-02-30'}])await h.cmd('proposal.prepare',{...advanced,packages:[{...advanced.packages[0],...patch}]},h.owner,400)
-  for(const linePatch of [{discountPercent:'100'},{discountAmount:'1001'},{groupDiscountAmount:'2001'},{groupDiscountPercent:'-1'}])await h.cmd('proposal.prepare',{...advanced,pricingTables:[{...advanced.pricingTables[0],lines:advanced.pricingTables[0].lines.map((l,i)=>i===0?{...l,...linePatch}:l)}]},h.owner,400)
+  for(const linePatch of [{discountPercent:'100.01'},{discountAmount:'1001'},{groupDiscountAmount:'2001'},{groupDiscountPercent:'-1'}])await h.cmd('proposal.prepare',{...advanced,pricingTables:[{...advanced.pricingTables[0],lines:advanced.pricingTables[0].lines.map((l,i)=>i===0?{...l,...linePatch}:l)}]},h.owner,400)
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_proposals ORDER BY id').all()).results,savedRows)
   // The installation clock advances to a fixed instant, independent of wall-clock boundaries.
   await h.cmd('expiry.remove',{id:hidden.id,version:3})

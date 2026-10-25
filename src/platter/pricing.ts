@@ -1,11 +1,12 @@
-import { discountedCents, percentBps } from './discounts'
+import { allocateNet, fixedDiscount, scopedNet, percentBps } from './discounts'
+import { calendarDate } from './expiry-time'
 import { dollars, need, text } from './model'
 
 export interface PriceLine {
- name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number
+ name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number; grossCents?:number; discountBps?:number; discountFixedCents?:number; groupDiscountBps?:number; groupDiscountFixedCents?:number
 }
 export interface PriceTable {
- name: string; lines: PriceLine[]; groups: { name: string; subtotalCents: number }[]; subtotalCents: number
+ name: string; lines: PriceLine[]; groups: { name: string; subtotalCents: number }[]; subtotalCents: number; thresholdBps?:number
 }
 const object = (value: unknown): value is Record<string, any> => !!value && typeof value === 'object' && !Array.isArray(value)
 const boundedTotal = (value: bigint) => {
@@ -21,7 +22,7 @@ export function tableInputs(input: unknown): any[] {
  return tables
 }
 
-export function pricedOptions(options: { id: string; label: string; cents: number; discountBps?:number }[], input: unknown) {
+export function pricedOptions(options: { id: string; label: string; cents: number; discountBps?:number; discountFixedCents?:number; concealDiscount?:boolean; discountExpiresOn?:string }[], input: unknown) {
  const tables=tableInputs(input)
  const priced = options.map(option => ({ ...option, tables: [] as PriceTable[] }))
  for (const table of tables) {
@@ -38,21 +39,31 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
    const mills = BigInt(whole) * 1000n + BigInt(fraction.padEnd(3, '0'))
    need(mills > 0n && mills <= 1000000000n, 'Quantity must be from 0.001 to 1,000,000')
    const cents = dollars(line.unitPrice)
-   const lineTotalCents = boundedTotal((mills * BigInt(cents) + 500n) / 1000n)
+   const grossCents = boundedTotal((mills * BigInt(cents) + 500n) / 1000n),discountBps=percentBps(line.discountPercent,'a line discount',9999),discountFixedCents=fixedDiscount(line.discountAmount),groupDiscountBps=percentBps(line.groupDiscountPercent,'a group discount',9999),groupDiscountFixedCents=fixedDiscount(line.groupDiscountAmount),lineTotalCents=scopedNet(grossCents,discountBps,discountFixedCents)
    const description = line.description ?? '', group = line.group ?? ''
    need(typeof description === 'string' && description.length <= 2000, 'Description must be text up to 2000 characters')
    need(typeof group === 'string' && group.length <= 200, 'Group must be text up to 200 characters')
    const name = text(line.name, 'a line name'), unit = text(line.unit, 'a unit', 40)
    groups.set(group.trim(), boundedTotal(BigInt(groups.get(group.trim()) ?? 0) + BigInt(lineTotalCents)))
-   return { name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents }
+   return { name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{grossCents,discountBps,discountFixedCents,groupDiscountBps,groupDiscountFixedCents}:{}) }
   })
+  let thresholdBps=Math.max(0,...lines.map(l=>l.grossCents?Math.ceil((l.grossCents-l.lineTotalCents)*10000/l.grossCents):0))
+  for(const group of groups.keys()){
+   const members=lines.filter(l=>l.group===group),rules=members.filter(l=>l.groupDiscountBps||l.groupDiscountFixedCents)
+   if(!rules.length)continue
+   need(group.length>0,'Name a group before discounting it')
+   const rule=rules[0];need(rules.every(l=>l.groupDiscountBps===rule.groupDiscountBps&&l.groupDiscountFixedCents===rule.groupDiscountFixedCents),'Use the same discount for each entry in a group')
+   const amounts=members.map(l=>l.lineTotalCents),net=scopedNet(amounts.reduce((n,v)=>n+v,0),rule.groupDiscountBps??0,rule.groupDiscountFixedCents??0),allocation=allocateNet(amounts,net)
+   thresholdBps=Math.max(thresholdBps,amounts.reduce((n,v)=>n+v,0)?Math.ceil((amounts.reduce((n,v)=>n+v,0)-net)*10000/amounts.reduce((n,v)=>n+v,0)):0)
+   members.forEach((line,i)=>{line.grossCents??=line.lineTotalCents;line.lineTotalCents=allocation[i]});groups.set(group,net)
+  }
   const subtotalCents = boundedTotal(lines.reduce((sum, line) => sum + BigInt(line.lineTotalCents), 0n))
-  option.tables.push({ name: text(table.name, 'a table name'), lines, groups: [...groups].map(([name, subtotalCents]) => ({ name, subtotalCents })), subtotalCents })
+  option.tables.push({ ...(thresholdBps?{thresholdBps}:{}),name: text(table.name, 'a table name'), lines, groups: [...groups].map(([name, subtotalCents]) => ({ name, subtotalCents })), subtotalCents })
  }
  return priced.map(({ tables, ...option }) => {
-  const {discountBps=0,...publicOption}=option,gross=tables.length?boundedTotal(tables.reduce((sum,table)=>sum+BigInt(table.subtotalCents),0n)):option.cents,cents=discountedCents(gross,discountBps)
+  const {discountBps=0,discountFixedCents=0,...publicOption}=option,gross=tables.length?boundedTotal(tables.reduce((sum,table)=>sum+BigInt(table.subtotalCents),0n)):option.cents,cents=scopedNet(gross,discountBps,discountFixedCents),pricingGrossCents=tables.reduce((n,t)=>n+t.lines.reduce((m,l)=>m+(l.grossCents??l.lineTotalCents),0),0)
   need(cents>0,'Package total after discount must be at least $0.01')
-  return {...publicOption,cents,...(tables.length?{tables}:{}),...(discountBps?{discount:{bps:discountBps,grossCents:gross,cents:gross-cents}}:{})}
+  return {...publicOption,cents,...(tables.length?{tables}:{}),...(pricingGrossCents>gross?{pricingGrossCents}:{}),...(discountBps||discountFixedCents?{discount:{bps:discountBps,grossCents:gross,cents:gross-cents,...(discountFixedCents?{fixedCents:discountFixedCents}:{})}}:{})}
  })
 }
 
@@ -60,7 +71,7 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
 export function pricingInput(options: any[]) {
  return options.flatMap(option => (option.tables ?? []).map((table: PriceTable) => ({
   optionId: option.id, name: table.name,
-  lines: table.lines.map(({ name, description, quantity, unit, unitPrice, group }) => ({ name, description, quantity, unit, unitPrice, group })),
+  lines: table.lines.map(({ name, description, quantity, unit, unitPrice, group, discountBps, discountFixedCents, groupDiscountBps, groupDiscountFixedCents }) => ({ name, description, quantity, unit, unitPrice, group,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{discountPercent:(discountBps??0)/100,discountAmount:((discountFixedCents??0)/100).toFixed(2),groupDiscountPercent:(groupDiscountBps??0)/100,groupDiscountAmount:((groupDiscountFixedCents??0)/100).toFixed(2)}:{}) })),
  })))
 }
 
@@ -90,8 +101,11 @@ export function packageInputs(input: unknown, tables: any[]) {
    return { id, label: text(extra.label, 'an optional-item name'), unitCents: dollars(extra.unitPrice), min, max, quantity, editable: extra.editable }
   })
   const discountBps=percentBps(item.discountPercent,'a package discount',9999)
-  return { ...(discountBps?{discountBps}:{}),id, label: text(item.label, 'a package name'), cents: tables.some(t => t?.optionId === id) ? 1 : dollars(item.price, 'package:' + id), ...(optionalItems.length ? { optionalItems } : {}) }
+  const discountFixedCents=fixedDiscount(item.discountAmount)
+  need(item.showDiscount===undefined||[true,false,'yes','no'].includes(item.showDiscount),'Choose whether to show discounts')
+  const concealDiscount=item.showDiscount===false||item.showDiscount==='no',discountExpiresOn=item.discountExpiresOn?calendarDate(item.discountExpiresOn):undefined
+  return { ...(concealDiscount?{concealDiscount:true}:{}),...(discountExpiresOn?{discountExpiresOn}:{}),...(discountBps?{discountBps}:{}),...(discountFixedCents?{discountFixedCents}:{}),id, label: text(item.label, 'a package name'), cents: tables.some(t => t?.optionId === id) ? 1 : dollars(item.price, 'package:' + id), ...(optionalItems.length ? { optionalItems } : {}) }
  })
 }
 
-export const editablePackages = (options: any[]) => options.map(option => ({ id: option.id, label: option.label, price: ((option.discount?.grossCents??option.cents) / 100).toFixed(2),discountPercent:((option.discount?.bps??0)/100).toString(), optionalItems: (option.optionalItems ?? []).map((item: any) => ({ ...item, unitPrice: (item.unitCents / 100).toFixed(2) })) }))
+export const editablePackages = (options: any[]) => options.map(option => ({ id: option.id, label: option.label,showDiscount:option.concealDiscount?'no':'yes',discountExpiresOn:option.discountExpiresOn??'', price: ((option.discount?.grossCents??option.cents) / 100).toFixed(2),discountPercent:((option.discount?.bps??0)/100).toString(),discountAmount:((option.discount?.fixedCents??0)/100).toFixed(2), optionalItems: (option.optionalItems ?? []).map((item: any) => ({ ...item, unitPrice: (item.unitCents / 100).toFixed(2) })) }))

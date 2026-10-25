@@ -2026,6 +2026,32 @@ test('PRICE-004 / APPROVE-001 visible package discounts preserve exact optional 
   const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf'+query,{headers:{cookie}});assert.equal(pdf.status,200);const text=(await pdfPages(await pdf.arrayBuffer())).join(' ');assert.match(text,/Package discount: 20%/);assert.match(text,/104\.00/);assert.doesNotMatch(text,/Internal cost|3\.17/)
   assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'main',items:[{id:'rush',quantity:3}],consent:true},cookie)).status,200)
   row=(await h.state()).proposals.find(r=>r.id===p.id);assert.deepEqual([row.acceptance.totalCents,row.acceptance.depositCents,row.acceptance.selection.discountCents],[10400,2600,2600]);assert.deepEqual([row.internalPricing.total.revenueCents,row.internalPricing.total.costCents,row.internalPricing.total.marginCents],[10400,4951,5449]);assert.equal(row.internalPricing.lines.reduce((n,l)=>n+(l.selected?l.revenueCents:0),0),10400)
+  // Group reductions precede the once-only fixed total reduction.
+  const advanced={clientId:client.id,title:'Scoped discounts',scope:'Public scope',depositPercent:'25',packages:[{id:'main',label:'Scoped package',price:'2500',discountAmount:'500',discountExpiresOn:'2099-05-01'}],pricingTables:[{optionId:'main',name:'Services',lines:[{name:'First',quantity:'1',unit:'project',unitPrice:'1000',group:'Delivery',groupDiscountPercent:'10'},{name:'Second',quantity:'1',unit:'project',unitPrice:'1000',group:'Delivery'},{name:'Other',quantity:'1',unit:'project',unitPrice:'500'}]}]}
+  await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
+  await h.cmd('approval.rule',{version:1,name:'Discount review',position:0,condition:{kind:'discountOver',bps:1500},approvers:['role:owner']})
+  const scoped=await h.cmd('proposal.prepare',advanced);let current=(await h.state()).proposals.find(r=>r.id===scoped.id)
+  assert.equal(current.options[0].cents,180000);assert.deepEqual(current.options[0].tables[0].lines.map(l=>l.lineTotalCents),[90000,90000,50000]);assert.equal(current.internalPricing.total.revenueCents,180000);assert.equal(current.approval.required,true)
+  await h.cmd('proposal.send',{id:scoped.id,version:1},h.owner,409)
+  await h.cmd('proposal.approve',{id:scoped.id,version:1,revision:1});await h.cmd('proposal.send',{id:scoped.id,version:2})
+  const variant={...advanced,packages:[{...advanced.packages[0],showDiscount:false}],pricingTables:[{...advanced.pricingTables[0],lines:advanced.pricingTables[0].lines.map((l,i)=>i===0?{...l,discountPercent:'20',discountAmount:'10'}:l)}]}
+  const hidden=await h.cmd('proposal.prepare',variant);current=(await h.state()).proposals.find(r=>r.id===hidden.id)
+  assert.equal(current.options[0].cents,161100);assert.equal(current.approval.required,true);assert.equal(current.internalPricing.total.revenueCents,161100)
+  const templ=await h.cmd('template.save',{id:hidden.id,version:1,name:'Scoped discount template'}),started=await h.cmd('template.start',{id:templ.id,version:1,clientId:client.id}),duplicate=await h.cmd('proposal.duplicate',{id:hidden.id,version:1})
+  for(const id of [started.id,duplicate.id])assert.deepEqual((await h.state()).proposals.find(r=>r.id===id).options,current.options)
+  await h.cmd('proposal.approve',{id:hidden.id,version:1,revision:1});const hiddenPath=new URL((await h.cmd('proposal.send',{id:hidden.id,version:2})).shareUrl).pathname,hiddenCookie=await verified(h,hiddenPath)
+  const hiddenData=await h.send(hiddenPath+'/data.json',undefined,hiddenCookie);assert.equal(hiddenData.value.selection.totalCents,161100);assert.doesNotMatch(hiddenData.text,/grossCents|discountCents|discountBps|fixedCents|unitPrice/);assert.equal(hiddenData.value.options[0].tables[0].lines.reduce((n,l)=>n+l.lineTotalCents,0),161100)
+  const hiddenPage=await h.send(hiddenPath,undefined,hiddenCookie);assert.doesNotMatch(hiddenPage.text,/Package discount:|Package discounts|Unit price/)
+  const hiddenPdf=await h.mf.dispatchFetch(h.origin+hiddenPath+'/download.pdf?optionId=main',{headers:{cookie:hiddenCookie}});assert.equal(hiddenPdf.status,200);assert.doesNotMatch((await pdfPages(await hiddenPdf.arrayBuffer())).join(' '),/Package discount:|1000[.]00/)
+  const savedRows=(await h.db.prepare('SELECT * FROM p_proposals ORDER BY id').all()).results
+  for(const patch of [{discountAmount:'3000'},{discountAmount:'-1'},{discountExpiresOn:'2099-02-30'}])await h.cmd('proposal.prepare',{...advanced,packages:[{...advanced.packages[0],...patch}]},h.owner,400)
+  for(const linePatch of [{discountPercent:'100'},{discountAmount:'1001'},{groupDiscountAmount:'2001'},{groupDiscountPercent:'-1'}])await h.cmd('proposal.prepare',{...advanced,pricingTables:[{...advanced.pricingTables[0],lines:advanced.pricingTables[0].lines.map((l,i)=>i===0?{...l,...linePatch}:l)}]},h.owner,400)
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_proposals ORDER BY id').all()).results,savedRows)
+  // The installation clock advances to a fixed instant, independent of wall-clock boundaries.
+  await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET observed_at=excluded.observed_at').bind(Date.parse('2099-05-02T12:00:00Z')).run()
+  await h.cmd('proposal.send',{id:started.id,version:1},h.owner,409)
+  assert.equal((await h.send(hiddenPath+'/action?name=accept',{name:'Synthetic client',optionId:'main',consent:true},hiddenCookie)).status,409)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_acceptances WHERE proposal_id=?').bind(hidden.id).first()).n,0)
   const tiny=await h.cmd('proposal.prepare',{clientId:client.id,title:'Cent allocation',scope:'Public scope',depositPercent:'25',packages:[{id:'main',label:'Tiny',price:'0.03',discountPercent:'33.33'}],pricingTables:[{optionId:'main',name:'Tiny lines',lines:['First','Second','Third'].map(name=>({name,description:'',quantity:'1',unit:'each',unitPrice:'0.01'}))}]});const small=(await h.state()).proposals.find(r=>r.id===tiny.id);assert.equal(small.options[0].cents,2);assert.deepEqual(small.internalPricing.lines.map(l=>l.revenueCents),[1,1,0])
  }finally{await h.close()}
 })

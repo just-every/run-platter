@@ -1,3 +1,4 @@
+import { displayOptions } from '../discounts'
 import { escape, hidden, money } from './shared'
 
 const textInput = (label: string, key: string, value: unknown = '', extra = ''): string =>
@@ -10,6 +11,10 @@ function lineEditor(line: any = {}): string {
     ${textInput('Unit', 'unit', line.unit, 'required maxlength="40" placeholder="e.g. hours, guests, items"')}
     ${textInput('Unit price in USD', 'unitPrice', line.unitPrice, 'required inputmode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" title="Enter a USD amount with up to two decimal places, at most 10000000."')}
     ${textInput('Group (optional)', 'group', line.group, 'maxlength="200"')}
+    ${textInput('Line discount (%)', 'discountPercent', (line.discountBps??0)/100, 'inputmode="decimal"')}
+    ${textInput('Line discount in USD', 'discountAmount', ((line.discountFixedCents??0)/100).toFixed(2), 'inputmode="decimal"')}
+    ${textInput('Group discount (%) — enter once per group', 'groupDiscountPercent', (line.groupDiscountBps??0)/100, 'inputmode="decimal"')}
+    ${textInput('Group discount in USD — enter once per group', 'groupDiscountAmount', ((line.groupDiscountFixedCents??0)/100).toFixed(2), 'inputmode="decimal"')}
     <button type="button" class="secondary" data-pricing-action="remove-line">Remove line item</button></fieldset>`
 }
 
@@ -36,13 +41,13 @@ export function pricingEditor(options: any[]): string {
 function lineDetails(line: any, currency: string): string {
   return `<li><article><strong>${escape(line.name)}</strong>${line.description ? `<p class="preserve">${escape(line.description)}</p>` : ''}
     <dl><dt>Quantity</dt><dd>${escape(line.quantity)}</dd><dt>Unit</dt><dd>${escape(line.unit || '—')}</dd>
-    <dt>Unit price</dt><dd>${money(Number(line.unitPrice) * 100, currency)}</dd>
+    ${line.unitPrice!==undefined?`<dt>Unit price</dt><dd>${money(Number(line.unitPrice) * 100, currency)}</dd>`:''}
     ${line.group ? `<dt>Group</dt><dd>${escape(line.group)}</dd>` : ''}
     <dt>Line total</dt><dd>${money(line.lineTotalCents, currency)}</dd></dl></article></li>`
 }
 
 export function pricingTables(options: any[], currency: string): string {
-  return options.filter(option => option.tables?.length).map(option => `<section data-pricing-display>
+  return displayOptions(options).filter(option => option.tables?.length).map(option => `<section data-pricing-display>
     <h3>${escape(option.label)} pricing</h3>${option.tables.map((table: any) => `<section>
       <h4>${escape(table.name)}</h4><ul class="records">${table.lines.map((line: any) => lineDetails(line, currency)).join('')}</ul>
       ${table.groups?.length ? `<dl>${table.groups.map((group: any) => `<dt>${escape(group.name || 'Ungrouped')} subtotal</dt><dd>${money(group.subtotalCents, currency)}</dd>`).join('')}</dl>` : ''}

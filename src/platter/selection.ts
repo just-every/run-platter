@@ -1,4 +1,4 @@
-import { discountedCents } from './discounts'
+import { scopedNet } from './discounts'
 import { need } from './model'
 
 export function selectionItems(input: Record<string, any>): unknown {
@@ -39,7 +39,7 @@ export function offerSelection(options: any[], depositBps: number, optionId: unk
  items.sort((a: any, b: any) => offered.optionalItems.findIndex((x: any) => x.id === a.id) - offered.optionalItems.findIndex((x: any) => x.id === b.id))
  const gross=(offered.discount?.grossCents??offered.cents)+items.reduce((sum:number,item:any)=>sum+item.totalCents,0),bps=offered.discount?.bps??0
  need(Number.isSafeInteger(gross),'Invalid selected total')
- const cents=discountedCents(gross,bps);need(Number.isSafeInteger(cents)&&cents<=1000000000,'Selected total must not exceed $10,000,000')
- const discount=bps?{bps,grossCents:gross,cents:gross-cents}:undefined
+ const cents=scopedNet(gross,bps,offered.discount?.fixedCents??0);need(Number.isSafeInteger(cents)&&cents<=1000000000,'Selected total must not exceed $10,000,000')
+ const discount=offered.discount?{...offered.discount,bps,grossCents:gross,cents:gross-cents}:undefined
  return {option:{...offered,cents,...(discount?{discount}:{})},items,baseCents:offered.cents,deposit:Math.round(cents*depositBps/10000),...(discount?{grossCents:gross,discountCents:gross-cents,discountBps:bps}:{})}
 }

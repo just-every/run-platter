@@ -1,5 +1,5 @@
 import { legalText } from './documents/blocks'
-import { percentBps } from './discounts'
+import { discountThreshold, percentBps } from './discounts'
 import { internalPricing, costReaders } from './internal-pricing'
 import { starterTemplates } from './starter-templates'
 import type { Bindings } from '../auth.server'
@@ -15,13 +15,13 @@ export async function approvalSettings(db:D1Database){
 function matches(a:Actor,approver:string){return approver==='person:'+a.id||approver==='role:'+a.role}
 export async function approvalPlan(db:D1Database,row:any,a?:Actor){
  const {policy,rules}=await approvalSettings(db),options=typeof row.options==='string'?JSON.parse(row.options):row.options
- const totals=options.map((o:any)=>BigInt(o.discount?.grossCents??o.cents)+(o.optionalItems??[]).reduce((sum:bigint,item:any)=>sum+BigInt(item.unitCents)*BigInt(item.editable?item.max:item.quantity),0n)),total=totals.reduce((a:bigint,b:bigint)=>a>b?a:b,0n),first=await db.prepare('SELECT snapshot,prepared_by FROM p_revisions WHERE proposal_id=? AND revision=1').bind(row.id).first<any>(),origin=await db.prepare('SELECT template_id FROM p_template_sources WHERE proposal_id=?').bind(row.id).first<any>()
+ const totals=options.map((o:any)=>BigInt(o.pricingGrossCents??o.discount?.grossCents??o.cents)+(o.optionalItems??[]).reduce((sum:bigint,item:any)=>sum+BigInt(item.unitCents)*BigInt(item.editable?item.max:item.quantity),0n)),total=totals.reduce((a:bigint,b:bigint)=>a>b?a:b,0n),first=await db.prepare('SELECT snapshot,prepared_by FROM p_revisions WHERE proposal_id=? AND revision=1').bind(row.id).first<any>(),origin=await db.prepare('SELECT template_id FROM p_template_sources WHERE proposal_id=?').bind(row.id).first<any>()
  let costing:any
  const holds=async(r:any)=>{
   if(r.templates.length&&!r.templates.includes(origin?.template_id))return false
   const c=r.condition
   if(c.kind==='totalOver')return row.currency===c.currency&&total>BigInt(c.cents)
-  if(c.kind==='discountOver')return options.some((o:any)=>(o.discount?.bps??0)>c.bps)
+  if(c.kind==='discountOver')return options.some((o:any)=>discountThreshold(o)>c.bps)
   if(c.kind==='termsEdited')return row.revision>1&&Boolean(first)&&legalText(row)!==legalText(JSON.parse(first.snapshot))
   if(c.kind==='paymentTerms')return row.deposit_bps<c.minimumDepositBps||(c.standardTerms!==null&&String(row.terms??'')!==c.standardTerms)
   if(c.kind==='template')return Boolean(origin)

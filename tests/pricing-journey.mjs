@@ -78,6 +78,27 @@ export async function pricingJourney() {
      assert.match(await clientPage.locator('main').innerText(),/Proposal accepted/);assert.match(await clientPage.locator('[data-pricing-display]').innerText(),/403\.89/)
      if(screenshots){await clientPage.screenshot({path:join(screenshots,`PRICE-001-accepted-${width}.png`),fullPage:true});await clientPage.getByRole('heading',{name:'Proposal accepted',exact:true}).scrollIntoViewIfNeeded();await clientPage.screenshot({path:join(screenshots,`PRICE-001-accepted-detail-${width}.png`)})}
     }finally{await clientContext.close()}
+    // Exercise the discount controls through the compiled editor at both widths.
+    const discounted=await cmd('proposal.prepare',{clientId:client.id,title:'Discounted services',scope:'Public scope',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'2500'}],pricingTables:[{optionId:'main',name:'Services',lines:[{name:'First',quantity:'1',unit:'project',unitPrice:'1000',group:'Delivery'},{name:'Second',quantity:'1',unit:'project',unitPrice:'1000',group:'Delivery'},{name:'Other',quantity:'1',unit:'project',unitPrice:'500'}]}]})
+    await page.goto(app.origin+'/app/proposal?id='+discounted.id)
+    await page.locator('[data-package-field=discountAmount]').fill('500')
+    await page.locator('[data-pricing-field=groupDiscountPercent]').first().fill('10')
+    await page.locator('[data-package-field=discountExpiresOn]').fill('2099-05-01')
+    await page.getByRole('button',{name:'Save revision',exact:true}).click()
+    let discountState=await(await context.request.get(app.origin+'/api/platter/state')).json(),discountRow=discountState.proposals.find(p=>p.id===discounted.id)
+    assert.equal(discountRow.options[0].cents,180000)
+    assert.equal(await page.locator('[data-package-field=discountAmount]').inputValue(),'500.00')
+    assert.equal(await page.locator('[data-pricing-field=groupDiscountPercent]').first().inputValue(),'10')
+    await capture('discount-editor')
+    await page.locator('[data-pricing-field=discountPercent]').first().fill('20')
+    await page.locator('[data-pricing-field=discountAmount]').first().fill('10')
+    await page.locator('[data-package-field=showDiscount]').selectOption('no')
+    await page.getByRole('button',{name:'Save revision',exact:true}).click()
+    discountState=await(await context.request.get(app.origin+'/api/platter/state')).json();discountRow=discountState.proposals.find(p=>p.id===discounted.id);assert.equal(discountRow.options[0].cents,161100)
+    await page.getByRole('button',{name:'Approve this revision',exact:true}).click();await page.getByRole('button',{name:'Send approved proposal',exact:true}).click()
+    await page.getByRole('link',{name:'Open client proposal',exact:true}).click()
+    assert.match(await page.locator('main').innerText(),/1,611[.]00/);assert.doesNotMatch(await page.locator('main').innerText(),/Package discount:|Package discounts|Unit price/)
+    assert.match(await page.locator('main').innerText(),/2099-05-01/);await capture('discount-client')
    }finally{await context.close();await app.close();app=undefined}
   }
  }finally{await app?.close();await browser?.close()}

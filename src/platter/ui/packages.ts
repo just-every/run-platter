@@ -17,7 +17,8 @@ function packageEditor(option: any): string {
  ${field('Option label',suffix?'option'+suffix:'',option.label,'data-package-field="label" required maxlength="200"')}
  ${field('Price in USD',suffix?'price'+suffix:'',option.price,'data-package-field="price" required inputmode="decimal"')}
  ${field('Package discount (%)','',option.discountPercent??'0','data-package-field="discountPercent" inputmode="decimal"')}
- <div data-optional-items>${(option.optionalItems??[]).map(optionalEditor).join('')}</div>
+ ${field('Package discount in USD','',option.discountAmount??'0','data-package-field="discountAmount" inputmode="decimal"')}
+<label>Show discounts to client<select data-package-field="showDiscount"><option value="yes"${option?.showDiscount!=='no'?' selected':''}>Show discounts</option><option value="no"${option?.showDiscount==='no'?' selected':''}>Show net prices only</option></select></label><label>Discount expiry date (UTC)<input type="date" data-package-field="discountExpiresOn" value="${escape(option?.discountExpiresOn??'')}"></label> <div data-optional-items>${(option.optionalItems??[]).map(optionalEditor).join('')}</div>
  <div class="actions"><button type="button" class="secondary" data-package-action="add-item">Add optional item</button>
  <button type="button" class="secondary" data-package-action="remove-package">Remove package</button></div></fieldset>`
 }
@@ -47,7 +48,8 @@ export function selectedSummary(selection:any,currency:string,reviewLabel?:strin
  if(!selection)return ''
  const review=reviewLabel!==undefined
  const total=selection.totalCents??selection.option?.cents,deposit=selection.depositCents??selection.deposit
- const discount=selection.discountCents??selection.option?.discount?.cents,bps=selection.discountBps??selection.option?.discount?.bps
+ const conceal=selection.concealDiscount||selection.option?.concealDiscount
+ const discount=conceal?0:selection.discountCents??selection.option?.discount?.cents,bps=selection.discountBps??selection.option?.discount?.bps
  const contents=`${review?`<p>Package: ${escape(reviewLabel)}</p>`:''}<ul>${(selection.items??[]).map((x:any)=>`<li>${escape(x.label)} · ${x.quantity} × ${money(x.unitCents,currency)} = ${money(x.totalCents,currency)}</li>`).join('')}</ul>${discount?`<p>Package discount: ${escape(bps/100)}% · −${money(discount,currency)}</p>`:''}<p>Total: <output aria-label="Selected total">${money(total,currency)}</output></p><p>Deposit due: <output aria-label="Selected deposit">${money(deposit,currency)}</output></p>`
  // A native fragment target restores reading/focus after the GET review, even
  // without JavaScript. Other summary surfaces retain their existing markup.

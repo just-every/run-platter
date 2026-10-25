@@ -71,7 +71,8 @@ export async function synchronizeOutcome(env:Bindings,id:string){
   const remote=await providerJson('https://api.hubapi.com/crm/v3/objects/deals/'+encodeURIComponent(binding.deal_id)+'?properties=pipeline,dealstage',secret.token)
   if(String(remote.id)!==binding.deal_id||String(remote.properties?.pipeline)!==binding.pipeline_id||!await available()){await db.prepare("UPDATE p_crm_outcome_attempts SET status='withheld' WHERE proposal_id=? AND revision=?").bind(id,row.revision).run();return}
   const receipt=await demoEffect(async()=>{
-   const response=await fetch('https://api.hubapi.com/crm/v3/objects/deals/'+encodeURIComponent(binding.deal_id),{method:'PATCH',headers:{authorization:'Bearer '+secret.token,'content-type':'application/json'},body:JSON.stringify({properties:{dealstage:stage}}),redirect:'manual'})
+   const payload=Response.json({properties:{dealstage:stage}});payload.headers.set('authorization','Bearer '+secret.token)
+   const response=await fetch('https://api.hubapi.com/crm/v3/objects/deals/'+encodeURIComponent(binding.deal_id),{method:'PATCH',headers:payload.headers,body:payload.body,redirect:'manual'})
    need(response.ok,'CRM did not confirm the outcome',409);const body=await response.text();need(body.length<=262144,'CRM response too large',409);return JSON.parse(body)
   },()=>({id:binding.deal_id,properties:{dealstage:stage}}))
   need(String(receipt.id)===binding.deal_id&&String(receipt.properties?.dealstage)===stage,'CRM outcome receipt does not match',409)

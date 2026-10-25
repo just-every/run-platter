@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "49812f9b53b8a63a93743ec3e782ecf688cf10b3066d359e865c8d659eb861b5",
+      "sha256": "0063413ba1a92ce8ddce9f7d530072a60cc5284af4650ca80d8c9631cd2c4fcf",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "638a5d4887f7aa9e49fb61a3d2f8c9f69bafd5b80154b746028eecee266832b3",
+      "sha256": "e06e558b6865ac791b9c050a403291454bf89d64266198c8fb1cd5fae5b68562",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2526,7 +2526,7 @@
       "executable": false
     },
     "src/platter/outcomes.ts": {
-      "sha256": "5411990d9c1e266a28d0fcfc7bfc78f445fb364ee3694aac33763ae421be57d2",
+      "sha256": "2875694f93e1a53c3fa9b429b76355bcbca01d77f5288c129aa5895181c5f7db",
       "executable": false
     },
     "src/platter/paper-acceptance.ts": {
@@ -3034,7 +3034,7 @@
       "executable": false
     },
     "tests/site-harness.mjs": {
-      "sha256": "b128fa1a3b32774108eaa9119be6208a069877d031cef3e964cfab64148619b5",
+      "sha256": "18cb2347facdd4a41cde3d17331594907baa8bfe52b905381cf8bd5c8d352ff4",
       "executable": false
     },
     "tests/site.test.mjs": {

@@ -1,3 +1,4 @@
+import { assertDiscountDates, discountDeadline } from './discounts'
 import { detachChangedLibraryCopies } from './library-links'
 import { documentOf } from './documents/blocks'
 import { copyCosts, patchCosts } from './internal-pricing'
@@ -47,7 +48,9 @@ export async function negotiationCommand(env: Bindings, actor: Actor, name: stri
  }
  const approval=await approvalPlan(db,negotiatedView(offer,pending),actor);need(approval.complete, 'Approve this revision before sending', 409)
  guard.sql+=' AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?';guard.values.push(approval.policyVersion)
- const next = JSON.parse(pending.snapshot), token = secret(), shareUrl = env.AUTH_ORIGIN + '/p/' + token
+ const next = JSON.parse(pending.snapshot);assertDiscountDates(next.options,at)
+ guard.sql+=' AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))';guard.values.push(discountDeadline(next.options),at)
+ const token = secret(), shareUrl = env.AUTH_ORIGIN + '/p/' + token
  const client = await db.prepare('SELECT COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(offer.id,offer.client_id).first<any>()
  await commit(db, actor, [
   db.prepare("UPDATE p_proposals SET title=?,scope=?,terms=?,attachments=?,options=?,deposit_bps=?,revision=?,previous_sent_revision=?,prepared_by=?,approved_by=?,approved_at=?,version=version+1 WHERE id=?").bind(next.title, next.scope, next.terms??'', JSON.stringify(next.attachments??[]), JSON.stringify(next.options), next.deposit_bps, next.revision, offer.revision, pending.prepared_by, pending.approved_by, pending.approved_at, offer.id),

@@ -2048,7 +2048,7 @@ test('TEAM-001 / PRICE-006 optional and flat-package costs produce exact selecte
  }finally{await h.close()}
 })
 
-test('PRICE-004 / APPROVE-001 visible package discounts preserve exact optional totals, private margins, templates and public PDF/JSON custody',async()=>{
+test('PRICE-004 scoped discounts preserve exact selections, private margins, templates and public PDF and JSON custody',async()=>{
  const h=await harness({assetsDirectory:'public'})
  try{
   const {client}=await draft(h),input={clientId:client.id,title:'Synthetic discounted package',scope:'Public scope',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'100',discountPercent:'20',optionalItems:[{id:'rush',label:'Rush',unitPrice:'10',min:1,max:5,quantity:2,editable:true}]}],pricingTables:[{optionId:'main',name:'Services',lines:[{name:'Work',description:'Public work',quantity:'1',unit:'project',unitPrice:'100'}]}]},p=await h.cmd('proposal.prepare',input)
@@ -2063,6 +2063,8 @@ test('PRICE-004 / APPROVE-001 visible package discounts preserve exact optional 
   const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf'+query,{headers:{cookie}});assert.equal(pdf.status,200);const text=(await pdfPages(await pdf.arrayBuffer())).join(' ');assert.match(text,/Package discount: 20%/);assert.match(text,/104\.00/);assert.doesNotMatch(text,/Internal cost|3\.17/)
   assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'main',items:[{id:'rush',quantity:3}],consent:true},cookie)).status,200)
   row=(await h.state()).proposals.find(r=>r.id===p.id);assert.deepEqual([row.acceptance.totalCents,row.acceptance.depositCents,row.acceptance.selection.discountCents],[10400,2600,2600]);assert.deepEqual([row.internalPricing.total.revenueCents,row.internalPricing.total.costCents,row.internalPricing.total.marginCents],[10400,4951,5449]);assert.equal(row.internalPricing.lines.reduce((n,l)=>n+(l.selected?l.revenueCents:0),0),10400)
+  // Pin the installation clock before exercising discount dates.
+  await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET observed_at=excluded.observed_at').bind(Date.parse('2099-04-30T12:00:00Z')).run()
   // Group reductions precede the once-only fixed total reduction.
   const advanced={clientId:client.id,title:'Scoped discounts',scope:'Public scope',depositPercent:'25',packages:[{id:'main',label:'Scoped package',price:'2500',discountAmount:'500',discountExpiresOn:'2099-05-01'}],pricingTables:[{optionId:'main',name:'Services',lines:[{name:'First',quantity:'1',unit:'project',unitPrice:'1000',group:'Delivery',groupDiscountPercent:'10'},{name:'Second',quantity:'1',unit:'project',unitPrice:'1000',group:'Delivery'},{name:'Other',quantity:'1',unit:'project',unitPrice:'500'}]}]}
   await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})

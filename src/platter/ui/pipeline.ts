@@ -4,11 +4,11 @@ import { empty, escape, field, money, panel, proposalPath, statusPill } from './
 
 // The proposal line: each proposal on one dotted track through the stages Platter records.
 const stages = ['Prepared', 'Approved', 'Sent', 'Accepted', 'Deposit exported']
-const reached: Record<string, number> = { draft: 0, approved: 1, sent: 2, expired: 2, withdrawn: 2, declined: 2, lost: 2, accepted: 3 }
+const reached: Record<string, number> = { draft: 0, approved: 1, sent: 2, expired: 2, withdrawn: 2, declined: 2, lost: 2, won: 3, accepted: 3 }
 
 function track(row: any): string {
   const at = row.nextAction === 'complete' ? 4 : reached[row.status] ?? 0
-  const stalled = ['expired', 'withdrawn', 'declined', 'lost'].includes(row.status)
+  const stalled = ['expired', 'withdrawn', 'declined', 'lost', 'won'].includes(row.status)
   return `<ol class="track${stalled ? ' stalled' : ''}" aria-label="Progress">${stages.map((stage, i) => `<li class="${i < at ? 'done' : i === at ? 'now' : ''}"><span>${stage}</span></li>`).join('')}</ol>`
 }
 
@@ -17,7 +17,7 @@ export function pipelinePanel(proposals: any[], params: URLSearchParams, followu
  const select = (label: string, key: string, choices: { id: string; name: string }[]) => `<label>${label}<select name="${key}" aria-label="${label}"><option value="">All</option>${choices.map(c => `<option value="${escape(c.id)}"${params.get(key) === c.id ? ' selected' : ''}>${escape(c.name)}</option>`).join('')}</select></label>`
  const filters = `<form method="get" action="/app" class="filters">${revenue?'<input type="hidden" name="view" value="recorded-revenue">':''}<div class="filter-grid">`
   + field('Search proposal text', 'q', params.get('q'), 'type="search" maxlength="200"')
-  + select('Proposal folder','folder',[...new Map(proposals.filter(p=>p.folderId).map(p=>[p.folderId,{id:p.folderId,name:p.folderName??p.folderId}])).values()] as {id:string;name:string}[]) + select('Owner', 'owner', report.owners) + select('Status', 'status', ['draft','awaiting-approval','approved','sent','accepted','expired','withdrawn','declined','lost'].map(id => ({id,name:id})))
+  + select('Proposal folder','folder',[...new Map(proposals.filter(p=>p.folderId).map(p=>[p.folderId,{id:p.folderId,name:p.folderName??p.folderId}])).values()] as {id:string;name:string}[]) + select('Owner', 'owner', report.owners) + select('Status', 'status', ['draft','awaiting-approval','approved','sent','accepted','expired','withdrawn','declined','lost','won'].map(id => ({id,name:id})))
   + select('Due follow-up','dueFollowup',[{id:'yes',name:'Due today or overdue'},{id:'no',name:'No due follow-up'}])
   + select('Client', 'client', report.clients) + select('Next action', 'nextAction', Object.entries(nextActions).map(([id,name]) => ({id,name})))
   + `<label>Sort by<select name="sort" aria-label="Sort by">${['status','value','owner','client','age','nextAction','dueDate'].map(id => `<option value="${id}"${(params.get('sort') || 'status') === id ? ' selected' : ''}>${escape(id === 'nextAction' ? 'Next action' : id === 'dueDate' ? 'Due date' : id)}</option>`).join('')}</select></label>`

@@ -28,3 +28,5 @@ export function displayOptions(options:any[]){return options.map(option=>{
  const {discount,pricingGrossCents,...visible}=option,all=(option.tables??[]).flatMap((t:any)=>t.lines),allocated=allocateNet(all.map((l:any)=>l.lineTotalCents),option.cents);let index=0
  return {...visible,...(all.length?{tables:option.tables.map((t:any)=>{const lines=t.lines.map((l:any)=>({name:l.name,description:l.description,quantity:l.quantity,unit:l.unit,group:l.group,lineTotalCents:allocated[index++]}));return {name:t.name,lines,subtotalCents:lines.reduce((n:number,l:any)=>n+l.lineTotalCents,0),groups:[...new Set<string>(lines.map((l:any)=>l.group))].map(name=>({name,subtotalCents:lines.filter((l:any)=>l.group===name).reduce((n:number,l:any)=>n+l.lineTotalCents,0)}))}})}:{})}
 })}
+
+export function discountDeadline(options:any[]){return Math.min(Number.MAX_SAFE_INTEGER,...options.filter(o=>o.discountExpiresOn).map(o=>new Date(o.discountExpiresOn+'T23:59:59.999Z').getTime()))}

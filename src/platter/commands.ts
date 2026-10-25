@@ -1,4 +1,5 @@
-import { assertDiscountDates } from './discounts'
+import { saveOutcomeSettings, configureCrmOutcome, synchronizeOutcome } from './outcomes'
+import { assertDiscountDates, discountDeadline } from './discounts'
 import { detachChangedLibraryCopies } from './library-links'
 import { notificationCommand } from './notifications/commands'
 import { validateDocumentMedia } from './documents/media'
@@ -96,7 +97,10 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='proposal.prepare'&&p.templateId!==undefined)return templateCommand(env,a,'template.start',{id:p.templateId,version:p.templateVersion,clientId:p.clientId,...(p.title?{title:p.title}:{})})
  if(name.startsWith('followup.'))return followupCommand(env,a,name,p)
  if(name==='proposal.duplicate')return duplicateProposal(env,a,p)
- if(name==='proposal.withdraw'||name==='proposal.lose')return withdraw(env,a,p,name==='proposal.lose')
+ if(name==='outcome.settings')return saveOutcomeSettings(db,a,p)
+ if(name==='outcome.crm')return configureCrmOutcome(env,a,p)
+ if(name==='outcome.crm.sync'){need(['owner','admin'].includes(a.role),'Only owner and admins synchronize CRM outcomes',403);await synchronizeOutcome(env,text(p.id,'a proposal'));return {saved:true}}
+ if(name==='proposal.withdraw'||name==='proposal.lose'||name==='proposal.win')return withdraw(env,a,p,name==='proposal.lose',name==='proposal.win')
  if(name.startsWith('question.'))return questionCommand(env,a,name,p)
  if(name.startsWith('expiry.'))return expiryCommand(env,a,name,p)
  if(name==='pdf.downloads')return pdfCommand(env,a,p)
@@ -151,7 +155,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   const pending=await pendingNegotiation(db,old.id);assertDiscountDates(snapshot(negotiatedView(old,pending)).options,at)
   if(pending)return negotiationCommand(env,a,name,p,old)
   need(['draft','approved','sent'].includes(old.status),'Only an open proposal can be sent',409);const approval=await approvalPlan(db,old,a);need(approval.complete,'Approve this revision before sending',409);const token=secret(),client=await db.prepare('SELECT c.*,COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(old.id,old.client_id).first<any>(),shareUrl=env.AUTH_ORIGIN+'/p/'+token
-  await commit(db,a,[db.prepare("UPDATE p_proposals SET status='sent',version=version+1 WHERE id=?").bind(old.id),db.prepare('INSERT INTO p_shares(proposal_id,revision,token) VALUES(?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET token=excluded.token,revision=excluded.revision,code_hash=NULL,code_expires=NULL,code_attempts=0,code_generation=0,code_sent_at=NULL,session_hash=NULL,session_expires=NULL').bind(old.id,old.revision,token),...await expirySendStatements(db,old.id,a.id,at),...invitationMail(env,a,p,old,client.email,shareUrl,at)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved','sent')) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?",values:[old.id,old.version,approval.policyVersion]});await dispatchMail(env,old.id);return{shareUrl}
+  await commit(db,a,[db.prepare("UPDATE p_proposals SET status='sent',version=version+1 WHERE id=?").bind(old.id),db.prepare('INSERT INTO p_shares(proposal_id,revision,token) VALUES(?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET token=excluded.token,revision=excluded.revision,code_hash=NULL,code_expires=NULL,code_attempts=0,code_generation=0,code_sent_at=NULL,session_hash=NULL,session_expires=NULL').bind(old.id,old.revision,token),...await expirySendStatements(db,old.id,a.id,at),...invitationMail(env,a,p,old,client.email,shareUrl,at)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved','sent')) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=? AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))",values:[old.id,old.version,approval.policyVersion,discountDeadline(snapshot(old).options),at]});await dispatchMail(env,old.id);return{shareUrl}
  }
  fail('Unknown command',404)
 }

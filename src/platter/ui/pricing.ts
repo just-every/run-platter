@@ -43,7 +43,7 @@ function lineDetails(line: any, currency: string): string {
     <dl><dt>Quantity</dt><dd>${escape(line.quantity)}</dd><dt>Unit</dt><dd>${escape(line.unit || '—')}</dd>
     ${line.unitPrice!==undefined?`<dt>Unit price</dt><dd>${money(Number(line.unitPrice) * 100, currency)}</dd>`:''}
     ${line.group ? `<dt>Group</dt><dd>${escape(line.group)}</dd>` : ''}
-    <dt>Line total</dt><dd>${money(line.lineTotalCents, currency)}</dd></dl></article></li>`
+    ${line.discountBps||line.discountFixedCents?`<dt>Line discount</dt><dd>${escape((line.discountBps??0)/100)}% and ${money(line.discountFixedCents??0,currency)}</dd>`:''}${line.groupDiscountBps||line.groupDiscountFixedCents?`<dt>Group discount</dt><dd>${escape((line.groupDiscountBps??0)/100)}% and ${money(line.groupDiscountFixedCents??0,currency)} once for ${escape(line.group)}</dd>`:''}<dt>Line total</dt><dd>${money(line.lineTotalCents, currency)}</dd></dl></article></li>`
 }
 
 export function pricingTables(options: any[], currency: string): string {

@@ -42,7 +42,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  pdf.text(`Not signed, revision ${revision}`)
  pdf.gap()
  pdf.text(`Selected option: ${selected.label}`, 13)
- if(selected.discount&&!selected.concealDiscount)pdf.text(`Package discount: ${selected.discount.bps/100}% off ${amount(selected.discount.grossCents,currency)}; discount ${amount(selected.discount.cents,currency)}`)
+ if(selected.discount&&!selected.concealDiscount)pdf.text(`Package discount: ${selected.discount.bps/100}% off ${amount(selected.discount.grossCents,currency)}; discount ${amount(selected.discount.cents,currency)}${selected.discount.fixedCents?`; fixed reduction ${amount(selected.discount.fixedCents,currency)}`:''}`)
  pdf.text(`Selected option total: ${amount(selected.cents, currency)}`)
  pdf.text(`Deposit due: ${amount(deposit(selected.cents), currency)}`)
  if(selection.items.length){pdf.heading('Selected optional items');for(const item of selection.items)pdf.text(`${item.label}: ${item.quantity} x ${amount(item.unitCents,currency)} = ${amount(item.totalCents,currency)}`)}
@@ -72,15 +72,17 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   pdf.gap(8)
   pdf.text(`${option.id === optionId ? 'Selected option' : 'Option'}: ${option.label}`, 12)
   pdf.text(`Total: ${amount(option.cents, currency)}`)
+  if(option.discountExpiresOn)pdf.text(`Offer price expires on ${option.discountExpiresOn} (UTC)`)
   pdf.text(`Deposit due: ${amount(deposit(option.cents), currency)}`)
   for(const [tableIndex,table] of (option.tables??[]).entries()){
    if(doc.blocks.some(b=>b.type==='pricing'&&b.optionId===option.id&&b.tableIndex===tableIndex))continue
    pdf.heading(table.name)
    for(const line of table.lines){pdf.text(`${line.group ? line.group+': ' : ''}${line.name}`,12);if(line.description)pdf.text(line.description);pdf.text(`${line.quantity} ${line.unit}${line.unitPrice!==undefined?' x '+amount(Number(line.unitPrice.replace('.','')),currency):''} = ${amount(line.lineTotalCents,currency)}`)}
+   for(const line of table.lines){if(line.discountBps||line.discountFixedCents)pdf.text(`Line discount for ${line.name}: ${(line.discountBps??0)/100}% and ${amount(line.discountFixedCents??0,currency)}`);if(line.groupDiscountBps||line.groupDiscountFixedCents)pdf.text(`Group discount for ${line.group}: ${(line.groupDiscountBps??0)/100}% and ${amount(line.groupDiscountFixedCents??0,currency)} once`)}
    for(const group of table.groups)pdf.text(`${group.name||'Ungrouped'} subtotal: ${amount(group.subtotalCents,currency)}`)
    pdf.text(`Table subtotal: ${amount(table.subtotalCents,currency)}`,12)
   }
-  if(option.discount)pdf.text(`Package discount: ${option.discount.bps/100}% off ${amount(option.discount.grossCents,currency)}; discount ${amount(option.discount.cents,currency)}`)
+  if(option.discount)pdf.text(`Package discount: ${option.discount.bps/100}% off ${amount(option.discount.grossCents,currency)}; discount ${amount(option.discount.cents,currency)}${option.discount.fixedCents?`; fixed reduction ${amount(option.discount.fixedCents,currency)}`:''}`)
   if(option.tables?.length)pdf.text(`Package grand total: ${amount(option.cents,currency)}`,13)
  }
 

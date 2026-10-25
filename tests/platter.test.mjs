@@ -150,11 +150,12 @@ test('FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposal
  const fixture=[]
  for(let i=0;i<30;i++){
   const person=people[i%3],client=clients[i%2],input={...offer,clientId:client.id,title:`Campaign ${String(i+1).padStart(2,'0')}`,priceOne:String(1000+i*10),priceTwo:String(2000+i*20)}
-  const made=await h.cmd('proposal.prepare',input,person.cookie),status=i===2?'expired':i===6?'withdrawn':i===10?'declined':i===14?'lost':['draft','approved','sent','accepted'][i%4]
+  const made=await h.cmd('proposal.prepare',input,person.cookie),status=i===2?'expired':i===6?'withdrawn':i===10?'declined':i===14?'lost':i===18?'won':['draft','approved','sent','accepted'][i%4]
   let version=1
   if(status!=='draft'){await h.cmd('proposal.approve',{id:made.id,version:version++,revision:1})}
-  if(['sent','accepted','expired','withdrawn','declined','lost'].includes(status)){
+  if(['sent','accepted','expired','withdrawn','declined','lost','won'].includes(status)){
    const shared=await h.cmd('proposal.send',{id:made.id,version:version++})
+   if(status==='won')await h.cmd('proposal.win',{id:made.id,version:version++,reason:'Signed outside'})
    if(status==='lost')await h.cmd('proposal.lose',{id:made.id,version:version++,reason:'Project cancelled'})
    if(status==='declined'){const path=new URL(shared.shareUrl).pathname,cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=decline',{revision:1,reason:'Budget'},cookie)).status,410)}
    if(status==='withdrawn')await h.cmd('proposal.withdraw',{id:made.id,version:version++,reason:'Client project cancelled',notice:false})
@@ -164,7 +165,7 @@ test('FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposal
     assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
    }
   }
-  fixture.push({id:made.id,title:input.title,status:status==='draft'?'awaiting-approval':status,owner:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':status==='sent'?'await-client':status==='expired'?'reopen':['withdrawn','declined','lost'].includes(status)?'withdrawn':'export-deposit'})
+  fixture.push({id:made.id,title:input.title,status:status==='draft'?'awaiting-approval':status,owner:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':status==='sent'?'await-client':status==='expired'?'reopen':['withdrawn','declined','lost','won'].includes(status)?'withdrawn':'export-deposit'})
  }
  const scheduled=fixture.filter(p=>p.status==='sent').slice(0,2)
  for(const [i,row] of scheduled.entries()){await h.cmd('followup.schedule',{id:row.id,action:'Call the client',dueDate:i?'2000-03-02':'2000-03-01'});row.nextAction='followup'}
@@ -180,11 +181,11 @@ test('FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposal
  assert.equal((await report('dueFollowup=yes')).totals[0].valueCents,fixture.filter(p=>dueRows.some(r=>r.id===p.id)).reduce((n,p)=>n+p.valueCents,0))
  assert.deepEqual((await report('nextAction=followup')).rows.map(r=>r.id).sort(),scheduled.map(r=>r.id).sort())
  const expired=await report('status=expired&sort=value');assert.equal(expired.count,1);assert.equal(expired.totals[0].count,1);assert.equal(expired.totals[0].valueCents,fixture.find(p=>p.status==='expired').valueCents)
- for(const status of ['declined','lost']){const reportRow=await report('status='+status+'&sort=value');const expected=fixture.filter(p=>p.status===status);assert.equal(reportRow.count,expected.length);assert.equal(reportRow.totals[0].count,expected.length);assert.equal(reportRow.totals[0].valueCents,expected.reduce((n,p)=>n+p.valueCents,0))}
+ for(const status of ['declined','lost','won']){const reportRow=await report('status='+status+'&sort=value');const expected=fixture.filter(p=>p.status===status);assert.equal(reportRow.count,expected.length);assert.equal(reportRow.totals[0].count,expected.length);assert.equal(reportRow.totals[0].valueCents,expected.reduce((n,p)=>n+p.valueCents,0))}
  const selected=fixture.filter(p=>p.owner===people[1].id&&p.status==='sent'),filtered=await report('owner='+people[1].id+'&status=sent&sort=value')
  assert.deepEqual(filtered.rows.map(p=>p.id),selected.toSorted((a,b)=>a.valueCents-b.valueCents).map(p=>p.id));assert.equal(filtered.totals[0].valueCents,selected.reduce((n,p)=>n+p.valueCents,0))
  for(const [query,expected] of [
-  ['status=withdrawn',fixture.filter(p=>p.status==='withdrawn')],['nextAction=withdrawn',fixture.filter(p=>['withdrawn','declined','lost'].includes(p.status))],
+  ['status=withdrawn',fixture.filter(p=>p.status==='withdrawn')],['nextAction=withdrawn',fixture.filter(p=>['withdrawn','declined','lost','won'].includes(p.status))],
   ['status=declined',fixture.filter(p=>p.status==='declined')],['status=lost',fixture.filter(p=>p.status==='lost')],
   ['status=expired',fixture.filter(p=>p.status==='expired')],['nextAction=reopen',fixture.filter(p=>p.status==='expired')],
   ['client='+clients[0].id,fixture.filter(p=>p.client===clients[0].id)],
@@ -1240,12 +1241,18 @@ test('SEND-006 self-test mail uses only the active sign-in address, previews an 
 }))
 
 
-test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval',()=>run(async h=>{
+test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval',async()=>{
+ const patches=[],reads=[],crm={timeout:false,revoke:null};let h
+ h=await harness({outboundService:async request=>{const url=new URL(request.url);assert.equal(url.hostname,'api.hubapi.com');if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-9900'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9901',stages:[{id:'synthetic-platter-9902',metadata:{isClosed:'true',probability:'1.0'}},{id:'synthetic-platter-9903',metadata:{isClosed:'true',probability:'0.0'}}]}]});const id=url.pathname.split('/').at(-1);if(request.method==='GET'){reads.push(id);if(crm.revoke){const revoke=crm.revoke;crm.revoke=null;await revoke()}return Response.json({id,properties:{pipeline:'synthetic-platter-9901'}})}assert.equal(request.method,'PATCH');const body=await request.json();patches.push({id,body});if(crm.timeout)throw Error('Synthetic uncertain CRM response');return Response.json({id,properties:body.properties})}})
+ try{
+ await h.cmd('provider.connect',{provider:'hubspot',version:0,token:'synthetic-platter-9904',consent:true})
+ const bind=async(id,version)=>h.cmd('outcome.crm',{id,version,bindingVersion:0,dealId:'synthetic-platter-'+id.replaceAll('-',''),pipelineId:'synthetic-platter-9901',wonStage:'synthetic-platter-9902',lostStage:'synthetic-platter-9903',consent:true})
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
  const {p,path,client}=await sent(h),cookie=await verified(h,path)
  const current=async id=>(await h.state()).proposals.find(x=>x.id===id)
  await h.send(path+'/action?name=question.create',{revision:1,section:'scope',text:'Could this wait until next quarter?'},cookie)
  await h.cmd('followup.schedule',{id:p.id,action:'Call about budget',dueDate:'2027-03-10'})
+ await bind(p.id,3)
  const before=await current(p.id),beforeMail=(await h.state()).outbox.map(m=>m.id)
  const unchanged=async()=>{assert.deepEqual(await current(p.id),before);assert.deepEqual((await h.state()).outbox.map(m=>m.id),beforeMail)}
  for(const [input,session,status,headers] of [
@@ -1258,6 +1265,7 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  const declined=await h.send(path+'/action?name=decline',{revision:1,reason:'Budget'},cookie)
  assert.equal(declined.status,410,declined.text);assert.match(declined.text,/Proposal withdrawn/)
  const after=await current(p.id)
+ assert.equal(patches.length,1);assert.deepEqual(patches[0].body,{properties:{dealstage:'synthetic-platter-9903'}});assert.equal((await h.state()).crmOutcomes.attempts[0].status,'confirmed')
  assert.equal(after.pipelineStatus,'declined');assert.equal(after.status,'withdrawn');assert.equal(after.outcomes[0].reason,'Budget');assert.equal(after.outcomes[0].actor_role,'client');assert.equal(after.outcomes[0].actor_email,'avery@northstar.example');assert.ok(after.outcomes[0].occurred_at>0)
  assert.deepEqual(after.options,before.options);assert.equal(after.revision,before.revision);assert.equal(after.approved_at,before.approved_at);assert.equal(after.acceptance,undefined);assert.equal(after.invoice,undefined)
  assert.ok(!(await h.send('/api/platter/followups',undefined,h.owner)).value.rows.some(r=>r.id===p.id))
@@ -1307,7 +1315,36 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  const sameTimeAudit=(await h.send('/api/platter/audit?action=proposal.lose&subject='+lost.id,undefined,h.owner)).value.rows
  assert.equal(sameTimeAudit.length,2);assert.ok(sameTimeAudit.every(row=>row.occurred_at===clock));assert.deepEqual(sameTimeAudit.map(row=>row.reason).sort(),['Funding withdrawn','Project cancelled'],'separate outcomes at the same server time retain their own audit reason')
  const accepted=await current(p.id);await h.cmd('proposal.lose',{id:p.id,version:accepted.version,reason:'Too late'},h.owner,409)
-}))
+
+ await h.cmd('outcome.settings',{version:0,reasons:['Budget','Timing','Signed outside']},member,403)
+ await h.cmd('outcome.settings',{version:0,reasons:['Budget','budget']},h.owner,400)
+ await h.cmd('outcome.settings',{version:0,reasons:['Budget','Timing','Signed outside']})
+ await h.cmd('outcome.settings',{version:0,reasons:['Changed']},h.owner,409)
+ const make=async title=>{const made=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title});await h.cmd('proposal.approve',{id:made.id,version:1,revision:1});return {...made,path:new URL((await h.cmd('proposal.send',{id:made.id,version:2})).shareUrl).pathname}}
+ const won=await make('Explicit won override');await h.cmd('followup.schedule',{id:won.id,action:'Call client',dueDate:'2027-03-11'})
+ await h.cmd('proposal.win',{id:won.id,version:3,reason:'Signed outside'},member,403)
+ await h.cmd('proposal.win',{id:won.id,version:3,reason:'Unconfigured reason'},h.owner,400)
+ await h.cmd('outcome.crm',{id:won.id,version:3,bindingVersion:0,dealId:'synthetic-platter-9990',pipelineId:'synthetic-platter-9901',wonStage:'synthetic-platter-9902',lostStage:'synthetic-platter-9903',consent:true},member,403)
+ await bind(won.id,3)
+ const mailIds=(await h.state()).outbox.map(r=>r.id),beforeWonPatches=patches.length
+ await h.cmd('proposal.win',{id:won.id,version:3,reason:'Signed outside'})
+ const wonRow=await current(won.id);assert.equal(wonRow.pipelineStatus,'won');assert.equal(wonRow.outcomes[0].reason,'Signed outside');assert.equal(wonRow.outcomes[0].actor_role,'owner');assert.equal(wonRow.acceptance,undefined);assert.equal(wonRow.invoice,undefined)
+ assert.deepEqual((await h.state()).outbox.map(r=>r.id),mailIds);assert.equal((await h.send(won.path)).status,410);assert.ok(!(await h.send('/api/platter/followups',undefined,h.owner)).value.rows.some(r=>r.id===won.id));await h.cmd('invoice.export',{id:won.id},h.owner,409)
+ assert.equal(patches.length,beforeWonPatches+1);assert.deepEqual(patches.at(-1).body,{properties:{dealstage:'synthetic-platter-9902'}})
+ await h.cmd('outcome.crm.sync',{id:won.id});assert.equal(patches.length,beforeWonPatches+1,'confirmed outcome writes are not replayed')
+ const wonReport=(await h.send('/api/platter/pipeline?status=won&sort=value',undefined,h.owner)).value;assert.equal(wonReport.count,1);assert.equal(wonReport.totals[0].valueCents,420000)
+ const uncertain=await make('Uncertain CRM outcome');await bind(uncertain.id,3);crm.timeout=true
+ await h.cmd('proposal.lose',{id:uncertain.id,version:3,reason:'Timing'});crm.timeout=false;const uncertainCount=patches.length
+ assert.equal((await h.state()).crmOutcomes.attempts.find(r=>r.proposal_id===uncertain.id).status,'uncertain');await h.cmd('outcome.crm.sync',{id:uncertain.id});assert.equal(patches.length,uncertainCount)
+ const revoked=await make('Consent revoked during CRM preflight');await bind(revoked.id,3)
+ crm.revoke=()=>h.cmd('outcome.crm',{id:revoked.id,version:4,bindingVersion:1,enabled:false})
+ await h.cmd('proposal.lose',{id:revoked.id,version:3,reason:'Budget'})
+ assert.equal(patches.length,uncertainCount);assert.equal((await h.state()).crmOutcomes.attempts.find(r=>r.proposal_id===revoked.id).status,'withheld')
+ const off=await make('CRM off by default'),offCount=patches.length;await h.cmd('proposal.lose',{id:off.id,version:3,reason:'Budget'});assert.equal(patches.length,offCount)
+ assert.ok((await h.send('/api/platter/audit?action=outcome.crm.authorize',undefined,h.owner)).value.rows.some(r=>r.subject===won.id))
+
+ }finally{await h.close()}
+})
 
 test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP',()=>run(async h=>{
  assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)

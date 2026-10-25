@@ -28,7 +28,7 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
   if(c.kind==='marginBelow'){
    costing??=await internalPricing(db,row,{id:'internal-rule-evaluation',email:'',role:'owner'})
    if(!costing||costing.packages.some((p:any)=>p.marginBps===null||BigInt(p.marginBps)<BigInt(c.bps)))return true
-   return costing.lines.filter((l:any)=>l.kind==='optional').some((l:any)=>{const o=options.find((o:any)=>o.id===l.optionId),item=o.optionalItems.find((i:any)=>i.id===l.itemId),net=BigInt(item.unitCents)*BigInt(10000-(o.discount?.bps??0))/10000n;return l.unitCostCents===null||net===0n||(net-BigInt(l.unitCostCents))*10000n<BigInt(c.bps)*net})
+   return costing.lines.filter((l:any)=>l.kind==='optional').some((l:any)=>{const o=options.find((o:any)=>o.id===l.optionId),item=o.optionalItems.find((i:any)=>i.id===l.itemId),net=BigInt(item.unitCents)*BigInt(10000-(o.discount?.bps??0))/10000n-BigInt(o.discount?.fixedCents??0);return l.unitCostCents===null||net<=0n||(net-BigInt(l.unitCostCents))*10000n<BigInt(c.bps)*net})
   }
   return true // Unknown restored rule types require review rather than silently skipping.
  }

@@ -1,4 +1,5 @@
-import { assertDiscountDates } from './discounts'
+import { synchronizeOutcome } from './outcomes'
+import { assertDiscountDates, discountDeadline } from './discounts'
 import { workspaceDefaults } from './workspace'
 import { acceptanceFields } from './documents/blocks'
 import { withdrawalStatements, outcomeStatement } from './withdrawal'
@@ -46,6 +47,7 @@ export async function clientCommand(env:Bindings,c:Awaited<ReturnType<typeof cli
   const writes=await withdrawalStatements(env,row,actor,owner.email,reason,false,at,'proposal.decline')
   writes.push(outcomeStatement(db,row,actor,'declined',reason,at))
   await atomic(env,c,writes,"s.session_hash=? AND s.session_expires>MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0)) AND p.revision=? AND NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=p.id AND revision=p.revision)",[share.session_hash,at,row.revision])
+  await synchronizeOutcome(env,row.id)
   return {withdrawn:true,contact:owner.email}
  }
  if(name==='question.create')return createQuestion(env,c,p)
@@ -66,7 +68,7 @@ export async function clientCommand(env:Bindings,c:Awaited<ReturnType<typeof cli
   need(c.verified,'Verify your email before accepting',401);const a=await db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(row.id).first<any>();if(a)return{acceptance:acceptanceView(a)}
   need(!c.expiry.expired,'This proposal has expired. Ask the firm to reopen it.',409)
   need(p.consent===true||['on','yes'].includes(String(p.consent)),'Confirm that you accept this proposal');const signer=text(p.name,'your full name',200),{option,deposit,frozen,consent}=acceptanceTerms(row,p.optionId,p,at),fieldValues=acceptanceFields(frozen.document,p,signer);if(fieldValues)Object.assign(frozen,{fieldValues})
-  await atomic(env,c,[db.prepare('INSERT INTO p_acceptances(proposal_id,revision,snapshot,name,email,option_id,total_cents,deposit_cents,accepted_at,consent,currency) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(row.id,row.revision,JSON.stringify(frozen),signer,row.clientEmail,option.id,option.cents,deposit,at,consent,frozen.currency),db.prepare("UPDATE p_proposals SET status='accepted',version=version+1 WHERE id=?").bind(row.id),db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id)],`s.session_hash=? AND s.session_expires>? AND ${expiryOpenSql('p')}`,[share.session_hash,at,at]);return{message:'Proposal accepted. Your agreed version is frozen.'}
+  await atomic(env,c,[db.prepare('INSERT INTO p_acceptances(proposal_id,revision,snapshot,name,email,option_id,total_cents,deposit_cents,accepted_at,consent,currency) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(row.id,row.revision,JSON.stringify(frozen),signer,row.clientEmail,option.id,option.cents,deposit,at,consent,frozen.currency),db.prepare("UPDATE p_proposals SET status='accepted',version=version+1 WHERE id=?").bind(row.id),db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id)],`s.session_hash=? AND s.session_expires>? AND ${expiryOpenSql('p')} AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))`,[share.session_hash,at,at,discountDeadline([option]),at]);return{message:'Proposal accepted. Your agreed version is frozen.'}
  }
  fail('Unknown client action',404)
 }

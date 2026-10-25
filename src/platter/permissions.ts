@@ -86,7 +86,7 @@ export async function authorizeCommand(db:D1Database,a:Actor,name:string,p:Recor
  if(name.startsWith('expiry.')){await permitted(db,a,id,'send');return}
  const edit=['proposal.autosave','proposal.quantity','proposal.document','proposal.revise','proposal.negotiate','proposal.restore','attachments.refresh','suggestions.allow','suggestion.resolve','pdf.downloads']
  if(edit.includes(name)){await permitted(db,a,id,'edit');return}
- if(['proposal.send','proposal.withdraw','proposal.lose','question.answer','question.email'].includes(name)||name.startsWith('followup.')){await permitted(db,a,id,'send');return}
+ if(['proposal.send','proposal.withdraw','proposal.lose','proposal.win','question.answer','question.email'].includes(name)||name.startsWith('followup.')){await permitted(db,a,id,'send');return}
  if(name==='proposal.approve'||name==='proposal.reject'){await permitted(db,a,id,'approve');return}
  if(['proposal.duplicate','template.save','proposal.test-mail'].includes(name)){need(editors.includes(a.role),'Your role cannot prepare proposals',403);await permitted(db,a,id);return}
  if(name==='proposal.prepare'||name==='template.start'||name==='client.save'){need(editors.includes(a.role),'Your role cannot prepare proposals',403);return}

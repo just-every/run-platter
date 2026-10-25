@@ -1,3 +1,4 @@
+import { discountDeadline } from './discounts'
 import { currentTime } from './expiry-time'
 import { prepareAttachment } from './attachments'
 import { acceptanceTerms } from './signing'
@@ -34,6 +35,6 @@ export async function paperAcceptance(db: D1Database, a: Actor, form: FormData) 
   db.prepare('INSERT INTO p_paper_acceptances(proposal_id,file_id,signed_on,attested_by,attested_at) VALUES(?,?,?,?,?)').bind(row.id, prepared.attachment.id, date, a.email, at),
   db.prepare("UPDATE p_proposals SET status='accepted',version=version+1 WHERE id=?").bind(row.id),
   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),
- ], true, { sql: "EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status='sent' AND approved_by IS NOT NULL)", values: [row.id, row.version, row.revision] })
+ ], true, { sql: "EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status='sent' AND approved_by IS NOT NULL) AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))", values: [row.id, row.version, row.revision,discountDeadline([option]),at] })
  return { id: row.id }
 }

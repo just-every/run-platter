@@ -1,9 +1,10 @@
+import { firmOutcomeReason, synchronizeOutcome } from './outcomes'
 import type { Bindings } from '../auth.server'
 import { commit, exact, need, proposal, text, type Actor } from './model'
 import { currentTime } from './expiry-time'
 import { dispatchMail, queueMail } from './mail'
 
-export function outcomeStatement(db:D1Database,row:any,actor:{id:string,email:string,role:string},kind:'declined'|'lost',reason:string,at:number) {
+export function outcomeStatement(db:D1Database,row:any,actor:{id:string,email:string,role:string},kind:'declined'|'lost'|'won',reason:string,at:number) {
  return db.prepare('INSERT INTO p_outcomes(proposal_id,revision,kind,actor_id,actor_role,actor_email,occurred_at,reason) VALUES(?,?,?,?,?,?,?,?)').bind(row.id,row.revision,kind,actor.id,actor.role,actor.email,at,reason)
 }
 
@@ -26,17 +27,19 @@ export async function withdrawalStatements(env:Bindings,row:any,actor:{id:string
  return writes
 }
 
-export async function withdraw(env:Bindings,a:Actor,input:Record<string,unknown>,lost=false) {
+export async function withdraw(env:Bindings,a:Actor,input:Record<string,unknown>,lost=false,won=false) {
  need(['owner','admin','manager','sales'].includes(a.role),'Only the owner sends or withdraws proposals',403)
+ if(won)need(['owner','admin'].includes(a.role),'Only owner and admins record an explicit won override',403)
  const db=env.DB,row=await proposal(db,input.id),at=await currentTime(db)
  exact(row,input)
  need(row.status==='sent','Only an unsigned sent proposal can be withdrawn',409)
- const reason=text(input.reason,lost?'the lost reason':'the withdrawal reason',1000)
+ const configured=lost||won?await firmOutcomeReason(db,input.reason):null,reason=configured?.reason??text(input.reason,'the withdrawal reason',1000)
  need(input.notice===undefined||[true,false,'yes','no'].includes(input.notice as any),'Choose whether to notify the recipient')
- const notice=lost?input.notice===true||input.notice==='yes':input.notice!==false&&input.notice!=='no'
- const writes=await withdrawalStatements(env,row,a,a.email,reason,notice,at,lost?'proposal.lose':'proposal.withdraw')
- if(lost)writes.push(outcomeStatement(db,row,a,'lost',reason,at))
- await commit(db,a,writes,true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status='sent') AND NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=? AND revision=?)",values:[row.id,row.version,row.id,row.revision]})
+ const notice=won?false:lost?input.notice===true||input.notice==='yes':input.notice!==false&&input.notice!=='no'
+ const writes=await withdrawalStatements(env,row,a,a.email,reason,notice,at,won?'proposal.win':lost?'proposal.lose':'proposal.withdraw')
+ if(lost||won)writes.push(outcomeStatement(db,row,a,won?'won':'lost',reason,at))
+ await commit(db,a,writes,true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status='sent') AND NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=? AND revision=?)"+(configured?' AND COALESCE((SELECT version FROM p_outcome_settings WHERE singleton=1),0)=?':''),values:[row.id,row.version,row.id,row.revision,...(configured?[configured.settingsVersion]:[])]})
+ if(lost||won)await synchronizeOutcome(env,row.id)
  await dispatchMail(env,row.id)
  return {id:row.id,withdrawn:true}
 }

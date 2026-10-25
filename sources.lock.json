@@ -458,7 +458,7 @@
       "executable": false
     },
     "migrations/core/0067_outcome_settings.sql": {
-      "sha256": "042b46dd1be263d8bbc802ebf158b6abad454a745c542af992dbfa1e0f718382",
+      "sha256": "500b3a65b59caadfa6e4d8b04c8fa1073dfb49a52de179abcd0e5912cb8efe08",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -2526,7 +2526,7 @@
       "executable": false
     },
     "src/platter/outcomes.ts": {
-      "sha256": "81b70270d9f7a85e000ccb344ddb2169b63298c9ac462f09924a0c6ef23b125d",
+      "sha256": "70fe12ab915c950e2a42ef5ebd3f2e6066a21d0d8cdf07c2a1a20505c9487f45",
       "executable": false
     },
     "src/platter/paper-acceptance.ts": {
@@ -2630,7 +2630,7 @@
       "executable": false
     },
     "src/platter/state.ts": {
-      "sha256": "fd46517ba2206e3da5d4423772604720fa330765efbd78f00ff62bba09d3ee13",
+      "sha256": "1271978dca119d36321b62f568d0a175bc3bcae89efd7ca9168200bc1a1b9fc6",
       "executable": false
     },
     "src/platter/suggestions.ts": {
@@ -2822,7 +2822,7 @@
       "executable": false
     },
     "src/platter/withdrawal.ts": {
-      "sha256": "1efe1fff3dbec5cdeed4f4105afa3883d3ad7cdcfe3826a73349225e38f0cb63",
+      "sha256": "799f83fa9d4b717cccf547282b492b15014b215035341a893aed5e46808a19df",
       "executable": false
     },
     "src/platter/workspace.ts": {
@@ -2938,7 +2938,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "e3e688f852cef20ae7fa2a5ecc8409713734a17abed1aa840061407aa22f0a2a",
+      "sha256": "395a43d080ba77cf5d4bb202e4fdf87c2f4adbd91f83654e9f72c611f0bff81c",
       "executable": false
     },
     "tests/browser-edge.mjs": {

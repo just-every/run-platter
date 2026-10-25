@@ -46,7 +46,7 @@ export async function state(env:Bindings,a:Actor,candidateIds?:string[]){const d
  const memberZones=(await db.prepare('SELECT operator_id,time_zone FROM p_members').all<any>()).results,defaultZone=await installationZone(db)
  const sectionLocks=(await db.prepare('SELECT * FROM p_proposal_locks UNION ALL SELECT * FROM p_proposal_block_locks ORDER BY section').all<any>()).results
  const savedDefaults=(await db.prepare('SELECT * FROM p_proposal_defaults').all<any>()).results
- const outcomes=(await db.prepare('SELECT * FROM p_outcomes ORDER BY occurred_at,revision').all<any>()).results
+ const outcomes=(await db.prepare('SELECT * FROM (SELECT * FROM p_outcomes UNION ALL SELECT * FROM p_outcome_records) ORDER BY occurred_at,revision').all<any>()).results
  const withdrawals=(await db.prepare('SELECT * FROM p_withdrawals ORDER BY withdrawn_at,id').all<any>()).results
  const testMail=(await db.prepare("SELECT actor_id,subject AS proposal_id,occurred_at FROM p_audit WHERE action='proposal.test-mail' ORDER BY occurred_at DESC,id DESC").all<any>()).results
  const invitationMessages=a.role==='agent'?[]:(await db.prepare('SELECT * FROM p_invitation_messages ORDER BY queued_at DESC,id DESC').all<any>()).results

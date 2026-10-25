@@ -5,7 +5,7 @@ import { currentTime } from './expiry-time'
 import { dispatchMail, queueMail } from './mail'
 
 export function outcomeStatement(db:D1Database,row:any,actor:{id:string,email:string,role:string},kind:'declined'|'lost'|'won',reason:string,at:number) {
- return db.prepare('INSERT INTO p_outcomes(proposal_id,revision,kind,actor_id,actor_role,actor_email,occurred_at,reason) VALUES(?,?,?,?,?,?,?,?)').bind(row.id,row.revision,kind,actor.id,actor.role,actor.email,at,reason)
+ return db.prepare('INSERT INTO p_outcome_records(proposal_id,revision,kind,actor_id,actor_role,actor_email,occurred_at,reason) VALUES(?,?,?,?,?,?,?,?)').bind(row.id,row.revision,kind,actor.id,actor.role,actor.email,at,reason)
 }
 
 /** Both outcome doors use the same link revocation, queue closure and retained history as SEND-010. */

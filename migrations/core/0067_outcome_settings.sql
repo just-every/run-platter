@@ -1,5 +1,5 @@
--- Extend retained business outcomes without changing their historical facts.
-CREATE TABLE p_outcomes_next (
+-- Preserve historical outcome rows; new records use an additive table.
+CREATE TABLE p_outcome_records (
  proposal_id TEXT NOT NULL REFERENCES p_proposals(id),
  revision INTEGER NOT NULL,
  kind TEXT NOT NULL CHECK(kind IN ('declined','lost','won')),
@@ -10,9 +10,6 @@ CREATE TABLE p_outcomes_next (
  reason TEXT NOT NULL,
  PRIMARY KEY(proposal_id,revision)
 );
-INSERT INTO p_outcomes_next SELECT * FROM p_outcomes;
-DROP TABLE p_outcomes;
-ALTER TABLE p_outcomes_next RENAME TO p_outcomes;
 CREATE TABLE p_outcome_settings(singleton INTEGER PRIMARY KEY CHECK(singleton=1),version INTEGER NOT NULL,reasons TEXT NOT NULL);
 CREATE TABLE p_crm_outcome_bindings (
  proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id), revision INTEGER NOT NULL, version INTEGER NOT NULL,

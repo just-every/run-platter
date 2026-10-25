@@ -42,7 +42,7 @@ export async function configureCrmOutcome(env:Bindings,a:Actor,p:Record<string,u
   await commit(db,a,[db.prepare('DELETE FROM p_crm_outcome_authority WHERE proposal_id=?').bind(row.id),db.prepare('UPDATE p_crm_outcome_bindings SET version=version+1 WHERE proposal_id=?').bind(row.id),db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),a.id,a.role,'outcome.crm.revoke',row.id,at)],false,guard);return {saved:true}
  }
  need(['draft','approved','sent'].includes(row.status),'Authorize CRM outcomes on an open proposal',409)
- need(!await db.prepare('SELECT 1 FROM p_outcomes WHERE proposal_id=? AND revision=?').bind(row.id,row.revision).first(),'Authorize the destination before recording the outcome',409)
+ need(!await db.prepare('SELECT 1 FROM (SELECT * FROM p_outcomes UNION ALL SELECT * FROM p_outcome_records) WHERE proposal_id=? AND revision=?').bind(row.id,row.revision).first(),'Authorize the destination before recording the outcome',409)
  need(p.consent===true||p.consent==='yes','Explicitly authorize this proposal outcome to update the selected CRM deal')
  const {connection,secret}=await providerCredential(env,'workspace:hubspot'),deal=identifier(p.dealId,'the HubSpot deal id'),pipeline=identifier(p.pipelineId,'the HubSpot pipeline id'),won=identifier(p.wonStage,'the Closed won stage id'),lost=identifier(p.lostStage,'the Closed lost stage id')
  need(won!==lost,'Choose distinct won and lost stages')
@@ -57,7 +57,7 @@ export async function configureCrmOutcome(env:Bindings,a:Actor,p:Record<string,u
 }
 /** A failed or uncertain write is retained and never automatically replayed. */
 export async function synchronizeOutcome(env:Bindings,id:string){
- const db=env.DB,row=await db.prepare('SELECT * FROM p_proposals WHERE id=?').bind(id).first<any>(),outcome=row?await db.prepare('SELECT * FROM p_outcomes WHERE proposal_id=? AND revision=?').bind(id,row.revision).first<any>():null,binding=await db.prepare('SELECT b.* FROM p_crm_outcome_bindings b JOIN p_crm_outcome_authority a ON a.proposal_id=b.proposal_id AND a.binding_version=b.version WHERE b.proposal_id=?').bind(id).first<any>()
+ const db=env.DB,row=await db.prepare('SELECT * FROM p_proposals WHERE id=?').bind(id).first<any>(),outcome=row?await db.prepare('SELECT * FROM (SELECT * FROM p_outcomes UNION ALL SELECT * FROM p_outcome_records) WHERE proposal_id=? AND revision=?').bind(id,row.revision).first<any>():null,binding=await db.prepare('SELECT b.* FROM p_crm_outcome_bindings b JOIN p_crm_outcome_authority a ON a.proposal_id=b.proposal_id AND a.binding_version=b.version WHERE b.proposal_id=?').bind(id).first<any>()
  if(!outcome||!binding||binding.revision!==row.revision)return
  const available=async()=>{
   const actor=await actorById(db,binding.actor_id);if(!actor||!administrators.includes(actor.role))return false

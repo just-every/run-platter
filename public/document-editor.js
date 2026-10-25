@@ -22,7 +22,7 @@
    container.replaceChildren();
    if(!doc.blocks.length)container.append(element('p',{class:'empty-document'},'No blocks yet. Choose a block type and add your first section.'));
    for(const [index,block] of doc.blocks.entries()){
-    const locked=(form.dataset.lockTerms==='yes'&&block.type==='terms')||(block.type==='embed'&&form.dataset.externalEdit!=='yes');
+    const locked=JSON.parse(form.dataset.blockLocks??'[]').includes('block:'+block.id)||(form.dataset.lockTerms==='yes'&&block.type==='terms')||(block.type==='embed'&&form.dataset.externalEdit!=='yes');
     const card=element('section',{class:'document-editor-block','data-block-id':block.id,'aria-label':names[block.type]+' block '+(index+1)}),bar=element('div',{class:'document-block-bar'}),title=element('h3',{},(index+1)+'. '+names[block.type]);
     bar.append(title);
     const drag=button('Drag block','⠿',()=>{status.textContent='Drag this handle onto another block, or use Move up and Move down.';});drag.node.draggable=true;drag.node.dataset.blockDrag='';
@@ -63,7 +63,7 @@
      const conditions=new Map();for(const o of options){conditions.set(o.id,'Only '+o.label);for(const i of o.optionalItems??[])conditions.set('item:'+i.id,'Only with '+i.label);}
      for(const [id,label] of conditions){const opt=element('option',{value:id},label);opt.selected=block.condition===id;select.append(opt);}select.addEventListener('change',()=>{checkpoint();if(select.value)block.condition=select.value;else delete block.condition;schedule();});wrap.append(select);card.append(wrap);
     }
-    if(locked){card.append(element('p',{class:'muted'},block.type==='embed'?'Only the owner or an admin changes external content.':'Terms are locked. You can move this section; ask an owner, admin or team manager to unlock it before changing its content.'));for(const node of card.querySelectorAll('input,textarea,select'))node.disabled=true;}
+    if(locked){card.append(element('p',{class:'muted'},block.type==='embed'?'Only the owner or an admin changes external content.':'This section is locked. You can move this section; ask an owner, admin or team manager to unlock it before changing its content.'));for(const node of card.querySelectorAll('input,textarea,select'))node.disabled=true;}
     container.append(card);
    }
    undo.disabled=!history.length;

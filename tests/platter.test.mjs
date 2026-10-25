@@ -1673,20 +1673,48 @@ test('TEAM-001 shared templates and library folders enforce role edits and live 
 test('TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval',()=>run(async h=>{
  const team=await h.cmd('team.create',{name:'East'}),people={}
  for(const role of ['admin','manager','sales','content_editor','viewer','billing','other']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role:role==='other'?'manager':role,teams:role==='other'?[]:[team.id]});people[role]={cookie,id}}
- const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'}),source=await h.cmd('proposal.prepare',{...offer,clientId:client.id,terms:'Payment within 14 days.'})
+ const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'}),source=await h.cmd('proposal.prepare',{...offer,clientId:client.id,terms:'Payment within 14 days.',document:documentFixture()})
  const saved=await h.cmd('template.save',{id:source.id,version:1,name:'Locked legal',shared:true,shareConsent:true})
  await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
  await h.cmd('approval.rule',{version:1,name:'Legal review',position:0,condition:{kind:'termsEdited'},approvers:['person:'+people.admin.id]})
- for(const role of ['owner','admin','manager','content_editor']){const cookie=role==='owner'?h.owner:people[role].cookie,current=(await h.state()).templates.find(t=>t.id===saved.id);await h.cmd('template.locks',{id:saved.id,version:current.version,sections:['terms']},cookie)}
+ for(const role of ['owner','admin','manager','content_editor']){const cookie=role==='owner'?h.owner:people[role].cookie,current=(await h.state()).templates.find(t=>t.id===saved.id);await h.cmd('template.locks',{id:saved.id,version:current.version,sections:['terms','block:columns','block:terms']},cookie)}
  const template=(await h.state()).templates.find(t=>t.id===saved.id)
  for(const role of ['sales','viewer','billing'])await h.cmd('template.locks',{id:saved.id,version:template.version,sections:[]},people[role].cookie,403)
  const p=await h.cmd('template.start',{id:saved.id,version:template.version,clientId:client.id},people.sales.cookie),fields={...offer,clientId:client.id,id:p.id,version:1,terms:'Changed terms'}
  await h.cmd('proposal.revise',fields,people.sales.cookie,403);assert.equal((await h.state(people.sales.cookie)).proposals.find(r=>r.id===p.id).revision,1)
+ const lockedDocument=(await h.state(people.sales.cookie)).proposals.find(r=>r.id===p.id).document
+ for(const change of [b=>b.text='Changed warranty',b=>b.second='Changed second column',b=>b.title='Changed heading',b=>b.type='text',b=>b.condition='two',b=>b.id='replacement']){
+  const document=structuredClone(lockedDocument);change(document.blocks.find(b=>b.id==='columns'))
+  await h.cmd('proposal.document',{id:p.id,version:1,document},people.sales.cookie,403)
+ }
+ const removed=structuredClone(lockedDocument);removed.blocks=removed.blocks.filter(b=>b.id!=='columns')
+ await h.cmd('proposal.document',{id:p.id,version:1,document:removed},people.sales.cookie,403)
+ await h.cmd('template.locks',{id:saved.id,version:template.version,sections:['block:missing']},h.owner,400)
+ assert.deepEqual((await h.state(people.sales.cookie)).proposals.find(r=>r.id===p.id).document,lockedDocument)
  const copy=await h.cmd('proposal.duplicate',{id:p.id,version:1},people.sales.cookie);await h.cmd('proposal.revise',{...fields,id:copy.id},people.sales.cookie,403)
  const personal=await h.cmd('template.save',{id:p.id,version:1,name:'Personal with locks'},people.sales.cookie)
- const unlockedSource=await h.cmd('proposal.prepare',{...offer,clientId:client.id,terms:'Changed terms'},people.sales.cookie)
+ const changedTemplateDocument=documentFixture();changedTemplateDocument.blocks.find(b=>b.id==='columns').second='Changed warranty'
+ const unlockedSource=await h.cmd('proposal.prepare',{...offer,clientId:client.id,terms:'Payment within 14 days.',document:changedTemplateDocument},people.sales.cookie)
  await h.cmd('template.save',{id:unlockedSource.id,version:1,templateId:personal.id,templateVersion:1,name:'Bypass'},people.sales.cookie,403)
  const started=await h.cmd('template.start',{id:personal.id,version:1,clientId:client.id},people.sales.cookie);await h.cmd('proposal.revise',{...fields,id:started.id},people.sales.cookie,403)
+ for(const id of [copy.id,started.id])assert.deepEqual((await h.state(people.sales.cookie)).proposals.find(r=>r.id===id).lockedSections,['block:columns','block:terms','terms'])
+ const reordered=structuredClone(lockedDocument);reordered.blocks.reverse();reordered.blocks.find(b=>b.id==='story').text='An independently editable paragraph'
+ await h.cmd('proposal.document',{id:started.id,version:1,document:reordered},people.sales.cookie)
+ await h.cmd('proposal.share',{id:started.id,operatorId:people.other.id},people.sales.cookie)
+ await h.cmd('proposal.unlock',{id:started.id,version:2,section:'block:terms'},people.other.cookie,403)
+ for(const role of ['sales','content_editor'])await h.cmd('proposal.unlock',{id:started.id,version:2,section:'block:terms'},people[role].cookie,403)
+ await h.cmd('proposal.unlock',{id:started.id,version:2,section:'block:terms'},people.admin.cookie)
+ const editedDocument=structuredClone(reordered);editedDocument.blocks.find(b=>b.id==='terms').text='Amended rich legal terms'
+ await h.cmd('proposal.document',{id:started.id,version:3,document:editedDocument},people.sales.cookie,403)
+ await h.cmd('proposal.unlock',{id:started.id,version:3,section:'terms'},people.admin.cookie)
+ await h.cmd('proposal.document',{id:started.id,version:4,document:editedDocument},people.sales.cookie)
+ const richReview=(await h.state(people.sales.cookie)).proposals.find(r=>r.id===started.id);assert.equal(richReview.approval.required,true);assert.equal(richReview.approval.complete,false)
+ await h.cmd('proposal.send',{id:started.id,version:5},people.sales.cookie,409)
+ await h.cmd('member.set',{operatorId:people.manager.id,version:1,role:'manager',teams:[]})
+ await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'block:columns'},people.manager.cookie,403)
+ await h.cmd('member.set',{operatorId:people.manager.id,version:2,role:'manager',teams:[team.id]})
+ await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'block:columns'},people.manager.cookie)
+ await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'block:terms'},people.manager.cookie,409)
  await h.cmd('proposal.share',{id:p.id,operatorId:people.content_editor.id},people.sales.cookie)
  for(const role of ['sales','content_editor','viewer','billing','other'])await h.cmd('proposal.unlock',{id:p.id,version:1,section:'terms'},people[role].cookie,403)
  await h.cmd('proposal.unlock',{id:p.id,version:1,section:'terms'},people.admin.cookie)
@@ -1695,8 +1723,10 @@ test('TEAM-001 / EDIT-015 template locks survive starts, copies and personal tem
  await h.cmd('proposal.send',{id:p.id,version:3},people.sales.cookie,409)
  await h.cmd('proposal.approve',{id:p.id,version:3,revision:2},people.admin.cookie);await h.cmd('proposal.send',{id:p.id,version:4},people.sales.cookie)
  const audit=await h.send('/api/platter/audit?action=proposal.unlock',undefined,h.owner);assert.equal(audit.status,200);assert.ok(audit.value.rows.some(r=>r.actor_id===people.admin.id&&r.subject===p.id))
+ await h.cmd('template.locks',{id:saved.id,version:template.version,sections:[]})
+ assert.deepEqual((await h.state(people.sales.cookie)).proposals.find(r=>r.id===copy.id).lockedSections,['block:terms','terms'],'later template changes do not unlock existing proposals')
  // An allowed team manager can unlock their team's draft, and a stale revision cannot do so twice.
- await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'terms'},people.manager.cookie);await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'terms'},people.manager.cookie,409)
+ await h.cmd('proposal.unlock',{id:copy.id,version:2,section:'terms'},people.manager.cookie);await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'terms'},people.manager.cookie,409)
 }))
 
 test('TEAM-001 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses',async()=>{

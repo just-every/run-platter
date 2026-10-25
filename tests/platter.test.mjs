@@ -2048,9 +2048,11 @@ test('PRICE-004 / APPROVE-001 visible package discounts preserve exact optional 
   for(const linePatch of [{discountPercent:'100'},{discountAmount:'1001'},{groupDiscountAmount:'2001'},{groupDiscountPercent:'-1'}])await h.cmd('proposal.prepare',{...advanced,pricingTables:[{...advanced.pricingTables[0],lines:advanced.pricingTables[0].lines.map((l,i)=>i===0?{...l,...linePatch}:l)}]},h.owner,400)
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_proposals ORDER BY id').all()).results,savedRows)
   // The installation clock advances to a fixed instant, independent of wall-clock boundaries.
+  await h.cmd('expiry.remove',{id:hidden.id,version:3})
+  await h.db.prepare('UPDATE p_shares SET session_expires=? WHERE proposal_id=?').bind(Date.parse('2099-05-03T12:00:00Z'),hidden.id).run()
   await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET observed_at=excluded.observed_at').bind(Date.parse('2099-05-02T12:00:00Z')).run()
   await h.cmd('proposal.send',{id:started.id,version:1},h.owner,409)
-  assert.equal((await h.send(hiddenPath+'/action?name=accept',{name:'Synthetic client',optionId:'main',consent:true},hiddenCookie)).status,409)
+  const expiredAcceptance=await h.send(hiddenPath+'/action?name=accept',{name:'Synthetic client',optionId:'main',consent:true},hiddenCookie);assert.equal(expiredAcceptance.status,409);assert.match(expiredAcceptance.text,/discount expired/)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_acceptances WHERE proposal_id=?').bind(hidden.id).first()).n,0)
   const tiny=await h.cmd('proposal.prepare',{clientId:client.id,title:'Cent allocation',scope:'Public scope',depositPercent:'25',packages:[{id:'main',label:'Tiny',price:'0.03',discountPercent:'33.33'}],pricingTables:[{optionId:'main',name:'Tiny lines',lines:['First','Second','Third'].map(name=>({name,description:'',quantity:'1',unit:'each',unitPrice:'0.01'}))}]});const small=(await h.state()).proposals.find(r=>r.id===tiny.id);assert.equal(small.options[0].cents,2);assert.deepEqual(small.internalPricing.lines.map(l=>l.revenueCents),[1,1,0])
  }finally{await h.close()}

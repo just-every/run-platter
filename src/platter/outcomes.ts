@@ -36,8 +36,10 @@ export async function configureCrmOutcome(env:Bindings,a:Actor,p:Record<string,u
  const old=await db.prepare('SELECT * FROM p_crm_outcome_bindings WHERE proposal_id=?').bind(row.id).first<any>()
  need(Number(p.bindingVersion)===(old?.version??0),'CRM outcome settings changed. Reload.',409)
  const version=(old?.version??0)+1,at=await currentTime(db),guard={sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=?) AND COALESCE((SELECT version FROM p_crm_outcome_bindings WHERE proposal_id=?),0)=?',values:[row.id,row.version,row.revision,row.id,old?.version??0] as any[]}
+ const revocations=await db.prepare("SELECT COUNT(*) AS n FROM p_audit WHERE action='outcome.crm.revoke' AND subject=?").bind(row.id).first<{n:number}>()
+ guard.sql+=" AND (SELECT COUNT(*) FROM p_audit WHERE action='outcome.crm.revoke' AND subject=?)=?";guard.values.push(row.id,revocations?.n??0)
  if(p.enabled===false||p.enabled==='no'){
-  await commit(db,a,[db.prepare('DELETE FROM p_crm_outcome_authority WHERE proposal_id=?').bind(row.id),db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),a.id,a.role,'outcome.crm.revoke',row.id,at)],false,guard);return {saved:true}
+  await commit(db,a,[db.prepare('DELETE FROM p_crm_outcome_authority WHERE proposal_id=?').bind(row.id),db.prepare('UPDATE p_crm_outcome_bindings SET version=version+1 WHERE proposal_id=?').bind(row.id),db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),a.id,a.role,'outcome.crm.revoke',row.id,at)],false,guard);return {saved:true}
  }
  need(['draft','approved','sent'].includes(row.status),'Authorize CRM outcomes on an open proposal',409)
  need(!await db.prepare('SELECT 1 FROM p_outcomes WHERE proposal_id=? AND revision=?').bind(row.id,row.revision).first(),'Authorize the destination before recording the outcome',409)

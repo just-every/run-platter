@@ -2342,7 +2342,7 @@
       "executable": false
     },
     "src/platter/documents/offer-pdf.ts": {
-      "sha256": "ec1ac24f3bd7fdbcf8ef92ce2aa8a5cec9516cf8c927cd0742e5549174a296ee",
+      "sha256": "f82666e651dcf455245453dd0989774d1540133ee5a93ebf5378a3978ef30c3b",
       "executable": false
     },
     "src/platter/documents/pdf-fonts.ts": {
@@ -2526,7 +2526,7 @@
       "executable": false
     },
     "src/platter/outcomes.ts": {
-      "sha256": "2875694f93e1a53c3fa9b429b76355bcbca01d77f5288c129aa5895181c5f7db",
+      "sha256": "81b70270d9f7a85e000ccb344ddb2169b63298c9ac462f09924a0c6ef23b125d",
       "executable": false
     },
     "src/platter/paper-acceptance.ts": {
@@ -3014,7 +3014,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "f464984b8df947a132a31e45b0220f0a3ee27e338e6c63c22b8a87c41506554e",
+      "sha256": "725ce23382796128b4b2b1a300c732f9592760c0e22ef304720273a0c48869ac",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

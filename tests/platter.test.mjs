@@ -1341,6 +1341,18 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  await h.cmd('proposal.lose',{id:revoked.id,version:3,reason:'Budget'})
  assert.equal(patches.length,uncertainCount);assert.equal((await h.state()).crmOutcomes.attempts.find(r=>r.proposal_id===revoked.id).status,'withheld')
  const off=await make('CRM off by default'),offCount=patches.length;await h.cmd('proposal.lose',{id:off.id,version:3,reason:'Budget'});assert.equal(patches.length,offCount)
+ const racing=await make('Revocation invalidates in-flight authorization');await bind(racing.id,3)
+ const authorizeRace={id:racing.id,version:3,bindingVersion:1,dealId:'synthetic-platter-9991',pipelineId:'synthetic-platter-9901',wonStage:'synthetic-platter-9902',lostStage:'synthetic-platter-9903',consent:true}
+ crm.revoke=()=>h.cmd('outcome.crm',{id:racing.id,version:3,bindingVersion:1,enabled:false})
+ await h.cmd('outcome.crm',authorizeRace,h.owner,409)
+ const revokedBinding=(await h.state()).crmOutcomes.bindings.find(r=>r.proposal_id===racing.id);assert.equal(revokedBinding.version,2);assert.equal(revokedBinding.authorized,0)
+ await h.cmd('outcome.crm',authorizeRace,h.owner,409)
+ await h.cmd('outcome.crm',{...authorizeRace,bindingVersion:2});const beforeRacing=patches.length
+ await h.cmd('proposal.lose',{id:racing.id,version:3,reason:'Budget'});assert.equal(patches.length,beforeRacing+1,'fresh consent after revocation authorizes only the new binding')
+ const initialRace=await make('Revocation before initial CRM consent')
+ crm.revoke=()=>h.cmd('outcome.crm',{id:initialRace.id,version:3,bindingVersion:0,enabled:false})
+ await h.cmd('outcome.crm',{...authorizeRace,id:initialRace.id,bindingVersion:0},h.owner,409)
+ assert.ok(!(await h.state()).crmOutcomes.bindings.some(r=>r.proposal_id===initialRace.id),'revoking an initial in-flight request leaves execution off')
  assert.ok((await h.send('/api/platter/audit?action=outcome.crm.authorize',undefined,h.owner)).value.rows.some(r=>r.subject===won.id))
 
  }finally{await h.close()}

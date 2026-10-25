@@ -101,9 +101,11 @@ export async function pricingJourney() {
     assert.equal(await page.locator('[data-package-field=discountAmount]').inputValue(),'500.00')
     assert.equal(await page.locator('[data-pricing-field=groupDiscountPercent]').first().inputValue(),'10')
     await capture('discount-editor')
+    if(screenshots){await page.locator('[data-package-id=main]').scrollIntoViewIfNeeded();await page.screenshot({path:join(screenshots,`PRICE-004-editor-viewport-${width}.png`)})}
     if(screenshots)await page.getByRole('region',{name:'Offer summary',exact:true}).screenshot({path:join(screenshots,`PRICE-004-editor-summary-${width}.png`)})
     await page.getByRole('button',{name:'Approve this revision',exact:true}).click()
     await assertDiscountSummary();await capture('discount-approved')
+    if(screenshots){await page.locator('[data-package-id=main]').scrollIntoViewIfNeeded();await page.screenshot({path:join(screenshots,`PRICE-004-approved-viewport-${width}.png`)})}
     if(screenshots)await page.getByRole('region',{name:'Offer summary',exact:true}).screenshot({path:join(screenshots,`PRICE-004-approved-summary-${width}.png`)})
     await page.locator('[data-pricing-field=discountPercent]').first().fill('20')
     await page.locator('[data-pricing-field=discountAmount]').first().fill('10')

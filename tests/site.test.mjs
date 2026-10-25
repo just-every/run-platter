@@ -683,7 +683,7 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect rev
     await page.getByText('CRM outcome sync',{exact:true}).click()
     const authorize=page.locator('form:has(input[name="dealId"])')
     for(const [name,value] of Object.entries({dealId:'synthetic-platter-9955',pipelineId:'synthetic-platter-9951',wonStage:'synthetic-platter-9952',lostStage:'synthetic-platter-9953'}))await authorize.locator(`[name=${name}]`).fill(value)
-    await authorize.getByRole('checkbox').check();await capture('crm-consent');await authorize.getByRole('button',{name:'Authorize CRM outcome sync',exact:true}).click()
+    await authorize.getByRole('checkbox').check();await capture('crm-consent');if(screenshots)await authorize.screenshot({path:join(screenshots,`FOLLOW-005-crm-consent-panel-${width}.png`)});await authorize.getByRole('button',{name:'Authorize CRM outcome sync',exact:true}).click()
     await page.getByRole('link',{name:'Open client proposal',exact:true}).click();assert.equal(await page.getByRole('heading',{name:'Verify your email',exact:true}).count(),1);await capture('new-offer')
     await page.getByRole('button',{name:'Send verification code'}).click()
     const newState=await(await context.request.get(app.origin+'/api/platter/state')).json(),newCode=newState.outbox.find(m=>m.proposal_id===original.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]

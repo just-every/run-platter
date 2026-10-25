@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "70ccca4a7d3035a4da7a09656d357f71ebcc054f8fcecbbd22e83cce20fbba0f",
+      "sha256": "ec3090ac23b27b246920ad7adb485bca1042e19f391d84a3bc63067bd52275e9",
       "executable": false
     },
     "deploy-demo.json": {
@@ -3026,7 +3026,7 @@
       "executable": false
     },
     "tests/pricing-journey.mjs": {
-      "sha256": "294bfea04a959398002abb8dcaa628f6a0f195fb75d04bdd3ec53b69e1688093",
+      "sha256": "971a4687c0ac0a1f3dfe2107e46bae8f799465f93e9bf529bbfd9938fdc9fef9",
       "executable": false
     },
     "tests/reminders-http.mjs": {
@@ -3042,7 +3042,7 @@
       "executable": false
     },
     "tests/site.test.mjs": {
-      "sha256": "feb3cc1a9cabfaf49ad95c753e7b7cb48ff5ac668a4d5fb48ba66c7cad476f4c",
+      "sha256": "ff05a4a32cb1ee0b2dcf9326e5b79f58005800ad4fc049784e77fc98ecf8e280",
       "executable": false
     },
     "tests/templates-http.mjs": {

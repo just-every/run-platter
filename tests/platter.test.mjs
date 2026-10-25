@@ -978,9 +978,9 @@ test('PRICE-001 / COLLAB-003 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / PROP-
 
 test('PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-002 arbitrary packages and bounded optional quantities share server totals and immutable selection',async()=>{
  const h=await harness({assetsDirectory:'public'});try{
-  const {packageFixture,packageSelection:items,packageExpected:expected}=await import('./packages-fixture.mjs')
+  const {packageFixture,packageSelection:items,packageExpected:expected,scheduleFixture,scheduleExpected}=await import('./packages-fixture.mjs')
   const client=await h.cmd('client.save',{name:'Package client',email:'packages@studio.example'})
-  const input={...offer,clientId:client.id,packages:packageFixture(),terms:'Complete package only',sectionConditions:{terms:'three'}}
+  const input={...offer,paymentTerms:scheduleFixture(),clientId:client.id,packages:packageFixture(),terms:'Complete package only',sectionConditions:{terms:'three'}}
   const p=await h.cmd('proposal.prepare',input),current=async()=> (await h.state()).proposals.find(x=>x.id===p.id)
   const key=await h.cmd('agent.create',{label:'PRICE-002 package drafter'}),rpc=await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'prepare_proposal',arguments:{clientId:client.id,title:'Agent package draft',scope:'Defined services',depositPercent:25,packages:packageFixture()}}},'',{authorization:'Bearer '+key.token})
   assert.equal(rpc.status,200);assert.ok(!rpc.value.result.isError,JSON.stringify(rpc.value));const agentDraft=JSON.parse(rpc.value.result.content[0].text);assert.equal((await h.state()).proposals.find(x=>x.id===agentDraft.id).options.length,3)
@@ -1036,11 +1036,30 @@ test('PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-
   await h.cmd('proposal.negotiate',{...input,id:p.id,version:5,packages:changed})
   r=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',items,consent:true,totalCents:1,depositCents:1},cookie);assert.equal(r.status,200,r.text)
   const accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first(),snapshot=JSON.parse(accepted.snapshot)
+  assert.deepEqual(snapshot.paymentSchedule,scheduleExpected(230100,57525));const publicAgreement=await h.send(path+'/data.json',undefined,cookie);assert.deepEqual(publicAgreement.value.paymentSchedule,snapshot.paymentSchedule);assert.deepEqual(publicAgreement.value.acceptance.paymentSchedule,snapshot.paymentSchedule)
+  for(const amount of ['862.88','862.87','230.10','2099-02-28','Design approval','net 15'])assert.ok(pdfText.includes(amount),'PDF schedule '+amount)
+  assert.ok((await h.send(path,undefined,cookie)).text.includes('2099-02-28'))
   assert.equal(accepted.total_cents,expected.totalCents);assert.equal(accepted.deposit_cents,expected.depositCents);assert.equal(snapshot.selection.optionId,'two');assert.equal(snapshot.selection.items[0].quantity,4);assert.equal(snapshot.selection.items[0].totalCents,30100);assert.ok(!snapshot.terms);assert.deepEqual(snapshot.options,row.options)
   await h.send(path+'/action?name=accept',{name:'Another signer',optionId:'one',items:[],consent:true},cookie);assert.deepEqual(await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first(),accepted)
   r=await h.send(path,undefined,cookie);assert.match(r.text,/2,301\.00/);assert.match(r.text,/Rush delivery/)
   const invoice=await h.cmd('invoice.export',{id:p.id});assert.match((await h.send('/api/platter/invoices/'+invoice.id+'.csv',undefined,h.owner)).text,/575\.25/)
 
+  // Terms copy independently; fixed deposits and date or event schedules use the same selected money.
+  const termSource=await h.cmd('proposal.prepare',{...input,depositPercent:'30'});await h.cmd('template.save',{id:termSource.id,version:1,name:'Schedule template'});const template=(await h.state()).templates.find(t=>t.name==='Schedule template'),templateBytes=JSON.stringify(template.snapshot)
+  const fromTemplate=await h.cmd('template.start',{id:template.id,version:template.version,clientId:client.id});await h.cmd('proposal.revise',{...input,id:fromTemplate.id,version:1,depositPercent:'25'});assert.equal(JSON.stringify((await h.state()).templates.find(t=>t.id===template.id).snapshot),templateBytes);assert.equal(template.snapshot.deposit_bps,3000)
+  await h.cmd('proposal.restore',{id:fromTemplate.id,version:2,revision:1});assert.equal((await h.state()).proposals.find(t=>t.id===fromTemplate.id).deposit_bps,3000)
+  for(const fixed of [null,'500']){
+   const terms={...scheduleFixture(),depositFixed:fixed,netDays:30},f=await h.cmd('proposal.prepare',{...input,paymentTerms:terms,depositPercent:'30'}),q='?optionId=two&items='+encodeURIComponent(JSON.stringify(items)),expectedSchedule={...scheduleExpected(230100,fixed?50000:69030),netDays:30};expectedSchedule.rows=expectedSchedule.rows.map(r=>({...r,netDays:30}))
+   const preview=await h.send(`/app/preview/client?id=${f.id}&revision=1&optionId=two&items=`+encodeURIComponent(JSON.stringify(items)),undefined,h.owner);assert.equal(preview.status,200,preview.text);assert.match(preview.text,/net 30/)
+   const defaults=await h.send(`/app/preview/client?id=${f.id}&revision=1&optionId=one`,undefined,h.owner);assert.equal(defaults.status,200);assert.match(defaults.text,fixed?/500\.00/:/300\.00/)
+   await h.cmd('proposal.approve',{id:f.id,version:1,revision:1});const fpath=new URL((await h.cmd('proposal.send',{id:f.id,version:2})).shareUrl).pathname;await h.send(fpath+'/action?name=code.request',{});const code=(await h.state()).outbox.find(x=>x.proposal_id===f.id&&x.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],session=await h.send(fpath+'/action?name=code.verify',{code});assert.equal(session.status,200)
+   const selected=await h.send(fpath+'/data.json'+q,undefined,session.cookie);assert.deepEqual(selected.value.paymentSchedule,expectedSchedule)
+   const fp=await h.mf.dispatchFetch(h.origin+fpath+'/download.pdf'+q,{headers:{host:new URL(h.origin).host,cookie:session.cookie}});assert.equal(fp.status,200);const ftext=(await pdfPages(await fp.arrayBuffer())).join(' ');assert.ok(ftext.includes(fixed?'500.00':'690.30'));assert.ok(ftext.includes('net 30'))
+   assert.equal((await h.send(fpath+'/action?name=accept',{name:'Avery Chen',optionId:'two',items,consent:true},session.cookie)).status,200);assert.deepEqual((await h.send(fpath+'/data.json',undefined,session.cookie)).value.paymentSchedule,expectedSchedule)
+  }
+  const beforeInvalid=await h.state();for(const paymentTerms of [{...scheduleFixture(),depositFixed:'1001'}, {...scheduleFixture(),netDays:7}, {...scheduleFixture(),milestones:[{label:'Invalid',percent:60,date:'2099-02-30'}]}, {...scheduleFixture(),milestones:[{label:'Underallocated',percent:60,event:'Approval'}]}])await h.cmd('proposal.prepare',{...input,paymentTerms},h.owner,400);assert.deepEqual((await h.state()).proposals,beforeInvalid.proposals)
+  await h.send('/auth/invite',{email:'schedule-sales@studio.example',displayName:'Schedule sales',role:'member',returnTo:'/app'},h.owner);const sales=await h.signIn('schedule-sales@studio.example');await h.cmd('proposal.prepare',{...input},sales,403)
+  await h.cmd('proposal.share',{id:termSource.id,operatorId:(await h.state(sales)).actor.id});await h.cmd('proposal.revise',{...input,id:termSource.id,version:1,paymentTerms:{...scheduleFixture(),netDays:30}},sales,403)
   // EDIT-009 inheritance: a section shown only while an optional item is added, in whichever package offers it.
   const rushTerms='Rush delivery terms apply.',rushInput={...input,title:'Rush-dependent terms',terms:rushTerms,sectionConditions:{terms:'item:rush'}},withRush='&items='+encodeURIComponent(JSON.stringify(items)),beforeRush=await h.state()
   for(const terms of ['item:absent','item:','item:rush:extra','rush'])await h.cmd('proposal.prepare',{...rushInput,sectionConditions:{terms}},h.owner,400)
@@ -1073,9 +1092,9 @@ test('PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-
 
 test('PRICE-002 / SIGN-008 / TEAM-004 signed-upload selections use sent prices, refuse invalid quantities without writes, and freeze the exact agreement and invoice',()=>run(async h=>{
  assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
- const {packageFixture,packageSelection:items,packageExpected:expected}=await import('./packages-fixture.mjs')
+ const {packageFixture,packageSelection:items,packageExpected:expected,scheduleFixture,scheduleExpected}=await import('./packages-fixture.mjs')
  const client=await h.cmd('client.save',{name:'Paper package client',email:'paper@studio.example'})
- const input={...offer,clientId:client.id,packages:packageFixture(),terms:'Complete package only',sectionConditions:{terms:'three'}}
+ const input={...offer,paymentTerms:scheduleFixture(),clientId:client.id,packages:packageFixture(),terms:'Complete package only',sectionConditions:{terms:'three'}}
  const p=await h.cmd('proposal.prepare',input)
  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:p.id,version:2}),path=new URL(share.shareUrl).pathname
  const fields={id:p.id,version:3,optionId:'two',signer:'Morgan Lee',signedOn:'2026-10-15',attest:'yes',items:JSON.stringify(items),totalCents:1,depositCents:1}

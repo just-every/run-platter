@@ -1,3 +1,4 @@
+import { paymentTerms, paymentSchedule } from './payment-terms'
 import { scopedNet } from './discounts'
 import { need } from './model'
 
@@ -16,7 +17,7 @@ export function reviewItems(input: Record<string, any>): unknown {
 }
 
 /** One server calculation for preview, review, PDF and the frozen agreement. */
-export function offerSelection(options: any[], depositBps: number, optionId: unknown, input: unknown = []) {
+export function offerSelection(options: any[], depositBps: number, optionId: unknown, input: unknown = [], terms?:any) {
  const offered = options.find(option => option.id === optionId)
  need(offered, 'Choose one offered option')
  need(Array.isArray(input), 'Optional-item selection must be a list')
@@ -41,5 +42,6 @@ export function offerSelection(options: any[], depositBps: number, optionId: unk
  need(Number.isSafeInteger(gross),'Invalid selected total')
  const cents=scopedNet(gross,bps,offered.discount?.fixedCents??0);need(Number.isSafeInteger(cents)&&cents<=1000000000,'Selected total must not exceed $10,000,000')
  const discount=offered.discount?{...offered.discount,bps,grossCents:gross,cents:gross-cents}:undefined
- return {option:{...offered,cents,...(discount?{discount}:{})},items,baseCents:offered.cents,deposit:Math.round(cents*depositBps/10000),...(discount?{grossCents:gross,discountCents:gross-cents,discountBps:bps}:{})}
+ const t=paymentTerms(terms),deposit=t?.depositFixedCents??Math.round(cents*depositBps/10000),schedule=paymentSchedule(cents,deposit,t)
+ return {...(schedule?{paymentSchedule:schedule}:{}),option:{...offered,cents,...(discount?{discount}:{})},items,baseCents:offered.cents,deposit,...(discount?{grossCents:gross,discountCents:gross-cents,discountBps:bps}:{})}
 }

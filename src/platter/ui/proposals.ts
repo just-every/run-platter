@@ -1,3 +1,4 @@
+import { depositCents, paymentTerms } from '../payment-terms'
 import { folderSelect } from './folders'
 import { libraryInsertion } from './library'
 import { blockEditor, documentBlocks } from './blocks'
@@ -53,7 +54,7 @@ export function proposalEyebrow(state: any, id: string): string {
 
 function offerCards(p: any): string {
   const chosen = p.acceptance?.optionId
-  const card = (o: any, i: number) => `<article class="tier${(chosen ? o.id === chosen : i === 1) ? ' raised' : ''}"><p class="tier-legend">${i ? 'Option two' : 'Option one'}${o.id === chosen ? ' · chosen' : ''}</p><h2 class="tier-title">${escape(o.label)}</h2><p class="tier-amount">${money(o.cents, p.currency)}</p><dl class="tier-lines"><dt>Deposit at acceptance</dt><dd>${money(Math.round(o.cents * p.deposit_bps / 10000), p.currency)}</dd><dt>Balance after the deposit</dt><dd>${money(o.cents - Math.round(o.cents * p.deposit_bps / 10000), p.currency)}</dd></dl><p class="chip sage"><span class="tick" aria-hidden="true"></span>${escape(Number(p.deposit_bps) / 100)}% deposit${o.id === chosen ? ` · chosen by ${escape(p.acceptance.name)}` : ''}</p></article>`
+  const card = (o: any, i: number) => `<article class="tier${(chosen ? o.id === chosen : i === 1) ? ' raised' : ''}"><p class="tier-legend">${i ? 'Option two' : 'Option one'}${o.id === chosen ? ' · chosen' : ''}</p><h2 class="tier-title">${escape(o.label)}</h2><p class="tier-amount">${money(o.cents, p.currency)}</p><dl class="tier-lines"><dt>Deposit at acceptance</dt><dd>${money(depositCents(o.cents,p.deposit_bps,p), p.currency)}</dd><dt>Balance after the deposit</dt><dd>${money(o.cents - depositCents(o.cents,p.deposit_bps,p), p.currency)}</dd></dl><p class="chip sage"><span class="tick" aria-hidden="true"></span>${paymentTerms(p)?.depositFixedCents!=null?'Fixed deposit':escape(Number(p.deposit_bps) / 100)+'% deposit'}${o.id === chosen ? ` · chosen by ${escape(p.acceptance.name)}` : ''}</p></article>`
   return `<div class="tiers">${(p.options ?? []).map(card).join('')}<article class="tier scope-tier"><h2 class="tier-legend">Scope of work</h2><p class="preserve">${escape(p.scope)}</p><h2 class="tier-legend">Terms</h2><p class="preserve">${escape(p.terms || 'No additional terms.')}</p></article></div>`
 }
 
@@ -73,7 +74,7 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   const person = Boolean(p.canEdit)
   const frozen = p.status === 'sent' || p.status === 'accepted' || p.status === 'expired' || p.status === 'withdrawn'
   const pricing = p.currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'
-  const sum = receiptSum(p.options ?? [], Number(p.deposit_bps), p.currency, p.acceptance?.optionId)
+  const sum = receiptSum(p.options ?? [], Number(p.deposit_bps), p.currency, p.acceptance?.optionId,p)
   const withdrawn = p.withdrawals?.some((w: any) => w.revision === p.sentRevision)
   const clientView = owner && p.shareToken && !withdrawn ? `<div class="band-actions"><a class="button-link secondary" href="/p/${encodeURIComponent(p.shareToken)}">Open revision ${escape(p.sentRevision)} as ${escape(p.clientName)} sees it</a></div>` : ''
   const negotiated = p.negotiating ? `<div class="band caution" role="note"><p><strong>Negotiated draft · revision ${escape(p.sentRevision)} is still with ${escape(p.clientName)}.</strong> ${withdrawn ? 'The previous offer remains withdrawn.' : 'Revision ' + escape(p.sentRevision) + ' remains available to the client until'} this revision is approved and sent. If the client accepts it first, this draft cannot be sent.</p>${clientView}</div>` : ''

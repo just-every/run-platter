@@ -1,3 +1,4 @@
+import { paymentTerms } from './payment-terms'
 import { documentOf } from './documents/blocks'
 import { folderGuard, resourceEditors } from './folders'
 import { permitted } from './permissions'
@@ -6,7 +7,7 @@ export const lockSections=['title','scope','terms','pricing','deposit']
 export const lockChoices=(row:any)=>[...lockSections.map(section=>({section,label:section})),...documentOf(row).blocks.map(block=>({section:'block:'+block.id,label:'Block: '+(block.title||block.type)}))]
 const canonical=(value:any):any=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])):value
 const richTerms=(row:any)=>documentOf(row).blocks.filter(b=>b.type==='terms').map(({title,text,condition})=>({title,text,...(condition?{condition}:{})})).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
-const fieldValue=(row:any,section:string)=>section.startsWith('block:')?documentOf(row).blocks.find(b=>b.id===section.slice(6))??null:section==='pricing'?typeof row.options==='string'?JSON.parse(row.options):row.options:section==='deposit'?row.deposit_bps:['scope','terms'].includes(section)?[row[section]??'',...(section==='terms'?[richTerms(row)]:[]),(typeof row.section_conditions==='string'?JSON.parse(row.section_conditions):row.section_conditions??{})[section]??null]:row[section]
+const fieldValue=(row:any,section:string)=>section.startsWith('block:')?documentOf(row).blocks.find(b=>b.id===section.slice(6))??null:section==='pricing'?typeof row.options==='string'?JSON.parse(row.options):row.options:section==='deposit'?[row.deposit_bps,paymentTerms(row)]:['scope','terms'].includes(section)?[row[section]??'',...(section==='terms'?[richTerms(row)]:[]),(typeof row.section_conditions==='string'?JSON.parse(row.section_conditions):row.section_conditions??{})[section]??null]:row[section]
 export async function assertSectionLocks(db:D1Database,old:any,next:any){
  const locks=(await db.prepare('SELECT section FROM p_proposal_locks WHERE proposal_id=? UNION ALL SELECT section FROM p_proposal_block_locks WHERE proposal_id=?').bind(old.id,old.id).all<any>()).results
  for(const {section} of locks)need(JSON.stringify(canonical(fieldValue(old,section)))===JSON.stringify(canonical(fieldValue(next,section))),'The '+section+' section is locked. Ask an owner, admin or team manager to unlock this proposal first.',403)

@@ -1,3 +1,4 @@
+import { paymentTerms } from './payment-terms'
 import { legalText } from './documents/blocks'
 import { discountThreshold, percentBps } from './discounts'
 import { internalPricing, costReaders } from './internal-pricing'
@@ -23,7 +24,7 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
   if(c.kind==='totalOver')return row.currency===c.currency&&total>BigInt(c.cents)
   if(c.kind==='discountOver')return options.some((o:any)=>discountThreshold(o)>c.bps)
   if(c.kind==='termsEdited')return row.revision>1&&Boolean(first)&&legalText(row)!==legalText(JSON.parse(first.snapshot))
-  if(c.kind==='paymentTerms')return row.deposit_bps<c.minimumDepositBps||(c.standardTerms!==null&&String(row.terms??'')!==c.standardTerms)
+  if(c.kind==='paymentTerms')return Boolean(paymentTerms(row))||row.deposit_bps<c.minimumDepositBps||(c.standardTerms!==null&&String(row.terms??'')!==c.standardTerms)
   if(c.kind==='template')return Boolean(origin)
   if(c.kind==='marginBelow'){
    costing??=await internalPricing(db,row,{id:'internal-rule-evaluation',email:'',role:'owner'})

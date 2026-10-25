@@ -1,3 +1,4 @@
+import { depositCents } from '../payment-terms'
 export type Feedback = { message?: string; error?: string; result?: any; status?: number; field?: string; command?: string; input?: Record<string, unknown> }
 export const escape = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!)
 export const money = (cents: number, currency?: string): string => `$${(Number(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${currency ? ' ' + escape(currency) : ''}`
@@ -41,4 +42,4 @@ export function notices(feedback?: Feedback, focus = false): string {
   return html
 }
 export const statusPill = (value: unknown): string => `<span class="status status-${escape(String(value).toLowerCase().replace(/[^a-z]+/g, '-'))}">${escape(value)}</span>`
-export const optionPair = (options: any[], depositBps: number, chosen?: string, currency?: string): string => `<div class="option-pair">${options.map(option => `<div class="offer-option${option.id === chosen ? ' chosen' : ''}"><strong>${escape(option.label)}</strong><span class="option-price">${money(option.cents,currency)}</span><span class="muted">Deposit ${money(Math.round(option.cents * depositBps / 10000),currency)}</span></div>`).join('')}</div>`
+export const optionPair = (options: any[], depositBps: number, chosen?: string, currency?: string,terms?:any): string => `<div class="option-pair">${options.map(option => `<div class="offer-option${option.id === chosen ? ' chosen' : ''}"><strong>${escape(option.label)}</strong><span class="option-price">${money(option.cents,currency)}</span><span class="muted">Deposit ${money(depositCents(option.cents,depositBps,terms),currency)}</span></div>`).join('')}</div>`

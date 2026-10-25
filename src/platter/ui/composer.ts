@@ -1,3 +1,5 @@
+import { depositCents, paymentTerms } from '../payment-terms'
+import { scheduleEditor } from './payment-terms'
 import { catalogShelf } from './catalog-shelf'
 import { editablePackages } from '../pricing'
 import { optionalEditor } from './packages'
@@ -9,17 +11,17 @@ import { area, date, escape, field, form, hidden, money, proposalPath, type Feed
 // the proposal's details under them, and a receipt that sums what the client will choose between.
 export type ComposerMode = 'prepare' | 'revise' | 'negotiate'
 
-const depositOf = (option: any, bps: number, currency?: string) => option ? money(Math.round(option.cents * bps / 10000), currency === 'AUD' ? currency : undefined) : '—'
+const depositOf = (option: any, bps: number, currency?: string,terms?:any) => option ? money(depositCents(option.cents,bps,terms), currency === 'AUD' ? currency : undefined) : '—'
 
 // The tier figure is set as text over its field ("$4,200.00"); focusing the field shows the editable value.
 const figure = (option: any) => option?.cents ? money(option.cents) : ''
 const ordinal = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight']
 
 /** One priced column. With packages (USD) it is also a package: its own optional items and package actions. */
-function tier(option: any, index: number, currency: string, bps: number | undefined, raised: boolean, formId: string, packages: boolean): string {
+function tier(option: any, index: number, currency: string, bps: number | undefined, raised: boolean, formId: string, packages: boolean, terms?:any): string {
   const id = option?.id ?? '', suffix = id === 'one' ? 'One' : id === 'two' ? 'Two' : ''
   const legend = index < 0 ? 'New package' : `Option ${ordinal[index] ?? index + 1}`
-  const deposit = option?.cents && bps !== undefined ? Math.round(option.cents * bps / 10000) : undefined
+  const deposit = option?.cents && bps !== undefined ? depositCents(option.cents,bps,terms) : undefined
   const shown = (cents?: number) => cents === undefined ? '—' : money(cents, currency === 'AUD' ? currency : undefined)
   const named = (field: string) => `${suffix ? ` name="${field}${suffix}"` : ''}${packages ? ` data-package-field="${field === 'option' ? 'label' : 'price'}"` : ''}`
   const extras = packages ? `<div class="tier-extras" data-optional-items>${(option?.optionalItems ?? []).map(optionalEditor).join('')}</div><div class="tier-actions"><button type="button" class="quiet" data-package-action="add-item">Add optional item</button><button type="button" class="quiet" data-package-action="remove-package">Remove package</button></div>` : ''
@@ -28,7 +30,7 @@ function tier(option: any, index: number, currency: string, bps: number | undefi
     + `<label class="tier-price">Price${(Number(option?.discountPercent??0)>0||Number(option?.discountAmount??0)>0)?' before discount':''} in ${escape(currency)}<span class="money-field"><span class="money-sign" aria-hidden="true">$</span><input${id ? ` id="${escape(formId)}-price-${escape(id)}"` : ''}${named('price')} value="${escape(option?.price ?? '')}" required inputmode="decimal" placeholder="0.00" autocomplete="off"><span class="money-figure" aria-hidden="true">${figure((Number(option?.discountPercent??0)>0||Number(option?.discountAmount??0)>0)?{...option,cents:Math.round(Number(option.price)*100)}:option)}</span></span></label>`
     + (packages?`<label>Package discount (%)<input data-package-field="discountPercent" value="${escape(option?.discountPercent??'0')}" inputmode="decimal" aria-label="Package discount (%)"></label><label>Package discount in USD<input data-package-field="discountAmount" value="${escape(option?.discountAmount??'0')}" inputmode="decimal"></label><label>Show discounts to client<select data-package-field="showDiscount"><option value="yes"${option?.showDiscount!=='no'?' selected':''}>Show discounts</option><option value="no"${option?.showDiscount==='no'?' selected':''}>Show net prices only</option></select></label><label>Discount expiry date (UTC)<input type="date" data-package-field="discountExpiresOn" value="${escape(option?.discountExpiresOn??'')}"></label>`:'')
     + `<dl class="tier-lines"><dt>Deposit at acceptance</dt><dd data-line="deposit">${shown(deposit)}</dd><dt>Balance after the deposit</dt><dd data-line="balance">${shown(deposit === undefined ? undefined : option.cents - deposit)}</dd></dl>`
-    + `<p class="chip sage tier-deposit"><span class="tick" aria-hidden="true"></span><span><output data-line="percent">${bps === undefined ? '—' : escape(bps / 100)}</output>% deposit</span></p>${extras}</fieldset>`
+    + `<p class="chip sage tier-deposit"><span class="tick" aria-hidden="true"></span><span><output data-line="percent">${paymentTerms(terms)?.depositFixedCents!=null?'Fixed':bps === undefined ? '—' : escape(bps / 100)}</output>${paymentTerms(terms)?.depositFixedCents!=null?' deposit':'% deposit'}</span></p>${extras}</fieldset>`
 }
 
 export function composerForm(state: any, proposal: any, mode: ComposerMode, id: string, inlineButton?: string): string {
@@ -45,7 +47,7 @@ export function composerForm(state: any, proposal: any, mode: ComposerMode, id: 
   // An optional item offered by several packages under one id is one condition: shown while the client adds it.
   const extras = [...new Map(shown.flatMap((o: any) => (o.optionalItems ?? []).map((x: any) => [x.id, x.label]))).entries()]
   const visibility = (section: 'scope' | 'terms') => `<label class="visibility">${section === 'scope' ? 'Scope' : 'Terms'} visibility<select name="${section}Option"><option value="">Every option</option>${shown.map((o: any) => `<option value="${escape(o.id)}"${conditions[section] === o.id ? ' selected' : ''}>Only ${escape(o.label || 'option ' + o.id)}</option>`).join('')}${extras.map(([item, label]) => `<option value="item:${escape(item)}"${conditions[section] === 'item:' + item ? ' selected' : ''}>Only with ${escape(label)}</option>`).join('')}</select></label>`
-  const columns = shown.map((o: any, i: number) => tier(o, i, currency, bps, i === Math.min(1, shown.length - 1), id, packages)).join('')
+  const columns = shown.map((o: any, i: number) => tier(o, i, currency, bps, i === Math.min(1, shown.length - 1), id, packages,proposal)).join('')
     + `<div class="tier scope-tier">${area('Scope of work', 'scope', proposal?.scope, 'required rows="5"')}${area('Terms', 'terms', proposal?.terms ?? '', 'rows="2"')}<div class="visibility-row">${visibility('scope')}${visibility('terms')}</div></div>`
   // Main's packages editor (packages.js) works on these columns: it adds and removes packages and their optional items.
   const tiers = packages ? `<div data-packages-editor><input type="hidden" data-packages-payload><div class="tiers" data-packages>${columns}</div>`
@@ -56,16 +58,16 @@ export function composerForm(state: any, proposal: any, mode: ComposerMode, id: 
     + field('Proposal title', 'title', proposal?.title, 'required maxlength="200"')
     + field('Deposit percentage', 'depositPercent', proposal ? Number(proposal.deposit_bps) / 100 : '', 'required inputmode="decimal" placeholder="25"') + '</div>'
   const command = mode === 'negotiate' ? 'proposal.negotiate' : mode === 'revise' ? 'proposal.revise' : 'proposal.prepare'
-  const body = (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + tiers + `<h2 class="shelf-title">Details</h2>` + details + (currency === 'USD' ? `<div class="itemised">${pricingEditor(options)}</div>` : '') + (inlineButton ? `<div class="composer-actions"><button>${inlineButton}</button></div>` : '')
+  const body = (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + tiers + `<h2 class="shelf-title">Details</h2>` + details + scheduleEditor(proposal) + (currency === 'USD' ? `<div class="itemised">${pricingEditor(options)}</div>` : '') + (inlineButton ? `<div class="composer-actions"><button>${inlineButton}</button></div>` : '')
   return form(command, proposal ? proposalPath(proposal.id) : '/app', body, proposal ? `proposal-${proposal.id}-${proposal.version}` : 'proposal-new')
     .replace('<form ', `<form id="${escape(id)}" class="composer" `)
 }
 
 /** What the client chooses between, priced the way acceptance prices it. */
-export function receiptSum(options: any[], bps: number, currency: string, chosen?: string): string {
+export function receiptSum(options: any[], bps: number, currency: string, chosen?: string,terms?:any): string {
   const named = options.map((o: any) => `<span class="${o.id === chosen ? 'picked' : ''}"><strong class="serif">${escape(o.label)}</strong> <span data-sum-price="${escape(o.id)}">${money(o.cents, currency === 'AUD' ? currency : undefined)}</span></span>`).join(' <span class="muted">or</span> ')
-  const deposits = options.map((o: any) => `<span data-sum-deposit="${escape(o.id)}">${depositOf(o, bps, currency)}</span>`).join(' or ')
-  return `<p class="receipt-sum">${named} <span class="sep">·</span> <span data-sum-percent>${escape(bps / 100)}</span>% deposit ${deposits}<span class="currency-note"> <span class="sep">·</span> <span class="muted">${currency === 'AUD' ? 'GST-free in AUD' : 'USD · sales tax not calculated'}</span></span></p>`
+  const deposits = options.map((o: any) => `<span data-sum-deposit="${escape(o.id)}">${depositOf(o, bps, currency,terms)}</span>`).join(' or ')
+  return `<p class="receipt-sum">${named} <span class="sep">·</span> <span data-sum-percent>${paymentTerms(terms)?.depositFixedCents!=null?'Fixed':escape(bps / 100)}</span>${paymentTerms(terms)?.depositFixedCents!=null?' deposit':'% deposit'} ${deposits}<span class="currency-note"> <span class="sep">·</span> <span class="muted">${currency === 'AUD' ? 'GST-free in AUD' : 'USD · sales tax not calculated'}</span></span></p>`
 }
 
 export function receipt(sum: string, actions: string, note = ''): string {

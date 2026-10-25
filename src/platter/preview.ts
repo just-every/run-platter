@@ -26,7 +26,7 @@ export async function previewResponse(request:Request,env:Bindings) {
  need(row.revision===Number(url.searchParams.get('revision')),'This revision changed. Return to the editor.',409)
  const content=snapshot(row),optionId=url.searchParams.get('optionId')??content.options[0].id
  if(file){const attachment=copyAttachments(content.attachments).find(item=>item.id===file[1]);need(attachment,'Attachment not found',404);return downloadAttachment(env.DB,attachment)}
- const selection=offerSelection(content.options,content.deposit_bps,optionId,reviewItems(Object.fromEntries(url.searchParams)))
+ const selection=offerSelection(content.options,content.deposit_bps,optionId,reviewItems(Object.fromEntries(url.searchParams)),content)
  if(media)return await documentMedia(env.DB,selectedContent({...content,id:row.id},optionId,selection.items),media[1])
  const width=url.searchParams.get('width')??'1440'
  need(['1440','390'].includes(width),'Choose desktop or phone width')

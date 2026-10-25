@@ -1,3 +1,4 @@
+import { depositCents, paymentTerms, scheduleLines } from '../payment-terms'
 import { displayOptions } from '../discounts'
 import { documentOf } from './blocks'
 import { offerSelection } from '../selection'
@@ -15,7 +16,7 @@ function amount(cents: number, currency: string) {
 export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Array | ArrayBuffer)[] = [], items: unknown = [],media?:(id:string)=>Promise<Uint8Array>,mediaLink?:(id:string)=>string): Promise<Uint8Array> {
  const options = typeof view.options === 'string' ? JSON.parse(view.options) : view.options
  need(Array.isArray(options), 'Offer options are missing')
- const selection = offerSelection(options,view.deposit_bps,optionId,items), selected = selection.option
+ const selection = offerSelection(options,view.deposit_bps,optionId,items,view), selected = selection.option
  need(selected, 'Choose one offered option')
  view = selectedContent(view,optionId,selection.items)
  const revision = Number(view.revision)
@@ -26,7 +27,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  need(currency === 'AUD' || currency === 'USD', 'Unsupported offer currency')
  const deposit = (cents: number) => {
   need(Number.isSafeInteger(cents) && cents >= 0 && Number.isSafeInteger(cents * depositBps), 'Invalid offer price')
-  return Math.round(cents * depositBps / 10000)
+  return view.payment_terms ? depositCents(cents,depositBps,view) : Math.round(cents * depositBps / 10000)
  }
  const pdf = await PdfText.create(revision, fontBytes,undefined,documentOf(view).brand)
  pdf.document.setTitle(String(view.title ?? ''))
@@ -45,6 +46,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  if(selected.discount&&!selected.concealDiscount)pdf.text(`Package discount: ${selected.discount.bps/100}% off ${amount(selected.discount.grossCents,currency)}; discount ${amount(selected.discount.cents,currency)}${selected.discount.fixedCents?`; fixed reduction ${amount(selected.discount.fixedCents,currency)}`:''}`)
  pdf.text(`Selected option total: ${amount(selected.cents, currency)}`)
  pdf.text(`Deposit due: ${amount(deposit(selected.cents), currency)}`)
+ if(selection.paymentSchedule){pdf.heading('Payment schedule');pdf.text('Informational schedule. No automatic charges or invoices. Monthly retainers are additional to the package price.');for(const line of scheduleLines(selection.paymentSchedule,currency))pdf.text(line)}
  if(selection.items.length){pdf.heading('Selected optional items');for(const item of selection.items)pdf.text(`${item.label}: ${item.quantity} x ${amount(item.unitCents,currency)} = ${amount(item.totalCents,currency)}`)}
 
  const doc=documentOf(view)
@@ -67,7 +69,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
 
  pdf.heading('Offer options')
  pdf.text(currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.')
- pdf.text(`Deposit: ${depositBps / 100}% of the chosen option.`)
+ pdf.text(view.payment_terms&&paymentTerms(view)?.depositFixedCents!=null?'Fixed deposit applies.':`Deposit: ${depositBps / 100}% of the chosen option.`)
  for (const option of displayOptions(options)) {
   pdf.gap(8)
   pdf.text(`${option.id === optionId ? 'Selected option' : 'Option'}: ${option.label}`, 12)

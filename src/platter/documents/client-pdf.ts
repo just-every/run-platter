@@ -29,7 +29,7 @@ export async function clientPdf(env: Bindings, context: any, optionId: string, i
  need(context.verified, 'Verify your email before downloading the proposal PDF', 401)
  need(context.row.status === 'sent', 'Unsigned downloads are only available before acceptance', 409)
  need(await pdfEnabled(env.DB, context.row.id), 'Client PDF downloads are disabled for this proposal', 403)
- const items=selectionItems(input),selection=offerSelection(JSON.parse(context.row.options),context.row.deposit_bps,optionId,items)
+ const items=selectionItems(input),selection=offerSelection(JSON.parse(context.row.options),context.row.deposit_bps,optionId,items,context.row)
  const bytes = await offerPdf(context.row, optionId, await pdfFonts(env,context.row),items,id=>mediaBytes(env.DB,context.row,id),id=>env.AUTH_ORIGIN+'/p/'+encodeURIComponent(context.token)+'/media/'+encodeURIComponent(id)), at = Date.now()
  try {
   await env.DB.batch([

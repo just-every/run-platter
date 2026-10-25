@@ -13,7 +13,7 @@ export async function pendingNegotiation(db: D1Database, id: string) {
  return db.prepare('SELECT * FROM p_negotiations WHERE proposal_id=?').bind(id).first<any>()
 }
 export function negotiatedView(offer: any, pending: any) {
- return pending ? { ...offer, ...JSON.parse(pending.snapshot), status: pending.approved_by ? 'approved' : 'draft', prepared_by: pending.prepared_by, approved_by: pending.approved_by, approved_at: pending.approved_at, negotiating: true, sentRevision: offer.revision } : offer
+ return pending ? { ...offer,payment_terms:null, ...JSON.parse(pending.snapshot), status: pending.approved_by ? 'approved' : 'draft', prepared_by: pending.prepared_by, approved_by: pending.approved_by, approved_at: pending.approved_at, negotiating: true, sentRevision: offer.revision } : offer
 }
 
 export async function negotiationCommand(env: Bindings, actor: Actor, name: string, input: Record<string, unknown>, offer: any, fields?: any) {
@@ -54,7 +54,7 @@ export async function negotiationCommand(env: Bindings, actor: Actor, name: stri
  const client = await db.prepare('SELECT COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(offer.id,offer.client_id).first<any>()
  await commit(db, actor, [
   db.prepare("UPDATE p_proposals SET title=?,scope=?,terms=?,attachments=?,options=?,deposit_bps=?,revision=?,previous_sent_revision=?,prepared_by=?,approved_by=?,approved_at=?,version=version+1 WHERE id=?").bind(next.title, next.scope, next.terms??'', JSON.stringify(next.attachments??[]), JSON.stringify(next.options), next.deposit_bps, next.revision, offer.revision, pending.prepared_by, pending.approved_by, pending.approved_at, offer.id),
-  db.prepare('UPDATE p_proposals SET section_conditions=?,document=? WHERE id=?').bind(JSON.stringify(next.section_conditions??{}),JSON.stringify(documentOf(next)),offer.id),
+  db.prepare('UPDATE p_proposals SET section_conditions=?,document=?,payment_terms=? WHERE id=?').bind(JSON.stringify(next.section_conditions??{}),JSON.stringify(documentOf(next)),next.payment_terms?JSON.stringify(next.payment_terms):null,offer.id),
   db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(offer.id),
   db.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient) VALUES(?,?,?,?)').bind(offer.id, next.revision, token,client.email),
   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(offer.id),

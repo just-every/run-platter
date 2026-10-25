@@ -65,6 +65,8 @@ window.platterRevisionSaved=(id,previous,result)=>{
     const page = form.closest('.composer-page');
     const update = () => {
       const percent = Number(form.elements.depositPercent?.value);
+      const fixed = form.elements.scheduleEnabled?.value === 'yes' && form.elements.depositKind?.value === 'fixed';
+      const fixedAmount = cents(form.elements.depositAmount?.value ?? '');
       const valid = Number.isFinite(percent) && percent > 0 && percent <= 100;
       for (const tier of form.querySelectorAll('.tier[data-tier]')) {
         const id = tier.dataset.tier, field = tier.querySelector('.tier-price input');
@@ -73,10 +75,10 @@ window.platterRevisionSaved=(id,previous,result)=>{
         field.classList.toggle('invalid', field.value.trim() !== '' && price === null);
         const figure = tier.querySelector('.money-figure');
         if (figure) figure.textContent = gross === null ? field.value.trim() : show(gross);
-        const deposit = price === null || !valid ? null : Math.round(price * percent * 100 / 10000);
+        const deposit = price === null || !valid ? null : fixed ? fixedAmount : Math.round(price * percent * 100 / 10000);
         tier.querySelector('[data-line="deposit"]').textContent = show(deposit);
         tier.querySelector('[data-line="balance"]').textContent = show(deposit === null ? null : price - deposit);
-        if (valid) tier.querySelector('[data-line="percent"]').textContent = String(percent);
+        if (valid) { const output=tier.querySelector('[data-line="percent"]'); output.textContent = fixed ? 'Fixed' : String(percent); if(output.nextSibling)output.nextSibling.textContent=fixed?' deposit':'% deposit'; }
         if (!page || !id) continue;
         const sum = page.querySelector(`[data-sum-price="${id}"]`), part = page.querySelector(`[data-sum-deposit="${id}"]`);
         if (sum) { sum.textContent = show(price); sum.classList.toggle('invalid', price === null); }
@@ -85,7 +87,7 @@ window.platterRevisionSaved=(id,previous,result)=>{
         if (label && typed) label.textContent = typed;
       }
       const shown = page?.querySelector('[data-sum-percent]');
-      if (shown && valid) shown.textContent = String(percent);
+      if (shown && valid) { shown.textContent = fixed ? 'Fixed' : String(percent); if(shown.nextSibling)shown.nextSibling.textContent=fixed?' deposit ':'% deposit '; }
     };
     form.addEventListener('input', update);
     form.addEventListener('click', () => requestAnimationFrame(update));

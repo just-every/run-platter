@@ -60,7 +60,8 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
  const token=text(p.token,'a provider token',8192);need(!/[\r\n\0]/.test(token),'Use a single-line provider token')
  let accountId:string,mailboxEmail:string|null=null,webhookSecret:string|undefined
  if(provider==='stripe'){
-  webhookSecret=text(p.webhookSecret,'the Stripe webhook signing secret',8192)
+  webhookSecret=p.webhookSecret?text(p.webhookSecret,'the Stripe webhook signing secret',8192):undefined
+  if(p.publishableKey!==undefined&&p.publishableKey!=='')need(typeof p.publishableKey==='string'&&p.publishableKey.length>0&&p.publishableKey.length<=8192&&!/[\r\n\0]/.test(p.publishableKey),'Use the Stripe publishable key')
   const result=await providerJson('https://api.stripe.com/v1/account',token);accountId=text(result.id,'the verified provider account',200)
  }else if(provider==='quickbooks'){
   const realm=text(p.realmId,'the QuickBooks company id',100),result=await providerJson('https://quickbooks.api.intuit.com/v3/company/'+encodeURIComponent(realm)+'/companyinfo/'+encodeURIComponent(realm),token)
@@ -88,7 +89,7 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
   need(await db.prepare('SELECT 1 WHERE '+sql).bind(...values).first(),'This mailbox is already bound to another member',403)
   guard.sql+=' AND '+sql;guard.values.push(...values)
  }
- const sealed=await sealCredential(env,id,{provider,token,accountId,...(webhookSecret?{webhookSecret}:{})}),at=Date.now()
+ const sealed=await sealCredential(env,id,{provider,token,accountId,...(webhookSecret?{webhookSecret}:{}),...(provider==='stripe'&&p.publishableKey?{publishableKey:p.publishableKey}:{})}),at=Date.now()
  await commit(db,a,[db.prepare("INSERT INTO p_connections(id,provider,operator_id,account_id,mailbox_email,status,connected_by,connected_at) VALUES(?,?,?,?,?,'connected',?,?) ON CONFLICT(id) DO UPDATE SET account_id=excluded.account_id,mailbox_email=excluded.mailbox_email,status='connected',broken_at=NULL,version=p_connections.version+1,connected_by=excluded.connected_by,connected_at=excluded.connected_at").bind(id,provider,isMailbox(provider)?a.id:null,accountId,mailboxEmail,a.id,at),db.prepare('INSERT INTO p_connection_secrets(connection_id,sealed) VALUES(?,?) ON CONFLICT(connection_id) DO UPDATE SET sealed=excluded.sealed').bind(id,sealed)],false,guard)
  return {id,status:'connected'}
 }

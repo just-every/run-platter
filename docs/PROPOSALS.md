@@ -54,6 +54,16 @@ Codes expire after ten minutes, allow five attempts and have a one-minute resend
 
 For a sent proposal, the owner can choose **Send fresh client link**. This revokes the previous link and verification session while keeping the offer frozen. Use it if access is lost or needs replacing, or after [restoring a backup](BACKUP-RESTORE.md). It does not change the offered terms.
 
+## Collect a deposit
+
+In Settings, an owner or admin connects Stripe with its secret key and matching publishable key. On a USD draft, open **Deposit collection** and choose **Required** or **Due** before sending. Required retains the signature while acceptance waits for a successful deposit. Due completes acceptance when signed and keeps an unpaid deposit due. A declined payment never changes the signed terms.
+
+After signing, the verified client chooses an offered method, confirms preparation and selects **Continue to secure payment**. Stripe loads only after that action and collects payment details inside its own secure fields. The client reviews the deposit, any separate card fee and total before paying. **Refresh payment status** reads Stripe's current result; a processing bank debit is not shown as paid.
+
+Workspace methods are copied into blank proposals. Personal and shared templates retain their method choices, and each proposal can change its copied methods before sending. Owners and admins configure the card fee in Settings after confirming it is permitted. Unknown billing states, states marked prohibited and ACH payments have no card fee. Fee settings do not authorize future charges.
+
+Wallet availability depends on the device, wallet and Stripe account configuration. Current release evidence and outstanding bank verification and wallet proofs are recorded under PAY-001 in [CONTRACT.md](../CONTRACT.md).
+
 ## Export the deposit invoice
 
 After acceptance, open the owner's proposal and choose **Export invoice CSV**, then **Download deposit invoice CSV**. Repeating the export returns the same retained invoice; downloading it again does not create another invoice.
@@ -138,3 +148,5 @@ A pricing block places one of the proposal’s saved tables. Its quantities and 
 Client fields currently support required or optional text, dates and checkboxes for the invited Client role. Each typed-signature block must match the name adopted at acceptance. Required values block acceptance and then remain immutable with the agreement. File collection, additional recipient roles, signed certificates and invoice/CRM propagation remain separate capabilities.
 
 Preview the exact unsent revision before approving. Package and optional-item conditions govern document sections in the preview, client page, selected unsigned PDF and accepted snapshot. Verified clients can ask about a block and can suggest tracked text edits where you explicitly enable them. Accepting a suggestion creates a separate unapproved draft; it never changes the live offer. Unsigned PDFs use US Letter pages, the chosen brand, uploaded images and video stills, two-column text and the same block order, with the revision and “Not signed” on every page.
+
+Test qualification uses test-only `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY` injected into `node ./tests/stripe-sandbox.mjs`. After `pnpm build`, `node ./tests/collection-browser.mjs` exercises the real Payment Element at 1440 and 390. The journeys refund successful test charges and cancel unfinished intents; Stripe retains those records. They create no webhook endpoint.

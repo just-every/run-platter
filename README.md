@@ -2,7 +2,7 @@
 
 Proposals and quotes for a small Australian agency or studio. Prepare two priced options, approve the exact offer, let a client accept one after email verification, and keep the agreement and a once-only deposit invoice export.
 
-New offers use **USD**. Existing first-release offers and agreements retain their **GST-free AUD** amounts and invoice files without conversion. Platter does not collect payments or calculate sales tax. [ACCEPTANCE.md](ACCEPTANCE.md) names the supported jobs.
+New offers use **USD**. Existing first-release offers and agreements retain their **GST-free AUD** amounts and invoice files without conversion. USD proposals can collect explicitly authorized Stripe deposits after signing; wallet and bank proof gaps are recorded under PAY-001. Platter does not calculate sales tax. [ACCEPTANCE.md](ACCEPTANCE.md) names the supported jobs.
 
 ## Run from a fresh clone
 

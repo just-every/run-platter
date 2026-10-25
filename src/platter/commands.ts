@@ -1,3 +1,5 @@
+import { surchargeCommand } from './collection-fees'
+import { collectionPolicyCommand } from './collection-policy'
 import { scheduleInput, editableTerms, paymentTerms } from './payment-terms'
 import { saveOutcomeSettings, configureCrmOutcome, synchronizeOutcome } from './outcomes'
 import { assertDiscountDates, discountDeadline } from './discounts'
@@ -88,6 +90,8 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='proposal.unlock'||name==='template.locks')return sectionLockCommand(db,a,name,p)
  if(name==='proposal.folder')return fileProposal(db,a,p)
  if(name==='folder.save')return folderCommand(db,a,p)
+ if(name==='payment.surcharge')return surchargeCommand(db,a,p)
+ if(name==='payment.collection')return collectionPolicyCommand(env,a,name,p)
  if(name.startsWith('payment.'))return paymentCommand(env,a,name,p)
  if(name.startsWith('provider.'))return connectionCommand(env,a,name,p)
  if(name==='workspace.defaults')return workspaceCommand(db,a,p)

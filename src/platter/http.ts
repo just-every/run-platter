@@ -1,3 +1,4 @@
+import { clientCollection, authorizeCollection } from './collection'
 import { ensurePdfSearch } from './documents/pdf-search'
 import { searchCandidates } from './search'
 import { templateState } from './templates'
@@ -57,7 +58,8 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   if(path==='/api/platter/question-replies')return await questionReplyResponse(request,env)
   if(path==='/api/platter/mail/events')return await deliveryWebhook(request,env)
   if(request.method==='POST'&&!isAgent)need(request.headers.get('origin')===env.AUTH_ORIGIN&&request.headers.get('sec-fetch-site')!=='cross-site','Cross-site request refused',403)
-  if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/action|\/download\.pdf|\/data\.json|\/attachments\/([\w-]+)|\/media\/([\w-]+))?$/);need(match,'Invitation not found',404);const withdrawn=await env.DB.prepare('SELECT contact_email FROM p_withdrawn_links WHERE token=?').bind(match[1]).first<{contact_email:string}>();if(withdrawn)return path.endsWith('/data.json')?json({error:'Proposal withdrawn',contact:withdrawn.contact_email},410):withdrawnPage(withdrawn.contact_email);context=await clientContext(env,match[1],request)
+  if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/action|\/payment\.json|\/payment-consent\.json|\/payment-status\.json|\/download\.pdf|\/data\.json|\/attachments\/([\w-]+)|\/media\/([\w-]+))?$/);need(match,'Invitation not found',404);const withdrawn=await env.DB.prepare('SELECT contact_email FROM p_withdrawn_links WHERE token=?').bind(match[1]).first<{contact_email:string}>();if(withdrawn)return path.endsWith('.json')?json({error:'Proposal withdrawn',contact:withdrawn.contact_email},410):withdrawnPage(withdrawn.contact_email);context=await clientContext(env,match[1],request)
+   if(match[2]==='/payment.json'||match[2]==='/payment-status.json'||match[2]==='/payment-consent.json'){need(request.method==='POST','Use a payment submission',405);const result=match[2]==='/payment-consent.json'?await authorizeCollection(env,context,await body(request)):await clientCollection(env,context,await body(request),match[2]==='/payment-status.json');await recordAudit(env.DB,{id:context.row.client_id,role:'client'},match[2]==='/payment-consent.json'?'payment.authorize':match[2]==='/payment.json'?'payment.prepare':'payment.refresh',context.row.id);return json(result)}
    if(request.method==='GET'&&match[4])return await documentMedia(env.DB,selectedContent(snapshot(context.row),context.optionId,context.selection.items),match[4])
    if(match[2]==='/data.json'){need(request.method==='GET','Method not allowed',405);const data=await clientData(env,context);await recordAudit(env.DB,{id:context.row.client_id,role:'client'},'proposal.data',context.row.id);return json(data)}
    if(match[2]==='/download.pdf'){const input=request.method==='POST'?await body(request):Object.fromEntries(url.searchParams);return await clientPdf(env,context,String(input.optionId??''),input)}
@@ -110,7 +112,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   }
   return path.startsWith('/app')?renderMissing():json({error:'Not found'},404)
  }catch(error){const status=Number((error as any)?.status)||500;const message=status<500?(error as Error).message:'The change could not be completed. Reload and try again.';if(status>=500)console.error(error)
-  if(isClient&&path.endsWith('/data.json'))return json({error:message},status)
+  if(isClient&&path.endsWith('.json'))return json({error:message},status)
   if(isClient&&context&&status!==403){const r=renderClient(await clientView(env,context),context.token,{error:message});return new Response(r.body,{status,headers:r.headers})}
   if((path==='/app/attachment'||path==='/app/document-media'||path==='/app/paper-acceptance')&&actor){const response=renderApp(await state(env,actor),back,{error:message});return new Response(response.body,{status,headers:response.headers})}
   if(path==='/app/action'&&actor)return renderApp(await state(env,actor),back,{error:message,status,field:(error as any)?.field,command:url.searchParams.get('name')??undefined,input:submitted})

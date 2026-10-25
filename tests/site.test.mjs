@@ -1,3 +1,4 @@
+import { collectionBrowser } from './collection-browser.mjs'
 import { documentJourney } from './document-journey.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { templatesJourney } from './templates-journey.mjs'
@@ -1292,3 +1293,5 @@ test('EDIT-003 linked and detached library insertion, frozen sending and scoped 
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('deposit collection settings, retained signatures, required and due completion at desktop and phone widths',{timeout:180000},()=>collectionBrowser())

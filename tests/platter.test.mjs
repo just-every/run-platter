@@ -1,3 +1,4 @@
+import { collectionLifecycle, collectionFees, collectionMethodInheritance } from './collection-journey.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { richLibraryPropagation, richLibrarySource } from './library-fixture.mjs'
 import { documentFixture } from './document-fixture.mjs'
@@ -754,8 +755,8 @@ test('SEND-010 / FOLLOW-002 withdrawal revokes every current public door, preser
  assert.ok((await h.send('/api/platter/followups',undefined,h.owner)).value.rows.some(r=>r.id===p.id))
  const before=(await h.state()).proposals.find(x=>x.id===p.id)
  await h.cmd('proposal.withdraw',{id:p.id,version:4,reason:'Sent to the wrong client'})
- for(const suffix of ['', '/action?name=accept','/action?name=code.request','/action?name=code.verify','/action?name=question.create','/action?name=suggestion.create','/action?name=expiry.reopen','/download.pdf?optionId=one','/data.json','/attachments/any-file']){
-  const r=await h.send(path+suffix,suffix.includes('/action')?{name:'Avery',optionId:'one',consent:true,code:'123456'}:undefined,cookie)
+ for(const suffix of ['', '/action?name=accept','/action?name=code.request','/action?name=code.verify','/action?name=question.create','/action?name=suggestion.create','/action?name=expiry.reopen','/download.pdf?optionId=one','/data.json','/payment.json','/payment-status.json','/payment-consent.json','/action?name=payment.refresh','/attachments/any-file']){
+  const r=await h.send(path+suffix,(suffix.includes('/action')||suffix.includes('/payment'))?{name:'Avery',optionId:'one',consent:true,code:'123456'}:undefined,cookie)
   assert.equal(r.status,410,r.text);assert.match(r.text,/Proposal withdrawn/);assert.match(r.text,/owner@studio.example/)
   for(const secret of [offer.title,offer.scope,offer.optionOne,'2400','When can you begin?'])assert.ok(!r.text.includes(secret),'withdrawn response reveals none of the proposal')
  }
@@ -1295,8 +1296,8 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  assert.ok(!(await h.send('/api/platter/followups',undefined,h.owner)).value.rows.some(r=>r.id===p.id))
  assert.ok(!(await h.send('/api/platter/questions',undefined,h.owner)).value.questions.some(q=>q.proposal_id===p.id))
  await h.cmd('followup.schedule',{id:p.id,action:'Call again',dueDate:'2027-03-11'},h.owner,409)
- for(const suffix of ['', '/action?name=accept','/action?name=decline','/action?name=code.request','/action?name=question.create','/action?name=expiry.reopen','/download.pdf?optionId=one','/data.json','/attachments/any-file']){
-  const response=await h.send(path+suffix,suffix.includes('/action')?{name:'Avery',optionId:'one',consent:true,reason:'Changed reason',revision:1}:undefined,cookie)
+ for(const suffix of ['', '/action?name=accept','/action?name=decline','/action?name=code.request','/action?name=question.create','/action?name=expiry.reopen','/download.pdf?optionId=one','/data.json','/payment.json','/payment-status.json','/payment-consent.json','/action?name=payment.refresh','/attachments/any-file']){
+  const response=await h.send(path+suffix,(suffix.includes('/action')||suffix.includes('/payment'))?{name:'Avery',optionId:'one',consent:true,reason:'Changed reason',revision:1}:undefined,cookie)
   assert.equal(response.status,410,response.text);assert.ok(!response.text.includes(offer.scope));assert.ok(!response.text.includes('Budget'))
  }
  assert.deepEqual((await current(p.id)).outcomes,after.outcomes,'replay does not replace the reason or add another outcome')
@@ -1330,7 +1331,7 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  assert.equal(lost.pipelineStatus,'lost');assert.equal(lost.outcomes[0].kind,'lost');assert.equal(lost.outcomes[0].actor_role,'owner');assert.equal(lost.outcomes[0].reason,'Project cancelled');assert.equal(lost.withdrawals[0].notice,0)
  assert.deepEqual((await h.state()).outbox.map(m=>m.id),mailBefore,'marking lost sends no recipient notice by default')
  assert.ok(!(await h.send('/api/platter/followups',undefined,h.owner)).value.rows.some(r=>r.id===lost.id))
- for(const suffix of ['', '/action?name=accept','/action?name=code.request','/download.pdf?optionId=one','/data.json','/attachments/any-file'])assert.equal((await h.send(other.path+suffix,suffix.includes('/action')?{name:'Avery',optionId:'one',consent:true}:undefined,otherCookie)).status,410)
+ for(const suffix of ['', '/action?name=accept','/action?name=code.request','/download.pdf?optionId=one','/data.json','/payment.json','/payment-status.json','/payment-consent.json','/action?name=payment.refresh','/attachments/any-file'])assert.equal((await h.send(other.path+suffix,(suffix.includes('/action')||suffix.includes('/payment'))?{name:'Avery',optionId:'one',consent:true}:undefined,otherCookie)).status,410)
  const lostAudit=(await h.send('/api/platter/audit?action=proposal.lose',undefined,h.owner)).value.rows
  assert.equal(lostAudit.length,1);assert.equal(lostAudit[0].actor_id,(await h.state()).actor.id);assert.equal(lostAudit[0].occurred_at,lost.outcomes[0].occurred_at)
  await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:lost.id,version:lost.version})
@@ -2570,3 +2571,32 @@ test('EDIT-003 insertion enforces live role, folder and proposal scope, consent,
   const before=await h.state();await h.cmd('library.insert',{...input,id:own.id,version:2},cookie,403);assert.deepEqual(await h.state(),before)
  }
 }))
+
+
+async function collectionHarness(){
+ const intents=new Map();let next=0
+ const h=await harness({outboundService:async request=>{
+  const url=new URL(request.url),path=url.pathname
+  if(path==='/v1/account')return Response.json({id:'synthetic-platter-account',default_currency:'usd'})
+  if(path==='/v1/payment_intents'&&request.method==='POST'){
+   const form=new URLSearchParams(await request.text()),id='synthetic-platter-intent-'+(++next),intent={id,amount:Number(form.get('amount')),currency:form.get('currency'),status:'requires_payment_method',client_secret:'synthetic-platter-client-'+next,payment_method_types:[form.get('excluded_payment_method_types[]')==='card'?'us_bank_account':'card'],metadata:{platter_proposal_id:form.get('metadata[platter_proposal_id]'),platter_revision:form.get('metadata[platter_revision]')}};intents.set(id,intent);return Response.json(intent)
+  }
+  const id=path.split('/').at(-1);assert.ok(intents.has(id),'only bound Stripe requests are sent');return Response.json(intents.get(id))
+ }})
+ await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-1',publishableKey:'synthetic-platter-2',consent:true})
+ return {h,intents}
+}
+
+test('deposit signatures survive declines, required acceptance waits for Stripe success and due acceptance stays complete',async()=>{
+ const {h,intents}=await collectionHarness()
+ try{
+  await collectionLifecycle(h,async(id,outcome)=>{const intent=intents.get(id);intent.status=outcome==='success'?'succeeded':'requires_payment_method';if(outcome==='success')intent.latest_charge={id:'synthetic-platter-charge-'+id,paid:true,status:'succeeded',amount:intent.amount,currency:intent.currency}})
+ }finally{await h.close()}
+})
+
+test('card fees require admin confirmation, remain separate and exempt ACH and prohibited billing states',async()=>{
+ const {h}=await collectionHarness()
+ try{await collectionFees(h)}finally{await h.close()}
+})
+
+test('proposal methods copy template overrides or workspace defaults and remain independent',()=>run(collectionMethodInheritance))

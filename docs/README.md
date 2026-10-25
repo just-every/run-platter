@@ -16,7 +16,7 @@ These guides describe your installed Platter app. Open its own address to use **
 
 Sending freezes the scope, both options and their prices. A verified client chooses one option and accepts with their name and consent. Platter retains that agreement and can export its deposit as one invoice CSV in Xero's columns. Repeating the export returns the same invoice.
 
-Platter does not collect payments, calculate sales tax, generate proposal PDFs or sync directly with Xero. Check the exported CSV's account and tax settings before importing it into your books, and import each invoice only once.
+USD proposals can collect explicitly authorized Stripe deposits after signing. See [deposit collection](PROPOSALS.md#collect-a-deposit) and the PAY-001 proof gaps in [CONTRACT.md](../CONTRACT.md). Platter does not calculate sales tax or sync directly with Xero. Check the exported CSV's account and tax settings before importing it into your books, and import each invoice only once.
 
 ## Reference
 

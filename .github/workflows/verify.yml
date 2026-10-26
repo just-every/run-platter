@@ -86,8 +86,16 @@ jobs:
           node-version: 22.20.0
       - run: corepack enable && corepack prepare pnpm@10.12.4 --activate
       - run: pnpm install --frozen-lockfile
-      - if: matrix.shard == 'runtime' || matrix.shard == 'browser_documents'
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Install Chromium
+        if: matrix.shard == 'runtime' || matrix.shard == 'browser_documents'
+        run: |
+          set -euo pipefail
+          pnpm exec playwright install chromium
+          # Hosted ubuntu-24.04 already carries Chromium's libraries. Use apt only when a real launch fails.
+          node scripts/ci/chromium-probe.mjs || {
+            timeout 420 pnpm exec playwright install-deps chromium
+            node scripts/ci/chromium-probe.mjs
+          }
       - name: Verify runtime and hosted output
         if: matrix.shard == 'runtime'
         run: pnpm verify
@@ -109,7 +117,15 @@ jobs:
           node-version: 22.20.0
       - run: corepack enable && corepack prepare pnpm@10.12.4 --activate
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Install Chromium
+        run: |
+          set -euo pipefail
+          pnpm exec playwright install chromium
+          # Hosted ubuntu-24.04 already carries Chromium's libraries. Use apt only when a real launch fails.
+          node scripts/ci/chromium-probe.mjs || {
+            timeout 420 pnpm exec playwright install-deps chromium
+            node scripts/ci/chromium-probe.mjs
+          }
       - run: pnpm build
       - run: node tests/editor-budget.mjs
         env:

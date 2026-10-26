@@ -1008,3 +1008,269 @@ test('FOLLOW-003 sender expiry notices create dated follow-ups independently of 
   await h.cmd('notification.defaults',{version:1,enabled:true,leadDays:2,renewalEnabled:true,renewalDays:20},cookie,403)
  }finally{await h.close()}
 })
+
+test('SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP preserve independent email reminders', {timeout:120000}, async()=>{
+ const {createHmac}=await import('node:crypto'),sms=[],email=[]
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-8100',TWILIO_ACCOUNT_SID:'synthetic-platter-8101',TWILIO_AUTH_TOKEN:'synthetic-platter-8102',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
+  if(new URL(request.url).hostname==='api.twilio.com'){
+   assert.equal(request.method,'POST');assert.equal(request.headers.get('authorization'),'Basic '+Buffer.from('synthetic-platter-8101:synthetic-platter-8102').toString('base64'))
+   const form=Object.fromEntries(new URLSearchParams(await request.text()));sms.push(form);assert.equal(form.From,'+15005550006');return Response.json({sid:'synthetic-platter-'+(8200+sms.length)},{status:201})
+  }
+  assert.equal(new URL(request.url).hostname,'api.resend.com');email.push(await request.json());return Response.json({id:'synthetic-platter-'+(8300+email.length)})
+ }})
+ const callback=async(path,fields,bad=false)=>{
+  const url=h.origin+'/api/platter/sms/'+path,form=new URLSearchParams({AccountSid:'synthetic-platter-8101',...fields})
+  const signature=createHmac('sha1','synthetic-platter-8102').update(url+[...form.keys()].sort().map(k=>k+form.get(k)).join('')).digest('base64')
+  const response=await h.mf.dispatchFetch(url,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','x-twilio-signature':bad?'synthetic-platter-8103':signature},body:form.toString()})
+  return {status:response.status,text:await response.text()}
+ }
+ try{
+  await finishSetup(h)
+  const tick=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+  await tick('2030-03-08T18:00:00Z')
+  const id=await approved(h)
+  await h.cmd('reminder.configure',{id,version:2,enabled:true,consent:true,timeZone:'America/Los_Angeles',afterDays:[2,5],beforeDays:[],cap:2})
+  const sent=await h.cmd('proposal.send',{id,version:3}),row=(await h.state()).proposals.find(p=>p.id===id)
+  const input={id,version:row.version,consent:true,phone:'+12025550123',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-8104'}
+  await h.cmd('sms.send',{id,message:'Review your proposal',requestId:'synthetic-platter-8105'},h.owner,409)
+  for(const change of [{consent:false},{timeZone:''},{timeZone:'Inferred'},{phone:'+442025550123'},{evidence:''},{version:1}])await h.cmd('sms.configure',{...input,...change},h.owner,change.version?409:400)
+  assert.equal(sms.length,0)
+  await h.cmd('sms.configure',input)
+  const send={id,message:'Review your proposal',requestId:'synthetic-platter-8105'}
+  const first=await h.cmd('sms.send',send)
+  await h.cmd('sms.send',send)
+  assert.equal(sms.length,1);assert.equal(sms[0].To,input.phone);assert.ok(sms[0].Body.includes(sent.shareUrl));assert.match(sms[0].Body,/Reply STOP/)
+  await h.cmd('sms.send',{...send,message:'Different text'},h.owner,409)
+  const history=async()=>(await h.send('/api/platter/sms?id='+id,undefined,h.owner)).value
+  assert.equal((await history()).messages[0].status,'accepted');assert.equal((await history()).consent.evidence,input.evidence)
+  assert.ok(!JSON.stringify(await history()).includes(new URL(sent.shareUrl).pathname),'timeline retains no bearer invitation')
+  const status={MessageSid:'synthetic-platter-8201',MessageStatus:'delivered',To:input.phone}
+  assert.equal((await callback('status',status,true)).status,401);assert.equal((await history()).messages[0].status,'accepted')
+  assert.equal((await callback('status',{...status,AccountSid:'synthetic-platter-9999'})).status,403)
+  assert.equal((await callback('status',status)).status,204);assert.equal((await history()).messages[0].status,'delivered')
+  await callback('status',{...status,MessageStatus:'sent'});assert.equal((await history()).messages[0].status,'delivered','late nonterminal receipt never regresses delivery')
+  const inbound={From:input.phone,To:'+15005550006',Body:'HELP'}
+  assert.match((await callback('inbound',inbound)).text,/Contact the sender/)
+  assert.equal((await callback('inbound',{...inbound,Body:'STOP'},true)).status,401)
+  await tick('2030-03-10T17:00:00Z');assert.equal(sms.length,2,'SMS reminder uses the existing schedule')
+  const emailsBefore=email.filter(m=>m.subject.startsWith('Reminder:')).length
+  assert.equal((await callback('inbound',{...inbound,Body:'stop'})).status,200)
+  await callback('inbound',{...inbound,Body:'STOP'});await callback('inbound',{...inbound,Body:'START'})
+  await h.cmd('sms.send',{...send,requestId:'synthetic-platter-8106'},h.owner,409)
+  await h.cmd('sms.configure',input,h.owner,409)
+  await tick('2030-03-13T17:00:00Z');assert.equal(sms.length,2);assert.equal(email.filter(m=>m.subject.startsWith('Reminder:')).length,emailsBefore+1,'STOP does not suppress email')
+  assert.equal((await h.send('/api/platter/sms?id='+id)).status,401)
+  const audit=await h.send('/api/platter/audit?action=sms.consent',undefined,h.owner);assert.equal(audit.value.rows.filter(r=>r.subject===id).length,1)
+  assert.ok(first.smsId)
+ }finally{await h.close()}
+})
+
+test('SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically cancels queued texts without duplicate transport', {timeout:120000}, async()=>{
+ const sms=[],email=[]
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-8400',TWILIO_ACCOUNT_SID:'synthetic-platter-8401',TWILIO_AUTH_TOKEN:'synthetic-platter-8402',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
+  if(new URL(request.url).hostname==='api.twilio.com'){sms.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(8500+sms.length)},{status:201})}
+  email.push(await request.json());return Response.json({id:'synthetic-platter-'+(8600+email.length)})
+ }})
+ try{
+  await finishSetup(h)
+  const tick=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+  await tick('2030-03-10T13:00:00Z') // 6 am Pacific, after the DST jump.
+  const ids=[]
+  for(const phone of ['+12025550124','+12025550125']){
+   const id=await approved(h)
+   await h.cmd('reminder.configure',{id,version:2,enabled:true,consent:true,timeZone:'America/Los_Angeles',afterDays:[1],beforeDays:[],cap:1})
+   const sent=await h.cmd('proposal.send',{id,version:3}),row=(await h.state()).proposals.find(p=>p.id===id)
+   await h.cmd('sms.configure',{id,version:row.version,consent:true,phone,timeZone:'America/Los_Angeles',evidence:'synthetic-platter-8403'})
+   const input={id,kind:'manual',message:'Please review the proposal',requestId:'synthetic-platter-'+(8700+ids.length)}
+   await h.cmd('sms.send',input);await h.cmd('sms.send',input)
+   await h.cmd('sms.send',{...input,requestId:'synthetic-platter-'+(8800+ids.length)},h.owner,429)
+   ids.push({id,sent})
+  }
+  assert.equal(sms.length,0)
+  const second=(await h.state()).proposals.find(p=>p.id===ids[1].id),mailBefore=email.length
+  await h.cmd('proposal.withdraw',{id:second.id,version:second.version,reason:'Sent to the wrong client'})
+  assert.equal(email.length,mailBefore+1,'the existing recipient withdrawal notice still sends once')
+  const history=await h.send('/api/platter/sms?id='+second.id,undefined,h.owner);assert.equal(history.value.messages[0].status,'cancelled')
+  assert.equal((await h.send(new URL(ids[1].sent.shareUrl).pathname)).status,410)
+  await tick('2030-03-10T14:59:00Z');assert.equal(sms.length,0)
+  await Promise.all([tick('2030-03-10T15:00:00Z'),tick('2030-03-10T15:00:00Z')]);assert.equal(sms.length,1,'8 am release is claimed once under concurrent cron triggers')
+  assert.equal(sms[0].To,'+12025550124');assert.ok(sms[0].Body.includes(ids[0].sent.shareUrl))
+  await tick('2030-03-11T13:00:00Z');assert.equal(sms.length,1,'scheduled texts due at 6 am wait for quiet hours')
+  await tick('2030-03-11T15:00:00Z');assert.equal(sms.length,2,'only the live proposal has a scheduled text after withdrawal');assert.equal(sms[1].To,'+12025550124')
+ }finally{await h.close()}
+})
+
+test('SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes cannot replay sending authority', {timeout:120000}, async()=>{
+ let attempts=0
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-8900',TWILIO_ACCOUNT_SID:'synthetic-platter-8901',TWILIO_AUTH_TOKEN:'synthetic-platter-8902',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
+  if(new URL(request.url).hostname==='api.twilio.com'){attempts++;throw Error('Synthetic uncertain SMS outcome')}
+  return Response.json({id:'synthetic-platter-8903'})
+ }})
+ try{
+  await finishSetup(h)
+  const tick=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+  await tick('2030-06-01T16:00:00Z')
+  const id=await approved(h);await h.cmd('proposal.send',{id,version:2})
+  let row=(await h.state()).proposals.find(p=>p.id===id)
+  const consent={id,version:row.version,consent:true,phone:'+12025550126',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-8904'}
+  await h.cmd('sms.configure',consent)
+  const input={id,message:'Review the proposal',requestId:'synthetic-platter-8905'}
+  await h.cmd('sms.send',input);assert.equal(attempts,1)
+  await h.cmd('sms.send',input);await tick('2030-06-01T16:15:00Z');assert.equal(attempts,1)
+  let history=(await h.send('/api/platter/sms?id='+id,undefined,h.owner)).value
+  assert.equal(history.messages[0].status,'held')
+  await h.cmd('proposal.send',{id,version:row.version})
+  await h.cmd('sms.send',{...input,requestId:'synthetic-platter-8906'},h.owner,409);assert.equal(attempts,1)
+  row=(await h.state()).proposals.find(p=>p.id===id);await h.cmd('sms.configure',{...consent,version:row.version})
+  // Restore removes this execution-only table. Retained consent cannot activate SMS on its own.
+  await h.db.prepare('DELETE FROM p_sms_authority').run()
+  await h.cmd('sms.send',{...input,requestId:'synthetic-platter-8907'},h.owner,409);assert.equal(attempts,1)
+  history=(await h.send('/api/platter/sms?id='+id,undefined,h.owner)).value;assert.equal(history.messages[0].status,'held')
+  const address='sms-sender@synthetic-platter.example';await h.send('/auth/invite',{email:address,role:'member',displayName:'SMS sender'},h.owner)
+  const member=await h.signIn(address),person=(await h.state(member)).actor
+  await h.cmd('sms.send',{id,message:'Outside scope',requestId:'synthetic-platter-8908'},member,403)
+  const client=(await h.state()).clients.find(c=>c.email===recipient),owned=await h.cmd('proposal.prepare',{...offer,clientId:client.id},member)
+  await h.cmd('proposal.approve',{id:owned.id,version:1,revision:1});await h.cmd('proposal.send',{id:owned.id,version:2},member)
+  const memberRow=(await h.state(member)).proposals.find(p=>p.id===owned.id)
+  await h.cmd('sms.configure',{id:owned.id,version:memberRow.version,consent:true,phone:'+12025550130',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-8909'},member)
+  await tick('2030-06-02T05:00:00Z')
+  await h.cmd('sms.send',{id:owned.id,kind:'manual',message:'Wait for morning',requestId:'synthetic-platter-8910'},member)
+  await h.cmd('member.set',{operatorId:person.id,version:0,role:'viewer',teams:[]})
+  await h.cmd('sms.send',{id:owned.id,message:'Role changed',requestId:'synthetic-platter-8911'},member,403)
+  await tick('2030-06-02T15:00:00Z');assert.equal(attempts,1,'demotion cancels the queued SMS without a provider call')
+
+ }finally{await h.close()}
+})
+
+test('SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links', {timeout:120000}, async()=>{
+ const messages=[],chats=[],intents=new Map();let h
+ h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9000'},outboundService:async request=>{
+  const url=new URL(request.url)
+  if(url.hostname==='api.resend.com'){messages.push(await request.json());return Response.json({id:'synthetic-platter-'+(9100+messages.length)})}
+  if(url.hostname==='slack.com'){
+   if(url.pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-9001'})
+   if(url.pathname==='/api/users.info')return Response.json({ok:true,user:{team_id:'synthetic-platter-9001',profile:{email:h.auth.OWNER_EMAIL}}})
+   if(url.pathname==='/api/conversations.open')return Response.json({ok:true,channel:{id:'synthetic-platter-9002'}})
+   assert.equal(url.pathname,'/api/chat.postMessage');chats.push(await request.json());return Response.json({ok:true})
+  }
+  assert.equal(url.hostname,'api.stripe.com')
+  if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-9003',default_currency:'usd'})
+  if(url.pathname==='/v1/payment_intents'&&request.method==='POST'){
+   const f=new URLSearchParams(await request.text()),id='synthetic-platter-9004',intent={id,amount:Number(f.get('amount')),currency:f.get('currency'),status:'requires_payment_method',client_secret:'synthetic-platter-9005',payment_method_types:['card'],metadata:{platter_proposal_id:f.get('metadata[platter_proposal_id]'),platter_revision:f.get('metadata[platter_revision]')}};intents.set(id,intent);return Response.json(intent)
+  }
+  assert.ok(intents.has(url.pathname.split('/').at(-1)));return Response.json(intents.get(url.pathname.split('/').at(-1)))
+ }})
+ try{
+  await finishSetup(h)
+  await h.cmd('provider.connect',{provider:'slack',version:0,token:'synthetic-platter-9006',consent:true})
+  await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-9007',publishableKey:'synthetic-platter-9008',consent:true})
+  const owner=(await h.state()).actor,route=await h.cmd('notification.route',{provider:'slack',event:'approval',kind:'direct',destination:'synthetic-platter-9009',operatorId:owner.id,consent:true})
+  await h.send('/auth/invite',{email:'watcher@synthetic-platter.example',role:'member',displayName:'Second watcher'},h.owner)
+  const member=await h.signIn('watcher@synthetic-platter.example'),person=(await h.state(member)).actor
+  const client=await h.cmd('client.save',{name:'Northstar Coffee',email:recipient}),p=await h.cmd('proposal.prepare',{...offer,clientId:client.id})
+  await h.cmd('payment.collection',{id:p.id,version:1,completion:'required',paymentMethods:['card']})
+  await h.cmd('proposal.approve',{id:p.id,version:2,revision:1})
+  const share=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(share.shareUrl).pathname
+  const watch={id:p.id,version:0,email:true,slackRoute:route.id,events:['view','comment','signed','paid'],consent:true}
+  await h.cmd('notification.watch',watch,member,403)
+  await h.cmd('proposal.share',{id:p.id,operatorId:person.id,shared:true})
+  await h.cmd('notification.watch',watch)
+  await h.cmd('notification.watch',{...watch,slackRoute:route.id},member,403)
+  await h.cmd('notification.watch',{...watch,slackRoute:null,events:['comment','signed','paid']},member)
+  const preferences=await h.send('/api/platter/watch?id='+p.id,undefined,member)
+  assert.equal(preferences.value.watcher.email_enabled,1);assert.equal(preferences.value.watcher.slack_route,null);assert.deepEqual(JSON.parse(preferences.value.watcher.events),['comment','signed','paid'])
+  assert.equal((await h.send('/api/platter/watch?id='+p.id)).status,401)
+  const tick=async()=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  const notices=()=>messages.filter(m=>['Proposal opened','Proposal comment','Proposal signed','Proposal payment recorded'].includes(m.subject))
+  assert.equal((await h.send(path)).status,200);await tick()
+  assert.equal(notices().length,1);assert.equal(chats.length,1)
+  assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+  const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code' ORDER BY created_at DESC").bind(p.id).first()).body.match(/\b\d{6}\b/)[0]
+  const verification=await h.send(path+'/action?name=code.verify',{code}),cookie=verification.cookie;assert.equal(verification.status,200,verification.text)
+  assert.equal((await h.send(path+'/action?name=question.create',{revision:1,section:'scope',text:'Synthetic private question'},cookie)).status,200);await tick()
+  assert.equal((await h.send(path+'/action?name=accept',{optionId:'one',name:'Avery Chen',consent:true},cookie)).status,200);await tick()
+  const payment=await h.send(path+'/payment.json',{method:'card',consent:true},cookie);assert.equal(payment.status,200,payment.text)
+  const saved=await h.db.prepare('SELECT * FROM p_collection_intents WHERE proposal_id=?').bind(p.id).first()
+  assert.equal((await h.send(path+'/payment-consent.json',{consent:true,cents:saved.cents},cookie)).status,200)
+  const intent=intents.get(saved.provider_intent);intent.status='succeeded';intent.latest_charge={id:'synthetic-platter-9010',paid:true,status:'succeeded',amount:intent.amount,currency:intent.currency}
+  const receipt=await h.send(path+'/payment-status.json',{},cookie);assert.equal(receipt.status,200,receipt.text);await tick()
+  const ownerMail=notices().filter(m=>m.to.includes(h.auth.OWNER_EMAIL)),memberMail=notices().filter(m=>m.to.includes(person.email))
+  assert.deepEqual(ownerMail.map(m=>m.subject),['Proposal opened','Proposal comment','Proposal signed','Proposal payment recorded'])
+  assert.deepEqual(memberMail.map(m=>m.subject),['Proposal comment','Proposal signed','Proposal payment recorded']);assert.equal(chats.length,4)
+  for(const notice of [...notices().map(m=>m.text),...chats.map(m=>m.text)]){assert.ok(notice.includes('/app/proposal?id='+p.id));assert.ok(!notice.includes('/p/'));assert.ok(!notice.includes('Synthetic private question'));assert.ok(!notice.includes('2400'))}
+  const link=new URL(ownerMail[0].text.match(/https:\/\/[^\s]+/)[0]);const signedOut=await h.send(link.pathname+link.search);assert.equal(signedOut.status,303);assert.match(signedOut.headers.get('location'),/^\/signin\?/);assert.equal((await h.send(link.pathname+link.search,undefined,h.owner)).status,200)
+  await Promise.all([tick(),tick()]);assert.equal(notices().length,7);assert.equal(chats.length,4)
+  await h.send(path+'/payment-status.json',{},cookie);await tick();assert.equal(notices().length,7,'reconciliation never creates another paid notification')
+  await h.send(path,undefined,cookie);await tick();assert.equal(notices().length,7,'only the first client view notifies watchers')
+ }finally{await h.close()}
+})
+
+test('SEND-005 personal notification revocation and lost proposal scope suppress queued and future sends', {timeout:120000},async()=>{
+ const h=await notificationFixture()
+ try{
+  const p=await h.prepare('Scoped watcher'),watch={id:p.id,version:0,email:true,events:['view'],consent:true}
+  await h.cmd('notification.watch',{...watch,consent:false},h.owner,400)
+  await h.cmd('notification.watch',{...watch,events:['unknown']},h.owner,400)
+  await h.cmd('notification.watch',watch)
+  await h.cmd('notification.watch',watch,h.owner,409)
+  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const sent=await h.cmd('proposal.send',{id:p.id,version:2}),path=new URL(sent.shareUrl).pathname
+  await h.send(path)
+  await h.cmd('notification.watch',{...watch,version:1,email:false,events:[]})
+  await h.tick(Date.now());assert.equal(h.messages.filter(m=>m.subject==='Proposal opened').length,0)
+  await h.send('/auth/invite',{email:'watching-sales@synthetic-platter.example',role:'member',displayName:'Watching sales'},h.owner)
+  const cookie=await h.signIn('watching-sales@synthetic-platter.example'),person=(await h.state(cookie)).actor
+  await h.cmd('proposal.share',{id:p.id,operatorId:person.id,shared:true})
+  await h.cmd('notification.watch',watch,cookie)
+  await h.cmd('proposal.share',{id:p.id,operatorId:person.id,shared:false})
+  await h.send(path);await h.tick(Date.now());assert.equal(h.messages.filter(m=>m.subject==='Proposal opened').length,0)
+  assert.equal((await h.send('/api/platter/watch?id='+p.id,undefined,cookie)).status,403)
+ }finally{await h.close()}
+})
+
+test('SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash', {timeout:120000},async()=>{
+ const {createHash}=await import('node:crypto'),texts=[]
+ const h=await harness({origin:'https://platter.example',assetsDirectory:'public',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9200',TWILIO_ACCOUNT_SID:'synthetic-platter-9201',TWILIO_AUTH_TOKEN:'synthetic-platter-9202',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
+  if(new URL(request.url).hostname==='api.twilio.com'){texts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(9300+texts.length)},{status:201})}
+  return Response.json({id:'synthetic-platter-9203'})
+ }})
+ try{
+  await finishSetup(h)
+  const tick=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+  await tick('2030-06-01T13:00:00Z')
+  const id=await approved(h),sent=await h.cmd('proposal.send',{id,version:2}),path=new URL(sent.shareUrl).pathname,row=(await h.state()).proposals.find(p=>p.id===id)
+  await h.cmd('signer.method',{id,version:row.version,method:'SMS code'},h.owner,409)
+  await h.cmd('sms.configure',{id,version:row.version,consent:true,phone:'+12025550128',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-9204'})
+  await h.cmd('signer.method',{id,version:row.version,method:'SMS code'})
+  assert.equal((await h.send(path+'/action?name=code.request',{})).status,429);assert.equal(texts.length,0,'6 am text codes are refused during quiet hours')
+  await tick('2030-06-01T15:00:00Z')
+  assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true})).status,401)
+  assert.equal((await h.send(path+'/action?name=code.request',{})).status,200);assert.equal(texts.length,1)
+  const first=texts[0].Body.match(/\b\d{6}\b/)[0],wrong=first==='000000'?'000001':'000000'
+  assert.equal((await h.send(path+'/action?name=code.request',{})).status,429)
+  for(let i=0;i<5;i++)assert.equal((await h.send(path+'/action?name=code.verify',{code:wrong})).status,401)
+  assert.equal((await h.send(path+'/action?name=code.verify',{code:first})).status,401,'the correct code cannot bypass an exhausted attempt limit')
+  await h.cmd('signer.method',{id,version:row.version,method:'mailbox code'},h.owner,409)
+  await tick('2030-06-01T15:01:00Z')
+  assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+  const code=texts.at(-1).Body.match(/\b\d{6}\b/)[0],verified=await h.send(path+'/action?name=code.verify',{code});assert.equal(verified.status,200,verified.text)
+  assert.equal((await h.send(path+'/action?name=code.verify',{code})).status,401,'the code is single use')
+  assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},verified.cookie)).status,200)
+  assert.equal((await h.db.prepare('SELECT method FROM p_signature_facts WHERE proposal_id=?').bind(id).first()).method,'SMS code')
+  assert.equal((await h.send(path+'/certificate.json')).status,401)
+  const certificate=await h.send(path+'/certificate.json',undefined,verified.cookie);assert.equal(certificate.status,200,certificate.text)
+  assert.equal(certificate.value.signers[0].method,'SMS code');assert.equal(certificate.value.signers[0].verifiedAt,Date.parse('2030-06-01T15:01:00Z'));assert.equal(certificate.value.signers[0].acceptedAt,Date.parse('2030-06-01T15:01:00Z'))
+  assert.equal(certificate.value.location,'not recorded');assert.equal(certificate.value.userAgent,'not recorded')
+  const download=async(url,cookie)=>{const r=await h.mf.dispatchFetch(h.origin+url,{headers:{cookie},redirect:'manual'});assert.equal(r.status,200);return Buffer.from(await r.arrayBuffer())}
+  const bytes=await download(path+'/agreement.pdf',verified.cookie),ownerBytes=await download('/api/platter/agreement.pdf?id='+id,h.owner)
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),certificate.value.documentSha256);assert.deepEqual(ownerBytes,bytes)
+  const pdf=await download(path+'/certificate.pdf',verified.cookie);assert.equal(pdf.subarray(0,4).toString(),'%PDF')
+  const {pdfPages}=await import('./pdf-document.mjs'),pages=await pdfPages(bytes);assert.ok(pages.join('\n').includes('SMS code'));assert.ok(!pages.join('\n').includes('Not signed'))
+  assert.equal((await h.send('/api/platter/certificate.json?id='+id)).status,401)
+  const mailbox=await approved(h),mailShare=await h.cmd('proposal.send',{id:mailbox,version:2}),mailPath=new URL(mailShare.shareUrl).pathname
+  await h.send(mailPath+'/action?name=code.request',{});assert.equal(texts.length,2,'default proposals still request a mailbox code')
+  const mailboxCode=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(mailbox).first()).body.match(/\b\d{6}\b/)[0]
+  const mailVerification=await h.send(mailPath+'/action?name=code.verify',{code:mailboxCode});assert.equal(mailVerification.status,200)
+  await h.send(mailPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},mailVerification.cookie)
+  const mailCertificate=await h.send(mailPath+'/certificate.json',undefined,mailVerification.cookie);assert.equal(mailCertificate.status,200,mailCertificate.text);assert.equal(mailCertificate.value.signers[0].method,'mailbox code')
+ }finally{await h.close()}
+})

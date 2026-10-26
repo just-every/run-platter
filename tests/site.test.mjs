@@ -1295,3 +1295,51 @@ test('EDIT-003 linked and detached library insertion, frozen sending and scoped 
 })
 
 test('deposit collection settings, retained signatures, required and due completion at desktop and phone widths',{timeout:180000},()=>collectionBrowser())
+
+test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the compiled client at desktop and phone widths', {timeout:120000},async()=>{
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs')
+ let browser
+ try{
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  if(process.env.PLATTER_SCREENSHOTS)await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true})
+  for(const width of [1440,390]){
+   let h,edge,context
+   const texts=[]
+   try{
+    edge=await browserEdge()
+    h=await harness({entry:'dist/server/index.js',origin:edge.origin,assetsDirectory:'dist/client',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9400',TWILIO_ACCOUNT_SID:'synthetic-platter-9401',TWILIO_AUTH_TOKEN:'synthetic-platter-9402',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
+     if(new URL(request.url).hostname==='api.twilio.com'){texts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-9403'},{status:201})}
+     return Response.json({id:'synthetic-platter-9404'})
+    }})
+    edge.attach(h)
+    const finish=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(finish.status,303)
+    await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T12:00:00Z'),cron:'*/15 * * * *'})
+    const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
+    const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Text verified agreement',scope:'Synthetic studio scope',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+    await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const sent=await h.cmd('proposal.send',{id:p.id,version:2}),row=(await h.state()).proposals.find(row=>row.id===p.id)
+    await h.cmd('sms.configure',{id:p.id,version:row.version,consent:true,phone:'+12025550129',timeZone:'Etc/UTC',evidence:'synthetic-platter-9405'})
+    await h.cmd('signer.method',{id:p.id,version:row.version,method:'SMS code'})
+    context=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
+    const page=await context.newPage();assert.equal((await page.goto(sent.shareUrl)).status(),200)
+    await page.getByRole('heading',{name:'Verify by text',exact:true}).waitFor()
+    assert.equal(await page.locator('input[name="code"]').getAttribute('autocomplete'),'one-time-code')
+    if(process.env.PLATTER_SCREENSHOTS)await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-006-request-${width}.png`),fullPage:true})
+    await page.getByRole('button',{name:'Send verification code',exact:true}).click();assert.equal(texts.length,1)
+    await page.getByLabel('Text verification code',{exact:true}).fill(texts[0].Body.match(/\b\d{6}\b/)[0])
+    await page.getByRole('button',{name:'Verify text code',exact:true}).click()
+    await page.getByRole('heading',{name:'Accept this proposal',exact:true}).waitFor()
+    await page.locator('input[name="optionId"][value="one"]').check()
+    await page.getByLabel('Your full name',{exact:true}).fill('Avery Chen')
+    await page.locator('input[name="consent"]').check()
+    await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
+    await page.getByRole('heading',{name:'Agreement downloads',exact:true}).waitFor()
+    const download=page.waitForEvent('download');await page.getByRole('link',{name:'Signed agreement PDF',exact:true}).click();const file=await download;assert.equal(file.suggestedFilename(),'agreement.pdf')
+    const certificateDownload=page.waitForEvent('download');await page.getByRole('link',{name:'Certificate of completion',exact:true}).click();assert.equal((await certificateDownload).suggestedFilename(),'certificate.pdf')
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true)
+    // All current client controls have visible text; none needs an icon-only tooltip.
+    for(const button of await page.locator('button').all())assert.ok((await button.innerText()).trim(),'client controls have visible labels')
+    if(process.env.PLATTER_SCREENSHOTS)await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-006-complete-${width}.png`),fullPage:true})
+   }finally{await context?.close();await h?.close();await edge?.close()}
+  }
+ }finally{await browser?.close()}
+})

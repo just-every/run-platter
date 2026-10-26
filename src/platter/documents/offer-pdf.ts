@@ -13,7 +13,7 @@ function amount(cents: number, currency: string) {
 }
 
 /** Render the current offer only. Caller owns authorization and revision selection. */
-export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Array | ArrayBuffer)[] = [], items: unknown = [],media?:(id:string)=>Promise<Uint8Array>,mediaLink?:(id:string)=>string): Promise<Uint8Array> {
+export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Array | ArrayBuffer)[] = [], items: unknown = [],media?:(id:string)=>Promise<Uint8Array>,mediaLink?:(id:string)=>string,signer?:{name:string;email:string;method:string;acceptedAt:number;consent:string}): Promise<Uint8Array> {
  const options = typeof view.options === 'string' ? JSON.parse(view.options) : view.options
  need(Array.isArray(options), 'Offer options are missing')
  const selection = offerSelection(options,view.deposit_bps,optionId,items,view), selected = selection.option
@@ -29,9 +29,9 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   need(Number.isSafeInteger(cents) && cents >= 0 && Number.isSafeInteger(cents * depositBps), 'Invalid offer price')
   return view.payment_terms ? depositCents(cents,depositBps,view) : Math.round(cents * depositBps / 10000)
  }
- const pdf = await PdfText.create(revision, fontBytes,undefined,documentOf(view).brand)
+ const pdf = await PdfText.create(revision, fontBytes,signer?`Signed agreement, revision ${revision}`:undefined,documentOf(view).brand)
  pdf.document.setTitle(String(view.title ?? ''))
- pdf.document.setSubject(`Not signed, revision ${revision}`)
+ pdf.document.setSubject(`${signer?'Signed agreement':'Not signed'}, revision ${revision}`)
  pdf.document.setCreator('Platter')
  pdf.document.setProducer('Platter')
 
@@ -40,7 +40,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  if (view.clientName != null) pdf.text(`Client: ${view.clientName}`)
  if (view.clientEmail != null) pdf.text(`Client email: ${view.clientEmail}`)
  pdf.text(`Revision ${revision}`)
- pdf.text(`Not signed, revision ${revision}`)
+ pdf.text(`${signer?'Signed agreement':'Not signed'}, revision ${revision}`)
  pdf.gap()
  pdf.text(`Selected option: ${selected.label}`, 13)
  if(selected.discount&&!selected.concealDiscount)pdf.text(`Package discount: ${selected.discount.bps/100}% off ${amount(selected.discount.grossCents,currency)}; discount ${amount(selected.discount.cents,currency)}${selected.discount.fixedCents?`; fixed reduction ${amount(selected.discount.fixedCents,currency)}`:''}`)
@@ -98,5 +98,6 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   if (attachment.sha256) pdf.text(`SHA-256: ${attachment.sha256}`, 9)
   pdf.gap(6)
  }
+ if(signer){pdf.heading('Signature');pdf.text('Signed by: '+signer.name);pdf.text('Recipient: '+signer.email);pdf.text('Verification method: '+signer.method);pdf.text('Accepted at: '+new Date(signer.acceptedAt).toISOString());pdf.text('Consent: '+signer.consent)}
  return pdf.document.save()
 }

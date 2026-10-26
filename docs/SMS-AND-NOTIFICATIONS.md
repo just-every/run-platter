@@ -1,0 +1,31 @@
+# SMS, personal notifications and signer methods
+
+These native interfaces are available through the authenticated command endpoint at `/api/platter/command`. Send JSON with `name` and `input`, the current person's session, and this installation's Origin. Agent keys cannot configure or send SMS or choose notification preferences.
+
+## Text messages
+
+The runtime needs the private `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` bindings and the `TWILIO_FROM` sender binding. Installation setup does not yet collect these optional bindings. Production delivery requires the owner's registered US A2P or toll-free sender; provider-fake tests do not qualify a sender or establish carrier compliance. Development mode suppresses SMS transport. Configure the inbound Twilio webhook to `/api/platter/sms/inbound` and delivery callbacks to `/api/platter/sms/status` on the installation's HTTPS origin. Both require Twilio's account-bound HMAC signature; callbacks cannot activate consent.
+
+After sending an approved proposal invitation, use `sms.configure` with its `id`, current `version`, `consent: true`, a US `phone` in international format, the recipient-supplied IANA `timeZone`, and an `evidence` reference to explicit recorded recipient consent. Only a person with current Send authority can do this. No number or zone is inferred. Consent belongs to that exact revision and invitation. Reissuing an invitation requires fresh consent. Restored consent is historical and cannot send.
+
+Use `sms.send` with `id`, `message` and a unique `requestId`. The default kind is `invitation`; `kind: "manual"` requests a reminder. Platter adds the current invitation link and STOP and HELP instructions. A repeated request id returns the original attempt; changed text is refused. A manual reminder is limited to one per recipient calendar day. Quiet-hour messages wait for the next allowed time. Scheduled texts use the existing explicitly authorized reminder schedule, matching supplied recipient zone and cap. Disabling or changing the schedule prevents its queued texts from sending.
+
+`GET /api/platter/sms?id=…` returns the consenting person's record and the proposal's link-free message history to its current senders. Bearer invitation links and credentials are transport-only. Provider acceptance is distinct from delivered; signed callbacks update delivery status without regressing a terminal receipt. Uncertain sends remain held, without automatic retries. Withdrawal atomically cancels queued messages. Acceptance, decline, expiry, lost authority, invitation rotation and STOP prevent later sends. STOP applies to the number, including other proposals; START never restores sending authority. HELP returns sender-support instructions. STOP does not change email preferences.
+
+Conservative consent semantics are adopted pending ct approval. Completion texts, a sender settings interface and installer integration remain unfinished.
+
+## Personal activity notifications
+
+Use `notification.watch` with proposal `id`, preference `version` (zero initially), explicit `consent: true`, boolean `email`, and `events` selected from `view`, `comment`, `signed`, and `paid`. An empty event list disables these notices. Each person manages only their own preferences and must currently see the proposal. Preferences bind to the current revision; changing them starts from current events without replaying older activity.
+
+An optional `slackRoute` must name an active, admin-verified direct Slack route for that same person. Configure it through the existing `notification.route` interface; a channel or another person's direct route is refused. Other explicitly configured notification routes keep their own purposes and consent. Email goes only to the active person's sign-in address. `GET /api/platter/watch?id=…` reads that person's preferences.
+
+The Worker scheduler queues the first client view, client questions, signatures and verified received-payment records once per watcher and carrier. Notices contain generic event text and a session-protected proposal link, without proposal content, question text, prices or recipient credentials. Losing proposal scope, changing preferences, disabling the route or restoring an archive prevents queued outbound work. Provider uncertainty is held, not retried automatically. Decline and failed-payment events, personal Teams, Nook and push preferences, and a preference screen remain unfinished.
+
+## Text-code signing and retained certificates
+
+Mailbox code remains the default. A current sender selects `signer.method` with proposal `id`, current `version`, and `method: "SMS code"` only after recording the SMS consent above. The current invitation must not already have requested or verified a code; reissue before changing an identity check already in use. The existing client form then requests and verifies a text code. Codes expire after ten minutes, permit five wrong attempts, require a minute between generations, have a ten-generation limit and are single use. Quiet hours and STOP apply. A changed SMS consent record invalidates outstanding text verification.
+
+New signatures retain their actual method, verification time when known, acceptance time and consent. Completed single-client agreements expose `/p/<invitation>/agreement.pdf`, `/p/<invitation>/certificate.pdf` and `/p/<invitation>/certificate.json` to the verified signer. Current scoped people can use the corresponding `/api/platter/` download routes with proposal `id`. The client page links the PDFs. A required deposit must be complete first. The immutable signed PDF hash matches the certificate; the same bytes are retained in archives. Historical signatures without retained method facts are refused rather than assigned a method retroactively. Location and user agent are explicitly labelled not recorded.
+
+Multiple signers, ID verification, link-only signing, completion email attachments and full certificate metadata remain unfinished. The consent default also applies to SMS identity verification pending ct approval.

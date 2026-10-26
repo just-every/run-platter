@@ -48,6 +48,9 @@ export interface Bindings {
  GOOGLE_MAIL_CLIENT_SECRET?: string
  MICROSOFT_MAIL_CLIENT_ID?: string
  MICROSOFT_MAIL_CLIENT_SECRET?: string
+ TWILIO_ACCOUNT_SID?: string
+ TWILIO_AUTH_TOKEN?: string
+ TWILIO_FROM?: string
  MAIL_ACCOUNT_ID?: string
 }
 

@@ -1,3 +1,4 @@
+import { queueWatcherEvents } from './watchers'
 import { queueExpiryNotices } from './expiry'
 import type { Bindings } from '../../auth.server'
 import { currentTime } from '../expiry-time'
@@ -22,6 +23,7 @@ export async function runNotifications(env:Bindings){
    await notificationWrite(env,route.event+':'+event.id,event.proposal_id,route.event==='signed'?'Proposal signed':'Follow-up updated',env.AUTH_ORIGIN+'/app/proposal?id='+encodeURIComponent(event.proposal_id),at,null,null,route.id).run()
   }
  }
+ await queueWatcherEvents(env)
  await queueExpiryNotices(env)
  await flushNotifications(env)
 }

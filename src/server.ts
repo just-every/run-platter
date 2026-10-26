@@ -1,3 +1,4 @@
+import { runSms } from './platter/sms'
 import { runNotifications } from './platter/notifications/scheduled'
 import { withDemo } from '@runeditrun/rer/internal/modules/demo/index.mjs'
 import { platterResponse } from './platter/http'
@@ -48,6 +49,7 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
   async scheduled(controller, env) {
     await runExpiry(runtimeBindings(env), controller.scheduledTime)
     await runReminders(runtimeBindings(env), controller.scheduledTime)
+    await runSms(runtimeBindings(env))
     await runDueReports(runtimeBindings(env), controller.scheduledTime)
     await runNotifications(runtimeBindings(env))
   },

@@ -1,3 +1,5 @@
+import { signerMethodCommand } from './signer-methods'
+import { smsCommand } from './sms'
 import { surchargeCommand } from './collection-fees'
 import { collectionPolicyCommand } from './collection-policy'
 import { scheduleInput, editableTerms, paymentTerms } from './payment-terms'
@@ -59,6 +61,8 @@ export function proposalFields(p:Record<string,unknown>){
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
+ if(name==='signer.method')return signerMethodCommand(env,a,p)
+ if(name.startsWith('sms.'))return smsCommand(env,a,name,p)
  if(name.startsWith('notification.'))return notificationCommand(env,a,name,p)
  if(name.startsWith('team.')||name.startsWith('member.')||name==='proposal.share')return teamCommand(db,a,name,p)
  if(name.startsWith('approval.')||name==='proposal.approve'||name==='proposal.reject')return approvalCommand(env,a,name,p)

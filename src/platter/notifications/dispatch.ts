@@ -1,3 +1,4 @@
+import { activeWatcher } from './watchers'
 import type { Bindings } from '../../auth.server'
 import { demoEffect } from '@runeditrun/rer/internal/modules/demo/index.mjs'
 import { operatorMail } from '../../mail.server.mjs'
@@ -34,6 +35,7 @@ export async function flushNotifications(env:Bindings) {
  const db=env.DB,rows=(await db.prepare("SELECT * FROM p_notification_outbox WHERE status='pending' ORDER BY created_at,id LIMIT 100").all<any>()).results
  for(const row of rows){
   const allowed=async()=>{
+   if(row.watcher_id&&!await activeWatcher(env,row))return false
    if(row.event_key.startsWith('expiry:')){const { activeExpiryNotice }=await import('./expiry');if(!await activeExpiryNotice(env,row))return false}
    if(row.request_id){const r=await db.prepare('SELECT r.* FROM p_approval_requests r JOIN p_notification_authority a ON a.request_id=r.id WHERE r.id=?').bind(row.request_id).first<any>();if(!r||!await activeRequest(env,r))return false;if(row.recipient){const person=await actorById(db,r.approver_id);if(person?.email!==row.recipient)return false}}
    if(row.route_id){const r=await db.prepare('SELECT * FROM p_notification_routes WHERE id=?').bind(row.route_id).first<any>();if(!r||!await routeAvailable(env,r))return false;if(r.kind==='direct'){const person=await actorById(db,r.operator_id);if(!person)return false;try{await permitted(db,person,row.proposal_id)}catch{return false}}}

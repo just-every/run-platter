@@ -1,3 +1,6 @@
+import { agreementArtifact } from './documents/agreement'
+import { watcherState } from './notifications/watchers'
+import { smsHistory, smsWebhook } from './sms'
 import { clientCollection, authorizeCollection } from './collection'
 import { ensurePdfSearch } from './documents/pdf-search'
 import { searchCandidates } from './search'
@@ -54,11 +57,13 @@ export async function platterResponse(request:Request,original:Bindings):Promise
  let actor:Actor|undefined;const requestedBack=new URL(url.searchParams.get('returnTo')||'/app',env.AUTH_ORIGIN);const back=requestedBack.origin===env.AUTH_ORIGIN&&pages.has(requestedBack.pathname)?requestedBack.pathname+requestedBack.search:'/app';let context:any,submitted:Record<string,unknown>|undefined
  try{
   need(url.origin===env.AUTH_ORIGIN&&(!request.headers.has('host')||request.headers.get('host')===url.host),'Wrong application origin',403);need(['GET','POST'].includes(request.method),'Method not allowed',405)
+  if(path==='/api/platter/sms/status'||path==='/api/platter/sms/inbound')return await smsWebhook(request,env,path.endsWith('/status'))
   if(path==='/api/platter/client-mail-replies')return await clientMailReplyResponse(request,env)
   if(path==='/api/platter/question-replies')return await questionReplyResponse(request,env)
   if(path==='/api/platter/mail/events')return await deliveryWebhook(request,env)
   if(request.method==='POST'&&!isAgent)need(request.headers.get('origin')===env.AUTH_ORIGIN&&request.headers.get('sec-fetch-site')!=='cross-site','Cross-site request refused',403)
-  if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/action|\/payment\.json|\/payment-consent\.json|\/payment-status\.json|\/download\.pdf|\/data\.json|\/attachments\/([\w-]+)|\/media\/([\w-]+))?$/);need(match,'Invitation not found',404);const withdrawn=await env.DB.prepare('SELECT contact_email FROM p_withdrawn_links WHERE token=?').bind(match[1]).first<{contact_email:string}>();if(withdrawn)return path.endsWith('.json')?json({error:'Proposal withdrawn',contact:withdrawn.contact_email},410):withdrawnPage(withdrawn.contact_email);context=await clientContext(env,match[1],request)
+  if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/action|\/agreement\.pdf|\/certificate\.json|\/certificate\.pdf|\/payment\.json|\/payment-consent\.json|\/payment-status\.json|\/download\.pdf|\/data\.json|\/attachments\/([\w-]+)|\/media\/([\w-]+))?$/);need(match,'Invitation not found',404);const withdrawn=await env.DB.prepare('SELECT contact_email FROM p_withdrawn_links WHERE token=?').bind(match[1]).first<{contact_email:string}>();if(withdrawn)return path.endsWith('.json')?json({error:'Proposal withdrawn',contact:withdrawn.contact_email},410):withdrawnPage(withdrawn.contact_email);context=await clientContext(env,match[1],request)
+   if(['/agreement.pdf','/certificate.json','/certificate.pdf'].includes(match[2])){need(request.method==='GET','Use an agreement download',405);return await agreementArtifact(env,context.row.id,match[2].slice(1),{client:context})}
    if(match[2]==='/payment.json'||match[2]==='/payment-status.json'||match[2]==='/payment-consent.json'){need(request.method==='POST','Use a payment submission',405);const result=match[2]==='/payment-consent.json'?await authorizeCollection(env,context,await body(request)):await clientCollection(env,context,await body(request),match[2]==='/payment-status.json');await recordAudit(env.DB,{id:context.row.client_id,role:'client'},match[2]==='/payment-consent.json'?'payment.authorize':match[2]==='/payment.json'?'payment.prepare':'payment.refresh',context.row.id);return json(result)}
    if(request.method==='GET'&&match[4])return await documentMedia(env.DB,selectedContent(snapshot(context.row),context.optionId,context.selection.items),match[4])
    if(match[2]==='/data.json'){need(request.method==='GET','Method not allowed',405);const data=await clientData(env,context);await recordAudit(env.DB,{id:context.row.client_id,role:'client'},'proposal.data',context.row.id);return json(data)}
@@ -88,6 +93,9 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   if(request.method==='GET'){
    const media=path.match(/^\/api\/platter\/document-media\/([\w-]+)\/([\w-]+)$/);if(media){const row=await permitted(env.DB,actor,media[1]);return await documentMedia(env.DB,negotiatedView(row,await pendingNegotiation(env.DB,row.id)),media[2])}
    const dispute=path.match(/^\/api\/platter\/disputes\/([^/]+)\/evidence\.pdf$/);if(dispute){const response=await disputePdf(env,actor,decodeURIComponent(dispute[1]),url.searchParams.get('submission'),url.searchParams.get('packet'));await recordAudit(env.DB,actor,'dispute.evidence',decodeURIComponent(dispute[1]));return response}
+   if(path==='/api/platter/agreement.pdf'||path==='/api/platter/certificate.pdf'||path==='/api/platter/certificate.json')return await agreementArtifact(env,String(url.searchParams.get('id')),path.split('/').at(-1)!,{actor})
+   if(path==='/api/platter/watch')return json({watcher:await watcherState(env,actor,url.searchParams.get('id'))})
+   if(path==='/api/platter/sms')return json(await smsHistory(env,actor,url.searchParams.get('id')))
    if(path==='/api/platter/internal-pricing.pdf'){const response=await internalPricingPdf(env,actor,url.searchParams);await recordAudit(env.DB,actor,'pricing.export',String(url.searchParams.get('id')));return response}
    if(path==='/api/platter/business-original')return await businessOriginal(env,actor,url.searchParams)
    if(path==='/api/platter/business-records'){need(actor.role==='owner','Only the owner reads imported business records',403);return json(await businessRecords(env.DB,actor))}

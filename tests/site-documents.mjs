@@ -661,7 +661,7 @@ test('COLLAB-002 internal comment, resolution and dated assignment work at deskt
     await panel.getByText('Assign a section',{exact:true}).click()
     const assignment=panel.locator('form').filter({has:page.getByRole('button',{name:'Assign section',exact:true})})
     await assignment.getByLabel('Block',{exact:true}).selectOption('block:synthetic-platter-9002')
-    await assignment.getByLabel('Due date',{exact:true}).fill('2030-03-04');await assignment.getByRole('checkbox').check();await assignment.getByRole('button',{name:'Assign section',exact:true}).click()
+    await assignment.getByLabel('Assignment due date',{exact:true}).fill('2030-03-04');await assignment.getByRole('checkbox').check();await assignment.getByRole('button',{name:'Assign section',exact:true}).click()
     await page.waitForLoadState('load');assert.match(await panel.innerText(),/2030-03-04/);await capture('assigned')
     const stored=await (await context.request.get(app.origin+'/api/platter/state')).json(),threads=stored.proposals[0].collaboration.threads
     assert.equal(threads.length,2);assert.ok(threads.find(t=>t.kind==='comment').resolved_at);assert.equal(threads.find(t=>t.kind==='assignment').block_id,'block:synthetic-platter-9002')

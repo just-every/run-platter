@@ -1406,7 +1406,7 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 
 ## Status
 
-Status inventory reflects this committed tree.
+Judged from the code and tests at commit `436fbd19d74b1de2f0008dc99a5986ca7843bac4` (26 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |

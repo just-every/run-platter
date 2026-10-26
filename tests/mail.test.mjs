@@ -1332,6 +1332,7 @@ test('COLLAB-002 scoped colleagues comment, receive consented generic email and 
    assert.equal(h.chats.length,chat,action+' refusal sends no chat')
   }else{
    const prior=new Set(before.map(row=>row.id)),added=after.filter(row=>!prior.has(row.id)&&row.action===action)
+   assert.deepEqual(after.filter(row=>prior.has(row.id)),before,action+' retains prior audit rows')
    assert.equal(added.length,1,action+' writes exactly one audit row')
    const [row]=added
    assert.deepEqual({actor:row.actor_id,role:row.actor_role,action:row.action,subject:row.subject},{actor:actor.id,role:actor.role,action,subject:action==='collaboration.route'?input.routeId:input.id},action+' records the actual actor, role, action and subject')

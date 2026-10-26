@@ -875,7 +875,7 @@ test('FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, en
 
 async function notificationFixture(options={}) {
  const messages=[],chats=[];let uncertain=false
- const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7000'},outboundService:async request=>{
+ const h=await harness({assetsDirectory:'public',origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7000'},outboundService:async request=>{
   const url=new URL(request.url)
   if(url.hostname==='api.resend.com'){messages.push(await request.json());return Response.json({id:'synthetic-platter-7001'})}
   if(url.pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-7002'})
@@ -1312,3 +1312,75 @@ test('SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates ret
 })
 
 test('SEND-007 unsigned replacement preserves the frozen offer, revokes old authority and retains certificate custody through races', {timeout:120000},async()=>{const {replacementHttp}=await import('./signer-replacement-http.mjs');await replacementHttp()})
+
+test('COLLAB-002 scoped colleagues comment, receive consented generic email and chat, resolve and assign without exposing internal threads to clients', {timeout:120000},async()=>{
+ const h=await notificationFixture()
+ try{
+  await h.connect('slack');const owner=(await h.state()).actor
+  const route=await h.cmd('notification.route',{provider:'slack',event:'followup',kind:'channel',destination:'synthetic-platter-7003',consent:true})
+  await h.cmd('collaboration.route',{routeId:route.id},h.owner,400)
+  await h.cmd('collaboration.route',{routeId:route.id,consent:true})
+  await h.send('/auth/invite',{email:'colleague@synthetic-platter.example',role:'member',displayName:'Synthetic colleague'},h.owner)
+  const colleague=await h.signIn('colleague@synthetic-platter.example'),person=(await h.state(colleague)).actor
+  await h.cmd('member.set',{operatorId:person.id,version:0,role:'viewer',teams:[]})
+  assert.equal((await h.state(colleague)).actor.role,'viewer')
+  const p=await h.prepare('Internal collaboration'),input={id:p.id,version:1,blockId:'pricing',text:'synthetic-platter-private-comment',recipientId:person.id,consent:true}
+  await h.cmd('collaboration.comment',input,h.owner,403)
+  await h.cmd('proposal.share',{id:p.id,operatorId:person.id})
+  await h.cmd('collaboration.comment',{...input,consent:false},h.owner,400)
+  const startMail=h.messages.length,startChat=h.chats.length
+  const comment=await h.cmd('collaboration.comment',input)
+  assert.equal(h.messages.length,startMail+1);assert.equal(h.chats.length,startChat+1)
+  assert.deepEqual(h.messages.at(-1).to,[person.email]);assert.doesNotMatch(h.messages.at(-1).text,/synthetic-platter-private-comment|Internal collaboration/)
+  assert.doesNotMatch(h.chats.at(-1).value.text,/synthetic-platter-private-comment|colleague@/)
+  const link=h.messages.at(-1).text.match(/https:\/\/[^\s]+/)[0],url=new URL(link)
+  assert.equal((await h.send(url.pathname+url.search)).status,303)
+  const thread=(await h.state(colleague)).proposals.find(x=>x.id===p.id).collaboration.threads[0]
+  assert.equal(thread.id,comment.threadId);assert.equal(thread.block_id,'pricing');assert.equal(thread.recipient_id,person.id)
+  await h.cmd('collaboration.resolve',{id:p.id,version:1,threadId:thread.id,threadVersion:1},colleague)
+  await h.cmd('collaboration.resolve',{id:p.id,version:1,threadId:thread.id,threadVersion:1},colleague,409)
+  const assignment=await h.cmd('collaboration.assign',{...input,blockId:'scope',dueDate:'2030-03-04'})
+  let threads=(await h.state(colleague)).proposals.find(x=>x.id===p.id).collaboration.threads
+  assert.ok(threads.find(t=>t.id===thread.id).resolved_at)
+  assert.equal(threads.find(t=>t.id===assignment.threadId).due_date,'2030-03-04')
+  assert.equal(h.messages.at(-1).subject,'Section assigned');assert.equal(h.chats.at(-1).value.text.split('\n')[0],'Section assigned')
+  for(const bad of [{blockId:'missing'},{dueDate:'2030-02-30'},{version:0}])await h.cmd('collaboration.assign',{...input,blockId:'scope',dueDate:'2030-03-04',...bad},h.owner,bad.version===0?409:400)
+  await h.cmd('proposal.document',{id:p.id,version:1,document:{version:1,blocks:[{id:'synthetic-platter-block',type:'text',title:'Rich section',text:'Public block'}]}})
+  const current=(await h.state()).proposals.find(x=>x.id===p.id)
+  for(const blockId of ['scope','terms','block:synthetic-platter-block'])await h.cmd('collaboration.comment',{id:p.id,version:current.version,blockId,text:'synthetic-platter-rich-private'})
+  await h.connect('teams')
+  const teams=await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-7006',operatorId:owner.id,consent:true})
+  await h.cmd('collaboration.route',{routeId:teams.id,consent:true})
+  await h.cmd('collaboration.assign',{id:p.id,version:current.version,blockId:'terms',recipientId:owner.id,dueDate:'2030-03-05',consent:true})
+  assert.ok(h.chats.some(c=>c.url.includes('graph.microsoft.com')&&c.value.body.content.startsWith('Section assigned')))
+  h.uncertain(true)
+  await h.cmd('collaboration.comment',{id:p.id,version:current.version,blockId:'pricing',recipientId:person.id,text:'synthetic-platter-uncertain-private',consent:true})
+  const attempts=h.chats.length
+  await h.tick(Date.now());assert.equal(h.chats.length,attempts,'uncertain collaboration delivery is never retried')
+  h.uncertain(false)
+  await h.cmd('proposal.approve',{id:p.id,version:current.version,revision:current.revision})
+  const sent=await h.cmd('proposal.send',{id:p.id,version:current.version+1}),path=new URL(sent.shareUrl).pathname
+  await h.send(path+'/action?name=code.request',{})
+  const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(p.id).first()).body.match(/\b\d{6}\b/)[0]
+  const verified=await h.send(path+'/action?name=code.verify',{code})
+  const client=await h.send(path,undefined,verified.cookie),data=await h.send(path+'/data.json',undefined,verified.cookie)
+  for(const response of [client,data]){assert.equal(response.status,200,response.text);assert.doesNotMatch(response.text,/synthetic-platter-private-comment|synthetic-platter-rich-private|p_internal_threads|recipient_id/)}
+  const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId=one',{headers:{cookie:verified.cookie}})
+  assert.equal(pdf.status,200);const {pdfPages}=await import('./pdf-document.mjs');const pages=await pdfPages(Buffer.from(await pdf.arrayBuffer()))
+  assert.doesNotMatch(JSON.stringify(pages),/synthetic-platter-private-comment|synthetic-platter-rich-private|Section assignment/)
+  const accepted=await h.send(path+'/action?name=accept',{optionId:'one',name:'Synthetic client',consent:true},verified.cookie);assert.equal(accepted.status,200,accepted.text)
+  const agreement=await h.mf.dispatchFetch(h.origin+path+'/agreement.pdf',{headers:{cookie:verified.cookie}})
+  assert.equal(agreement.status,200);assert.doesNotMatch(JSON.stringify(await pdfPages(Buffer.from(await agreement.arrayBuffer()))),/synthetic-platter-private-comment|synthetic-platter-rich-private|Section assignment/)
+  const acceptedData=await h.send(path+'/data.json',undefined,verified.cookie);assert.equal(acceptedData.status,200);assert.doesNotMatch(acceptedData.text,/synthetic-platter-private-comment|synthetic-platter-rich-private/)
+  const agent=await h.cmd('agent.create',{label:'Synthetic drafting'})
+  const agentState=await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+agent.token})
+  assert.doesNotMatch(agentState.text,/synthetic-platter-private-comment|synthetic-platter-rich-private/)
+  // Removing a share ends the public read and write doors immediately.
+  await h.cmd('proposal.share',{id:p.id,operatorId:person.id,shared:false})
+  assert.ok(!(await h.state(colleague)).proposals.some(x=>x.id===p.id))
+  assert.equal((await h.send('/app/proposal?id='+p.id,undefined,colleague)).status,403)
+  await h.cmd('collaboration.resolve',{id:p.id,version:current.version+2,threadId:assignment.threadId,threadVersion:1},colleague,403)
+  const audit=await h.send('/api/platter/audit?action=collaboration.comment',undefined,h.owner)
+  assert.ok(audit.value.rows.some(r=>r.actor_id===owner.id))
+ }finally{await h.close()}
+})

@@ -16,3 +16,20 @@ The existing scheduled Worker processes notifications. Channel events contain ge
 Archives preserve requests, settings, route metadata and completed sender notice facts. They exclude provider secrets, queued notification bodies and all activation authority. Restoring history never sends notifications. Historical approval requests are retained for custody; they do not automatically reactivate.
 
 The explicit-consent default and limited channel disclosure await ct approval. The contract remains partial. Future Nook, mobile push, watcher, template and renewal work must extend these same public-door proofs before claiming completion.
+
+## Internal collaboration
+
+Open a proposal and use **Internal collaboration** to comment on its scope, pricing table, terms or any document block. Choose **Mention colleague** to name an active member who can view that proposal. Check the notice consent box to send a generic email and notices through configured chat routes. A named member can open the link under their existing session and choose **Resolve thread**. Members with proposal View access can comment and resolve; this grants no proposal editing, sending or approval authority.
+
+Choose **Assign a section**, its block, assignee and calendar due date, then explicitly authorize the notices. Assignment and comment history retain their block title, author, revision and time. Resolution preserves the thread. Internal threads never enter client pages, client API projections or proposal PDFs. They are not copied into proposal templates or duplicated proposals.
+
+An owner or admin can explicitly authorize an existing verified notification route for collaboration in **Settings**, under **Internal collaboration notices**. First create that route through the documented `notification.route` command. Direct notices match the named recipient; channel notices contain only generic text and a session-protected link. Revoking the original route with `notification.route.remove` or disconnecting its provider stops its collaboration notices too.
+
+The command endpoint also accepts:
+
+- `collaboration.comment`: proposal `id`, current `version`, `blockId` (`scope`, `pricing`, `terms`, or `block:` followed by a current document block id), `text`, optional `recipientId`, and explicit `consent: true` when mentioning a member.
+- `collaboration.assign`: proposal `id`, current `version`, `blockId`, `recipientId`, a valid `dueDate` in YYYY-MM-DD form and `consent: true`.
+- `collaboration.resolve`: proposal `id`, current `version`, `threadId` and current `threadVersion`.
+- `collaboration.route`: an existing verified `routeId` and `consent: true`; owner and admins only.
+
+These commands use existing sessions, live proposal scopes and transaction-time authority. Delivery rechecks current revision, both members and route consent before provider requests. Lost receipts are held without automatic retry. Archives preserve internal threads and event history but exclude queued notices and activation authority; a restore never sends them.

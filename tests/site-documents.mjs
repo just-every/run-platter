@@ -630,3 +630,58 @@ test('EDIT-003 linked and detached library insertion, frozen sending and scoped 
 })
 
 test('deposit collection settings, retained signatures, required and due completion at desktop and phone widths',{timeout:180000},()=>collectionBrowser())
+
+test('COLLAB-002 internal comment, resolution and dated assignment work at desktop and phone widths', {timeout:120000},async()=>{
+ let app,browser
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ try{
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp({scheduled:true,outboundService:async request=>{const url=new URL(request.url);if(url.pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-9010'});if(url.pathname==='/api/conversations.info')return Response.json({ok:true,channel:{id:'synthetic-platter-9011',is_member:true}});throw Error('Unexpected provider request')}})
+   const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage()
+    const claimed=await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic member'},maxRedirects:0});assert.equal(claimed.status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    const client=await cmd('client.save',{name:'Synthetic client',email:'synthetic-platter-9001@example.com'})
+    const p=await cmd('proposal.prepare',{clientId:client.id,title:'Synthetic collaboration',scope:'Public scope',optionOne:'One',priceOne:'100',optionTwo:'Two',priceTwo:'200',depositPercent:25,document:{version:1,blocks:[{id:'synthetic-platter-9002',type:'text',title:'Public section',text:'Public text'}]}})
+    await page.goto(app.origin+'/app/proposal?id='+p.id)
+    const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Internal collaboration',exact:true})})
+    const capture=async name=>{await page.evaluate(async()=>{await document.fonts.ready});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await panel.screenshot({path:join(screenshots,`COLLAB-002-${name}-${width}.png`)})}
+    await panel.getByText('Add internal comment',{exact:true}).click()
+    const comment=panel.locator('form').filter({has:page.getByRole('button',{name:'Post internal comment',exact:true})})
+    await comment.getByLabel('Block',{exact:true}).selectOption('pricing')
+    await comment.getByLabel('Internal comment',{exact:true}).fill('synthetic-platter-private-browser')
+    await comment.getByLabel('Mention colleague',{exact:true}).selectOption({label:'Synthetic member'})
+    await comment.getByRole('checkbox').check();await comment.getByRole('button',{name:'Post internal comment',exact:true}).click()
+    await page.waitForLoadState('load');assert.match(await panel.innerText(),/synthetic-platter-private-browser/);await capture('comment')
+    await panel.getByRole('button',{name:'Resolve thread',exact:true}).click();await page.waitForLoadState('load');assert.match(await panel.innerText(),/Resolved/);await capture('resolved')
+    await panel.getByText('Assign a section',{exact:true}).click()
+    const assignment=panel.locator('form').filter({has:page.getByRole('button',{name:'Assign section',exact:true})})
+    await assignment.getByLabel('Block',{exact:true}).selectOption('block:synthetic-platter-9002')
+    await assignment.getByLabel('Due date',{exact:true}).fill('2030-03-04');await assignment.getByRole('checkbox').check();await assignment.getByRole('button',{name:'Assign section',exact:true}).click()
+    await page.waitForLoadState('load');assert.match(await panel.innerText(),/2030-03-04/);await capture('assigned')
+    const stored=await (await context.request.get(app.origin+'/api/platter/state')).json(),threads=stored.proposals[0].collaboration.threads
+    assert.equal(threads.length,2);assert.ok(threads.find(t=>t.kind==='comment').resolved_at);assert.equal(threads.find(t=>t.kind==='assignment').block_id,'block:synthetic-platter-9002')
+    // Audit the existing document controls on the same changed proposal screen.
+    const tools=page.locator('.document-tool button:not(:disabled)'),count=await tools.count();assert.ok(count>0)
+    for(let i=0;i<count;i++){const tool=tools.nth(i);assert.equal(await tool.evaluate(node=>{node.focus();return getComputedStyle(document.getElementById(node.getAttribute('aria-describedby'))).visibility}),'visible')}
+    const tool=tools.first(),tip=page.locator('#'+await tool.getAttribute('aria-describedby'));await page.locator('h1').click();await tool.hover();await page.waitForTimeout(350);assert.equal(await tip.isVisible(),true)
+    await tool.focus()
+    if(screenshots)await page.locator('.document-editor').screenshot({path:join(screenshots,`COLLAB-002-tooltip-${width}.png`)})
+    await cmd('provider.connect',{provider:'slack',version:0,token:'synthetic-platter-9012',consent:true})
+    const route=await cmd('notification.route',{provider:'slack',event:'followup',kind:'channel',destination:'synthetic-platter-9011',consent:true})
+    await page.goto(app.origin+'/app/settings')
+    const settings=page.locator('section').filter({has:page.getByRole('heading',{name:'Internal collaboration notices',exact:true})})
+    assert.match(await settings.innerText(),/verified chat destination/)
+    await settings.getByLabel('Verified chat route',{exact:true}).selectOption(route.id)
+    await settings.getByRole('checkbox').check();await settings.getByRole('button',{name:'Authorize collaboration route',exact:true}).click()
+    assert.match(await settings.innerText(),/authorized/)
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+    if(screenshots)await settings.screenshot({path:join(screenshots,`COLLAB-002-settings-${width}.png`)})
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})

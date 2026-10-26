@@ -1,0 +1,16 @@
+import { collaborationBlocks } from '../collaboration'
+import { area, escape, field, form, hidden, panel, proposalPath, date } from './shared'
+export function collaborationPanel(p:any){
+ if(!p.collaboration)return ''
+ const path=proposalPath(p.id),base=hidden('id',p.id)+hidden('version',p.version)
+ const blocks='<label>Block<select name="blockId" aria-label="Block">'+collaborationBlocks(p).map(b=>`<option value="${escape(b.id)}">${escape(b.title)}</option>`).join('')+'</select></label>'
+ const people=(empty:boolean)=>'<label>'+ (empty?'Mention colleague':'Assign to')+'<select name="recipientId" aria-label="'+(empty?'Mention colleague':'Assign to')+'">'+(empty?'<option value="">No mention</option>':'')+p.collaboration.people.map((m:any)=>`<option value="${escape(m.id)}">${escape(m.name)}</option>`).join('')+'</select></label>'
+ const consent='<label><input type="checkbox" name="consent" value="yes">Send email and configured chat notices to this member</label>'
+ const threads=p.collaboration.threads.map((t:any)=>`<li><article><h3>${escape(t.kind==='assignment'?'Section assignment':'Internal comment')} · ${escape(t.block_title)}</h3><p class="preserve">${escape(t.text)}</p><p>${escape(t.author_name)} · Revision ${escape(t.revision)} · ${date(t.created_at)}${t.recipient_id?' · '+escape(t.recipient_name):''}${t.due_date?' · Due '+escape(t.due_date):''}</p>${t.resolved_at?'<p>Resolved · '+date(t.resolved_at)+'</p>':form('collaboration.resolve',path,base+hidden('threadId',t.id)+hidden('threadVersion',t.version)+'<button class="secondary">Resolve thread</button>')}</article></li>`).join('')
+ return panel('Internal collaboration','<p>Only members with access to this proposal can read these threads. They stay out of client pages and downloads.</p>'+ (threads?'<ul class="records">'+threads+'</ul>':'<p>No internal threads yet.</p>')+ '<details><summary>Add internal comment</summary>'+form('collaboration.comment',path,base+blocks+area('Internal comment','text','', 'required')+people(true)+consent+'<button>Post internal comment</button>')+'</details><details><summary>Assign a section</summary>'+form('collaboration.assign',path,base+blocks+people(false)+field('Due date','dueDate','','type="date" required')+consent+'<button>Assign section</button>')+'</details>','wide')
+}
+export function collaborationSettings(state:any){
+ if(!['owner','admin'].includes(state.actor.role))return ''
+ const routes=state.collaborationRoutes??[]
+ return panel('Internal collaboration notices','<p>Explicitly authorize an existing verified chat destination for generic internal mention and assignment notices. Members still need proposal access to open the link.</p>'+ (routes.length?form('collaboration.route','/app/settings','<label>Verified chat route<select name="routeId" aria-label="Verified chat route">'+routes.map((r:any)=>`<option value="${escape(r.id)}">${escape(r.provider)} · ${escape(r.kind)} · ${escape(r.destination)}${r.enabled?' · authorized':''}</option>`).join('')+'</select></label><label><input type="checkbox" name="consent" value="yes" required>I authorize internal collaboration notices to this destination</label><button>Authorize collaboration route</button>'):'<p>Set up a verified chat destination before authorizing collaboration notices.</p>'))
+}

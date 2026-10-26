@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { harness } from './harness.mjs'
 import { forwardProviderRequest } from './provider-network.mjs'
+import { captureRuntimeLog, databaseText, instrumentNumbers } from './instrument-scan.mjs'
 import { signedDeposit, signSentDeposit, collectionMethodInheritance } from './collection-journey.mjs'
 
 async function enterCard(frame,number){
@@ -14,7 +15,18 @@ async function enterCard(frame,number){
 
 async function payDeposit(page){
  const button=page.locator('[data-stripe-payment] button:not(:disabled)');await button.waitFor()
+ // Stripe resizes its card frame and the page scrolls to the focused status line: submit only once the button holds still.
+ await button.evaluate(async element=>{let last='',stable=0;for(let frame=0;frame<300&&stable<12;frame++){await new Promise(resolve=>requestAnimationFrame(resolve));const box=element.getBoundingClientRect(),key=[box.x,box.y,scrollY].map(Math.round).join();stable=key===last?stable+1:0;last=key}})
  await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/payment-consent.json')&&r.status()===200),button.press('Enter')])
+}
+
+
+async function completeAuthentication(page,button,width){
+ const box=await button.boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2
+ console.log('Authentication target at '+width+': '+JSON.stringify(await page.evaluate(([px,py])=>{const top=document.elementFromPoint(px,py);return {tag:top?.tagName,name:top?.getAttribute('name')?.slice(0,40),size:top?.getBoundingClientRect().toJSON()}},[x,y])))
+ await page.mouse.click(x,y)
+ const settled=await button.waitFor({state:'hidden',timeout:5000}).then(()=>true,()=>false)
+ if(!settled){console.log('Pointer click did not reach the Stripe test page at '+width+'; activating its button inside the frame');await button.evaluate(element=>element.click())}
 }
 
 export async function collectionBrowser({real=false}={}){
@@ -34,7 +46,7 @@ export async function collectionBrowser({real=false}={}){
   }
   return Response.json(intents.get(url.pathname.split('/').at(-1)))
  }
- const screenshots=process.env.PLATTER_SCREENSHOTS
+ const screenshots=process.env.PLATTER_SCREENSHOTS,log=real?captureRuntimeLog():null
  try{
   if(screenshots)await mkdir(screenshots,{recursive:true})
   browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
@@ -106,17 +118,20 @@ export async function collectionBrowser({real=false}={}){
      await payDeposit(page)
      let authentication
      for(let attempt=0;attempt<80&&!authentication;attempt++){
-      for(const challenge of page.frames()){const button=challenge.getByRole('button',{name:'Complete',exact:true});if(await button.isVisible().catch(()=>false)){authentication=button;break}}
+      for(const challenge of page.frames()){const button=challenge.locator('button',{hasText:/^\s*complete\s*$/i}).first();if(await button.isVisible().catch(()=>false)){authentication=button;break}}
       if(!authentication)await page.waitForTimeout(250)
      }
-     assert.ok(authentication,'Stripe shows its test authentication completion button');await capture('3ds-challenge');await authentication.click()
+     assert.ok(authentication,'Stripe shows its test authentication completion button');await capture('3ds-challenge');await completeAuthentication(page,authentication,width)
      await page.getByRole('heading',{name:'Deposit paid',exact:true}).waitFor();await capture('3ds-paid');console.log('PASS real 3-D Secure completion at '+width)
      }catch(error){authenticationFailures.push(error);console.log('3-D Secure challenge incomplete at '+width+': '+error.name+' '+error.message);console.log('Authentication buttons: '+JSON.stringify((await Promise.all(page.frames().map(f=>f.getByRole('button').allTextContents().catch(()=>[])))).flat()));if(screenshots)await page.screenshot({path:join(screenshots,`PAY-3ds-failed-${width}.png`),fullPage:true})}
     }
+    if(real){const stored=await databaseText(h.db);assert.ok(stored.tables>20&&stored.rows>0);assert.deepEqual(instrumentNumbers(stored.text),[],'No card or bank numbers anywhere in the database');console.log('PASS whole-database inspection at '+width+': '+stored.rows+' rows in '+stored.tables+' tables hold no payment instrument numbers')}
    }catch(error){if(page)console.log('Payment diagnostics: '+JSON.stringify({form:await page.locator('[data-stripe-payment]').evaluateAll(forms=>forms.map(f=>({valid:f.checkValidity(),disabled:f.querySelector('button').disabled,buttonType:f.querySelector('button').type,buttonOwnsForm:f.querySelector('button').form===f}))),states:(await h.db.prepare('SELECT status,authorized_at IS NOT NULL AS authorized FROM p_collection_intents').all()).results}));if(screenshots&&page)await page.screenshot({path:join(screenshots,`PAY-failed-${width}.png`),fullPage:true}).catch(()=>{});throw error}finally{await context.close();await h.close()}
   }
+  if(real){assert.deepEqual(instrumentNumbers(log.text()),[],'No card or bank numbers in the runtime log');console.log('PASS runtime-log inspection: '+log.text().length+' characters hold no payment instrument numbers')}
   if(authenticationFailures.length)throw new AggregateError(authenticationFailures,'The real 3-D Secure challenges did not complete')
  }finally{
+  log?.stop()
   await browser?.close()
   if(real)for(const id of intents.keys()){const value=await provider('payment_intents/'+id);if(value.status==='succeeded')await provider('refunds',{payment_intent:id});else if(value.status!=='canceled')await provider('payment_intents/'+id+'/cancel',{})}
  }

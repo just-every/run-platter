@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "848eb005fbd284ddee691cf1ed73583e039479c3af8651544ea7f596732a891b",
+      "sha256": "e3f614074751f9734ea67379789e88305744b9872b4cca227dd6d2db49d6764a",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "1cda1f56937b34208b1bb2bdf7a05507637d275cd6e404df6bb522e94f4a6bb0",
+      "sha256": "80777315e27b93afedc6180f371fa2e4d536cdb2c436bdda2fd349c41c6f6583",
       "executable": false
     },
     "deploy-demo.json": {
@@ -138,7 +138,7 @@
       "executable": false
     },
     "docs/README.md": {
-      "sha256": "475c844d2e518c8c7fb3275c9ca9ba935a96ba3f8832c8b98446d6f7b5f4ddfa",
+      "sha256": "7938cbe2dcdb0531c079f823f22f6a1ae8c2ef1956a634e1d4be45b1b529edca",
       "executable": false
     },
     "docs/SOURCE.md": {
@@ -1118,7 +1118,7 @@
       "executable": false
     },
     "README.md": {
-      "sha256": "8c85eb2428133fc44feee7048b48d2a0fe5ce5f5117a2d2e744d0d2fd998bb3a",
+      "sha256": "26d2d8e7cc164845f01044879c40f985adfc3f8aada278dcd3c0ed02c3a6c07d",
       "executable": false
     },
     "RELEASE.json": {
@@ -3002,7 +3002,7 @@
       "executable": false
     },
     "tests/collection-browser.mjs": {
-      "sha256": "5c1699d39339108eabf9540de9b79cd1510ce8e6ec768513ca69524fc9ab0d49",
+      "sha256": "918c2ee11f5f7a866ee7cbdec8cd876c1e142c2ff7366b616f2327767836391c",
       "executable": false
     },
     "tests/collection-journey.mjs": {
@@ -3043,6 +3043,10 @@
     },
     "tests/inbound-mail-fixture.mjs": {
       "sha256": "b760fa38d7b8847b52209ced26c8ace5dfa24a6292328bda2e8ccf07713de76d",
+      "executable": false
+    },
+    "tests/instrument-scan.mjs": {
+      "sha256": "3023dc28e60c4631ccca0285b622172d45c86deae5d5df78275f613a74b426a9",
       "executable": false
     },
     "tests/library-fixture.mjs": {
@@ -3102,7 +3106,7 @@
       "executable": false
     },
     "tests/stripe-sandbox.mjs": {
-      "sha256": "5707f19a57ddd7449e9ee8dd97849942ec2ed27655df98c007363eeadc071506",
+      "sha256": "7f6990392702ee96b7ef3577550b324352bcd88e2b07c6b2e2459306bc3f9019",
       "executable": false
     },
     "tests/templates-http.mjs": {

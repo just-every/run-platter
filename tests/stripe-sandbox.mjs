@@ -51,8 +51,26 @@ try{
   assert.ok((await h.db.prepare('SELECT provider_mandate FROM p_collection_intents WHERE proposal_id=?').bind(bank.id).first()).provider_mandate,'Stripe mandate reference retained without bank numbers')
   console.log('ACH provider state: '+refreshed.value.status+'; mandate and settlement proof remain separate')
  }catch(error){console.log('ACH unavailable: '+error.message)}
+ {
+  const bank=await signedDeposit(h,'required',['ach']),started=await h.send(bank.path+'/payment.json',{method:'ach',consent:'yes'},bank.cookie);assert.equal(started.status,200,started.text)
+  const saved=await h.db.prepare('SELECT * FROM p_collection_intents WHERE proposal_id=?').bind(bank.id).first()
+  assert.equal((await h.send(bank.path+'/payment-consent.json',{consent:true,cents:saved.cents},bank.cookie)).status,200)
+  const method=await stripe('payment_methods',{type:'us_bank_account','us_bank_account[account_holder_type]':'individual','us_bank_account[account_number]':'000123456789','us_bank_account[routing_number]':'110000000','billing_details[name]':'Avery Chen'})
+  const pending=await stripe('payment_intents/'+saved.provider_intent+'/confirm',{payment_method:method.id,'mandate_data[customer_acceptance][type]':'online','mandate_data[customer_acceptance][online][ip_address]':'127.0.0.1','mandate_data[customer_acceptance][online][user_agent]':'Platter explicit sandbox journey',return_url:'https://example.com'})
+  assert.equal(pending.status,'requires_action');assert.equal(pending.next_action.type,'verify_with_microdeposits')
+  let waiting=await h.send(bank.path+'/payment-status.json',{},bank.cookie)
+  assert.equal(waiting.value.status,'requires_action');assert.equal(waiting.value.complete,false)
+  assert.match((await h.send(bank.path,undefined,bank.cookie)).text,/Payment authentication required/)
+  await stripe('payment_intents/'+saved.provider_intent+'/verify_microdeposits',{descriptor_code:'SM11AA'})
+  waiting=await h.send(bank.path+'/payment-status.json',{},bank.cookie)
+  for(let attempt=0;attempt<30&&waiting.value.status==='processing';attempt++){await new Promise(resolve=>setTimeout(resolve,4000));waiting=await h.send(bank.path+'/payment-status.json',{},bank.cookie)}
+  assert.ok(['processing','succeeded'].includes(waiting.value.status),'Verified microdeposits move the debit forward: '+waiting.value.status)
+  const retained=await h.db.prepare('SELECT authorization,provider_mandate FROM p_collection_intents WHERE proposal_id=?').bind(bank.id).first()
+  assert.match(retained.authorization,/one-time ACH bank debit of 600.00 USD/);assert.match(retained.authorization,/records the ACH debit mandate/);assert.ok(retained.provider_mandate,'Stripe mandate reference retained with the agreement')
+  console.log('PASS native ACH micro-deposit verification: requires_action held, descriptor code verified, debit '+waiting.value.status+'; authorization text and mandate reference retained')
+ }
  const rows=(await h.db.prepare('SELECT snapshot FROM p_acceptances UNION ALL SELECT authorization AS snapshot FROM p_collection_intents UNION ALL SELECT body AS snapshot FROM p_mail').all()).results
- for(const row of rows)assert.ok(!/4242424242424242|4000000000003220|000123456789/.test(row.snapshot),'No card or bank numbers retained')
+ for(const row of rows)assert.ok(!/4242424242424242|4000000000003220|000123456789|110000000/.test(row.snapshot),'No card or bank numbers retained')
  console.log('PASS retained agreement, authorization and mail inspection: no payment instrument numbers')
 }finally{
  let failed=false

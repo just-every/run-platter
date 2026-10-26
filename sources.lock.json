@@ -3094,7 +3094,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "1b7699a1cc88cd8fbd435f63650ea86e259fe2fedc653f883fe11e25ac97af7d",
+      "sha256": "788c0100f3be081f1426792beae8538986cf6787cd4a7cd55b7e5260dddc7a7a",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {
@@ -3138,7 +3138,7 @@
       "executable": false
     },
     "tests/signer-replacement-http.mjs": {
-      "sha256": "1e1f5adb995efa728e2bc2966a51cdbba77d350d48d84286430bcad80c8ec9bf",
+      "sha256": "3fe3642bdbd3b1e78b20c52b3548f2d1695882420964c4f3381c5cb6b52cb891",
       "executable": false
     },
     "tests/signer-replacement-journey.mjs": {

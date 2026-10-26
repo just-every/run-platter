@@ -1101,10 +1101,10 @@ test('SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically c
 })
 
 test('SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes cannot replay sending authority', {timeout:120000}, async()=>{
- let attempts=0
+ let attempts=0;const invitationMails=[]
  const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-8900',TWILIO_ACCOUNT_SID:'synthetic-platter-8901',TWILIO_AUTH_TOKEN:'synthetic-platter-8902',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
   if(new URL(request.url).hostname==='api.twilio.com'){attempts++;throw Error('Synthetic uncertain SMS outcome')}
-  return Response.json({id:'synthetic-platter-8903'})
+  invitationMails.push(await request.json());return Response.json({id:'synthetic-platter-8903'})
  }})
  try{
   await finishSetup(h)
@@ -1146,6 +1146,7 @@ test('SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes
   await tick('2030-06-03T05:00:00Z')
   await h.cmd('sms.send',{id:smsId,kind:'manual',message:'Wait for the signer',requestId:'synthetic-platter-8912'})
   const replacement=await h.cmd('signer.replace',{id:smsId,version:smsRow.version,recipient:'coo@northstar.example',reason:'COO signs instead'})
+  assert.deepEqual(invitationMails.at(-1).to,['coo@northstar.example']);assert.ok(invitationMails.at(-1).text.includes(replacement.shareUrl))
   assert.equal((await h.send(new URL(smsFirst.shareUrl).pathname)).status,410)
   assert.equal((await h.send(new URL(replacement.shareUrl).pathname+'/action?name=code.request',{})).status,409,'replacement retains the SMS requirement and requires new consent')
   assert.equal((await h.db.prepare('SELECT method FROM p_signer_methods WHERE proposal_id=?').bind(smsId).first()).method,'SMS code')

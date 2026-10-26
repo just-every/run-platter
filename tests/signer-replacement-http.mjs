@@ -11,7 +11,11 @@ export async function replacementHttp(){
   const offer={clientId:client.id,title:'Leadership agreement',scope:'Two production days.',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'}
   const prepare=async()=>{const p=await h.cmd('proposal.prepare',offer);await h.cmd('proposal.revise',{...offer,id:p.id,version:1,scope:'Three production days.'});await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});return {id:p.id,...await h.cmd('proposal.send',{id:p.id,version:3})}}
   const verify=async path=>{assert.equal((await h.send(path+'/action?name=code.request',{})).status,200);const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=(SELECT proposal_id FROM p_shares WHERE token=?) AND subject='Your Platter verification code' ORDER BY created_at DESC LIMIT 1").bind(path.split('/').at(-1)).first()).body.match(/\b\d{6}\b/)[0];const r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,200,r.text);return {cookie:r.cookie,code}}
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T16:00:00Z'),cron:'*/15 * * * *'})
   const p=await prepare(),oldPath=new URL(p.shareUrl).pathname,oldSession=await verify(oldPath)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T16:01:00Z'),cron:'*/15 * * * *'})
+  assert.equal((await h.send(oldPath+'/action?name=code.request',{})).status,200)
+  const outstanding=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code' AND body!='Verification code consumed'").bind(p.id).first()).body.match(/\b\d{6}\b/)[0]
   const before=(await h.state()).proposals.find(x=>x.id===p.id),approvals=(await h.db.prepare('SELECT * FROM p_approvals WHERE proposal_id=?').bind(p.id).all()).results,decisions=(await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(p.id).all()).results
   const input={id:p.id,version:before.version,recipient:'coo@northstar.example',reason:'The COO is our authorized signer.',mailSubject:'Please sign as COO',mailMessage:'Hi COO, review these exact terms.'}
   await h.cmd('signer.replace',{...input,version:1},h.owner,409)
@@ -29,6 +33,8 @@ export async function replacementHttp(){
   const message=after.invitationMessages.find(m=>m.recipient===input.recipient);assert.equal(message.subject,input.mailSubject);assert.equal(message.message,input.mailMessage)
   for(const door of ['', '/data.json','/download.pdf','/certificate.json','/certificate.pdf','/agreement.pdf','/attachments/synthetic-platter-1','/media/synthetic-platter-1','/payment.json','/payment-consent.json','/payment-status.json']){const r=await h.send(oldPath+door,undefined,oldSession.cookie);assert.equal(r.status,410,door);assert.ok(!r.text.includes(offer.title))}
   assert.equal((await h.send(oldPath+'/action?name=code.verify',{code:oldSession.code})).status,410)
+  assert.equal((await h.send(oldPath+'/action?name=code.verify',{code:outstanding})).status,410)
+  assert.equal((await h.send(path+'/action?name=code.verify',{code:outstanding})).status,401)
   assert.equal((await h.send(oldPath+'/action?name=accept',{name:'CEO',optionId:'one',consent:true},oldSession.cookie)).status,410)
   assert.equal((await h.send(path+'/action?name=accept',{name:'COO',optionId:'one',consent:true},oldSession.cookie)).status,401)
   const session=await verify(path);assert.equal((await h.send(path+'/action?name=accept',{name:'COO',optionId:'two',consent:true},session.cookie)).status,200)
@@ -40,9 +46,10 @@ export async function replacementHttp(){
   assert.deepEqual(await bytes('/api/platter/certificate.pdf?id='+p.id),certificate)
   assert.equal(createHash('sha256').update(document).digest('hex'),cert.value.documentSha256)
   const text=(await pdfPages(certificate)).join(' ');for(const value of [input.recipient,'ceo@northstar.example',input.reason,h.auth.OWNER_EMAIL])assert.ok(text.includes(value),value)
-  const accepted=(await h.state()).proposals.find(x=>x.id===p.id),history=(await h.db.prepare('SELECT * FROM p_signer_replacements').all()).results
+  const refusedState=await h.state(),accepted=refusedState.proposals.find(x=>x.id===p.id),history=(await h.db.prepare('SELECT * FROM p_signer_replacements').all()).results
   await h.cmd('signer.replace',{...input,version:accepted.version,recipient:'other@northstar.example'},h.owner,409)
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_signer_replacements').all()).results,history)
+  assert.deepEqual(await h.state(),refusedState,'signed replacement performs no writes or transport')
   // Replacement and withdrawal serialize on the same proposal version.
   const race=await prepare(),racePath=new URL(race.shareUrl).pathname,raceRow=(await h.state()).proposals.find(x=>x.id===race.id)
   const results=await Promise.all([h.send('/api/platter/command',{name:'signer.replace',input:{...input,id:race.id,version:raceRow.version}},h.owner),h.send('/api/platter/command',{name:'proposal.withdraw',input:{id:race.id,version:raceRow.version,reason:'Wrong recipient',notice:false}},h.owner)])

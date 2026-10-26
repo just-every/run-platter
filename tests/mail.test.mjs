@@ -1174,6 +1174,7 @@ test('SEND-005 personal Slack and email preferences deliver client open, comment
   const watch={id:p.id,version:0,email:true,slackRoute:route.id,events:['view','comment','signed','paid'],consent:true}
   await h.cmd('notification.watch',watch,member,403)
   await h.cmd('proposal.share',{id:p.id,operatorId:person.id,shared:true})
+  await h.cmd('notification.watch',{...watch,slackRoute:null},member,403)
   await h.cmd('notification.watch',watch)
   await h.cmd('notification.watch',{...watch,slackRoute:route.id},member,403)
   await h.cmd('notification.watch',{...watch,slackRoute:null,events:['comment','signed','paid']},member)
@@ -1214,23 +1215,35 @@ test('SEND-005 personal notification revocation and lost proposal scope suppress
   await h.cmd('notification.watch',watch)
   await h.cmd('notification.watch',watch,h.owner,409)
   await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const sent=await h.cmd('proposal.send',{id:p.id,version:2}),path=new URL(sent.shareUrl).pathname
-  await h.send(path)
-  await h.cmd('notification.watch',{...watch,version:1,email:false,events:[]})
-  await h.tick(Date.now());assert.equal(h.messages.filter(m=>m.subject==='Proposal opened').length,0)
   await h.send('/auth/invite',{email:'watching-sales@synthetic-platter.example',role:'member',displayName:'Watching sales'},h.owner)
   const cookie=await h.signIn('watching-sales@synthetic-platter.example'),person=(await h.state(cookie)).actor
   await h.cmd('proposal.share',{id:p.id,operatorId:person.id,shared:true})
   await h.cmd('notification.watch',watch,cookie)
-  await h.cmd('proposal.share',{id:p.id,operatorId:person.id,shared:false})
-  await h.send(path);await h.tick(Date.now());assert.equal(h.messages.filter(m=>m.subject==='Proposal opened').length,0)
-  assert.equal((await h.send('/api/platter/watch?id='+p.id,undefined,cookie)).status,403)
+  await h.cmd('notification.watch',{...watch,version:1,email:false,events:[]})
+  await h.send(path);await h.tick(Date.now());assert.equal(h.messages.filter(m=>m.subject==='Proposal opened').length,0,'owner opt-out suppresses every watcher')
+  await h.cmd('notification.watch',{...watch,version:2,email:false})
+  await h.tick(Date.now());assert.equal(h.messages.filter(m=>m.subject==='Proposal opened').length,0,'owner opt-in never replays a pre-consent view to another watcher')
+  const scoped=await h.prepare('Scope removed before first view')
+  await h.cmd('proposal.approve',{id:scoped.id,version:1,revision:1});const scopedSent=await h.cmd('proposal.send',{id:scoped.id,version:2})
+  await h.cmd('notification.watch',{...watch,id:scoped.id,email:false})
+  await h.cmd('proposal.share',{id:scoped.id,operatorId:person.id,shared:true})
+  await h.cmd('notification.watch',{...watch,id:scoped.id},cookie)
+  await h.cmd('proposal.share',{id:scoped.id,operatorId:person.id,shared:false})
+  await h.send(new URL(scopedSent.shareUrl).pathname);await h.tick(Date.now());assert.equal(h.messages.filter(m=>m.subject==='Proposal opened').length,0,'lost scope suppresses a genuinely new client event')
+  assert.equal((await h.send('/api/platter/watch?id='+scoped.id,undefined,cookie)).status,403)
  }finally{await h.close()}
 })
 
 test('SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash', {timeout:120000},async()=>{
- const {createHash}=await import('node:crypto'),texts=[]
+ const {createHash}=await import('node:crypto'),texts=[];let acceptedId
  const h=await harness({origin:'https://platter.example',assetsDirectory:'public',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9200',TWILIO_ACCOUNT_SID:'synthetic-platter-9201',TWILIO_AUTH_TOKEN:'synthetic-platter-9202',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
   if(new URL(request.url).hostname==='api.twilio.com'){texts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(9300+texts.length)},{status:201})}
+  const url=new URL(request.url)
+  if(url.hostname==='api.stripe.com'){
+   if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-9205'})
+   if(url.pathname.startsWith('/v1/charges/'))return Response.json({id:'synthetic-platter-9206',paid:true,status:'succeeded',amount:60000,amount_refunded:0,currency:'usd',metadata:{platter_proposal_id:acceptedId,platter_revision:'1'}})
+   return Response.json({id:'synthetic-platter-9207',charge:'synthetic-platter-9206',currency:'usd',amount:60000,status:'needs_response',evidence_details:{due_by:Date.parse('2030-06-02T12:00:00Z')/1000}})
+  }
   return Response.json({id:'synthetic-platter-9203'})
  }})
  try{
@@ -1238,6 +1251,7 @@ test('SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates ret
   const tick=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
   await tick('2030-06-01T13:00:00Z')
   const id=await approved(h),sent=await h.cmd('proposal.send',{id,version:2}),path=new URL(sent.shareUrl).pathname,row=(await h.state()).proposals.find(p=>p.id===id)
+  acceptedId=id
   await h.cmd('signer.method',{id,version:row.version,method:'SMS code'},h.owner,409)
   await h.cmd('sms.configure',{id,version:row.version,consent:true,phone:'+12025550128',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-9204'})
   await h.cmd('signer.method',{id,version:row.version,method:'SMS code'})
@@ -1266,6 +1280,13 @@ test('SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates ret
   const pdf=await download(path+'/certificate.pdf',verified.cookie);assert.equal(pdf.subarray(0,4).toString(),'%PDF')
   const {pdfPages}=await import('./pdf-document.mjs'),pages=await pdfPages(bytes);assert.ok(pages.join('\n').includes('SMS code'));assert.ok(!pages.join('\n').includes('Not signed'))
   assert.equal((await h.send('/api/platter/certificate.json?id='+id)).status,401)
+  await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-9208',consent:true})
+  const payment=await h.cmd('payment.bind',{id,chargeId:'synthetic-platter-9206',consent:true})
+  await h.cmd('dispute.import',{paymentId:payment.id,disputeId:'synthetic-platter-9207'})
+  const packet=await h.cmd('dispute.prepare',{disputeId:'synthetic-platter-9207',version:1,note:'Use the actual recorded SMS method'})
+  const disputeBytes=await download('/api/platter/disputes/synthetic-platter-9207/evidence.pdf?packet='+packet.id,h.owner),disputeText=(await pdfPages(disputeBytes)).join(' ')
+  assert.match(disputeText,/invitation SMS code verified/);assert.doesNotMatch(disputeText,/Verified mailbox|invitation mailbox code/);assert.match(disputeText,/Retained certificate.pdf is omitted/);assert.ok(disputeText.includes(certificate.value.documentSha256))
+
   const mailbox=await approved(h),mailShare=await h.cmd('proposal.send',{id:mailbox,version:2}),mailPath=new URL(mailShare.shareUrl).pathname
   await h.send(mailPath+'/action?name=code.request',{});assert.equal(texts.length,2,'default proposals still request a mailbox code')
   const mailboxCode=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(mailbox).first()).body.match(/\b\d{6}\b/)[0]

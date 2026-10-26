@@ -16,7 +16,7 @@ Conservative consent semantics are adopted pending ct approval. Completion texts
 
 ## Personal activity notifications
 
-Use `notification.watch` with proposal `id`, preference `version` (zero initially), explicit `consent: true`, boolean `email`, and `events` selected from `view`, `comment`, `signed`, and `paid`. An empty event list disables these notices. Each person manages only their own preferences and must currently see the proposal. Preferences bind to the current revision; changing them starts from current events without replaying older activity.
+Use `notification.watch` with proposal `id`, preference `version` (zero initially), explicit `consent: true`, boolean `email`, and `events` selected from `view`, `comment`, `signed`, and `paid`. An empty event list disables these notices. View alerts additionally require the current owner to opt in for that revision; owner revocation stops them for every watcher, and no pre-consent view is replayed. Each person manages only their own preferences and must currently see the proposal. Preferences bind to the current revision; changing them starts from current events without replaying older activity.
 
 An optional `slackRoute` must name an active, admin-verified direct Slack route for that same person. Configure it through the existing `notification.route` interface; a channel or another person's direct route is refused. Other explicitly configured notification routes keep their own purposes and consent. Email goes only to the active person's sign-in address. `GET /api/platter/watch?id=…` reads that person's preferences.
 

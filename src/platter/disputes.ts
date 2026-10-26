@@ -33,12 +33,13 @@ async function remoteDispute(env:Bindings,payment:any,id:string){
 }
 async function evidenceBytes(env:Bindings,payment:any,dispute:any,note:string){
  const accepted=await env.DB.prepare('SELECT * FROM p_acceptances WHERE proposal_id=? AND revision=?').bind(payment.proposal_id,payment.revision).first<any>();need(accepted,'The exact accepted agreement is unavailable',409)
- const paper=await paperRow(env.DB,payment.proposal_id)
+ const paper=await paperRow(env.DB,payment.proposal_id),method=await env.DB.prepare('SELECT method FROM p_signature_facts WHERE proposal_id=? AND revision=?').bind(payment.proposal_id,payment.revision).first<any>(),artifacts=await env.DB.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(payment.proposal_id).first<any>()
  const pdf=await PdfText.create(accepted.revision,await pdfFonts(env),'Acceptance record · revision '+accepted.revision)
  pdf.document.setTitle('Dispute acceptance evidence');pdf.text('Platter acceptance record',20)
  pdf.text('This packet reports retained acceptance facts. It is not a signature certificate.')
  pdf.heading('Not included')
- pdf.text('SIGN-005 signature certificate; TRACK-001 view analytics; PAY-001 and PAY-002 payment authorization artifacts are unavailable.')
+ pdf.text('SIGN-005 signature certificate is not included. TRACK-001 view analytics and PAY-001 and PAY-002 payment authorization artifacts are unavailable.')
+ if(artifacts){pdf.text('Retained agreement.pdf is omitted. SHA-256: '+JSON.parse(artifacts.facts).documentSha256);pdf.text('Retained certificate.pdf is omitted. SHA-256: '+await fingerprint(new Uint8Array(artifacts.certificate)))}
  pdf.text('Attachment contents are not included. Retained files omitted from this packet:')
  const files=copyAttachments(JSON.parse(accepted.snapshot).attachments)
  if(paper)files.push({id:paper.file_id,filename:paper.filename,mediaType:paper.media_type,size:paper.size,sha256:paper.sha256})
@@ -50,6 +51,8 @@ async function evidenceBytes(env:Bindings,payment:any,dispute:any,note:string){
  if(paper){
   pdf.text('Acceptance method: owner-attested upload. Platter did not verify the signature.')
   pdf.text('Recorded client email: '+accepted.email);pdf.text('Signed date as attested: '+paper.signed_on);pdf.text('Attested by: '+paper.attested_by);pdf.text('Attested at: '+new Date(paper.attested_at).toISOString())
+ }else if(method?.method==='SMS code'){
+  pdf.text('Acceptance method: invitation SMS code verified (SIGN-006).');pdf.text('Recorded recipient email: '+accepted.email)
  }else{
   pdf.text('Acceptance method: invitation mailbox code verified (SIGN-001 and SIGN-002).');pdf.text('Verified mailbox: '+accepted.email)
  }

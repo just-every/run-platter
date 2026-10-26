@@ -6,6 +6,9 @@ import { permitted } from '../permissions'
 import { routeAvailable } from './dispatch'
 
 const sources={view:{table:'p_audit',id:'id',proposal:'subject',filter:"action='proposal.view' AND actor_role IN ('client','invitation')"},comment:{table:'p_questions',id:'id',proposal:'proposal_id',filter:'1'},signed:{table:'p_acceptances',id:'proposal_id',proposal:'proposal_id',filter:'1'},paid:{table:'p_payment_records',id:'id',proposal:'proposal_id',filter:'1'}} as const
+async function ownerViewConsent(db:D1Database,id:string,revision:number){
+ return await db.prepare("SELECT w.cursors FROM p_watchers w JOIN p_watcher_authority a ON a.watcher_id=w.id AND a.version=w.version JOIN oa_operators o ON o.id=w.operator_id WHERE w.proposal_id=? AND w.revision=? AND o.role='owner' AND o.status='active' AND EXISTS(SELECT 1 FROM json_each(w.events) WHERE value='view')").bind(id,revision).first<{cursors:string}>()
+}
 export async function watchCommand(env:Bindings,a:Actor,p:Record<string,unknown>){
  need(a.role!=='agent','A person chooses their own notifications',403)
  const db=env.DB,row=await permitted(db,a,p.id),at=await currentTime(db)
@@ -13,6 +16,7 @@ export async function watchCommand(env:Bindings,a:Actor,p:Record<string,unknown>
  need(Number(p.version??0)===(old?.version??0),'Notification preferences changed. Reload.',409)
  need(typeof p.email==='boolean','Choose whether to receive email');need(p.consent===true,'Explicitly authorize these personal notifications')
  const events=p.events;need(Array.isArray(events)&&events.length<=4&&events.every(e=>typeof e==='string'&&Object.hasOwn(sources,e))&&new Set(events).size===events.length,'Choose view, comment, signed or paid events')
+ if(events.includes('view')&&a.role!=='owner')need(await ownerViewConsent(db,row.id,row.revision),'The owner must opt in to view alerts for this revision first',403)
  const routeId=p.slackRoute?text(p.slackRoute,'a verified direct Slack route'):null
  let route:any
  if(routeId){route=await db.prepare("SELECT * FROM p_notification_routes WHERE id=? AND provider='slack' AND kind='direct' AND operator_id=?").bind(routeId,a.id).first<any>();need(route&&await routeAvailable(env,route),'Choose your verified active direct Slack route',403)}
@@ -32,6 +36,7 @@ export async function activeWatcher(env:Bindings,out:any){
  const actor=await actorById(env.DB,w.operator_id);if(!actor||(actor.memberVersion??0)!==w.member_version)return false
  try{const row=await permitted(env.DB,actor,w.proposal_id);if(row.revision!==w.revision)return false}catch{return false}
  const [,watcherId,version,kind]=out.event_key.split(':')
+ if(kind==='view'&&!await ownerViewConsent(env.DB,w.proposal_id,w.revision))return false
  if(watcherId!==w.id||Number(version)!==w.version||!JSON.parse(w.events).includes(kind))return false
  return out.route_id?w.slack_route===out.route_id:Boolean(w.email_enabled&&out.recipient===actor.email)
 }
@@ -41,7 +46,10 @@ export async function queueWatcherEvents(env:Bindings){
   const person=await actorById(db,w.operator_id);if(!person)continue
   const events=JSON.parse(w.events) as (keyof typeof sources)[],cursors=JSON.parse(w.cursors)
   for(const kind of events){
-   const s=sources[kind],rows=(await db.prepare('SELECT '+s.id+' AS event_id FROM '+s.table+' WHERE rowid>? AND '+s.proposal+'=? AND ('+s.filter+')'+(kind==='view'?" AND rowid=(SELECT MIN(rowid) FROM p_audit WHERE subject=? AND action='proposal.view' AND actor_role IN ('client','invitation'))":'')).bind(cursors[kind],w.proposal_id,...(kind==='view'?[w.proposal_id]:[])).all<any>()).results
+   const ownerConsent=kind==='view'?await ownerViewConsent(db,w.proposal_id,w.revision):null
+   if(kind==='view'&&!ownerConsent)continue
+   const cursor=kind==='view'?Math.max(cursors.view,JSON.parse(ownerConsent!.cursors).view):cursors[kind]
+   const s=sources[kind],rows=(await db.prepare('SELECT '+s.id+' AS event_id FROM '+s.table+' WHERE rowid>? AND '+s.proposal+'=? AND ('+s.filter+')'+(kind==='view'?" AND rowid=(SELECT MIN(rowid) FROM p_audit WHERE subject=? AND action='proposal.view' AND actor_role IN ('client','invitation'))":'')).bind(cursor,w.proposal_id,...(kind==='view'?[w.proposal_id]:[])).all<any>()).results
    for(const event of rows){
     const key='watch:'+w.id+':'+w.version+':'+kind+':'+event.event_id,subject={view:'Proposal opened',comment:'Proposal comment',signed:'Proposal signed',paid:'Proposal payment recorded'}[kind]
     const body=subject+'. Sign in to review: '+env.AUTH_ORIGIN+'/app/proposal?id='+encodeURIComponent(w.proposal_id)

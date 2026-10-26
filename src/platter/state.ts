@@ -60,7 +60,7 @@ export async function state(env:Bindings,a:Actor,candidateIds?:string[]){const d
  const negotiations=(await db.prepare('SELECT * FROM p_negotiations').all<any>()).results
  const deliveries=(await db.prepare("SELECT proposal_id,status FROM p_mail WHERE subject LIKE 'Your proposal:%' ORDER BY created_at DESC").all<any>()).results
  const papers=await paperRows(db)
- const [accepted,invoices,shares]=await Promise.all([db.prepare('SELECT * FROM p_acceptances').all<any>(),db.prepare('SELECT id,proposal_id,number,exported_at FROM p_invoices').all<any>(),canWork?db.prepare('SELECT proposal_id,token FROM p_shares').all<any>():Promise.resolve({results:[]})])
+ const [accepted,invoices,shares]=await Promise.all([db.prepare('SELECT a.*,f.method AS verification_method FROM p_acceptances a LEFT JOIN p_signature_facts f ON f.proposal_id=a.proposal_id').all<any>(),db.prepare('SELECT id,proposal_id,number,exported_at FROM p_invoices').all<any>(),canWork?db.prepare('SELECT proposal_id,token FROM p_shares').all<any>():Promise.resolve({results:[]})])
  const visible=new Set(proposals.map(p=>p.id)),personalTimeZone=(await db.prepare('SELECT time_zone FROM p_members WHERE operator_id=?').bind(a.id).first<any>())?.time_zone??await installationZone(db)
  const mailReplies=(await db.prepare('SELECT id,proposal_id,revision,client_id,client_email,claimed_from,spf_result,dkim_result,text,received_at FROM p_mail_replies ORDER BY received_at,id').all<any>()).results
  const mailAttributions=(await db.prepare('SELECT m.*,o.email AS actor_email FROM p_mail_attributions m JOIN oa_operators o ON o.id=m.actor_id ORDER BY m.occurred_at DESC,m.mail_id').all<any>()).results

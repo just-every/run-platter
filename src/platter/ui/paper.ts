@@ -21,7 +21,7 @@ export function paperAcceptanceForm(state: any, p: any, params = new URLSearchPa
 }
 
 export function acceptanceMethod(a: any, signedCopyBase?: string): string {
-  if (a.method !== 'upload') return '<dt>Acceptance method</dt><dd>Platter e-signature after mailbox verification</dd>'
+  if (a.method !== 'upload') return '<dt>Acceptance method</dt><dd>Platter e-signature after '+(a.verificationMethod==='SMS code'?'text-code verification':'mailbox verification')+'</dd>'
   const copy = a.signedCopy && signedCopyBase ? `<dt>Signed copy</dt><dd><a href="${signedCopyBase}${encodeURIComponent(a.signedCopy.id)}">${escape(a.signedCopy.filename)} · ${escape(a.signedCopy.size)} bytes</a></dd>` : ''
   return `<dt>Acceptance method</dt><dd>Accepted by upload: signed outside Platter. Platter did not verify this signature.</dd><dt>Signed on</dt><dd>${escape(a.signedOn)}</dd>${copy}<dt>Attested by</dt><dd>${escape(a.attestedBy)} · ${date(a.attestedAt)}</dd>`
 }

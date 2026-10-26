@@ -2682,7 +2682,7 @@
       "executable": false
     },
     "src/platter/signing.ts": {
-      "sha256": "a79d1906cc6a77d1df82412e1f9223791f128f6b205750ed230fbeb0ca2a159a",
+      "sha256": "83a1f23850c113ffd87a844a51e34c826f45b40e369f9a055f25991a91641a4f",
       "executable": false
     },
     "src/platter/sms.ts": {
@@ -2694,7 +2694,7 @@
       "executable": false
     },
     "src/platter/state.ts": {
-      "sha256": "d699fb5e477050fc7bdec649c6b261661233b45e21ba20a7589033bbd2e00eba",
+      "sha256": "db196cbb9e031a0f4a6a18618b53829e19ffce067f62b45bc480feab2ef26e63",
       "executable": false
     },
     "src/platter/suggestions.ts": {
@@ -2786,7 +2786,7 @@
       "executable": false
     },
     "src/platter/ui/expiry.ts": {
-      "sha256": "62bddc54d60a193b4791a9db0a923c1f77a68e02134f88e5beb11a742cf44041",
+      "sha256": "1027c69f22933666853ea4e753155aa03d853841aa7006719cca0ddfdab43d25",
       "executable": false
     },
     "src/platter/ui/folders.ts": {
@@ -2822,7 +2822,7 @@
       "executable": false
     },
     "src/platter/ui/paper.ts": {
-      "sha256": "bd7532cf8277e2efccf458e1f382caa49985eeb796002abed913c71dd47df6bb",
+      "sha256": "1f20fd3336353101d76db9dba0c61466cfdea25ed41989086a8cdb752779528e",
       "executable": false
     },
     "src/platter/ui/payment-terms.ts": {
@@ -2850,7 +2850,7 @@
       "executable": false
     },
     "src/platter/ui/questions.ts": {
-      "sha256": "5ecc990cad4f2c9ecc3c6a9f96e3510ebb2d0e913b0e15b123c2c1d3139729d8",
+      "sha256": "5fd93b09a31a7ba146d44462477600f8399059b0fcd15aaec5a8526abb48da29",
       "executable": false
     },
     "src/platter/ui/reminder-messages.ts": {
@@ -2878,7 +2878,7 @@
       "executable": false
     },
     "src/platter/ui/suggestions.ts": {
-      "sha256": "dae2945177e70b4612a331539e20e90b490bcfcf5d7bd0ca0ff65142a248287c",
+      "sha256": "bdf7b3c0f43ceddaa4af0cbe6af1dccd14cfbb89a5c1014d2c1a9313e4a20199",
       "executable": false
     },
     "src/platter/ui/team.ts": {
@@ -3134,7 +3134,7 @@
       "executable": false
     },
     "tests/site.test.mjs": {
-      "sha256": "18d963aca0680b9b50efaabe22504d4ae76b1a47753a0c5f1eaafaa7903c8f2d",
+      "sha256": "a5b4085d09b50296f4ff3bbcad21e512d0a02186fc2eb49456bb57bdefabe752",
       "executable": false
     },
     "tests/stripe-sandbox.mjs": {

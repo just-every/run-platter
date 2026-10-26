@@ -1333,12 +1333,15 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
     await page.locator('input[name="consent"]').check()
     await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
     await page.getByRole('heading',{name:'Agreement downloads',exact:true}).waitFor()
+    assert.ok((await page.locator('main').innerText()).includes('Platter e-signature after text-code verification'))
     const download=page.waitForEvent('download');await page.getByRole('link',{name:'Signed agreement PDF',exact:true}).click();const file=await download;assert.equal(file.suggestedFilename(),'agreement.pdf')
     const certificateDownload=page.waitForEvent('download');await page.getByRole('link',{name:'Certificate of completion',exact:true}).click();assert.equal((await certificateDownload).suggestedFilename(),'certificate.pdf')
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true)
     // All current client controls have visible text; none needs an icon-only tooltip.
     for(const button of await page.locator('button').all())assert.ok((await button.innerText()).trim(),'client controls have visible labels')
     if(process.env.PLATTER_SCREENSHOTS)await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-006-complete-${width}.png`),fullPage:true})
+    const ownerContext=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
+    try{await ownerContext.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}]);const ownerPage=await ownerContext.newPage();await ownerPage.goto(h.origin+'/app/proposal?id='+p.id);assert.ok((await ownerPage.locator('main').innerText()).includes('Platter e-signature after text-code verification'));assert.equal(await ownerPage.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);if(process.env.PLATTER_SCREENSHOTS)await ownerPage.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-006-owner-${width}.png`),fullPage:true})}finally{await ownerContext.close()}
    }finally{await context?.close();await h?.close();await edge?.close()}
   }
  }finally{await browser?.close()}

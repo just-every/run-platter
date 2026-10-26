@@ -36,7 +36,7 @@ export function clientExpiryPanel(view: any, publicForm: (name: string, body: st
  if (!expiry.expired) return panel('Offer expiry', `<p>${expiryLabel(expiry)}</p>`)
  const pending = (expiry.reopenRequests ?? []).some((r: any) => !r.resolvedAt && r.revision === view.revision && r.deadlineAt === expiry.deadlineAt)
  return panel('This proposal has expired', `<p>${expiryLabel(expiry)} Acceptance is closed.</p>`
-  + (!view.verified ? '<p>Verify your email below to ask the firm to reopen this offer.</p>'
+  + (!view.verified ? '<p>Verify your '+(view.verificationMethod==='SMS code'?'identity':'email')+' below to ask the firm to reopen this offer.</p>'
     : pending ? '<p role="status">Your request to reopen this proposal has been saved. The firm can extend this offer or send you a revised one.</p>'
       : '<p>Ask the firm to reopen this offer so you can accept it.</p>' + publicForm('expiry.reopen', '<button>Request reopening</button>')))
 }

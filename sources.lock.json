@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "94b95214af724b56fdda56f5140de3c467206cf1e318afd96d6fd7297f6455df",
+      "sha256": "1d20d00e4a45c4bfd7c8b40d4d84eeebe8dcbbcae68ffbcad7586bbb6d2c8ee0",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "5b825758d2b4aea275a4b280254084b27605f7f45d24ede51a7c042bac67865f",
+      "sha256": "49057f1f2f5738d051d413d19683d91ec41162c930c7fb23e51864e7cc6b9d7d",
       "executable": false
     },
     "deploy-demo.json": {
@@ -3106,7 +3106,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "beb27c35ebf4438f8645956770535b8dd23a87c4d0dc8f943899952dc1d19a6f",
+      "sha256": "324280d7e00700964247603d447ff781ee71725da78f57999a0d15e886446cdd",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {

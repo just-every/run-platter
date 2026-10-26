@@ -1315,21 +1315,46 @@ test('SEND-007 unsigned replacement preserves the frozen offer, revokes old auth
 
 test('COLLAB-002 scoped colleagues comment, receive consented generic email and chat, resolve and assign without exposing internal threads to clients', {timeout:120000},async()=>{
  const h=await notificationFixture()
+ const audit=async()=>{const response=await h.send('/api/platter/audit',undefined,h.owner);assert.equal(response.status,200,response.text);return response.value.rows}
+ const business=async()=>{
+  const tables=(await h.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB 'p_*' ORDER BY name").all()).results
+  return Object.fromEntries(await Promise.all(tables.map(async({name})=>[name,(await h.db.prepare('SELECT * FROM "'+name+'" ORDER BY rowid').all()).results])))
+ }
+ const collaborate=async(action,input,cookie=h.owner,status=200)=>{
+  const before=await audit(),state=await h.state(),rows=await business(),mail=h.messages.length,chat=h.chats.length
+  const actor=(await h.state(cookie)).actor,from=Date.now()
+  const result=await h.cmd(action,input,cookie,status),to=Date.now(),after=await audit()
+  if(status!==200){
+   assert.deepEqual(after,before,action+' refusal retains the complete audit log')
+   assert.deepEqual(await business(),rows,action+' refusal retains every business table')
+   assert.deepEqual(await h.state(),state,action+' refusal retains public business state')
+   assert.equal(h.messages.length,mail,action+' refusal sends no email')
+   assert.equal(h.chats.length,chat,action+' refusal sends no chat')
+  }else{
+   const prior=new Set(before.map(row=>row.id)),added=after.filter(row=>!prior.has(row.id)&&row.action===action)
+   assert.equal(added.length,1,action+' writes exactly one audit row')
+   const [row]=added
+   assert.deepEqual({actor:row.actor_id,role:row.actor_role,action:row.action,subject:row.subject},{actor:actor.id,role:actor.role,action,subject:action==='collaboration.route'?input.routeId:input.id},action+' records the actual actor, role, action and subject')
+   assert.ok(Number.isSafeInteger(row.occurred_at)&&row.occurred_at>=from&&row.occurred_at<=to,action+' records server epoch-millisecond time during the HTTP request')
+  }
+  return result
+ }
  try{
   await h.connect('slack');const owner=(await h.state()).actor
   const route=await h.cmd('notification.route',{provider:'slack',event:'followup',kind:'channel',destination:'synthetic-platter-7003',consent:true})
-  await h.cmd('collaboration.route',{routeId:route.id},h.owner,400)
-  await h.cmd('collaboration.route',{routeId:route.id,consent:true})
+  await collaborate('collaboration.route',{routeId:route.id},h.owner,400)
+  await collaborate('collaboration.route',{routeId:route.id,consent:true})
   await h.send('/auth/invite',{email:'colleague@synthetic-platter.example',role:'member',displayName:'Synthetic colleague'},h.owner)
   const colleague=await h.signIn('colleague@synthetic-platter.example'),person=(await h.state(colleague)).actor
   await h.cmd('member.set',{operatorId:person.id,version:0,role:'viewer',teams:[]})
   assert.equal((await h.state(colleague)).actor.role,'viewer')
+  await collaborate('collaboration.route',{routeId:route.id,consent:true},colleague,403)
   const p=await h.prepare('Internal collaboration'),input={id:p.id,version:1,blockId:'pricing',text:'synthetic-platter-private-comment',recipientId:person.id,consent:true}
-  await h.cmd('collaboration.comment',input,h.owner,403)
+  await collaborate('collaboration.comment',input,h.owner,403)
   await h.cmd('proposal.share',{id:p.id,operatorId:person.id})
-  await h.cmd('collaboration.comment',{...input,consent:false},h.owner,400)
+  await collaborate('collaboration.comment',{...input,consent:false},h.owner,400)
   const startMail=h.messages.length,startChat=h.chats.length
-  const comment=await h.cmd('collaboration.comment',input)
+  const comment=await collaborate('collaboration.comment',input)
   assert.equal(h.messages.length,startMail+1);assert.equal(h.chats.length,startChat+1)
   assert.deepEqual(h.messages.at(-1).to,[person.email]);assert.doesNotMatch(h.messages.at(-1).text,/synthetic-platter-private-comment|Internal collaboration/)
   assert.doesNotMatch(h.chats.at(-1).value.text,/synthetic-platter-private-comment|colleague@/)
@@ -1337,24 +1362,24 @@ test('COLLAB-002 scoped colleagues comment, receive consented generic email and 
   assert.equal((await h.send(url.pathname+url.search)).status,303)
   const thread=(await h.state(colleague)).proposals.find(x=>x.id===p.id).collaboration.threads[0]
   assert.equal(thread.id,comment.threadId);assert.equal(thread.block_id,'pricing');assert.equal(thread.recipient_id,person.id)
-  await h.cmd('collaboration.resolve',{id:p.id,version:1,threadId:thread.id,threadVersion:1},colleague)
-  await h.cmd('collaboration.resolve',{id:p.id,version:1,threadId:thread.id,threadVersion:1},colleague,409)
-  const assignment=await h.cmd('collaboration.assign',{...input,blockId:'scope',dueDate:'2030-03-04'})
+  await collaborate('collaboration.resolve',{id:p.id,version:1,threadId:thread.id,threadVersion:1},colleague)
+  await collaborate('collaboration.resolve',{id:p.id,version:1,threadId:thread.id,threadVersion:1},colleague,409)
+  const assignment=await collaborate('collaboration.assign',{...input,blockId:'scope',dueDate:'2030-03-04'})
   let threads=(await h.state(colleague)).proposals.find(x=>x.id===p.id).collaboration.threads
   assert.ok(threads.find(t=>t.id===thread.id).resolved_at)
   assert.equal(threads.find(t=>t.id===assignment.threadId).due_date,'2030-03-04')
   assert.equal(h.messages.at(-1).subject,'Section assigned');assert.equal(h.chats.at(-1).value.text.split('\n')[0],'Section assigned')
-  for(const bad of [{blockId:'missing'},{dueDate:'2030-02-30'},{version:0}])await h.cmd('collaboration.assign',{...input,blockId:'scope',dueDate:'2030-03-04',...bad},h.owner,bad.version===0?409:400)
+  for(const bad of [{blockId:'missing'},{dueDate:'2030-02-30'},{version:0}])await collaborate('collaboration.assign',{...input,blockId:'scope',dueDate:'2030-03-04',...bad},h.owner,bad.version===0?409:400)
   await h.cmd('proposal.document',{id:p.id,version:1,document:{version:1,blocks:[{id:'synthetic-platter-block',type:'text',title:'Rich section',text:'Public block'}]}})
   const current=(await h.state()).proposals.find(x=>x.id===p.id)
-  for(const blockId of ['scope','terms','block:synthetic-platter-block'])await h.cmd('collaboration.comment',{id:p.id,version:current.version,blockId,text:'synthetic-platter-rich-private'})
+  for(const blockId of ['scope','terms','block:synthetic-platter-block'])await collaborate('collaboration.comment',{id:p.id,version:current.version,blockId,text:'synthetic-platter-rich-private'})
   await h.connect('teams')
   const teams=await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-7006',operatorId:owner.id,consent:true})
-  await h.cmd('collaboration.route',{routeId:teams.id,consent:true})
-  await h.cmd('collaboration.assign',{id:p.id,version:current.version,blockId:'terms',recipientId:owner.id,dueDate:'2030-03-05',consent:true})
+  await collaborate('collaboration.route',{routeId:teams.id,consent:true})
+  await collaborate('collaboration.assign',{id:p.id,version:current.version,blockId:'terms',recipientId:owner.id,dueDate:'2030-03-05',consent:true})
   assert.ok(h.chats.some(c=>c.url.includes('graph.microsoft.com')&&c.value.body.content.startsWith('Section assigned')))
   h.uncertain(true)
-  await h.cmd('collaboration.comment',{id:p.id,version:current.version,blockId:'pricing',recipientId:person.id,text:'synthetic-platter-uncertain-private',consent:true})
+  await collaborate('collaboration.comment',{id:p.id,version:current.version,blockId:'pricing',recipientId:person.id,text:'synthetic-platter-uncertain-private',consent:true})
   const attempts=h.chats.length
   await h.tick(Date.now());assert.equal(h.chats.length,attempts,'uncertain collaboration delivery is never retried')
   h.uncertain(false)
@@ -1376,7 +1401,7 @@ test('COLLAB-002 scoped colleagues comment, receive consented generic email and 
   await h.cmd('proposal.approve',{id:draft.id,version:1,revision:1})
   await h.cmd('proposal.send',{id:draft.id,version:2})
   const negotiated=await h.cmd('proposal.negotiate',{...offer,id:draft.id,version:3,clientId:h.client.id,document:{version:1,blocks:[{id:'synthetic-platter-negotiated',type:'text',title:'New negotiated section',text:'Draft content'}]}})
-  const draftComment=await h.cmd('collaboration.comment',{id:draft.id,version:negotiated.version,blockId:'block:synthetic-platter-negotiated',text:'synthetic-platter-negotiated-private',recipientId:owner.id,consent:true})
+  const draftComment=await collaborate('collaboration.comment',{id:draft.id,version:negotiated.version,blockId:'block:synthetic-platter-negotiated',text:'synthetic-platter-negotiated-private',recipientId:owner.id,consent:true})
   const retained=(await h.state()).proposals.find(x=>x.id===draft.id).collaboration.threads.find(t=>t.id===draftComment.threadId)
   assert.equal(retained.revision,negotiated.revision);assert.equal(retained.block_title,'New negotiated section')
   assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_notification_outbox WHERE event_key LIKE 'collab:%' AND proposal_id=? AND status='sent'").bind(draft.id).first()).n,3,'negotiated-revision mentions retain exact current authority for email and both chat routes')
@@ -1387,8 +1412,8 @@ test('COLLAB-002 scoped colleagues comment, receive consented generic email and 
   await h.cmd('proposal.share',{id:p.id,operatorId:person.id,shared:false})
   assert.ok(!(await h.state(colleague)).proposals.some(x=>x.id===p.id))
   assert.equal((await h.send('/app/proposal?id='+p.id,undefined,colleague)).status,403)
-  await h.cmd('collaboration.resolve',{id:p.id,version:current.version+2,threadId:assignment.threadId,threadVersion:1},colleague,403)
-  const audit=await h.send('/api/platter/audit?action=collaboration.comment',undefined,h.owner)
-  assert.ok(audit.value.rows.some(r=>r.actor_id===owner.id))
+  await collaborate('collaboration.resolve',{id:p.id,version:current.version+2,threadId:assignment.threadId,threadVersion:1},colleague,403)
+  const actions=(await audit()).filter(row=>row.action.startsWith('collaboration.'))
+  assert.deepEqual([...new Set(actions.map(row=>row.action))].sort(),['collaboration.assign','collaboration.comment','collaboration.resolve','collaboration.route'])
  }finally{await h.close()}
 })

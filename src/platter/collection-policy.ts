@@ -7,7 +7,7 @@ export type CollectionMethod = typeof collectionMethods[number]
 export type CollectionCompletion = 'required' | 'due'
 export type CollectionPolicy = { enabled: boolean; completion: CollectionCompletion | 'off'; methods: CollectionMethod[] }
 
-function methodsInput(value: unknown): CollectionMethod[] {
+export function methodsInput(value: unknown): CollectionMethod[] {
  let methods = value
  if (typeof methods === 'string') {
   try { methods = JSON.parse(methods) } catch { need(false, 'Choose payment methods') }

@@ -1,4 +1,5 @@
 import { documentMediaIds } from './documents/media'
+import { methodsInput } from './collection-policy'
 import { documentOf, bindDocument } from './documents/blocks'
 import { agentDeliveryDefaults } from './reminder-message-defaults'
 import { assertTemplateLocks } from './section-locks'
@@ -128,7 +129,9 @@ async function templateDeliveryCommand(db:D1Database,a:Actor,p:Record<string,unk
  const nullableDays=(value:unknown,fallback:number|null)=>value===undefined?fallback:value===''||value===null?null:Number(value)
  const expiryDays=nullableDays(p.expiryDays,expiry.period_days),warningDays=nullableDays(p.warningDays,expiry.warning_days)
  for(const [label,value] of [['Expiry',expiryDays],['Warning',warningDays]] as const)need(value===null||Number.isInteger(value)&&value>=1&&value<=36500,label+' days must be from 1 to 36500, or empty')
- const settings={...old,remindersEnabled:p.remindersEnabled===undefined?old.remindersEnabled:p.remindersEnabled===true||p.remindersEnabled==='yes',reminderDays:dayList(p.reminderDays,old.reminderDays),beforeExpiryDays:dayList(p.beforeExpiryDays,old.beforeExpiryDays),reminderCap:cap}
+ const methodFields=Object.keys(p).filter(k=>k.startsWith('method:'))
+ const paymentMethods=methodsInput(p.paymentMethods===undefined?(p.methodsProvided==='yes'||methodFields.length?methodFields.filter(k=>p[k]==='yes').map(k=>k.slice(7)):old.paymentMethods??[]):p.paymentMethods)
+ const settings={...old,paymentMethods,remindersEnabled:p.remindersEnabled===undefined?old.remindersEnabled:p.remindersEnabled===true||p.remindersEnabled==='yes',reminderDays:dayList(p.reminderDays,old.reminderDays),beforeExpiryDays:dayList(p.beforeExpiryDays,old.beforeExpiryDays),reminderCap:cap}
  const messageId=p.reminderTemplateId===undefined?undefined:String(p.reminderTemplateId)||null
  if(messageId)need(await db.prepare('SELECT 1 FROM p_reminder_templates WHERE id=?').bind(messageId).first(),'Reminder template not found',404)
  const nextExpiry={...expiry,...(p.expiryDays!==undefined?{mode:expiryDays===null?'never':'days',period_days:expiryDays,expires_on:null}:{}),warning_days:warningDays}

@@ -158,4 +158,32 @@ export async function templatesHttp(h) {
  for (const action of ['template.save', 'template.start', 'mcp.search_templates', 'mcp.prepare_from_template']) assert.ok(audit.some(r => r.action === action && r.subject), action)
  await h.cmd('agent.revoke', { id: key.id })
  assert.equal((await h.send('/api/platter/agent/context', undefined, '', { authorization: 'Bearer ' + key.token })).status, 401)
+ // Template payment choices and terms copy independently, without collection authority.
+ await (await h.mf.getWorker()).scheduled({scheduledTime:new Date("2030-03-01T18:00:00Z"),cron:"*/15 * * * *"})
+ const paymentSource=await h.cmd('proposal.prepare',{clientId:client.id,title:'Scheduled template',scope:'Reviewed service',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:30,paymentTerms:{netDays:15,milestones:[{label:'Delivery',event:'Delivery approved',percent:100}]}})
+ const sourceTerms=(await h.state()).proposals.find(p=>p.id===paymentSource.id).payment_terms
+ const parsedTerms=typeof sourceTerms==='string'?JSON.parse(sourceTerms):sourceTerms
+ assert.equal(parsedTerms.netDays,15);assert.equal(parsedTerms.milestones[0].bps,10000)
+ const paymentTemplate=await h.cmd('template.save',{id:paymentSource.id,version:1,name:'Payment choices',shared:true,shareConsent:true})
+ const tables=['p_personal_templates','p_template_defaults','p_proposals','p_revisions','p_audit'],read=()=>Promise.all(tables.map(table=>h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all().then(r=>r.results)))
+ const unchanged=async action=>{const before=await read();await action();assert.deepEqual(await read(),before)}
+ const update={id:paymentTemplate.id,version:1,paymentMethods:['card','ach']}
+ await unchanged(()=>h.cmd('template.delivery',update,member,403))
+ for(const paymentMethods of [['wire'],['card','card'],null])await unchanged(()=>h.cmd('template.delivery',{...update,paymentMethods},h.owner,400))
+ await h.cmd('template.delivery',update)
+ await unchanged(()=>h.cmd('template.delivery',update,h.owner,409))
+ const paymentStart=version=>h.cmd('template.start',{id:paymentTemplate.id,version,clientId:other.id})
+ const paymentFirst=await paymentStart(2),paymentSecond=await paymentStart(2)
+ const paymentDraft=async id=>(await h.state()).proposals.find(p=>p.id===id)
+ const frozen=[await paymentDraft(paymentFirst.id),await paymentDraft(paymentSecond.id)]
+ for(const p of frozen){assert.deepEqual(p.collectionPolicy,{enabled:false,completion:'off',methods:['card','ach']});assert.equal(p.deposit_bps,3000);assert.deepEqual(p.payment_terms,(await paymentDraft(paymentSource.id)).payment_terms);assert.equal(p.reminderSettings,null)}
+ await h.cmd('template.delivery',{id:paymentTemplate.id,version:2,paymentMethods:['ach']})
+ const paymentThird=await paymentStart(3)
+ assert.deepEqual([await paymentDraft(paymentFirst.id),await paymentDraft(paymentSecond.id)],frozen)
+ assert.deepEqual((await paymentDraft(paymentThird.id)).collectionPolicy,{enabled:false,completion:'off',methods:['ach']})
+ await h.cmd('payment.collection',{id:paymentFirst.id,version:1,paymentMethods:['card']})
+ assert.deepEqual((await h.state()).templates.find(t=>t.id===paymentTemplate.id).deliveryDefaults.paymentMethods,['ach'])
+ assert.deepEqual(await paymentDraft(paymentSecond.id),frozen[1])
+ await h.cmd('template.delivery',{id:paymentTemplate.id,version:3,methodsProvided:'yes'})
+ assert.deepEqual((await paymentDraft((await paymentStart(4)).id)).collectionPolicy,{enabled:false,completion:'off',methods:[]})
 }

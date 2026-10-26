@@ -2,6 +2,7 @@ import type { Bindings } from '../auth.server'
 import { actorById } from './credentials'
 import { documentOf } from './documents/blocks'
 import { currentTime } from './expiry-time'
+import { negotiatedView, pendingNegotiation } from './negotiation'
 import { authority, commit, exact, need, text, type Actor } from './model'
 import { administrators, permitted, scope } from './permissions'
 import { flushNotifications, notificationWrite, routeAvailable } from './notifications/dispatch'
@@ -25,7 +26,7 @@ export async function activeCollaboration(env:Bindings,out:any){
  if(!e||e.resolved_at)return false
  const actor=await actorById(env.DB,e.actor_id),person=await actorById(env.DB,e.recipient_id)
  if(!actor||!person)return false
- try{const row=await permitted(env.DB,actor,e.proposal_id);await permitted(env.DB,person,e.proposal_id);return row.revision===e.revision&&(!out.recipient||out.recipient===person.email)&&(!out.route_id||Boolean(await env.DB.prepare('SELECT 1 FROM p_collaboration_routes WHERE route_id=?').bind(out.route_id).first()))}catch{return false}
+ try{const original=await permitted(env.DB,actor,e.proposal_id),row=negotiatedView(original,await pendingNegotiation(env.DB,original.id));await permitted(env.DB,person,e.proposal_id);return row.revision===e.revision&&(!out.recipient||out.recipient===person.email)&&(!out.route_id||Boolean(await env.DB.prepare('SELECT 1 FROM p_collaboration_routes WHERE route_id=?').bind(out.route_id).first()))}catch{return false}
 }
 export async function collaborationCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  const db=env.DB,at=await currentTime(db);need(a.role!=='agent','A member session is required',403)
@@ -37,7 +38,8 @@ export async function collaborationCommand(env:Bindings,a:Actor,name:string,p:Re
   await commit(db,a,[db.prepare('INSERT INTO p_collaboration_routes(route_id,configured_by,created_at) VALUES(?,?,?) ON CONFLICT(route_id) DO UPDATE SET configured_by=excluded.configured_by,created_at=excluded.created_at').bind(route.id,a.id,at)],false,{sql:'EXISTS(SELECT 1 FROM p_notification_route_authority WHERE route_id=?)',values:[route.id]})
   return {id:route.id}
  }
- const row=await permitted(db,a,p.id);exact(row,p)
+ const original=await permitted(db,a,p.id);exact(original,p)
+ const row=negotiatedView(original,await pendingNegotiation(db,original.id))
  const guard={sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?)',values:[row.id,row.version] as any[]}
  if(name==='collaboration.resolve'){
   const thread=await db.prepare('SELECT * FROM p_internal_threads WHERE id=? AND proposal_id=?').bind(text(p.threadId,'a thread'),row.id).first<any>()

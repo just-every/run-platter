@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "609bdca79a73ec4f0eabe8bef62df7b537badf9fdee44b8c6383f8b586cceb35",
+      "sha256": "fc3424d25a872a2d775166e98c406910ccf4e2370f24ce2a16840a67f02957ba",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "4ffded84a2ebe8636178574c12322a5e57ccb351a949a353db045c6c0876ab8d",
+      "sha256": "4171878b1d555782193dbe39cfb124edc59cb3755bbb7541b6da577a10339bbc",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2306,7 +2306,7 @@
       "executable": false
     },
     "src/platter/collaboration.ts": {
-      "sha256": "5335ab450f793980ef1e6306762699b9f0dbda8969fc34e5f4e539637a629186",
+      "sha256": "15c38e051e6ca392f8624c64b024d9e0f33c633ade9410d5e852072ecb209f80",
       "executable": false
     },
     "src/platter/collection-fees.ts": {
@@ -3106,7 +3106,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "745356ee9fccb4df91dea01f066b7274f61f0ea484649c9f135385d8c9c925c4",
+      "sha256": "beb27c35ebf4438f8645956770535b8dd23a87c4d0dc8f943899952dc1d19a6f",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {

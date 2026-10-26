@@ -446,7 +446,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source})
+  h=await harness({root:source,assetsDirectory:'public'})
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Email rehearsal',scope:'A photography session',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
   await h.cmd('proposal.test-mail',{id:p.id,version:1,subject:'Archive rehearsal only',message:'Test-only message never in the agreement package'})
@@ -454,9 +454,21 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   await h.cmd('proposal.approve',{id:real.id,version:1,revision:1})
   const invitation=await h.cmd('proposal.send',{id:real.id,version:2,mailSubject:'Your photography agreement',mailMessage:'Hi Avery, please review the agreed session.'})
   const before=await h.state(),proposal=before.proposals.find(row=>row.id===p.id)
-  const retained=before.proposals.find(row=>row.id===real.id).invitationMessages
+  let retained=before.proposals.find(row=>row.id===real.id).invitationMessages
   assert.equal(retained.length,1)
   assert.equal(proposal.testMail.length,1);assert.equal(before.outbox.length,2)
+  const replacement=await h.cmd('signer.replace',{id:real.id,version:3,recipient:'coo@northstar.example',reason:'COO signs this agreement',mailSubject:'COO invitation',mailMessage:'Please sign the unchanged offer.'})
+  const replacementPath=new URL(replacement.shareUrl).pathname
+  retained=(await h.state()).proposals.find(row=>row.id===real.id).invitationMessages
+  const replacements=(await h.state()).proposals.find(row=>row.id===real.id).signerReplacements
+  assert.equal(replacements.length,1);assert.equal(replacements[0].signing_position,1)
+  assert.equal((await h.send(replacementPath+'/action?name=code.request',{})).status,200)
+  const code=(await h.state()).outbox.find(m=>m.proposal_id===real.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+  const verified=await h.send(replacementPath+'/action?name=code.verify',{code});assert.equal(verified.status,200)
+  assert.equal((await h.send(replacementPath+'/action?name=accept',{name:'Northstar COO',optionId:'two',consent:true},verified.cookie)).status,200)
+  const certificate=await h.send(replacementPath+'/certificate.json',undefined,verified.cookie);assert.equal(certificate.status,200,certificate.text)
+  const artifacts=(await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(real.id).all()).results
+
   await h.close();h=null
   const archive=join(temporary,'source.rer')
   await command(source,['export','--output',archive])
@@ -464,17 +476,25 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.ok(!bytes.includes('Test-only message never in the agreement package'))
   assert.ok(!bytes.includes('[Test] Archive rehearsal only'))
   assert.ok(!bytes.includes(new URL(invitation.shareUrl).pathname))
-  assert.deepEqual(records.filter(item=>item.table==='p_invitation_messages').map(item=>item.row),retained)
+  assert.ok(!bytes.includes(replacementPath))
+  assert.equal(records.filter(item=>item.table==='p_replaced_links').length,0)
+  assert.deepEqual(records.filter(item=>item.table==='p_signer_replacements').map(item=>item.row),replacements)
+  assert.deepEqual(records.filter(item=>item.table==='p_invitation_messages').map(item=>item.row).sort((a,b)=>a.id.localeCompare(b.id)),[...retained].sort((a,b)=>a.id.localeCompare(b.id)))
   assert.equal(records.filter(item=>item.table==='p_mail').length,0)
   const tests=records.filter(item=>item.table==='p_audit'&&item.row.action==='proposal.test-mail')
   assert.equal(tests.length,1)
   assert.equal(tests[0].row.subject,p.id);assert.equal(tests[0].row.actor_role,'owner')
   await command(restored,['import','--input',archive,'--yes'])
-  h=await harness({root:restored,unclaimed:true})
+  h=await harness({root:restored,unclaimed:true,assetsDirectory:'public'})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
   assert.deepEqual(after.proposals.find(row=>row.id===p.id),proposal)
   assert.deepEqual(after.proposals.find(row=>row.id===real.id).invitationMessages,retained)
   assert.equal((await h.send(new URL(invitation.shareUrl).pathname)).status,404)
+  assert.equal((await h.send(replacementPath)).status,404)
+  assert.deepEqual(after.proposals.find(row=>row.id===real.id).signerReplacements,replacements)
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(real.id).all()).results,artifacts)
+  assert.equal((await h.send('/api/platter/certificate.json?id='+real.id,undefined,owner)).text,certificate.text)
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n,0)
   const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})
   assert.equal(setup.status,303)
   const history=await h.send('/app/proposal?id='+real.id,undefined,owner)

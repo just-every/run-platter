@@ -16,10 +16,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [runtime, business, archive_custody, archive_restore, archive_media]
+        shard: [runtime, browser_documents, business, archive_custody, archive_restore, archive_media]
     env:
       CI: 'true'
       PLATTER_VERIFY_SHARD: ${{ matrix.shard }}
+      PLATTER_BROWSER_SHARD: lifecycle
       WRANGLER_SEND_METRICS: 'false'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -30,7 +31,7 @@ jobs:
           node-version: 22.20.0
       - run: corepack enable && corepack prepare pnpm@10.12.4 --activate
       - run: pnpm install --frozen-lockfile
-      - if: matrix.shard == 'runtime'
+      - if: matrix.shard == 'runtime' || matrix.shard == 'browser_documents'
         run: pnpm exec playwright install --with-deps chromium
       - name: Verify runtime and hosted output
         if: matrix.shard == 'runtime'

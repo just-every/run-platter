@@ -21,7 +21,7 @@ import { libraryReaders } from './library'
 import { permitted, administrators, reporters, senders } from './permissions'
 import { currentTime } from './expiry-time'
 import { previewResponse } from './preview'
-import { withdrawnPage } from './ui/withdrawal'
+import { withdrawnPage, replacedInvitationPage } from './ui/withdrawal'
 import { openQuestions } from './questions'
 import { questionReplyResponse } from './question-replies'
 import { clientPdf } from './documents/client-pdf'
@@ -62,7 +62,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   if(path==='/api/platter/question-replies')return await questionReplyResponse(request,env)
   if(path==='/api/platter/mail/events')return await deliveryWebhook(request,env)
   if(request.method==='POST'&&!isAgent)need(request.headers.get('origin')===env.AUTH_ORIGIN&&request.headers.get('sec-fetch-site')!=='cross-site','Cross-site request refused',403)
-  if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/action|\/agreement\.pdf|\/certificate\.json|\/certificate\.pdf|\/payment\.json|\/payment-consent\.json|\/payment-status\.json|\/download\.pdf|\/data\.json|\/attachments\/([\w-]+)|\/media\/([\w-]+))?$/);need(match,'Invitation not found',404);const withdrawn=await env.DB.prepare('SELECT contact_email FROM p_withdrawn_links WHERE token=?').bind(match[1]).first<{contact_email:string}>();if(withdrawn)return path.endsWith('.json')?json({error:'Proposal withdrawn',contact:withdrawn.contact_email},410):withdrawnPage(withdrawn.contact_email);context=await clientContext(env,match[1],request)
+  if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/action|\/agreement\.pdf|\/certificate\.json|\/certificate\.pdf|\/payment\.json|\/payment-consent\.json|\/payment-status\.json|\/download\.pdf|\/data\.json|\/attachments\/([\w-]+)|\/media\/([\w-]+))?$/);need(match,'Invitation not found',404);const withdrawn=await env.DB.prepare('SELECT contact_email FROM p_withdrawn_links WHERE token=?').bind(match[1]).first<{contact_email:string}>();if(withdrawn)return path.endsWith('.json')?json({error:'Proposal withdrawn',contact:withdrawn.contact_email},410):withdrawnPage(withdrawn.contact_email);if(await env.DB.prepare('SELECT 1 FROM p_replaced_links WHERE token=?').bind(match[1]).first())return path.endsWith('.json')?json({error:'This signer invitation was replaced'},410):replacedInvitationPage();context=await clientContext(env,match[1],request)
    if(['/agreement.pdf','/certificate.json','/certificate.pdf'].includes(match[2])){need(request.method==='GET','Use an agreement download',405);return await agreementArtifact(env,context.row.id,match[2].slice(1),{client:context})}
    if(match[2]==='/payment.json'||match[2]==='/payment-status.json'||match[2]==='/payment-consent.json'){need(request.method==='POST','Use a payment submission',405);const result=match[2]==='/payment-consent.json'?await authorizeCollection(env,context,await body(request)):await clientCollection(env,context,await body(request),match[2]==='/payment-status.json');await recordAudit(env.DB,{id:context.row.client_id,role:'client'},match[2]==='/payment-consent.json'?'payment.authorize':match[2]==='/payment.json'?'payment.prepare':'payment.refresh',context.row.id);return json(result)}
    if(request.method==='GET'&&match[4])return await documentMedia(env.DB,selectedContent(snapshot(context.row),context.optionId,context.selection.items),match[4])

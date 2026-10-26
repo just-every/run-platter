@@ -13,3 +13,10 @@ export function invitationTimeline(p: any) {
  return panel('Invitation email history', '<p>Exact subject and personal message queued for each invitation. Client links are excluded from this retained history. Queuing does not confirm delivery.</p><ol>' + p.invitationMessages.map((m: any) =>
   `<li><p>Revision ${escape(m.revision)} · ${escape(m.recipient)} · Queued ${date(m.queued_at)}</p><h3>${escape(m.subject)}</h3><p class="preserve">${escape(m.message)}</p></li>`).join('') + '</ol>')
 }
+
+export function signerReplacementPanel(p:any){
+ const history=p.signerReplacements??[]
+ const rows=history.length?'<ol>'+history.map((r:any)=>`<li><p>${escape(r.old_recipient)} → ${escape(r.new_recipient)} · Position ${escape(r.signing_position)}</p><p>${escape(r.actor_email)} · ${date(r.replaced_at)}</p><p>${escape(r.reason)}</p><p>Required identity: ${escape(r.required_method)}</p></li>`).join('')+'</ol>':''
+ const controls=p.canSend&&p.status==='sent'&&!p.negotiating?`<form method="post" action="${action('signer.replace',proposalPath(p.id))}">${hidden('id',p.id)}${hidden('version',p.version)}<p>The new signer keeps this signing position and identity requirement. The previous link and verification are revoked. SMS consent and reminders require fresh authorization.</p>${field('Replacement signer email','recipient','','type="email" required maxlength="254"')}${field('Replacement reason','reason','','required maxlength="1000"')}${field('Replacement invitation subject','mailSubject',('Your proposal: '+p.title).slice(0,200),'required maxlength="200"')}<label>Replacement invitation message<textarea name="mailMessage" required maxlength="10000" rows="4">Review your proposal and verify your email before accepting:</textarea></label><button>Replace unsigned signer</button></form>`:p.acceptance?'<p>A signed recipient cannot be replaced.</p>':''
+ return controls||rows?panel('Signer replacement',controls+rows):''
+}

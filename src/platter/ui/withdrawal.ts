@@ -16,3 +16,7 @@ export function withdrawalPanel(state:any,p:any) {
 export function withdrawnPage(contact:string) {
  return document('Proposal withdrawn',panel('Contact the firm',`<p>This proposal has been withdrawn. Contact <a href="mailto:${escape(contact)}">${escape(contact)}</a>.</p>`),{client:true,status:410})
 }
+
+export function replacedInvitationPage(){
+ return document('Signer invitation replaced',panel('Contact the firm','<p>This signer invitation was replaced. Contact the firm for a current invitation.</p>'),{client:true,status:410})
+}

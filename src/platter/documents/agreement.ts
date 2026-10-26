@@ -24,9 +24,11 @@ export async function agreementArtifact(env:Bindings,id:string,kind:string,autho
   const frozen=JSON.parse(a.snapshot),fonts=await pdfFonts(env,frozen),signer={name:a.name,email:a.email,method:a.method,verifiedAt:a.verified_at,acceptedAt:a.accepted_at,consent:a.consent}
   const bytes=await offerPdf(frozen,a.option_id,fonts,frozen.selection?.items??[],asset=>mediaBytes(db,frozen,asset),undefined,signer)
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes.buffer as ArrayBuffer)),b=>b.toString(16).padStart(2,'0')).join('')
-  const facts={schemaVersion:1,proposalId:id,revision:a.revision,documentSha256:digest,signers:[signer],location:'not recorded',userAgent:'not recorded',attachments:frozen.attachments??[]}
+  const replacements=(await db.prepare('SELECT revision,old_recipient,new_recipient,actor_id,actor_email,replaced_at,reason,signing_position,required_method FROM p_signer_replacements WHERE proposal_id=? AND revision=? ORDER BY replaced_at,id').bind(id,a.revision).all<any>()).results
+  const facts={replacements,schemaVersion:1,proposalId:id,revision:a.revision,documentSha256:digest,signers:[signer],location:'not recorded',userAgent:'not recorded',attachments:frozen.attachments??[]}
   const pdf=await PdfText.create(a.revision,fonts,'Certificate of completion')
   pdf.heading('Certificate of completion');pdf.text('Proposal: '+frozen.title);pdf.text('Revision: '+a.revision);pdf.text('Document SHA-256: '+digest);pdf.text('Signer: '+a.name);pdf.text('Recipient: '+a.email);pdf.text('Verification method: '+a.method);pdf.text('Verified at: '+(a.verified_at?new Date(a.verified_at).toISOString():'not recorded'));pdf.text('Accepted at: '+new Date(a.accepted_at).toISOString());pdf.text('Consent: '+a.consent);pdf.text('Location and user agent: not recorded')
+  for(const r of replacements){pdf.heading('Signer replacement');pdf.text('Previous recipient: '+r.old_recipient);pdf.text('Replacement recipient: '+r.new_recipient);pdf.text('Replaced by: '+r.actor_email);pdf.text('Replaced at: '+new Date(r.replaced_at).toISOString());pdf.text('Reason: '+r.reason);pdf.text('Signing position: '+r.signing_position);pdf.text('Required verification: '+r.required_method)}
   const certificate=await pdf.document.save()
   await authorize()
   const write=db.prepare('INSERT INTO p_agreement_artifacts VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING').bind(id,a.revision,bytes,certificate,JSON.stringify(facts))

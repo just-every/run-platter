@@ -1139,6 +1139,20 @@ test('SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes
   await h.cmd('sms.send',{id:owned.id,message:'Role changed',requestId:'synthetic-platter-8911'},member,403)
   await tick('2030-06-02T15:00:00Z');assert.equal(attempts,1,'demotion cancels the queued SMS without a provider call')
 
+  const smsId=await approved(h);const smsFirst=await h.cmd('proposal.send',{id:smsId,version:2})
+  const smsRow=(await h.state()).proposals.find(p=>p.id===smsId)
+  await h.cmd('sms.configure',{...consent,id:smsId,version:smsRow.version})
+  await h.cmd('signer.method',{id:smsId,version:smsRow.version,method:'SMS code'})
+  await tick('2030-06-03T05:00:00Z')
+  await h.cmd('sms.send',{id:smsId,kind:'manual',message:'Wait for the signer',requestId:'synthetic-platter-8912'})
+  const replacement=await h.cmd('signer.replace',{id:smsId,version:smsRow.version,recipient:'coo@northstar.example',reason:'COO signs instead'})
+  assert.equal((await h.send(new URL(smsFirst.shareUrl).pathname)).status,410)
+  assert.equal((await h.send(new URL(replacement.shareUrl).pathname+'/action?name=code.request',{})).status,409,'replacement retains the SMS requirement and requires new consent')
+  assert.equal((await h.db.prepare('SELECT method FROM p_signer_methods WHERE proposal_id=?').bind(smsId).first()).method,'SMS code')
+  assert.equal(await h.db.prepare('SELECT 1 FROM p_sms_authority WHERE proposal_id=?').bind(smsId).first(),null)
+  assert.equal((await h.db.prepare('SELECT status FROM p_sms_runs WHERE proposal_id=?').bind(smsId).first()).status,'cancelled')
+  await tick('2030-06-03T15:00:00Z');assert.equal(attempts,1)
+
  }finally{await h.close()}
 })
 
@@ -1295,3 +1309,5 @@ test('SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates ret
   const mailCertificate=await h.send(mailPath+'/certificate.json',undefined,mailVerification.cookie);assert.equal(mailCertificate.status,200,mailCertificate.text);assert.equal(mailCertificate.value.signers[0].method,'mailbox code')
  }finally{await h.close()}
 })
+
+test('SEND-007 unsigned replacement preserves the frozen offer, revokes old authority and retains certificate custody through races', {timeout:120000},async()=>{const {replacementHttp}=await import('./signer-replacement-http.mjs');await replacementHttp()})

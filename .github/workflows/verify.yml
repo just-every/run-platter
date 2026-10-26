@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   shards:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     strategy:
       fail-fast: false
@@ -41,13 +41,13 @@ jobs:
   verify:
     if: always()
     needs: shards
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - run: test '${{ needs.shards.result }}' = success
 
   editor_budget:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       CI: 'true'

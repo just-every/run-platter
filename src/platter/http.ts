@@ -1,3 +1,4 @@
+import { publicApi } from './api'
 import { stakeholderResponse } from './tracking/stakeholders'
 import { readingEvent, engagement } from './tracking/index'
 import { recordView, senderAlerts } from './tracking'
@@ -59,6 +60,7 @@ async function body(request:Request,maxBytes=150000){const raw=await request.tex
 export async function platterResponse(request:Request,original:Bindings):Promise<Response|null>{const env=runtimeBindings(original),url=new URL(request.url),path=url.pathname,isClient=path.startsWith('/p/'),isAgent=path.startsWith('/api/platter/agent/');if(!isClient&&!path.startsWith('/api/platter/')&&path!=='/app'&&!path.startsWith('/app/'))return null
  let actor:Actor|undefined;const requestedBack=new URL(url.searchParams.get('returnTo')||'/app',env.AUTH_ORIGIN);const back=requestedBack.origin===env.AUTH_ORIGIN&&pages.has(requestedBack.pathname)?requestedBack.pathname+requestedBack.search:'/app';let context:any,submitted:Record<string,unknown>|undefined
  try{
+  const api=await publicApi(request,env);if(api)return api
   need(url.origin===env.AUTH_ORIGIN&&(!request.headers.has('host')||request.headers.get('host')===url.host),'Wrong application origin',403);need(['GET','POST'].includes(request.method),'Method not allowed',405)
   if(path==='/api/platter/sms/status'||path==='/api/platter/sms/inbound')return await smsWebhook(request,env,path.endsWith('/status'))
   if(path==='/api/platter/client-mail-replies')return await clientMailReplyResponse(request,env)

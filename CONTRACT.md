@@ -1406,13 +1406,13 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 
 ## Status
 
-Judged from the code and tests at commit `436fbd19d74b1de2f0008dc99a5986ca7843bac4` (26 October 2026).
+Judged from the code and tests at commit `83bd6212cf655bbef0714f850a43f8339d677792` (27 October 2026). Counts and named evidence below describe the current tree; landing validation is recorded separately.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 36 | 35 | 58 | 129 |
-| All | 48 | 35 | 58 | 141 |
+| Target and push further | 38 | 35 | 56 | 129 |
+| All | 50 | 35 | 56 | 141 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |

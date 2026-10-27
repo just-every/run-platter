@@ -3190,7 +3190,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "2e9337695bda205a1fcdeb8217b321715f54ddc41ec6c163acb929ea31901147",
+      "sha256": "dc9ae1019bc9e6364d2f564207698978d6c507245763d5fd0b326d15e3e232e5",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3230,7 +3230,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "d2955a22a959230b3ddde76b111c21c367416d5c2bc8610335f89ce08fd7514e",
+      "sha256": "2dd0643ca7021cffcf9e70587e16057ef050b4f2652eee6b780c6dc123e5a7f8",
       "executable": false
     },
     "tests/site.test.mjs": {

@@ -737,7 +737,7 @@ test('REPORT-002 and AI-004 compiled report filters and explicit price applicati
  let h,edge,browser,context
  try{
   browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
-  edge=await browserEdge();h=await harness({entry:'dist/server/index.js',origin:edge.origin,assetsDirectory:'dist/client'});edge.attach(h)
+  edge=await browserEdge();h=await harness({entry:'dist/server/index.js',origin:edge.origin,assetsDirectory:'./dist/client'});edge.attach(h)
   const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
   const f=await salesFixture(h)
   context=await browser.newContext({viewport:{width:1440,height:900},ignoreHTTPSErrors:true})

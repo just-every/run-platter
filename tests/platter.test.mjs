@@ -2823,5 +2823,9 @@ test('AI-004 historical range and three linked examples never change prices befo
  await h.cmd('client.segment',{id:f.clients[0].id,segment:'Agency'})
  await h.cmd('proposal.approve',{id:p.id,version:p.version,revision:p.revision});const approved=(await h.state()).proposals.find(v=>v.id===p.id);await h.cmd('proposal.send',{id:p.id,version:approved.version});const sent=(await h.state()).proposals.find(v=>v.id===p.id);await h.cmd('pricing.suggested',{...input,version:sent.version},h.owner,409)
  await h.cmd('pricing.suggested',{...input,id:'synthetic-platter-history-0-00',version:1},h.owner,409)
+ const native=await h.cmd('proposal.prepare',{...f.base,clientId:f.clients[0].id,title:'Native catalog comparison'})
+ await h.cmd('catalog.insert',{id:native.id,version:1,catalogId:f.catalog[0].id,catalogVersion:1,optionId:'one',quantity:'1'})
+ const linked=(await h.state()).proposals.find(p=>p.id===native.id).priceSuggestions;assert.equal(linked.length,1);assert.equal(linked[0].catalogId,f.catalog[0].id);assert.equal(linked[0].sampleSize,50,'native catalog insertion retains the historical comparison identity')
+
  assert.ok((await h.send('/api/platter/audit?action=pricing.suggested',undefined,h.owner)).value.rows.some(r=>r.subject===p.id))
 }))

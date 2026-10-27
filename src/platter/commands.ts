@@ -1,3 +1,4 @@
+import { applyPriceFields } from './price-suggestions'
 import { collaborationCommand } from './collaboration'
 import { replaceSigner } from './signer-replacement'
 import { signerMethodCommand } from './signer-methods'
@@ -93,6 +94,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   const current=negotiatedView(original,await pendingNegotiation(db,original.id)),content=snapshot(current)
   return command(env,a,'proposal.revise',{id:original.id,version:original.version,clientId:current.client_id,title:current.title,scope:current.scope,terms:current.terms??'',sectionConditions:content.section_conditions??{},depositPercent:current.deposit_bps/100,packages:editablePackages(content.options),pricingTables:pricingInput(content.options),document:p.document})
  }
+ if(name==='pricing.suggest.apply')return command(env,a,'proposal.revise',await applyPriceFields(db,a,p))
  if(name==='catalog.save')return saveCatalog(db,a,p)
  if(name==='catalog.insert'){const addition=await catalogInsertion(db,a,p);return command(env,a,'proposal.revise',addition.fields,undefined,addition.costs)}
  if(name==='proposal.unlock'||name==='template.locks')return sectionLockCommand(db,a,name,p)
@@ -124,7 +126,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='suggestions.allow'||name==='suggestion.resolve')return suggestionCommand(env,a,name,p)
  if(name==='proposal.restore'){const fields=await restoreFields(db,a,p);return command(env,a,'proposal.revise',fields,fields.restoredAttachments,undefined,Number(p.revision))}
  if(name==='client.save'){
-  need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email) VALUES(?,?,?)').bind(id,text(p.name,'a client name'),email(p.email))]);return{id}
+  need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email,segment) VALUES(?,?,?,?)').bind(id,text(p.name,'a client name'),email(p.email),p.segment?text(p.segment,'a client segment',100):'Not recorded')]);return{id}
  }
  if(name==='client.erase'){
   need(a.role==='owner','Only the owner erases clients',403);const id=text(p.id,'a client'),c=await db.prepare('SELECT * FROM p_clients WHERE id=?').bind(id).first<any>();need(c,'Client not found',404);need(p.confirmName===c.name,'Type the exact client name to confirm erasure');

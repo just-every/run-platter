@@ -28,7 +28,7 @@
             optionId: option.dataset.pricingOption,
             name: value(table, 'name'),
             lines: Array.from(table.querySelectorAll('[data-pricing-line]'), line =>
-              Object.fromEntries(['name', 'description', 'quantity', 'unit', 'unitPrice', 'group', 'discountPercent', 'discountAmount', 'groupDiscountPercent', 'groupDiscountAmount'].map(key => [key, value(line, key)]))),
+              ({... (line.querySelector('[data-pricing-field="catalogId"]')?{catalogId:value(line,'catalogId')}:{}),...Object.fromEntries(['name', 'description', 'quantity', 'unit', 'unitPrice', 'group', 'discountPercent', 'discountAmount', 'groupDiscountPercent', 'groupDiscountAmount'].map(key => [key, value(line, key)]))})),
           });
         }
       }

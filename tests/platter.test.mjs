@@ -1701,7 +1701,8 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
  const h=await harness({outboundService:async request=>{const url=new URL(request.url);assert.equal(url.hostname,'api.stripe.com');calls.push({path:url.pathname,method:request.method});if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2400'});if(url.pathname==='/v1/charges/synthetic-platter-2401')return Response.json({id:'synthetic-platter-2401',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:refunded,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}});assert.equal(url.pathname,'/v1/refunds');assert.equal(request.method,'POST');assert.match(request.headers.get('idempotency-key'),/^platter-refund-/);const body=new URLSearchParams(await request.text());assert.equal(body.get('charge'),'synthetic-platter-2401');if(uncertain)return new Response(null,{status:503});const amount=Number(body.get('amount'));refunded+=amount;assert.ok(refunded<=accepted.deposit_cents);return Response.json({id:'synthetic-platter-'+(2500+calls.length),charge:'synthetic-platter-2401',amount,status:'succeeded'})}})
  try{
   const people={};for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[]});people[role]=cookie}
-  const {p,path}=await sent(h),cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},cookie)).status,200);accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
+  const {p,path}=await sent(h),cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},cookie)).status,200)
+  if(at.includes('+01:00'))for(const receivedOn of ['2099-04-04','2099-03-29','2099-03-31','2099-04-02'])await h.cmd('payment.record',{id:b.id,method:'wire',receivedOn,amount:'1',reference:'synthetic-platter-boundary-'+receivedOn,consent:true});accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-2402',webhookSecret:'synthetic-platter-2403',consent:true})
   for(const role of ['manager','sales','content_editor','viewer']){await h.cmd('payment.bind',{id:p.id,chargeId:'synthetic-platter-2401',consent:true},people[role],403);await h.cmd('payment.record',{id:p.id,amount:'1',receivedOn:'2026-10-21',method:'wire',reference:'Synthetic reference',consent:true},people[role],403)}
   assert.equal(calls.length,1);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_payment_records').first()).n,0)
@@ -1982,7 +1983,8 @@ test('TEAM-001 / PAY-006 dispute responses enforce financial roles, exact deposi
  try{
   assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
   const people={};for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[]});people[role]=cookie}
-  const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,pricingTables:[{optionId:'one',name:'Delivery',lines:[{name:'Studio',description:'Synthetic delivery',quantity:'1',unit:'project',unitPrice:'2400'}]}]});const line=(await h.state()).proposals[0].internalPricing.lines[0];await h.cmd('pricing.cost',{id:p.id,version:1,lineKey:line.key,unitCost:'1337.29'});await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const path=new URL((await h.cmd('proposal.send',{id:p.id,version:3})).shareUrl).pathname,cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},cookie)).status,200);accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
+  const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,pricingTables:[{optionId:'one',name:'Delivery',lines:[{name:'Studio',description:'Synthetic delivery',quantity:'1',unit:'project',unitPrice:'2400'}]}]});const line=(await h.state()).proposals[0].internalPricing.lines[0];await h.cmd('pricing.cost',{id:p.id,version:1,lineKey:line.key,unitCost:'1337.29'});await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const path=new URL((await h.cmd('proposal.send',{id:p.id,version:3})).shareUrl).pathname,cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},cookie)).status,200)
+  if(at.includes('+01:00'))for(const receivedOn of ['2099-04-04','2099-03-29','2099-03-31','2099-04-02'])await h.cmd('payment.record',{id:b.id,method:'wire',receivedOn,amount:'1',reference:'synthetic-platter-boundary-'+receivedOn,consent:true});accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-3405',webhookSecret:'synthetic-platter-3406',consent:true});const payment=await h.cmd('payment.bind',{id:p.id,chargeId:'synthetic-platter-3401',consent:true}),input={paymentId:payment.id,disputeId:'synthetic-platter-3402'}
 
   const forbidden=['manager','sales','content_editor','viewer'],before=calls.length
@@ -2514,6 +2516,7 @@ test('EDIT-003 linked draft copies propagate atomically while detached, sent and
  await h.cmd('library.save',{id:item.id,version:2,title:'Updated case study',kind:'case_study',content:'Negotiated story'})
  assert.equal((await read(frozen.id)).document.blocks[0].text,'Negotiated story');assert.match((await h.send(path,undefined,cookie)).text,/Original client story/)
  assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},cookie)).status,200)
+  if(at.includes('+01:00'))for(const receivedOn of ['2099-04-04','2099-03-29','2099-03-31','2099-04-02'])await h.cmd('payment.record',{id:b.id,method:'wire',receivedOn,amount:'1',reference:'synthetic-platter-boundary-'+receivedOn,consent:true})
  const accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(frozen.id).first(),acceptedView=await read(frozen.id)
  await h.cmd('library.save',{id:item.id,version:3,title:'Updated case study',kind:'case_study',content:'Final library story'})
  assert.deepEqual(await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(frozen.id).first(),accepted)
@@ -2600,3 +2603,152 @@ test('card fees require admin confirmation, remain separate and exempt ACH and p
 })
 
 test('proposal methods copy template overrides or workspace defaults and remain independent',()=>run(collectionMethodInheritance))
+
+test('REPORT-002 hundred decided proposals expose exact segmented metrics, matching CSV and scheduled figures',()=>run(async h=>{
+ const {performanceFixture,suggestionDraft}=await import('./performance-fixture.mjs'),f=await performanceFixture(h,{asymmetric:true})
+ const read=async(group,cookie=h.owner,quarter='')=>{const r=await h.send('/api/platter/sales-performance?'+new URLSearchParams({group,quarter}),undefined,cookie);assert.equal(r.status,200,r.text);return r.value}
+ for(const group of ['owner','template','service','segment','quarter']){
+  const report=await read(group);assert.equal(report.count,100);assert.equal(report.rows.length,2);assert.deepEqual([report.totals[0].decided,report.totals[0].won,report.totals[0].lost,report.totals[0].winRate,report.totals[0].medianSignMs,report.totals[0].medianPayMs,report.totals[0].averageDealCents],[100,80,20,80,4*86400000,5*86400000,18000])
+  const keys=group==='owner'?[f.ownerId,f.salesId]:group==='template'?f.templates.map(t=>t.id):group==='service'?f.catalog.map(c=>c.id):group==='segment'?['Small business','Enterprise']:['2099-Q1','2099-Q2'];const ordered=keys.map(id=>report.rows.find(row=>row.id===id));assert.ok(ordered.every(Boolean))
+  for(const [i,row] of ordered.entries())assert.deepEqual({currency:row.currency,decided:row.decided,won:row.won,lost:row.lost,rate:row.winRate,sign:row.medianSignMs,pay:row.medianPayMs,signSamples:row.signSamples,paySamples:row.paySamples,average:row.averageDealCents,reasons:row.lostReasons},{currency:'USD',decided:50,won:40,lost:10,rate:80,sign:(i?4:1)*86400000,pay:(i?5:2)*86400000,signSamples:40,paySamples:40,average:i?23000:13000,reasons:i?{Timing:10}:{Budget:10}})
+  assert.deepEqual(new Set(report.rows.map(r=>r.id)),new Set(group==='owner'?[f.ownerId,f.salesId]:group==='template'?f.templates.map(t=>t.id):group==='service'?f.catalog.map(c=>c.id):group==='segment'?['Small business','Enterprise']:['2099-Q1','2099-Q2']))
+ }
+ const filtered=await read('segment',h.owner,'2099-Q1');assert.equal(filtered.count,50);assert.deepEqual(filtered.rows.map(r=>r.label),['Small business'])
+ const scoped=await read('owner',f.sales);assert.equal(scoped.count,50);assert.deepEqual(scoped.rows.map(r=>r.id),[f.salesId])
+ const team=await h.cmd('team.create',{name:'Performance team'});await h.cmd('member.set',{operatorId:f.salesId,version:0,role:'sales',teams:[team.id]})
+ for(const role of ['admin','manager','viewer','content_editor','billing']){
+  const email=role+'-performance@studio.example';await h.send('/auth/invite',{email,displayName:role+' report reader',role:role==='admin'?'admin':'member',returnTo:'/app'},h.owner)
+  const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id
+  if(role!=='admin')await h.cmd('member.set',{operatorId:id,version:0,role,teams:['manager','viewer'].includes(role)?[team.id]:[]})
+  const response=await h.send('/api/platter/sales-performance?group=owner',undefined,cookie)
+  if(['content_editor','billing'].includes(role)){assert.equal(response.status,403);continue}
+  assert.equal(response.status,200,response.text);assert.equal(response.value.count,role==='admin'?100:50);assert.deepEqual(new Set(response.value.rows.map(r=>r.id)),new Set(role==='admin'?[f.ownerId,f.salesId]:[f.salesId]))
+  if(role!=='admin'){assert.equal((await h.send('/api/platter/pipeline.csv?view=sales-performance',undefined,cookie)).status,403);await h.cmd('report.schedule',{filters:'view=sales-performance',cadence:'daily',hour:9,recipients:[h.auth.OWNER_EMAIL]},cookie,403)}
+ }
+ const empty=await read('quarter',h.owner,'2100-Q1');assert.deepEqual(empty.rows,[]);assert.equal(empty.count,0)
+ const csv=await h.send('/api/platter/pipeline.csv?view=sales-performance&group=segment&quarter=2099-Q1',undefined,h.owner);assert.equal(csv.status,200);const expectedCsv='Group,Currency,Decided,Won,Lost,Win rate percent,Median sign days,Sign samples,Median pay days,Payment samples,Average won deal,Lost reasons\r\nSmall business,USD,50,40,10,80.0,1,40,2,40,130.00,"{""Budget"":10}"\r\nTotal,USD,50,40,10,80.0,1,40,2,40,130.00,"{""Budget"":10}"\r\n';assert.equal(csv.text,expectedCsv)
+ await h.cmd('report.schedule',{filters:'view=sales-performance&group=segment&quarter=2099-Q1',cadence:'weekly',weekday:1,hour:9,recipients:[h.auth.OWNER_EMAIL,'sales@studio.example']})
+ const schedule=await h.db.prepare('SELECT * FROM p_report_schedules').first(),worker=await h.mf.getWorker()
+ await Promise.all([worker.scheduled({scheduledTime:new Date(schedule.next_run_at),cron:'*/15 * * * *'}),worker.scheduled({scheduledTime:new Date(schedule.next_run_at),cron:'*/15 * * * *'})])
+ const mail=(await h.db.prepare('SELECT * FROM p_report_mail').all()).results;assert.equal(mail.length,2);assert.deepEqual(new Set(mail.map(m=>m.recipient)),new Set([h.auth.OWNER_EMAIL,'sales@studio.example']));for(const m of mail){assert.equal(m.body,'50 decided proposals. Filters: group=segment&quarter=2099-Q1&view=sales-performance\nSmall business · USD · 50 · 40 · 10 · 80.0 · 1 · 40 · 2 · 40 · $130.00 USD · {"Budget":10}\nTotal · USD · 50 · 40 · 10 · 80.0 · 1 · 40 · 2 · 40 · $130.00 USD · {"Budget":10}\nCSV:\n'+expectedCsv);assert.equal(m.status,'local')}
+ assert.equal((await h.state()).timeZone,'UTC')
+ await audited(h,'report.export',(await h.state()).actor.id,'owner','pipeline')
+ await h.cmd('report.unschedule',{id:schedule.id})
+ await h.cmd('report.schedule',{filters:'view=sales-performance',cadence:'daily',hour:9,recipients:[]},h.owner,400)
+ await h.cmd('report.schedule',{filters:'view=sales-performance',cadence:'daily',hour:9,recipients:['outside@synthetic-platter.example']},h.owner,400)
+ const admin=await h.signIn('admin-performance@studio.example');assert.equal((await h.send('/api/platter/pipeline.csv?view=sales-performance&group=segment&quarter=2099-Q1',undefined,admin)).text,expectedCsv)
+ const adminSchedule=await h.cmd('report.schedule',{filters:'view=sales-performance',cadence:'daily',hour:9,recipients:[h.auth.OWNER_EMAIL]},admin);await h.cmd('report.unschedule',{id:adminSchedule.id},admin)
+ await h.cmd('report.time-zone',{timeZone:'America/New_York'})
+ const fire=at=>worker.scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+ for(const [hour,due,early,check,next] of [[1,'2026-11-01T05:00:00Z','2026-11-01T04:45:00Z','2026-11-01T05:15:00Z','2026-11-02T06:00:00Z'],[2,'2027-03-13T07:00:00Z','2027-03-13T06:45:00Z','2027-03-13T07:15:00Z','2027-03-14T07:00:00Z']]){
+  const scheduled=await h.cmd('report.schedule',{filters:'view=sales-performance&group=segment&quarter=2099-Q1',cadence:'daily',hour,recipients:[h.auth.OWNER_EMAIL]})
+  await h.db.prepare('UPDATE p_report_schedules SET next_run_at=? WHERE id=?').bind(Date.parse(due),scheduled.id).run()
+  const beforeCount=(await h.db.prepare('SELECT count(*) AS n FROM p_report_mail').first()).n
+  await fire(early);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_report_mail').first()).n,beforeCount)
+  await Promise.all([fire(check),fire(check)]);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_report_mail').first()).n,beforeCount+1)
+  assert.equal((await h.db.prepare('SELECT next_run_at FROM p_report_schedules WHERE id=?').bind(scheduled.id).first()).next_run_at,Date.parse(next))
+  if(hour===1){await fire('2026-11-01T06:15:00Z');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_report_mail').first()).n,beforeCount+1,'repeated hour never sends twice')}
+  else {await fire('2027-03-14T07:15:00Z');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_report_mail').first()).n,beforeCount+2,'skipped hour runs at first following check');await fire('2027-03-17T09:15:00Z');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_report_mail').first()).n,beforeCount+3,'missed checks catch up once')}
+  await h.cmd('report.unschedule',{id:scheduled.id})
+ }
+ for(let i=0;i<3;i++){const email='recipient-'+i+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:'Report recipient '+i,role:'member',returnTo:'/app'},h.owner);await h.signIn(email)}
+ const ten=(await h.db.prepare("SELECT email FROM oa_operators WHERE status='active' ORDER BY email").all()).results.map(p=>p.email);assert.equal(ten.length,10)
+ const maxRecipients=await h.cmd('report.schedule',{filters:'view=sales-performance',cadence:'daily',hour:9,recipients:ten});assert.deepEqual((await h.state()).reportSchedules.find(s=>s.id===maxRecipients.id).recipients.toSorted(),ten)
+ await h.cmd('report.schedule',{filters:'view=sales-performance',cadence:'daily',hour:9,recipients:[...ten,'eleventh@synthetic-platter.example']},h.owner,400);await h.db.prepare("UPDATE oa_operators SET status='inactive' WHERE email='recipient-0@synthetic-platter.example'").run()
+ const maxRow=await h.db.prepare('SELECT next_run_at FROM p_report_schedules WHERE id=?').bind(maxRecipients.id).first();await fire(maxRow.next_run_at)
+ const maxRun=(await h.state()).reportSchedules.find(s=>s.id===maxRecipients.id).runs[0];assert.deepEqual(maxRun.skipped,['no longer active']);assert.equal(maxRun.mail.length,9);assert.ok(maxRun.mail.every(m=>m.recipient!=='recipient-0@synthetic-platter.example'))
+ await h.db.prepare("UPDATE oa_operators SET status='active' WHERE email='recipient-0@synthetic-platter.example'").run();await h.cmd('report.unschedule',{id:maxRecipients.id})
+ const first=f.ids[0],second=f.ids[2],third=f.ids[4]
+ await h.db.prepare('DELETE FROM p_expiry WHERE proposal_id=?').bind(first).run()
+ await h.db.prepare('UPDATE p_expiry SET sent_at=? WHERE proposal_id=?').bind(Date.parse('2100-01-01T00:00:00Z'),second).run()
+ let timing=(await read('segment')).rows.find(r=>r.id==='Small business');assert.equal(timing.signSamples,38,'missing and reversed send facts are excluded');assert.equal(timing.medianSignMs,86400000)
+ await h.db.prepare('DELETE FROM p_payment_records WHERE proposal_id=?').bind(third).run()
+ await h.cmd('payment.record',{id:first,method:'wire',receivedOn:'2099-01-01',amount:'1',reference:'synthetic-platter-early',consent:true})
+ await h.cmd('payment.record',{id:first,method:'wire',receivedOn:'2099-01-19',amount:'1',reference:'synthetic-platter-later',consent:true})
+ timing=(await read('segment')).rows.find(r=>r.id==='Small business');assert.equal(timing.paySamples,39);assert.equal(timing.medianPayMs,2*86400000,'earlier receipt cannot hide the first qualifying receipt')
+ // Historical currency is retained rather than converted.
+ await h.db.prepare("UPDATE p_proposals SET currency='AUD' WHERE id=?").bind(f.ids[8]).run()
+ const money=await read('segment');assert.deepEqual(money.totals.map(t=>[t.currency,t.decided,t.won,t.lost,t.averageDealCents]),[['AUD',1,0,1,null],['USD',99,80,19,18000]])
+ const multiCsv=await h.send('/api/platter/pipeline.csv?view=sales-performance&group=segment&quarter=2099-Q1',undefined,h.owner);assert.equal(multiCsv.text,expectedCsv.split('\r\n')[0]+'\r\n'+['Small business,AUD,1,0,1,0.0,,0,,0,,"{""Budget"":1}"','Small business,USD,49,40,9,81.6,1,38,2,39,130.00,"{""Budget"":9}"','Total,AUD,1,0,1,0.0,,0,,0,,"{""Budget"":1}"','Total,USD,49,40,9,81.6,1,38,2,39,130.00,"{""Budget"":9}"'].join('\r\n')+'\r\n')
+ const owned=await suggestionDraft(h,f);await h.cmd('proposal.share',{id:owned.id,operatorId:f.salesId});await h.cmd('proposal.revise',{...((await import('./performance-fixture.mjs')).baseOffer),id:owned.id,version:1,clientId:f.clients[0].id},f.sales)
+ const revised=(await h.state()).proposals.find(p=>p.id===owned.id);assert.equal(revised.sales_owner_id,f.ownerId);assert.equal(revised.prepared_by,'sales@studio.example')
+ await h.cmd('proposal.approve',{id:owned.id,version:2,revision:2});await h.cmd('proposal.send',{id:owned.id,version:3});await h.cmd('proposal.win',{id:owned.id,version:4,reason:'Budget'})
+ const byOwner=await read('owner');assert.equal(byOwner.rows.find(r=>r.id===f.ownerId&&r.currency==='USD').won,41,'revision preparer does not take historical ownership')
+ const boundaryClient=await h.cmd('client.save',{name:'UTC boundaries',email:'synthetic-platter-boundary@example.com',segment:'UTC boundary'})
+ const clock=async at=>h.db.prepare('UPDATE p_expiry_clock SET observed_at=? WHERE singleton=1').bind(Date.parse(at)).run()
+ for(const at of ['2099-04-01T00:30:00+01:00','2099-03-31T20:00:00-04:00']){
+  const b=await h.cmd('proposal.prepare',{...(await import('./performance-fixture.mjs')).baseOffer,clientId:boundaryClient.id,pricingTables:[{optionId:'one',name:'Two services',lines:[{catalogId:f.catalog[0].id,name:'Brand',unit:'project',unitPrice:'40',quantity:'1'},{catalogId:f.catalog[1].id,name:'Support',unit:'project',unitPrice:'60',quantity:'1'}]}]})
+  await h.cmd('proposal.approve',{id:b.id,version:1,revision:1});await clock('2099-03-30T00:00:00Z');const share=await h.cmd('proposal.send',{id:b.id,version:2}),path=new URL(share.shareUrl).pathname
+  await clock(at);const cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},cookie)).status,200)
+  if(at.includes('+01:00'))for(const receivedOn of ['2099-04-04','2099-03-29','2099-03-31','2099-04-02'])await h.cmd('payment.record',{id:b.id,method:'wire',receivedOn,amount:'1',reference:'synthetic-platter-boundary-'+receivedOn,consent:true})
+ }
+ assert.deepEqual((await read('segment',h.owner,'2099-Q1')).rows.filter(r=>r.id==='UTC boundary').map(r=>[r.decided,r.won,r.medianSignMs]),[[1,1,47.5*3600000]],'UTC instant before quarter boundary remains in Q1')
+ assert.deepEqual((await read('segment',h.owner,'2099-Q2')).rows.filter(r=>r.id==='UTC boundary').map(r=>[r.decided,r.won,r.medianSignMs]),[[1,1,48*3600000]],'UTC instant at quarter boundary moves to Q2')
+ const boundaryTiming=(await read('segment',h.owner,'2099-Q1')).rows.find(r=>r.id==='UTC boundary');assert.deepEqual([boundaryTiming.paySamples,boundaryTiming.medianPayMs],[1,24.5*3600000],'first qualifying receipt date at midnight UTC wins over earlier and later receipts')
+ const decline=await h.cmd('proposal.prepare',{...(await import('./performance-fixture.mjs')).baseOffer,clientId:boundaryClient.id,pricingTables:[{optionId:'one',name:'Two services',lines:[{catalogId:f.catalog[0].id,name:'Brand',unit:'project',unitPrice:'40',quantity:'1'},{catalogId:f.catalog[1].id,name:'Support',unit:'project',unitPrice:'60',quantity:'1'}]}]});await h.cmd('proposal.approve',{id:decline.id,version:1,revision:1});const declinePath=new URL((await h.cmd('proposal.send',{id:decline.id,version:2})).shareUrl).pathname,declineCookie=await verified(h,declinePath);assert.equal((await h.send(declinePath+'/action?name=decline',{revision:1,reason:'Timing'},declineCookie)).status,410)
+ const boundaryOutcome=(await read('segment',h.owner,'2099-Q2')).rows.find(r=>r.id==='UTC boundary');assert.deepEqual([boundaryOutcome.decided,boundaryOutcome.won,boundaryOutcome.lost,boundaryOutcome.winRate,boundaryOutcome.averageDealCents,boundaryOutcome.lostReasons],[2,1,1,50,10000,{Timing:1}])
+ const serviceRows=(await read('service',h.owner,'2099-Q2')).rows;assert.deepEqual(serviceRows.filter(r=>r.id===f.catalog[0].id).map(r=>[r.decided,r.won,r.lost]),[[3,2,1]],'multiple services include the correct proposal once per service');assert.deepEqual(serviceRows.filter(r=>r.id===f.catalog[1].id).map(r=>[r.decided,r.won,r.lost]),[[52,41,11]],'second service retains accepted and declined proposals')
+ const providerMail=[],provider=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-report-provider'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');const body=await request.json();if(body.subject==='Platter sales performance report'){providerMail.push(body);if(providerMail.length===2)throw Error('Synthetic provider uncertainty')}return Response.json({id:'synthetic-platter-report-'+providerMail.length})}})
+ try{
+  await provider.send('/auth/invite',{email:'recipient@synthetic-platter.example',displayName:'Recipient',role:'member',returnTo:'/app'},provider.owner);await provider.signIn('recipient@synthetic-platter.example')
+  const client=await provider.cmd('client.save',{name:'Provider report',email:'client@synthetic-platter.example',segment:'Provider fixture'}),p=await provider.cmd('proposal.prepare',{...(await import('./performance-fixture.mjs')).baseOffer,clientId:client.id})
+  await provider.cmd('proposal.approve',{id:p.id,version:1,revision:1});await provider.cmd('proposal.send',{id:p.id,version:2});await provider.cmd('proposal.win',{id:p.id,version:3,reason:'Agreed by phone'})
+  const scheduled=await provider.cmd('report.schedule',{filters:'view=sales-performance&group=segment',cadence:'daily',hour:9,recipients:[provider.auth.OWNER_EMAIL,'recipient@synthetic-platter.example']}),row=await provider.db.prepare('SELECT * FROM p_report_schedules WHERE id=?').bind(scheduled.id).first(),worker=await provider.mf.getWorker()
+  const due={scheduledTime:new Date(row.next_run_at),cron:'*/15 * * * *'};await worker.scheduled(due);await worker.scheduled(due)
+  assert.equal(providerMail.length,2,'uncertain recipient is not resent');assert.deepEqual((await provider.db.prepare('SELECT status FROM p_report_mail ORDER BY rowid').all()).results.map(r=>r.status),['accepted','uncertain'])
+  for(const mail of providerMail){assert.match(mail.text,/1 decided proposals/);assert.match(mail.text,/Provider fixture · USD · 1 · 1 · 0 · 100.0 ·  · 0 ·  · 0 · \$100.00 USD · \{\}/);assert.match(mail.text,/Total,USD,1,1,0,100.0,,0,,0,100.00,\{\}/)}
+ }finally{await provider.close()}
+
+}))
+
+test('AI-004 matching catalog and segment history explains a price range without changing it until explicit revision apply',()=>run(async h=>{
+ const {performanceFixture,suggestionDraft}=await import('./performance-fixture.mjs'),f=await performanceFixture(h)
+ const unsigned=await suggestionDraft(h,f);await h.cmd('proposal.approve',{id:unsigned.id,version:unsigned.version,revision:unsigned.revision});await h.cmd('proposal.send',{id:unsigned.id,version:unsigned.version+1});await h.cmd('proposal.win',{id:unsigned.id,version:unsigned.version+2,reason:'Budget'})
+ const {baseOffer}=await import('./performance-fixture.mjs')
+ const historical=async({catalog=f.catalog[0],client=f.clients[0],price='900',duplicate=false,currency='USD'}={})=>{
+  const lines=[{catalogId:catalog.id,name:'Recorded service',unit:'project',unitPrice:price,quantity:'1',discountPercent:'50'},...(duplicate?[{catalogId:catalog.id,name:'Recorded service',unit:'project',unitPrice:'999',quantity:'1'}]:[])]
+  const p=await h.cmd('proposal.prepare',{...baseOffer,clientId:client.id,pricingTables:[{optionId:'one',name:'Services',lines}]})
+  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});await h.cmd('proposal.send',{id:p.id,version:2});await h.cmd('proposal.lose',{id:p.id,version:3,reason:'Budget',notice:false})
+  if(currency!=='USD')await h.db.prepare('UPDATE p_proposals SET currency=? WHERE id=?').bind(currency,p.id).run()
+  return p
+ }
+ await historical({catalog:f.catalog[1]});await historical({client:f.clients[1]});await historical({currency:'AUD'})
+ const discounted=await historical({price:'80',duplicate:true})
+ const p=await suggestionDraft(h,f),before=(await h.state()).proposals.find(x=>x.id===p.id)
+ const domain=async()=>{const names=(await h.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'p_%' ORDER BY name").all()).results.map(r=>r.name);return Promise.all(names.map(async name=>[name,(await h.db.prepare('SELECT * FROM '+name+' ORDER BY rowid').all()).results]))}
+ const prior=await domain()
+ const suggestion=await h.send('/api/platter/price-suggestions?id='+p.id,undefined,h.owner);assert.equal(suggestion.status,200);assert.deepEqual(await domain(),prior,'suggestion read changes no domain or audit table')
+ assert.equal(suggestion.value.suggestions.length,1);const s=suggestion.value.suggestions[0]
+ assert.deepEqual([s.lowCents,s.highCents,s.sampleSize,s.currentCents],[8000,18000,51,50000]);assert.equal(s.examples.length,3);assert.equal(new Set(s.examples.map(e=>e.id)).size,3);assert.ok(s.examples.every(e=>[...f.ids,discounted.id].includes(e.id)));for(const e of s.examples)assert.equal((await h.send('/app/proposal?id='+e.id,undefined,h.owner)).status,200)
+ assert.deepEqual((await h.state()).proposals.find(x=>x.id===p.id).options,before.options)
+ const beforeRefusal=await domain();await h.cmd('pricing.suggest.apply',{id:p.id,version:p.version,tableIndex:0,lineIndex:0,unitCents:7999},h.owner,400)
+ await h.cmd('pricing.suggest.apply',{id:p.id,version:p.version,tableIndex:0,lineIndex:0,unitCents:12000},f.sales,403)
+ await h.cmd('pricing.suggest.apply',{id:p.id,version:p.version,tableIndex:0,lineIndex:0,unitCents:18001},h.owner,400)
+ assert.deepEqual(await domain(),beforeRefusal,'foreign and out-of-range refusals write nothing')
+ await h.cmd('proposal.approve',{id:p.id,version:p.version,revision:p.revision})
+ await h.cmd('pricing.suggest.apply',{id:p.id,version:p.version+1,tableIndex:0,lineIndex:0,unitCents:12000})
+ await audited(h,'pricing.suggest.apply',(await h.state()).actor.id,'owner',p.id)
+ const after=(await h.state()).proposals.find(x=>x.id===p.id);assert.equal(after.options[0].tables[0].lines[0].unitPrice,'120.00');assert.equal(after.options[0].cents,12000);assert.equal(after.revision,p.revision+1);assert.equal(after.status,'draft');assert.equal(after.approved_by,null)
+ const applyRows=(await h.send('/api/platter/audit?'+new URLSearchParams({action:'pricing.suggest.apply',subject:p.id}),undefined,h.owner)).value.rows;assert.equal(applyRows.length,1)
+ const event=applyRows[0],auditQuery=new URLSearchParams({actor:event.actor_id,action:event.action,subject:event.subject,from:String(event.occurred_at),to:String(event.occurred_at),q:'PRICING.SUGGEST.APPLY'})
+ assert.deepEqual((await h.send('/api/platter/audit?'+auditQuery,undefined,h.owner)).value.rows,applyRows)
+ const applyCsv=await h.send('/api/platter/audit.csv?'+auditQuery,undefined,h.owner);assert.equal(applyCsv.status,200);assert.equal(applyCsv.text,'id,actor_id,actor_role,action,subject,occurred_at,reason,mail_route,sender_address\r\n'+[event.id,event.actor_id,'owner','pricing.suggest.apply',p.id,event.occurred_at,'','',''].map(v=>'"'+v+'"').join(',')+'\r\n')
+ assert.doesNotMatch(JSON.stringify(applyRows),/50000|unitCents|shareToken|synthetic-platter-/)
+ const afterApply=await domain();await h.cmd('pricing.suggest.apply',{id:p.id,version:p.version+1,tableIndex:0,lineIndex:0,unitCents:12000},h.owner,409)
+ await h.cmd('pricing.suggest.apply',{id:f.ids[0],version:5,tableIndex:0,lineIndex:0,unitCents:12000},h.owner,409)
+ assert.equal((await h.send('/api/platter/price-suggestions?id='+p.id,undefined,f.sales)).status,403);assert.deepEqual(await domain(),afterApply,'stale, frozen and foreign refusals write nothing')
+ const multi=await h.cmd('proposal.prepare',{...baseOffer,clientId:f.clients[0].id,pricingTables:[{optionId:'one',name:'First',lines:[{catalogId:f.catalog[0].id,name:'First service',unit:'project',unitPrice:'500',quantity:'1'},{catalogId:f.catalog[0].id,name:'Second service',unit:'project',unitPrice:'600',quantity:'1'}]},{optionId:'one',name:'Second',lines:[{catalogId:f.catalog[0].id,name:'Third service',unit:'project',unitPrice:'700',quantity:'1'}]}]})
+ const multiRead=await h.send('/api/platter/price-suggestions?id='+multi.id,undefined,h.owner);assert.deepEqual(multiRead.value.suggestions.map(s=>[s.tableIndex,s.lineIndex,s.currentCents,s.lowCents,s.highCents,s.sampleSize]),[[0,0,50000,8000,18000,51],[0,1,60000,8000,18000,51],[1,0,70000,8000,18000,51]])
+ await h.cmd('pricing.suggest.apply',{id:multi.id,version:1,tableIndex:1,lineIndex:0,unitCents:18000})
+ assert.deepEqual((await h.state()).proposals.find(p=>p.id===multi.id).options[0].tables.map(t=>t.lines.map(l=>l.unitPrice)),[['500.00','600.00'],['180.00']])
+ const scoped=await h.cmd('proposal.prepare',{...baseOffer,clientId:f.clients[1].id,pricingTables:[{optionId:'one',name:'Services',lines:[{catalogId:f.catalog[1].id,name:'Support',unit:'project',unitPrice:'500',quantity:'1'}]}]},f.sales)
+ await historical({catalog:f.catalog[1],client:f.clients[1],price:'900'})
+ const scopedRead=await h.send('/api/platter/price-suggestions?id='+scoped.id,undefined,f.sales);assert.equal(scopedRead.status,200);assert.deepEqual(scopedRead.value.suggestions.map(s=>[s.lowCents,s.highCents,s.sampleSize]),[[20000,28000,50]],'hidden matching owner history is excluded')
+ await h.cmd('pricing.suggest.apply',{id:scoped.id,version:1,tableIndex:0,lineIndex:0,unitCents:20000},f.sales)
+ const scopedApplied=(await h.state(f.sales)).proposals.find(p=>p.id===scoped.id);assert.equal(scopedApplied.options[0].tables[0].lines[0].unitPrice,'200.00');assert.equal(scopedApplied.revision,2);await audited(h,'pricing.suggest.apply',f.salesId,'sales',scoped.id)
+ const unmatched=await h.cmd('client.save',{name:'No history',email:'synthetic-platter-none@example.com',segment:'Nonprofit'}),unmatchedDraft=await h.cmd('proposal.prepare',{...(await import('./performance-fixture.mjs')).baseOffer,clientId:unmatched.id,pricingTables:[{optionId:'one',name:'Services',lines:[{catalogId:f.catalog[0].id,name:'Brand',unit:'project',unitPrice:'500',quantity:'1'}]}]});assert.deepEqual((await h.send('/api/platter/price-suggestions?id='+unmatchedDraft.id,undefined,h.owner)).value.suggestions,[])
+ await h.send('/auth/invite',{email:'editor-report@studio.example',displayName:'Content editor',role:'member',returnTo:'/app'},h.owner);const editor=await h.signIn('editor-report@studio.example'),person=(await h.state(editor)).actor;await h.cmd('member.set',{operatorId:person.id,role:'content_editor',version:0,teams:[]})
+ assert.equal((await h.send('/api/platter/sales-performance',undefined,editor)).status,403)
+ assert.equal((await h.send('/api/platter/pipeline.csv?view=sales-performance',undefined,f.sales)).status,403)
+ assert.equal((await h.send('/api/platter/sales-performance?group=wrong',undefined,h.owner)).status,400)
+}))

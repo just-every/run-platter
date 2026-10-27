@@ -727,3 +727,30 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
 })
 
 test('SEND-007 desktop and phone replace the unsigned signer, refuse the old link, verify the COO and retain completion history', {timeout:180000},async()=>{const {replacementBrowser}=await import('./signer-replacement-journey.mjs');await replacementBrowser()})
+
+test('REPORT-002 and AI-004 built sales metrics, segment input and explicit suggested-price application', {timeout:180000}, async()=>{
+ const {harness}=await import('./harness.mjs'),{performanceFixture,suggestionDraft}=await import('./performance-fixture.mjs')
+ const h=await harness({entry:'dist/server/index.js',assetsDirectory:'./dist/client'});let browser
+ try{
+  const f=await performanceFixture(h,{singleOwner:true}),p=await suggestionDraft(h,f)
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  const context=await browser.newContext({viewport:{width:1440,height:1000}})
+  await context.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}])
+  const page=await context.newPage(),screens=process.env.PLATTER_PERFORMANCE_SCREENSHOTS??process.env.PLATTER_SCREENSHOTS
+  if(screens)await mkdir(screens,{recursive:true})
+  const capture=async(name)=>{if(screens)await page.screenshot({path:join(screens,name+'.png'),fullPage:true})}
+  await page.goto(h.origin+'/app?view=sales-performance&group=segment&quarter=2099-Q1')
+  const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Sales performance',exact:true})})
+  assert.match(await panel.innerText(),/50 decided proposals/);assert.match(await panel.innerText(),/80.0% · 40 won, 10 lost/);assert.match(await panel.innerText(),/2 days · 40 samples/);assert.match(await panel.innerText(),/3 days · 40 samples/);assert.match(await panel.innerText(),/\$130.00/);assert.match(await panel.innerText(),/Budget.*10/)
+  await capture('REPORT-002-1440');await page.setViewportSize({width:390,height:1000});await capture('REPORT-002-390')
+  await page.setViewportSize({width:1440,height:1000});await page.goto(h.origin+'/app/proposal?id='+p.id)
+  const suggestions=page.locator('section').filter({has:page.getByRole('heading',{name:'Historical price suggestions',exact:true})})
+  assert.match(await suggestions.innerText(),/50 proposals/);assert.match(await suggestions.innerText(),/\$100.00 USD to \$180.00 USD/);assert.equal(await suggestions.locator('li a').count(),3);assert.match(await suggestions.innerText(),/Current unit price: \$500.00 USD/)
+  const move=page.getByRole('button',{name:'Move down',exact:true}).first();if(await move.count()){await move.focus();await page.getByRole('tooltip',{name:'Move down',exact:true}).waitFor()}
+  await suggestions.scrollIntoViewIfNeeded();if(screens)await suggestions.screenshot({path:join(screens,'AI-004-1440.png')});await page.setViewportSize({width:390,height:1000});await suggestions.scrollIntoViewIfNeeded();if(screens)await suggestions.screenshot({path:join(screens,'AI-004-390.png')})
+  await page.setViewportSize({width:1440,height:1000});await suggestions.getByLabel('Chosen unit price (USD)').fill('120.00');await suggestions.getByRole('button',{name:'Apply suggested price'}).click()
+  const current=(await h.state()).proposals.find(r=>r.id===p.id);assert.equal(current.options[0].tables[0].lines[0].unitPrice,'120.00');assert.equal(current.revision,p.revision+1)
+  await page.goto(h.origin+'/app/clients');const clientPanel=page.locator('section').filter({has:page.getByRole('heading',{name:'Add a client',exact:true})});if(screens)await clientPanel.screenshot({path:join(screens,'client-segment-1440.png')});await page.setViewportSize({width:390,height:1000});if(screens)await clientPanel.screenshot({path:join(screens,'client-segment-390.png')});await page.setViewportSize({width:1440,height:1000});await page.getByLabel('Client name',{exact:true}).fill('Segmented client');await page.getByLabel('Client email',{exact:true}).fill('synthetic-platter-segment@example.com');await page.getByLabel('Client segment',{exact:true}).fill('Nonprofit');await page.getByRole('button',{name:'Add client',exact:true}).click();assert.ok((await h.state()).clients.some(c=>c.name==='Segmented client'&&c.segment==='Nonprofit'))
+  await context.close()
+ }finally{await browser?.close();await h.close()}
+})

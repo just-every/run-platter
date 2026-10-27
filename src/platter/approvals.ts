@@ -16,7 +16,7 @@ export async function approvalSettings(db:D1Database){
 function matches(a:Actor,approver:string){return approver==='person:'+a.id||approver==='role:'+a.role}
 export async function approvalPlan(db:D1Database,row:any,a?:Actor){
  const {policy,rules}=await approvalSettings(db),options=typeof row.options==='string'?JSON.parse(row.options):row.options
- const totals=options.map((o:any)=>BigInt(o.pricingGrossCents??o.discount?.grossCents??o.cents)+(o.optionalItems??[]).reduce((sum:bigint,item:any)=>sum+BigInt(item.unitCents)*BigInt(item.editable?item.max:item.quantity),0n)),total=totals.reduce((a:bigint,b:bigint)=>a>b?a:b,0n),first=await db.prepare('SELECT snapshot,prepared_by FROM p_revisions WHERE proposal_id=? AND revision=1').bind(row.id).first<any>(),origin=await db.prepare('SELECT template_id FROM p_template_sources WHERE proposal_id=?').bind(row.id).first<any>()
+ const totals=options.map((o:any)=>BigInt(o.pricingGrossCents??o.discount?.grossCents??o.cents)+(o.optionalItems??[]).reduce((sum:bigint,item:any)=>sum+BigInt(item.unitCents)*BigInt(item.editable?item.max:item.quantity)*BigInt(item.recurrence?.term??1),0n)),total=totals.reduce((a:bigint,b:bigint)=>a>b?a:b,0n),first=await db.prepare('SELECT snapshot,prepared_by FROM p_revisions WHERE proposal_id=? AND revision=1').bind(row.id).first<any>(),origin=await db.prepare('SELECT template_id FROM p_template_sources WHERE proposal_id=?').bind(row.id).first<any>()
  let costing:any
  const holds=async(r:any)=>{
   if(r.templates.length&&!r.templates.includes(origin?.template_id))return false

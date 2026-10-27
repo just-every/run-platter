@@ -2764,3 +2764,10 @@ test('TRACK-003 forwarded viewers verify their own mailbox before owner conversi
  assert.equal((await h.send(path+'/action?name=accept',{name:'Riley Procurement',optionId:'one',consent:true})).status,401)
  assert.equal((await h.state()).proposals.find(row=>row.id===p.id).acceptance,undefined)
 }))
+
+test('PRICE-003 recurring fees keep exact schedules, first-year queue value and immutable selected documents',async()=>{
+ const h=await harness({assetsDirectory:'public'});try{
+ const {recurringJourney}=await import('./recurring-journey.mjs')
+ await recurringJourney(h,{offer,verified})
+ }finally{await h.close()}
+})

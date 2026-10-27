@@ -685,3 +685,8 @@ test('COLLAB-002 internal comment, resolution and dated assignment work at deskt
   }
  }finally{await browser?.close();await app?.close()}
 })
+
+test('PRICE-003 and PRICE-002 recurring line editing, preview, client selection and frozen agreement use the same amounts',{timeout:180000},async()=>{
+ const {recurringBrowserJourney}=await import('./recurring-browser.mjs')
+ await recurringBrowserJourney()
+})

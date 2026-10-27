@@ -2,7 +2,7 @@ import { editableTerms } from '../payment-terms'
 import { escape, field, money, panel } from './shared'
 export function schedulePanel(schedule:any,currency:string):string {
  if(!schedule)return ''
- return panel('Payment schedule',`<p>Informational schedule. No automatic charges or invoices. Monthly retainers are additional to the package price.</p><p>Net ${escape(schedule.netDays)} terms: milestones and retainers are due ${escape(schedule.netDays)} days after each listed date or event. The deposit is due at acceptance.</p><ol>${schedule.rows.map((r:any)=>`<li>${escape(r.label)} · <time>${escape(r.date??r.event)}</time> · ${money(r.amountCents,currency)} · net ${escape(r.netDays)}</li>`).join('')}</ol>`)
+ return panel('Payment schedule',`<p>Informational schedule. No automatic charges or invoices. Recurring pricing installments are included in the term total; any separately configured monthly retainer is additional.</p><p>Net ${escape(schedule.netDays)} terms: milestones and retainers are due ${escape(schedule.netDays)} days after each listed date or event. The deposit is due at acceptance.</p><ol>${schedule.rows.map((r:any)=>`<li>${escape(r.label)} · <time>${escape(r.date??r.event)}</time> · ${money(r.amountCents,currency)}${r.prepaidCents?` (deposit credit ${money(r.prepaidCents,currency)})`:""} · net ${escape(r.netDays)}</li>`).join('')}</ol>`)
 }
 export function scheduleEditor(row:any):string {
  const t=editableTerms(row),select=(label:string,name:string,values:string[],value:string)=>`<label for="schedule-${name}">${label}</label><select id="schedule-${name}" name="${name}">${values.map(v=>`<option value="${v}"${v===value?' selected':''}>${escape(v)}</option>`).join('')}</select>`

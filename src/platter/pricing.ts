@@ -1,9 +1,10 @@
 import { allocateNet, fixedDiscount, scopedNet, percentBps } from './discounts'
+import { recurrenceInput, type Recurrence } from './recurring'
 import { calendarDate } from './expiry-time'
 import { dollars, need, text } from './model'
 
 export interface PriceLine {
- name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number; grossCents?:number; discountBps?:number; discountFixedCents?:number; groupDiscountBps?:number; groupDiscountFixedCents?:number
+ recurrence?:Recurrence; name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number; grossCents?:number; discountBps?:number; discountFixedCents?:number; groupDiscountBps?:number; groupDiscountFixedCents?:number
 }
 export interface PriceTable {
  name: string; lines: PriceLine[]; groups: { name: string; subtotalCents: number }[]; subtotalCents: number; thresholdBps?:number
@@ -39,13 +40,13 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
    const mills = BigInt(whole) * 1000n + BigInt(fraction.padEnd(3, '0'))
    need(mills > 0n && mills <= 1000000000n, 'Quantity must be from 0.001 to 1,000,000')
    const cents = dollars(line.unitPrice)
-   const grossCents = boundedTotal((mills * BigInt(cents) + 500n) / 1000n),discountBps=percentBps(line.discountPercent,'a line discount'),discountFixedCents=fixedDiscount(line.discountAmount),groupDiscountBps=percentBps(line.groupDiscountPercent,'a group discount'),groupDiscountFixedCents=fixedDiscount(line.groupDiscountAmount),lineTotalCents=scopedNet(grossCents,discountBps,discountFixedCents)
+   const recurring=recurrenceInput(line),grossCents = boundedTotal(((mills * BigInt(cents) + 500n) / 1000n)*BigInt(recurring.recurrence?.term??1)),discountBps=percentBps(line.discountPercent,'a line discount'),discountFixedCents=fixedDiscount(line.discountAmount),groupDiscountBps=percentBps(line.groupDiscountPercent,'a group discount'),groupDiscountFixedCents=fixedDiscount(line.groupDiscountAmount),lineTotalCents=scopedNet(grossCents,discountBps,discountFixedCents)
    const description = line.description ?? '', group = line.group ?? ''
    need(typeof description === 'string' && description.length <= 2000, 'Description must be text up to 2000 characters')
    need(typeof group === 'string' && group.length <= 200, 'Group must be text up to 200 characters')
    const name = text(line.name, 'a line name'), unit = text(line.unit, 'a unit', 40)
    groups.set(group.trim(), boundedTotal(BigInt(groups.get(group.trim()) ?? 0) + BigInt(lineTotalCents)))
-   return { name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{grossCents,discountBps,discountFixedCents,groupDiscountBps,groupDiscountFixedCents}:{}) }
+   return { ...recurring,name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{grossCents,discountBps,discountFixedCents,groupDiscountBps,groupDiscountFixedCents}:{}) }
   })
   let thresholdBps=Math.max(0,...lines.map(l=>l.grossCents?Math.ceil((l.grossCents-l.lineTotalCents)*10000/l.grossCents):0))
   for(const group of groups.keys()){
@@ -71,7 +72,7 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
 export function pricingInput(options: any[]) {
  return options.flatMap(option => (option.tables ?? []).map((table: PriceTable) => ({
   optionId: option.id, name: table.name,
-  lines: table.lines.map(({ name, description, quantity, unit, unitPrice, group, discountBps, discountFixedCents, groupDiscountBps, groupDiscountFixedCents }) => ({ name, description, quantity, unit, unitPrice, group,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{discountPercent:(discountBps??0)/100,discountAmount:((discountFixedCents??0)/100).toFixed(2),groupDiscountPercent:(groupDiscountBps??0)/100,groupDiscountAmount:((groupDiscountFixedCents??0)/100).toFixed(2)}:{}) })),
+  lines: table.lines.map(({ recurrence,name, description, quantity, unit, unitPrice, group, discountBps, discountFixedCents, groupDiscountBps, groupDiscountFixedCents }) => ({ ...(recurrence?{recurrence}:{}),name, description, quantity, unit, unitPrice, group,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{discountPercent:(discountBps??0)/100,discountAmount:((discountFixedCents??0)/100).toFixed(2),groupDiscountPercent:(groupDiscountBps??0)/100,groupDiscountAmount:((groupDiscountFixedCents??0)/100).toFixed(2)}:{}) })),
  })))
 }
 
@@ -98,7 +99,7 @@ export function packageInputs(input: unknown, tables: any[]) {
    const min = integer(extra.min), max = integer(extra.max), quantity = integer(extra.quantity)
    need(min <= quantity && quantity <= max, 'Default quantity must be within its minimum and maximum')
    need(typeof extra.editable === 'boolean', 'Choose whether quantity is client-editable')
-   return { id, label: text(extra.label, 'an optional-item name'), unitCents: dollars(extra.unitPrice), min, max, quantity, editable: extra.editable }
+   return { ...recurrenceInput(extra),id, label: text(extra.label, 'an optional-item name'), unitCents: dollars(extra.unitPrice), min, max, quantity, editable: extra.editable }
   })
   const discountBps=percentBps(item.discountPercent,'a package discount',9999)
   const discountFixedCents=fixedDiscount(item.discountAmount)

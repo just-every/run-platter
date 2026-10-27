@@ -35,4 +35,4 @@ export function paymentSchedule(total:number,deposit:number,t:any):any {
  if(t.retainer){const r=t.retainer,[y,m,d]=r.startsOn.split('-').map(Number),amount=Math.round(total*r.bps/10000);for(let i=0;i<r.months;i++){const month=new Date(Date.UTC(y,m-1+i,1));const last=new Date(Date.UTC(month.getUTCFullYear(),month.getUTCMonth()+1,0)).getUTCDate();month.setUTCDate(Math.min(d,last));rows.push({kind:'retainer',label:'Monthly retainer',date:month.toISOString().slice(0,10),amountCents:amount,netDays:t.netDays})}}
  return {netDays:t.netDays,rows}
 }
-export function scheduleLines(schedule:any,currency:string):string[]{return schedule.rows.map((r:any)=>`${r.label}: ${currency} ${(r.amountCents/100).toFixed(2)} · ${r.date??r.event} · net ${r.netDays}`)}
+export function scheduleLines(schedule:any,currency:string):string[]{return schedule.rows.map((r:any)=>`${r.label}: ${currency} ${(r.amountCents/100).toFixed(2)} · ${r.date??r.event}${r.prepaidCents?` · deposit credit ${currency} ${(r.prepaidCents/100).toFixed(2)}`:""} · net ${r.netDays}`)}

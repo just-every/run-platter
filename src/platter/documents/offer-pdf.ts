@@ -1,3 +1,4 @@
+import { feeLines } from '../recurring'
 import { depositCents, paymentTerms, scheduleLines } from '../payment-terms'
 import { displayOptions } from '../discounts'
 import { documentOf } from './blocks'
@@ -46,7 +47,8 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  if(selected.discount&&!selected.concealDiscount)pdf.text(`Package discount: ${selected.discount.bps/100}% off ${amount(selected.discount.grossCents,currency)}; discount ${amount(selected.discount.cents,currency)}${selected.discount.fixedCents?`; fixed reduction ${amount(selected.discount.fixedCents,currency)}`:''}`)
  pdf.text(`Selected option total: ${amount(selected.cents, currency)}`)
  pdf.text(`Deposit due: ${amount(deposit(selected.cents), currency)}`)
- if(selection.paymentSchedule){pdf.heading('Payment schedule');pdf.text('Informational schedule. No automatic charges or invoices. Monthly retainers are additional to the package price.');for(const line of scheduleLines(selection.paymentSchedule,currency))pdf.text(line)}
+ for(const line of feeLines(selection.fees,currency))pdf.text(line)
+ if(selection.paymentSchedule){pdf.heading('Payment schedule');pdf.text('Informational schedule. No automatic charges or invoices. Recurring pricing installments are included in the term total; any separately configured monthly retainer is additional.');for(const line of scheduleLines(selection.paymentSchedule,currency))pdf.text(line)}
  if(selection.items.length){pdf.heading('Selected optional items');for(const item of selection.items)pdf.text(`${item.label}: ${item.quantity} x ${amount(item.unitCents,currency)} = ${amount(item.totalCents,currency)}`)}
 
  const doc=documentOf(view)

@@ -2806,8 +2806,8 @@ test('AUTO-004 scoped REST drafting, immutable owner keys and human-only authori
 
 test('AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation',async()=>{
  const {createHmac}=await import('node:crypto'),received=[]
- let refuse=true
- const h=await harness({outboundService:async request=>{received.push({url:request.url,body:await request.text(),headers:Object.fromEntries(request.headers)});return new Response(refuse?'synthetic-platter-92':null,{status:refuse?503:204})}})
+ let refuse=true,revokeDuringDelivery=null
+ const h=await harness({outboundService:async request=>{received.push({url:request.url,body:await request.text(),headers:Object.fromEntries(request.headers)});if(revokeDuringDelivery){const id=revokeDuringDelivery;revokeDuringDelivery=null;assert.equal((await h.send('/api/platter/v1/webhooks/'+id+'/revoke',{},h.owner)).status,200)}return new Response(refuse?'synthetic-platter-92':null,{status:refuse?503:204})}})
  try{
   const api=(path,input,cookie=h.owner)=>h.send('/api/platter/v1'+path,input,cookie)
   assert.equal((await api('/webhooks',{url:'https://hooks.example.com/events',consent:false})).status,400)
@@ -2829,6 +2829,9 @@ test('AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocati
   assert.doesNotMatch((await api('/webhooks')).text,new RegExp(hook.secret))
   assert.doesNotMatch((await h.state()).proposals.map(p=>JSON.stringify(p)).join(''),new RegExp(hook.secret))
   await api('/webhooks/'+hook.id+'/revoke',{});const client=(await h.state()).clients[0];await h.cmd('proposal.prepare',{...offer,clientId:client.id});await cron(now+180003);assert.equal(received.length,n,'revocation stops future delivery')
+  const second=(await api('/webhooks',{url:'https://hooks.example.com/second',consent:true})).value
+  const queued=await h.cmd('proposal.prepare',{...offer,clientId:client.id});await h.cmd('proposal.approve',{id:queued.id,version:1,revision:1});revokeDuringDelivery=second.id
+  await cron(now+240004);assert.equal(received.length,n+1,'revocation during one request withholds the other preselected deliveries')
  }finally{await h.close()}
 })
 

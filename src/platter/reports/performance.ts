@@ -26,7 +26,7 @@ export async function performanceHistory(db:D1Database,a:Actor) {
   const lines=historicalLines(options),selected=won&&p.option_id?lines.filter(l=>l.optionId===p.option_id):lines
   const received=payments.results.filter(r=>r.proposal_id===p.id&&r.revision===p.revision).map(r=>r.received_on?Date.parse(r.received_on+'T00:00:00Z'):r.recorded_at).filter(t=>p.accepted_at!=null&&t>=Date.parse(new Date(p.accepted_at).toISOString().slice(0,10)+'T00:00:00Z')).map(t=>Math.max(t,p.accepted_at))
   const date=new Date(at),quarter=`${date.getUTCFullYear()}-Q${Math.floor(date.getUTCMonth()/3)+1}`
-  return [{id:p.id,title:p.title,revision:p.revision,currency:p.currency,won,at,reason:won?null:outcome.reason,
+  return [{id:p.id,title:p.title,revision:p.revision,currency:p.currency,accepted:p.accepted_at!=null,won,at,reason:won?null:outcome.reason,
    valueCents:p.total_cents??Math.max(...options.map((o:any)=>o.cents)),owner:p.sales_owner_id??missing,ownerLabel:p.sales_owner_name??missing,
    template:p.template_id??missing,templateLabel:p.template_name??p.template_id??missing,segment:p.segment||missing,quarter,
    services:[...new Map(lines.map(l=>[l.catalogId??l.name,{id:l.catalogId??l.name,label:l.name}])).values()],lines:selected,

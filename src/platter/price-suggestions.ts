@@ -11,7 +11,7 @@ export function priceSuggestions(history:any[],proposal:any,segment:string) {
  if(!segment)return []
  return proposal.options.flatMap((o:any)=>(o.tables??[]).flatMap((t:any,ti:number)=>t.lines.flatMap((l:any,li:number)=>{
   if(!l.catalogId)return []
-  const samples=history.filter(r=>r.id!==proposal.id&&r.segment===segment&&r.currency===proposal.currency).flatMap(r=>{
+  const samples=history.filter(r=>(r.accepted||!r.won)&&r.id!==proposal.id&&r.segment===segment&&r.currency===proposal.currency).flatMap(r=>{
    const prices=r.lines.filter((v:any)=>v.catalogId===l.catalogId&&v.unit===l.unit).map((v:any)=>Math.round(Number(v.unitPrice)*100))
    return prices.length?[{id:r.id,title:r.title,outcome:r.won?'won':'lost',prices}]:[]
   }).sort((a,b)=>a.id.localeCompare(b.id))

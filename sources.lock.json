@@ -2650,7 +2650,7 @@
       "executable": false
     },
     "src/platter/price-suggestions.ts": {
-      "sha256": "9a8bc1d14d3d420f762c65efab48a42fee9d8b0d91dda753c68794468e3a4943",
+      "sha256": "190ec2c2c1f89589e506fe396e8286e161849ffa8e6098e361921600cc57c838",
       "executable": false
     },
     "src/platter/pricing.ts": {
@@ -2686,7 +2686,7 @@
       "executable": false
     },
     "src/platter/reports/performance.ts": {
-      "sha256": "83ff72c2414b0a4c0afc9ff19d5a9722327b03b233d2db71e4b6164c8819b553",
+      "sha256": "489c55c307051d2fe02f31dd5172ef2f18b01b4db12d9a76db10d1b5f52b262b",
       "executable": false
     },
     "src/platter/reports/pipeline-csv.ts": {
@@ -3190,7 +3190,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "90648809482b4678ce22ccc021ea937dd0657c2a9f9babba9636dcecd9fad699",
+      "sha256": "2e9337695bda205a1fcdeb8217b321715f54ddc41ec6c163acb929ea31901147",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

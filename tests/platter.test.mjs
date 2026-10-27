@@ -2802,11 +2802,11 @@ test('AI-004 historical range and three linked examples never change prices befo
  const {salesFixture}=await import('./performance-fixture.mjs'),f=await salesFixture(h),before=await h.db.prepare('SELECT options,version FROM p_proposals WHERE id=?').bind(f.draft.id).first()
  // Distractors independently challenge the item, segment, currency and unit boundaries.
  const original=await h.db.prepare("SELECT * FROM p_proposals WHERE id='synthetic-platter-history-0-24'").first()
- for(const [n,patch] of [{client_id:f.clients[1].id},{catalogId:f.catalog[1].id},{currency:'AUD'},{unit:'hour'}].entries()){
+ for(const [n,patch] of [{client_id:f.clients[1].id},{catalogId:f.catalog[1].id},{currency:'AUD'},{unit:'hour'},{won:true}].entries()){
   const row={...original,id:'synthetic-platter-distractor-'+n,...(patch.client_id?{client_id:patch.client_id}:{}),...(patch.currency?{currency:patch.currency}:{})},options=JSON.parse(row.options)
   Object.assign(options[0].tables[0].lines[0],{unitPrice:'0.01',...(patch.catalogId?{catalogId:patch.catalogId}:{}),...(patch.unit?{unit:patch.unit}:{})});row.options=JSON.stringify(options)
   const columns=Object.keys(row);await h.db.prepare(`INSERT INTO p_proposals(${columns.join(',')}) VALUES(${columns.map(()=>'?').join(',')})`).bind(...Object.values(row)).run()
-  await h.db.prepare("INSERT INTO p_outcome_records(proposal_id,revision,kind,actor_id,actor_role,actor_email,occurred_at,reason) VALUES(?,1,'lost',?,'owner',?,?,'Budget')").bind(row.id,f.own.id,f.own.email,Date.UTC(2025,0,15)).run()
+  await h.db.prepare("INSERT INTO p_outcome_records(proposal_id,revision,kind,actor_id,actor_role,actor_email,occurred_at,reason) VALUES(?,1,?,?,'owner',?,?,'Budget')").bind(row.id,patch.won?'won':'lost',f.own.id,f.own.email,Date.UTC(2025,0,15)).run()
  }
  let p=(await h.state()).proposals.find(p=>p.id===f.draft.id),suggestion=p.priceSuggestions[0]
  assert.equal(p.priceSuggestions.length,1);assert.deepEqual([suggestion.minCents,suggestion.maxCents,suggestion.suggestedCents,suggestion.sampleSize],[100000,400000,250000,50]);assert.equal(suggestion.examples.length,3);assert.equal(new Set(suggestion.examples.map(e=>e.id)).size,3)
@@ -2822,5 +2822,6 @@ test('AI-004 historical range and three linked examples never change prices befo
  await h.cmd('client.segment',{id:f.clients[0].id,segment:''});p=(await h.state()).proposals.find(p=>p.id===f.draft.id);assert.deepEqual(p.priceSuggestions,[])
  await h.cmd('client.segment',{id:f.clients[0].id,segment:'Agency'})
  await h.cmd('proposal.approve',{id:p.id,version:p.version,revision:p.revision});const approved=(await h.state()).proposals.find(v=>v.id===p.id);await h.cmd('proposal.send',{id:p.id,version:approved.version});const sent=(await h.state()).proposals.find(v=>v.id===p.id);await h.cmd('pricing.suggested',{...input,version:sent.version},h.owner,409)
+ await h.cmd('pricing.suggested',{...input,id:'synthetic-platter-history-0-00',version:1},h.owner,409)
  assert.ok((await h.send('/api/platter/audit?action=pricing.suggested',undefined,h.owner)).value.rows.some(r=>r.subject===p.id))
 }))

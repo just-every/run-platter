@@ -1410,7 +1410,7 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 
 ## Status
 
-Judged from this committed tree (27 October 2026).
+Judged from the code and tests at commit `80284976ad88cff5df2cbb89a91bb23e7a55936a` (27 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |

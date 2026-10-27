@@ -999,7 +999,7 @@ Reports show win rate, time to sign, time to pay, average deal value and lost re
 
 *Acceptance:* From a fixture of 100 decided proposals, see win rate, median time to sign, median time to pay, average deal value and lost-reason counts by owner, template, service, client segment and quarter, each matching the fixture's hand-computed values.
 
-*Status:* missing. No conversion reporting.
+*Status:* done. The report groups decided proposals by recorded owner, source template, service, explicit client segment and UTC decision quarter. Accepted proposals and recorded won overrides count as won; current declined and lost outcomes count as lost. Missing timing facts remain excluded with sample counts. Sign time uses recorded send to acceptance; pay time uses acceptance to the first recorded receipt date at midnight UTC, excluding earlier receipts. Average deal value uses won values, with currencies separate. Existing report visibility applies. CSV and scheduled email retain the selected grouping and quarter and repeat the same rows and per-currency totals. Evidence: `tests/platter.test.mjs` — “REPORT-002 hundred decided proposals expose exact segmented metrics, matching CSV and scheduled figures” (all five hand-computed metrics and groupings, independent per-currency totals, quarter filtering, scoped reads, CSV and once-only two-recipient email); `tests/site.test.mjs` — “REPORT-002 and AI-004 built sales metrics, segment input and explicit suggested-price application” (compiled screens at 1440 and 390); `tests/archive.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” (identical restored report rows and segments).
 
 #### REPORT-003 — Content and pricing performance.
 
@@ -1222,7 +1222,7 @@ For each line item, Platter suggests a price range from the firm's own accepted 
 
 *Acceptance:* From a fixture history, see a suggested range with sample size and three linked examples, and see the price unchanged until the member applies it.
 
-*Status:* missing. No price suggestions.
+*Status:* done. Suggestions use only visible accepted and lost history with the same catalog identity, explicit client segment and currency. The range is the observed minimum to maximum unit price before discounts, with one sample per proposal and up to three linked examples. Reading a suggestion writes nothing. Explicit application validates the current version and range, creates an audited draft revision through the existing edit door and clears approval; stale, foreign and frozen offers are refused. Catalog identities and client segments survive the public archive. Evidence: `tests/platter.test.mjs` — “AI-004 matching catalog and segment history explains a price range without changing it until explicit revision apply” (range, sample size, three working links, no implicit write, segment exclusion, explicit revision, audit and refusals); `tests/site.test.mjs` — “REPORT-002 and AI-004 built sales metrics, segment input and explicit suggested-price application” (compiled apply flow at 1440, screens at 1440 and 390); `tests/archive.test.mjs` — named scoped-role public CLI journey (client segment and catalog identity custody).
 
 ### Privacy, security and portability
 
@@ -1406,13 +1406,13 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 
 ## Status
 
-Judged from the code and tests at commit `e17e2c0e8707eb579f6be13ea894feffa3bbb53e` (22 October 2026).
+Judged from the code and tests at commit `83bd6212cf655bbef0714f850a43f8339d677792` (27 October 2026). Counts and named evidence below describe the current tree; landing validation is recorded separately.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 36 | 35 | 58 | 129 |
-| All | 48 | 35 | 58 | 141 |
+| Target and push further | 38 | 35 | 56 | 129 |
+| All | 50 | 35 | 56 | 141 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1523,7 +1523,7 @@ Judged from the code and tests at commit `e17e2c0e8707eb579f6be13ea894feffa3bbb5
 | `RENEW-001` | Bulk proposal creation and sending | target | missing |  | No bulk sending. |
 | `RENEW-002` | Renewal proposals from accepted agreements | target | missing |  | No renewals. |
 | `REPORT-001` | Proposal pipeline dashboard | target | done | `src/platter/pipeline.ts`, `src/platter/ui/pipeline.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
-| `REPORT-002` | Win rate and sales performance | target | missing |  | No conversion reporting. |
+| `REPORT-002` | Win rate and sales performance | target | done | `tests/platter.test.mjs` — “REPORT-002 hundred decided proposals expose exact segmented metrics, matching CSV and scheduled figures” (all five hand-computed metrics and groupings, independent per-currency totals, quarter filtering, scoped reads, CSV and once-only two-recipient email); `tests/site.test.mjs` — “REPORT-002 and AI-004 built sales metrics, segment input and explicit suggested-price application” (compiled screens at 1440 and 390); `tests/archive.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” (identical restored report rows and segments). |  |
 | `REPORT-003` | Content and pricing performance | target | missing |  | No content analytics. |
 | `REPORT-004` | Booked, billed and collected revenue | target | partial | `src/platter/reports/recorded-revenue.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | The recorded-revenue pipeline view now shows accepted value, explicitly received payments, confirmed refunds, net received, unconfirmed refunds and exported deposit CSV value, separately by currency. It never labels an export as a paid provider invoice. Owner/admin/billing see all, manager/viewer see teams and sales sees own; content editors and agents receive no revenue facts. tests/platter.test.mjs — “TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund” proves hand-computed totals, each role, exact filtered CSV and once-only scheduled email with identical rows and money. The named role browser journey proves sales/manager/billing views and owner CSV/scheduling at 1440/390; the named role CLI archive journey preserves receipts, refunds, filters and identical report rows/totals. Gap: recurring/MRR/first-year figures, provider invoiced/overdue amounts, accepted/payment-period reporting and accounting reconciliation with the QuickBooks fake remain. |
 | `REPORT-005` | Report export and scheduled delivery | target | done | `src/platter/reports/schedules.ts`, `src/platter/reports/pipeline-csv.ts`, `src/platter/reports/zone.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs` |  |
@@ -1544,7 +1544,7 @@ Judged from the code and tests at commit `e17e2c0e8707eb579f6be13ea894feffa3bbb5
 | `AI-001` | Drafts from meeting notes, transcripts and email | target | partial | `src/platter/http.ts`, `tests/platter.test.mjs` | External agents can post structured drafts; there is no ingestion of notes, transcripts or email and no in-product drafting. |
 | `AI-002` | Writing assistant in the editor | target | missing |  | No writing assistant. |
 | `AI-003` | MCP server for AI assistants | target | done | `src/platter/mcp.ts`, `src/platter/send-requests.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
-| `AI-004` | Explainable price suggestions | target | missing |  | No price suggestions. |
+| `AI-004` | Explainable price suggestions | target | done | `tests/platter.test.mjs` — “AI-004 matching catalog and segment history explains a price range without changing it until explicit revision apply” (range, sample size, three working links, no implicit write, segment exclusion, explicit revision, audit and refusals); `tests/site.test.mjs` — “REPORT-002 and AI-004 built sales metrics, segment input and explicit suggested-price application” (compiled apply flow at 1440, screens at 1440 and 390); `tests/archive.test.mjs` — named scoped-role public CLI journey (client segment and catalog identity custody). |  |
 | `PRIV-001` | Erasure across contacts, tracking and synced systems | target | partial | `src/platter/commands.ts`, `tests/platter.test.mjs` | Only unused client records can be erased; no contacts, tracking data or notice to synced systems. |
 | `PORT-002` | Complete product archive | target | done | `tests/archive.test.mjs`, `src/platter/archive-policy.mjs` |  |
 | `SEC-001` | Provider credential custody | target | partial | `src/platter/connections.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Stripe, QuickBooks, HubSpot, Salesforce, Drive, Slack, Google and Microsoft tokens are sealed with purpose-separated AES-GCM, omitted from API/UI/log fields and excluded from archives. tests/platter.test.mjs — “TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens” proves connection authority, plaintext absence and disconnect; tests/archive.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” proves metadata restoration requires reconnection. Gap: SSO provider credentials, per-provider least-scope verification, OAuth refresh, visible breakage state and job-stop assertions for future synchronization jobs. |

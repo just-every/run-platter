@@ -24,16 +24,16 @@ export async function recurringBrowserJourney() {
    await line.getByLabel('Recurring installments').fill('24');await page.getByRole('button',{name:'Save revision',exact:true}).click()
    await line.getByLabel('Recurring installments').fill('12');await page.getByRole('button',{name:'Save revision',exact:true}).click();await capture('editor')
    await page.goto(app.origin+'/app/preview/client?id='+p.id+'&revision=3&optionId=two&items='+encodeURIComponent(JSON.stringify([{id:'seats',quantity:4}])))
-   if(width===1440){const text=await page.locator('main').innerText();assert.ok(text.includes('One-off total: USD 2,500.00'));assert.ok(text.includes('First-year value: USD 19,300.00'));assert.ok(text.includes('USD 200.00 per monthly'))}await capture('preview')
+   if(width===1440){const text=await page.locator('main').innerText();assert.ok(text.includes('One-off total: USD 2,500.00'));assert.ok(text.includes('First-year value: USD 19,300.00'));assert.ok(text.includes('USD 200.00 per month'))}await capture('preview')
    await cmd('proposal.approve',{id:p.id,version:3,revision:3});const sent=await cmd('proposal.send',{id:p.id,version:4}),path=new URL(sent.shareUrl).pathname
    await page.goto(app.origin+path+'?optionId=two')
-   if(width===1440){const text=await page.locator('main').innerText();assert.ok(text.includes('First-year value: USD 16,900.00'));assert.ok(text.includes('USD 1,200.00 per monthly'))}
+   if(width===1440){const text=await page.locator('main').innerText();assert.ok(text.includes('First-year value: USD 16,900.00'));assert.ok(text.includes('USD 1,200.00 per month'))}
    await page.getByRole('checkbox',{name:/Add Extra seats/}).check();await page.getByLabel('Quantity for Extra seats').fill('4');await page.getByRole('button',{name:'Review package',exact:true}).click();await capture('client')
    await page.getByRole('button',{name:'Send verification code',exact:true}).click()
    const state=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(x=>x.proposal_id===p.id&&x.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click()
    await page.getByLabel('Your full name').fill('Avery Chen');await page.locator('[name=consent]').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
-   if(width===1440){const text=await page.locator('main').innerText();assert.ok(text.includes('First-year value: USD 19,300.00'));assert.ok(text.includes('USD 200.00 per monthly'));assert.ok(text.includes('This agreement is complete'))}await capture('agreement')
+   if(width===1440){const text=await page.locator('main').innerText();assert.ok(text.includes('First-year value: USD 19,300.00'));assert.ok(text.includes('USD 200.00 per month'));assert.ok(text.includes('This agreement is complete'))}await capture('agreement')
   }finally{await context.close();await app.close()}
  }}finally{await browser.close()}
 }

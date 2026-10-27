@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "a1f83ee05ad1794aba3ac4ea299aa728f191082e9b051990a79efece2ff99cd0",
+      "sha256": "1da82271028ec7cfa7c7817221a21ce95151a88fb080cf6555b4ade53e38f3b6",
       "executable": false
     },
     "AGENTS.md": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "f11c7b7b68e09052bb0e167dfcc68d4ea534c3042a42d44886c734aee8c8baa3",
+      "sha256": "622a26bd1c27a26a9b2cd5da961ab9dbfbda9e056a3b24dd7eeb5f288eeb8545",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -138,7 +138,7 @@
       "executable": false
     },
     "docs/PROPOSALS.md": {
-      "sha256": "e24c8fa811fb9140fd600e64c4259ee23cc24bf594328f4ed79090d9b65a5c01",
+      "sha256": "fab9a0b3ac969435d9b4ae57ab7c8d0e968834e4120db226913cab4b696607eb",
       "executable": false
     },
     "docs/README.md": {
@@ -1182,7 +1182,7 @@
       "executable": false
     },
     "scripts/contract-docs.mjs": {
-      "sha256": "d28b4e59008375a01af18447c50463af69f6e9fdeeb9492cf29c09cba7a563f4",
+      "sha256": "c0cd88f2c3d6ab304ef14450a8845270e0d6608138195f7979e331eadebc8bf9",
       "executable": false
     },
     "scripts/delivery/base/artifact.mjs": {
@@ -2286,7 +2286,7 @@
       "executable": false
     },
     "src/platter/approvals.ts": {
-      "sha256": "46bd4f7ac6e0eddf92117a1c4a9552417aa335f769f903497a63dfd2547f3b0d",
+      "sha256": "aa675508caa3b73eb58b4446ea0081d2b45a8e91bfaf6d5f2fc94290db5c0fea",
       "executable": false
     },
     "src/platter/archive-policy.d.mts": {
@@ -2662,7 +2662,7 @@
       "executable": false
     },
     "src/platter/recurring.ts": {
-      "sha256": "d566eb9180447790c1d0e816abc97100f04fc5de83b6ce184db5d7f83b28e47a",
+      "sha256": "21223657c355bfc9608fe0f775adcc627ec405d02d68dcafec0d0a6a7644b3b5",
       "executable": false
     },
     "src/platter/reminder-message-defaults.ts": {
@@ -3194,11 +3194,11 @@
       "executable": false
     },
     "tests/recurring-browser.mjs": {
-      "sha256": "df01595ba20f111e9842677b3ea3ca55273f3aa72f31de4d1a8b813417eaf208",
+      "sha256": "cfdeca7b39e6407714cd8ca4b1710e4e166859b327b53039a88831e2e053b282",
       "executable": false
     },
     "tests/recurring-journey.mjs": {
-      "sha256": "93b79cb8edf0cc50cd837361a7a6fc6a029a15c8167ba093f889bce1978d5e7e",
+      "sha256": "724577f5abacbb8fa37964a7f1018bb9473ef05ad3e1fc2bd3dec0dd06d03c92",
       "executable": false
     },
     "tests/reminders-http.mjs": {

@@ -7,10 +7,10 @@ export const recurringFixture=(term=12)=>({
 })
 export async function recurringJourney(h,{offer,verified}) {
  const client=await h.cmd('client.save',{name:'Recurring client',email:'recurring@studio.example'}),input={...offer,...recurringFixture(),title:'Recurring services',depositPercent:'1',clientId:client.id}
- const p=await h.cmd('proposal.prepare',input),row=async id=>(await h.state()).proposals.find(p=>p.id===(id??p.id))
+ const p=await h.cmd('proposal.prepare',input),row=async id=>(await h.state()).proposals.find(x=>x.id===(id??p.id))
  assert.equal((await row()).options[1].cents,1690000,'Agreed term value is $16,900, never one installment')
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
- const summary=html=>{for(const text of ['One-off total: USD 2,500.00','USD 1,200.00 per monthly','First-year value: USD 16,900.00'])assert.ok(html.includes(text),'Recurring summary '+text)}
+ const summary=html=>{for(const text of ['One-off total: USD 2,500.00','USD 1,200.00 per month','First-year value: USD 16,900.00'])assert.ok(html.includes(text),'Recurring summary '+text)}
  summary((await h.send('/app/preview/client?id='+p.id+'&revision=1&optionId=two',undefined,h.owner)).text)
  const before=await h.state()
  for(const change of [{interval:'daily'},{term:0},{term:1.5},{term:121},{startsOn:'2099-02-30'}]){const f=recurringFixture();Object.assign(f.pricingTables[0].lines[1],change);await h.cmd('proposal.prepare',{...input,...f},h.owner,400)}
@@ -22,6 +22,7 @@ export async function recurringJourney(h,{offer,verified}) {
  assert.deepEqual(rows.map(r=>[r.valueCents,r.currency]),[[2000000,'USD'],[1690000,'USD'],[1690000,'USD']])
  assert.equal(queue.totals.find(r=>r.currency==='USD').valueCents,5380000)
  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const path=new URL((await h.cmd('proposal.send',{id:p.id,version:2})).shareUrl).pathname,cookie=await verified(h,path)
+ assert.equal((await h.send(path+'/action?name=accept',{name:'Unverified',optionId:'two',items:[],consent:true})).status,401)
  summary((await h.send(path+'?optionId=two',undefined,cookie)).text)
  const query=items=>'?optionId=two&items='+encodeURIComponent(JSON.stringify(items))
  const data=async items=>(await h.send(path+'/data.json'+query(items),undefined,cookie)).value
@@ -35,15 +36,16 @@ export async function recurringJourney(h,{offer,verified}) {
  assert.deepEqual([selected.selection.fees.oneOffCents,selected.selection.fees.firstYearCents,selected.selection.totalCents],[250000,1930000,1930000])
  assert.deepEqual(selected.selection.fees.recurring.map(r=>r.amountCents),[120000,20000]);assert.equal(selected.paymentSchedule.rows.length,26)
  const chosen=await h.send('/app/preview/client?id='+long.id+'&revision=1&optionId=two&items='+encodeURIComponent(JSON.stringify(items)),undefined,h.owner)
- assert.ok(chosen.text.includes('First-year value: USD 19,300.00'));assert.ok(chosen.text.includes('USD 200.00 per monthly'))
+ assert.ok(chosen.text.includes('First-year value: USD 19,300.00'));assert.ok(chosen.text.includes('USD 200.00 per month'))
  const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf'+query(items),{headers:{host:new URL(h.origin).host,cookie}});assert.equal(pdf.status,200)
  const pages=await pdfPages(await pdf.arrayBuffer()),text=pages.join(' ');for(const page of pages)assert.match(page,/Not signed, revision 1/)
- for(const value of ['One-off total: USD 2,500.00','USD 1,200.00 per monthly','USD 200.00 per monthly','First-year value: USD 19,300.00','2099-02-28'])assert.ok(text.includes(value),value)
+ for(const value of ['One-off total: USD 2,500.00','USD 1,200.00 per month','USD 200.00 per month','First-year value: USD 19,300.00','2099-02-28'])assert.ok(text.includes(value),value)
  const invalid=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',items:[{id:'seats',quantity:11}],consent:true},cookie);assert.equal(invalid.status,400);assert.equal((await row()).acceptance,undefined)
  assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',items,consent:true},cookie)).status,200)
  const accepted=(await row()).acceptance,frozen=await h.send(path+'/data.json',undefined,cookie)
  assert.deepEqual(frozen.value.paymentSchedule,selected.paymentSchedule);assert.deepEqual(frozen.value.selection.fees,selected.selection.fees);assert.equal(accepted.totalCents,1930000)
  await h.send(path+'/action?name=accept',{name:'Changed',optionId:'one',items:[],consent:true},cookie);assert.deepEqual((await row()).acceptance,accepted)
+ await h.cmd('proposal.revise',{...input,id:p.id,version:4},h.owner,409);assert.deepEqual((await row()).acceptance,accepted,'An accepted term cannot be repriced')
  // Every supported interval crosses actual calendar boundaries, with an explicit independent expected set.
  for(const [interval,term,dates,yearValue] of [['weekly',3,['2099-01-31','2099-02-07','2099-02-14'],360000],['quarterly',5,['2099-01-31','2099-04-30','2099-07-31','2099-10-31','2100-01-31'],480000],['annual',2,['2099-01-31','2100-01-31'],120000]]){
   const f=recurringFixture();Object.assign(f.pricingTables[0].lines[1],{interval,term});f.pricingTables[0].lines.shift();const t=await h.cmd('proposal.prepare',{...input,...f})

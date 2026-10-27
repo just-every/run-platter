@@ -49,5 +49,5 @@ export function recurringSelection(option:any,items:any[],total:number,deposit:n
 export function feeLines(fees:any,currency:string):string[] {
  if(!fees)return []
  const money=(n:number)=>currency+' '+(n/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
- return ['One-off total: '+money(fees.oneOffCents),...fees.recurring.map((r:any)=>money(r.amountCents)+' per '+r.interval+' · '+r.label+' · '+r.term+' installments from '+r.startsOn+' · renewal date '+r.renewalOn),'First-year value: '+money(fees.firstYearCents)]
+ return ['One-off total: '+money(fees.oneOffCents),...fees.recurring.map((r:any)=>money(r.amountCents)+' per '+({weekly:'week',monthly:'month',quarterly:'quarter',annual:'year'}[r.interval as Recurrence['interval']])+' · '+r.label+' · '+r.term+' installments from '+r.startsOn+' · renewal date '+r.renewalOn),'First-year value: '+money(fees.firstYearCents)]
 }

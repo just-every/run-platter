@@ -48,8 +48,8 @@ export async function recurringJourney(h,{offer,verified}) {
  await h.send(path+'/action?name=accept',{name:'Changed',optionId:'one',items:[],consent:true},cookie);assert.deepEqual((await row()).acceptance,accepted)
  await h.cmd('proposal.revise',{...input,id:p.id,version:4},h.owner,409);assert.deepEqual((await row()).acceptance,accepted,'An accepted term cannot be repriced')
  // Every supported interval crosses actual calendar boundaries, with an explicit independent expected set.
- for(const [interval,term,dates,yearValue] of [['weekly',3,['2099-01-31','2099-02-07','2099-02-14'],360000],['quarterly',5,['2099-01-31','2099-04-30','2099-07-31','2099-10-31','2100-01-31'],480000],['annual',2,['2099-01-31','2100-01-31'],120000]]){
-  const f=recurringFixture();Object.assign(f.pricingTables[0].lines[1],{interval,term});f.pricingTables[0].lines.shift();const t=await h.cmd('proposal.prepare',{...input,...f})
+ for(const [interval,term,dates,yearValue,startsOn='2099-01-31'] of [['weekly',3,['2099-01-31','2099-02-07','2099-02-14'],360000],['quarterly',5,['2099-01-31','2099-04-30','2099-07-31','2099-10-31','2100-01-31'],480000],['annual',2,['2099-01-31','2100-01-31'],120000],['annual',2,['2096-02-29','2097-02-28'],120000,'2096-02-29']]){
+  const f=recurringFixture();Object.assign(f.pricingTables[0].lines[1],{interval,term,startsOn});f.pricingTables[0].lines.shift();const t=await h.cmd('proposal.prepare',{...input,...f})
   await h.cmd('proposal.approve',{id:t.id,version:1,revision:1});const url=new URL((await h.cmd('proposal.send',{id:t.id,version:2})).shareUrl).pathname,c=await verified(h,url),v=(await h.send(url+'/data.json?optionId=two',undefined,c)).value
   assert.deepEqual(v.paymentSchedule.rows.filter(r=>r.kind==='recurring').map(r=>r.date),dates);assert.equal(v.selection.fees.firstYearCents,yearValue);assert.equal(v.paymentSchedule.rows.reduce((n,r)=>n+r.amountCents,0),120000*term)
  }

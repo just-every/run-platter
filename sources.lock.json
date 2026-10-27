@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "dfadb5d23d4035e12e1c4b5c14564739dafec0875b25cd4d491df3353e52243f",
+      "sha256": "97582366ae5a7e53fb005ab30cfd72e78c2c832effe6041a8b2af66590afbca4",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2662,7 +2662,7 @@
       "executable": false
     },
     "src/platter/recurring.ts": {
-      "sha256": "21223657c355bfc9608fe0f775adcc627ec405d02d68dcafec0d0a6a7644b3b5",
+      "sha256": "f707abe1214d70504b9f7fcf12a44a6bcfd233ef306b94848d8db65522435ecb",
       "executable": false
     },
     "src/platter/reminder-message-defaults.ts": {
@@ -3198,7 +3198,7 @@
       "executable": false
     },
     "tests/recurring-journey.mjs": {
-      "sha256": "8f199ffddd9da9721b1631db76b5d500003b9777fc3de641e88b0dc548d7c538",
+      "sha256": "a185674437dfe998e42c22d7fced78e354242bcd38e1ffdc1137c2a9e64c7432",
       "executable": false
     },
     "tests/reminders-http.mjs": {

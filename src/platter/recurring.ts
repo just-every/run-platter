@@ -25,8 +25,8 @@ export function recurringSelection(option:any,items:any[],total:number,deposit:n
  if(!base.length)base.push({label:option.label,cents:option.discount?.grossCents??option.cents})
  const parts=[...base,...items.map(i=>({label:i.label,cents:i.totalCents,recurrence:i.recurrence}))]
  if(!parts.some(p=>p.recurrence))return undefined
- const net=allocateNet(parts.map(p=>p.cents),total),starts=parts.filter(p=>p.recurrence).map(p=>p.recurrence.startsOn).sort(),start=starts[0],year=new Date(start+'T00:00:00Z');year.setUTCFullYear(year.getUTCFullYear()+1)
- const until=year.toISOString().slice(0,10),recurring:any[]=[],rows:any[]=[],oneOffCents=parts.reduce((n,p,i)=>n+(p.recurrence?0:net[i]),0)
+ const net=allocateNet(parts.map(p=>p.cents),total),starts=parts.filter(p=>p.recurrence).map(p=>p.recurrence.startsOn).sort(),start=starts[0]
+ const until=occurrence({interval:'annual',term:1,startsOn:start},1),recurring:any[]=[],rows:any[]=[],oneOffCents=parts.reduce((n,p,i)=>n+(p.recurrence?0:net[i]),0)
  let firstYearCents=oneOffCents
  parts.forEach((p,i)=>{
   if(!p.recurrence)return

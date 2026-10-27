@@ -2426,7 +2426,7 @@
       "executable": false
     },
     "src/platter/documents/offer-pdf.ts": {
-      "sha256": "482bffe042ff7f373bcd0062f4f568bbcfeb446affb7608c35a953cb432a8c81",
+      "sha256": "1686aa5d1f80b2c210c6420ecc44d74b768ff4f557859659da32597dad881cd5",
       "executable": false
     },
     "src/platter/documents/pdf-fonts.ts": {
@@ -2882,7 +2882,7 @@
       "executable": false
     },
     "src/platter/ui/packages.ts": {
-      "sha256": "9bfe3a869926ff449615e02203a1826caf9c8c62155dc1d7bdc2a5a48c8bd80e",
+      "sha256": "9b5b85815e7a63a622d97c11b4685968365dabd3236978e366f5061c348324cc",
       "executable": false
     },
     "src/platter/ui/paper.ts": {
@@ -3194,11 +3194,11 @@
       "executable": false
     },
     "tests/recurring-browser.mjs": {
-      "sha256": "cfdeca7b39e6407714cd8ca4b1710e4e166859b327b53039a88831e2e053b282",
+      "sha256": "747cf213316b7b56c6fc826a57f12af3541d2a9f925402defe0d87d505a026e7",
       "executable": false
     },
     "tests/recurring-journey.mjs": {
-      "sha256": "af0d8afcbf105cbbcf06dbf3bc8db85f1459868643d103b5f3b85d9acac7c512",
+      "sha256": "8f199ffddd9da9721b1631db76b5d500003b9777fc3de641e88b0dc548d7c538",
       "executable": false
     },
     "tests/reminders-http.mjs": {

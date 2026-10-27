@@ -28,7 +28,7 @@ export async function recurringBrowserJourney() {
    await cmd('proposal.approve',{id:p.id,version:3,revision:3});const sent=await cmd('proposal.send',{id:p.id,version:4}),path=new URL(sent.shareUrl).pathname
    await page.goto(app.origin+path+'?optionId=two')
    if(width===1440){const text=await page.locator('main').innerText();assert.ok(text.includes('First-year value: USD 16,900.00'));assert.ok(text.includes('USD 1,200.00 per month'))}
-   await page.getByRole('checkbox',{name:/Add Extra seats/}).check();await page.getByLabel('Quantity for Extra seats').fill('4');await page.getByRole('button',{name:'Review package',exact:true}).click();await capture('client')
+   await page.getByRole('checkbox',{name:/Add Extra seats/}).check();await page.getByLabel('Quantity for Extra seats').fill('4');await page.getByRole('button',{name:'Review package',exact:true}).click();if(width===1440)assert.ok((await page.locator('main').innerText()).includes('4 × $50.00 USD × 12 installments = $2,400.00 USD'));await capture('client')
    await page.getByRole('button',{name:'Send verification code',exact:true}).click()
    const state=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(x=>x.proposal_id===p.id&&x.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click()

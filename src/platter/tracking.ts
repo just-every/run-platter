@@ -62,6 +62,7 @@ export async function trackingState(db:D1Database,a:Actor){
 /** Generic sender notices never expose recipient or device and location details. */
 export async function senderAlerts(db:D1Database,a:Actor){
  if(!senders.includes(a.role))return []
+ await purgeTracking(db,await currentTime(db))
  const visibility=scope(a,'send')
  return (await db.prepare(`SELECT t.id,t.proposal_id AS proposalId,t.kind,p.title FROM p_tracking_alerts t JOIN p_proposals p ON p.id=t.proposal_id WHERE t.sender_id=? AND (${visibility.sql}) AND EXISTS(SELECT 1 FROM p_tracking_authority WHERE singleton=1 AND alerts=1) ORDER BY t.alerted_at DESC,t.id DESC LIMIT 100`).bind(a.id,...visibility.values).all<any>()).results
 }

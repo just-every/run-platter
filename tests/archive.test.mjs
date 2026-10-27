@@ -805,3 +805,19 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
   assert.equal((await h.send('/api/platter/document-media/'+started.id+'/'+media.id,undefined,owner)).status,200,'template media mapping survives the same CLI round trip')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('REPORT-002 AI-004 public CLI preserves business report sources, segments, item identities and report schedules', {timeout:360000},async()=>{
+ const {salesFixture}=await import('./performance-fixture.mjs'),temporary=await mkdtemp(join(tmpdir(),'platter-sales-')),source=join(temporary,'source'),restored=join(temporary,'restored');let h
+ try{
+  await checkout(source);await checkout(restored)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source});const f=await salesFixture(h)
+  await h.cmd('report.schedule',{report:'sales-performance',filters:'groupBy=segment',cadence:'weekly',weekday:1,hour:9,recipients:[h.auth.OWNER_EMAIL]})
+  const before=(await h.send('/api/platter/performance?groupBy=segment',undefined,h.owner)).value,prices=(await h.state()).proposals.find(p=>p.id===f.draft.id).priceSuggestions
+  const identity={auth:h.auth,owner:h.owner};await h.close();h=null
+  const archive=join(temporary,'sales.rer'),again=join(temporary,'again.rer');await command(source,['export','--output',archive,'--no-queue']);await command(restored,['import','--input',archive,'--yes','--no-queue']);await command(restored,['export','--output',again,'--no-queue'])
+  const parts=async file=>(await readFile(file,'utf8')).split('\n').filter(Boolean).map(JSON.parse).filter(p=>p.kind==='part');assert.deepEqual(await parts(again),await parts(archive))
+  h=await harness({root:restored,...identity});const owner=await h.signIn(h.auth.OWNER_EMAIL),after=(await h.send('/api/platter/performance?groupBy=segment',undefined,owner)).value
+  assert.deepEqual(after.rows,before.rows);assert.deepEqual(after.totals,before.totals);const state=await h.state(owner);assert.deepEqual(state.proposals.find(p=>p.id===f.draft.id).priceSuggestions,prices);assert.equal(state.reportSchedules[0].report,'sales-performance')
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

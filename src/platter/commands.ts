@@ -1,3 +1,4 @@
+import { applyPriceSuggestion } from './price-suggestions'
 import { stakeholderRecipient } from './tracking/index'
 import { trackingCommand } from './tracking'
 import { collaborationCommand } from './collaboration'
@@ -77,6 +78,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='reminder-template.save')return saveReminderTemplate(db,a,p)
  if(name.startsWith('reminder.'))return reminderCommand(env,a,name,p)
  if(name.startsWith('dispute.'))return disputeCommand(env,a,name,p)
+ if(name==='pricing.suggested')return applyPriceSuggestion(env,a,p,fields=>command(env,a,'proposal.revise',fields))
  if(name==='proposal.autosave'){
   need(a.role!=='agent','A person autosaves the proposal editor',403)
   const result=await command(env,a,'proposal.revise',p),current=negotiatedView(await proposal(db,result.id),await pendingNegotiation(db,result.id))
@@ -127,8 +129,11 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='attachments.refresh')return refreshVendorDocuments(db,a,p)
  if(name==='suggestions.allow'||name==='suggestion.resolve')return suggestionCommand(env,a,name,p)
  if(name==='proposal.restore'){const fields=await restoreFields(db,a,p);return command(env,a,'proposal.revise',fields,fields.restoredAttachments,undefined,Number(p.revision))}
+ if(name==='client.segment'){
+  need(a.role==='owner','Only the owner classifies client segments',403);const id=text(p.id,'a client'),segment=String(p.segment??'').trim();need(segment.length<=100,'Use at most 100 characters for a segment');need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(id).first(),'Client not found',404);await commit(db,a,[db.prepare('UPDATE p_clients SET segment=? WHERE id=?').bind(segment,id)],true);return{id}
+ }
  if(name==='client.save'){
-  need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email) VALUES(?,?,?)').bind(id,text(p.name,'a client name'),email(p.email))]);return{id}
+  need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email,segment) VALUES(?,?,?,?)').bind(id,text(p.name,'a client name'),email(p.email),p.segment===undefined||p.segment===''?'':text(p.segment,'a client segment',100))]);return{id}
  }
  if(name==='client.erase'){
   need(a.role==='owner','Only the owner erases clients',403);const id=text(p.id,'a client'),c=await db.prepare('SELECT * FROM p_clients WHERE id=?').bind(id).first<any>();need(c,'Client not found',404);need(p.confirmName===c.name,'Type the exact client name to confirm erasure');

@@ -1,3 +1,4 @@
+import { performanceHistory, salesPerformance, performanceMail, performanceFilterKeys } from './performance'
 import { actorById } from '../credentials'
 import type { Bindings } from '../../auth.server'
 import { operatorMail } from '../../mail.server.mjs'
@@ -14,10 +15,10 @@ import { nextRun, validZone } from './zone'
 const filterKeys = ['view','q', 'owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
 
 /** Keep only the pipeline's own filters, in a fixed order, after the pipeline validates them. */
-export function savedFilters(value: unknown) {
+export function savedFilters(value: unknown, report='pipeline') {
  const raw = new URLSearchParams(typeof value === 'string' ? value : ''), params = new URLSearchParams()
- for (const key of filterKeys) { const v = raw.get(key); if (v) params.set(key, v) }
- pipeline([], params)
+ for (const key of report==='sales-performance'?performanceFilterKeys:filterKeys) { const v = raw.get(key); if (v) params.set(key, v) }
+ if(report==='sales-performance')salesPerformance([],params);else pipeline([], params)
  return params.toString()
 }
 
@@ -46,15 +47,16 @@ export async function reportCommand(env: Bindings, a: Actor, name: string, p: Re
   return { id, deleted: true }
  }
  need(name === 'report.schedule', 'Unknown report command', 404)
- need(p.report === undefined || p.report === 'pipeline', 'Choose a report')
+ need(p.report === undefined || ['pipeline','sales-performance'].includes(String(p.report)), 'Choose a report')
+ const reportName=String(p.report??'pipeline');if(reportName==='sales-performance')need(a.role==='owner','Only the owner schedules sales performance',403)
  const cadence = String(p.cadence ?? ''), hour = Number(p.hour), weekday = cadence === 'weekly' ? Number(p.weekday) : null
  need(cadence === 'daily' || cadence === 'weekly', 'Choose daily or weekly')
  need(Number.isInteger(hour) && hour >= 0 && hour <= 23, 'Choose an hour from 0 to 23')
  need(weekday === null || (Number.isInteger(weekday) && weekday >= 0 && weekday <= 6), 'Choose a weekday')
  const people = await activePeople(db), recipients = recipientEmails(p).map(email => people.find(person => person.email === email)?.id ?? fail(`${email} is not an active person in this installation`))
- const id = crypto.randomUUID(), at = Date.now(), filters = savedFilters(p.filters)
- await commit(db, a, [db.prepare('INSERT INTO p_report_schedules(id,report,filters,cadence,weekday,hour,recipients,owner_id,created_at,next_run_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
-  .bind(id, 'pipeline', filters, cadence, weekday, hour, JSON.stringify(recipients), a.id, at, nextRun(cadence, weekday, hour, at, await installationZone(db)))], true)
+ const id = crypto.randomUUID(), at = Date.now(), filters = savedFilters(p.filters,reportName)
+ await commit(db, a, [db.prepare('INSERT INTO p_report_schedules(id,report,filters,cadence,weekday,hour,recipients,owner_id,created_at,next_run_at,report_view) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+  .bind(id, 'pipeline', filters, cadence, weekday, hour, JSON.stringify(recipients), a.id, at, nextRun(cadence, weekday, hour, at, await installationZone(db)),reportName)], true)
  return { id }
 }
 
@@ -64,14 +66,14 @@ export async function runDueReports(env: Bindings, at: number) {
  for (const s of due) {
   const claimed = await db.prepare('UPDATE p_report_schedules SET next_run_at=?,last_run_at=? WHERE id=? AND next_run_at=?').bind(nextRun(s.cadence, s.weekday, s.hour, at, zone), at, s.id, s.next_run_at).run()
   if (!claimed.meta.changes) continue
-  const person=await actorById(db,s.owner_id),owner=person&&['owner','admin'].includes(person.role)?person:undefined
+  const person=await actorById(db,s.owner_id),owner=person&&(s.report_view==='sales-performance'?person.role==='owner':['owner','admin'].includes(person.role))?person:undefined
   const runId = crypto.randomUUID(), people = await activePeople(db), ids: string[] = JSON.parse(s.recipients)
   const to = owner ? people.filter(p => ids.includes(p.id)) : [], skipped = owner ? ids.filter(id => !to.some(p => p.id === id)).map(() => 'no longer active') : ['schedule owner is no longer an active owner']
   const snapshot=owner?await state(env,owner):null
-  const report = snapshot ? pipeline(snapshot.proposals,new URLSearchParams(s.filters),at,snapshot.followups) : { rows: [], count: 0 }
+  const report = s.report_view==='sales-performance'&&owner?salesPerformance(await performanceHistory(db,owner),new URLSearchParams(s.filters),at):snapshot ? pipeline(snapshot.proposals,new URLSearchParams(s.filters),at,snapshot.followups) : { rows: [], count: 0 }
   const writes = [db.prepare('INSERT INTO p_report_runs(id,schedule_id,ran_at,row_count,skipped) VALUES(?,?,?,?,?)').bind(runId, s.id, at, report.count, JSON.stringify(skipped))]
   if (owner) {
-   const [subject, body] = pipelineMail(report as any, s.filters)
+   const [subject, body] = s.report_view==='sales-performance'?performanceMail(report as any,s.filters):pipelineMail(report as any, s.filters)
    for (const person of to) writes.push(db.prepare('INSERT INTO p_report_mail(id,run_id,recipient,subject,body,status,created_at) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(), runId, person.email, subject, body, capturesMail(env) ? 'local' : 'pending', at))
   }
   await db.batch(writes)

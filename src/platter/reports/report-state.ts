@@ -9,16 +9,16 @@ export const activePeople = (db: D1Database) => db.prepare("SELECT id,email,disp
 export async function reportState(env: Bindings, a: Actor) {
  if (!['owner','admin'].includes(a.role)) return {}
  const db = env.DB, people = await activePeople(db), everyone = (await db.prepare('SELECT id,email FROM oa_operators').all<any>()).results
- const schedules = (await db.prepare('SELECT * FROM p_report_schedules ORDER BY created_at,id').all<any>()).results
- const runs = (await db.prepare('SELECT * FROM p_report_runs ORDER BY ran_at DESC,id').all<any>()).results
+ const schedules = (await db.prepare('SELECT * FROM p_report_schedules ORDER BY created_at,id').all<any>()).results.filter(s=>a.role==='owner'||s.report_view!=='sales-performance')
+ const runs = (await db.prepare('SELECT * FROM p_report_runs ORDER BY ran_at DESC,id').all<any>()).results.filter(r=>schedules.some(s=>s.id===r.schedule_id))
  const mail = (await db.prepare('SELECT id,run_id,recipient,subject,status,created_at FROM p_report_mail ORDER BY created_at DESC,id').all<any>()).results
  return {
   timeZone: await installationZone(db),
   reportPeople: people.map(p => ({ email: p.email, name: p.display_name, role: p.role })),
-  reportSchedules: schedules.map(s => ({ id: s.id, report: s.report, filters: s.filters, cadence: s.cadence, weekday: s.weekday, hour: s.hour, nextRunAt: s.next_run_at, lastRunAt: s.last_run_at,
+  reportSchedules: schedules.map(s => ({ id: s.id, report: s.report_view ?? s.report, filters: s.filters, cadence: s.cadence, weekday: s.weekday, hour: s.hour, nextRunAt: s.next_run_at, lastRunAt: s.last_run_at,
    recipients: JSON.parse(s.recipients).map((id: string) => everyone.find(o => o.id === id)?.email ?? 'removed person'),
    runs: runs.filter(r => r.schedule_id === s.id).slice(0, 5).map(r => ({ ranAt: r.ran_at, count: r.row_count, skipped: JSON.parse(r.skipped), mail: mail.filter(m => m.run_id === r.id) })) })),
-  reportOutbox: capturesMail(env) ? (await db.prepare('SELECT id,recipient,subject,body,status FROM p_report_mail ORDER BY created_at DESC LIMIT 30').all()).results : [],
+  reportOutbox: capturesMail(env) ? (await db.prepare("SELECT m.id,m.recipient,m.subject,m.body,m.status FROM p_report_mail m JOIN p_report_runs r ON r.id=m.run_id JOIN p_report_schedules s ON s.id=r.schedule_id WHERE s.report_view!='sales-performance' OR ?='owner' ORDER BY m.created_at DESC LIMIT 30").bind(a.role).all()).results : [],
  }
 }
 

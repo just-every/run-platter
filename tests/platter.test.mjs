@@ -64,6 +64,17 @@ test('Client CSV dry run, fingerprint custody, journal, replay and undo through 
  const csv=await readFile('fixtures/clients.csv','utf8'),preview=await h.cmd('import.preview',{csv});assert.equal(preview.canApply,true);assert.equal((await h.state()).clients.length,0)
  await h.cmd('import.apply',{csv:csv.replace('@','2@'),fingerprint:preview.fingerprint},h.owner,409)
  let result=await h.cmd('import.apply',{csv,fingerprint:preview.fingerprint});for(let n=0;n<20&&result.job.state!=='completed';n++)result=await h.cmd('import.apply',{csv,fingerprint:preview.fingerprint});assert.equal(result.job.state,'completed');const journal=await h.cmd('import.journal',{id:result.job.id});assert.ok(journal.originals.length>0);assert.equal((await h.state()).clients.length,3)
+ const original='/api/platter/client-original?job='+encodeURIComponent(result.job.id)+'&name=clients.csv'
+ assert.equal((await h.send(original,undefined,h.owner)).text,csv,'the journal downloads byte-identical original CSV')
+ assert.equal((await h.send(original)).status,401)
+ await h.send('/auth/invite',{email:'synthetic-platter-9100@example.com',displayName:'Import viewer',role:'member',returnTo:'/app'},h.owner)
+ const member=await h.signIn('synthetic-platter-9100@example.com');assert.equal((await h.send(original,undefined,member)).status,403)
+ assert.equal((await h.send(original.replace('clients.csv','missing.csv'),undefined,h.owner)).status,404)
+ const missing=await h.cmd('import.journal',{id:'synthetic-platter-missing'},h.owner,404)
+ assert.match(missing.error,/^[A-Z][^_]+[.!]$/,'a missing journal explains recovery instead of showing an internal code')
+ const conflict=await h.cmd('import.preview',{csv});assert.equal(conflict.canApply,false)
+ assert.ok(conflict.conflicts.every(row=>row.message&&row.message.includes('preview')),'each conflicting row explains the next action')
+
  const again=await h.cmd('import.apply',{csv,fingerprint:preview.fingerprint});assert.equal(again.job.id,result.job.id)
  let undone=await h.cmd('import.undo',{id:result.job.id});for(let n=0;n<20&&undone.job.state==='undoing';n++)undone=await h.cmd('import.undo',{id:result.job.id});assert.equal(undone.job.state,'undone');assert.equal((await h.state()).clients.length,0)
 }))

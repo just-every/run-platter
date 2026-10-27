@@ -317,6 +317,14 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
     await command(erased,['import','--input',old,'--journal',later,'--yes','--no-queue'],4)
     await command(erased,['import','--input',later,'--yes','--no-queue'])
     await command(erased,['import','--input',later,'--yes','--no-queue'],4)
+    h=await harness({root:erased,unclaimed:true,auth:identity.auth})
+    const restoredOwner=await h.signIn(identity.auth.OWNER_EMAIL),restoredState=await h.state(restoredOwner)
+    assert.ok(!restoredState.clients.some(row=>row.id===p.id),'erased clients stay absent through the restored app door')
+    const retained=restoredState.proposals.find(row=>row.id===proposal.id)
+    assert.equal(retained.acceptance.depositCents,105000)
+    const retainedCsv=await h.send('/api/platter/invoices/'+retained.invoice.id+'.csv',undefined,restoredOwner)
+    assert.equal(retainedCsv.status,200);assert.match(retainedCsv.text,/1050\.00/)
+    await h.close();h=null
     const proxy=await getPlatformProxy({configPath:join(erased,'wrangler.jsonc'),persist:{path:join(erased,'.wrangler/state/v3')},remoteBindings:false})
     try { assert.equal(await proxy.env.DB.prepare('SELECT name FROM p_clients WHERE id=?').bind(p.id).first(),null);assert.equal((await proxy.env.DB.prepare('SELECT total_cents,deposit_cents FROM p_acceptances WHERE proposal_id=?').bind(proposal.id).first()).deposit_cents,105000);assert.match((await proxy.env.DB.prepare('SELECT csv FROM p_invoices WHERE proposal_id=?').bind(proposal.id).first()).csv,/1050\.00/) }
     finally { await proxy.dispose() }

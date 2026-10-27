@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { operatorInstaller, developmentTarget, previewTarget } from '@runeditrun/rer/operator-installer';
 import { selectLocalState } from '@runeditrun/rer/local/state';
 import { commandAdapter as createCommandAdapter } from '@runeditrun/rer/adapter';
-import { ownerDeploy } from '@runeditrun/rer/deploy';
+import { platterDeploy } from './deploy.mjs';
 import { localPortability } from '@runeditrun/rer/portability';
 import * as model from './ui/seed.mjs';
 
@@ -20,7 +20,7 @@ const lifecycle = operatorInstaller({
 export const adapter = lifecycle;
 export const { install } = lifecycle;
 export const commandAdapter = createCommandAdapter(lifecycle, {
- dev: developmentTarget, preview: previewTarget, verify: ['pnpm', ['run', 'verify:app']], deploy: ownerDeploy('deploy.json', lifecycle),
+ dev: developmentTarget, preview: previewTarget, verify: ['pnpm', ['run', 'verify:app']], deploy: platterDeploy(lifecycle),
  portability: localPortability({ database: 'foundation', policyModule: 'src/platter/archive-policy.mjs', transient: ['local runtime caches and logs'] }),
  setup: { manifestFile: 'rer-setup.json' }, browserModule: 'scripts/installer/ui/seed.mjs',
  // The run site (rer build --site, rer deploy --site, RER_SITE): pages from

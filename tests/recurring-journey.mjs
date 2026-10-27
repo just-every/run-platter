@@ -9,7 +9,7 @@ export async function recurringJourney(h,{offer,verified}) {
  const client=await h.cmd('client.save',{name:'Recurring client',email:'recurring@studio.example'}),input={...offer,...recurringFixture(),title:'Recurring services',depositPercent:'1',clientId:client.id}
  const p=await h.cmd('proposal.prepare',input),row=async id=>(await h.state()).proposals.find(x=>x.id===(id??p.id))
  assert.equal((await row()).options[1].cents,1690000,'Agreed term value is $16,900, never one installment')
- const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner},body:new URLSearchParams({confirm:'yes'}),redirect:'manual'});assert.equal(setup.status,303)
  const summary=html=>{for(const text of ['One-off total: USD 2,500.00','USD 1,200.00 per month','First-year value: USD 16,900.00'])assert.ok(html.includes(text),'Recurring summary '+text)}
  summary((await h.send('/app/preview/client?id='+p.id+'&revision=1&optionId=two',undefined,h.owner)).text)
  const before=await h.state()
@@ -52,4 +52,14 @@ export async function recurringJourney(h,{offer,verified}) {
   await h.cmd('proposal.approve',{id:t.id,version:1,revision:1});const url=new URL((await h.cmd('proposal.send',{id:t.id,version:2})).shareUrl).pathname,c=await verified(h,url),v=(await h.send(url+'/data.json?optionId=two',undefined,c)).value
   assert.deepEqual(v.paymentSchedule.rows.filter(r=>r.kind==='recurring').map(r=>r.date),dates);assert.equal(v.selection.fees.firstYearCents,yearValue);assert.equal(v.paymentSchedule.rows.reduce((n,r)=>n+r.amountCents,0),120000*term)
  }
+ await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
+ const review=await h.cmd('approval.rule',{version:1,name:'Review recurring terms',position:0,condition:{kind:'paymentTerms',minimumDepositBps:1,standardTerms:'Net 30'},approvers:['role:owner']})
+ const recurring=await h.cmd('proposal.prepare',{...input,depositPercent:'100',terms:'Net 30'}),plain=await h.cmd('proposal.prepare',{...input,depositPercent:'100',terms:'Net 30',packages:[{id:'one',label:'One-off',price:'1000'}],pricingTables:[]})
+ assert.deepEqual((await row(recurring.id)).approval.steps.map(r=>r.id),[review.id],'Recurring line schedules require configured payment-term review')
+ assert.deepEqual((await row(plain.id)).approval.steps,[],'Ordinary terms with a sufficient deposit still skip that rule')
+ const discounted=recurringFixture();discounted.packages[1].discountPercent='10'
+ const reduced=await h.cmd('proposal.prepare',{...input,...discounted});await h.cmd('proposal.approve',{id:reduced.id,version:1,revision:1});const reducedPath=new URL((await h.cmd('proposal.send',{id:reduced.id,version:2})).shareUrl).pathname,reducedCookie=await verified(h,reducedPath),v=(await h.send(reducedPath+'/data.json'+query(items),undefined,reducedCookie)).value
+ assert.deepEqual([v.selection.fees.oneOffCents,v.selection.fees.firstYearCents,v.selection.totalCents],[225000,1737000,1737000])
+ assert.deepEqual(v.selection.fees.recurring.map(r=>r.amountCents),[108000,18000]);assert.equal(v.paymentSchedule.rows.reduce((n,r)=>n+r.amountCents,0),1737000)
+
 }

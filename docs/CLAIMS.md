@@ -230,11 +230,9 @@ Evidence: `src/platter/selection.ts`, `src/platter/conditional.ts`, `src/platter
 
 ## PRICE-003 — One-off and recurring fees
 
-Status: **missing**.
+Status: **done**.
 
-Gap: One-off totals only.
-
-Evidence: None recorded.
+Evidence: `tests/platter.test.mjs`, `tests/recurring-journey.mjs`, `tests/site-documents.mjs`, `tests/recurring-browser.mjs`
 
 ## PRICE-004 — Discounts
 

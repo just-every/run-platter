@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "1da82271028ec7cfa7c7817221a21ce95151a88fb080cf6555b4ade53e38f3b6",
+      "sha256": "91c41e33204b91e8fb03d913d8f74fd5c7a2327856b3baa085a7e43836e00888",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "4ca80f457e59717a3fd77f9ce46ff6ad46e1a0538ba846fd9f004b80ea3285bb",
+      "sha256": "dfadb5d23d4035e12e1c4b5c14564739dafec0875b25cd4d491df3353e52243f",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "622a26bd1c27a26a9b2cd5da961ab9dbfbda9e056a3b24dd7eeb5f288eeb8545",
+      "sha256": "bbf8f719a124fbf3d3113be282e5677e13576ae488f1af1ceb4aa4bbb865a184",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -3198,7 +3198,7 @@
       "executable": false
     },
     "tests/recurring-journey.mjs": {
-      "sha256": "724577f5abacbb8fa37964a7f1018bb9473ef05ad3e1fc2bd3dec0dd06d03c92",
+      "sha256": "af0d8afcbf105cbbcf06dbf3bc8db85f1459868643d103b5f3b85d9acac7c512",
       "executable": false
     },
     "tests/reminders-http.mjs": {

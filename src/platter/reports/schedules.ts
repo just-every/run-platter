@@ -1,3 +1,4 @@
+import { performanceFilters, salesPerformance } from './performance'
 import { actorById } from '../credentials'
 import type { Bindings } from '../../auth.server'
 import { operatorMail } from '../../mail.server.mjs'
@@ -11,13 +12,13 @@ import { activePeople, installationZone } from './report-state'
 import { nextRun, validZone } from './zone'
 
 // REPORT-005: owner-named people receive a report at an hour in the installation's time zone; each run is claimed once.
-const filterKeys = ['view','q', 'owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
+const filterKeys = ['group','quarter','view','q', 'owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
 
 /** Keep only the pipeline's own filters, in a fixed order, after the pipeline validates them. */
 export function savedFilters(value: unknown) {
  const raw = new URLSearchParams(typeof value === 'string' ? value : ''), params = new URLSearchParams()
  for (const key of filterKeys) { const v = raw.get(key); if (v) params.set(key, v) }
- pipeline([], params)
+ if(params.get('view')==='sales-performance')performanceFilters(params);else pipeline([], params)
  return params.toString()
 }
 
@@ -68,7 +69,7 @@ export async function runDueReports(env: Bindings, at: number) {
   const runId = crypto.randomUUID(), people = await activePeople(db), ids: string[] = JSON.parse(s.recipients)
   const to = owner ? people.filter(p => ids.includes(p.id)) : [], skipped = owner ? ids.filter(id => !to.some(p => p.id === id)).map(() => 'no longer active') : ['schedule owner is no longer an active owner']
   const snapshot=owner?await state(env,owner):null
-  const report = snapshot ? pipeline(snapshot.proposals,new URLSearchParams(s.filters),at,snapshot.followups) : { rows: [], count: 0 }
+  const report = snapshot ? new URLSearchParams(s.filters).get('view')==='sales-performance'?await salesPerformance(db,owner!,new URLSearchParams(s.filters)):pipeline(snapshot.proposals,new URLSearchParams(s.filters),at,snapshot.followups) : { rows: [], count: 0 }
   const writes = [db.prepare('INSERT INTO p_report_runs(id,schedule_id,ran_at,row_count,skipped) VALUES(?,?,?,?,?)').bind(runId, s.id, at, report.count, JSON.stringify(skipped))]
   if (owner) {
    const [subject, body] = pipelineMail(report as any, s.filters)

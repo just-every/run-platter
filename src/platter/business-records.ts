@@ -3,6 +3,7 @@ import type { Bindings } from '../auth.server'
 import { need, type Actor } from './model'
 import { businessImportCommand, businessImportJobs, businessImageUrls } from './movein/business-import'
 import { acquireCatalogImages } from './movein/catalog-images'
+import { importCommand } from './movein/index'
 
 export async function businessRecords(db: D1Database, actor: Actor) {
  if(actor.role!=='owner')return {companies:[],contacts:[],catalog:[]}
@@ -24,4 +25,10 @@ export async function businessOriginal(env:Bindings,actor:Actor,query:URLSearchP
  const original=(journal as any).originals.find((o:any)=>o.name===query.get('name'))
  need(original&&original.original.status==='retained','Original file unavailable',404)
  return new Response(Buffer.from(original.original.base64,'base64'),{headers:{'content-type':'application/octet-stream','content-disposition':'attachment; filename="import-original"','cache-control':'no-store','x-content-type-options':'nosniff'}})
+}
+export async function clientOriginal(env:Bindings,actor:Actor,query:URLSearchParams) {
+ const journal=await importCommand(env.DB,actor,'import.journal',{id:query.get('job')})
+ const original=(journal as any).originals.find((file:any)=>file.name===query.get('name'))
+ need(original&&original.original.status==='retained','Original file unavailable',404)
+ return new Response(Buffer.from(original.original.base64,'base64'),{headers:{'content-type':'application/octet-stream','content-disposition':'attachment; filename="clients.csv"','cache-control':'no-store','x-content-type-options':'nosniff'}})
 }

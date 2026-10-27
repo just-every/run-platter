@@ -25,7 +25,7 @@ import { withdrawnPage, replacedInvitationPage } from './ui/withdrawal'
 import { openQuestions } from './questions'
 import { questionReplyResponse } from './question-replies'
 import { clientPdf } from './documents/client-pdf'
-import { businessOriginal, businessRecords } from './business-records'
+import { businessOriginal, clientOriginal, businessRecords } from './business-records'
 import { deliveryWebhook } from './delivery'
 import { attachmentUpload } from './attachment-commands'
 import { paperAcceptance } from './paper-acceptance'
@@ -98,6 +98,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    if(path==='/api/platter/sms')return json(await smsHistory(env,actor,url.searchParams.get('id')))
    if(path==='/api/platter/internal-pricing.pdf'){const response=await internalPricingPdf(env,actor,url.searchParams);await recordAudit(env.DB,actor,'pricing.export',String(url.searchParams.get('id')));return response}
    if(path==='/api/platter/business-original')return await businessOriginal(env,actor,url.searchParams)
+   if(path==='/api/platter/client-original'){const response=await clientOriginal(env,actor,url.searchParams);await recordAudit(env.DB,actor,'import.journal',String(url.searchParams.get('job')));return response}
    if(path==='/api/platter/business-records'){need(actor.role==='owner','Only the owner reads imported business records',403);return json(await businessRecords(env.DB,actor))}
    const attachment=path.match(/^\/api\/platter\/attachments\/([\w-]+)(?:\/([\w-]+))?$/);if(attachment){let files;if(attachment[2]){need(actor.role!=='agent','A person downloads proposal files',403);const row=await permitted(env.DB,actor,attachment[1]),paper=await paperRow(env.DB,row.id);files=[...copyAttachments(snapshot(row).attachments),...(paper?[paperFile(paper)]:[])]}else{need(administrators.includes(actor.role),'Only owner and admins read vendor settings',403);files=await vendorDocuments(env.DB)}const file=files.find(f=>f.id===(attachment[2]??attachment[1]));need(file,'Attachment not found',404);await recordAudit(env.DB,actor,'attachment.download',file.id);return downloadAttachment(env.DB,file)}
    if(path==='/app/audit'||path==='/api/platter/audit'||path==='/api/platter/audit.csv'){const rows=await auditRows(env.DB,actor,url.searchParams);if(path==='/app/audit'){const zone=await installationZone(env.DB),person=await env.DB.prepare('SELECT display_name FROM oa_operators WHERE id=?').bind(actor.id).first<{display_name:string}>();const names=await auditNames(env.DB);return document('Audit log',inZone(zone,()=>auditPage(rows,url.searchParams,names)),{actor,path,zone,name:person?.display_name,eyebrow:'<p class="eyebrow">Audit · who did what, and when</p>'})}return path.endsWith('.csv')?new Response(auditCsv(rows),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename=platter-audit.csv'}}):json({rows})}

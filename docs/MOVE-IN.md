@@ -97,7 +97,7 @@ business importer, with their existing fingerprint and undo behavior.
 5. Read **Import result** and **Import history**. If an import needs more work,
    choose **Resume reviewed import** until it completes.
 
-Use **View journal** to inspect the retained original data and the changes
+Use **View journal** to read the import status and row history, download the exact original CSV, and inspect the changes
 made by an import. If you change the CSV after previewing it, preview the new
 contents before applying them.
 
@@ -140,6 +140,8 @@ the exact same CSV bytes. Any changed file needs a fresh preview. Each atomic
 batch rechecks the active owner's authority and native records. Repeating apply
 with the same CSV and fingerprint resumes its journal without duplicate clients.
 If the job is `applying`, repeat apply until it is `completed`.
+
+The owner can download the original client CSV from the journal. The download requires an active owner session, just like the journal itself.
 
 The journal retains exact original CSV bytes, source identities, native record
 provenance, and applied/undone batch positions. Undo removes only unchanged

@@ -4,15 +4,21 @@ Run Platter on your own computer first. You need an internet connection for the 
 
 ## Launch Platter
 
-One line installs the RER launcher, clones the source into `run-platter` and launches Platter:
+First install the RER launcher:
 
 ```sh
-curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-platter
+curl -fsSL https://runeditrun.com/install.sh | sh
 ```
 
-Already have Node 22 or later? `npx -y @runeditrun/rer dev just-every/run-platter` does the same. If the installer prints a line that puts `rer` on your PATH, run that line too. To start it again later, run the same line from the same folder, or `cd run-platter && rer dev`.
+Run any PATH activation command the installer prints, then start Platter:
 
-The first launch can take a few minutes. RER prepares local storage and a local owner account. Open the private **RER_OPEN** link printed in your terminal on this computer. Keep that link private: it signs you in as the owner. If a launch is interrupted, run `rer dev` again to resume.
+```sh
+rer dev just-every/run-platter
+```
+
+This clones the source into `run-platter` and launches it. Already have Node 22 or later? `npx -y @runeditrun/rer dev just-every/run-platter` does the same. If the installer prints a line that puts `rer` on your PATH, run that line too. To start it again later, run the same line from the same folder, or `cd run-platter && rer dev`.
+
+The first launch can take a few minutes. RER prepares local storage and a local owner account. Open the private **RER_OPEN** link printed in your terminal on this computer. Keep that link private: it signs you in as the owner. If a launch is interrupted, run `cd run-platter && rer dev` from the folder where you first launched it. Inside the checkout, run `rer dev` to resume. Follow any repair command the launcher prints before retrying.
 
 Complete the first-run setup screen, then open **Proposals**. In your installation this is the `/app` page. To stop the managed app, run:
 
@@ -31,10 +37,10 @@ Have an existing client list? Use the [CSV move-in guide](MOVE-IN.md) to review 
 
 ## Use your real owner mailbox
 
-For a real owner's local installation, prepare the owner before the first launch, in place of the one line:
+For a real owner's local installation, prepare the owner before the first launch, after installing rer, in place of the start command:
 
 ```sh
-npx -y @runeditrun/rer setup just-every/run-platter --owner-email you@example.com
+rer setup just-every/run-platter --owner-email you@example.com
 cd run-platter
 rer dev
 ```

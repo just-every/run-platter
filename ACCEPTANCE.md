@@ -234,7 +234,7 @@ Not yet supported (target clauses below): USD pricing tables, payment collection
 
 ## Counts
 
-141 clauses: 50 done, 35 partial, 56 missing. Published: 12 done, 0 partial, 0 missing of 12. Target and push further: 38 done, 35 partial, 56 missing of 129.
+141 clauses: 48 done, 35 partial, 58 missing. Published: 12 done, 0 partial, 0 missing of 12. Target and push further: 36 done, 35 partial, 58 missing of 129.
 
 EDIT-014 covers today’s exact sent scope, terms, attachments and fixed-option selection. Named HTTP/browser journeys prove every-page unsigned revision marking, selected total/deposit, multipage Unicode content, unchanged offer/approval, owner toggle and 403 with no download/audit write when off. Public CLI retains policy and download history. EDIT-002 inherits the template default; EDIT-001/EDIT-005 added blocks/media; TRACK-001 its engagement timeline, each with identical named PDF assertions before shipping. PRICE-002 package, optional-item and quantity selections already meet them.
 

@@ -1,3 +1,4 @@
+import { recordView, senderAlerts } from './tracking'
 import { agreementArtifact } from './documents/agreement'
 import { watcherState } from './notifications/watchers'
 import { smsHistory, smsWebhook } from './sms'
@@ -69,7 +70,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    if(match[2]==='/data.json'){need(request.method==='GET','Method not allowed',405);const data=await clientData(env,context);await recordAudit(env.DB,{id:context.row.client_id,role:'client'},'proposal.data',context.row.id);return json(data)}
    if(match[2]==='/download.pdf'){const input=request.method==='POST'?await body(request):Object.fromEntries(url.searchParams);return await clientPdf(env,context,String(input.optionId??''),input)}
    if(request.method==='GET'&&match[3]){const file=copyAttachments(snapshot(context.row).attachments).find(f=>f.id===match[3]);need(file,'Attachment not found',404);await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},'attachment.download',context.row.id);return downloadAttachment(env.DB,file)}
-   if(request.method==='GET'&&!match[2]){await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},'proposal.view',context.row.id);return renderClient(await clientView(env,context),match[1])}
+   if(request.method==='GET'&&!match[2]){await recordView(env,context,request);await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},'proposal.view',context.row.id);return renderClient(await clientView(env,context),match[1])}
    if(request.method==='POST'&&match[2]==='/action'){const result=await clientCommand(env,context,url.searchParams.get('name')??'',await body(request));if((result as any).withdrawn)return withdrawnPage((result as any).contact);if(url.searchParams.get('name')!=='question.create')await recordAudit(env.DB,{id:context.verified?context.row.client_id:'unidentified',role:context.verified?'client':'invitation'},url.searchParams.get('name')==='accept'?'proposal.accept':String(url.searchParams.get('name')),context.row.id);const cookie=(result as any).cookie;const response=renderClient(await clientView(env,await clientContext(env,match[1],cookie?new Request(request.url,{headers:{cookie:cookie.split(';')[0]}}):request)),match[1],{message:(result as any).message??'Saved.'});if(cookie)response.headers.set('set-cookie',cookie);return response}
    fail('Not found',404)
   }
@@ -94,6 +95,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    const media=path.match(/^\/api\/platter\/document-media\/([\w-]+)\/([\w-]+)$/);if(media){const row=await permitted(env.DB,actor,media[1]);return await documentMedia(env.DB,negotiatedView(row,await pendingNegotiation(env.DB,row.id)),media[2])}
    const dispute=path.match(/^\/api\/platter\/disputes\/([^/]+)\/evidence\.pdf$/);if(dispute){const response=await disputePdf(env,actor,decodeURIComponent(dispute[1]),url.searchParams.get('submission'),url.searchParams.get('packet'));await recordAudit(env.DB,actor,'dispute.evidence',decodeURIComponent(dispute[1]));return response}
    if(path==='/api/platter/agreement.pdf'||path==='/api/platter/certificate.pdf'||path==='/api/platter/certificate.json')return await agreementArtifact(env,String(url.searchParams.get('id')),path.split('/').at(-1)!,{actor})
+   if(path==='/api/platter/tracking-alerts'){need(senders.includes(actor.role),'Only current proposal senders read open notices',403);return json({alerts:await senderAlerts(env.DB,actor)})}
    if(path==='/api/platter/watch')return json({watcher:await watcherState(env,actor,url.searchParams.get('id'))})
    if(path==='/api/platter/sms')return json(await smsHistory(env,actor,url.searchParams.get('id')))
    if(path==='/api/platter/internal-pricing.pdf'){const response=await internalPricingPdf(env,actor,url.searchParams);await recordAudit(env.DB,actor,'pricing.export',String(url.searchParams.get('id')));return response}

@@ -34,7 +34,7 @@ async function checkout(root) {
 }
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
-test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 240_000 }, async () => {
+test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 360_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
@@ -127,7 +127,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.ok((await h.db.prepare('SELECT COUNT(*) AS count FROM p_question_reply_keys').first()).count>0,'a reply capability exists before export')
     await h.close();h=null
     h=await harness({root:source,origin:sourceOrigin,assetsDirectory:'public',...localIdentity})
-    const business=state=>({clients:state.clients,proposals:state.proposals.map(({delivery,deliveries,shareToken,...proposal})=>proposal),importJobs:state.importJobs,templates:state.templates})
+    const business=state=>({clients:state.clients,proposals:state.proposals.map(({delivery,deliveries,shareToken,engagement,...proposal})=>proposal),importJobs:state.importJobs,templates:state.templates})
     const withdrawn=await h.cmd('proposal.prepare',{...offer,title:'Withdrawn offer'})
     await h.cmd('proposal.approve',{id:withdrawn.id,version:1,revision:1});const withdrawnShare=await h.cmd('proposal.send',{id:withdrawn.id,version:2})
     await h.cmd('proposal.withdraw',{id:withdrawn.id,version:3,reason:'Sent to the wrong client'})
@@ -179,6 +179,11 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const templateSource=(await h.state()).proposals.find(p=>p.id===work.id)
     const template=await h.cmd('template.save',{id:work.id,version:templateSource.version,name:'Restorable campaign'})
     const beforeVendorDocuments=(await h.state()).vendorDocuments
+    await h.cmd('tracking.settings',{enabled:'yes',alerts:'yes',retentionDays:90,quietMinutes:30,consent:'yes'})
+    assert.equal((await h.send(path,undefined,verified.cookie)).status,200)
+    await h.cmd('tracking.hold',{id:proposal.id,held:'yes',reason:'Synthetic archive hold'})
+    const beforeTracking=(await h.state()).tracking
+    assert.equal(beforeTracking.views.length,1);assert.equal(beforeTracking.alerts.length,1);assert.equal(beforeTracking.holds.length,1)
     const before=business(await h.state())
     const acceptedThread=before.proposals.find(p=>p.id===proposal.id).questions
     const openThread=before.proposals.find(p=>p.id===pending.id).questions
@@ -206,6 +211,8 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const rows=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part')
     assert.ok(rows(bytes).length>0);assert.deepEqual(rows(await readFile(again,'utf8')),rows(bytes))
     const archived=rows(bytes).flatMap(part=>part.items).filter(item=>item.kind==='row')
+    for(const [table,key] of [['p_views','views'],['p_tracking_alerts','alerts'],['p_tracking_holds','holds']])assert.deepEqual(archived.filter(item=>item.table===table).map(item=>item.row),beforeTracking[key],'Tracking business data survives export exactly')
+    assert.equal(archived.filter(item=>item.table==='p_tracking_authority').length,0,'Tracking transport authority never leaves the installation')
     assert.equal(archived.filter(item=>item.table==='p_questions').length,2,'FOLLOW-004 retains answered and unanswered questions')
     assert.equal(archived.filter(item=>item.table==='p_question_answers').length,1,'FOLLOW-004 retains the answer')
     assert.equal(archived.filter(item=>item.table==='p_question_reply_keys').length,0,'FOLLOW-004 reply credentials are not archived')
@@ -227,6 +234,8 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal((await h.send(path,undefined,verified.cookie)).status,404)
     const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
     const restoredState=await h.state(restoredOwner)
+    for(const key of ['views','alerts','holds'])assert.deepEqual(restoredState.tracking[key],beforeTracking[key])
+    assert.equal(restoredState.tracking.settings.enabled,false);assert.equal(restoredState.tracking.settings.alerts,false);assert.equal(restoredState.tracking.settings.retention_days,90)
     const retainedAuditIds=new Set(beforeAuditView.map(row=>row.id)),restoredAuditView=(await h.send('/api/platter/audit',undefined,restoredOwner)).value.rows.filter(row=>retainedAuditIds.has(row.id))
     assert.deepEqual(restoredAuditView,beforeAuditView,'TEAM-004 restores the complete audit view including reasons and sender routes/addresses')
     assert.deepEqual(business(restoredState),before)
@@ -289,11 +298,25 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const paperPage=await h.send('/app/proposal?id='+paper.id,undefined,restoredOwner);assert.equal(paperPage.status,200);assert.match(paperPage.text,/2,301\.00/);assert.match(paperPage.text,/500\.00/);assert.match(paperPage.text,/Rush delivery/)
     const standard=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=one`,undefined,restoredOwner),premium=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=two`,undefined,restoredOwner)
     assert.match(standard.text,/403\.89/);assert.match(standard.text,/Project services/);assert.equal(standard.status,200);assert.equal(premium.status,200);assert.ok(!standard.text.includes('Premium timeline: four weeks.'));assert.ok(premium.text.includes('Premium timeline: four weeks.'),'EDIT-009 restored conditions remain functional')
+    await h.cmd('tracking.hold',{id:proposal.id,held:'no'},restoredOwner)
+    await h.cmd('tracking.erase',{id:proposal.id,confirm:'erase'},restoredOwner)
+    assert.equal((await h.state(restoredOwner)).tracking.views.length,0)
+    await h.close();h=null
+    await command(restored,['export','--output',later,'--no-queue'])
+    const recovery=join(erased,'.rer/recovery');await mkdir(recovery,{recursive:true,mode:0o700})
+    await cp(later,join(recovery,'latest.rer'))
+    const erasureRefusal=await command(erased,['import','--input',old,'--journal','.rer/recovery/latest.rer','--yes','--no-queue'],4)
+    assert.match((erasureRefusal.stdout??'')+(erasureRefusal.stderr??''),/erasure_epoch|erased_row/)
+    await command(erased,['import','--input',later,'--yes','--no-queue'])
+    h=await harness({root:erased,...identity})
+    const cleanOwner=await h.signIn(h.auth.OWNER_EMAIL),cleanState=await h.state(cleanOwner)
+    assert.deepEqual(cleanState.tracking.views,[]);assert.deepEqual(cleanState.tracking.alerts,[])
+    assert.deepEqual(cleanState.proposals.find(p=>p.id===proposal.id).acceptance,restoredState.proposals.find(p=>p.id===proposal.id).acceptance,'Engagement erasure preserves the accepted agreement')
     await h.close();h=null
   } finally { if(h)await h.close();await rm(temporary,{recursive:true,force:true}) }
 })
 
-test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal', {timeout:240000}, async()=>{
+test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal', {timeout:300000}, async()=>{
  const temporary=await mkdtemp(join(tmpdir(),'platter-erasure-')),source=join(temporary,'source'),erased=join(temporary,'erased');let h
  try{
   for(const path of [source,erased])await checkout(path)
@@ -304,24 +327,35 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
   await h.cmd('proposal.approve',{id:proposal.id,version:1,revision:1});const sent=await h.cmd('proposal.send',{id:proposal.id,version:2}),path=new URL(sent.shareUrl).pathname
   await h.send(path+'/action?name=code.request',{});const code=(await h.state()).outbox.find(x=>x.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],verified=await h.send(path+'/action?name=code.verify',{code})
   assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'two',consent:true},verified.cookie)).status,200);await h.cmd('invoice.export',{id:proposal.id})
+  await h.cmd('tracking.settings',{enabled:'yes',alerts:'yes',retentionDays:90,quietMinutes:30,consent:'yes'});assert.equal((await h.send(path,undefined,verified.cookie)).status,200);assert.equal((await h.state()).tracking.views.length,1)
   const identity={auth:h.auth,owner:h.owner};await h.close();h=null
   const old=join(temporary,'before.rer'),later=join(temporary,'later.rer');await command(source,['export','--output',old,'--no-queue']);const bytes=await readFile(old,'utf8')
     const corrupt=join(temporary,'corrupt.rer');await writeFile(corrupt,bytes.replace('Temporary joiner','Changed joiner'),{mode:0o600})
-    // These operations own different checkouts. Finish both before using
-    // the erasure journal; keep every refusal and custody assertion intact.
+    // Checksum damage and tracking erasure own different checkouts.
     const independent=await Promise.allSettled([
-      // Checksum damage is a transfer failure (1); policy conflicts remain 4.
       command(erased,['import','--input',corrupt,'--yes','--no-queue'],1),
-      (async()=>{h=await harness({root:source,...identity});try{await h.cmd('client.erase',{id:p.id,confirmName:'Temporary joiner'},await h.signIn(h.auth.OWNER_EMAIL))}finally{await h.close();h=null}await command(source,['export','--output',later,'--no-queue'])})(),
+      (async()=>{
+        h=await harness({root:source,...identity})
+        try{
+          const owner=await h.signIn(h.auth.OWNER_EMAIL)
+          await h.cmd('tracking.erase',{id:proposal.id,confirm:'erase'},owner)
+          assert.deepEqual((await h.state(owner)).tracking.views,[])
+        }finally{await h.close();h=null}
+      })(),
     ])
     for(const result of independent)if(result.status==='rejected')throw result.reason
-    // The pinned runner requires a contained, private journal path. Assert the
-    // erasure fence itself; a path refusal with the same exit code proves nothing.
+    // Both erasure fences use the pinned runner's contained private journal path.
     const recovery=join(erased,'.rer/recovery');await mkdir(recovery,{recursive:true,mode:0o700})
+    const trackingOnly=join(temporary,'tracking-erased.rer');await command(source,['export','--output',trackingOnly,'--no-queue'])
+    await cp(trackingOnly,join(recovery,'tracking.rer'))
+    const trackingRefusal=await command(erased,['import','--input',old,'--journal','.rer/recovery/tracking.rer','--yes','--no-queue'],4)
+    assert.match(trackingRefusal.stdout+' '+trackingRefusal.stderr,/\((?:erased_row|erasure_epoch)\)/,'Tracking-only refusal must name the erasure fence')
+    h=await harness({root:source,...identity})
+    try{await h.cmd('client.erase',{id:p.id,confirmName:'Temporary joiner'},await h.signIn(h.auth.OWNER_EMAIL))}finally{await h.close();h=null}
+    await command(source,['export','--output',later,'--no-queue'])
     await cp(later,join(recovery,'latest.rer'))
     const refused=await command(erased,['import','--input',old,'--journal','.rer/recovery/latest.rer','--yes','--no-queue'],4)
     assert.match(refused.stdout+' '+refused.stderr,/\((?:erased_row|erasure_epoch)\)/,'the older archive is refused specifically by the erasure fence')
-
     await command(erased,['import','--input',later,'--yes','--no-queue'])
     await command(erased,['import','--input',later,'--yes','--no-queue'],4)
     h=await harness({root:erased,unclaimed:true,auth:identity.auth})

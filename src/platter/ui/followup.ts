@@ -9,7 +9,7 @@ export function followupQueuePanel(state:any,owner?:string|null) {
 export function followupPanel(state:any,p:any) {
  if(!p.canSend||p.acceptance||(p.activeWithdrawal&&!p.negotiating))return ''
  const current=state.followups?.rows.find((r:any)=>r.id===p.id)
- return panel('Next sales action',`<p>${current?escape(current.action)+' · Due '+escape(current.dueDate):'Sales follow-up closed.'} Engagement unavailable. Delivery correction authority stays with the sending owner.</p>`
+ return panel('Next sales action',`<p>${current?escape(current.action)+' · Due '+escape(current.dueDate):'Sales follow-up closed.'} ${escape(followupReasons[current?.engagement as keyof typeof followupReasons]??'Engagement unavailable')}. Delivery correction authority stays with the sending owner.</p>`
  +form('followup.schedule',proposalPath(p.id),hidden('id',p.id)+field('Next action','action',current?.action,'required maxlength="1000"')+field('Due date','dueDate',current?.dueDate??state.followups.today,'type="date" required')+'<button>Save sales follow-up</button>')
  +(current?form('followup.complete',proposalPath(p.id),hidden('id',p.id)+area('Logged action','action','','required maxlength="1000"')+'<button>Complete sales follow-up</button>')+form('followup.dismiss',proposalPath(p.id),hidden('id',p.id)+field('Dismissal reason','reason','','required maxlength="1000"')+'<button>Dismiss sales follow-up</button>')+form('followup.notify',proposalPath(p.id),hidden('id',p.id)+'<button>Notify sales owner</button>'):'')
  +(state.followupActions?.filter((r:any)=>r.proposal_id===p.id).length?'<ul>'+state.followupActions.filter((r:any)=>r.proposal_id===p.id).map((r:any)=>`<li>${escape(r.kind)}: ${escape(r.action)} · ${escape(r.due_date)}</li>`).join('')+'</ul>':''))

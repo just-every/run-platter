@@ -1,3 +1,4 @@
+import { purgeTracking } from './platter/tracking'
 import { runSms } from './platter/sms'
 import { runNotifications } from './platter/notifications/scheduled'
 import { withDemo } from '@runeditrun/rer/internal/modules/demo/index.mjs'
@@ -47,6 +48,7 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
   },
   // REPORT-005 scheduled report email, built as of the trigger's own time.
   async scheduled(controller, env) {
+    await purgeTracking(env.DB,controller.scheduledTime)
     await runExpiry(runtimeBindings(env), controller.scheduledTime)
     await runReminders(runtimeBindings(env), controller.scheduledTime)
     await runSms(runtimeBindings(env))

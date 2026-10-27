@@ -179,3 +179,24 @@ window.platterRevisionSaved=(id,previous,result)=>{
 for(const button of document.querySelectorAll('[data-embed-url]'))button.addEventListener('click',()=>{
  const frame=document.createElement('iframe');frame.src=button.dataset.embedUrl;frame.title=button.dataset.embedTitle;frame.setAttribute('sandbox','allow-scripts allow-same-origin allow-forms allow-presentation');frame.setAttribute('allow','fullscreen');frame.referrerPolicy='no-referrer';frame.loading='lazy';button.closest('[data-external-embed]').replaceChildren(frame);
 });
+
+// Sender notices are generic; the authenticated endpoint rechecks current scope.
+(() => {
+ const panel=document.querySelector('[data-tracking-notices]');if(!panel)return;
+ const list=panel.querySelector('ul');let stopped=false;
+ window.addEventListener('pagehide',()=>{stopped=true;},{once:true});
+ const refresh=async()=>{
+  if(stopped)return;
+  try{
+   const response=await fetch('/api/platter/tracking-alerts',{credentials:'same-origin',cache:'no-store'});
+   if(!response.ok){list.replaceChildren();panel.hidden=true;stopped=true;return;}
+   const {alerts}=await response.json(),known=Array.from(list.children).map(node=>node.dataset.alertId);
+   if(JSON.stringify(known)!==JSON.stringify(alerts.map(row=>row.id))){
+    list.replaceChildren(...alerts.map(row=>{const item=document.createElement('li'),link=document.createElement('a');item.dataset.alertId=row.id;link.href='/app/proposal?id='+encodeURIComponent(row.proposalId);link.textContent=(row.kind==='first'?'First open':'Return visit')+' · '+row.title;item.append(link);return item;}));
+   }
+   panel.hidden=alerts.length===0;
+  }catch{/* A failed refresh keeps the retained notices until the next read. */}
+  if(!stopped)setTimeout(refresh,5000);
+ };
+ refresh();
+})();

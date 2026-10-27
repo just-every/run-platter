@@ -727,3 +727,5 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
 })
 
 test('SEND-007 desktop and phone replace the unsigned signer, refuse the old link, verify the COO and retain completion history', {timeout:180000},async()=>{const {replacementBrowser}=await import('./signer-replacement-journey.mjs');await replacementBrowser()})
+
+test('TRACK-001 / TRACK-004 owner consent, private alerts, client disclosure and erasure at desktop and phone widths',{timeout:180000},async()=>{const {trackingBrowser}=await import('./tracking-browser.mjs');await trackingBrowser()})

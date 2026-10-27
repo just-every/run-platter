@@ -25,7 +25,7 @@ const tools = [
  { name: 'search_templates', description: 'Find built-in starter templates and personal templates belonging to this key’s owner. Use the returned id and version to prepare an independent draft.', inputSchema: schema({ query: { type: 'string', maxLength: 200 } }) },
  { name: 'prepare_from_template', description: 'Prepare an independent draft from a built-in starter or a personal template belonging to this key’s owner. This never approves or sends it.', inputSchema: schema({ templateId: string, templateVersion: integer, clientId: string, title: string }, ['templateId', 'templateVersion', 'clientId']) },
  { name: 'read_proposal', description: 'Read a current proposal, revision, version, approval and recorded delivery/acceptance status. No invitation credentials are returned.', inputSchema: schema({ id: string }, ['id']) },
- { name: 'read_engagement', description: 'Read recorded delivery and acceptance status. View tracking and section reading analytics are unavailable; delivery acceptance does not prove reading.', inputSchema: schema({ id: string }, ['id']) },
+ { name: 'read_engagement', description: 'Read recorded delivery and acceptance status. View detail is owner-only and unavailable to agent keys. Section reading analytics are unavailable; delivery acceptance does not prove reading.', inputSchema: schema({ id: string }, ['id']) },
  { name: 'prepare_proposal', description: 'Prepare a structured package draft (or a legacy two-option draft) for an existing client. The owner must review, approve and send it.', inputSchema: schema(draftingFields, draftRequired) },
  { name: 'revise_proposal', description: 'Revise the current draft or approved proposal using its version. This creates a draft revision and clears approval. Sent and accepted offers cannot be edited by an agent.', inputSchema: schema({ ...draftingFields, id: string, version: integer }, [...draftRequired, 'id', 'version']) },
  { name: 'request_send', description: 'Queue the exact current draft or approved revision for its key owner to review. Repeating an active request returns that request. This never approves or sends mail.', inputSchema: schema({ id: string, revision: integer }, ['id', 'revision']) },
@@ -68,7 +68,7 @@ async function callTool(env: Bindings, actor: Actor, name: string, input: Record
   return safe
  }
  return { id: found.id, revision: found.revision, status: found.status, delivery: found.delivery ?? null, acceptance: found.acceptance ?? null,
-  viewTracking: { available: false, reason: 'View tracking is not implemented.' }, sectionReading: { available: false, reason: 'Section-level reading analytics are not implemented.' } }
+  viewTracking: { available: false, reason: 'View detail is available only to the signed-in owner.' }, sectionReading: { available: false, reason: 'Section-level reading analytics are not implemented.' } }
 }
 
 export async function handleMcp(request: Request, env: Bindings, actor: Actor): Promise<Response> {

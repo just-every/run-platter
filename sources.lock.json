@@ -509,6 +509,10 @@
       "sha256": "82278abcd99260dd4e236ae9b71c9160002ee10505218e2eba43393c12363414",
       "executable": false
     },
+    "migrations/core/0078_public_api.sql": {
+      "sha256": "c288d4b47bf8f7d30c177e597a6ea7403dcba26bd76a9f120a37ee7707a8ae08",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -2285,6 +2289,22 @@
       "sha256": "ce31b0bae06aca21b3350c86344c981d53022e4fa502f1423e0027cd6bc1bc3c",
       "executable": false
     },
+    "src/platter/api/index.ts": {
+      "sha256": "e7d9eb92b998e644ac2da358dd08613d4e326e68cd7ac14e09d3f12ac0c59c55",
+      "executable": false
+    },
+    "src/platter/api/schema.ts": {
+      "sha256": "21d0983f26e581f8e1b638639d509e19cafa4efddaa11614b93556f43ba672c0",
+      "executable": false
+    },
+    "src/platter/api/variables.ts": {
+      "sha256": "517a36a76af168d9b51e68a1e087da84786197c5948c84d1e708893af65f0049",
+      "executable": false
+    },
+    "src/platter/api/webhooks.ts": {
+      "sha256": "d4fab68719a666ac250a267c0dd3f463787c2e73d7bc7a74a2ba21c95a6f944d",
+      "executable": false
+    },
     "src/platter/approvals.ts": {
       "sha256": "aa675508caa3b73eb58b4446ea0081d2b45a8e91bfaf6d5f2fc94290db5c0fea",
       "executable": false
@@ -2294,7 +2314,7 @@
       "executable": false
     },
     "src/platter/archive-policy.mjs": {
-      "sha256": "63deb658b06d21687991265a23e6edf8bade34802c8f0d32413aad8c719c046b",
+      "sha256": "3f4c7d9bb39d6e95f8c1e083d731fe66ad1b3421596d4b5ac315f393b18ce6e8",
       "executable": false
     },
     "src/platter/attachment-commands.ts": {
@@ -2346,7 +2366,7 @@
       "executable": false
     },
     "src/platter/commands.ts": {
-      "sha256": "9f5f42723b1ef916707edd02d8903e6a96bc21c058b4d79d4620eab5c53d6df4",
+      "sha256": "1f9a0e2e9b5573643d881fa4a12b74594910ee95cb6a2c1c4401afdfd1319852",
       "executable": false
     },
     "src/platter/conditional.ts": {
@@ -2358,7 +2378,7 @@
       "executable": false
     },
     "src/platter/credentials.ts": {
-      "sha256": "05b7c050346a74259d988f3a02b0f8087080c6943a259e8eeb0af07ede81e8a2",
+      "sha256": "963fc65de67330ab6408ce6fde8279f2d15a4dcab7be801002e9356769e035a5",
       "executable": false
     },
     "src/platter/delivery-intake.d.mts": {
@@ -2470,7 +2490,7 @@
       "executable": false
     },
     "src/platter/http.ts": {
-      "sha256": "98c74081038747ff64e4e618fae47e9211e3bb8704a9ff24e02a2ca5810b54aa",
+      "sha256": "ebe16a26b9b8ddc49c4bb8688a2d3ff8652d053de5671e2549b31fda362f77e0",
       "executable": false
     },
     "src/platter/internal-pricing.ts": {
@@ -2998,7 +3018,7 @@
       "executable": false
     },
     "src/server.ts": {
-      "sha256": "ed43d6ab9ff828e307b497c6e751a997e5df223b48bd42d3d659a516cd975b45",
+      "sha256": "d9670ad77f0995540373ffcce04ee220d360d9240bca1bc17093f90d2cb0f8ee",
       "executable": false
     },
     "src/site/docs.ts": {
@@ -3090,7 +3110,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "63ed86716d16aa298b78313ac750b9acc3f0e8577707b2d089cbdd69e7d9c80d",
+      "sha256": "71731620a11b1b9ffdc75ec116ba95f3cb3391fff5fc93026b8f3c8b07e3656a",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3178,7 +3198,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "3dad5df9af5b8f51295958706dd338c24ea7f866c2b6b9eaa776a5182f00b0df",
+      "sha256": "f0240e619d731e96b6212791ebc5baaa314e20204e9050a6663f7ecd641fa747",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3226,7 +3246,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "e351f6ae70ee967677f9d67a6f9eb6b6a17a5dee98b52786b9d16337a74b4614",
+      "sha256": "db6c85eb130aff8eb4555de4e7a814327386636b70a3a3baf1ed48aa8f82a046",
       "executable": false
     },
     "tests/site.test.mjs": {
@@ -3254,7 +3274,7 @@
       "executable": false
     },
     "tests/worker.ts": {
-      "sha256": "b212881b6ef9ef0a46a27fca6d867f854fc754135bb94eeeb3a078456fdb403b",
+      "sha256": "bbe0c6a9d994a63326e8f231de0f4cad69a1a907a2f54e0a25c7c4d2eea5a55d",
       "executable": false
     },
     "tsconfig.json": {

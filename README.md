@@ -76,7 +76,7 @@ rer dev
 
 Use the same owner email that the backup contains in the setup step above. A review backup may use the `owner@FOLDER.test` address printed by its original `rer dev`; keep that original address when restoring into a differently named checkout. This protects the archived owner and approval authors.
 
-Owner identities, business records, revisions, approvals, acceptances, invoice CSVs and import journals travel. Sign-in sessions, agent keys, client invitations, verification sessions, outbox messages and private provider settings do not. Use **Send fresh client link** for a restored sent proposal. RER refuses a nonempty destination or damaged archive. When restoring an older backup after erasure, supply a newer backup's erasure journal: `rer import --input ../old.rer --journal ../latest.rer --yes`. Such an old restore is refused rather than reviving erased data.
+Owner identities, business records, revisions, approvals, acceptances, invoice CSVs and import journals travel. Sign-in sessions, agent keys, client invitations, verification sessions, outbox messages and private provider settings do not. Use **Send fresh client link** for a restored sent proposal. RER refuses a nonempty destination or damaged archive. When restoring an older backup after erasure, follow the [older-backup recovery steps](docs/BACKUP-RESTORE.md#restore-older-data-after-an-erasure). They stage a temporary private journal in the destination's ignored recovery directory, as the pinned runner requires. An older archive containing erased data is refused; restore the newer backup instead, then remove the temporary journal. Never retry an older backup without its erasure journal.
 
 ## Deploy to your account
 

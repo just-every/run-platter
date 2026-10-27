@@ -118,7 +118,7 @@
       "executable": false
     },
     "docs/BACKUP-RESTORE.md": {
-      "sha256": "8b2d0e4409ac6645e313025317b2564b1f29be14416c2f8d76b0867846019999",
+      "sha256": "72c2265ebc20175e4fc5c8cef01e99eb3a43cde836ec9ac4f561ba3df67a8043",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -1142,7 +1142,7 @@
       "executable": false
     },
     "README.md": {
-      "sha256": "6a984486043ed2a5032b3aca6c062ce5c9887271311306f61ab64f0b8425f70b",
+      "sha256": "7d91745d757ade65a640848d33063a16499d0ecb1d9342116ceafc9478987fca",
       "executable": false
     },
     "RELEASE.json": {
@@ -3050,7 +3050,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "e656bffb7224d762ca57386a0c35fec769261444031a060742febf318926e7af",
+      "sha256": "f153b7b51522c15deb9555fd507962acd9a3d6f63e1c4f4f2c0c4b6452c41e6f",
       "executable": false
     },
     "tests/browser-edge.mjs": {

@@ -37,7 +37,7 @@ export async function runWebhooks(env:Bindings,at=Date.now()){
  WHERE d.status IN ('pending','retry') AND d.next_at<=? AND COALESCE(d.lease_until,0)<=? AND w.revoked_at IS NULL AND o.role='owner' AND o.status='active' AND o.version=w.owner_version ORDER BY d.next_at,d.id LIMIT 20`).bind(at,at).all<any>()).results
  for(const row of rows){
   // Both tables have an id. Resolve the delivery by its unique event and route.
-  const delivery=await db.prepare("UPDATE p_webhook_deliveries SET lease_until=?,attempts=attempts+1 WHERE webhook_id=? AND event_id=? AND status IN ('pending','retry') AND next_at<=? AND COALESCE(lease_until,0)<=? RETURNING id,attempts").bind(at+60000,row.webhook_id,row.id,at,at).first<any>()
+  const delivery=await db.prepare("UPDATE p_webhook_deliveries SET lease_until=?,attempts=attempts+1 WHERE webhook_id=? AND event_id=? AND status IN ('pending','retry') AND next_at<=? AND COALESCE(lease_until,0)<=? AND EXISTS(SELECT 1 FROM p_webhooks live JOIN p_webhook_secrets credential ON credential.webhook_id=live.id JOIN oa_operators owner ON owner.id=live.owner_id WHERE live.id=p_webhook_deliveries.webhook_id AND live.revoked_at IS NULL AND owner.role='owner' AND owner.status='active' AND owner.version=live.owner_version) RETURNING id,attempts").bind(at+60000,row.webhook_id,row.id,at,at).first<any>()
   if(!delivery)continue
   let code:number|null=null,ok=false
   try{

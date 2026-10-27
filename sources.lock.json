@@ -2302,7 +2302,7 @@
       "executable": false
     },
     "src/platter/api/webhooks.ts": {
-      "sha256": "d4fab68719a666ac250a267c0dd3f463787c2e73d7bc7a74a2ba21c95a6f944d",
+      "sha256": "86d2a65c63268d994bd79b58ccd15183d31d841348dfefa0209e0cf117004fd1",
       "executable": false
     },
     "src/platter/approvals.ts": {
@@ -3198,7 +3198,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "15f53e030ded8389aec3173eb6c42755338d049bd2822168cd70eefa95134b55",
+      "sha256": "008d1b0764e6d74452fa786f0af0612681f05fbaa647c146310a2cf7c18fb6b8",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

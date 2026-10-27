@@ -14,7 +14,7 @@ END;
 CREATE TRIGGER p_webhook_withdrawn AFTER INSERT ON p_withdrawals BEGIN
  INSERT INTO p_webhook_events VALUES(lower(hex(randomblob(16))),'proposal.withdrawn',NEW.proposal_id,NEW.revision,'withdrawn',NEW.withdrawn_at);
 END;
-CREATE TRIGGER p_webhook_declined AFTER INSERT ON p_outcomes BEGIN
- INSERT INTO p_webhook_events VALUES(lower(hex(randomblob(16))),CASE WHEN NEW.kind='declined' THEN 'proposal.declined' ELSE 'proposal.lost' END,NEW.proposal_id,NEW.revision,NEW.kind,NEW.occurred_at);
+CREATE TRIGGER p_webhook_declined AFTER INSERT ON p_outcome_records BEGIN
+ INSERT INTO p_webhook_events VALUES(lower(hex(randomblob(16))),CASE WHEN NEW.kind='declined' THEN 'proposal.declined' WHEN NEW.kind='won' THEN 'proposal.won' ELSE 'proposal.lost' END,NEW.proposal_id,NEW.revision,NEW.kind,NEW.occurred_at);
 END;
 CREATE INDEX p_webhook_due ON p_webhook_deliveries(status,next_at);

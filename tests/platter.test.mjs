@@ -2773,6 +2773,7 @@ test('AUTO-004 scoped REST drafting, immutable owner keys and human-only authori
   await h.send('/auth/invite',{email:'synthetic-platter-91@studio.example',displayName:'API member',role:'member',returnTo:'/app'},h.owner)
   const member=await h.signIn('synthetic-platter-91@studio.example')
   assert.equal((await api('/keys',{label:'Member key',scopes:['proposals.write']},null,member)).status,403)
+  assert.equal((await h.send('/api/platter/v1/keys',{label:'Unsafe origin',scopes:['proposals.write']},h.owner,{origin:'https://elsewhere.example'})).status,403)
   const readonly=(await api('/keys',{label:'Read only',scopes:['proposals.read']},null,h.owner)).value
   assert.equal((await api('/proposals',{templateId:template.id,templateVersion:1,clientId:client.id},readonly.token)).status,403)
   const key=(await api('/keys',{label:'Draft and selected reads',scopes:['proposals.write','templates.read','proposals.read','analytics.read','payments.read','agreements.read']},null,h.owner)).value
@@ -2846,8 +2847,16 @@ test('AUTO-004 published route reference matches live methods and webhook schema
   const validate=(schema,value)=>{assert.equal(Array.isArray(value)?'array':Number.isInteger(value)?'integer':typeof value,schema.type);if(schema.enum)assert.ok(schema.enum.includes(value));if(schema.type==='object'){for(const key of schema.required)assert.ok(Object.hasOwn(value,key));assert.deepEqual(Object.keys(value).sort(),Object.keys(schema.properties).sort());for(const [key,item] of Object.entries(value))validate(schema.properties[key],item)}}
   const events=spec.value['x-webhook-events'];assert.ok(Object.keys(events).length>=2)
   for(const [type,event] of Object.entries(events)){validate(spec.value.components.schemas.LifecycleEvent,event.example);assert.equal(event.example.type,type);assert.ok(reference.text.includes(type))}
-  const {p}=await draft(h);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});await h.cmd('proposal.send',{id:p.id,version:2})
-  const emitted=(await h.db.prepare('SELECT * FROM p_webhook_events').all()).results;assert.deepEqual(emitted.map(e=>e.type).sort(),['proposal.approved','proposal.created','proposal.sent'])
+  const {p,client}=await draft(h);await h.cmd('proposal.revise',{...offer,clientId:client.id,id:p.id,version:1,scope:'Synthetic revised scope'});await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const share=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+  assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},cookie)).status,200)
+  const make=()=>h.cmd('proposal.prepare',{...offer,clientId:client.id})
+  const withdrawn=await make();await h.cmd('proposal.approve',{id:withdrawn.id,version:1,revision:1});await h.cmd('proposal.send',{id:withdrawn.id,version:2});await h.cmd('proposal.withdraw',{id:withdrawn.id,version:3,reason:'Synthetic withdrawn',notify:'no'})
+  const lost=await make();await h.cmd('proposal.approve',{id:lost.id,version:1,revision:1});await h.cmd('proposal.send',{id:lost.id,version:2});await h.cmd('proposal.lose',{id:lost.id,version:3,reason:'Synthetic lost',notify:'no'})
+  const declined=await make();await h.cmd('proposal.approve',{id:declined.id,version:1,revision:1});const declineShare=await h.cmd('proposal.send',{id:declined.id,version:2}),declinePath=new URL(declineShare.shareUrl).pathname,declineCookie=await verified(h,declinePath);assert.equal((await h.send(declinePath+'/action?name=decline',{revision:1,reason:'Synthetic declined'},declineCookie)).status,410)
+  const won=await make();await h.cmd('proposal.approve',{id:won.id,version:1,revision:1});await h.cmd('proposal.send',{id:won.id,version:2});await h.cmd('proposal.win',{id:won.id,version:3,reason:'Synthetic won',notify:'no'})
+  const expiring=await make();await h.cmd('expiry.set',{id:expiring.id,version:1,mode:'days',days:1});await h.cmd('proposal.approve',{id:expiring.id,version:2,revision:1});await h.cmd('proposal.send',{id:expiring.id,version:3})
+  const deadline=(await h.state()).proposals.find(r=>r.id===expiring.id).expiry.deadlineAt;await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(deadline+1),cron:'*/15 * * * *'})
+  const emitted=(await h.db.prepare('SELECT * FROM p_webhook_events').all()).results;assert.deepEqual([...new Set(emitted.map(e=>e.type))].sort(),['proposal.approved','proposal.created','proposal.declined','proposal.expired','proposal.lost','proposal.revised','proposal.sent','proposal.signed','proposal.withdrawn','proposal.won'])
   for(const event of emitted){assert.ok(events[event.type]);validate(spec.value.components.schemas.LifecycleEvent,{id:event.id,type:event.type,occurredAt:event.occurred_at,data:{id:event.proposal_id,revision:event.revision,status:event.status}})}
  }finally{await h.close()}
 })

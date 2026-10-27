@@ -738,11 +738,9 @@ Evidence: `tests/mail.test.mjs`
 
 ## AUTO-004 — Public REST API and webhooks
 
-Status: **partial**.
+Status: **done**.
 
-Gap: A session and agent command API only; no documented public API, scoped API keys or signed lifecycle webhooks.
-
-Evidence: `src/platter/http.ts`, `tests/platter.test.mjs`
+Evidence: `src/platter/api/index.ts`, `src/platter/api/webhooks.ts`, `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
 
 ## AUTO-005 — Zapier, Make and Crank apps
 

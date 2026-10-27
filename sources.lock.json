@@ -505,6 +505,10 @@
       "sha256": "82278abcd99260dd4e236ae9b71c9160002ee10505218e2eba43393c12363414",
       "executable": false
     },
+    "migrations/core/0078_public_api.sql": {
+      "sha256": "c288d4b47bf8f7d30c177e597a6ea7403dcba26bd76a9f120a37ee7707a8ae08",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -2277,6 +2281,22 @@
       "sha256": "ce31b0bae06aca21b3350c86344c981d53022e4fa502f1423e0027cd6bc1bc3c",
       "executable": false
     },
+    "src/platter/api/index.ts": {
+      "sha256": "e7d9eb92b998e644ac2da358dd08613d4e326e68cd7ac14e09d3f12ac0c59c55",
+      "executable": false
+    },
+    "src/platter/api/schema.ts": {
+      "sha256": "21d0983f26e581f8e1b638639d509e19cafa4efddaa11614b93556f43ba672c0",
+      "executable": false
+    },
+    "src/platter/api/variables.ts": {
+      "sha256": "517a36a76af168d9b51e68a1e087da84786197c5948c84d1e708893af65f0049",
+      "executable": false
+    },
+    "src/platter/api/webhooks.ts": {
+      "sha256": "d4fab68719a666ac250a267c0dd3f463787c2e73d7bc7a74a2ba21c95a6f944d",
+      "executable": false
+    },
     "src/platter/approvals.ts": {
       "sha256": "cc4ba8fdd98a84a7cbdb6b1f4bdbd5c55a43550e398648bd1dddcd3924ddc21c",
       "executable": false
@@ -2338,7 +2358,7 @@
       "executable": false
     },
     "src/platter/commands.ts": {
-      "sha256": "cc6ba7b1466d8560b92aaf6fb2911ef4dc37091399b5218f8a6f88bd6c51e00e",
+      "sha256": "493d530430c8b9ce34330962f7872fc5b06f530edd56bf84fd0cfaf281c863d8",
       "executable": false
     },
     "src/platter/conditional.ts": {
@@ -3074,7 +3094,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "63ed86716d16aa298b78313ac750b9acc3f0e8577707b2d089cbdd69e7d9c80d",
+      "sha256": "71731620a11b1b9ffdc75ec116ba95f3cb3391fff5fc93026b8f3c8b07e3656a",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3162,7 +3182,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "67aec8182d50643d3d96779dfa8e46b6e2ad2dffdbeeab8447ab0b89ae548543",
+      "sha256": "1fd27c5be9bc4d4759e07252284b31ad3dd4ff7cae6492203f239c37caa9ed92",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3202,7 +3222,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "e351f6ae70ee967677f9d67a6f9eb6b6a17a5dee98b52786b9d16337a74b4614",
+      "sha256": "db6c85eb130aff8eb4555de4e7a814327386636b70a3a3baf1ed48aa8f82a046",
       "executable": false
     },
     "tests/site.test.mjs": {

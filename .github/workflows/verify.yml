@@ -99,6 +99,15 @@ jobs:
       - name: Verify runtime and hosted output
         if: matrix.shard == 'runtime'
         run: pnpm verify
+        env:
+          PLATTER_PERFORMANCE_SCREENSHOTS: ${{ runner.temp }}/sales-performance-screens
+      - name: Retain sales performance browser proof
+        if: matrix.shard == 'runtime'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sales-performance-screens
+          path: ${{ runner.temp }}/sales-performance-screens
+          if-no-files-found: error
       - name: Verify business or archive flow
         if: matrix.shard != 'runtime'
         run: pnpm verify:app

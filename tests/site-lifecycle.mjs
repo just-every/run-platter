@@ -736,7 +736,7 @@ test('REPORT-002 and AI-004 built sales metrics, segment input and explicit sugg
   browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   const context=await browser.newContext({viewport:{width:1440,height:1000}})
   await context.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}])
-  const page=await context.newPage(),screens=process.env.PLATTER_SCREENSHOTS
+  const page=await context.newPage(),screens=process.env.PLATTER_PERFORMANCE_SCREENSHOTS??process.env.PLATTER_SCREENSHOTS
   if(screens)await mkdir(screens,{recursive:true})
   const capture=async(name)=>{if(screens)await page.screenshot({path:join(screens,name+'.png'),fullPage:true})}
   await page.goto(h.origin+'/app?view=sales-performance&group=segment&quarter=2099-Q1')

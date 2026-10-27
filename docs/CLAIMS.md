@@ -230,7 +230,9 @@ Evidence: `src/platter/selection.ts`, `src/platter/conditional.ts`, `src/platter
 
 ## PRICE-003 — One-off and recurring fees
 
-Status: **done**.
+Status: **partial**.
+
+Gap: No test fails when the behaviour is removed for the money and customer-visible families of the named PRICE-003 journey: the selected schedule's amounts in the preview, the client HTML and the PDF (M39, M40, M41; M59 amounts attached to opposite line labels), first-year value starting at the earliest selected recurring start (M37), remaining prepayment allocated to the earliest installments first and residual cents retained (M29, M38), recurring optional value in the deposit (M58), native acceptance creating no automatic invoice (M61), queue totals separate per currency (M13), installment term bounds 1 and 120 and non-monthly optional items accepted (M30, M31, M32), weekly, quarterly and annual interval and amount display (M50-M52), requested package controlling recurring selection (M33), duplicate percentage retainer refused (M23).
 
 Evidence: `tests/platter.test.mjs`, `tests/recurring-journey.mjs`, `tests/site-documents.mjs`, `tests/recurring-browser.mjs`
 
@@ -738,7 +740,9 @@ Evidence: `tests/mail.test.mjs`
 
 ## AUTO-004 — Public REST API and webhooks
 
-Status: **done**.
+Status: **partial**.
+
+Gap: Withdrawn and expired offers are reported as sent by the public status and analytics routes, without assertions for either state. Negotiated revisions emit neither revised nor approved lifecycle webhooks, without assertions for either event on that path. Delivery of revised, withdrawn, declined, lost, won and expired webhooks is not asserted through the receiver. Correct scopes for each documented route lack an independent expected-value assertion.
 
 Evidence: `src/platter/api/index.ts`, `src/platter/api/webhooks.ts`, `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
 

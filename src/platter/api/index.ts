@@ -50,7 +50,7 @@ function reference(){return document('API reference','<section><p>Issue keys as 
 export async function publicApi(request:Request,env:Bindings):Promise<Response|null>{
  const url=new URL(request.url);if(url.pathname!==prefix&&!url.pathname.startsWith(prefix+'/'))return null
  try{
-  need(url.origin===env.AUTH_ORIGIN,'Wrong application origin',403)
+  need(url.origin===env.AUTH_ORIGIN&&(!request.headers.has('host')||request.headers.get('host')===url.host),'Wrong application origin',403)
   let id='';const route=routes.find(r=>{if(r.method!==request.method)return false;const parts=r.path.split('{id}');if(parts.length===1)return url.pathname===prefix+r.path;const start=prefix+parts[0],end=parts[1];if(!url.pathname.startsWith(start)||!url.pathname.endsWith(end))return false;const value=url.pathname.slice(start.length,end?-end.length:undefined);if(!value||value.includes('/'))return false;id=decodeURIComponent(value);return true})
   need(route,'Public API route not found',404)
   let actor={} as Actor

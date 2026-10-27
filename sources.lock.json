@@ -2290,7 +2290,7 @@
       "executable": false
     },
     "src/platter/api/index.ts": {
-      "sha256": "39652e9f50b6adeca21d26a6aecd57808b9b3537a67b2d87386c26b631a1c2a9",
+      "sha256": "64e9c364a8bccd256b6a7d161af94c3053dd711f8728a732469d9c455e05c93d",
       "executable": false
     },
     "src/platter/api/schema.ts": {

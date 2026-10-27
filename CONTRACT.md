@@ -939,11 +939,13 @@ Proposal events, approvals and follow-ups post to Slack, Microsoft Teams or [Noo
 
 #### AUTO-004 — Public REST API and webhooks.
 
+*Cites:* PORT-002, PRICE-006, SEC-001.
+
 A documented REST API creates proposals from templates, fills variables, reads status, analytics and payments, and lists agreements, under scoped API keys. Its documentation is an OpenAPI description served at a public route and rendered as a reference page, listing every public route with its scopes and every webhook event with its payload schema and an example. Signed webhooks deliver every lifecycle event, with retries and a delivery log.
 
 *Acceptance:* Create a proposal from a template through the API with a scoped key, send it, receive signed webhooks for sent and signed, verify their signatures, and see a key without write scope refused. Fetch the published OpenAPI description and reference page: the route table the server registers and the documented routes match both ways (no undocumented public route, no documented route the server lacks), each documented route names its scope, and every webhook event type Platter emits is documented with an example that validates against its schema.
 
-*Status:* partial. A session and agent command API only; no documented public API, scoped API keys or signed lifecycle webhooks. (`src/platter/http.ts`, `tests/platter.test.mjs`)
+*Status:* done. Owner-issued, immutable-scoped, expiring and revocable keys create template drafts, fill text variables and read selected projections. Approval, sending, signing and refunds remain human actions under the ct ruling of 23 October 2026 at 14:15Z. The public OpenAPI description and reference use the registered route table; all emitted lifecycle types have schemas and examples. Signed, durable delivery has retries, revocation and an owner delivery log. Public HTTP, compiled browser and public CLI custody assertions are named in the Status table. CRM source binding remains EDIT-004’s obligation.
 
 #### AUTO-005 — Zapier, Make and Crank apps.
 
@@ -1410,13 +1412,13 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 
 ## Status
 
-Judged from the code and tests at commit `80284976ad88cff5df2cbb89a91bb23e7a55936a` (27 October 2026).
+Judged from the code and tests at commit `b2e5254b828ed8301d5e3c7029019a61a503be5e` (27 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 38 | 38 | 53 | 129 |
-| All | 50 | 38 | 53 | 141 |
+| Target and push further | 39 | 37 | 53 | 129 |
+| All | 51 | 37 | 53 | 141 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1520,7 +1522,7 @@ Judged from the code and tests at commit `80284976ad88cff5df2cbb89a91bb23e7a5593
 | `AUTO-001` | Status-driven automations | target | missing |  | No automations. |
 | `AUTO-002` | Completed documents archived to file storage | target | missing |  | No document archiving. |
 | `AUTO-003` | Team chat notifications | target | partial | `tests/mail.test.mjs` — “AUTO-003 signed events reach Slack channels and approval requests reach verified Teams direct chats with session protected links” proves a real client acceptance posts once to a consented Slack channel, a pending approval posts to the verified Teams direct chat, a scheduled follow-up posts without its private action text, and event links require the existing member session. Approval request delivery and stale-plan refusals use the named APPROVE-002 tests. The named notification CLI test preserves route metadata while excluding credentials, pending messages and activation authority. | Nook, broader proposal events, channel settings screens and chat-native approval interactions remain. Conservative default adopted pending ct approval: only owner and admins authorize destinations; channel events contain generic event text and a session-protected link, never proposal content; approval details use a verified direct recipient. Restored routes require explicit reconnection and new consent. Future Nook and COLLAB-002 event sources inherit these obligations. |
-| `AUTO-004` | Public REST API and webhooks | target | partial | `src/platter/http.ts`, `tests/platter.test.mjs` | A session and agent command API only; no documented public API, scoped API keys or signed lifecycle webhooks. |
+| `AUTO-004` | Public REST API and webhooks | target | done | `src/platter/api/index.ts`, `src/platter/api/webhooks.ts`, `tests/platter.test.mjs` — “AUTO-004 scoped REST drafting, immutable owner keys and human-only authority” proves template creation, variable filling, selected reads, human send and missing-scope refusal; “AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation” proves sent and signed signatures, retries, delivery outcomes and cost-free payloads; “AUTO-004 published route reference matches live methods and webhook schemas both ways” proves registered routes, scopes and all ten emitted types against schemas. `tests/site-lifecycle.mjs` — “AUTO-004 compiled public API reference exposes scoped operations and signed event examples” proves the compiled reference at 1440 and 390. `tests/archive.test.mjs` — “public CLI preserves business records and import custody, excludes credentials, and enforces restore fences” retains routes and delivery history while excluding keys and signing secrets. |  |
 | `AUTO-005` | Zapier, Make and Crank apps | target | missing |  | No automation-platform apps. |
 | `HAND-001` | Accepted-scope handoff to delivery tools | target | missing |  | No delivery handoff. |
 | `HAND-002` | Handoff to Gauge with budget and rates | target | missing |  | No Gauge handoff. |

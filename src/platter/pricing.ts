@@ -3,7 +3,7 @@ import { calendarDate } from './expiry-time'
 import { dollars, need, text } from './model'
 
 export interface PriceLine {
- name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number; grossCents?:number; discountBps?:number; discountFixedCents?:number; groupDiscountBps?:number; groupDiscountFixedCents?:number
+ catalogId?: string; name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number; grossCents?:number; discountBps?:number; discountFixedCents?:number; groupDiscountBps?:number; groupDiscountFixedCents?:number
 }
 export interface PriceTable {
  name: string; lines: PriceLine[]; groups: { name: string; subtotalCents: number }[]; subtotalCents: number; thresholdBps?:number
@@ -45,7 +45,7 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
    need(typeof group === 'string' && group.length <= 200, 'Group must be text up to 200 characters')
    const name = text(line.name, 'a line name'), unit = text(line.unit, 'a unit', 40)
    groups.set(group.trim(), boundedTotal(BigInt(groups.get(group.trim()) ?? 0) + BigInt(lineTotalCents)))
-   return { name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{grossCents,discountBps,discountFixedCents,groupDiscountBps,groupDiscountFixedCents}:{}) }
+   return { ...(line.catalogId?{catalogId:text(line.catalogId,'a catalog item',100)}:{}),name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{grossCents,discountBps,discountFixedCents,groupDiscountBps,groupDiscountFixedCents}:{}) }
   })
   let thresholdBps=Math.max(0,...lines.map(l=>l.grossCents?Math.ceil((l.grossCents-l.lineTotalCents)*10000/l.grossCents):0))
   for(const group of groups.keys()){
@@ -71,7 +71,7 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
 export function pricingInput(options: any[]) {
  return options.flatMap(option => (option.tables ?? []).map((table: PriceTable) => ({
   optionId: option.id, name: table.name,
-  lines: table.lines.map(({ name, description, quantity, unit, unitPrice, group, discountBps, discountFixedCents, groupDiscountBps, groupDiscountFixedCents }) => ({ name, description, quantity, unit, unitPrice, group,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{discountPercent:(discountBps??0)/100,discountAmount:((discountFixedCents??0)/100).toFixed(2),groupDiscountPercent:(groupDiscountBps??0)/100,groupDiscountAmount:((groupDiscountFixedCents??0)/100).toFixed(2)}:{}) })),
+  lines: table.lines.map(({ catalogId, name, description, quantity, unit, unitPrice, group, discountBps, discountFixedCents, groupDiscountBps, groupDiscountFixedCents }) => ({ ...(catalogId?{catalogId}:{}),name, description, quantity, unit, unitPrice, group,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{discountPercent:(discountBps??0)/100,discountAmount:((discountFixedCents??0)/100).toFixed(2),groupDiscountPercent:(groupDiscountBps??0)/100,groupDiscountAmount:((groupDiscountFixedCents??0)/100).toFixed(2)}:{}) })),
  })))
 }
 

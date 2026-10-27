@@ -27,7 +27,7 @@ export async function performanceHistory(db:D1Database,a:Actor){
   const options=p.accepted_snapshot?content.options.filter((o:any)=>o.id===p.option_id):content.options
   const lines=options.flatMap((o:any)=>(o.tables??[]).flatMap((t:any)=>t.lines))
   const at=p.accepted_at??outcome.occurred_at,date=new Date(at),quarter=`${date.getUTCFullYear()}-Q${Math.floor(date.getUTCMonth()/3)+1}`
-  const receipt=payments.find(r=>r.proposal_id===p.id&&r.revision===(content.revision??p.revision))
+  const receipt=payments.find(r=>r.proposal_id===p.id&&r.revision===(content.revision??p.revision)&&p.accepted_at!=null&&Date.parse(r.received_on+'T00:00:00Z')>=p.accepted_at)
   const paidAt=receipt?Date.parse(receipt.received_on+'T00:00:00Z'):null
   return [{id:p.id,title:p.title,currency:p.currency,owner:p.sales_owner_name??'Not recorded',ownerId:p.sales_owner_id??'Not recorded',template:p.template_name,templateId:p.template_id??'Not recorded',segment:p.segment,quarter,won,lost,accepted:Boolean(p.accepted_at),reason:lost?outcome.reason:null,lines,
    services:[...new Set(lines.length?lines.map((l:any)=>l.catalogId??l.name):options.map((o:any)=>o.label))],
@@ -63,4 +63,4 @@ function metrics(id:string,label:string,currency:string,values:any[]){
 export const performanceColumns=['Group','Currency','Decided','Won','Lost','Win rate percent','Median sign days','Sign samples','Median pay days','Payment samples','Average won deal','Lost reasons']
 export const performanceValues=(r:any)=>[r.label,r.currency,r.decided,r.won,r.lost,r.winRate.toFixed(1),r.medianSignMs==null?'':r.medianSignMs/86400000,r.signSamples,r.medianPayMs==null?'':r.medianPayMs/86400000,r.paySamples,r.averageDealCents==null?'':(r.averageDealCents/100).toFixed(2),JSON.stringify(r.lostReasons)]
 export const performanceCsv=(report:any)=>[performanceColumns,...[...report.rows,...report.totals].map(performanceValues)].map(row=>row.map(cell).join(',')).join('\r\n')+'\r\n'
-export function performanceMail(report:any,filters:string):[string,string]{return ['Platter sales performance report',`${report.count} decided proposals. Filters: ${filters}\n${[...report.rows,...report.totals].map((r:any)=>performanceValues(r).join(' · ')).join('\n')}\nCSV:\n${performanceCsv(report)}`]}
+export function performanceMail(report:any,filters:string):[string,string]{return ['Platter sales performance report',`${report.count} decided proposals. Filters: ${filters}\n${[...report.rows,...report.totals].map((r:any)=>performanceValues(r).map((v:any,i:number)=>i===10&&r.averageDealCents!=null?'$'+(Math.round(r.averageDealCents)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+r.currency:v).join(' · ')).join('\n')}\nCSV:\n${performanceCsv(report)}`]}

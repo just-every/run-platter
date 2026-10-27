@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 export const baseOffer={title:'Synthetic scope',scope:'A documented service.',packages:[{id:'one',label:'Service',price:'100'}],depositPercent:'25'}
-export async function performanceFixture(h,{singleOwner=false}={}){
+export async function performanceFixture(h,{singleOwner=false,asymmetric=false}={}){
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
  await h.cmd('outcome.settings',{version:0,reasons:['Budget','Timing']})
  if(!singleOwner)await h.send('/auth/invite',{email:'sales@studio.example',displayName:'Sales colleague',role:'member',returnTo:'/app'},h.owner)
@@ -19,7 +19,7 @@ export async function performanceFixture(h,{singleOwner=false}={}){
   let p=await h.cmd('template.start',{id:templates[group].id,version:templates[group].version,clientId:clients[group].id,title:`History ${String(i).padStart(3,'0')}`},cookie)
   p=await h.cmd('proposal.revise',{...baseOffer,id:p.id,version:p.version,clientId:clients[group].id,title:`History ${String(i).padStart(3,'0')}`,pricingTables:[{optionId:'one',name:'Services',lines:[{catalogId:catalog[group].id,name:['Brand','Support'][group],unit:'project',unitPrice:String(price),quantity:'1'}]}]},cookie)
   await h.cmd('proposal.approve',{id:p.id,version:p.version,revision:p.revision})
-  const sentAt=Date.parse(group?'2099-04-15T00:00:00Z':'2099-01-15T00:00:00Z'),acceptedAt=sentAt+(group?4:2)*86400000
+  const sentAt=Date.parse(group?'2099-04-15T00:00:00Z':'2099-01-15T00:00:00Z'),signDays=asymmetric?(j<37?(group?4:1):(group?20:9)):(group?4:2),acceptedAt=sentAt+signDays*86400000
   await clock(sentAt)
   const share=await h.cmd('proposal.send',{id:p.id,version:p.version+1},cookie),path=new URL(share.shareUrl).pathname
   await clock(acceptedAt)
@@ -30,7 +30,7 @@ export async function performanceFixture(h,{singleOwner=false}={}){
    assert.equal(verified.status,200,verified.text)
    const accepted=await h.send(path+'/action?name=accept',{name:'Synthetic Client',optionId:'one',consent:true},verified.cookie)
    assert.equal(accepted.status,200,accepted.text)
-   await h.cmd('payment.record',{id:p.id,method:'wire',receivedOn:group?'2099-04-24':'2099-01-20',amount:String(price),reference:`synthetic-platter-${i}`,consent:true})
+   await h.cmd('payment.record',{id:p.id,method:'wire',receivedOn:asymmetric?new Date(acceptedAt+(j<37?(group?5:2):(group?21:14))*86400000).toISOString().slice(0,10):group?'2099-04-24':'2099-01-20',amount:String(price),reference:`synthetic-platter-${i}`,consent:true})
   }else{
    await h.cmd('proposal.lose',{id:p.id,version:p.version+2,reason:group?'Timing':'Budget',notice:false},cookie)
   }

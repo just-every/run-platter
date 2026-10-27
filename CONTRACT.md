@@ -1003,7 +1003,7 @@ Reports show win rate, time to sign, time to pay, average deal value and lost re
 
 *Acceptance:* From a fixture of 100 decided proposals, see win rate, median time to sign, median time to pay, average deal value and lost-reason counts by owner, template, service, client segment and quarter, each matching the fixture's hand-computed values.
 
-*Status:* missing. No conversion reporting.
+*Status:* done. Owner-only sales performance now groups 100 decided proposals by owner, template, catalog service, explicit client segment and UTC decision quarter. Accepted agreements and explicit won overrides are wins; declined and lost records are losses, and open proposals are excluded. Signing measures recorded send to acceptance; payment measures acceptance to the first recorded receipt, retaining date precision and zero for same-day receipts. Missing facts remain unrecorded. Average deal value uses wins; currencies stay separate, and a proposal with several services appears once in each service group. REPORT-005 exports and schedules the same filtered figures to explicitly named active people; PORT-002 retains all source facts and schedules. No model or provider call is made.
 
 #### REPORT-003 — Content and pricing performance.
 
@@ -1226,7 +1226,7 @@ For each line item, Platter suggests a price range from the firm's own accepted 
 
 *Acceptance:* From a fixture history, see a suggested range with sample size and three linked examples, and see the price unchanged until the member applies it.
 
-*Status:* missing. No price suggestions.
+*Status:* done. The owner sees observed minimum, maximum and median unit prices for each catalog-linked line, restricted to the same catalog identity, unit, currency and explicit client segment in the firm's own accepted or lost history. Accepted history uses the selected option; lost history uses offered prices. The sample count is distinct proposals, and up to three unique linked examples identify the historical offers and outcomes. Unclassified clients or absent comparable history receive no invented range. An explicit version-checked Apply action revises an unsent draft and clears approval under APPROVE-003; reads never change a price, and members, stale inputs and sent offers are refused. Catalog identities and segments survive PORT-002 archives; no outbound model call is made.
 
 ### Privacy, security and portability
 
@@ -1410,13 +1410,13 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 
 ## Status
 
-Judged from the code and tests at commit `80284976ad88cff5df2cbb89a91bb23e7a55936a` (27 October 2026).
+Judged from the code and tests at commit `20148c3d0a75966f1dd97a89b15ae9505c7bd0f3` (27 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 38 | 38 | 53 | 129 |
-| All | 50 | 38 | 53 | 141 |
+| Target and push further | 40 | 38 | 51 | 129 |
+| All | 52 | 38 | 51 | 141 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1527,7 +1527,7 @@ Judged from the code and tests at commit `80284976ad88cff5df2cbb89a91bb23e7a5593
 | `RENEW-001` | Bulk proposal creation and sending | target | missing |  | No bulk sending. |
 | `RENEW-002` | Renewal proposals from accepted agreements | target | missing |  | No renewals. |
 | `REPORT-001` | Proposal pipeline dashboard | target | done | `src/platter/pipeline.ts`, `src/platter/ui/pipeline.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
-| `REPORT-002` | Win rate and sales performance | target | missing |  | No conversion reporting. |
+| `REPORT-002` | Win rate and sales performance | target | done | `tests/platter.test.mjs` — “REPORT-002 100 decided proposals match hand-computed metrics in every grouping and scheduled CSV” (every metric and group, filters, explicit won override, currencies, missing facts, same-day receipts, owner authority, identical CSV and once-only weekly mail to two people); `tests/site-lifecycle.mjs` — “REPORT-002 and AI-004 compiled report filters and explicit price application” (compiled report, totals, grouping and screens at 1440 and 390); `tests/archive.test.mjs` — “REPORT-002 AI-004 public CLI preserves business report sources, segments, item identities and report schedules” (identical archive parts and restored report) | |
 | `REPORT-003` | Content and pricing performance | target | missing |  | No content analytics. |
 | `REPORT-004` | Booked, billed and collected revenue | target | partial | `src/platter/reports/recorded-revenue.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | The recorded-revenue pipeline view now shows accepted value, explicitly received payments, confirmed refunds, net received, unconfirmed refunds and exported deposit CSV value, separately by currency. It never labels an export as a paid provider invoice. Owner/admin/billing see all, manager/viewer see teams and sales sees own; content editors and agents receive no revenue facts. tests/platter.test.mjs — “TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund” proves hand-computed totals, each role, exact filtered CSV and once-only scheduled email with identical rows and money. The named role browser journey proves sales/manager/billing views and owner CSV/scheduling at 1440/390; the named role CLI archive journey preserves receipts, refunds, filters and identical report rows/totals. Gap: recurring/MRR/first-year figures, provider invoiced/overdue amounts, accepted/payment-period reporting and accounting reconciliation with the QuickBooks fake remain. |
 | `REPORT-005` | Report export and scheduled delivery | target | done | `src/platter/reports/schedules.ts`, `src/platter/reports/pipeline-csv.ts`, `src/platter/reports/zone.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs` |  |
@@ -1548,7 +1548,7 @@ Judged from the code and tests at commit `80284976ad88cff5df2cbb89a91bb23e7a5593
 | `AI-001` | Drafts from meeting notes, transcripts and email | target | partial | `src/platter/http.ts`, `tests/platter.test.mjs` | External agents can post structured drafts; there is no ingestion of notes, transcripts or email and no in-product drafting. |
 | `AI-002` | Writing assistant in the editor | target | missing |  | No writing assistant. |
 | `AI-003` | MCP server for AI assistants | target | done | `src/platter/mcp.ts`, `src/platter/send-requests.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` |  |
-| `AI-004` | Explainable price suggestions | target | missing |  | No price suggestions. |
+| `AI-004` | Explainable price suggestions | target | done | `tests/platter.test.mjs` — “AI-004 historical range and three linked examples never change prices before explicit apply” (range, median, exact sample size, three distinct working links, independent item, segment, unit and currency exclusions, unchanged price until Apply, scoped member refusal, stale and sent-state refusals, exact revised total and audit); `tests/site-lifecycle.mjs` — “REPORT-002 and AI-004 compiled report filters and explicit price application” (native Apply control and unchanged then revised prices, screens at 1440 and 390); `tests/archive.test.mjs` — “REPORT-002 AI-004 public CLI preserves business report sources, segments, item identities and report schedules” (restored suggestions) | |
 | `PRIV-001` | Erasure across contacts, tracking and synced systems | target | partial | `src/platter/commands.ts`, `tests/platter.test.mjs` | Only unused client records can be erased; no contacts, tracking data or notice to synced systems. |
 | `PORT-002` | Complete product archive | target | done | `tests/archive.test.mjs`, `src/platter/archive-policy.mjs` |  |
 | `SEC-001` | Provider credential custody | target | partial | `src/platter/connections.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Stripe, QuickBooks, HubSpot, Salesforce, Drive, Slack, Google and Microsoft tokens are sealed with purpose-separated AES-GCM, omitted from API/UI/log fields and excluded from archives. tests/platter.test.mjs — “TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens” proves connection authority, plaintext absence and disconnect; tests/archive.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” proves metadata restoration requires reconnection. Gap: SSO provider credentials, per-provider least-scope verification, OAuth refresh, visible breakage state and job-stop assertions for future synchronization jobs. |

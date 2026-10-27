@@ -1074,13 +1074,13 @@ Gap: none.
 
 ## REPORT-002 — Win rate and sales performance
 
-Status: **missing**.
+Status: **done**.
 
 Reports show win rate, time to sign, time to pay, average deal value and lost reasons by owner, template, service, client segment and period. *Acceptance:* From a fixture of 100 decided proposals, see win rate, median time to sign, median time to pay, average deal value and lost-reason counts by owner, template, service, client segment and quarter, each matching the fixture's hand-computed values.
 
-Evidence: None recorded.
+Evidence: `tests/platter.test.mjs` — “REPORT-002 100 decided proposals match hand-computed metrics in every grouping and scheduled CSV” (every metric and group, filters, explicit won override, currencies, missing facts, same-day receipts, owner authority, identical CSV and once-only weekly mail to two people); `tests/site-lifecycle.mjs` — “REPORT-002 and AI-004 compiled report filters and explicit price application” (compiled report, totals, grouping and screens at 1440 and 390); `tests/archive.test.mjs` — “REPORT-002 AI-004 public CLI preserves business report sources, segments, item identities and report schedules” (identical archive parts and restored report)
 
-Remaining gap: No conversion reporting.
+Gap: none.
 
 ## REPORT-003 — Content and pricing performance
 
@@ -1284,13 +1284,13 @@ Gap: none.
 
 ## AI-004 — Explainable price suggestions
 
-Status: **missing**.
+Status: **done**.
 
 For each line item, Platter suggests a price range from the firm's own accepted and lost proposals for the same catalog item and client segment, with the sample size and examples shown. The member decides; suggestions are never applied silently. *Acceptance:* From a fixture history, see a suggested range with sample size and three linked examples, and see the price unchanged until the member applies it.
 
-Evidence: None recorded.
+Evidence: `tests/platter.test.mjs` — “AI-004 historical range and three linked examples never change prices before explicit apply” (range, median, exact sample size, three distinct working links, independent item, segment, unit and currency exclusions, unchanged price until Apply, scoped member refusal, stale and sent-state refusals, exact revised total and audit); `tests/site-lifecycle.mjs` — “REPORT-002 and AI-004 compiled report filters and explicit price application” (native Apply control and unchanged then revised prices, screens at 1440 and 390); `tests/archive.test.mjs` — “REPORT-002 AI-004 public CLI preserves business report sources, segments, item identities and report schedules” (restored suggestions)
 
-Remaining gap: No price suggestions.
+Gap: none.
 
 ## PRIV-001 — Erasure across contacts, tracking and synced systems
 

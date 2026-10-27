@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "1db63c5aadb9aede58f7f5f4e1a303e7ea44ac0f8f282f769b64a698219658d1",
+      "sha256": "3c50711c94f8d3323d20cb0a4e43f7066ba20a595bf5f4703f8782c8bc8a5485",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "4ca80f457e59717a3fd77f9ce46ff6ad46e1a0538ba846fd9f004b80ea3285bb",
+      "sha256": "5d45c5559e194d7f2d743f284afac884aa10936cb714b825096df41cdc32e8b2",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "394c8c2bcd0e66442ea831625edc5c149ea4f9d09e4fc671659fc1aa22fca00b",
+      "sha256": "1d3b4835cb0d25da8c47d28f1ca23be19be6de178990ea73af8c07e6380da93c",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -1326,7 +1326,7 @@
       "executable": false
     },
     "scripts/verification/run.mjs": {
-      "sha256": "0b241ae448bd8efb1b80a5f643125fdf607d6c0644bc142738deb24693c66234",
+      "sha256": "63584c2a10dc712847bb5543fbd8d2f18434d920b8f7250b629b0b78d4c6ebbe",
       "executable": false
     },
     "SEED-COMMAND-CONTRACT.md": {

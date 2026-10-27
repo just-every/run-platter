@@ -2662,6 +2662,13 @@ test('REPORT-002 hundred decided proposals expose exact segmented metrics, match
   else {await fire('2027-03-14T07:15:00Z');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_report_mail').first()).n,beforeCount+2,'skipped hour runs at first following check');await fire('2027-03-17T09:15:00Z');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_report_mail').first()).n,beforeCount+3,'missed checks catch up once')}
   await h.cmd('report.unschedule',{id:scheduled.id})
  }
+ for(let i=0;i<3;i++){const email='recipient-'+i+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:'Report recipient '+i,role:'member',returnTo:'/app'},h.owner);await h.signIn(email)}
+ const ten=(await h.db.prepare("SELECT email FROM oa_operators WHERE status='active' ORDER BY email").all()).results.map(p=>p.email);assert.equal(ten.length,10)
+ const maxRecipients=await h.cmd('report.schedule',{filters:'view=sales-performance',cadence:'daily',hour:9,recipients:ten});assert.deepEqual((await h.state()).reportSchedules.find(s=>s.id===maxRecipients.id).recipients.toSorted(),ten)
+ await h.cmd('report.schedule',{filters:'view=sales-performance',cadence:'daily',hour:9,recipients:[...ten,'eleventh@synthetic-platter.example']},h.owner,400);await h.db.prepare("UPDATE oa_operators SET status='inactive' WHERE email='recipient-0@synthetic-platter.example'").run()
+ const maxRow=await h.db.prepare('SELECT next_run_at FROM p_report_schedules WHERE id=?').bind(maxRecipients.id).first();await fire(maxRow.next_run_at)
+ const maxRun=(await h.state()).reportSchedules.find(s=>s.id===maxRecipients.id).runs[0];assert.deepEqual(maxRun.skipped,['no longer active']);assert.equal(maxRun.mail.length,9);assert.ok(maxRun.mail.every(m=>m.recipient!=='recipient-0@synthetic-platter.example'))
+ await h.db.prepare("UPDATE oa_operators SET status='active' WHERE email='recipient-0@synthetic-platter.example'").run();await h.cmd('report.unschedule',{id:maxRecipients.id})
  const first=f.ids[0],second=f.ids[2],third=f.ids[4]
  await h.db.prepare('DELETE FROM p_expiry WHERE proposal_id=?').bind(first).run()
  await h.db.prepare('UPDATE p_expiry SET sent_at=? WHERE proposal_id=?').bind(Date.parse('2100-01-01T00:00:00Z'),second).run()
@@ -2691,7 +2698,18 @@ test('REPORT-002 hundred decided proposals expose exact segmented metrics, match
  const boundaryTiming=(await read('segment',h.owner,'2099-Q1')).rows.find(r=>r.id==='UTC boundary');assert.deepEqual([boundaryTiming.paySamples,boundaryTiming.medianPayMs],[1,24.5*3600000],'first qualifying receipt date at midnight UTC wins over earlier and later receipts')
  const decline=await h.cmd('proposal.prepare',{...(await import('./performance-fixture.mjs')).baseOffer,clientId:boundaryClient.id,pricingTables:[{optionId:'one',name:'Two services',lines:[{catalogId:f.catalog[0].id,name:'Brand',unit:'project',unitPrice:'40',quantity:'1'},{catalogId:f.catalog[1].id,name:'Support',unit:'project',unitPrice:'60',quantity:'1'}]}]});await h.cmd('proposal.approve',{id:decline.id,version:1,revision:1});const declinePath=new URL((await h.cmd('proposal.send',{id:decline.id,version:2})).shareUrl).pathname,declineCookie=await verified(h,declinePath);assert.equal((await h.send(declinePath+'/action?name=decline',{revision:1,reason:'Timing'},declineCookie)).status,410)
  const boundaryOutcome=(await read('segment',h.owner,'2099-Q2')).rows.find(r=>r.id==='UTC boundary');assert.deepEqual([boundaryOutcome.decided,boundaryOutcome.won,boundaryOutcome.lost,boundaryOutcome.winRate,boundaryOutcome.averageDealCents,boundaryOutcome.lostReasons],[2,1,1,50,10000,{Timing:1}])
- const serviceRows=(await read('service',h.owner,'2099-Q2')).rows;assert.deepEqual(serviceRows.filter(r=>r.id===f.catalog[0].id).map(r=>[r.decided,r.won,r.lost]),[[3,2,1]],'multiple services include the correct proposal once per service')
+ const serviceRows=(await read('service',h.owner,'2099-Q2')).rows;assert.deepEqual(serviceRows.filter(r=>r.id===f.catalog[0].id).map(r=>[r.decided,r.won,r.lost]),[[3,2,1]],'multiple services include the correct proposal once per service');assert.deepEqual(serviceRows.filter(r=>r.id===f.catalog[1].id).map(r=>[r.decided,r.won,r.lost]),[[52,41,11]],'second service retains accepted and declined proposals')
+ const providerMail=[],provider=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-report-provider'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');const body=await request.json();if(body.subject==='Platter sales performance report'){providerMail.push(body);if(providerMail.length===2)throw Error('Synthetic provider uncertainty')}return Response.json({id:'synthetic-platter-report-'+providerMail.length})}})
+ try{
+  await provider.send('/auth/invite',{email:'recipient@synthetic-platter.example',displayName:'Recipient',role:'member',returnTo:'/app'},provider.owner);await provider.signIn('recipient@synthetic-platter.example')
+  const client=await provider.cmd('client.save',{name:'Provider report',email:'client@synthetic-platter.example',segment:'Provider fixture'}),p=await provider.cmd('proposal.prepare',{...(await import('./performance-fixture.mjs')).baseOffer,clientId:client.id})
+  await provider.cmd('proposal.approve',{id:p.id,version:1,revision:1});await provider.cmd('proposal.send',{id:p.id,version:2});await provider.cmd('proposal.win',{id:p.id,version:3,reason:'Agreed by phone'})
+  const scheduled=await provider.cmd('report.schedule',{filters:'view=sales-performance&group=segment',cadence:'daily',hour:9,recipients:[provider.auth.OWNER_EMAIL,'recipient@synthetic-platter.example']}),row=await provider.db.prepare('SELECT * FROM p_report_schedules WHERE id=?').bind(scheduled.id).first(),worker=await provider.mf.getWorker()
+  const due={scheduledTime:new Date(row.next_run_at),cron:'*/15 * * * *'};await worker.scheduled(due);await worker.scheduled(due)
+  assert.equal(providerMail.length,2,'uncertain recipient is not resent');assert.deepEqual((await provider.db.prepare('SELECT status FROM p_report_mail ORDER BY rowid').all()).results.map(r=>r.status),['accepted','uncertain'])
+  for(const mail of providerMail){assert.match(mail.text,/1 decided proposals/);assert.match(mail.text,/Provider fixture · USD · 1 · 1 · 0 · 100.0 ·  · 0 ·  · 0 · \$100.00 USD · \{\}/);assert.match(mail.text,/Total,USD,1,1,0,100.0,,0,,0,100.00,\{\}/)}
+ }finally{await provider.close()}
+
 }))
 
 test('AI-004 matching catalog and segment history explains a price range without changing it until explicit revision apply',()=>run(async h=>{
@@ -2722,6 +2740,11 @@ test('AI-004 matching catalog and segment history explains a price range without
  await h.cmd('pricing.suggest.apply',{id:p.id,version:p.version+1,tableIndex:0,lineIndex:0,unitCents:12000})
  await audited(h,'pricing.suggest.apply',(await h.state()).actor.id,'owner',p.id)
  const after=(await h.state()).proposals.find(x=>x.id===p.id);assert.equal(after.options[0].tables[0].lines[0].unitPrice,'120.00');assert.equal(after.options[0].cents,12000);assert.equal(after.revision,p.revision+1);assert.equal(after.status,'draft');assert.equal(after.approved_by,null)
+ const applyRows=(await h.send('/api/platter/audit?'+new URLSearchParams({action:'pricing.suggest.apply',subject:p.id}),undefined,h.owner)).value.rows;assert.equal(applyRows.length,1)
+ const event=applyRows[0],auditQuery=new URLSearchParams({actor:event.actor_id,action:event.action,subject:event.subject,from:String(event.occurred_at),to:String(event.occurred_at),q:'PRICING.SUGGEST.APPLY'})
+ assert.deepEqual((await h.send('/api/platter/audit?'+auditQuery,undefined,h.owner)).value.rows,applyRows)
+ const applyCsv=await h.send('/api/platter/audit.csv?'+auditQuery,undefined,h.owner);assert.equal(applyCsv.status,200);assert.equal(applyCsv.text,'id,actor_id,actor_role,action,subject,occurred_at,reason,mail_route,sender_address\r\n'+[event.id,event.actor_id,'owner','pricing.suggest.apply',p.id,event.occurred_at,'','',''].map(v=>'"'+v+'"').join(',')+'\r\n')
+ assert.doesNotMatch(JSON.stringify(applyRows),/50000|unitCents|shareToken|synthetic-platter-/)
  const afterApply=await domain();await h.cmd('pricing.suggest.apply',{id:p.id,version:p.version+1,tableIndex:0,lineIndex:0,unitCents:12000},h.owner,409)
  await h.cmd('pricing.suggest.apply',{id:f.ids[0],version:5,tableIndex:0,lineIndex:0,unitCents:12000},h.owner,409)
  assert.equal((await h.send('/api/platter/price-suggestions?id='+p.id,undefined,f.sales)).status,403);assert.deepEqual(await domain(),afterApply,'stale, frozen and foreign refusals write nothing')

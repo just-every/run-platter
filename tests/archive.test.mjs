@@ -25,6 +25,7 @@ const command = async (cwd, args, expected = 0) => {
   catch (error) { result = error }
   console.log('Archive CLI '+args[0]+' completed in '+Math.round(performance.now()-started)+' ms')
   assert.equal(result.code, expected, `${args[0]}: ${result.stdout ?? ''} ${result.stderr ?? ''}`)
+  return result
 }
 async function checkout(root) {
   await mkdir(root)
@@ -314,7 +315,13 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
       (async()=>{h=await harness({root:source,...identity});try{await h.cmd('client.erase',{id:p.id,confirmName:'Temporary joiner'},await h.signIn(h.auth.OWNER_EMAIL))}finally{await h.close();h=null}await command(source,['export','--output',later,'--no-queue'])})(),
     ])
     for(const result of independent)if(result.status==='rejected')throw result.reason
-    await command(erased,['import','--input',old,'--journal',later,'--yes','--no-queue'],4)
+    // The pinned runner requires a contained, private journal path. Assert the
+    // erasure fence itself; a path refusal with the same exit code proves nothing.
+    const recovery=join(erased,'.rer/recovery');await mkdir(recovery,{recursive:true,mode:0o700})
+    await cp(later,join(recovery,'latest.rer'))
+    const refused=await command(erased,['import','--input',old,'--journal','.rer/recovery/latest.rer','--yes','--no-queue'],4)
+    assert.match(refused.stdout+' '+refused.stderr,/\((?:erased_row|erasure_epoch)\)/,'the older archive is refused specifically by the erasure fence')
+
     await command(erased,['import','--input',later,'--yes','--no-queue'])
     await command(erased,['import','--input',later,'--yes','--no-queue'],4)
     h=await harness({root:erased,unclaimed:true,auth:identity.auth})

@@ -37,13 +37,26 @@ Open the restored installation's private **RER_OPEN** link, finish setup as need
 
 ## Restore older data after an erasure
 
-When restoring an older backup after a client erasure, supply a newer backup containing the erasure journal:
+When restoring an older backup after a client erasure, always supply a newer backup containing the erasure journal. The pinned runner requires the journal to be a private file inside the destination checkout; `--journal ../latest.rer` is refused before the journal is read.
+
+Keep your original backups outside the checkout. From the fresh, empty destination, make a temporary private copy of the newer backup in the ignored recovery directory:
 
 ```sh
-rer import --input ../old.rer --journal ../latest.rer --yes
+mkdir -p .rer/recovery
+chmod 700 .rer/recovery
+cp ../latest.rer .rer/recovery/latest.rer
+chmod 600 .rer/recovery/latest.rer
+rer import --input ../old.rer --journal .rer/recovery/latest.rer --yes
 ```
 
-The older restore is refused rather than reviving erased data. Keep the latest archive with the erasure history when you retain older backups.
+Adjust the two source paths to your backups' actual locations. If the older backup contains erased data, Platter refuses the whole restore and leaves the destination empty. Do not retry that older backup without its journal. Restore the newer backup instead:
+
+```sh
+rer import --input ../latest.rer --yes
+rm .rer/recovery/latest.rer
+```
+
+Remove the temporary journal only after the restore finishes. Keep the original newer backup with the erasure history whenever you retain older backups, then continue with the owner setup and access checks above. Accepted agreements and invoice amounts remain retained.
 
 ## Reconnect access
 

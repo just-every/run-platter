@@ -29,10 +29,10 @@ const mapping: ImportMapping = {
 }
 const clients = (plan: ImportPlan) => plan.entries.flatMap(entry => entry.effects.map(effect => effect.value as { id: string; name: string; email: string; version: number }))
 async function conflicts(db: D1Database, plan: ImportPlan) {
-  const found: { clientId: string; existingId: string; reason: string }[] = []
+  const found: { clientId: string; existingId: string; reason: string; message: string }[] = []
   for (const value of clients(plan)) {
-    const rows = await db.prepare('SELECT id FROM p_clients WHERE id=? OR lower(email)=?').bind(value.id, value.email).all<{ id: string }>()
-    for (const row of rows.results) found.push({ clientId: value.id, existingId: row.id, reason: 'existing_client' })
+    const rows = await db.prepare('SELECT id,name FROM p_clients WHERE id=? OR lower(email)=?').bind(value.id, value.email).all<{ id: string; name: string }>()
+    for (const row of rows.results) found.push({ clientId: value.id, existingId: row.id, reason: 'existing_client', message: `${value.name} matches an existing client, ${row.name}, by ID or email. Keep the existing client or remove this row from the CSV, then preview again.` })
   }
   return found
 }
@@ -49,8 +49,8 @@ export async function importCommand(db: D1Database, who: Actor, name: string, in
         const existing = await conflicts(db, plan)
         await owner(db, who)
         return { kit: 'Client CSV', fingerprint: plan.fingerprint, counts: plan.counts,
-          diagnostics: [...plan.diagnostics, ...existing.map(c => ({ severity: 'error' as const, code: c.reason,
-            message: `Client ${c.clientId} conflicts with existing client ${c.existingId}`, sourceId: c.clientId }))],
+          diagnostics: [...plan.diagnostics, ...existing.map(c => ({ severity: 'error' as const, code: 'existing_client',
+            message: c.message, sourceId: c.clientId }))],
           clients: clients(plan), conflicts: existing, canApply: existing.length === 0 }
       }
       const reviewedFingerprint = requiredText(input.fingerprint, 'fingerprint')

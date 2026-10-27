@@ -6,17 +6,25 @@ New offers use **USD**. Existing first-release offers and agreements retain thei
 
 ## Run from a fresh clone
 
-Install Git, then run one line. It installs the RER launcher, clones Platter and starts it:
+Install Git, then follow the same two steps shown on the site's **Run** page:
 
 ```sh
-npx -y @runeditrun/rer dev just-every/run-platter
+curl -fsSL https://runeditrun.com/install.sh | sh
 ```
 
-To start it again later, run `cd run-platter && rer dev`.
+If the installer prints a PATH activation command, run it in this terminal before step two. It makes `rer` available now and in new terminals.
+
+```sh
+rer dev just-every/run-platter
+```
+
+Already have Node 22 or later? `npx -y @runeditrun/rer dev just-every/run-platter` performs both steps. You do not need to install pnpm yourself.
+
+To start it again later, run `cd run-platter && rer dev` from the folder where you first launched it. If installation or launch is interrupted, use that same command to resume; if you are already inside `run-platter`, run `rer dev`. Follow any repair command printed by the launcher before retrying.
 
 RER installs the pinned dependencies, selects Node 22.20.0, creates local D1, and opens a local owner account. The first run takes a few minutes and needs 15 GiB free. Open the private `RER_OPEN` URL printed in your terminal. Keep that link private. Complete the short setup screen, then open **Proposals** at `/app`.
 
-For a real owner's local install, run `npx -y @runeditrun/rer setup just-every/run-platter --owner-email you@example.com` in place of the one line, then `cd run-platter && rer dev`. Review installs use a local owner automatically. To stop the managed server, run `rer dev --stop`.
+For a real owner's local install, install rer as above, then run `rer setup just-every/run-platter --owner-email you@example.com` in place of the start command, then `cd run-platter && rer dev`. Review installs use a local owner automatically. To stop the managed server, run `rer dev --stop`.
 
 The run site is live at https://run-platter.com, with the run page at https://run-platter.com/run. Locally, the address printed as `RER_SITE` has the same marketing homepage, `/run` and [the docs](docs/README.md). The installed app’s `/` is the Lobby.
 
@@ -75,7 +83,7 @@ Owner identities, business records, revisions, approvals, acceptances, invoice C
 Use your own Cloudflare account, D1 and verified mail sender. A push does not deploy. Keep the generated `proposals/platter` project, `proposals-platter` Worker, and `foundation` D1 identities unchanged.
 
 1. Stop local dev. Supply `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` privately in the environment. Configure `deploy.json` with your verified `MAIL_FROM` and supported `MAIL_PROVIDER`; its default `auth@example.invalid` must be replaced for real mail. Supply `OWNER_EMAIL`, `SESSION_SECRET`, `SETUP_TOKEN` and `MAIL_API_KEY` through the private environment named by `deploy.json`. Generate fresh random secrets; never commit them.
-2. Run `rer deploy --dry-run` to validate, build and inspect the plan without provider requests. It requires the same private mail configuration as real deployment; missing configuration stops before building.
+2. Run `rer deploy --dry-run` to preflight the inputs, build and inspect the plan without uploading. Missing Cloudflare access prints the account inputs and their purposes before building or contacting the provider. With credentials, RER reads target secret bindings but makes no provider writes. Invalid mail configuration also stops before building.
 3. Commit your nonsecret configuration, then run `rer deploy`. RER provisions the declared resources on that account, applies all migrations, configures the origin and checks health. [OPERATIONS.md](OPERATIONS.md) covers account permissions and private configuration.
 4. Use `rer signin` for the hosted owner's initial entry, then complete setup. Test real mail with your own mailbox before inviting clients. Mail marked **Accepted by provider** means handoff, not delivery. An uncertain provider attempt is retained and is not retried automatically.
 
@@ -83,7 +91,7 @@ The optional product domain is not needed to run or deploy this seed. The run si
 
 ## Development
 
-The checkout pins `@runeditrun/rer` 0.2.25 in package mode and Node 22.20.0. After stopping dev:
+The checkout uses its own pinned `@runeditrun/rer` package and Node 22.20.0. After stopping dev:
 
 ```sh
 rer verify

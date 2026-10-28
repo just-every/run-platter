@@ -1,3 +1,4 @@
+import { recipientClientPanel } from './recipients'
 import { collectionPanel } from './collection'
 import { paymentTerms } from '../payment-terms'
 import { schedulePanel } from './payment-terms'
@@ -18,13 +19,15 @@ import { document } from './shell'
 
 // The client reads every time in the installation's zone, the same as the owner sees the same event.
 export function renderClient(view: any, token: string, feedback?: Feedback): Response {
-  return inZone(view.timeZone, () => clientDocument(view, token, feedback))
+  const response=inZone(view.timeZone, () => view.verificationRequired&&!view.verified?recipientVerification(view,token,feedback):clientDocument(view, token, feedback))
+  if(view.embedOrigin)response.headers.set('Content-Security-Policy',response.headers.get('Content-Security-Policy')!.replace("frame-ancestors 'none'",'frame-ancestors '+view.embedOrigin))
+  return response
 }
 function clientDocument(view: any, token: string, feedback?: Feedback): Response {
   const selectedId = view.acceptance?.optionId ?? view.preview?.selection.option.id ?? view.selectedOptionId ?? 'one'
   const endpoint = view.preview ? '/app/preview/client/action?name=' : `/p/${encodeURIComponent(token)}/action?name=`
-  const items=selectionChoices(view.selection),itemsQuery=items.length?'&amp;items='+encodeURIComponent(JSON.stringify(items)):''
-  const publicForm = (name: string, body: string): string => `<form${name==='accept'?' id="platter-acceptance"':''} method="post" action="${endpoint}${name}&amp;optionId=${encodeURIComponent(selectedId)}${itemsQuery}">${hidden('items',JSON.stringify(items))}${view.preview ? `<fieldset disabled>${body}</fieldset>` : body}</form>`
+  const items=selectionChoices(view.selection),embedQuery=view.embedded?'&amp;embed=1':'',itemsQuery=items.length?'&amp;items='+encodeURIComponent(JSON.stringify(items)):''
+  const publicForm = (name: string, body: string): string => `<form${['accept','recipient.approve'].includes(name)?' id="platter-acceptance"':''} method="post" action="${endpoint}${name}${embedQuery}&amp;optionId=${encodeURIComponent(selectedId)}${itemsQuery}">${hidden('items',JSON.stringify(items))}${view.preview ? `<fieldset disabled>${body}</fieldset>` : body}</form>`
   const options = view.options ?? []
   const currency = view.currency ?? 'AUD'
   const expanded=hasExpandedSelection(options),conditional=Boolean(paymentTerms(view))||Boolean(view.documentConditional)||expanded||Object.keys(sectionConditions(view.section_conditions)).length>0
@@ -47,8 +50,10 @@ function clientDocument(view: any, token: string, feedback?: Feedback): Response
   if(view.previous) html += panel('Changes since your previous offer', `<p>Revision ${escape(view.previous.revision)} compared with revision ${escape(view.revision)}</p>${changes(view.previous,view)}`)
   if(conditional&&!view.preview)html+=selectedSummary(view.selection,currency,options.find((o:any)=>o.id===selectedId)?.label)
   if(view.preview)html+=previewSelection(view)
-  else if(conditional&&view.status!=='accepted')html+=panel('Choose your package',`<form method="get" action="/p/${encodeURIComponent(token)}#selection-review">${hidden('itemsOptionId',selectedId)}<label>Review sections for<select name="optionId">${options.map((o:any)=>`<option value="${escape(o.id)}"${o.id===selectedId?' selected':''}>${escape(o.label)}</option>`).join('')}</select></label>${itemChoices(options.find((o:any)=>o.id===selectedId),view.selection)}<button>Review package</button></form><p>Scope and terms above match this selection. Review them before accepting.</p>`)
+  else if(conditional&&view.status!=='accepted'&&!view.recipientProgress?.choice)html+=panel('Choose your package',`<form method="get" action="/p/${encodeURIComponent(token)}#selection-review">${hidden('itemsOptionId',selectedId)}<label>Review sections for<select name="optionId">${options.map((o:any)=>`<option value="${escape(o.id)}"${o.id===selectedId?' selected':''}>${escape(o.label)}</option>`).join('')}</select></label>${itemChoices(options.find((o:any)=>o.id===selectedId),view.selection)}<button>Review package</button></form><p>Scope and terms above match this selection. Review them before accepting.</p>`)
   if(view.measured&&!view.verified)html+=panel('Received a forwarded link?',`<p>Identify yourself using your own mailbox. Your verified name and email will be shared with the proposal owner. This grants no signing authority.</p><form method="post" action="/p/${encodeURIComponent(token)}/stakeholder">${field('Your stakeholder name','name','','required maxlength="200"')}${field('Your stakeholder email','email','','required type="email"')}<label class="choice"><input type="checkbox" name="consent" value="yes" required><span>Send me a verification code and share my verified identity with the owner.</span></label><button>Identify stakeholder</button></form>`)
+  html+=recipientClientPanel(view,publicForm)
+  const maySign=!view.recipientProgress||['signer','countersigner'].includes(view.recipientProgress.recipient.role)&&(view.preview||view.recipientProgress.ready&&!view.recipientProgress.signed)
   if (view.acceptance) {
     const accepted = view.acceptance
     html += panel(view.collection?.enabled&&!view.collection.complete?'Agreement signed — waiting for payment':'Proposal accepted', `<p>${view.collection?.enabled&&!view.collection.complete?'Your signature is retained. Acceptance completes when the deposit succeeds.':'This agreement is complete and cannot be changed.'}</p><dl><dt>${view.collection?.enabled?'Signed by':'Accepted by'}</dt><dd>${escape(accepted.name)}${accepted.email && accepted.method !== 'upload' ? ` · ${escape(accepted.email)}` : ''}</dd><dt>Chosen option</dt><dd>${escape(options.find((option: any) => option.id === accepted.optionId)?.label)}</dd><dt>Total</dt><dd>${money(accepted.totalCents,accepted.currency??currency)}</dd><dt>${view.collection?.enabled?'Agreed deposit':'Deposit due'}</dt><dd>${money(accepted.depositCents,accepted.currency??currency)}</dd><dt>${view.collection?.enabled?'Signed at':'Accepted at'}</dt><dd>${date(accepted.acceptedAt)}</dd>${acceptanceMethod(accepted)}</dl>`)
@@ -57,11 +62,20 @@ function clientDocument(view: any, token: string, feedback?: Feedback): Response
     html += panel('Proposal accepted', '<p>This proposal has already been accepted. Its agreement cannot be changed.</p>')
   } else if (!view.verified) {
     html += panel(view.verificationMethod==='SMS code'?'Verify by text':'Verify your email', (view.verificationMethod==='SMS code'?'<p>A verification code will be sent to the mobile number recorded with your consent. Texts respect your quiet hours. Reply STOP to stop or HELP for help.</p>':`<p>A verification code will be sent to ${escape(view.clientEmail)}. Verify your email to accept this offer.</p>`) + publicForm('code.request', '<button>Send verification code</button>') + publicForm('code.verify', field(view.verificationMethod==='SMS code'?'Text verification code':'Email verification code', 'code', '', 'required autocomplete="one-time-code" inputmode="numeric"') + (view.verificationMethod==='SMS code'?'<button>Verify text code</button>':'<button>Verify email</button>')))
-  } else if (!view.expiry?.expired) {
+  } else if (!view.expiry?.expired&&maySign) {
     html += panel('Accept this proposal', '<p>Your '+(view.verificationMethod==='SMS code'?'text code':'email')+' is verified. Choose one option and confirm your acceptance below.</p>' + publicForm('accept', `<fieldset><legend>Choose one option</legend>${options.filter((o:any)=>!conditional||o.id===selectedId).map((option: any) => `<label class="choice option-choice"><input type="radio" name="optionId" value="${escape(option.id)}"${conditional||view.preview?.selection.option.id===option.id?' checked':''} required><span>${escape(option.label)} — ${money(expanded&&option.id===selectedId?(view.selection?.option?.cents??view.acceptance?.totalCents??option.cents):option.cents,currency)}<br><span class="muted">Deposit due: ${money(offerSelection(options,view.deposit_bps,option.id,expanded&&option.id===selectedId?items:[],view).deposit,currency)}</span></span></label>`).join('')}</fieldset>` + field('Your full name', 'name', '', 'required autocomplete="name"') + '<label class="choice"><input type="checkbox" name="consent" value="yes" required><span>I accept the scope of work, chosen option, total price, and deposit' + (paymentTerms(view)?' and payment schedule':'') + ' shown above.</span></label><p>Acceptance is permanent. Check your chosen option before continuing.</p><button>Accept proposal</button>' + (view.pdfDownloadsEnabled ? `<p>Choose an option above to download the unsigned revision.</p><button formnovalidate formaction="${view.preview?'/app/preview/client/download.pdf':`/p/${encodeURIComponent(token)}/download.pdf`}">Download unsigned proposal PDF</button>` : '')))
   }
-  html+=collectionPanel(view,token)
-  if(view.status!=='accepted'&&view.verified)html+=panel('Decline this proposal','<p>Declining closes this offer and revokes its client links. The firm can send a new revision for a fresh decision.</p>'+publicForm('decline',hidden('revision',view.revision)+field('Decline reason','reason','','required maxlength="1000"')+'<button class="secondary">Decline proposal</button>'))
+  if(!view.recipientProgress||['signer','countersigner'].includes(view.recipientProgress.recipient.role))html+=collectionPanel(view,token)
+  if(view.status!=='accepted'&&view.verified&&maySign)html+=panel('Decline this proposal','<p>Declining closes this offer and revokes its client links. The firm can send a new revision for a fresh decision.</p>'+publicForm('decline',hidden('revision',view.revision)+field('Decline reason','reason','','required maxlength="1000"')+'<button class="secondary">Decline proposal</button>'))
   for(const [heading,key] of [['Scope of work','scope'],['Offer options','pricing'],['Terms','terms'],[view.status==='accepted'?'Signed agreement package attachments':'Proposal attachments','attachments']])html=html.replace('<h2>'+heading+'</h2>','<h2 data-engagement-section="'+key+'">'+heading+'</h2>')
   return document(view.title, html, { client: true, collection:Boolean(view.collection?.enabled&&view.verified), styles:documentBrandCss(view)+(view.collection?.enabled?'[data-stripe-payment][hidden],[data-collection][hidden]{display:none}':''), feedback, eyebrow: `<p class="eyebrow">Proposal · Revision ${escape(view.revision)}${view.status === 'accepted' ? view.collection?.enabled&&!view.collection.complete?' · signed · payment pending':' · accepted' : ''}</p>` })
+}
+
+function recipientVerification(view:any,token:string,feedback?:Feedback){
+ const endpoint='/p/'+encodeURIComponent(token)+'/action?'+(view.embedded?'embed=1&amp;':'')+'name='
+ const body='<p>Verify the mailbox assigned to this personal invitation before viewing the proposal: '+escape(view.clientEmail)+'.</p>'+
+  '<form method="post" action="'+endpoint+'code.request"><button>Send verification code</button></form>'+
+  '<form method="post" action="'+endpoint+'code.verify">'+field('Email verification code','code','','required autocomplete="one-time-code" inputmode="numeric"')+'<button>Verify email</button></form>'+
+  (view.embedded?'<p><a href="/p/'+encodeURIComponent(token)+'" target="_blank" rel="noopener noreferrer">Open proposal in a new tab</a> if your browser blocks embedded verification.</p>':'')
+ return document('Verify your email',panel('Personal invitation',body),{client:true,feedback})
 }

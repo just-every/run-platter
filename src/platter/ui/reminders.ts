@@ -1,7 +1,9 @@
+import { recipientPlan } from '../recipients'
 import { reminderMessageChoice } from './reminder-messages'
 import { area, date, escape, field, form, hidden, panel, proposalPath } from './shared'
 
 export function reminderPanel(state:any,p:any){
+ if(recipientPlan(p).length)return panel('Reminders','<p>Scheduled and manual reminders for multiple recipients are not available yet. Expiry warnings still reach every unsigned signer.</p>')
  const old=p.reminderSettings?.revision===p.revision?p.reminderSettings:null,base=p.deliveryDefaults??{remindersEnabled:true,reminderDays:[2,5,9],beforeExpiryDays:[3],reminderCap:3}
  const settings=old?JSON.parse(old.settings):{afterDays:base.reminderDays,beforeDays:base.beforeExpiryDays,cap:base.reminderCap},enabled=old?Boolean(old.enabled):base.remindersEnabled
  const optedOut=p.reminderOptouts?.some((o:any)=>o.revision===p.revision),active=Boolean(old?.authorized&&old.enabled)&&!optedOut&&['draft','approved','sent'].includes(p.status)

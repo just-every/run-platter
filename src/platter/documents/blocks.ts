@@ -3,7 +3,7 @@ import { need } from '../model'
 
 export const blockTypes = ['cover','heading','text','image','video','gallery','embed','columns','pricing','quote','bio','case_study','terms','field','signature','page_break'] as const
 export type BlockType = typeof blockTypes[number]
-export interface ProposalBlock { id:string; type:BlockType; title:string; text:string; second?:string; optionId?:string; tableIndex?:number; condition?:string; assetId?:string; posterId?:string; alt?:string; images?:{assetId:string;alt:string}[]; url?:string; consent?:boolean; fieldKind?:'text'|'date'|'checkbox'; required?:boolean; recipientRole?:'client'; recipientId?:string }
+export interface ProposalBlock { id:string; type:BlockType; title:string; text:string; second?:string; optionId?:string; tableIndex?:number; condition?:string; assetId?:string; posterId?:string; alt?:string; images?:{assetId:string;alt:string}[]; url?:string; consent?:boolean; fieldKind?:'text'|'date'|'checkbox'; required?:boolean; recipientRole?:'client'|'slot'; recipientId?:string }
 export interface ProposalDocument { version:1; blocks:ProposalBlock[]; brand?:{name:string; accent:string; ink:string; paper:string; font:'sans'|'serif'; cover:string;logoId?:string} }
 const string=(value:unknown,max:number,label:string)=>{need(typeof value==='string'&&value.length<=max&& !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value),'Enter '+label+' (up to '+max+' characters)');return value}
 const color=(value:unknown)=>{need(typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value),'Use six-digit brand colors');return value.toLowerCase()}
@@ -21,7 +21,7 @@ export function proposalDocument(value:unknown,options?:any[],clientId?:string):
   need(b&&typeof b==='object'&&!Array.isArray(b)&&blockTypes.includes(b.type),'Choose a supported document block')
   need(typeof b.id==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(b.id)&&!ids.has(b.id),'Use distinct block ids');ids.add(b.id)
   const block:ProposalBlock={id:b.id,type:b.type,title:string(b.title??'',200,'a block heading'),text:string(b.text??'',10000,'block text')}
-  if(['field','signature'].includes(b.type)){need(b.recipientRole==='client','Assign every field and signature to the Client recipient role');block.recipientRole='client';if(clientId||b.recipientId)block.recipientId=string(clientId??b.recipientId,200,'a recipient id');if(b.type==='field'){need(['text','date','checkbox'].includes(b.fieldKind),'Choose text, date or checkbox');need(typeof b.required==='boolean','Choose whether this field is required');block.fieldKind=b.fieldKind;block.required=b.required}need(block.title.trim(),'Name each field or signature block')}
+  if(['field','signature'].includes(b.type)){need(['client','slot'].includes(b.recipientRole),'Assign every field and signature to a recipient role');block.recipientRole=b.recipientRole;if(b.recipientRole==='slot'){block.recipientId=string(b.recipientId,100,'a recipient slot');need(/^[a-zA-Z0-9_-]+$/.test(block.recipientId),'Choose a recipient slot')}else if(clientId||b.recipientId)block.recipientId=string(clientId??b.recipientId,200,'a recipient id');if(b.type==='field'){need(['text','date','checkbox'].includes(b.fieldKind),'Choose text, date or checkbox');need(typeof b.required==='boolean','Choose whether this field is required');block.fieldKind=b.fieldKind;block.required=b.required}need(block.title.trim(),'Name each field or signature block')}
   if(['image','video'].includes(b.type)){block.assetId=string(b.assetId??'',80,'a media file id');need(/^[a-zA-Z0-9_-]+$/.test(block.assetId),'Choose a media file');block.alt=string(b.alt??'',1000,'an image description');need(block.alt.trim(),'Describe the image or video');if(b.type==='video'){block.posterId=string(b.posterId??'',80,'a video poster id');need(/^[a-zA-Z0-9_-]+$/.test(block.posterId),'Choose a video poster')}}
   if(b.type==='gallery'){
    need(Array.isArray(b.images)&&b.images.length>=1&&b.images.length<=12,'Choose between 1 and 12 gallery images')
@@ -53,9 +53,10 @@ export function selectedDocument(value:unknown,optionId:string,items:{id:string}
 export function documentText(value:unknown){const doc=proposalDocument(value);return doc.blocks.map(b=>[b.type,b.title,b.text,b.second??'',b.alt??'',...(b.images??[]).map(image=>image.alt)].filter(Boolean).join('\n')).join('\n\n')}
 
 /** The single Client slot is rebound deliberately when a person chooses a new client. */
-export function bindDocument(value:unknown,clientId?:string){const doc=proposalDocument(value);return {...doc,blocks:doc.blocks.map(block=>{if(!['field','signature'].includes(block.type))return block;const {recipientId,...rest}=block;return {...rest,...(clientId?{recipientId:clientId}:{})}})}}
-export function acceptanceFields(document:unknown,input:Record<string,unknown>,signer:string){
- const blocks=proposalDocument(document).blocks.filter(b=>['field','signature'].includes(b.type)),values:Record<string,string|boolean>={}
+export function bindDocument(value:unknown,clientId?:string){const doc=proposalDocument(value);return {...doc,blocks:doc.blocks.map(block=>{if(!['field','signature'].includes(block.type)||block.recipientRole==='slot')return block;const {recipientId,...rest}=block;return {...rest,...(clientId?{recipientId:clientId}:{})}})}}
+export const fieldSlot=(block:ProposalBlock,clientSlot?:string)=>block.recipientRole==='slot'?block.recipientId:clientSlot
+export function acceptanceFields(document:unknown,input:Record<string,unknown>,signer:string,slotId?:string,clientSlot?:string){
+ const blocks=proposalDocument(document).blocks.filter(b=>['field','signature'].includes(b.type)&&(!slotId||fieldSlot(b,clientSlot)===slotId)),values:Record<string,string|boolean>={}
  for(const key of Object.keys(input).filter(k=>k.startsWith('field:')||k.startsWith('signature:')))need(blocks.some(b=>(b.type==='signature'?'signature:':'field:')+b.id===key),'A field does not belong to this selected document')
  for(const block of blocks){const key=(block.type==='signature'?'signature:':'field:')+block.id,value=input[key]
   if(block.type==='signature'){need(typeof value==='string'&&value.trim()===signer,'Adopt the same full name in '+block.title+' as your acceptance name');values[block.id]=value.trim();continue}

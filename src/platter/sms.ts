@@ -1,3 +1,4 @@
+import { recipientPlan } from './recipients'
 import { demoEffect } from '@runeditrun/rer/internal/modules/demo/index.mjs'
 import type { Bindings } from '../auth.server'
 import { actorById } from './credentials'
@@ -16,7 +17,7 @@ async function live(env:Bindings,id:string,completed=false){
  const db=env.DB,c=await db.prepare('SELECT c.*,a.share_hash,a.member_version FROM p_sms_consent c JOIN p_sms_authority a ON a.proposal_id=c.proposal_id AND a.revision=c.revision AND a.consented_at=c.consented_at WHERE c.proposal_id=?').bind(id).first<any>()
  need(c,'Record fresh SMS consent before sending',409)
  const a=await actorById(db,c.actor_id);need(a&&senders.includes(a.role)&&(a.memberVersion??0)===c.member_version,'SMS sender authority changed',409)
- const row=await permitted(db,a,id,'send'),share=await db.prepare('SELECT * FROM p_shares WHERE proposal_id=?').bind(id).first<any>(),at=await currentTime(db)
+ const row=await permitted(db,a,id,'send');need(!recipientPlan(row).length,'Configure mailbox verification for multiple recipients',409);const share=await db.prepare('SELECT * FROM p_shares WHERE proposal_id=?').bind(id).first<any>(),at=await currentTime(db)
  need((row.status==='sent'||completed&&row.status==='accepted')&&row.revision===c.revision&&!(await expiryFor(db,row,at)).expired&&share&&share.revision===row.revision&&await hash(share.token)===c.share_hash,'SMS invitation is no longer current',409)
  need(!await db.prepare('SELECT 1 FROM p_sms_optouts WHERE phone=?').bind(c.phone).first(),'This number has opted out of SMS',409)
  return {a,c,row,share,at,values:[id,row.revision,c.phone,a.id,c.share_hash,share.token,c.consented_at,c.time_zone,at]}

@@ -1,3 +1,4 @@
+import { recipientPlan } from './recipients'
 import { reminderMessageSnapshot } from './reminder-message-defaults'
 import { reminderCopy, scheduledReminderCopy } from './reminder-messages'
 import type { Bindings } from '../auth.server'
@@ -33,7 +34,7 @@ export async function reminderCommand(env:Bindings,a:Actor,name:string,p:Record<
   await commit(db,a,[db.prepare('INSERT INTO p_reminder_policy(singleton,quiet_start,quiet_end) VALUES(1,?,?) ON CONFLICT(singleton) DO UPDATE SET quiet_start=excluded.quiet_start,quiet_end=excluded.quiet_end,version=p_reminder_policy.version+1').bind(start,end)],true,{sql:'COALESCE((SELECT version FROM p_reminder_policy WHERE singleton=1),0)=?',values:[old.version]})
   return {id:'installation'}
  }
- const row=await permitted(db,a,p.id,'send');need(senders.includes(a.role),'Your role cannot send reminders',403)
+ const row=await permitted(db,a,p.id,'send');need(!recipientPlan(row).length,'Multiple-recipient reminders are not enabled. Expiry warnings remain available.',409);need(senders.includes(a.role),'Your role cannot send reminders',403)
  const old=await db.prepare('SELECT * FROM p_reminder_settings WHERE proposal_id=?').bind(row.id).first<any>()
  if(name==='reminder.configure'){
   exact(row,p);need(['draft','approved','sent'].includes(row.status),'Only open proposals can have reminders',409)
@@ -57,6 +58,7 @@ export async function reminderCommand(env:Bindings,a:Actor,name:string,p:Record<
 }
 async function queueReminder(env:Bindings,a:Actor,row:any,input:{subject:string;message:string;zone:string;kind:string;slot:string;requestId:string;at:number;settingsVersion?:number;cap?:number}){
  const db=env.DB,{at,kind,slot}=input
+ need(!recipientPlan(row).length,'Multiple-recipient reminders are not enabled',409)
  need(row.status==='sent'&&!(await expiryFor(db,row,at)).expired,'Only an unsigned open proposal can be reminded',409)
  const share=await db.prepare('SELECT s.*,c.email FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id JOIN p_clients c ON c.id=p.client_id WHERE s.proposal_id=? AND s.revision=?').bind(row.id,row.revision).first<any>();need(share,'Send a current invitation first',409)
  const recipient=share.recipient??share.email

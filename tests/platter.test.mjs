@@ -744,6 +744,7 @@ test('SEND-004 / TEAM-004 calendar expiry warns unsigned only, supports same-lin
  await h.send('/auth/invite',{email:'expiry-member@studio.example',displayName:'Colleague',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('expiry-member@studio.example')
  await h.cmd('expiry.set',{id:noExpiry.id,version:3,mode:'days',days:1},member,403)
  await fire(at('2027-04-01T04:00:00Z'));assert.equal((await h.state()).proposals.find(p=>p.id===signed.id).status,'accepted');assert.deepEqual(await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(signed.id).first(),accepted)
+ const {recipientExpiryHttp}=await import('./recipients-http.mjs');await recipientExpiryHttp(h)
  // Historical sent-offer fixture: the old schema had no expiry/send-time record.
  const legacy=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Legacy offer without send-time custody'})
  await h.cmd('proposal.approve',{id:legacy.id,version:1,revision:1});await h.cmd('proposal.send',{id:legacy.id,version:2})
@@ -800,6 +801,7 @@ test('SEND-010 / FOLLOW-002 withdrawal revokes every current public door, preser
  assert.equal((await h.send(path,undefined,cookie)).status,410);assert.equal((await h.send(newPath,undefined,cookie)).status,200)
  const session=await verified(h,newPath);assert.equal((await h.send(newPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},session)).status,200)
  await h.cmd('proposal.withdraw',{id:p.id,version:9,reason:'Too late'},h.owner,409)
+ const {recipientWithdrawalHttp}=await import('./recipients-http.mjs');await recipientWithdrawalHttp(h)
  const secondProposal=await h.cmd('proposal.prepare',{...offer,clientId:before.client_id,title:'Cancelled campaign'});await h.cmd('proposal.approve',{id:secondProposal.id,version:1,revision:1});const secondShare=await h.cmd('proposal.send',{id:secondProposal.id,version:2});const second={p:secondProposal,path:new URL(secondShare.shareUrl).pathname},mailBefore=(await h.state()).outbox.length
  await h.cmd('proposal.withdraw',{id:second.p.id,version:3,reason:'Deal cancelled',notice:false})
  assert.equal((await h.state()).outbox.length,mailBefore);assert.equal((await h.send(second.path)).status,410)
@@ -2910,7 +2912,8 @@ describe('AUTO-004 negotiated lifecycle delivery',()=>{
  test('receiver gets revised and approved events for each negotiated revision before it is sent',async()=>{
   const received=[],h=await harness({migrateThrough:'0078_public_api.sql',outboundService:async request=>{received.push(await request.json());return new Response(null,{status:204})}})
   try{
-   await h.db.batch(unstable_splitSqlQuery(await readFile('migrations/core/0079_negotiated_webhooks.sql','utf8')).map(sql=>h.db.prepare(sql)))
+   const upgrades=(await readdir('migrations/core')).filter(file=>file.endsWith('.sql')&&file>'0078_public_api.sql').sort()
+   for(const file of upgrades)await h.db.batch(unstable_splitSqlQuery(await readFile('migrations/core/'+file,'utf8')).map(sql=>h.db.prepare(sql)))
    assert.equal((await h.send('/api/platter/v1/webhooks',{url:'https://hooks.example.com/negotiated',consent:true},h.owner)).status,200)
    const {p,client,path}=await sent(h)
    await h.cmd('proposal.negotiate',{...offer,id:p.id,clientId:client.id,version:3,scope:'Synthetic negotiated scope'})
@@ -2991,3 +2994,10 @@ describe('AUTO-004 independently documented authority',()=>{
   assert.deepEqual(documented,expected.map(([method,path])=>method+' /api/platter/v1'+path).sort())
  }))
 })
+
+
+test('SIGN-004 sequential and parallel recipient groups complete only after every signature',async()=>{
+ const h=await harness({assetsDirectory:'public'})
+ try{const {signingOrderHttp,ownershipHandoffHttp}=await import('./recipients-http.mjs');await signingOrderHttp(h);await ownershipHandoffHttp(h)}finally{await h.close()}
+})
+test('SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP',()=>run(async h=>{const {recipientRolesHttp}=await import('./recipients-http.mjs');await recipientRolesHttp(h)}))

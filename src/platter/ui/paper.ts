@@ -1,10 +1,11 @@
+import { recipientPlan } from '../recipients'
 import { offerSelection, selectionItems } from '../selection'
 import { hasExpandedSelection, itemChoices, selectedSummary, selectionChoices } from './packages'
 import { date, escape, field, hidden, money, panel, proposalPath } from './shared'
 
 // SIGN-008 screens: record a client-signed copy, and label how an agreement was accepted.
 export function paperAcceptanceForm(state: any, p: any, params = new URLSearchParams()): string {
-  if (state.actor?.role !== 'owner' || p.status !== 'sent') return ''
+  if (state.actor?.role !== 'owner' || p.status !== 'sent' || recipientPlan(p).length) return ''
   const options = (p.options ?? []).map((o: any) => `<label class="choice option-choice"><input type="radio" name="optionId" value="${escape(o.id)}" required><span>${escape(o.label)} — ${money(o.cents, p.currency)}</span></label>`).join('')
   const expanded = hasExpandedSelection(p.options ?? [])
   const selection = expanded ? offerSelection(p.options, p.deposit_bps, params.get('paperOption') ?? p.options[0].id, selectionItems(Object.fromEntries(params)),p) : undefined

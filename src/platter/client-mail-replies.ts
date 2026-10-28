@@ -9,7 +9,7 @@ import { authenticatedReply } from './question-replies'
 export async function prepareClientReply(env:Bindings,a:Actor,row:any){
  if(!row.reply_consent||row.reply_to)return row.reply_to
  need(resendReplyAvailable(env),'Email replies are unavailable',409)
- const share=await env.DB.prepare('SELECT token FROM p_shares WHERE proposal_id=? AND revision=?').bind(row.proposal_id,row.proposal_revision).first<any>()
+ const share=await env.DB.prepare('SELECT token FROM p_shares WHERE proposal_id=? AND revision=? AND (recipient=? OR recipient IS NULL)').bind(row.proposal_id,row.proposal_revision,row.recipient).first<any>()
  need(share,'The invitation changed before sending',409)
  const token=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join(''),sealed=await sealReplyAddress(env,token+'@'+replyDomain(env)!)
  await commit(env.DB,a,[
@@ -25,7 +25,7 @@ export async function clientMailReplyResponse(request:Request,env:Bindings){
   const {message,token,email,ignored}=await authenticatedReply(request,env,true)
   if(ignored)return new Response(null,{status:204,headers:{'cache-control':'no-store'}})
   const keyhash=await hash(token),db=env.DB
-  const k=await db.prepare("SELECT k.*,p.client_id,p.status,p.revision AS current_revision,s.token AS current_token,m.status AS mail_status FROM p_mail_reply_keys k JOIN p_proposals p ON p.id=k.proposal_id JOIN p_shares s ON s.proposal_id=p.id JOIN p_mail m ON m.id=k.mail_id WHERE k.keyhash=?").bind(keyhash).first<any>()
+  const k=await db.prepare("SELECT k.*,p.client_id,p.status,p.revision AS current_revision,s.token AS current_token,m.status AS mail_status FROM p_mail_reply_keys k JOIN p_proposals p ON p.id=k.proposal_id JOIN p_shares s ON s.proposal_id=p.id AND (s.recipient=k.recipient OR s.recipient IS NULL) JOIN p_mail m ON m.id=k.mail_id WHERE k.keyhash=?").bind(keyhash).first<any>()
   need(k&&k.mail_status==='accepted'&&['sent','accepted'].includes(k.status)&&k.current_revision===k.revision&&await hash(k.current_token)===k.share_hash,'This reply address is no longer current',409)
   need(message.from.toLowerCase()===k.recipient.toLowerCase(),'Reply from the invited client mailbox',403)
   const at=Date.now(),id=crypto.randomUUID(),sourceKey=await hash('resend:'+email.id)

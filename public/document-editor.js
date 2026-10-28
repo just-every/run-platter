@@ -37,7 +37,11 @@
     if(block.type!=='page_break'){
      card.append(control('Block heading','title',block.title,v=>block.title=v));
      if(['field','signature'].includes(block.type)){
-      const label=element('label',{},'Assigned recipient'),select=element('select',{'aria-label':'Assigned recipient'});select.append(element('option',{value:'client'},'Client recipient'));label.append(select);card.append(label);
+      const label=element('label',{},'Assigned recipient'),select=element('select',{'aria-label':'Assigned recipient'});select.append(element('option',{value:'client'},'Client recipient'));
+      for(const r of JSON.parse(form.dataset.recipientSlots??'[]').filter(r=>['signer','approver','countersigner'].includes(r.role)))select.append(element('option',{value:'slot:'+r.id},r.name+' · '+r.role));
+      select.value=block.recipientRole==='slot'?'slot:'+block.recipientId:'client';
+      select.addEventListener('change',()=>{checkpoint();if(select.value==='client'){block.recipientRole='client';delete block.recipientId;}else{block.recipientRole='slot';block.recipientId=select.value.slice(5);}schedule();});
+      label.append(select);card.append(label);
       if(block.type==='field'){const wrap=element('label',{},'Field type'),kind=element('select',{'aria-label':'Field type'});for(const [id,name] of [['text','Text'],['date','Date'],['checkbox','Checkbox']]){const option=element('option',{value:id},name);option.selected=block.fieldKind===id;kind.append(option);}kind.addEventListener('change',()=>{checkpoint();block.fieldKind=kind.value;schedule();});wrap.append(kind);card.append(wrap);const required=element('label',{class:'choice'},'Required field'),check=element('input',{type:'checkbox','aria-label':'Required field'});check.checked=block.required;check.addEventListener('change',()=>{checkpoint();block.required=check.checked;schedule();});required.prepend(check);card.append(required);}
       card.append(control('Instructions','text',block.text,v=>block.text=v,'textarea'));
      }else if(['image','video'].includes(block.type)){

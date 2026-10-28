@@ -6,7 +6,7 @@ import { smsCodeContext } from './sms'
 
 export async function signerMethodCommand(env:Bindings,a:Actor,p:Record<string,unknown>){
  need(senders.includes(a.role),'Only proposal senders choose a signer method',403)
- const db=env.DB,row=await permitted(db,a,p.id,'send');exact(row,p)
+ const db=env.DB,row=await permitted(db,a,p.id,'send');exact(row,p);need(row.recipient_plan==='[]','Configured recipients verify their own mailbox',409)
  need(row.status==='sent','Choose the method on the current sent invitation',409)
  need(p.method==='mailbox code'||p.method==='SMS code','Choose mailbox code or SMS code')
  if(p.method==='SMS code')await smsCodeContext(env,row.id,false)

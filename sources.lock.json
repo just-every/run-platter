@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "3ed33310874ed59bfa5187f84eaf6563d403b33e83f1432130d32997624647aa",
+      "sha256": "155eff7f2c899c754fd4ee14f68736526abf7a4203d58e770796fda527306ae0",
       "executable": false
     },
     "AGENTS.md": {
@@ -90,7 +90,7 @@
       "executable": false
     },
     "CHANGELOG.md": {
-      "sha256": "0fa3fca24c769605b93fddbc95df008df7e718f0ffe2f418ebb60c6eaf15ee95",
+      "sha256": "275de80c55ac23644c536f56da01d84cb449611f8eecb356b2fb17699c080885",
       "executable": false
     },
     "composition.lock.json": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "271420079c0675f46295ec48490aae404bb85a3e2be361cd6ef0ace12bbb132d",
+      "sha256": "7a74c62a8d018d17367985e7c9f7d103fc919f3111b39cbdff9da272ed7c9958",
       "executable": false
     },
     "deploy-demo.json": {
@@ -130,7 +130,7 @@
       "executable": false
     },
     "docs/contract/COVERAGE.json": {
-      "sha256": "19cbb9948923634cc14085f2a3e0553cf25a0fb31270ab059f0a48dbfd8b766c",
+      "sha256": "41665583cd39f54480b89f0b93f6b2b21ea32a907d4431f1cea1818e4a8a3b42",
       "executable": false
     },
     "docs/contract/DONE-AUDIT.md": {
@@ -167,10 +167,6 @@
     },
     "docs/SOURCE.md": {
       "sha256": "8bd86f13d28074b46e922a48613b670007265ff2f22d3fb9eb46657932a8fc91",
-      "executable": false
-    },
-    "docs/verify.md": {
-      "sha256": "242ad3d3f1adb82a5c8a0ac32477de37ad8b1d481e88b313f68fac86c0efaa1e",
       "executable": false
     },
     "edition.json": {
@@ -1222,7 +1218,7 @@
       "executable": false
     },
     "RULINGS.md": {
-      "sha256": "478cdd18be4b6206a7cf99fb051b3dc0b43685862bb70b2b31b2a2a783d4bb81",
+      "sha256": "9bc8bd6e2b9a5b11a3a283b9c65c864701e8c60525a8cbe061af4e6b37df2850",
       "executable": false
     },
     "RUN-LOCALLY.md": {

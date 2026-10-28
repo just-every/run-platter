@@ -3490,7 +3490,9 @@ test('MIG-007 exported document move-in resumes across sessions, holds ambiguous
  const issued=await h.cmd('proposal.send',{id:sentDraft.id,version:sentDraft.version},second)
  assert.equal((await h.send(new URL(issued.shareUrl).pathname,undefined,'')).status,200)
  assert.equal((await h.state(second)).proposals.find(p=>p.id===sentDraft.id).status,'sent')
- await h.cmd('document-import.undo',{id:native.id},second,409)
+ let nativeRefusal
+ for(let i=0;i<60;i++){nativeRefusal=await h.send('/api/platter/command',{name:'document-import.undo',input:{id:native.id}},second);if(nativeRefusal.status===409)break;assert.equal(nativeRefusal.status,200);assert.notEqual(nativeRefusal.value.job?.state,'undone')}
+ assert.equal(nativeRefusal.status,409,'undo must stop at a used library section, template or changed draft')
  assert.ok((await h.state(second)).templates.some(t=>t.id===nativeProof.template.id),'dependent native offers preserve their imported template')
  const nativeTables=['p_document_native_imports','p_proposals','p_personal_templates','p_library_items','p_catalog_items','p_contacts']
  const nativeSnapshot=async()=>Promise.all(nativeTables.map(t=>h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all().then(r=>r.results)))

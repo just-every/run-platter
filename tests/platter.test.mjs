@@ -2095,6 +2095,7 @@ test('TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices an
  await h.cmd('catalog.insert',{id:fresh.id,version:2,catalogId:catalog[0].id,catalogVersion:1,optionId:'one',quantity:'1'},people.sales,409)
  await h.cmd('catalog.save',{...input,sku:input.sku+'-owner'},h.owner,409);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_priced_catalog').first()).n,3)
  await h.cmd('catalog.save',{...input,sku:'synthetic-platter-3101',unitCost:'0.00'});assert.equal((await h.state()).catalogItems.find(r=>r.sku==='synthetic-platter-3101').unitCostCents,0);await audited(h,'catalog.save',(await h.state(people.manager)).actor.id,'manager',catalog[0].id);await audited(h,'catalog.insert',(await h.state(people.sales)).actor.id,'sales',p.id)
+ const {catalogJourney}=await import('./catalog-journey.mjs');await catalogJourney(h,{client,people,offer,verified})
  }finally{await h.close()}
 })
 

@@ -748,3 +748,27 @@ test('PRICE-005 native owner-configured tax settings, selected quantities and fr
  const browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
  try{await taxesBrowserJourney(browser,process.env.PLATTER_SCREENSHOTS)}finally{await browser.close()}
 })
+
+
+test('CAT-001 reviewed CSV promotion and explicit recurring insertion preserve independent defaults', {timeout:180000},async()=>{
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{catalogBrowser}=await import('./catalog-browser.mjs')
+ const mail=[]
+ const edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-1'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mail.push(await request.json());return Response.json({id:'synthetic-platter-'+(6500+mail.length)})}});edge.attach(h)
+ let browser,owner,sales
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  owner=await browser.newContext({viewport:{width:1440,height:900},ignoreHTTPSErrors:true});sales=await browser.newContext({viewport:{width:1440,height:900},ignoreHTTPSErrors:true})
+  const putCookie=async(context,cookie)=>{const [name,value]=cookie.split('=');await context.addCookies([{name,value,url:h.origin}])}
+  await putCookie(owner,h.owner)
+  const op=await owner.newPage();await op.goto(h.origin+'/setup');await op.getByRole('checkbox').check();await op.getByRole('button',{name:'Finish setup'}).click()
+  assert.equal((await h.send('/auth/invite',{email:h.auth.MAIL_FROM,displayName:'Synthetic sales',role:'member',returnTo:'/app'},h.owner)).status,202)
+  assert.equal((await h.send('/auth/magic-link',{email:h.auth.MAIL_FROM})).status,202)
+  const message=mail.findLast(m=>m.to.includes(h.auth.MAIL_FROM)),link=message.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]
+  const confirmed=await h.send('/auth/confirm',{token:new URL(link).searchParams.get('token')});assert.equal(confirmed.status,303);await putCookie(sales,confirmed.cookie)
+  const client=await h.cmd('client.save',{name:'Synthetic catalog client',email:h.auth.OWNER_EMAIL})
+  const command=async(context,name,input,status=200)=>{const response=await context.request.post(h.origin+'/api/platter/command',{headers:{origin:h.origin},data:{name,input}});assert.equal(response.status(),status,await response.text());return response.json()}
+  const state=async(context=owner)=>(await context.request.get(h.origin+'/api/platter/state')).json()
+  const page=await sales.newPage(),review=await owner.newPage()
+  await catalogBrowser({origin:h.origin,owner,sales,op,page,review,command,state,capture:async()=>{},client,width:1440})
+ }finally{await owner?.close();await sales?.close();await browser?.close();await edge.close();await h.close()}
+})

@@ -2,7 +2,7 @@ import { fail } from './errors.ts'
 import type { BusinessMapping } from './business-model.ts'
 
 const contactFields = ['company_id', 'company_name', 'contact_id', 'first_name', 'last_name', 'email', 'title', 'phone', 'billing_address', 'service_address', 'tax_exempt']
-const catalogFields = ['id', 'name', 'sku', 'price', 'currency', 'description', 'images', 'type', 'bundle_components', 'category', 'cost', 'billing_frequency', 'quantity', 'unit_name', 'price_type', 'billing_mode', 'min_price', 'max_price', 'terms', 'tax_exempt', 'optional', 'adjustable', 'tags']
+const catalogFields = ['id', 'name', 'sku', 'price', 'currency', 'description', 'images', 'type', 'bundle_components', 'category', 'cost', 'billing_frequency', 'quantity', 'unit_name', 'price_type', 'billing_mode', 'min_price', 'max_price', 'terms', 'tax_exempt', 'tax_code', 'income_account', 'optional', 'adjustable', 'tags']
 const addressFields = ['street_address', 'city', 'postal_code', 'country', 'state', 'service_street_address', 'service_city', 'service_postal_code', 'service_country', 'service_state']
 const identity = (fields: string[]) => Object.fromEntries(fields.map(field => [field, field]))
 const presets: Record<string, { delimiter: string; contacts?: Record<string, string>; catalog?: Record<string, string> }> = {

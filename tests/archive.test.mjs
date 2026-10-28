@@ -651,7 +651,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   for(const [index,mode] of ['linked','detached'].entries())await h.cmd('library.insert',{id:libraryCopy.id,version:index+1,itemId:archivedLibrary.id,itemVersion:1,mode,consent:true})
   await h.cmd('proposal.approve',{id:p.id,version:2,revision:2},people.manager.cookie)
   const paid=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic paid proposal',scope:'Synthetic scope',optionOne:'First',priceOne:'2400',optionTwo:'Second',priceTwo:'4200',depositPercent:'25'})
-  const catalog=await h.cmd('catalog.save',{name:'Archived service',sku:'synthetic-platter-3300',description:'Reviewed service',unit:'hour',unitPrice:'100',unitCost:'25'});await h.cmd('catalog.insert',{id:paid.id,version:1,catalogId:catalog.id,catalogVersion:1,optionId:'one',quantity:'2'})
+  const catalog=await h.cmd('catalog.save',{name:'Archived service',sku:'synthetic-platter-3300',description:'Reviewed service',unit:'hour',unitPrice:'100',unitCost:'25',defaultRecurrence:'one-off',taxable:'no',taxCode:'archive-tax',incomeAccount:'archive-income'});await h.cmd('catalog.insert',{id:paid.id,version:1,catalogId:catalog.id,catalogVersion:1,optionId:'one',quantity:'2'})
   const paidPath=new URL((await h.cmd('proposal.send',{id:paid.id,version:2})).shareUrl).pathname
   await h.send(paidPath+'/action?name=code.request',{});const code=(await h.db.prepare("SELECT body FROM p_mail WHERE subject='Your Platter verification code' ORDER BY created_at DESC").first()).body.match(/\b\d{6}\b/)[0],verified=(await h.send(paidPath+'/action?name=code.verify',{code})).cookie;assert.equal((await h.send(paidPath+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},verified)).status,200)
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-2803',webhookSecret:'synthetic-platter-2804',consent:true});const payment=await h.cmd('payment.bind',{id:paid.id,chargeId:'synthetic-platter-2801',consent:true}),refund={paymentId:payment.id,amount:'100',reason:'Synthetic partial refund',requestId:'synthetic-platter-2805',consent:true};await h.cmd('payment.refund',refund)
@@ -722,6 +722,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.deepEqual(after.replyCapNotices,before.replyCapNotices);assert.equal(after.replyCapNotices.length,1)
   assert.deepEqual(after.proposals.find(r=>r.id===mailboxDraft.id).mailReplies,replyReceipt);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_mail_reply_keys').first()).n,0);assert.deepEqual(after.proposals.find(r=>r.id===mailboxDraft.id).mailAttributions,before.proposals.find(r=>r.id===mailboxDraft.id).mailAttributions);assert.deepEqual(after.proposals.find(r=>r.id===mailboxDraft.id).mailAttributions.find(m=>m.mail_id===mailboxReceipt[0].mail_id),mailboxReceipt[0]);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_mailbox_oauth').first()).n,0);assert.doesNotMatch(JSON.stringify(after),/synthetic-platter-560[234]/)
   assert.deepEqual(after.proposals.find(r=>r.id===discounted.id).options,before.proposals.find(r=>r.id===discounted.id).options);assert.deepEqual(after.proposals.find(r=>r.id===scopedTemplate.id).approval,before.proposals.find(r=>r.id===scopedTemplate.id).approval);assert.deepEqual(after.proposals.find(r=>r.id===optional.id).internalPricing,before.proposals.find(r=>r.id===optional.id).internalPricing);assert.deepEqual(after.disputes,before.disputes);assert.equal((await h.cmd('dispute.submit',submission,owner)).status,'submitted','restored submission retries issue no provider call');const retainedEvidence=await h.mf.dispatchFetch(h.origin+'/api/platter/disputes/'+submission.disputeId+'/evidence.pdf?submission='+submission.requestId,{headers:{host:new URL(h.origin).host,cookie:owner}});assert.equal(retainedEvidence.status,200);assert.deepEqual(new Uint8Array(await retainedEvidence.arrayBuffer()),evidenceBytes);assert.deepEqual(after.catalogItems,before.catalogItems);assert.deepEqual(after.workspaceDefaults,before.workspaceDefaults);assert.deepEqual(after.approvalSettings,before.approvalSettings);assert.deepEqual(after.proposals.find(r=>r.id===p.id).internalPricing,before.proposals.find(r=>r.id===p.id).internalPricing);assert.deepEqual(after.libraryItems,before.libraryItems)
+  assert.deepEqual(after.proposals.find(r=>r.id===paid.id).options,before.proposals.find(r=>r.id===paid.id).options);assert.deepEqual(after.proposals.find(r=>r.id===paid.id).internalPricing,before.proposals.find(r=>r.id===paid.id).internalPricing)
   const restoredRevenue=await h.send('/api/platter/pipeline?'+revenueFilters,undefined,owner);assert.equal(restoredRevenue.status,200);assert.deepEqual(restoredRevenue.value.rows,beforeRevenue.value.rows);assert.deepEqual(restoredRevenue.value.totals,beforeRevenue.value.totals);assert.deepEqual(after.reportSchedules,before.reportSchedules);assert.deepEqual((await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,owner)).value.rows,allRevenue.value.rows);assert.deepEqual((await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,owner)).value.totals,allRevenue.value.totals);assert.equal((await h.send('/api/platter/pipeline.csv?'+revenueFilters,undefined,owner)).text,beforeRevenueCsv.text)
   for(const [i,t] of tables.entries())assert.deepEqual(canonical((await h.db.prepare('SELECT * FROM '+t).all()).results),rows[i],t)
   assert.deepEqual(restoredCalls,[],'archive restoration and dispute replay make no provider call')
@@ -879,8 +880,16 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
   h=await harness({root:source,assetsDirectory:'public'})
   const {configureTaxes,taxRequest,taxPackages,taxTables}=await import('./taxes-fixture.mjs')
   const version=await configureTaxes(h.cmd),client=await h.cmd('client.save',{name:'Synthetic tax client',email:h.auth.OWNER_EMAIL})
+  const {catalogCsv,promoteImported}=await import('./catalog-fixture.mjs'),{applyBusiness}=await import('./business-import-fixture.mjs')
+  await applyBusiness(h,{kind:'catalog',format:'platter',csv:catalogCsv()})
+  const promoted=await promoteImported(h,['synthetic-platter-6200','synthetic-platter-6201'])
+  const recurringCatalog=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archived catalog defaults',scope:'Independent metadata',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+  await h.cmd('catalog.insert',{id:recurringCatalog.id,version:1,catalogId:promoted.items[0].id,catalogVersion:1,optionId:'one',quantity:'2',term:'12',startsOn:'2099-01-31'})
+  const catalogTemplate=await h.cmd('template.save',{id:recurringCatalog.id,version:2,name:'Archived catalog metadata'})
+  const catalogTemplateDraft=await h.cmd('template.start',{id:catalogTemplate.id,version:1,clientId:client.id})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archived tax selection',scope:'One-off services',packages:taxPackages(),pricingTables:taxTables(),tax:taxRequest(),depositPercent:50})
-  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const path=new URL((await h.cmd('proposal.send',{id:p.id,version:2})).shareUrl).pathname
+  await h.cmd('catalog.insert',{id:p.id,version:1,catalogId:promoted.items[1].id,catalogVersion:1,optionId:'one',quantity:'1'})
+  await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const path=new URL((await h.cmd('proposal.send',{id:p.id,version:3})).shareUrl).pathname
   await h.send(path+'/action?name=code.request',{})
   const code=(await h.state()).outbox.find(m=>m.proposal_id===p.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],session=await h.send(path+'/action?name=code.verify',{code})
   assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'two',items:[{id:'extra',quantity:4}],consent:true},session.cookie)).status,200)
@@ -892,6 +901,16 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
   h=await harness({root:restored,...identity})
   await h.state(identity.owner,401);assert.equal((await h.send(path,undefined,session.cookie)).status,404)
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner),agreement=after.proposals.find(p1=>p1.id===p.id)
+  assert.deepEqual(after.catalogItems,before.catalogItems)
+  assert.deepEqual(after.businessRecords,before.businessRecords)
+  for(const id of [recurringCatalog.id,catalogTemplateDraft.id]){
+   const prior=before.proposals.find(r=>r.id===id),retained=after.proposals.find(r=>r.id===id)
+   assert.deepEqual(retained.options,prior.options);assert.deepEqual(retained.internalPricing,prior.internalPricing)
+  }
+  assert.deepEqual(after.templates.find(t=>t.id===catalogTemplate.id),before.templates.find(t=>t.id===catalogTemplate.id))
+  const replayBefore=(await h.state(owner)).catalogItems
+  await h.cmd('business-import.promote-preview',{itemIds:['synthetic-platter-6200'],fallbackUnit:'each'},owner,409)
+  assert.deepEqual((await h.state(owner)).catalogItems,replayBefore,'restored promotion provenance refuses duplicate pricing')
   assert.deepEqual(after.taxSettings,before.taxSettings,'Effective-dated owner rates restore as business records')
   assert.deepEqual(agreement.options,proposalBefore.options,'Sent addresses, codes, tax flags and frozen rate components restore exactly')
   assert.deepEqual(agreement.acceptance,proposalBefore.acceptance,'Selected quantities, discount allocation, tax and deposit remain exact')

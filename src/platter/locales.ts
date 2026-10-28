@@ -311,6 +311,6 @@ export async function saveClientLocale(db: D1Database, actor: Actor, input: Reco
   need(!row.recipient_plan || row.recipient_plan === '[]', 'Spanish currently requires a single client mailbox', 409)
   need(!await db.prepare('SELECT 1 FROM p_collection_policy WHERE proposal_id=?').bind(row.id).first(), 'Turn off collection before choosing Spanish', 409)
  }
- await commit(db, actor, [db.prepare('UPDATE p_proposals SET client_locale=?,version=version+1 WHERE id=?').bind(input.locale,row.id)], false, {sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))", values:[row.id,row.version]})
+ await commit(db, actor, [db.prepare('INSERT INTO p_client_locales(proposal_id,locale) VALUES(?,?) ON CONFLICT(proposal_id) DO UPDATE SET locale=excluded.locale').bind(row.id,input.locale),db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id)], false, {sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))", values:[row.id,row.version]})
  return {id:row.id}
 }

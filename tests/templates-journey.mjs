@@ -66,7 +66,7 @@ export async function templatesJourney() {
     const source = await cmd('proposal.prepare', { clientId: firstClient.id, title: 'Campaign photography', scope: 'Studio photography and a usage licence.', terms: 'Delivery within two weeks.', optionOne: 'Essential campaign', priceOne: '2400', optionTwo: 'Complete campaign', priceTwo: '4200', depositPercent: 30 })
     await page.goto(app.origin + '/app/proposal?id=' + source.id)
     await page.getByRole('button', { name: 'Turn off client PDF downloads', exact: true }).click()
-    await page.locator('select[name=mode]').selectOption('days'); await page.getByLabel('Expiry period in calendar days', { exact: true }).fill('14'); await page.getByRole('button', { name: 'Save expiry', exact: true }).click()
+    await page.getByRole('combobox', { name: 'Expiry type', exact: true }).selectOption('days'); await page.getByLabel('Expiry period in calendar days', { exact: true }).fill('14'); await page.getByRole('button', { name: 'Save expiry', exact: true }).click()
     const templatePanel = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Save a personal template', exact: true }) })
     await templatePanel.getByLabel('Template name', { exact: true }).fill('Agency campaign')
     await templatePanel.getByRole('button', { name: 'Save personal template', exact: true }).click()

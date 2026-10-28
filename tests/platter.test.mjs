@@ -2918,28 +2918,74 @@ test('AUTO-004 scoped REST drafting, immutable owner keys and human-only authori
 test('AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation',async()=>{
  const {createHmac}=await import('node:crypto'),received=[]
  let refuse=true,revokeDuringDelivery=null
- const h=await harness({outboundService:async request=>{received.push({url:request.url,body:await request.text(),headers:Object.fromEntries(request.headers)});if(revokeDuringDelivery){const id=revokeDuringDelivery;revokeDuringDelivery=null;assert.equal((await h.send('/api/platter/v1/webhooks/'+id+'/revoke',{},h.owner)).status,200)}return new Response(refuse?'synthetic-platter-92':null,{status:refuse?503:204})}})
+ const h=await harness({assetsDirectory:'public',outboundService:async request=>{received.push({url:request.url,body:await request.text(),headers:Object.fromEntries(request.headers)});if(revokeDuringDelivery){const id=revokeDuringDelivery;revokeDuringDelivery=null;assert.equal((await h.send('/api/platter/v1/webhooks/'+id+'/revoke',{},h.owner)).status,200)}return new Response(refuse?'synthetic-platter-92':null,{status:refuse?503:204})}})
  try{
   const api=(path,input,cookie=h.owner)=>h.send('/api/platter/v1'+path,input,cookie)
   assert.equal((await api('/webhooks',{url:'https://hooks.example.com/events',consent:false})).status,400)
   for(const url of ['http://hooks.example.com/events','https://127.0.0.1/events','https://localhost/events','https://hooks.example.com/events?token=private'])assert.equal((await api('/webhooks',{url,consent:true})).status,400)
   const hook=(await api('/webhooks',{url:'https://hooks.example.com/events',consent:true})).value;assert.ok(hook.secret)
-  const {p,path}=await sent(h),cookie=await verified(h,path)
-  const accepted=await h.send(path+'/action?name=accept',{name:'Synthetic Signer',optionId:'one',consent:true},cookie);assert.equal(accepted.status,200)
+  // PRICE-006: distinct nonzero private amounts travel with each revision, never with an event.
+  const client=await h.cmd('client.save',{name:'Synthetic priced client',email:h.auth.MAIL_FROM})
+  const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic priced package',scope:'Public delivery',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'15000',optionalItems:[{id:'rush',label:'Rush delivery',unitPrice:'1000',min:1,max:5,quantity:2,editable:true}]},{id:'alternative',label:'Alternative',price:'20000'}],pricingTables:[{optionId:'main',name:'Services',lines:[{name:'Delivery work',description:'Public work',quantity:'1.5',unit:'hour',unitPrice:'10000'}]}]})
+  const current=async(cookie=h.owner)=>(await h.state(cookie)).proposals.find(row=>row.id===p.id)
+  let row=await current()
+  await h.cmd('pricing.cost',{id:p.id,version:row.version,lineKey:row.internalPricing.lines.find(l=>l.kind==='base'&&l.optionId==='main').key,unitCost:'4137.29'})
+  row=await current();await h.cmd('pricing.cost',{id:p.id,version:row.version,lineKey:row.internalPricing.lines.find(l=>l.kind==='optional').key,unitCost:'317.29'})
+  row=await current();await h.cmd('pricing.cost',{id:p.id,version:row.version,lineKey:row.internalPricing.lines.find(l=>l.optionId==='alternative').key,unitCost:'8329.41'})
+  row=await current()
+  assert.deepEqual(row.internalPricing.lines.map(l=>[l.unitCostCents,l.costCents,l.marginCents]),[[413729,620594,879406],[31729,63458,136542],[832941,832941,1167059]])
+  assert.deepEqual(row.internalPricing.packages.map(o=>[o.revenueCents,o.costCents,o.marginCents]),[[1500000,620594,879406],[2000000,832941,1167059]])
+  assert.deepEqual([row.internalPricing.total.costCents,row.internalPricing.total.marginCents],[620594,879406])
+  const privateAmounts=['413729','620594','879406','31729','63458','136542','832941','1167059','95187','715781','1084219','204813','4137.29','6205.94','8794.06','317.29','634.58','1365.42','8329.41','11670.59','951.87','7157.81','10842.19','2048.13']
+  const costFree=value=>{
+   assert.doesNotMatch(value,/internalPricing|unitCost|unit_cost|costCents|cost_cents|margin/i)
+   for(const amount of privateAmounts){assert.ok(!value.includes(amount),'private amount excluded: '+amount);const [whole,fraction]=amount.split('.');if(fraction)assert.ok(!value.includes(Number(whole).toLocaleString('en-US')+'.'+fraction),'formatted private amount excluded: '+amount)}
+  }
+  await h.send('/auth/invite',{email:h.auth.MAIL_FROM,displayName:'Synthetic sales',role:'member',returnTo:'/app'},h.owner)
+  const sales=await h.signIn(h.auth.MAIL_FROM),salesActor=(await h.state(sales)).actor
+  await h.cmd('member.set',{operatorId:salesActor.id,version:0,role:'sales',teams:[]})
+  await h.cmd('proposal.share',{id:p.id,operatorId:salesActor.id})
+  assert.equal((await current(sales)).internalPricing,undefined);costFree(JSON.stringify(await current(sales)))
+  await h.cmd('pricing.cost',{id:p.id,version:row.version,lineKey:row.internalPricing.lines[0].key,unitCost:'0'},sales,403)
+  assert.deepEqual((await current()).internalPricing,row.internalPricing,'a refused sales edit changes no private amounts')
+  await h.cmd('proposal.approve',{id:p.id,version:row.version,revision:row.revision})
+  row=await current();const path=new URL((await h.cmd('proposal.send',{id:p.id,version:row.version})).shareUrl).pathname
+  const unsigned=await current()
+  const unverified=await h.send(path+'/action?name=accept',{name:'Synthetic Signer',optionId:'main',items:[{id:'rush',quantity:3}],consent:true})
+  assert.equal(unverified.status,401);const refused=await current();assert.equal(refused.acceptance,undefined)
+  assert.deepEqual([refused.version,refused.revision,refused.status,refused.internalPricing],[unsigned.version,unsigned.revision,unsigned.status,unsigned.internalPricing],'unverified acceptance leaves the sent revision and private amounts unchanged')
+  const cookie=await verified(h,path),query='?optionId=main&add.rush=yes&qty.rush=3'
+  const data=await h.send(path+'/data.json'+query,undefined,cookie);assert.equal(data.status,200,data.text);assert.equal(data.value.selection.totalCents,1800000);costFree(data.text)
+  const page=await h.send(path+query,undefined,cookie);assert.equal(page.status,200);costFree(page.text)
+  const file=await h.mf.dispatchFetch(h.origin+path+'/download.pdf'+query,{headers:{cookie}});assert.equal(file.status,200)
+  const publicPdf=(await pdfPages(await file.arrayBuffer())).join(' ');assert.match(publicPdf,/18,?000\.00/);costFree(publicPdf)
+  const accepted=await h.send(path+'/action?name=accept',{name:'Synthetic Signer',optionId:'main',items:[{id:'rush',quantity:3}],consent:true},cookie);assert.equal(accepted.status,200)
+  row=await current();assert.equal(row.acceptance.totalCents,1800000)
+  assert.deepEqual([row.internalPricing.total.revenueCents,row.internalPricing.total.costCents,row.internalPricing.total.marginCents,row.internalPricing.total.marginBps],[1800000,715781,1084219,6023])
+  assert.deepEqual([row.internalPricing.lines[1].quantity,row.internalPricing.lines[1].costCents,row.internalPricing.lines[1].marginCents],['3',95187,204813])
+  const acceptedData=await h.send(path+'/data.json',undefined,cookie);assert.equal(acceptedData.status,200);costFree(acceptedData.text)
+  const acceptedPage=await h.send(path,undefined,cookie);assert.equal(acceptedPage.status,200);costFree(acceptedPage.text)
+  costFree(JSON.stringify(await current(sales)))
   const now=Date.now()+1000,cron=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
   await cron(now)
-  let log=await api('/deliveries');assert.equal(log.status,200);assert.deepEqual(log.value.map(d=>d.type).sort(),['proposal.approved','proposal.created','proposal.sent','proposal.signed'])
+  let log=await api('/deliveries');assert.equal(log.status,200);assert.deepEqual(log.value.map(d=>d.type).sort(),['proposal.approved','proposal.created','proposal.revised','proposal.revised','proposal.revised','proposal.sent','proposal.signed'])
   assert.ok(log.value.every(d=>d.status==='retry'&&d.attempts===1&&d.httpStatus===503),'all failed deliveries are retained for retry')
   const sentEvent=received.find(r=>JSON.parse(r.body).type==='proposal.sent'),signedEvent=received.find(r=>JSON.parse(r.body).type==='proposal.signed')
   assert.ok(sentEvent&&signedEvent)
-  for(const r of received){const event=JSON.parse(r.body);assert.equal(r.url,hook.url);assert.equal(r.headers['platter-event-id'],event.id);assert.equal(r.headers['platter-signature'],'v1='+createHmac('sha256',hook.secret).update(r.headers['platter-timestamp']+'.'+r.body).digest('hex'));assert.notEqual(r.headers['platter-signature'],'v1='+createHmac('sha256',hook.secret).update(r.headers['platter-timestamp']+'.'+r.body+' ').digest('hex'));assert.deepEqual(Object.keys(event.data).sort(),['id','revision','status']);assert.equal(event.data.id,p.id);assert.doesNotMatch(r.body,/cost|margin|email|token|secret|scope/i)}
+  const expected=[['proposal.created',1,'draft'],['proposal.revised',2,'draft'],['proposal.revised',3,'draft'],['proposal.revised',4,'draft'],['proposal.approved',4,'approved'],['proposal.sent',4,'sent'],['proposal.signed',4,'accepted']]
+  assert.deepEqual(received.map(r=>{const e=JSON.parse(r.body);return [e.type,e.data.revision,e.data.status]}).sort(),expected.sort(),'the receiver sees every priced lifecycle projection')
+  const checkRequests=()=>{for(const r of received){const event=JSON.parse(r.body);assert.equal(r.url,hook.url);assert.equal(r.headers['platter-event-id'],event.id);assert.equal(r.headers['platter-signature'],'v1='+createHmac('sha256',hook.secret).update(r.headers['platter-timestamp']+'.'+r.body).digest('hex'));assert.notEqual(r.headers['platter-signature'],'v1='+createHmac('sha256',hook.secret).update(r.headers['platter-timestamp']+'.'+r.body+' ').digest('hex'));assert.deepEqual(Object.keys(event).sort(),['data','id','occurredAt','type']);assert.ok(Number.isSafeInteger(event.occurredAt));assert.deepEqual(Object.keys(event.data).sort(),['id','revision','status']);assert.equal(event.data.id,p.id);assert.ok(expected.some(([type,revision,status])=>event.type===type&&event.data.revision===revision&&event.data.status===status));assert.doesNotMatch(r.body,/cost|margin|email|token|secret|scope/i);costFree(r.body)}}
+  checkRequests()
+  const firstBodies=new Map(received.map(r=>[JSON.parse(r.body).id,r.body]))
   refuse=false;await cron(now+60001)
   log=await api('/deliveries');assert.ok(log.value.every(d=>d.status==='delivered'&&d.attempts===2&&d.httpStatus===204))
   assert.equal(received.filter(r=>JSON.parse(r.body).id===JSON.parse(sentEvent.body).id).length,2,'retry keeps the same event id')
+  assert.equal(received.length,14);checkRequests()
+  for(const [id,body] of firstBodies)assert.deepEqual(received.filter(r=>JSON.parse(r.body).id===id).map(r=>r.body),[body,body],'every retry keeps the same cost-free body')
   const n=received.length;await cron(now+120002);assert.equal(received.length,n,'delivered events are not resent')
   assert.doesNotMatch((await api('/webhooks')).text,new RegExp(hook.secret))
   assert.doesNotMatch((await h.state()).proposals.map(p=>JSON.stringify(p)).join(''),new RegExp(hook.secret))
-  await api('/webhooks/'+hook.id+'/revoke',{});const client=(await h.state()).clients[0];await h.cmd('proposal.prepare',{...offer,clientId:client.id});await cron(now+180003);assert.equal(received.length,n,'revocation stops future delivery')
+  await api('/webhooks/'+hook.id+'/revoke',{});await h.cmd('proposal.prepare',{...offer,clientId:client.id});await cron(now+180003);assert.equal(received.length,n,'revocation stops future delivery')
   const second=(await api('/webhooks',{url:'https://hooks.example.com/second',consent:true})).value
   const queued=await h.cmd('proposal.prepare',{...offer,clientId:client.id});await h.cmd('proposal.approve',{id:queued.id,version:1,revision:1});revokeDuringDelivery=second.id
   await cron(now+240004);assert.equal(received.length,n+1,'revocation during one request withholds the other preselected deliveries')

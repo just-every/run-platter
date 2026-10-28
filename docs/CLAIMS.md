@@ -250,11 +250,9 @@ Evidence: `src/platter/taxes.ts`, `src/platter/selection.ts`, `tests/platter.tes
 
 ## PRICE-006 — Internal cost and margin
 
-Status: **partial**.
+Status: **done**.
 
-Gap: Version-bound internal unit costs now produce cent-exact line costs and line or package margins. Only owner, admin, manager and billing proposal views carry internalPricing; billing reads but does not edit proposals. Sales, content editor, viewer and agent responses omit it. The separate /api/platter/internal-pricing.pdf export requires those same read rights and proposal scope; public offer PDFs always use the public snapshot and contain no costs. tests/platter.test.mjs — “TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions and templates, and stay out of sales or client data and public PDFs” proves the amounts, role or API or private-PDF boundaries, public-page or PDF exclusion, revisions, negotiation, restoration, duplication and personal templates. The named team browser journey proves manager cost editing and sales exclusion at 1440/390; the role CLI journey restores exact costs and templates. Optional-item and flat-package costs now ship with selected or base totals. tests/platter.test.mjs — “TEAM-001 / PRICE-006 optional and flat-package costs produce exact selected totals while verified client JSON, pages and PDFs exclude private state” proves exact optional quantities, selected total margins, template or catalog carryover, unverified and cross-invitation refusal, and absence of private fields from the new mailbox-verified /p/<invitation>/data.json projection. The named role browser and CLI journeys prove 1440/390 total selectors, selected margins and exact custody. Gap: outbound webhook payload proof remains when AUTO-004 adds that door; no lifecycle webhook is currently sent. AUTO-004 inherits the cost-free public projection before its webhook capability ships.
-
-Evidence: `src/platter/internal-pricing.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+Evidence: `src/platter/internal-pricing.ts`, `tests/platter.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 
 ## PRICE-007 — Payment terms and schedules on the proposal
 

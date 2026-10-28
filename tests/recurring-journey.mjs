@@ -27,6 +27,7 @@ export async function recurringJourney(h,{offer,verified}) {
  assert.equal(queue.totals.find(r=>r.currency==='USD').valueCents,5380000)
  assert.deepEqual(queue.totals,[{currency:'AUD',count:1,valueCents:700000},{currency:'USD',count:3,valueCents:5380000}],'Queue totals never combine currencies')
  assert.deepEqual(queue.rows.find(r=>r.id===aud.id).currency,'AUD')
+ assert.deepEqual((await h.state()).followups.totals,[{currency:'AUD',count:1,valueCents:700000},{currency:'USD',count:3,valueCents:5380000}],'State queue totals independently retain each currency')
  const selectedPreview=await h.send('/app/preview/client?id='+p.id+'&revision=1&optionId=two&items='+encodeURIComponent(JSON.stringify([{id:'seats',quantity:4}])),undefined,h.owner)
  assert.equal(selectedPreview.status,200)
  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const path=new URL((await h.cmd('proposal.send',{id:p.id,version:2})).shareUrl).pathname,cookie=await verified(h,path)
@@ -57,12 +58,18 @@ export async function recurringJourney(h,{offer,verified}) {
  assert.deepEqual(htmlRows(selectedPreview.text),expectedHtml,'Selected preview schedule attaches exact amounts to each line and date')
  const selectedPage=await h.send(path+query(items),undefined,cookie)
  assert.deepEqual(htmlRows(selectedPage.text),expectedHtml,'Selected client schedule attaches exact amounts to each line and date')
+ for(const [label,amount] of [['Care','1,200.00'],['Extra seats','200.00']]){
+  const fee='USD '+amount+' per month · '+label+' · 12 installments from 2099-01-31'
+  assert.ok(selectedPreview.text.includes(fee),'Selected preview interval amount belongs to '+label)
+  assert.ok(selectedPage.text.includes(fee),'Selected client interval amount belongs to '+label)
+ }
  const chosen=await h.send('/app/preview/client?id='+long.id+'&revision=1&optionId=two&items='+encodeURIComponent(JSON.stringify(items)),undefined,h.owner)
  assert.ok(chosen.text.includes('First-year value: USD 19,300.00'));assert.ok(chosen.text.includes('USD 200.00 per month'))
  const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf'+query(items),{headers:{host:new URL(h.origin).host,cookie}});assert.equal(pdf.status,200)
  const pages=await pdfPages(await pdf.arrayBuffer()),text=pages.join(' ');for(const page of pages)assert.match(page,/Not signed, revision 1/)
  assert.ok((await h.send(path+query(items),undefined,cookie)).text.includes('4 × $50.00 USD × 12 installments = $2,400.00 USD'))
  for(const value of ['Extra seats: 4 x USD 50.00 x 12 installments = USD 2,400.00','1 service x USD 1,200.00 x 12 installments = USD 14,400.00','One-off total: USD 2,500.00','USD 1,200.00 per month','USD 200.00 per month','First-year value: USD 19,300.00','2099-02-28'])assert.ok(text.includes(value),value)
+ for(const [label,amount] of [['Care','1,200.00'],['Extra seats','200.00']])assert.ok(text.includes('USD '+amount+' per month · '+label+' · 12 installments from 2099-01-31'),'Selected PDF interval amount belongs to '+label)
  const scheduleText=text.split('Payment schedule')[1].split('Selected optional items')[0].replace(/\s+/g,' ')
  for(const [label,date,cents] of expectedRows)assert.ok(scheduleText.includes(label+': USD '+(cents/100).toFixed(2)+' · '+date+' · net 0'),'Selected PDF schedule: '+label+' '+date+' '+cents)
  const invalid=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',items:[{id:'seats',quantity:11}],consent:true},cookie);assert.equal(invalid.status,400);assert.equal((await row()).acceptance,undefined)

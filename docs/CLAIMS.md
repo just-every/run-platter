@@ -230,9 +230,7 @@ Evidence: `src/platter/selection.ts`, `src/platter/conditional.ts`, `src/platter
 
 ## PRICE-003 — One-off and recurring fees
 
-Status: **partial**.
-
-Gap: No test fails when the behaviour is removed for the money and customer-visible families of the named PRICE-003 journey: the selected schedule's amounts in the preview, the client HTML and the PDF (M39, M40, M41; M59 amounts attached to opposite line labels), first-year value starting at the earliest selected recurring start (M37), remaining prepayment allocated to the earliest installments first and residual cents retained (M29, M38), recurring optional value in the deposit (M58), native acceptance creating no automatic invoice (M61), queue totals separate per currency (M13), installment term bounds 1 and 120 and non-monthly optional items accepted (M30, M31, M32), weekly, quarterly and annual interval and amount display (M50-M52), requested package controlling recurring selection (M33), duplicate percentage retainer refused (M23).
+Status: **done**.
 
 Evidence: `tests/platter.test.mjs`, `tests/recurring-journey.mjs`, `tests/site-documents.mjs`, `tests/recurring-browser.mjs`
 

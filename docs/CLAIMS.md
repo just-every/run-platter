@@ -902,11 +902,11 @@ Evidence: `src/platter/movein/business-import.ts`, `src/platter/business-records
 
 ## MIG-007 — Move-in from exported files without API access
 
-Status: **missing**.
+Status: **partial**.
 
-Gap: No document import; only the client CSV kit exists.
+Gap: The document and report-CSV slice uses the conservative current-owner-only authority floor under the standing scope policy; scoped delegation and provider boundaries remain unqualified. Signature certificates and pages are recognized only as supplied source evidence, not cryptographically validated signatures. Open documents are held read-only: open-document reissue, editable template and library conversion in this combined move-in, native folder creation, catalog and contact integration, provider enrichment and complete qualification for every incumbent export remain. Existing documents are held rather than replaced by a later import. Image acquisition still requires the qualified Base image-GET egress door with validated public address pinning, original-host TLS, no redirects and the required 5-MiB image and 20-MiB batch bounds; the recorded POST-only 64-KiB relay does not qualify. Explicit image failure and apply without images remain in MIG-006. EDIT-013 prerequisites remain unchanged. No live-provider, full migration or DONE claim.
 
-Evidence: None recorded.
+Evidence: `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 
 ## MOB-001 — Team app on a phone
 

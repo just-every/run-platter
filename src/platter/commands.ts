@@ -68,7 +68,7 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
  const priced=rawPriced.map(o=>tax?{...o,tax}:o);validateTaxOptions(priced,schedule)
  return{payment_terms:schedule,document:proposalDocument(p.document,priced,String(p.clientId??'')),section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:priced}
 }
-export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
+export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
  if(name==='tax.rate')return saveTaxRate(db,a,p)
  let tax:TaxSnapshot|undefined
@@ -76,7 +76,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   const current=name==='proposal.prepare'?null:negotiatedView(await proposal(db,p.id),await pendingNegotiation(db,String(p.id)))
   const existing=current?optionTax(snapshot(current).options):undefined
   if(current)exact(await proposal(db,p.id),p)
-  const request=taxRequest(p);tax=request!==undefined?await resolveTax(db,a,request,at):existing
+  const request=taxRequest(p);if(restoredTax!==undefined)need(a.role==='owner'||JSON.stringify(restoredTax??undefined)===JSON.stringify(existing),'Only the owner restores changed tax settings',403);tax=restoredTax!==undefined?restoredTax??undefined:request!==undefined?await resolveTax(db,a,request,at):existing
   need(!tax||!current||current.currency==='USD','Historical AUD proposals keep their original GST-free form',409)
   need(!tax||!current||p.clientId===undefined||p.clientId===current.client_id||request!==undefined,'Supply explicit tax addresses for the new client',409)
  }
@@ -146,7 +146,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name.startsWith('report.'))return reportCommand(env,a,name,p)
  if(name==='attachments.refresh')return refreshVendorDocuments(db,a,p)
  if(name==='suggestions.allow'||name==='suggestion.resolve')return suggestionCommand(env,a,name,p)
- if(name==='proposal.restore'){const fields=await restoreFields(db,a,p);return command(env,a,'proposal.revise',fields,fields.restoredAttachments,undefined,Number(p.revision))}
+ if(name==='proposal.restore'){const fields=await restoreFields(db,a,p);return command(env,a,'proposal.revise',fields,fields.restoredAttachments,undefined,Number(p.revision),fields.restoredTax)}
  if(name==='client.save'){
   need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email,variable_fields) VALUES(?,?,?,?)').bind(id,text(p.name,'a client name'),email(p.email),JSON.stringify(clientVariableFields(p.variableFields??Object.fromEntries(['contactName','firstName','lastName','title','address'].filter(key=>p[key]!==undefined).map(key=>[key,p[key]])))))]);return{id}
  }

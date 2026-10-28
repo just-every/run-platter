@@ -739,3 +739,9 @@ test('REPORT-004 booked snapshots and independent receipt periods export and sch
   }
  }finally{await browser?.close()}
 })
+
+test('PRICE-005 native owner-configured tax settings, selected quantities and frozen agreement', {timeout:120000},async()=>{
+ const {taxesBrowserJourney}=await import('./packages-journey.mjs')
+ const browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+ try{await taxesBrowserJourney(browser,process.env.PLATTER_SCREENSHOTS)}finally{await browser.close()}
+})

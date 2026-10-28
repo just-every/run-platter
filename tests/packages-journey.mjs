@@ -6,7 +6,7 @@ import { installedApp } from './site-harness.mjs'
 import { pdfPages } from './pdf-document.mjs'
 
 export async function packagesJourney() {
- const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+ const browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
  const screenshots=process.env.PLATTER_SCREENSHOTS
  if(screenshots)await mkdir(screenshots,{recursive:true})
  try {for(const width of [1440,390]){
@@ -107,4 +107,61 @@ export async function packagesJourney() {
 
   }finally{await clientContext?.close();await context.close();await app.close()}
  }}finally{await browser.close()}
+}
+
+// Extend the package sanity journey at one assertion width; record the same screens on a phone.
+export async function taxesBrowserJourney(browser,screenshots){
+ const app=await installedApp(),context=await browser.newContext({viewport:{width:1440,height:1000}})
+ let clientContext
+ try{
+  const page=await context.newPage(),headers={origin:app.origin}
+  assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers,data:{token:app.token,displayName:'Synthetic tax owner'},maxRedirects:0})).status(),303)
+  await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers,data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+  const state=async()=>{const r=await context.request.get(app.origin+'/api/platter/state');assert.equal(r.status(),200);return r.json()}
+  const capture=async(target,name)=>{if(!screenshots)return;await target.evaluate(()=>document.fonts.ready);for(const width of [1440,390]){await target.setViewportSize({width,height:1000});await target.screenshot({path:join(screenshots,`PRICE-005-${name}-${width}.png`),fullPage:true})}await target.setViewportSize({width:1440,height:1000})}
+  await page.goto(app.origin+'/app/settings')
+  const {taxRates,taxAddress}=await import('./taxes-fixture.mjs')
+  const settings=page.locator('section').filter({has:page.getByRole('heading',{name:'Sales tax rates',exact:true})})
+  for(const rate of taxRates){await settings.getByLabel('Jurisdiction component').selectOption(rate.level);await settings.getByLabel('State code',{exact:true}).fill(rate.region);await settings.getByLabel('Jurisdiction name').fill(rate.jurisdiction??'');await settings.getByLabel('Tax rate (%)').fill(rate.percent);await settings.getByLabel('Effective from').fill(rate.startsOn);await settings.getByRole('button',{name:'Save tax rate',exact:true}).click();assert.equal(await page.getByRole('alert').count(),0)}
+  assert.match(await settings.innerText(),/6.25%/);await capture(page,'settings')
+  const client=await cmd('client.save',{name:'Synthetic tax client',email:(await state()).actor.email})
+  await page.goto(app.origin+'/app');await page.locator('[name=clientId]').selectOption(client.id)
+  for(const [name,value]of Object.entries({title:'Synthetic taxed offer',scope:'One-off taxable and non-taxable services',optionOne:'Standard',priceOne:'1500',optionTwo:'Selected services',priceTwo:'1500',depositPercent:'50'}))await page.locator(`[name=${name}]`).fill(value)
+  await page.getByText('Sales tax and addresses',{exact:true}).click();await page.locator('[name=taxMethod]').selectOption('owner')
+  for(const kind of ['service','billing']){const a=taxAddress();for(const key of ['line1','city','region','postalCode','county'])await page.locator(`[name="tax.${kind}.${key}"]`).fill(a[key]);await page.locator(`[name="tax.${kind}.districts"]`).fill(a.districts.join(', '))}
+  for(const id of ['one','two']){
+   const pricing=page.locator(`[data-pricing-option=${id}]`);await pricing.getByRole('button',{name:'Add table',exact:true}).click()
+   const table=pricing.locator('[data-pricing-table]').last();await table.getByLabel('Table name',{exact:true}).fill('Services')
+   for(const [index,[name,price,taxable]]of [['Taxable services','1000','yes'],['Non-taxable services','500','no']].entries()){
+    if(index)await table.getByRole('button',{name:'Add line item',exact:true}).click();const line=table.locator('[data-pricing-line]').last()
+    for(const [key,value]of Object.entries({name,quantity:'1',unit:'project',unitPrice:price,taxCode:'synthetic-platter-service'}))await line.locator(`[data-pricing-field=${key}]`).fill(value)
+    await line.locator('[data-pricing-field=taxable]').selectOption(taxable)
+   }
+  }
+  const pack=page.locator('[data-package-id=two]');await pack.getByLabel('Package discount (%)',{exact:true}).fill('10');await pack.getByLabel('Package discount in USD',{exact:true}).fill('50')
+  await pack.getByRole('button',{name:'Add optional item',exact:true}).click();const item=pack.locator('[data-optional-item]').last()
+  for(const [key,value]of Object.entries({label:'Extra taxable service',unitPrice:'25',taxCode:'synthetic-platter-service',min:'1',max:'10',quantity:'1'}))await item.locator(`[data-item-field=${key}]`).fill(value)
+  await item.locator('[data-item-field=taxable]').selectOption('yes');await capture(page,'editor')
+  await page.getByRole('button',{name:'Prepare proposal',exact:true}).click();assert.equal(await page.getByRole('alert').count(),0)
+  const p=(await state()).proposals.find(p=>p.title==='Synthetic taxed offer');assert.ok(p);assert.equal(p.options[0].tables[0].lines[0].taxable,true)
+  await page.goto(app.origin+'/app/proposal?id='+p.id)
+  // Audit icon-only controls on the touched editor using its existing tooltip component.
+  for(const tool of await page.locator('.document-tool button:not(:disabled)').all()){const id=await tool.getAttribute('aria-describedby');assert.ok(id);await tool.focus();assert.equal(await page.locator('#'+id).isVisible(),true)}
+  await page.getByRole('link',{name:'Preview client page',exact:true}).click()
+  const frame=page.frameLocator('iframe'),update=async()=>{const nav=page.waitForEvent('framenavigated',{predicate:f=>f.url().includes('/app/preview/client?')});await frame.getByRole('button',{name:'Update preview selection'}).click();await(await nav).waitForLoadState('load')}
+  assert.match(await frame.locator('main').innerText(),/Sales tax: USD 82\.50/)
+  await frame.getByLabel('Choose one option',{exact:true}).selectOption('two');await update();await frame.getByRole('checkbox',{name:/Add Extra taxable service/}).check();await frame.getByLabel('Quantity for Extra taxable service').fill('4');await update()
+  assert.match(await frame.locator('main').innerText(),/Sales tax: USD 78\.85/);assert.match(await frame.getByLabel('Selected total').innerText(),/1,468\.85/);assert.match(await frame.getByLabel('Selected deposit').innerText(),/734\.43/)
+  const preview=await context.newPage();await preview.goto(page.frames().find(f=>f.url().includes('/app/preview/client?')).url());await capture(preview,'preview');await preview.close()
+  await page.goto(app.origin+'/app/proposal?id='+p.id);await page.getByRole('button',{name:'Approve this revision',exact:true}).click();await page.getByRole('button',{name:'Send approved proposal',exact:true}).click()
+  const sent=(await state()).proposals.find(x=>x.id===p.id),path='/p/'+sent.shareToken
+  clientContext=await browser.newContext({viewport:{width:1440,height:1000},javaScriptEnabled:false});const clientPage=await clientContext.newPage()
+  await clientPage.goto(app.origin+path);await clientPage.getByLabel('Review sections for').selectOption('two');await clientPage.getByRole('button',{name:'Review package',exact:true}).click();await clientPage.getByRole('checkbox',{name:/Add Extra taxable service/}).check();await clientPage.getByLabel('Quantity for Extra taxable service').fill('4');await clientPage.getByRole('button',{name:'Review package',exact:true}).click()
+  assert.match(await clientPage.locator('main').innerText(),/Sales tax: USD 78\.85/);assert.match(await clientPage.getByLabel('Selected total').innerText(),/1,468\.85/);await capture(clientPage,'client')
+  await clientPage.getByRole('button',{name:'Send verification code',exact:true}).click();const code=(await state()).outbox.find(m=>m.proposal_id===p.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0];await clientPage.getByLabel('Email verification code').fill(code);await clientPage.getByRole('button',{name:'Verify email',exact:true}).click()
+  await clientPage.getByLabel('Your full name').fill('Synthetic tax signer');await clientPage.locator('[name=consent]').check();await clientPage.getByRole('button',{name:'Accept proposal',exact:true}).click()
+  assert.match(await clientPage.locator('main').innerText(),/This agreement is complete/);assert.match(await clientPage.locator('main').innerText(),/Sales tax: USD 78\.85/);assert.match(await clientPage.getByLabel('Selected deposit').innerText(),/734\.43/);await capture(clientPage,'agreement')
+  const accepted=(await state()).proposals.find(x=>x.id===p.id).acceptance;assert.equal(accepted.selection.tax.taxCents,7885);assert.equal(accepted.totalCents,146885)
+ }finally{await clientContext?.close();await context.close();await app.close()}
 }

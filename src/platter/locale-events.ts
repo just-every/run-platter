@@ -202,5 +202,17 @@ export default {
   "Vous pouvez répondre une fois depuis cette adresse invitée pour ajouter un message en texte brut à la proposition. La réponse complète, y compris le texte cité, est visible par les collaborateurs de l’entreprise sur cette proposition. Retirez les adresses de réponse privées et les pièces jointes avant l’envoi. Cet e-mail constitue uniquement un enregistrement ; il n’approuve ni ne signe la proposition et ne change pas son état. L’adresse de l’expéditeur est une déclaration, pas une identité vérifiée. Les réponses automatiques et les envois groupés sont rejetés. Une seule réponse est enregistrée par invitation ; le propriétaire reçoit un avis dans l’application si la limite est atteinte. Une nouvelle invitation remplace cette adresse de réponse.",
   "Sie können einmal von dieser eingeladenen Adresse antworten, um dem Angebot eine reine Textnachricht hinzuzufügen. Die vollständige Antwort einschließlich zitierter Texte ist für die Mitarbeiter des Unternehmens an diesem Angebot sichtbar. Entfernen Sie private Antwortadressen und Anhänge vor dem Senden. Diese E-Mail dient nur der Aufzeichnung; sie genehmigt oder unterschreibt das Angebot nicht und ändert seinen Status nicht. Die Absenderadresse ist eine Angabe, keine bestätigte Identität. Automatische Antworten und Massenmails werden verworfen. Pro Einladung wird nur eine Antwort erfasst; bei Erreichen des Limits erhält der Eigentümer einen Hinweis in der Anwendung. Eine neue Einladung ersetzt diese Antwortadresse.",
   "Você pode responder uma vez deste endereço convidado para adicionar uma mensagem de texto à proposta. A resposta completa, incluindo texto citado, fica visível aos colaboradores da empresa nesta proposta. Remova endereços privados de resposta e anexos antes de enviar. Este e-mail serve apenas como registro; nunca aprova, assina ou altera o estado da proposta. O endereço do remetente é uma declaração, não uma identidade verificada. Respostas automáticas e mensagens em massa são descartadas. Apenas uma resposta é registrada por convite; o proprietário recebe um aviso no aplicativo se o limite for atingido. Um novo convite substitui este endereço de resposta."
+ ],
+ "This offer changed. Reload before asking.": [
+  "Esta oferta ha cambiado. Vuelva a cargarla antes de preguntar.",
+  "Cette offre a changé. Rechargez-la avant de poser une question.",
+  "Dieses Angebot wurde geändert. Laden Sie es vor einer Frage neu.",
+  "Esta oferta mudou. Recarregue antes de perguntar."
+ ],
+ "This offer is no longer open": [
+  "Esta oferta ya no está abierta",
+  "Cette offre n’est plus ouverte",
+  "Dieses Angebot ist nicht mehr offen",
+  "Esta oferta não está mais aberta"
  ]
 } as Record<string,string[]>

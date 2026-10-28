@@ -164,6 +164,23 @@ test('EDIT-017 mailbox languages preserve authority, verification limits, author
  const previousSignatures=(await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(multi.id).all()).results
  assert.equal((await decide('second')).status,200)
  assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(multi.id).all()).results,previousSignatures)
+ const changed=await h.cmd('proposal.prepare',{...offer,clientId:client.id})
+ await h.cmd('proposal.locale',{id:changed.id,version:1,locale:'es'});await h.cmd('proposal.approve',{id:changed.id,version:2,revision:1})
+ await h.cmd('proposal.send',{id:changed.id,version:3})
+ const nextRevision=await h.cmd('proposal.negotiate',{...offer,id:changed.id,clientId:client.id,version:4,title:'Terms — authored title',scope:'Scope of work — authored revision',priceOne:'2600'})
+ await h.cmd('proposal.approve',{id:changed.id,version:nextRevision.version,revision:nextRevision.revision})
+ const revisedPath=new URL((await h.cmd('proposal.send',{id:changed.id,version:nextRevision.version+1})).shareUrl).pathname
+ const revisionPage=await h.send(revisedPath);assert.equal(revisionPage.status,200)
+ for(const label of ['Título','Alcance','Opción 1 — precio'])assert.ok(revisionPage.text.includes('<dt>'+label+'</dt>'),'localized revision label '+label)
+ for(const authored of ['Terms — authored title','Scope of work — authored revision'])assert.ok(revisionPage.text.includes(authored))
+ await h.cmd('expiry.set',{id:changed.id,version:(await h.state()).proposals.find(p=>p.id===changed.id).version,mode:'date',date:'2020-01-01'})
+ assert.equal((await h.send(revisedPath+'/action?name=code.request',{})).status,200)
+ const reopenCode=(await h.state()).outbox.find(m=>m.proposal_id===changed.id&&m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0]
+ const reopenVerification=await h.send(revisedPath+'/action?name=code.verify',{code:reopenCode});assert.equal(reopenVerification.status,200)
+ const reopen=await h.send(revisedPath+'/action?name=expiry.reopen',{},reopenVerification.cookie);assert.equal(reopen.status,200,reopen.text)
+ assert.match(reopen.text,/Se ha guardado su solicitud/);assert.ok(!reopen.text.includes('Your request to reopen'))
+ assert.equal((await h.send(revisedPath+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},reopenVerification.cookie)).status,409)
+ assert.equal((await h.db.prepare('SELECT count(*) n FROM p_acceptances WHERE proposal_id=?').bind(changed.id).first()).n,0)
  }finally{await h.close()}
 })
 test('native auth, CSRF, roles and revocable agent boundary',()=>run(async h=>{

@@ -28,8 +28,8 @@ Core · published · **partial** · Cites BASE-ACCESS-002, BASE-ACCESS-004, BASE
 **Acceptance.**
 1. A member attempts an owner-only invoice export and import: neither changes records.
 
-**Evidence.** `tests/platter.test.mjs`, `src/platter/http.ts`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Owner-only invoice/import attempts are refused without record changes. Expected statuses are checked by tests/harness.mjs, outside this clause’s cited evidence; the complete no-write outcome is not asserted here.
+**Evidence.** `tests/platter.test.mjs` — “native auth, CSRF, roles and revocable agent boundary”; `src/platter/http.ts`
+**Gap.** Delivered: Role-bound owner-only invoice/import commands are refused through the harness, whose command helper checks the response. Missing “HTTP-001 complete authorized domain dispatch journey”: Member invoice export and import are refused with the complete proposal/client/invoice state read back unchanged.
 
 #### ACCESS-001 — Proposal preparation grants
 
@@ -42,8 +42,8 @@ Core · published · **partial** · Cites BASE-AGENT-004, BASE-AGENT-005, BASE-A
 2. Under a held company policy, a commitment-class price approval waits for the named person and client creation follows its standard rule; under the all-autonomous company policy, each permitted call runs.
 3. Revoke the grant and read context again: access is refused.
 
-**Evidence.** `tests/platter.test.mjs`, `src/platter/credentials.ts`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Company-policy decisions under held. No asserting line in the old cited evidence. all-autonomous policies. No asserting line in the old cited evidence.
+**Evidence.** `tests/platter.test.mjs` — “native auth, CSRF, roles and revocable agent boundary”; “AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund”; `src/platter/credentials.ts`
+**Gap.** Delivered: A labelled key prepares an attributed draft and revocation ends context access. Missing “ACCESS-001 complete proposal preparation grants journey”: The same permitted sponsor/grant workflow runs under held and all-autonomous company policies with computed classes.
 
 ### Approval, sending and acceptance
 
@@ -58,8 +58,8 @@ Core · published · **partial** · Cites BASE-AGENT-007, BASE-AGENT-008
 2. After approving the new revision and sending, two retained approval records identify their respective revisions, approvers, roles, rules and times.
 3. A manager’s approval under a matching rule binds the same exact revision.
 
-**Evidence.** `tests/platter.test.mjs`, `src/platter/commands.ts`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Stale approval. The expected-status assertions for these actions live in the uncited harness. send-after-edit refusal. The expected-status assertions for these actions live in the uncited harness. Every retained approval’s approver. No asserting line in the old cited evidence. role. No asserting line in the old cited evidence. rule. No asserting line in the old cited evidence. time are read together. No asserting line in the old cited evidence.
+**Evidence.** `tests/platter.test.mjs` — “PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations invalidate old authority”; “APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied”; `src/platter/commands.ts`
+**Gap.** Delivered: Exact revisions govern stale approval, edit invalidation and manager decisions; command helpers check refusals. Missing “PROP-001 complete approval binds the exact revision journey”: The held-policy revision journey reads the complete retained approver, role, rule and time history after the second approval and send.
 
 #### PROP-002 — Sending freezes the offer
 
@@ -70,8 +70,8 @@ Core · published · **partial** · Cites BASE-ROLE-001
 **Acceptance.**
 1. Send an approved proposal, try to revise it (409), send a fresh invitation and confirm the old link is refused and the offer unchanged.
 
-**Evidence.** `tests/platter.test.mjs`, `src/platter/commands.ts`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Frozen-offer revision refusal. The expected-status assertion is in tests/harness.mjs, outside the cited files.
+**Evidence.** `tests/platter.test.mjs` — “PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations invalidate old authority”; `src/platter/commands.ts`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### SIGN-001 — Verified-mailbox acceptance
 
@@ -87,8 +87,8 @@ Core · published · **partial** · Rules D-1
 5. Requests are limited to one per minute and ten per invitation; codes expire after ten minutes.
 6. The verification cookie is private to its invitation, HttpOnly and SameSite Strict; another revision gains no authority.
 
-**Evidence.** `tests/platter.test.mjs`, `src/platter/signing.ts`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: A previously valid unconsumed code is refused specifically after its expiry. The expiry case reuses an already-exhausted condition and submits an arbitrary code, so it does not isolate expiry. Ten-code invitation ceiling. No asserting line in the old cited evidence. exactly ten-minute lifetime. No asserting line in the old cited evidence. Cookie path and SameSite/HttpOnly flags. Cookie presence alone does not assert these properties. another revision’s denied authority. Cookie presence alone does not assert these properties.
+**Evidence.** `tests/platter.test.mjs` — “email verification precedes acceptance, code is single-use, immutable option and deposit exported once”; “code attempt limits, resend throttling and revision-bound sessions”; `src/platter/signing.ts`
+**Gap.** Delivered: Verification precedes acceptance, a used or exhausted code is refused and resend throttling is exercised. Missing “SIGN-001 complete verified-mailbox acceptance journey”: An unconsumed valid code expires independently of attempt exhaustion; the invitation ceiling and revision-bound cookie security are exercised through a complete verification journey.
 
 #### SIGN-002 — Immutable acceptance with an integer-cent deposit
 
@@ -99,8 +99,8 @@ Core · published · **partial** · Rules D-1
 **Acceptance.**
 1. Accept with an unknown option (400), accept option two with consent, accept again with another name and option, and read back the first acceptance with total 420000 and deposit 105000 cents.
 
-**Evidence.** `tests/platter.test.mjs`, `src/platter/signing.ts`
-**Gap.** All listed acceptance outcomes are traced in DONE-AUDIT. The published conservative demotion is retained pending a fresh ct judgment; this rewrite makes no status promotion.
+**Evidence.** `tests/platter.test.mjs` — “email verification precedes acceptance, code is single-use, immutable option and deposit exported once”; `src/platter/signing.ts`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### INV-001 — One retained deposit invoice per acceptance
 
@@ -111,8 +111,8 @@ Core · published · **partial**
 **Acceptance.**
 1. Export an unaccepted proposal (409), export an accepted one twice concurrently and get one invoice, and download its CSV.
 
-**Evidence.** `tests/platter.test.mjs`, `src/platter/invoices.ts`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Unaccepted invoice export is refused. Expected-status assertion is in the uncited harness.
+**Evidence.** `tests/platter.test.mjs` — “money rejects malformed or unsafe prices and cannot export an unaccepted proposal”; “email verification precedes acceptance, code is single-use, immutable option and deposit exported once”; `src/platter/invoices.ts`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 ### Clients, erasure and archives
 
@@ -128,8 +128,8 @@ Core · published · **partial** · Cites BASE-DATA-001
 3. Apply the reviewed bytes, read their original and journal, and replay: the same import job is returned.
 4. Undo restores the previous clients; a changed imported client or one with dependent proposals prevents undo.
 
-**Evidence.** `tests/platter.test.mjs`, `src/platter/movein/index.ts`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Changed-file apply refuses the reviewed fingerprint. Expected-status assertion lives in the uncited harness. Changed imported client prevents undo. The cited journey does not assert this separate changed-client case.
+**Evidence.** `tests/platter.test.mjs` — “Client CSV dry run, fingerprint custody, journal, replay and undo through HTTP”; “import undo preserves clients with dependent proposals; owner erasure fences unused client”; `src/platter/movein/index.ts`
+**Gap.** Delivered: Preview writes nothing, a changed fingerprint is refused, original bytes and replayed job identity are retained, and dependent proposals prevent undo. Missing “IMPORT-001 complete reviewed client csv move-in with undo journey”: Undo is also exercised after an imported client is independently edited, retaining the intervening edit and dependent records.
 
 #### ERASE-001 — Bounded client erasure
 
@@ -140,8 +140,8 @@ Core · published · **partial** · Cites BASE-DATA-003, BASE-DATA-006, BASE-DAT
 **Acceptance.**
 1. Erase a client with a draft (409), erase with the wrong name (400), erase an unused client, then restore an older archive with the newer erasure journal and find the client absent.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Draft. wrong-name refusals. Expected-status assertions are in the uncited harness.
+**Evidence.** `tests/platter.test.mjs` — “import undo preserves clients with dependent proposals; owner erasure fences unused client”; `tests/archive.test.mjs` — “PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal”
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### PORT-001 — Validated archives and restore
 
@@ -154,8 +154,8 @@ Core · published · **partial** · Cites BASE-DATA-001, BASE-BACKUP-001
 2. A populated destination and a damaged archive are refused.
 3. An older archive after erasure is refused without the newer erasure journal.
 
-**Evidence.** `tests/archive.test.mjs`, `src/platter/archive-policy.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: All record. The archive journey asserts many records but never compares the complete re-exported part manifest. attachment parts are identical after export/import/re-export. The archive journey asserts many records but never compares the complete re-exported part manifest.
+**Evidence.** `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”; “PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal”; `src/platter/archive-policy.mjs`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 ### Mail and the public site
 
@@ -170,7 +170,7 @@ Core · published · **done** · Cites BASE-MAIL-001, BASE-OPS-003, BASE-OPS-004
 2. With a mail-provider fake, the proposal and mail row exist and are claimed before provider contact.
 3. A provider timeout leaves the message uncertain; processing again sends no duplicate.
 
-**Evidence.** `src/platter/mail.ts`, `tests/mail.test.mjs`
+**Evidence.** `src/platter/mail.ts`; `tests/mail.test.mjs` — “MAIL-001 local proposal and verification mail are captured without provider contact”; “MAIL-001 hosted mail commits and claims before provider acceptance; timeout is uncertain and never resent”
 **Gap.** None.
 
 #### SITE-001 — Public run site and documentation
@@ -184,8 +184,8 @@ Core · published · **partial** · Cites BASE-DOCS-001, BASE-PUBLIC-001
 2. Open the guides without JavaScript and read their Markdown content.
 3. Open the installed home and see the Lobby.
 
-**Evidence.** `tests/site.test.mjs`, `scripts/verification/run.mjs`, `src/site/pages.ts`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Run Platter opens the run page. Browser assertions are in tests/site-lifecycle.mjs, while the cited tests/site.test.mjs only imports suites. Markdown is readable with JavaScript disabled. Browser assertions are in tests/site-lifecycle.mjs, while the cited tests/site.test.mjs only imports suites. Installed home is the Lobby. Browser assertions are in tests/site-lifecycle.mjs, while the cited tests/site.test.mjs only imports suites.
+**Evidence.** `tests/site.test.mjs` — “SITE-001 built homepage opens run instructions, Markdown docs work without JavaScript, installed root remains the Lobby” (registered through tests/site-lifecycle.mjs); `scripts/verification/run.mjs`; `src/site/pages.ts`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 ### Authoring and branding
 
@@ -198,8 +198,8 @@ Core · target · **partial** · Cites BASE-INPUT-002, BASE-INPUT-003, BASE-ACCE
 **Acceptance.**
 1. A browser journey at 1440 and 390 pixels builds a proposal from blank with every block type, reorders by drag and by keyboard, applies a brand kit, reloads and sees the same document, and exports a PDF whose pages carry the same blocks in order; the `EDIT-011` budget journey passes on the same build.
 
-**Evidence.** `tests/site.test.mjs`, `tests/platter.test.mjs`, `tests/archive.test.mjs`, `tests/editor-budget.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every palette block. drag. keyboard reorder. brand. reload. same-order PDF at 1440. Assertions are in imported browser helpers. not the old cited wrapper. The same complete browser flow at 390. Assertions are in imported browser helpers. Performance proof on the same exact build as the editor browser flow. No assertion in the cited files binds the two receipts to the same candidate.
+**Evidence.** `tests/site.test.mjs` — “EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths” (registered through tests/site-documents.mjs); `tests/platter.test.mjs`; `tests/archive.test.mjs`; `tests/editor-budget.mjs` — “Forty-page reference proposal with 4x CPU editor and phone client budgets”
+**Gap.** Delivered: The document journey builds all block types, applies branding, reorders by keyboard/drag, reloads and compares real PDF order; the separate budget runner measures the reference document. Missing “EDIT-001 complete branded drag-and-drop proposal editor journey”: The editor and throttled reference-performance journeys have a single recorded acceptance receipt on the same built candidate; the budget job is separate from push Verify.
 
 #### EDIT-002 — Proposal templates
 
@@ -227,8 +227,8 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-003 · Rules D-
 **Acceptance.**
 1. Insert a linked and a detached case study into a draft and a sent proposal, edit the library item, and see only the linked copy in the draft change; the item's usage list names all three.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Linked draft changes while detached. The linked-propagation assertion is in tests/library-fixture.mjs, outside the old Evidence set. sent. The linked-propagation assertion is in tests/library-fixture.mjs, outside the old Evidence set. accepted copies do not. The linked-propagation assertion is in tests/library-fixture.mjs, outside the old Evidence set. Usage names exactly all three copies. No directly cited asserting line establishes the exact usage list.
+**Evidence.** `tests/platter.test.mjs` — “EDIT-003 linked draft copies propagate atomically while detached, sent and accepted copies retain exact content”; `tests/site.test.mjs` — “EDIT-003 linked and detached library insertion, frozen sending and scoped usage at desktop and phone widths” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### EDIT-004 — Variables from client, deal and CRM records
 
@@ -253,7 +253,7 @@ Core · target · **done** · Rules D-1
 2. Unmapped tokens become named custom variables; missing source images are reported rather than invented.
 3. Import ten Heading 1 sections as library content: ten items carry those headings.
 
-**Evidence.** `tests/platter.test.mjs` — “EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections” (editable content, mapped and custom variables, catalog links, unmatched and missing images, library names, independent copies and revoked scope); “EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing” (source bytes, positioned fields, schedules, every-page revision marks, paper sizes and frozen signed custody); “EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order” (native Word structures, exact prices and media, PDF order); `tests/site-documents.mjs` — “EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads” (compiled editor, client pages, local fixed-page rendering and Word download); `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority” (exact media, fixed originals, variables and library custody without restored links)
+**Evidence.** `tests/platter.test.mjs` — “EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections”; `tests/site-documents.mjs` — “EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads”; `tests/archive.test.mjs`
 **Gap.** None.
 
 #### EDIT-019 — Fixed PDF pages with signing fields
@@ -267,7 +267,7 @@ Core · target · **done** · From EDIT-005 · Rules D-1
 2. Place a signature field on page 3; append pricing after the last page and verify its added lines total correctly.
 3. Fixed pages and added blocks retain the exact-revision unsigned-download behavior of EDIT-014.
 
-**Evidence.** `tests/platter.test.mjs` — “EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections” (editable content, mapped and custom variables, catalog links, unmatched and missing images, library names, independent copies and revoked scope); “EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing” (source bytes, positioned fields, schedules, every-page revision marks, paper sizes and frozen signed custody); “EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order” (native Word structures, exact prices and media, PDF order); `tests/site-documents.mjs` — “EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads” (compiled editor, client pages, local fixed-page rendering and Word download); `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority” (exact media, fixed originals, variables and library custody without restored links)
+**Evidence.** `tests/platter.test.mjs` — “EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing”; `tests/site-documents.mjs` — “EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads”; `tests/archive.test.mjs`
 **Gap.** None.
 
 #### EDIT-020 — Word and PDF exports
@@ -280,7 +280,7 @@ Core · target · **done** · From EDIT-005 · Rules D-1
 1. Export three headings, a four-line pricing table and two images to Word: headings use Word heading styles, the table carries every name, quantity, unit price and total, and both images are embedded.
 2. The PDF contains the same blocks in the same order.
 
-**Evidence.** `tests/platter.test.mjs` — “EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections” (editable content, mapped and custom variables, catalog links, unmatched and missing images, library names, independent copies and revoked scope); “EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing” (source bytes, positioned fields, schedules, every-page revision marks, paper sizes and frozen signed custody); “EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order” (native Word structures, exact prices and media, PDF order); `tests/site-documents.mjs` — “EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads” (compiled editor, client pages, local fixed-page rendering and Word download); `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority” (exact media, fixed originals, variables and library custody without restored links)
+**Evidence.** `tests/platter.test.mjs` — “EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order”; `tests/site-documents.mjs` — “EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads”; `tests/archive.test.mjs`
 **Gap.** None.
 
 #### EDIT-006 — Embedded rich media
@@ -292,8 +292,8 @@ Core · target · **partial** · Cites BASE-INPUT-002, BASE-INPUT-003, BASE-PUBL
 **Acceptance.**
 1. Add an uploaded video, a Loom link and a gallery, view on a 390-pixel phone and play the video, export the PDF and see stills with links, and try an embed from a host outside the allowlist (refused).
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Uploaded video. The browser helpers are not in the old Evidence set. gallery render. The browser helpers are not in the old Evidence set. play at 390. The browser helpers are not in the old Evidence set. PDF has still images. The old cited wrappers do not assert every named carrier. links. The old cited wrappers do not assert every named carrier. Outside-allowlist embed refusal. A command status in a helper is not an asserting line in the cited file.
+**Evidence.** `tests/platter.test.mjs` — “EDIT-001 display media requires consent and live edit scope, stays private until placed and keeps exact bytes through copies and templates”; `tests/site.test.mjs` — “EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### EDIT-007 — Mobile client review
 
@@ -330,8 +330,8 @@ Core · target · **partial** · Rules D-1
 
 2. A variable-dependent section follows the filled variable on preview, client page, agreement and PDF.
 
-**Evidence.** `src/platter/conditional.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Package- and optional-item visibility is asserted through client/PDF/acceptance carriers. Variable-dependent visibility on preview, client, agreement and PDF remains unproved.
+**Evidence.** `src/platter/conditional.ts`; `tests/platter.test.mjs` — “EDIT-009 conditional sections match selected preview, client, PDF and immutable agreement; revisions, copies and negotiations retain rules”; `tests/site.test.mjs` — “MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
+**Gap.** Delivered: Package and optional-item conditions retain matching client, agreement and PDF content. Missing “EDIT-009 complete conditional content by package journey”: A filled-variable condition is followed through preview, client, immutable agreement and PDF in one complete selection journey.
 
 #### EDIT-010 — Attachments and vendor documents
 
@@ -342,7 +342,7 @@ Core · target · **done** · Cites BASE-INPUT-003, BASE-DATA-001 · Rules D-1
 **Acceptance.**
 1. Upload a W-9 in settings, send a proposal, and as the client download the W-9; replace the W-9 in settings and see the sent proposal still carry the original.
 
-**Evidence.** `src/platter/attachments.ts`, `src/platter/attachment-commands.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Evidence.** `src/platter/attachments.ts`; `src/platter/attachment-commands.ts`; `tests/platter.test.mjs` — “EDIT-010 / TEAM-004 defaults and arbitrary files freeze with approval, download exact bytes and remain in the signed package after replacement”; `tests/site.test.mjs` — “EDIT-010 desktop and phone upload vendor defaults and MSA, download frozen bytes, replace defaults and accept the original package” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
 **Gap.** None.
 
 #### EDIT-011 — Large-proposal performance budget
@@ -354,7 +354,7 @@ Core · target · **done** · Rules D-1
 **Acceptance.**
 1. A browser journey creates the reference proposal through the public API, applies the 4× throttle, opens it at 1440 pixels and records time to editable, the p95 of 200 keystroke-to-paint intervals (Event Timing API), one drag reorder and one quantity edit, then opens the client page at 390 pixels and records largest contentful paint; the run reports each measured value and fails if any exceeds its budget.
 
-**Evidence.** `tests/editor-budget.mjs`, `.github/workflows/verify.yml`, `tests/platter.test.mjs`
+**Evidence.** `tests/editor-budget.mjs` — “Forty-page reference proposal with 4x CPU editor and phone client budgets”; `.github/workflows/verify.yml`; `tests/platter.test.mjs`
 **Gap.** None.
 
 #### EDIT-012 — Duplicate a proposal for another client
@@ -369,8 +369,8 @@ Core · target · **partial** · Rules D-1
 3. With approval required for all proposals, sending waits for approval; with it off and no matching rule, the owning sales member sends.
 4. Acme’s agreement remains byte-identical.
 
-**Evidence.** `src/platter/duplicate.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Destination variables. The original full-target combination is not asserted by its old cited files. role slots. The original full-target combination is not asserted by its old cited files. every payment. The original full-target combination is not asserted by its old cited files. delivery setting are copied. The original full-target combination is not asserted by its old cited files. Copy has no payment records. No explicit read of a populated source payment collection establishes this absence. Mandatory. Expected refusal statuses are asserted in the uncited harness; the full role/variable combination is not read back. optional approval copy branches. Expected refusal statuses are asserted in the uncited harness; the full role/variable combination is not read back.
+**Evidence.** `src/platter/duplicate.ts`; `tests/platter.test.mjs` — “EDIT-012 duplicate accepted content into an independent member-owned draft for another client without changing the source”; `tests/site.test.mjs` — “MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads” (registered through tests/site-documents.mjs); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
+**Gap.** Delivered: Accepted content becomes a separate preparer-owned draft while the original agreement stays frozen; copy and custody journeys cover files, selected prices and approval behavior. Missing “EDIT-012 complete duplicate a proposal for another client journey”: A populated accepted source with payments, all delivery settings and template-assigned recipient slots is copied to another client and every destination binding and cleared lifecycle authority is reconciled.
 
 #### EDIT-021 — Duplicate lifecycle and file custody
 
@@ -385,8 +385,8 @@ Core · target · **partial** · From EDIT-012 · Rules D-1
 4. At desktop and phone widths, copy through the form, choose Beta, inspect the separate draft, approve and send while the source remains accepted.
 5. Archive and restore the copy’s files, content and settings exactly.
 
-**Evidence.** `src/platter/duplicate.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every lifecycle authority. Individual null fields do not prove an uninspected collection. including payments. Individual null fields do not prove an uninspected collection. is absent. Individual null fields do not prove an uninspected collection. Stale refusal. Old key behavior has a hard-coded refusal, not the required policy matrix. company-policy standard copy behavior. Old key behavior has a hard-coded refusal, not the required policy matrix. Compiled copy form. The browser assertions are outside the old Evidence set. independent source at 1440 and 390. The browser assertions are outside the old Evidence set.
+**Evidence.** `src/platter/duplicate.ts`; `tests/platter.test.mjs` — “EDIT-012 duplicate accepted content into an independent member-owned draft for another client without changing the source”; `tests/site.test.mjs`; `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
+**Gap.** Delivered: Independent draft copies and archived content/settings are retained without changing the source. Missing “EDIT-021 complete duplicate lifecycle and file custody journey”: The complete source-state copy journey covers every draft/sent/terminal/negotiation state and company-policy standard-class execution, then reconciles all inherited lifecycle authority.
 
 #### EDIT-013 — Documents without pricing
 
@@ -409,8 +409,8 @@ Core · target · **partial** · Cites BASE-ROLE-001 · Rules D-1
 **Acceptance.**
 1. As a verified client, choose a package and download the PDF: every page reads "Not signed, revision 2" and shows the chosen package, and the timeline lists the download; turn downloads off on another proposal and see no download action and the PDF route refused (403).
 
-**Evidence.** `src/platter/documents/client-pdf.ts`, `src/platter/documents/offer-pdf.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Every-page unsigned watermark, selected aggregate content, download history and disabled-door refusal are asserted. A selected-package identifier on each individual page is not asserted; aggregate PDF text is insufficient.
+**Evidence.** `src/platter/documents/client-pdf.ts`; `src/platter/documents/offer-pdf.ts`; `tests/platter.test.mjs` — “EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and every page marked; disabling refuses download without a write”; `tests/site.test.mjs` — “PRICE-001 / COLLAB-003 / EDIT-014 / EDIT-018 desktop and phone create grouped line tables, edit and restore, preview, send, download and accept identical server totals” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
+**Gap.** Delivered: Selected money and current unsigned revision marks reach downloaded bytes; disabling downloads removes the browser action and refuses the route. Missing “EDIT-014 complete client pdf download before signing journey”: A multi-page selected-package download visibly identifies its chosen package on every page while retaining the disabled-download boundary.
 
 #### EDIT-015 — Locked template sections
 
@@ -421,8 +421,8 @@ Core · target · **partial** · Cites BASE-ROLE-001 · Rules D-1
 **Acceptance.**
 1. Lock the terms section in a template; as a sales member try to edit it in the editor and through the API (both refused); as a content editor try to unlock it in a proposal (403); as an admin unlock it in one proposal and edit it, and see the unlock in the audit log and approval required before sending.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Terms editing through both editor and API is refused to sales. The compiled editor assertion is in an uncited imported browser helper. Content editor cannot unlock. The complete multi-outcome combination lacks asserting lines in the old Evidence files; expected statuses use the uncited harness. admin unlock changes audit. The complete multi-outcome combination lacks asserting lines in the old Evidence files; expected statuses use the uncited harness. requires approval. The complete multi-outcome combination lacks asserting lines in the old Evidence files; expected statuses use the uncited harness.
+**Evidence.** `tests/platter.test.mjs` — “TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval”; `tests/site.test.mjs` — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### EDIT-016 — Proposal search and folders
 
@@ -433,7 +433,7 @@ Core · target · **done** · Cites BASE-ROLE-001 · Rules D-1
 **Acceptance.**
 1. Seed 500 proposals; search a phrase that appears only in the body of two proposals and one uploaded PDF and get exactly those three within one second; file proposals in a team folder and see a member outside the team find none of them by search or by folder.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Evidence.** `tests/platter.test.mjs` — “EDIT-016 body phrase search returns exactly three of 500 proposals including an uploaded PDF with live folder permissions”; `tests/site.test.mjs`; `tests/archive.test.mjs`
 **Gap.** None.
 
 #### EDIT-017 — Client page in the client's language
@@ -460,8 +460,8 @@ Core · target · **partial** · Rules D-1
 3. Quantity 11 is refused in both preview and sent page.
 4. Viewing as signer 2 shows only signer 2’s fields.
 
-**Evidence.** `src/platter/preview.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Desktop/phone compiled banner identifies exact revision. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. recipient. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. The full three-package tax/deposit/schedule/conditional selection equals the sent page. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. Out-of-bounds quantity eleven is refused. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. Only signer two’s assigned fields appear. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set.
+**Evidence.** `src/platter/preview.ts`; `tests/platter.test.mjs` — “EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state”; `tests/site.test.mjs` — “EDIT-018 desktop and phone preview exact client content, switch widths and select without sending” (registered through tests/site-documents.mjs); “MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
+**Gap.** Delivered: Revision banners, preview selection, package conditions, quantity bounds and the sent-page money comparison have real preview/browser journeys. Missing “EDIT-018 complete client-page preview before sending journey”: A complete three-package, tax/deposit/schedule and two-signer preview journey verifies signer-two fields and the same exact subsequently sent selection.
 
 #### EDIT-022 — Preview isolation and exact approval link
 
@@ -476,8 +476,8 @@ Core · target · **partial** · From EDIT-018 · Cites BASE-ROLE-001, BASE-AUDI
 4. A person outside proposal scope is refused; signed-out and client-only sessions see no private preview.
 5. Preview audit records retain actor, subject and server time through archive; refusals add no preview audit.
 
-**Evidence.** `src/platter/preview.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Pending approver follows an exact revision-one approval-request link. The old preview fixture uses owner/member links rather than the named full request flow. A person outside proposal scope sees no preview content. An HTTP status alone is not a no-content assertion. Exact preview audit survives public CLI restore. Archive assertions compare broader data. this point’s specific preview outcome is not isolated in the old Evidence set.
+**Evidence.** `src/platter/preview.ts`; `tests/platter.test.mjs` — “EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state”; `tests/site.test.mjs`; `tests/archive.test.mjs`
+**Gap.** Delivered: Preview submissions are refused and previewing leaves proposal revisions, approvals and outbound/tracking activity unchanged apart from its own audit. Missing “EDIT-022 complete preview isolation and exact approval link journey”: A pending manager follows the exact approval-request preview, an out-of-scope reader sees no content, and that specific preview audit survives public CLI custody without restoring authority.
 
 ### Catalog and pricing
 
@@ -502,8 +502,8 @@ Core · target · **partial** · Rules D-1
 **Acceptance.**
 1. Build two tables with 12 lines, quantities and units, and see the server totals match a cent-exact fixture; send malformed quantities and prices (400); reload and see identical totals in the client page and the PDF.
 
-**Evidence.** `src/platter/pricing.ts`, `src/platter/ui/pricing.ts`, `tests/platter.test.mjs`, `tests/pricing-journey.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every malformed quantity. Expected status assertions are in the uncited harness. price is refused with the named status. Expected status assertions are in the uncited harness.
+**Evidence.** `src/platter/pricing.ts`; `src/platter/ui/pricing.ts`; `tests/platter.test.mjs` — “PRICE-001 / COLLAB-003 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / PROP-001 / TEAM-004 tables recompute twelve grouped lines, preserve every carrier and refuse malformed prices and quantities”; `tests/pricing-journey.mjs` — “PRICE-001 / COLLAB-003 / EDIT-014 / EDIT-018 desktop and phone create grouped line tables, edit and restore, preview, send, download and accept identical server totals” (pricingJourney called by the browser suite); `tests/archive.test.mjs`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### PRICE-002 — Packages and optional items the client chooses
 
@@ -514,8 +514,8 @@ Core · target · **partial** · Rules D-1
 **Acceptance.**
 1. Offer three packages and two optional items with an editable quantity between 1 and 10; as the client choose the middle package, add one item and set quantity 4; the server totals, agreement and PDF all show that selection; quantity 11 is refused.
 
-**Evidence.** `src/platter/selection.ts`, `src/platter/conditional.ts`, `src/platter/paper-acceptance.ts`, `src/platter/ui/paper.ts`, `src/platter/ui/packages.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/packages-journey.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Agreement and PDF both retain every field of the same middle-package quantity-four selection. The target requires equality across every carrier, not a single successful read or subset of money fields.
+**Evidence.** `src/platter/selection.ts`; `src/platter/conditional.ts`; `src/platter/paper-acceptance.ts`; `src/platter/ui/paper.ts`; `src/platter/ui/packages.ts`; `tests/platter.test.mjs` — “PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-002 arbitrary packages and bounded optional quantities share server totals and immutable selection”; `tests/site.test.mjs` — “MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads” (registered through tests/site-documents.mjs); `tests/packages-journey.mjs`; `tests/archive.test.mjs`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### PRICE-003 — One-off and recurring fees
 
@@ -526,7 +526,7 @@ Core · target · **done** · Rules D-1
 **Acceptance.**
 1. Add a $2,500 one-off setup and a $1,200 monthly retainer for 12 months; the client page shows one-off $2,500, $1,200 a month and first-year value $16,900; acceptance creates a matching schedule.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/recurring-journey.mjs`, `tests/site-documents.mjs`, `tests/recurring-browser.mjs`
+**Evidence.** `tests/platter.test.mjs` — “PRICE-003 recurring fees keep exact schedules, first-year queue value and immutable selected documents”; `tests/recurring-journey.mjs`; `tests/site-documents.mjs` — “PRICE-003 and PRICE-002 recurring line editing, preview, client selection and frozen agreement use the same amounts”; `tests/recurring-browser.mjs`
 **Gap.** None.
 
 #### PRICE-004 — Discounts
@@ -538,8 +538,8 @@ Core · target · **partial** · Rules D-1
 **Acceptance.**
 1. Apply 10% to a group and $500 off the total, see cent-exact totals; set an approval threshold of 15% and see a 20% discount require approval before sending.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/pricing-journey.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Ten percent at group scope plus $500 total discount matches the fixture. The cited discount cases assert different combinations, without the complete named group-plus-total case.
+**Evidence.** `tests/platter.test.mjs` — “PRICE-004 scoped discounts preserve exact selections, private margins, templates and public PDF and JSON custody”; “APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied”; `tests/pricing-journey.mjs`; `tests/archive.test.mjs`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### PRICE-005 — US sales tax
 
@@ -577,8 +577,8 @@ Core · target · **partial** · Rules D-1
 1. Set a 30% deposit, two milestones and a monthly retainer on net 15 terms; as the client see the schedule with dates and amounts; accept and read the same frozen schedule back.
 2. Start a proposal from a template whose terms are a 30% deposit and a net-15 milestone: the proposal opens with those terms; change its deposit to 25% and the template still holds 30%.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/packages-journey.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: The exact 30%-deposit/two-milestone/monthly/net-15 schedule is shown. The old evidence tests several schedule selections; the full named combination and both reads are not asserted together. frozen at acceptance. The old evidence tests several schedule selections; the full named combination and both reads are not asserted together. A template’s 30%-deposit/net-15 terms survive an independently edited 25% proposal. The copied payment-term fields are not all asserted in the old Evidence set.
+**Evidence.** `tests/platter.test.mjs`; `tests/site.test.mjs` — “MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads” (registered through tests/site-documents.mjs); `tests/packages-journey.mjs`; `tests/archive.test.mjs`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### PRICE-008 — First-release AUD agreements stay exact
 
@@ -589,7 +589,7 @@ Core · target · **done** · Rules D-1
 **Acceptance.**
 1. Restore a first-release archive with an accepted AUD proposal into a target build, and see the agreement, deposit and CSV byte-identical and labeled AUD while new proposals are USD.
 
-**Evidence.** `migrations/core/0017_currency.sql`, `tests/archive.test.mjs`, `tests/site.test.mjs`
+**Evidence.** `migrations/core/0017_currency.sql`; `tests/archive.test.mjs` — “PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores re-exported first-release AUD bytes and new proposals and acceptances use USD without conversion”; `tests/site.test.mjs` — “PRICE-008 legacy AUD agreement and new USD owner/client screens show exact currency at desktop and phone widths” (registered through tests/site-lifecycle.mjs)
 **Gap.** None.
 
 ### Collaboration and approvals
@@ -615,7 +615,7 @@ Core · target · **done** · Cites BASE-ROLE-001, BASE-MAIL-001
 **Acceptance.**
 1. Comment on a pricing table mentioning a colleague, who gets a notification and resolves it; assign a section; the client page, PDF and client API show no internal comment.
 
-**Evidence.** `tests/mail.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
+**Evidence.** `tests/mail.test.mjs` — “COLLAB-002 scoped colleagues comment, receive consented generic email and chat, resolve and assign without exposing internal threads to clients”; `tests/site-documents.mjs` — “COLLAB-002 internal comment, resolution and dated assignment work at desktop and phone widths”; `tests/archive.test.mjs`
 **Gap.** None.
 
 #### COLLAB-003 — Version history with compare and restore
@@ -627,8 +627,8 @@ Core · target · **partial**
 **Acceptance.**
 1. Make three revisions, compare the first and third and see the changed price and text, restore the first as revision four and see approval required.
 
-**Evidence.** `src/platter/history.ts`, `src/platter/ui/history.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`
-**Gap.** Three saved revisions, exact comparisons and an unapproved restored revision four are asserted. Blocking its send until a new approval is asserted in tests/harness.mjs, outside the old Evidence set.
+**Evidence.** `src/platter/history.ts`; `src/platter/ui/history.ts`; `tests/platter.test.mjs` — “COLLAB-003 every saved revision has an author/time, comparisons highlight changes, restore creates unapproved revision four”; `tests/site.test.mjs` — “PRICE-001 / COLLAB-003 / EDIT-014 / EDIT-018 desktop and phone create grouped line tables, edit and restore, preview, send, download and accept identical server totals” (registered through tests/site-documents.mjs)
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### APPROVE-001 — Approval rules and routing
 
@@ -641,8 +641,8 @@ Core · target · **partial** · Cites BASE-ROLE-001
 2. A $30,000 proposal with 20% discount needs both in order; editing after the first approval clears both.
 3. A parallel rule routes edited legal terms to a named admin (counsel) and a named billing user (finance) at once: it completes only when both approve, in either order, and one rejection stops it; a second billing user not named in the rule is refused (403), and saving a rule that names a sales member is refused (400).
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Saved threshold rules are the manager-above-$25,000. The rule-save operation’s expected-status assertions are in the uncited harness. owner-above-15% configuration. The rule-save operation’s expected-status assertions are in the uncited harness. Both parallel completion orders. Each named branch must be asserted in a cited file; command execution alone does not read back every result. rejection. Each named branch must be asserted in a cited file; command execution alone does not read back every result. unnamed billing refusal. Each named branch must be asserted in a cited file; command execution alone does not read back every result. invalid sales-rule save. Each named branch must be asserted in a cited file; command execution alone does not read back every result.
+**Evidence.** `tests/platter.test.mjs` — “APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied”; “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP”; `tests/site.test.mjs`; `tests/archive.test.mjs`
+**Gap.** Delivered: Value, discount, margin, terms and template rules select sequential/parallel approval steps and invalidate them after edits. Missing “APPROVE-001 complete approval rules and routing journey”: The complete threshold configuration journey covers both parallel completion orders, a rejection and unauthorized approver/rule changes while retaining the exact saved rule configuration.
 
 #### APPROVE-002 — Approval requests that reach the approver
 
@@ -670,8 +670,8 @@ Core · target · **partial** · Cites BASE-AGENT-007, BASE-AGENT-008
 4. Turn no-rule approval on: the unruled proposal waits for the selected owner, admin or manager role; changing that role changes who may decide.
 5. Only owner/admin change the proposal policy; the change retains actor and time.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Unruled $3,000 sales send has no approval record. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Manager approves matching $30,000. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. owning sales sends. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Every role. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. outside-team refusal changes no record. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Each owner/admin/manager no-rule default selects exactly the eligible decider. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Only authorized policy edits persist with actor/time. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness.
+**Evidence.** `tests/platter.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP”; `tests/site.test.mjs` — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
+**Gap.** Delivered: Sales and manager flows exercise scoped send/approve decisions and policy-controlled proposal approval. Missing “APPROVE-003 complete who approves, who sends and what needs approval journey”: The full no-rule owner/admin/manager decision matrix and authorized policy-edit history run together, including out-of-team no-change refusals and unruled sending without a fabricated approval.
 
 #### APPROVE-004 — Approval reevaluation on the exact revision
 
@@ -686,8 +686,8 @@ Core · target · **partial** · From APPROVE-003 · Cites BASE-AGENT-007
 4. Parallel approvers act in either order; a rejection prevents sending until revision.
 5. An agent-prepared proposal’s commitment decision follows the company’s policy after human revisions as well as before them.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Sending after edit is refused until the next approval. Expected-status assertion lives in the uncited harness. Highest optional-quantity maximum. Every computed fact is not read back at its decision. currency-preserving threshold facts. Every computed fact is not read back at its decision. First-draft legal comparison. No asserting line in the old cited evidence. sequence/id tie order. No asserting line in the old cited evidence. Parallel order. The exact rejection/readback branches are not all asserted in the old files. rejected-revision refusal. The exact rejection/readback branches are not all asserted in the old files. Company-policy commitment decisions after both agent. No asserting line in the old cited evidence. human revisions. No asserting line in the old cited evidence.
+**Evidence.** `tests/platter.test.mjs` — “APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied”; `tests/site.test.mjs`; `tests/archive.test.mjs`
+**Gap.** Delivered: Gross value and discount rules invalidate prior approval after edits; legal/terms conditions and ordered steps are exercised. Missing “APPROVE-004 complete approval reevaluation on the exact revision journey”: The evaluator journey covers maximum optional quantities, currency-preserving facts, first-draft legal comparison and tied/parallel ordering, then proves agent commitment decisions under both company policies.
 
 ### Sending and delivery
 
@@ -704,8 +704,8 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-SECRET-001, BASE-MAIL
 4. After the member loses send authority, no mailbox message leaves.
 5. Provider refusal changes the next send’s route and records the installation sender.
 
-**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** All listed acceptance outcomes are traced in DONE-AUDIT. The published conservative demotion is retained pending a fresh ct judgment; this rewrite makes no status promotion.
+**Evidence.** `tests/mail.test.mjs` — “SEND-001 / SEND-011 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail”; `tests/site.test.mjs`; `tests/archive.test.mjs`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### SEND-011 — Inbound client reply custody
 
@@ -719,8 +719,8 @@ Core · target · **partial** · From SEND-001 · Cites BASE-ROLE-001, BASE-SECR
 3. The per-invitation reply cap produces one durable owner notice when reached.
 4. Reply history retains the claimed sender and receiving-server authentication results.
 
-**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** All listed acceptance outcomes are traced in DONE-AUDIT. The published conservative demotion is retained pending a fresh ct judgment; this rewrite makes no status promotion.
+**Evidence.** `tests/mail.test.mjs` — “SEND-001 / SEND-011 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail”; `tests/site.test.mjs`; `tests/archive.test.mjs`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### SEND-002 — Delivery status and bounce handling
 
@@ -734,8 +734,8 @@ Core · target · **partial** · Cites BASE-MAIL-001, BASE-OPS-003 · Rules D-1
 3. Queued, complained and uncertain states remain distinct.
 4. At desktop and phone widths, read delivery history.
 
-**Evidence.** `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Delivered. The complete listed branch set needs asserting lines, rather than a provider callback status alone. deferred-then-delivered. The complete listed branch set needs asserting lines, rather than a provider callback status alone. hard bounce each display their state. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Both signed-provider correlations. The complete listed branch set needs asserting lines, rather than a provider callback status alone. replay. The complete listed branch set needs asserting lines, rather than a provider callback status alone. terminal regression cases. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Queued/complained/uncertain remain distinct. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Compiled delivery history at 1440 and 390. Browser assertions are outside the cited wrapper file.
+**Evidence.** `src/platter/delivery.ts`; `src/platter/ui/delivery.ts`; `tests/mail.test.mjs` — “SEND-006 / SEND-002 / SEND-012 signed provider delivery, durable sender notice and actionable address correction”; “SEND-002 / SEND-012 SendGrid signed correlation, queued state, uncertainty and logged dismissal”; `tests/site.test.mjs` — “SEND-002 desktop and phone show provider delivery and preserve bounce notice until explicit correction” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### SEND-012 — Bounce correction follow-up
 
@@ -750,8 +750,8 @@ Core · target · **partial** · From SEND-002 · Cites BASE-MAIL-001, BASE-OPS-
 4. Dismissal requires a logged reason.
 5. Desktop/phone journeys exercise correction; archive restores open and resolved corrections without mail or invitation credentials.
 
-**Evidence.** `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Hard bounce creates both sender notice. The complete combination is not established by a cited asserting line for each listed effect. separate follow-up. The complete combination is not established by a cited asserting line for each listed effect. Current sender correction rotates link/session. The complete combination is not established by a cited asserting line for each listed effect. preserves offer/client. The complete combination is not established by a cited asserting line for each listed effect. routes verification to corrected address. The complete combination is not established by a cited asserting line for each listed effect. Provider acceptance closes correction while uncertainty leaves it open. The complete combination is not established by a cited asserting line for each listed effect. Dismissal retains the entered reason. The complete combination is not established by a cited asserting line for each listed effect. Both desktop/phone correction. The complete combination is not established by a cited asserting line for each listed effect. exact open/resolved CLI restore. The complete combination is not established by a cited asserting line for each listed effect.
+**Evidence.** `src/platter/delivery.ts`; `src/platter/ui/delivery.ts`; `tests/mail.test.mjs` — “SEND-006 / SEND-002 / SEND-012 signed provider delivery, durable sender notice and actionable address correction”; “SEND-002 / SEND-012 SendGrid signed correlation, queued state, uncertainty and logged dismissal”; `tests/site.test.mjs` — “SEND-002 desktop and phone show provider delivery and preserve bounce notice until explicit correction” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs` — “SEND-002 public CLI preserves bounce follow-ups and logged action without provider events or invitation credentials”
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### SEND-003 — Recipients, roles and sharing
 
@@ -762,8 +762,8 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-PUBLIC-002 · Rules D
 **Acceptance.**
 1. Add a signer, a CFO approver and a viewer; each opens their own link; the viewer cannot sign; remove the viewer and see their link refused.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Current main judged SEND-003 done under RL-21. Its role/link/removal assertions are in tests/recipients-http.mjs and its compiled browser assertions in tests/recipients-browser.mjs, neither named in the old Evidence set. The wrapper test titles alone do not prove those outcomes; stakeholder conversion’s no-mail/no-authority assertions are retained.
+**Evidence.** `tests/platter.test.mjs` — “SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP”; `tests/site.test.mjs`; `tests/archive.test.mjs`
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### SEND-004 — Expiry and reopening
 
@@ -778,8 +778,8 @@ Core · target · **partial** · Rules D-1
 4. An accepted agreement never expires; a fresh invitation keeps its first-send clock and a sent negotiated revision starts a new period.
 5. Expiry changes and reopen requests survive archive without transport authority.
 
-**Evidence.** `src/platter/expiry.ts`, `src/platter/expiry-time.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Accepted never expires. Every independent clock branch must have a readback assertion. reinvite keeps clock. Every independent clock branch must have a readback assertion. negotiation restarts period. Every independent clock branch must have a readback assertion. Expiry settings. The complete outcome is not isolated in the cited archive assertions. reopen requests survive restore without transport authority. The complete outcome is not isolated in the cited archive assertions.
+**Evidence.** `src/platter/expiry.ts`; `src/platter/expiry-time.ts`; `tests/platter.test.mjs` — “SEND-004 / SEND-013 / TEAM-004 calendar expiry warns unsigned only, supports same-link reopening and reissue, and never expires accepted agreements”; `tests/site.test.mjs`; `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### SEND-013 — Unsigned-recipient expiry warnings
 
@@ -793,8 +793,8 @@ Core · target · **partial** · From SEND-004 · Rules D-1
 3. Repeated processing produces one warning; uncertain transport remains held.
 4. Settings and warning facts survive archive without sending authority.
 
-**Evidence.** `src/platter/expiry.ts`, `src/platter/expiry-time.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every unsigned signer receives one warning. The additional recipient assertions live in tests/recipients-http.mjs, outside the old Evidence set. every signed signer receives none. The additional recipient assertions live in tests/recipients-http.mjs, outside the old Evidence set. Extension moves the warning date without stale delivery. No asserting line in the old cited evidence. Repeated processing gives one warning. No asserting line in the old cited evidence. uncertain transport stays held. No asserting line in the old cited evidence. All warning facts/settings restore without sending authority. No asserting line in the old cited evidence.
+**Evidence.** `src/platter/expiry.ts`; `src/platter/expiry-time.ts`; `tests/platter.test.mjs` — “SEND-004 / SEND-013 / TEAM-004 calendar expiry warns unsigned only, supports same-link reopening and reissue, and never expires accepted agreements”; `tests/site.test.mjs`; `tests/archive.test.mjs`
+**Gap.** Delivered: Unsigned-recipient warning timing, changed dates and repeat processing are exercised with accepted offers excluded. Missing “SEND-013 complete unsigned-recipient expiry warnings journey”: A complete multi-recipient warning journey spans unsigned and already-signed recipients, date extension and uncertain delivery, then restores warning history/settings without transport authority.
 
 #### SEND-005 — Completion and activity notifications
 
@@ -894,8 +894,8 @@ Core · target · **partial** · Cites BASE-ROLE-001 · Rules D-1
 4. A sender outside proposal scope cannot withdraw it.
 5. An accepted agreement cannot be withdrawn.
 
-**Evidence.** `src/platter/withdrawal.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Each signer/approver/viewer/CC/shared/replaced link refuses all proposal content. The full recipient proof lives in tests/recipients-http.mjs; an HTTP 410 alone cannot assert content absence. Every email/text reminder is cancelled. Each independent channel must be asserted after withdrawal. every unpaid payment link is refused. Each independent channel must be asserted after withdrawal. Questions. sales/correction follow-ups. expiry warnings all stop. Separate lifecycle assertions are required for each named work item. Out-of-scope sender withdrawal leaves no changes. A refusal status alone is insufficient for the no-effect outcome. Accepted agreement withdrawal is refused. Expected-status assertion lives in the uncited harness.
+**Evidence.** `src/platter/withdrawal.ts`; `tests/platter.test.mjs` — “SEND-010 / SEND-015 / FOLLOW-009 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval”; `tests/site.test.mjs` — “FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs`
+**Gap.** Delivered: Withdrawal revokes live offers, closes questions/follow-ups and cancels pending outbound work; browser and recipient helpers read the revoked state. Missing “SEND-010 complete withdraw a sent proposal journey”: A complete withdrawn-offer journey reconciles every recipient door and unpaid payment link with email/text reminders and all correction/expiry work, without affecting an accepted agreement.
 
 #### SEND-015 — Withdrawal receipt and approved reissue
 
@@ -910,8 +910,8 @@ Core · target · **partial** · From SEND-010 · Cites BASE-AUDIT-001 · Rules 
 4. Prepare revision 2, approve and send: new links work while revision 1 remains refused.
 5. Desktop/phone journeys exercise sender, withdrawn-client, audit, report and reissue screens; archive preserves read-only history without invitation authority.
 
-**Evidence.** `src/platter/withdrawal.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Notice per recipient. The full recipient inventory is not asserted in the old cited set. no notice when disabled. The full recipient inventory is not asserted in the old cited set. Partially signed withdrawal retains the first signature as void. The assertion is in tests/recipients-http.mjs, not the old cited files. Timeline/audit actor/time/reason plus report counts/totals. The exact entered reason must be read back in both records. New revision works. Each recipient and previous authority must be checked after reissue. every old link remains refused. Each recipient and previous authority must be checked after reissue. Compiled 1440/390 screens. The old browser wrapper has no asserting line. read-only CLI history without authority. The old browser wrapper has no asserting line.
+**Evidence.** `src/platter/withdrawal.ts`; `tests/platter.test.mjs` — “SEND-010 / SEND-015 / FOLLOW-009 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval”; `tests/site.test.mjs` — “FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
+**Gap.** Delivered: Withdrawal history and optional notices retain the old offer while explicit approval creates a new revision. Missing “SEND-015 complete withdrawal receipt and approved reissue journey”: The receipt/reissue journey reconciles partially signed void history, optional per-recipient notices, exact entered reason in timeline/audit, report totals and every old link after reissue and restore.
 
 ### Engagement tracking
 
@@ -925,8 +925,8 @@ Core · target · **partial** · Cites BASE-PUBLIC-001, BASE-MAIL-001
 1. Open the proposal as two recipients on desktop and phone; the sender gets an alert and the timeline lists both views with device class and approximate location (city, region and country from the request address through an IP-location fixture: Austin, Texas, United States for the first and Portland, Oregon, United States for the second).
 2. With a 30-minute quiet period, the first recipient's return visit 10 minutes later raises no alert and a visit 45 minutes after that raises one return-visit alert.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/followup-journey.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
-**Gap.** Recipient view records, coarse location/device fields and quiet-period alerts are asserted. The rendered timeline’s city, region, country and device fields for both views are not asserted in a cited file; tests/site-lifecycle.mjs imports tests/tracking-browser.mjs.
+**Evidence.** `tests/platter.test.mjs` — “TRACK-001 opted-in views retain trusted coarse location, verification and device with quiet-period owner alerts”; `tests/followup-journey.mjs`; `tests/site-lifecycle.mjs` — “TRACK-001 / TRACK-004 owner consent, private alerts, client disclosure and erasure at desktop and phone widths”; `tests/archive.test.mjs`
+**Gap.** Delivered: Opted-in records keep trusted coarse location and device facts with quiet-period owner alerts. Missing “TRACK-001 complete view tracking and live open alerts journey”: A two-recipient sender-timeline journey displays both city/region/country/device records at desktop and phone widths and checks the quiet return-visit alert alongside those displayed facts.
 
 #### TRACK-002 — Section-level reading analytics
 
@@ -961,8 +961,8 @@ Core · target · **partial** · Cites BASE-PUBLIC-001, BASE-DATA-003
 **Acceptance.**
 1. Open the client page and see the disclosure; inspect network requests for third-party hosts (none); read a stored view and find no full IP address; set 90-day retention and see older views removed.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Client network makes no third-party request. A full network-host absence assertion is not in the old cited files; a rendered page alone is insufficient.
+**Evidence.** `tests/platter.test.mjs` — “TRACK-004 disclosure, bounded retention and explicit erasure respect holds and owner authority”; `tests/site-lifecycle.mjs` — “TRACK-001 / TRACK-004 owner consent, private alerts, client disclosure and erasure at desktop and phone widths”; `tests/archive.test.mjs`
+**Gap.** Delivered: Disclosure, bounded retention and explicit erasure respect holds and operator authority. Missing “TRACK-004 complete tracking disclosure and privacy limits journey”: A client-network privacy journey inventories outbound hosts during ordinary viewing and confirms no third-party request while checking stored IP minimization and retention.
 
 ### Follow-up and negotiation
 
@@ -1007,8 +1007,8 @@ Core · target · **partial**
 3. With engagement unavailable, disclose it and retain the interim exact order A,C,D,B,F,E,G without inferring views.
 4. Equal-date/reason ties and currency-separated totals follow [queue behavior](docs/contract-behavior.md#follow-002).
 
-**Evidence.** `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Personal-owner time-zone boundaries. The existing queue uses installation time-zone fixtures. All equal-date/reason sent-time/proposal-number. Current stable-id behavior does not establish future proposal-number ties. currency tie outcomes. Current stable-id behavior does not establish future proposal-number ties.
+**Evidence.** `src/platter/followup/queue.ts`; `src/platter/followup/commands.ts`; `tests/followup-journey.mjs`; `tests/platter.test.mjs` — “FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal”; `tests/site.test.mjs`; `tests/archive.test.mjs`
+**Gap.** Delivered: The seven-proposal fixture shows exact engaged/unavailable ordering, due periods, reasons and per-currency totals through followupJourney. Missing “FOLLOW-002 complete next-action follow-up queue by sales owner journey”: The queue journey crosses each recorded owner’s personal-zone boundary and resolves equal-date/reason sent-time/proposal-number ties without combining currencies.
 
 #### FOLLOW-009 — Follow-up lifecycle and action history
 
@@ -1023,8 +1023,8 @@ Core · target · **partial** · From FOLLOW-002
 4. Acceptance, decline and withdrawal close the action; unanswered question threads remain until answered.
 5. History retains actor, time, action and reason through archive; notification transport and invitations do not return.
 
-**Evidence.** `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Notice leaves work open. All listed decisions require separate assertion lines. reason-free dismissal is refused. All listed decisions require separate assertion lines. Every creation/revision action. No asserting line in the old cited evidence. explicit reopening retains the right due date. No asserting line in the old cited evidence. Acceptance. decline. withdrawal. unanswered question lifecycles reconcile. Checking one terminal case does not cover the full named branch set. Every history field. No asserting line in the old cited evidence. authority absence survives restore. No asserting line in the old cited evidence.
+**Evidence.** `src/platter/followup/queue.ts`; `src/platter/followup/commands.ts`; `tests/followup-journey.mjs`; `tests/platter.test.mjs` — “FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal”; `tests/site.test.mjs` — “MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
+**Gap.** Delivered: Notify leaves work open, logged completion preserves separate bounce correction, reason-free dismissal fails, and explicit rescheduling reopens an action. Missing “FOLLOW-009 complete follow-up lifecycle and action history journey”: A complete lifecycle-and-custody journey reconciles creation/revision, acceptance/decline/withdrawal, unanswered questions and exact action/reason/actor/time history after restore without transport authority.
 
 #### FOLLOW-010 — Follow-up reporting and team visibility
 
@@ -1037,8 +1037,8 @@ Core · target · **partial** · From FOLLOW-002 · Cites BASE-ROLE-001
 2. Owner filters and team/own scopes match the current sales owner and manager team.
 3. Desktop and phone screens show the same queue and totals.
 
-**Evidence.** `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: All sales/manager team-scope queues use the current owner. The full role-scope branch set is not asserted in the old evidence. Compiled 1440 and 390 queue screens. Asserting browser helpers are not in the old cited Evidence set.
+**Evidence.** `src/platter/followup/queue.ts`; `src/platter/followup/commands.ts`; `tests/followup-journey.mjs`; `tests/platter.test.mjs` — “FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership”; `tests/site.test.mjs` — “MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs`
+**Gap.** Delivered: Due filters, sorting and totals have populated pipeline and compiled queue journeys. Missing “FOLLOW-010 complete follow-up reporting and team visibility journey”: The same thirty-proposal due fixture is reconciled under current sales-owner and manager/team scopes after ownership and membership changes at both browser widths.
 
 #### FOLLOW-003 — Expiry and renewal notifications
 
@@ -1071,8 +1071,8 @@ Core · target · **partial** · Cites BASE-AGENT-007, BASE-MAIL-001
 5. Exercise owner/client/queue/agreement at 1440 and 390.
 6. Export and restore answered and open threads through the public CLI, excluding genuine issued reply capabilities.
 
-**Evidence.** `src/platter/questions.ts`, `src/platter/question-replies.ts`, `src/platter/ui/questions.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Client pricing question. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. app answer. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. exact notification. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. queue removal. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. retained agreement thread. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Scope/terms. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. every unverified/stale/invalid-section refusal. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Member queue. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. held-policy agent answer. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Every signed intake authority. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. expiry. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. replay. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. no-second-notification outcome. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Compiled owner/client/queue/agreement at both widths. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Answered/open CLI threads with genuine reply credentials excluded. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes.
+**Evidence.** `src/platter/questions.ts`; `src/platter/question-replies.ts`; `src/platter/ui/questions.ts`; `tests/mail.test.mjs` — “FOLLOW-004 verified client questions, native answers and one-use authenticated owner email replies”; `tests/site.test.mjs` — “MOB-001 / FOLLOW-004 invited client asks exact sent sections; owner queue answers and agreement retains threads on desktop and phone” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
+**Gap.** Delivered: Section questions, native answers and authenticated one-use email replies retain threads and exact notifications; browser and archive journeys cover those retained conversations. Missing “FOLLOW-004 complete client questions and comments journey”: An agent’s external-class answer completes the same thread/notification workflow under held and all-autonomous company policies within its sponsor’s scope.
 
 #### FOLLOW-005 — Decline reasons and won or lost outcomes
 
@@ -1139,7 +1139,7 @@ Core · target · **done** · Rules D-1
 **Acceptance.**
 1. Send revision 1, revise the price, approve and send revision 2; the revision 1 link is refused; the client page shows the price change; acceptance records revision 2.
 
-**Evidence.** `src/platter/negotiation.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Evidence.** `src/platter/negotiation.ts`; `tests/platter.test.mjs` — “NEG-001 negotiated offer requires exact approval, preserves the live offer until send, compares changes and accepts revision two”; `tests/site.test.mjs` — “NEG-001 desktop and phone negotiate, approve, send and accept the changed offer with client comparison” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs`
 **Gap.** None.
 
 #### NEG-002 — Client-suggested text edits
@@ -1151,7 +1151,7 @@ Core · target · **done** · Cites BASE-AGENT-006, BASE-AGENT-007 · Rules D-1
 **Acceptance.**
 1. Allow suggestions on the terms section, suggest two edits as the client, accept one and reject one, and see revision 2 contain only the accepted edit.
 
-**Evidence.** `src/platter/suggestions.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Evidence.** `src/platter/suggestions.ts`; `tests/platter.test.mjs` — “NEG-002 / TEAM-004 opt-in tracked terms edits accept one/reject one into revision two, preserve offer and require fresh approval”; `tests/site.test.mjs` — “NEG-002 desktop and phone client suggests two terms edits; firm accepts one, rejects one and sends revision two” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs`
 **Gap.** None.
 
 ### E-signature
@@ -1233,8 +1233,8 @@ Core · target · **partial** · Cites BASE-INPUT-003, BASE-AGENT-007 · Rules D
 **Acceptance.**
 1. Upload a client-signed PDF for a sent proposal, record signer and date, and see the agreement marked accepted by upload with the file, followed by the deposit request.
 
-**Evidence.** `src/platter/paper-acceptance.ts`, `src/platter/paper-record.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`
-**Gap.** Uploaded signer/date, exact retained file, distinct acceptance label and owner deposit-invoice CSV are asserted. A following client-facing deposit request is not asserted.
+**Evidence.** `src/platter/paper-acceptance.ts`; `src/platter/paper-record.ts`; `tests/platter.test.mjs` — “SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by upload, distinct from e-signature, then exports the deposit”; `tests/site.test.mjs` — “MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads” (registered through tests/site-documents.mjs)
+**Gap.** Delivered: A client-signed file is retained as an attested upload with signer/date and a matching deposit invoice, distinct from electronic verification. Missing “SIGN-008 complete acceptance on the client's own paper journey”: The upload-acceptance journey produces and exposes the client-facing deposit request after the attested agreement, beyond owner invoice export.
 
 #### SIGN-009 — Recipient delegation of signing
 
@@ -1318,8 +1318,8 @@ Core · target · **partial** · Rules D-1
 1. With payment required, sign and decline the test card: the agreement waits for payment; pay and see it complete.
 2. With payment due, sign, fail the payment and see the agreement accepted with the deposit due.
 
-**Evidence.** `tests/collection-browser.mjs`, `tests/stripe-sandbox.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Due-deposit amount remains outstanding after the declined payment. The cited browser assertion checks accepted state; a separate exact due-money readback is needed.
+**Evidence.** `tests/collection-browser.mjs`; `tests/stripe-sandbox.mjs`; `tests/platter.test.mjs`; `tests/site.test.mjs` — “deposit collection settings, retained signatures, required and due completion at desktop and phone widths” (registered through tests/site-documents.mjs)
+**Gap.** Delivered: Required-payment and due-payment collection helpers distinguish waiting from accepted agreement state after a failed card attempt. Missing “PAY-002 complete deposit or partial payment at acceptance journey”: The due-payment journey reads the exact outstanding deposit after the declined payment and then reconciles its successful collection without changing accepted terms.
 
 #### PAY-003 — Milestone and recurring payment schedules
 
@@ -1678,8 +1678,8 @@ Core · target · **partial** · Cites BASE-ROLE-001
 2. Owner/admin see all, managers/viewers their teams and sales owned/shared proposals; content and revenue specialists use only their report rights.
 3. Edits keep the original sales owner, including the sponsor of an agent-prepared proposal.
 
-**Evidence.** `src/platter/pipeline.ts`, `src/platter/ui/pipeline.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every role’s full visible report set. The matrix includes unimplemented content/revenue specialist reports.
+**Evidence.** `src/platter/pipeline.ts`; `src/platter/ui/pipeline.ts`; `tests/platter.test.mjs` — “FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership”; `tests/site.test.mjs`; `tests/archive.test.mjs`
+**Gap.** Delivered: Thirty populated proposals reconcile field filters, ordering, counts and currency totals without reassigning the recorded owner. Missing “REPORT-001 complete proposal pipeline dashboard journey”: The complete report-rights journey includes content/revenue specialists once those report capabilities exist, with each role’s exact visible report set.
 
 #### REPORT-002 — Win rate and sales performance
 
@@ -1727,8 +1727,8 @@ Core · target · **partial**
 **Acceptance.**
 1. Export the pipeline: every screen row, count and per-currency total matches CSV in the same order.
 
-**Evidence.** `src/platter/reports/schedules.ts`, `src/platter/reports/pipeline-csv.ts`, `src/platter/reports/zone.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`
-**Gap.** All listed acceptance outcomes are traced in DONE-AUDIT. The published conservative demotion is retained pending a fresh ct judgment; this rewrite makes no status promotion.
+**Evidence.** `src/platter/reports/schedules.ts`; `src/platter/reports/pipeline-csv.ts`; `src/platter/reports/zone.ts`; `tests/platter.test.mjs` — “FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures”; `tests/site.test.mjs` — “REPORT-005 / REPORT-006 desktop and phone export the filtered pipeline CSV and schedule weekly email in the installation time zone” (registered through tests/site-lifecycle.mjs)
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### REPORT-006 — Scheduled report delivery
 
@@ -1742,8 +1742,8 @@ Core · target · **partial** · From REPORT-005 · Cites BASE-MAIL-001, BASE-RO
 3. Repeated checks and downtime recovery produce one run; inactive recipients are visibly skipped and uncertain transport is not resent.
 4. Schedules survive archive without email transport.
 
-**Evidence.** `src/platter/reports/schedules.ts`, `src/platter/reports/pipeline-csv.ts`, `src/platter/reports/zone.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Weekly win-rate report reaches two people with exact screen rows/figures and CSV. REPORT-002 win-rate does not exist; pipeline fallback does not assert it. Once-only run. Every independent branch needs its own assertion. inactive recipients. Every independent branch needs its own assertion. uncertain delivery across downtime. Every independent branch needs its own assertion. Schedules restore without transport. This part’s old Evidence set omits the archive assertion file.
+**Evidence.** `src/platter/reports/schedules.ts`; `src/platter/reports/pipeline-csv.ts`; `src/platter/reports/zone.ts`; `tests/platter.test.mjs` — “FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures”; `tests/site.test.mjs` — “REPORT-005 / REPORT-006 desktop and phone export the filtered pipeline CSV and schedule weekly email in the installation time zone” (registered through tests/site-lifecycle.mjs)
+**Gap.** Delivered: Filtered pipeline delivery retains exact rows and money for two named recipients, stays at the local hour across DST and skips an inactive person. Missing “REPORT-006 complete scheduled report delivery journey”: The weekly win-rate journey has an implemented win-rate report with matching screen/CSV/mail, then covers downtime/uncertainty and schedule restore without transport.
 
 ### Team administration
 
@@ -1905,8 +1905,8 @@ Core · target · **partial** · Cites BASE-AUDIT-001, BASE-AGENT-009, BASE-OPS-
 3. Owner/admin can search and download at 1440 and 390; other roles and signed-out readers cannot.
 4. Archive and restore preserve the proposal audit exactly.
 
-**Evidence.** `src/platter/audit.ts`, `src/platter/auth-audit.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Compiled admin/owner audit. The old browser Evidence file imports the assertion helpers rather than containing them. unauthorized readers at 1440/390. The old browser Evidence file imports the assertion helpers rather than containing them.
+**Evidence.** `src/platter/audit.ts`; `src/platter/auth-audit.ts`; `tests/platter.test.mjs` — “TEAM-004 current person, agent, invitation, signature, native, import and invoice actions have searchable/exportable actors and times”; `tests/site.test.mjs` — “TEAM-004 owner searches audit actions and downloads the same filtered activity at desktop and phone widths” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### TEAM-005 — Security review pack for procurement
 
@@ -2026,8 +2026,8 @@ Core · target · **partial** · Cites BASE-ACCESSIBILITY-001 · Register R-4, R
 **Acceptance.**
 1. A browser journey at 390 pixels completes each of those actions, the sends and answers as a sales member and the approval as a manager; the same approval attempted by the sales member is refused (403).
 
-**Evidence.** `tests/site.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Sales template/send/answer/queue. All browser asserting lines are outside the sole old cited wrapper. manager approval. All browser asserting lines are outside the sole old cited wrapper. sales refusal at 390. All browser asserting lines are outside the sole old cited wrapper.
+**Evidence.** `tests/site.test.mjs` — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” (registered through tests/site-documents.mjs); “MOB-001 / FOLLOW-004 invited client asks exact sent sections; owner queue answers and agreement retains threads on desktop and phone” (registered through tests/site-lifecycle.mjs); “MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting” (registered through tests/site-lifecycle.mjs)
+**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### MOB-002 — iOS and Android apps with push notifications
 
@@ -2083,8 +2083,8 @@ Core · target · **partial** · Cites BASE-AGENT-001, BASE-AGENT-002, BASE-AGEN
 5. Premature fulfillment and an unauthorized person’s queue decision are refused; tool results exclude invitation credentials.
 6. Use the queue at desktop/phone widths and archive requests and resolutions without credentials.
 
-**Evidence.** `src/platter/mcp.ts`, `src/platter/send-requests.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: MCP search. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. schema. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. draft/revision/status. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. engagement. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. One retained send request with unchanged business state before execution. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Held. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. all-autonomous company-policy execution. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. revoked/foreign-origin refusal. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Stale revision. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. dismissal. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. exact fulfillment. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Premature/unauthorized queue refusal. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. absence of credentials. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Compiled queue at both widths. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. exact credential-free CLI restore. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target.
+**Evidence.** `src/platter/mcp.ts`; `src/platter/send-requests.ts`; `tests/platter.test.mjs` — “AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund”; `tests/site.test.mjs` — “AI-003 desktop and phone owners review MCP requests, approve/send explicitly, and dismiss stale requests” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
+**Gap.** Delivered: Schemas, search, drafting, status, honest engagement and revision-bound send requests use the public MCP door; the owner queue and archives retain request/resolution history. Missing “AI-003 complete mcp server for ai assistants journey”: The same MCP workflow classifies and executes permitted calls under held and all-autonomous company policies instead of relying on the legacy hard-coded tool-name refusals.
 
 #### AI-004 — Explainable price suggestions
 
@@ -2123,8 +2123,8 @@ Core · target · **partial** · Cites BASE-DATA-001, BASE-SECRET-001
 1. Inspect a populated product archive: it includes templates, library items, catalog, media, signed PDFs and certificates, payment/invoice records, report source data and integration mappings with their retained bytes.
 2. Inspect that populated archive: no provider token, agent key, native session, invitation, verification state or mail is carried.
 
-**Evidence.** `tests/archive.test.mjs`, `src/platter/archive-policy.mjs`
-**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every product record/attachment part is identical on re-export. Named subset comparisons do not establish a complete part inventory equality. Every provider/agent/native/verification/mail credential kind is absent from the populated archive. Every named exclusion requires a mechanism assertion; one empty table is insufficient.
+**Evidence.** `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”; “SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority”; `src/platter/archive-policy.mjs`
+**Gap.** Delivered: Current templates, catalog/library, business records, provider metadata and retained originals have real CLI custody with local authority excluded. Missing “PORT-002 complete complete product archive journey”: A complete product archive journey includes the remaining signed-certificate/payment/report/integration record kinds as their public doors ship and retains their original bytes without exporting authority.
 
 #### SEC-001 — Provider credential custody
 

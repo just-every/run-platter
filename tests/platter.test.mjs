@@ -2998,6 +2998,6 @@ describe('AUTO-004 independently documented authority',()=>{
 
 test('SIGN-004 sequential and parallel recipient groups complete only after every signature',async()=>{
  const h=await harness({assetsDirectory:'public'})
- try{const {signingOrderHttp}=await import('./recipients-http.mjs');await signingOrderHttp(h)}finally{await h.close()}
+ try{const {signingOrderHttp,ownershipHandoffHttp}=await import('./recipients-http.mjs');await signingOrderHttp(h);await ownershipHandoffHttp(h)}finally{await h.close()}
 })
 test('SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP',()=>run(async h=>{const {recipientRolesHttp}=await import('./recipients-http.mjs');await recipientRolesHttp(h)}))

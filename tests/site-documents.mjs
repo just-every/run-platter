@@ -1,4 +1,5 @@
 import { acceptRevenue } from './revenue-fixture.mjs'
+import { localeBrowser } from './locale-browser.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
 import { documentJourney } from './document-journey.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
@@ -10,6 +11,8 @@ import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { pdfPages } from './pdf-document.mjs'
 import { builtSite, installedApp } from './site-harness.mjs'
+
+test('EDIT-017 owner-selected Spanish invitation, verification, consent and completion preserve authored English through the compiled client', {timeout:120000},()=>localeBrowser())
 
 test('COLLAB-003 desktop and phone compare revisions and restore an earlier draft requiring fresh approval', { timeout: 120000 }, async () => {
  let app, browser

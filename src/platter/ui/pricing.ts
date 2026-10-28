@@ -1,3 +1,4 @@
+import { ui, clientEnum } from '../locales'
 import { taxFields } from './taxes'
 import { recurrenceEditor } from './recurring'
 import { displayOptions } from '../discounts'
@@ -42,18 +43,18 @@ export function pricingEditor(options: any[]): string {
 }
 
 function lineDetails(line: any, currency: string): string {
-  return `<li><article><strong>${escape(line.name)}</strong>${line.description ? `<p class="preserve">${escape(line.description)}</p>` : ''}
+  return ui`<li><article><strong>${escape(line.name)}</strong>${line.description ? `<p class="preserve">${escape(line.description)}</p>` : ''}
     <dl><dt>Quantity</dt><dd>${escape(line.quantity)}</dd><dt>Unit</dt><dd>${escape(line.unit || '—')}</dd>
-    ${line.unitPrice!==undefined?`<dt>Unit price</dt><dd>${money(Number(line.unitPrice) * 100, currency)}</dd>`:''}
-    ${line.group ? `<dt>Group</dt><dd>${escape(line.group)}</dd>` : ''}
-    ${line.discountBps||line.discountFixedCents?`<dt>Line discount</dt><dd>${escape((line.discountBps??0)/100)}% and ${money(line.discountFixedCents??0,currency)}</dd>`:''}${line.groupDiscountBps||line.groupDiscountFixedCents?`<dt>Group discount</dt><dd>${escape((line.groupDiscountBps??0)/100)}% and ${money(line.groupDiscountFixedCents??0,currency)} once for ${escape(line.group)}</dd>`:''}${line.recurrence?`<dt>Recurring terms</dt><dd>${escape(line.recurrence.interval)} · ${line.recurrence.term} installments from ${escape(line.recurrence.startsOn)}</dd>`:""}<dt>${line.recurrence?"Term total":"Line total"}</dt><dd>${money(line.lineTotalCents, currency)}</dd></dl></article></li>`
+    ${line.unitPrice!==undefined?ui`<dt>Unit price</dt><dd>${money(Number(line.unitPrice) * 100, currency)}</dd>`:''}
+    ${line.group ? ui`<dt>Group</dt><dd>${escape(line.group)}</dd>` : ''}
+    ${line.discountBps||line.discountFixedCents?ui`<dt>Line discount</dt><dd>${escape((line.discountBps??0)/100)}% and ${money(line.discountFixedCents??0,currency)}</dd>`:''}${line.groupDiscountBps||line.groupDiscountFixedCents?ui`<dt>Group discount</dt><dd>${escape((line.groupDiscountBps??0)/100)}% and ${money(line.groupDiscountFixedCents??0,currency)} once for ${escape(line.group)}</dd>`:''}${line.recurrence?ui`<dt>Recurring terms</dt><dd>${escape(clientEnum(line.recurrence.interval))} · ${line.recurrence.term} installments from ${escape(line.recurrence.startsOn)}</dd>`:""}<dt>${line.recurrence?ui("Term total"):ui("Line total")}</dt><dd>${money(line.lineTotalCents, currency)}</dd></dl></article></li>`
 }
 
 export function pricingTables(options: any[], currency: string): string {
-  return displayOptions(options).filter(option => option.tables?.length).map(option => `<section data-pricing-display>
-    <h3>${escape(option.label)} pricing</h3>${option.tables.map((table: any) => `<section>
+  return displayOptions(options).filter(option => option.tables?.length).map(option => ui`<section data-pricing-display>
+    <h3>${escape(option.label)} pricing</h3>${option.tables.map((table: any) => ui`<section>
       <h4>${escape(table.name)}</h4><ul class="records">${table.lines.map((line: any) => lineDetails(line, currency)).join('')}</ul>
-      ${table.groups?.length ? `<dl>${table.groups.map((group: any) => `<dt>${escape(group.name || 'Ungrouped')} subtotal</dt><dd>${money(group.subtotalCents, currency)}</dd>`).join('')}</dl>` : ''}
+      ${table.groups?.length ? `<dl>${table.groups.map((group: any) => ui`<dt>${escape(group.name || ui('Ungrouped'))} subtotal</dt><dd>${money(group.subtotalCents, currency)}</dd>`).join('')}</dl>` : ''}
       <p><strong>Table subtotal: ${money(table.subtotalCents, currency)}</strong></p></section>`).join('')}
     <p class="option-price">Package grand total: ${money(option.cents, currency)}</p></section>`).join('')
 }

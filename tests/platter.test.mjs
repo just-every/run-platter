@@ -16,6 +16,85 @@ async function audited(h,action,actor,role,subject){const query=new URLSearchPar
 async function draft(h){const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'});const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id});return{client,p}}
 async function sent(h){const{client,p}=await draft(h);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:p.id,version:2});return{client,p,path:new URL(share.shareUrl).pathname}}
 async function verified(h,path){let r=await h.send(path+'/action?name=code.request',{});assert.equal(r.status,200,r.text);const mail=(await h.state()).outbox.find(x=>x.subject.includes('verification code'));const code=mail.body.match(/\b\d{6}\b/)[0];r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,200,r.text);assert.ok(r.cookie);return r.cookie}
+test('EDIT-017 Spanish mailbox journey preserves authority, verification limits, authored content and actual certificate language',async()=>{const h=await harness({assetsDirectory:'public'});try{
+ const {client,p}=await draft(h)
+ const at=Date.parse('2030-06-01T15:00:00Z'),tick=async time=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(time),cron:'*/15 * * * *'})
+ await tick(at)
+ const before=(await h.state()).proposals.find(row=>row.id===p.id)
+ const memberEmail='synthetic-platter-9708'+String.fromCharCode(64)+'example.test'
+ await h.send('/auth/invite',{email:memberEmail,displayName:'Client member',role:'member',returnTo:'/app'},h.owner)
+ const member=await h.signIn(memberEmail)
+ await h.cmd('proposal.locale',{id:p.id,version:1,locale:'es'},member,403)
+ await h.cmd('proposal.locale',{id:p.id,version:0,locale:'es'},h.owner,409)
+ await h.cmd('proposal.locale',{id:p.id,version:1,locale:'fr'},h.owner,400)
+ assert.deepEqual((await h.state()).proposals.find(row=>row.id===p.id),before)
+ await h.cmd('proposal.locale',{id:p.id,version:1,locale:'es'})
+ await h.cmd('proposal.approve',{id:p.id,version:2,revision:1})
+ const invitation=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(invitation.shareUrl).pathname
+ await h.cmd('proposal.locale',{id:p.id,version:4,locale:'en'},h.owner,409)
+ await h.cmd('signer.method',{id:p.id,version:4,method:'SMS code'},h.owner,409)
+ let r=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true});assert.equal(r.status,401);assert.match(r.text,/Verifique su correo electrónico antes de aceptar/)
+ r=await h.send(path,undefined,'',{'accept-language':'fr'});assert.match(r.text,/<html lang="es">/);assert.ok(r.text.includes(offer.scope));assert.ok(r.text.includes(offer.optionOne))
+ assert.match(r.text,/Privacidad de las visitas/);assert.match(r.text,/No se utilizan rastreadores de terceros/)
+ await h.cmd('tracking.settings',{enabled:'yes',alerts:'no',retentionDays:90,quietMinutes:30,consent:'yes'})
+ r=await h.send(path);assert.match(r.text,/Se miden las visitas a esta página/);assert.match(r.text,/No se almacena la dirección IP completa/);assert.match(r.text,/¿Ha recibido un enlace reenviado\?/)
+ r=await h.send(path+'/action?name=code.request',{});assert.equal(r.status,200)
+ const code=(await h.state()).outbox.find(m=>m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0],wrong=code==='000000'?'000001':'000000'
+ assert.equal((await h.send(path+'/action?name=code.request',{})).status,429)
+ for(let i=0;i<5;i++){r=await h.send(path+'/action?name=code.verify',{code:wrong});assert.equal(r.status,401);assert.match(r.text,/Código de verificación incorrecto/)}
+ r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,401);assert.match(r.text,/límite de intentos/)
+ await tick(at+60000)
+ assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+ const next=(await h.state()).outbox.find(m=>m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0]
+ r=await h.send(path+'/action?name=code.verify',{code:next});assert.equal(r.status,200,r.text);const cookie=r.cookie
+ assert.equal((await h.send(path+'/action?name=code.verify',{code:next})).status,401)
+ assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:false},cookie)).status,400)
+ r=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true},cookie);assert.equal(r.status,200,r.text);assert.match(r.text,/Propuesta aceptada/)
+ const accepted=(await h.state()).proposals.find(row=>row.id===p.id)
+ assert.equal(accepted.acceptance.language,'es');assert.equal(accepted.acceptance.totalCents,420000);assert.equal(accepted.acceptance.depositCents,105000)
+ const frozen=JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot)
+ assert.equal(frozen.language,'es');assert.equal(frozen.scope,offer.scope);assert.equal(frozen.options[0].label,offer.optionOne)
+ assert.equal((await h.send(path+'/certificate.json')).status,401)
+ const certificate=await h.send(path+'/certificate.json',undefined,cookie);assert.equal(certificate.status,200,certificate.text);assert.equal(certificate.value.language,'es');assert.equal(certificate.value.signers[0].language,'es')
+ const response=await h.mf.dispatchFetch(h.origin+path+'/certificate.pdf',{headers:{cookie}});assert.equal(response.status,200)
+ assert.match((await pdfPages(new Uint8Array(await response.arrayBuffer()))).join(' '),/Language shown: Spanish \(es\)/)
+ const legacyP=await h.cmd('proposal.prepare',{...offer,clientId:client.id})
+ await h.cmd('proposal.approve',{id:legacyP.id,version:1,revision:1})
+ const legacy={p:legacyP,path:new URL((await h.cmd('proposal.send',{id:legacyP.id,version:2})).shareUrl).pathname},legacyCookie=await verified(h,legacy.path)
+ const historical=(await h.state()).proposals.find(row=>row.id===legacy.p.id)
+ // Seed a retained pre-language agreement without changing any immutable fact.
+ await h.db.batch([
+  h.db.prepare('INSERT INTO p_acceptances(proposal_id,revision,snapshot,name,email,option_id,total_cents,deposit_cents,accepted_at,consent,currency) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(legacy.p.id,1,JSON.stringify(historical),'Avery Chen',historical.clientEmail??h.auth.OWNER_EMAIL,'one',240000,60000,at,'I accept the selected option, scope and deposit.','USD'),
+  h.db.prepare('INSERT INTO p_signature_facts(proposal_id,revision,method,verified_at) VALUES(?,?,?,?)').bind(legacy.p.id,1,'mailbox code',at),
+  h.db.prepare("UPDATE p_proposals SET status='accepted' WHERE id=?").bind(legacy.p.id)
+ ])
+ const old=await h.send(legacy.path+'/certificate.json',undefined,legacyCookie);assert.equal(old.status,200);assert.equal(old.value.language,undefined);assert.equal(old.value.signers[0].language,undefined)
+ const limited=await h.cmd('proposal.prepare',{...offer,clientId:client.id})
+ await h.cmd('payment.collection',{id:limited.id,version:1,completion:'required',paymentMethods:['card']})
+ await h.cmd('proposal.locale',{id:limited.id,version:2,locale:'es'},h.owner,409)
+ await h.cmd('payment.collection',{id:limited.id,version:2,completion:'off'})
+ await h.cmd('proposal.locale',{id:limited.id,version:3,locale:'es'})
+ await h.cmd('proposal.approve',{id:limited.id,version:4,revision:1})
+ const limitedPath=new URL((await h.cmd('proposal.send',{id:limited.id,version:5})).shareUrl).pathname
+ assert.equal((await h.send(limitedPath+'/action?name=code.request',{})).status,200)
+ const expired=(await h.state()).outbox.find(m=>m.proposal_id===limited.id&&m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0]
+ let now=at+660000;await tick(now)
+ assert.equal((await h.send(limitedPath+'/action?name=code.verify',{code:expired})).status,401,'a ten-minute-old code cannot verify a Spanish invitation')
+ for(let generation=2;generation<=10;generation++){await tick(now+=60000);assert.equal((await h.send(limitedPath+'/action?name=code.request',{})).status,200)}
+ await tick(now+=60000)
+ const exhausted=await h.db.prepare('SELECT * FROM p_shares WHERE token=?').bind(limitedPath.split('/').at(-1)).first()
+ r=await h.send(limitedPath+'/action?name=code.request',{});assert.equal(r.status,429);assert.match(r.text,/límite de solicitudes/)
+ assert.deepEqual(await h.db.prepare('SELECT * FROM p_shares WHERE token=?').bind(limitedPath.split('/').at(-1)).first(),exhausted)
+ const fresh=new URL((await h.cmd('proposal.send',{id:limited.id,version:6})).shareUrl).pathname
+ assert.equal((await h.send(limitedPath+'/action?name=code.verify',{code:expired})).status,404)
+ assert.equal((await h.send(limitedPath)).status,404)
+ const freshRequest=await h.send(fresh+'/action?name=code.request',{});assert.equal(freshRequest.status,200)
+ const freshCode=(await h.state()).outbox.find(m=>m.proposal_id===limited.id&&m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0]
+ const freshVerification=await h.send(fresh+'/action?name=code.verify',{code:freshCode});assert.equal(freshVerification.status,200)
+ r=await h.send(fresh+'/action?name=decline',{revision:1,reason:'No se necesita',consent:true},freshVerification.cookie);assert.equal(r.status,410);assert.match(r.text,/Propuesta retirada/);assert.ok(!r.text.includes(offer.scope))
+ r=await h.send(fresh,undefined,freshVerification.cookie);assert.equal(r.status,410);assert.match(r.text,/<html lang="es">/);assert.ok(!r.text.includes(offer.scope))
+ }finally{await h.close()}
+})
 test('native auth, CSRF, roles and revocable agent boundary',()=>run(async h=>{
  await h.state('',401);await h.cmd('client.save',{name:'Unsafe',email:'a@b.example'},h.owner,403,{origin:'https://elsewhere.example'})
  const key=await h.cmd('agent.create',{label:'Draft assistant'});let r=await h.send('/api/platter/agent/command',{name:'client.save',input:{}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,403)

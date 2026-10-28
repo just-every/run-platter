@@ -1,6 +1,7 @@
+import { ui } from '../locales'
 import { escape, form, hidden, panel, proposalPath, ownerOnly } from './shared'
 const label=(f:any)=>`${escape(f.filename)} · ${escape(f.size)} bytes${f.kind?` · ${f.kind==='w9'?'W-9':'Insurance'}`:''}`
-export function attachmentList(files:any[],base:string,suffix=''){return files.length?`<ul class="records">${files.map(f=>`<li><a href="${base}${encodeURIComponent(f.id)}${escape(suffix)}">${label(f)}</a></li>`).join('')}</ul>`:'<p>No attachments.</p>'}
+export function attachmentList(files:any[],base:string,suffix=''){return files.length?`<ul class="records">${files.map(f=>`<li><a href="${base}${encodeURIComponent(f.id)}${escape(suffix)}">${label(f)}</a></li>`).join('')}</ul>`:ui('<p>No attachments.</p>')}
 const upload=(contents:string,button:string)=>`<form method="post" enctype="multipart/form-data" action="/app/attachment">${contents}<label>Document file<input name="file" type="file" required></label><button>${button}</button></form>`
 export function vendorSettings(state:any){
  if(!['owner','admin'].includes(state.actor?.role))return ownerOnly()

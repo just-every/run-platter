@@ -1,3 +1,4 @@
+import { inClientLocale, ui, type ClientLocale } from '../locales'
 import { date, escape, field, form, hidden, panel, proposalPath } from './shared'
 import { document } from './shell'
 
@@ -13,10 +14,10 @@ export function withdrawalPanel(state:any,p:any) {
  const action=p.canSend&&['sent','expired'].includes(p.status)?form('proposal.withdraw',proposalPath(p.id),hidden('id',p.id)+hidden('version',p.version)+field('Withdrawal reason','reason','','required maxlength="1000"')+'<label>Recipient notice<select name="notice"><option value="yes">Send withdrawal notice</option><option value="no">Do not send a notice</option></select></label><button>Withdraw proposal</button>'):''
  return outcomePanel+(rows||action?panel('Withdrawal', (p.status==='withdrawn'?'<p>This offer is withdrawn and read-only. Prepare a new revision for approval to send again.</p>':'')+(rows?`<ol class="records">${rows}</ol>`:'')+action):'')
 }
-export function withdrawnPage(contact:string) {
- return document('Proposal withdrawn',panel('Contact the firm',`<p>This proposal has been withdrawn. Contact <a href="mailto:${escape(contact)}">${escape(contact)}</a>.</p>`),{client:true,status:410})
+export function withdrawnPage(contact:string,locale:ClientLocale='en') {
+ return inClientLocale(locale,()=>document(ui('Proposal withdrawn'),panel(ui('Contact the firm'),ui`<p>This proposal has been withdrawn. Contact <a href="mailto:${escape(contact)}">${escape(contact)}</a>.</p>`),{client:true,status:410}))
 }
 
-export function replacedInvitationPage(){
- return document('Signer invitation replaced',panel('Contact the firm','<p>This signer invitation was replaced. Contact the firm for a current invitation.</p>'),{client:true,status:410})
+export function replacedInvitationPage(locale:ClientLocale='en'){
+ return inClientLocale(locale,()=>document(ui('Signer invitation replaced'),panel(ui('Contact the firm'),ui('<p>This signer invitation was replaced. Contact the firm for a current invitation.</p>')),{client:true,status:410}))
 }

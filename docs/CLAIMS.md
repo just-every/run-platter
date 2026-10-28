@@ -244,9 +244,9 @@ Evidence: `tests/platter.test.mjs`, `tests/pricing-journey.mjs`, `tests/archive.
 
 Status: **partial**.
 
-Gap: Stripe Tax and AvaTax adapters, AvaTax commit on invoice issuance, recurring tax, exemption-certificate custody and accounting tax-code propagation remain unimplemented. Owner-only configuration is the conservative interim authority floor; scoped delegation is not claimed. Browser and public CLI restore proof are being completed for the native one-off path.
+Gap: Stripe Tax and AvaTax adapters, AvaTax commit on invoice issuance, recurring tax, exemption-certificate custody and accounting tax-code propagation remain unimplemented. Owner-only configuration is the conservative interim authority floor; scoped delegation is not claimed. The named native journeys prove the one-off path; no live provider, filing, exemption or accounting determination is claimed.
 
-Evidence: `src/platter/taxes.ts`, `src/platter/selection.ts`, `tests/platter.test.mjs`
+Evidence: `src/platter/taxes.ts`, `src/platter/selection.ts`, `tests/platter.test.mjs`, `tests/site-documents.mjs`, `tests/packages-journey.mjs`, `tests/archive.test.mjs`
 
 ## PRICE-006 — Internal cost and margin
 

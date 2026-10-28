@@ -694,3 +694,10 @@ test('PRICE-003 and PRICE-002 recurring line editing, preview, client selection 
 test('EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads', {timeout:120000},async()=>{
  const {documentImportBrowser}=await import('./document-import-browser.mjs');await documentImportBrowser()
 })
+
+
+test('PRICE-005 native owner-configured tax settings, selected quantities and frozen agreement', {timeout:120000},async()=>{
+ const {taxesBrowserJourney}=await import('./packages-journey.mjs')
+ const browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+ try{await taxesBrowserJourney(browser,process.env.PLATTER_SCREENSHOTS)}finally{await browser.close()}
+})

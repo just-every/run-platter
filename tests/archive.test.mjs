@@ -855,3 +855,34 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
   assert.equal((await h.send('/api/platter/document-media/'+started.id+'/'+media.id,undefined,owner)).status,200,'template media mapping survives the same CLI round trip')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('PRICE-005 public CLI preserves business tax rates and frozen agreements without restoring signing authority',{timeout:360000},async()=>{
+ const temporary=await mkdtemp(join(tmpdir(),'platter-tax-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
+ let h
+ try{
+  for(const root of [source,restored])await checkout(root)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source,assetsDirectory:'public'})
+  const {configureTaxes,taxRequest,taxPackages,taxTables}=await import('./taxes-fixture.mjs')
+  const version=await configureTaxes(h.cmd),client=await h.cmd('client.save',{name:'Synthetic tax client',email:h.auth.OWNER_EMAIL})
+  const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archived tax selection',scope:'One-off services',packages:taxPackages(),pricingTables:taxTables(),tax:taxRequest(),depositPercent:50})
+  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const path=new URL((await h.cmd('proposal.send',{id:p.id,version:2})).shareUrl).pathname
+  await h.send(path+'/action?name=code.request',{})
+  const code=(await h.state()).outbox.find(m=>m.proposal_id===p.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],session=await h.send(path+'/action?name=code.verify',{code})
+  assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'two',items:[{id:'extra',quantity:4}],consent:true},session.cookie)).status,200)
+  await h.cmd('tax.rate',{version,level:'city',region:'TX',jurisdiction:'Austin',startsOn:'2099-01-01',percent:'2'})
+  const before=await h.state(),proposalBefore=before.proposals.find(p1=>p1.id===p.id),bytes=(await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot,identity={auth:h.auth,owner:h.owner}
+  assert.equal(proposalBefore.acceptance.totalCents,146885);assert.equal(proposalBefore.acceptance.depositCents,73443);assert.equal(proposalBefore.acceptance.selection.tax.taxCents,7885)
+  await h.close();h=null
+  const archive=join(temporary,'tax.rer');await command(source,['export','--output',archive,'--no-queue']);await command(restored,['import','--input',archive,'--yes','--no-queue'])
+  h=await harness({root:restored,...identity})
+  await h.state(identity.owner,401);assert.equal((await h.send(path,undefined,session.cookie)).status,404)
+  const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner),agreement=after.proposals.find(p1=>p1.id===p.id)
+  assert.deepEqual(after.taxSettings,before.taxSettings,'Effective-dated owner rates restore as business records')
+  assert.deepEqual(agreement.options,proposalBefore.options,'Sent addresses, codes, tax flags and frozen rate components restore exactly')
+  assert.deepEqual(agreement.acceptance,proposalBefore.acceptance,'Selected quantities, discount allocation, tax and deposit remain exact')
+  assert.equal((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot,bytes,'The immutable agreement restores byte-identically')
+  const noWrite=await h.cmd('invoice.export',{id:p.id},owner,409);assert.match(noWrite.error,/Accounting export for taxed agreements is not supported/)
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_invoices').first()).n,0)
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

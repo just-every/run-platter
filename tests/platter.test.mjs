@@ -3128,15 +3128,19 @@ test('PRICE-005 owner tax follows selected quantities and discounts, freezes rat
  const {configureTaxes,taxRequest,taxPackages,taxTables}=await import('./taxes-fixture.mjs')
  let rateVersion=await configureTaxes(h.cmd)
  const {client}=await draft(h),input={clientId:client.id,title:'Taxed services',scope:'One-off services',depositPercent:50,packages:taxPackages(),pricingTables:taxTables(),tax:taxRequest()}
+ const billing=await h.cmd('proposal.prepare',{...input,tax:{...taxRequest(),addressKind:'billing'}})
  const p=await h.cmd('proposal.prepare',input),portland=await h.cmd('proposal.prepare',{...input,tax:taxRequest('Portland','OR')})
  const preview=async(id,option='one',items=[])=>h.send('/app/preview/client?'+new URLSearchParams({id,revision:1,optionId:option,items:JSON.stringify(items)}),undefined,h.owner)
  let response=await preview(p.id);assert.equal(response.status,200,response.text);assert.match(response.text,/Sales tax: USD 82\.50/);assert.match(response.text,/1,582\.50/);assert.match(response.text,/791\.25/)
  response=await preview(portland.id);assert.match(response.text,/Sales tax: USD 0\.00/);assert.match(response.text,/1,500\.00/)
+ response=await preview(billing.id);assert.match(response.text,/Sales tax: USD 0\.00/)
  const selected=[{id:'extra',quantity:4}]
  // $1,600 less 10% and $50 = $1,390. Allocated taxable base $955.62;
  // each jurisdiction rounds separately: $59.73 + $9.56 + $9.56 = $78.85.
  response=await preview(p.id,'two',selected);for(const value of ['Sales tax: USD 78.85','1,468.85','734.43'])assert.ok(response.text.includes(value),value)
  const noWrites=async action=>{const before=await h.state();await action();assert.deepEqual(await h.state(),before)}
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,pricingTables:taxTables().map(t=>({...t,lines:t.lines.map(l=>({...l,taxCode:''}))}))},h.owner,400))
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,pricingTables:[],packages:[{id:'large',label:'Large package',price:'10000000',taxable:true,taxCode:'synthetic-platter-service'}]},h.owner,400))
  await noWrites(()=>h.cmd('proposal.prepare',{...input,tax:{...taxRequest(),method:'stripe'}},h.owner,409))
  await noWrites(()=>h.cmd('proposal.prepare',{...input,tax:{...taxRequest(),method:'avatax'}},h.owner,409))
  await noWrites(()=>h.cmd('proposal.prepare',{...input,tax:{...taxRequest(),serviceAddress:{...taxRequest().serviceAddress,region:'WA'}}},h.owner,409))
@@ -3170,6 +3174,15 @@ test('PRICE-005 owner tax follows selected quantities and discounts, freezes rat
  const frozen=await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
  assert.equal((await h.send(path+'/action?name=accept',{optionId:'one',consent:true,name:'Replay'},cookie)).status,200)
  assert.equal((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot,frozen.snapshot)
+ const paper=await h.cmd('proposal.prepare',{...input,title:'Taxed signed copy'})
+ await h.cmd('proposal.approve',{id:paper.id,version:1,revision:1});await h.cmd('proposal.send',{id:paper.id,version:2})
+ const form=new FormData();for(const [key,value]of Object.entries({id:paper.id,version:3,optionId:'one',signer:'Synthetic signer',signedOn:'2020-01-01',attest:'yes'}))form.set(key,String(value));form.set('file',new File(['%PDF synthetic-platter-tax-signed-copy'],'synthetic-platter-tax.pdf',{type:'application/pdf'}))
+ const upload=new Request(h.origin+'/app/paper-acceptance',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:form}),uploaded=await h.mf.dispatchFetch(upload.url,{method:'POST',headers:upload.headers,body:await upload.arrayBuffer()});assert.equal(uploaded.status,200)
+ const paperAgreement=(await h.state()).proposals.find(x=>x.id===paper.id).acceptance;assert.equal(paperAgreement.selection.tax.taxCents,10250);assert.equal(paperAgreement.totalCents,160250);assert.equal(paperAgreement.depositCents,80125)
+ const restored=await h.cmd('proposal.duplicate',{id:p.id,version:4})
+ await h.cmd('proposal.revise',{...input,id:restored.id,version:1,tax:{...taxRequest(),addressKind:'billing'}})
+ await h.cmd('proposal.restore',{id:restored.id,version:2,revision:1})
+ response=await h.send('/app/preview/client?'+new URLSearchParams({id:restored.id,revision:3,optionId:'one'}),undefined,h.owner);assert.match(response.text,/Sales tax: USD 82\.50/)
  // New client drafts cannot silently inherit another client's address, or send taxable lines without one.
  const destination=await h.cmd('client.save',{name:'Synthetic destination',email:h.auth.OWNER_EMAIL}),copy=await h.cmd('proposal.duplicate',{id:p.id,version:4,clientId:destination.id})
  assert.ok((await h.state()).proposals.find(x=>x.id===copy.id).options.every(o=>!o.tax));await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1});await h.cmd('proposal.send',{id:copy.id,version:2},h.owner,409)

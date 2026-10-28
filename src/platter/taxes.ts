@@ -33,7 +33,7 @@ export async function saveTaxRate(db:D1Database,a:Actor,p:Record<string,any>){
  const rate={level,region,jurisdiction,startsOn,bps},rates=old.rates.filter(r=>!(r.level===level&&r.region===region&&key(r.jurisdiction)===key(jurisdiction)&&r.startsOn===startsOn))
  rates.push(rate)
  await commit(db,a,[db.prepare('INSERT INTO p_tax_settings(singleton,rates,version) VALUES(1,?,1) ON CONFLICT(singleton) DO UPDATE SET rates=excluded.rates,version=p_tax_settings.version+1').bind(JSON.stringify(rates))],false,{sql:'COALESCE((SELECT version FROM p_tax_settings WHERE singleton=1),0)=?',values:[old.version]})
- return {version:old.version+1}
+ return {id:'tax-rates',version:old.version+1}
 }
 /** A revision carries explicit owner-entered jurisdiction facts, never a geolocation guess. */
 export async function resolveTax(db:D1Database,a:Actor,input:any,at:number):Promise<TaxSnapshot|undefined>{
@@ -55,6 +55,7 @@ export const optionTax=(options:any[]):TaxSnapshot|undefined=>options.find(o=>o.
 export function validateTaxOptions(options:any[],terms?:any){
  if(!optionTax(options))return
  need(!terms?.retainer&&!options.some(o=>o.optionalItems?.some((i:any)=>i.recurrence)||o.tables?.some((t:any)=>t.lines.some((l:any)=>l.recurrence))),'Tax on recurring pricing or retainers is not supported. Use a one-off offer.',409)
+ for(const option of options)need(option.cents+(selectionTax(option,[],option.cents)?.taxCents??0)<=1000000000,'Tax-inclusive package total must not exceed $10,000,000')
 }
 /** Allocate the package reduction across net lines and chosen extras before each jurisdiction rounds. */
 export function selectionTax(option:any,items:any[],subtotalCents:number){

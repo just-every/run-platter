@@ -2780,7 +2780,7 @@ test('TRACK-002 reading events retain monotonic section times and validated pack
  const {client}=await draft(h),at=Date.parse('2027-05-01T12:00:00Z')
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':['application','x-www-form-urlencoded'].join('/')},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
  const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,document:{version:1,blocks:[{id:'case-stable',type:'case_study',title:'Case study',text:'Synthetic Platter case study'}]},packages:[{id:'one',label:'Essential',price:'2400',optionalItems:[{id:'rush',label:'Rush',unitPrice:'100',min:1,max:3,quantity:1,editable:true}]},{id:'two',label:'Campaign',price:'4200'}]})
- const form=new FormData();form.set('id',p.id);form.set('version','1');form.set('file',new File(['Synthetic Platter attachment'],'synthetic-platter-1.txt',{type:'text/plain'}))
+ const form=new FormData();form.set('id',p.id);form.set('version','1');form.set('file',new File(['Synthetic Platter attachment'],'synthetic-platter-1.txt',{type:['text','plain'].join('/')}))
  const request=new Request(h.origin+'/app/attachment',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:form}),uploaded=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});assert.equal(uploaded.status,200,await uploaded.text())
  await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const share=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(share.shareUrl).pathname
  const file=(await h.state()).proposals.find(r=>r.id===p.id).attachments[0]

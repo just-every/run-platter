@@ -12,7 +12,7 @@ export function documentBlocks(view:any,mediaBase='',suffix=''){
  const doc=documentOf(view)
  if(!doc.blocks.length&&!doc.fixedPdf)return ''
  const media=(id:string)=>escape(mediaBase+encodeURIComponent(id)+suffix)
- return '<article class="proposal-document" aria-label="Proposal document">'+(doc.brand?.logoId?'<img class="document-logo" src="'+media(doc.brand.logoId)+'" alt="'+escape(doc.brand.name||'Firm logo')+'" width="200" height="100">':'')+(doc.fixedPdf?'<section aria-label="Fixed PDF pages"><h2>Fixed PDF pages</h2><p>'+doc.fixedPdf.pages+' original pages, followed by the appended blocks.</p><a href="'+media(doc.fixedPdf.fileId)+'">Open original PDF</a></section>':'')+(doc.brand?.name?'<p class="document-brand">'+escape(doc.brand.name)+'</p>':'')+doc.blocks.map(b=>{
+ return '<article class="proposal-document" aria-label="Proposal document">'+(doc.brand?.logoId?'<img class="document-logo" src="'+media(doc.brand.logoId)+'" alt="'+escape(doc.brand.name||'Firm logo')+'" width="200" height="100">':'')+(doc.fixedPdf?'<section aria-label="Fixed PDF pages"><h2>Fixed PDF pages</h2><p>'+doc.fixedPdf.pages+' original pages, followed by the appended blocks.</p><a href="'+media(doc.fixedPdf.fileId)+'">Open original PDF</a><div data-fixed-pages data-source="'+media(doc.fixedPdf.fileId)+'"><p role="status">Loading original PDF pages…</p></div><script type="module" src="/fixed-pages.js"></script></section>':'')+(doc.brand?.name?'<p class="document-brand">'+escape(doc.brand.name)+'</p>':'')+doc.blocks.map(b=>{
   let body=b.title?'<h2>'+escape(b.title)+'</h2>':''
   if(b.type==='page_break')return '<hr class="document-page-break" aria-label="Page break" data-document-block="'+escape(b.id)+'">'
   if(b.type==='field'||b.type==='signature'){

@@ -3035,6 +3035,8 @@ test('EDIT-004 linked deal variables refuse missing values, freeze the sent revi
   const conditioned=await h.cmd('proposal.prepare',{...offer,clientId:b.id,variableValues:{'Custom.Region':'West'},document:{version:1,blocks:[{id:'synthetic-platter-west',type:'text',title:'West delivery',text:'Shown West content',condition:'variable:Custom.Region=West'},{id:'synthetic-platter-east',type:'text',title:'East delivery',text:'Excluded East content',condition:'variable:Custom.Region=East'},{id:'synthetic-platter-marker',type:'text',title:'Region',text:'{{Custom.Region}}'}]}})
   await h.cmd('proposal.approve',{id:conditioned.id,version:1,revision:1});const visible=await h.cmd('proposal.send',{id:conditioned.id,version:2}),visiblePath=new URL(visible.shareUrl).pathname,visibleCookie=await verified(h,visiblePath),visibleData=await h.send(visiblePath+'/data.json',undefined,visibleCookie)
   assert.deepEqual(visibleData.value.document.blocks.map(b=>b.id),['synthetic-platter-west','synthetic-platter-marker']);assert.doesNotMatch(JSON.stringify(visibleData.value),/Excluded East content|patterns/)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:Date.UTC(2099,5,15,12),cron:'*/15 * * * *'})
+  const dated=await h.cmd('proposal.prepare',{...offer,clientId:b.id,title:'Synthetic dated variables',scope:'{{Date.Today}} {{Sender.Name}} {{Sender.FirstName}} {{Sender.LastName}} {{Sender.Email}}',variableValues:{}});assert.equal((await get(dated.id)).scope,'2099-06-15 Jordan Venue Jordan Venue '+['owner','studio.example'].join('@'))
   await h.cmd('provider.disconnect',{provider:'hubspot',version:1});await h.cmd('proposal.duplicate',{id:p.id,version:5,clientId:b.id,deal:{provider:'hubspot',id:'synthetic-platter-205'}},h.owner,409)
  }finally{await h.close()}
 })
@@ -3060,6 +3062,10 @@ test('EDIT-005 Word import maps tokens and catalog quote rows, keeps editable bl
   await h.cmd('library.insert',{id:destination.id,version:1,itemId:richItem.id,itemVersion:1,mode:'detached',consent:true})
   const inserted=(await h.state()).proposals.find(p=>p.id===destination.id);assert.deepEqual(inserted.document.blocks.map(b=>b.type),['heading','text','pricing','image']);assert.equal(inserted.options[0].tables[0].lines.length,2);assert.equal((await h.send('/api/platter/document-media/'+destination.id+'/'+inserted.document.blocks[3].assetId,undefined,h.owner)).status,200)
   await h.cmd('library.insert',{id:destination.id,version:2,itemId:richItem.id,itemVersion:1,mode:'linked',consent:true},h.owner,400)
+  const mailbox=['synthetic-platter-305','example.test'].join('@');await h.send('/auth/invite',{email:mailbox,displayName:'Synthetic document member',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn(mailbox),actor=(await h.state(member)).actor
+  await h.cmd('proposal.share',{id:destination.id,operatorId:actor.id});await uploadDocument(h,destination.id,2,await wordFixture({headings:1,rows:0,images:0,tokens:false}),'synthetic-platter-305.docx',{},200,member)
+  const retained=(await h.state()).proposals.find(r=>r.id===destination.id);assert.ok(retained.document.blocks.some(b=>b.type==='image'));assert.equal(retained.version,3)
+  await h.cmd('proposal.share',{id:destination.id,operatorId:actor.id,shared:false});await uploadDocument(h,destination.id,3,await wordFixture(),'synthetic-platter-306.docx',{},403,member);assert.equal((await h.send('/api/platter/document-export?id='+destination.id+'&format=docx',undefined,member)).status,403);assert.equal((await h.send('/api/platter/document-media/'+destination.id+'/'+inserted.document.blocks[3].assetId,undefined,member)).status,403);assert.deepEqual((await h.state()).proposals.find(r=>r.id===destination.id).document,retained.document)
   await uploadDocument(h,p.id,1,await wordFixture(),'synthetic-platter-303.docx',{},409)
  }finally{await h.close()}
 })
@@ -3087,12 +3093,13 @@ test('EDIT-005 fixed PDF originals remain exact with a page-three signature and 
 test('EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order',async()=>{
  const {wordFixture,uploadDocument}=await import('./document-import-fixture.mjs'),{unzipSync,strFromU8}=await import('fflate'),h=await harness({assetsDirectory:'public'})
  try{
-  const {p}=await draft(h);await uploadDocument(h,p.id,1,await wordFixture({rows:4,images:2,tokens:false}),'synthetic-platter-320.docx')
+  const {p}=await draft(h);await uploadDocument(h,p.id,1,await wordFixture({rows:4,images:2,tokens:false,extras:true}),'synthetic-platter-320.docx')
   const word=await h.mf.dispatchFetch(h.origin+'/api/platter/document-export?id='+p.id+'&format=docx',{headers:{cookie:h.owner}});assert.equal(word.status,200);const files=unzipSync(new Uint8Array(await word.arrayBuffer())),xml=strFromU8(files['word/document.xml'])
+  const imported=(await h.state()).proposals.find(r=>r.id===p.id);assert.ok(imported.document.blocks.some(b=>b.type==='text'&&b.text==='- Synthetic list item'));assert.ok(imported.document.blocks.some(b=>b.type==='table'&&b.text==='Service area\tWest'));assert.ok(imported.document.importReport.missing.includes('Image missing-source'));assert.match(xml,/Synthetic list item/);assert.match(xml,/Service area/);
   assert.equal((xml.match(/w:pStyle w:val="Heading1"/g)??[]).length,3);assert.equal(Object.keys(files).filter(k=>k.startsWith('word/media/')).length,2)
   for(let i=1;i<=4;i++){assert.match(xml,new RegExp('Synthetic product '+i));assert.match(xml,new RegExp('>'+i+'<'));assert.match(xml,new RegExp('>'+(9+i)+'\\.00<'));assert.match(xml,new RegExp('>'+i*(9+i)+'\\.00<'))}
   const pdf=await h.mf.dispatchFetch(h.origin+'/api/platter/document-export?id='+p.id+'&format=pdf&size=a4',{headers:{cookie:h.owner}});assert.equal(pdf.status,200);const pages=await pdfPages(new Uint8Array(await pdf.arrayBuffer()),true),text=pages.map(p=>p.text).join(' ')
-  assert.ok(text.indexOf('Synthetic section 1')<text.indexOf('Synthetic section 2'));assert.ok(text.indexOf('Synthetic section 3')<text.indexOf('Synthetic product 1'));assert.ok(pages.reduce((n,p)=>n+p.imageCount,0)>=2);assert.ok(pages.every(p=>Math.abs(p.width-595.28)<.01&&Math.abs(p.height-841.89)<.01));for(const page of pages)assert.match(page.text,/Not signed, revision 2/)
+  assert.match(text,/Synthetic list item/);assert.match(text,/Service area/);assert.match(text,/West/);assert.ok(text.indexOf('Synthetic section 1')<text.indexOf('Synthetic section 2'));assert.ok(text.indexOf('Synthetic section 3')<text.indexOf('Synthetic product 1'));assert.ok(pages.reduce((n,p)=>n+p.imageCount,0)>=2);assert.ok(pages.every(p=>Math.abs(p.width-595.28)<.01&&Math.abs(p.height-841.89)<.01));for(const page of pages)assert.match(page.text,/Not signed, revision 2/)
   assert.equal((await h.send('/api/platter/document-export?id='+p.id+'&format=docx')).status,401)
  }finally{await h.close()}
 })

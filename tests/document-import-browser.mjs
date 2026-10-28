@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import {mkdir} from 'node:fs/promises'
+import {mkdir,readFile} from 'node:fs/promises'
+import {unzipSync,strFromU8} from 'fflate'
 import {join} from 'node:path'
 import {chromium} from '@playwright/test'
 import {PDFDocument,StandardFonts} from 'pdf-lib'
@@ -28,8 +29,10 @@ export async function documentImportBrowser(width=1440){
   await page.reload();const filePanel=page.locator('section.panel').filter({has:page.getByRole('heading',{name:'Document files',exact:true})}),link=filePanel.getByRole('link',{name:'Export Word document',exact:true});const word=await context.request.get(new URL(await link.getAttribute('href'),h.origin).href);assert.equal(word.status(),200);assert.match(word.headers()['content-type'],/wordprocessingml/)
   const fixed=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic fixed document',scope:'Fixed pages and live terms.',optionOne:'Studio',priceOne:'1200',optionTwo:'Campaign',priceTwo:'2400',depositPercent:'25'}),source=await PDFDocument.create(),font=await source.embedFont(StandardFonts.Helvetica);for(let i=1;i<=3;i++)source.addPage().drawText('Synthetic fixed page '+i,{font,x:48,y:700});const bytes=await source.save()
   await page.goto(h.origin+'/app/proposal?id='+fixed.id);upload=page.locator('details').filter({has:page.getByText('Import Word or PDF',{exact:true})});await upload.locator('summary').click();await upload.getByLabel('Source document').setInputFiles({name:'synthetic-platter-402.pdf',mimeType:'application/pdf',buffer:Buffer.from(bytes)});await upload.getByRole('checkbox').check();await upload.getByRole('button',{name:'Import document',exact:true}).click()
-  assert.match(await page.locator('body').innerText(),/3 fixed PDF pages/)
+  assert.match(await page.locator('body').innerText(),/3 fixed PDF pages/);await page.locator('[data-fixed-page="3"]').waitFor();assert.equal(await page.locator('[data-fixed-page]').count(),3);assert.ok(await page.locator('[data-fixed-page="1"]').evaluate(canvas=>canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data.some((value,i)=>i%4!==3&&value<200)),'original PDF page has rendered ink')
   await page.locator('[data-block-type]').selectOption('signature');await page.locator('[data-block-add]').click();const signature=page.locator('[data-block-id]').last();await signature.getByLabel('Fixed PDF page (blank for appended field)').fill('3');await page.locator('[data-document-save]').click();await page.waitForFunction(()=>document.querySelector('[data-document-editor]')?.dataset.saveState==='saved');assert.equal((await h.state()).proposals.find(r=>r.id===fixed.id).document.blocks[0].page,3);await capture('fixed-page-field')
   await page.reload();const originalLink=page.getByRole('link',{name:'Download original PDF',exact:true}),original=await context.request.get(new URL(await originalLink.getAttribute('href'),h.origin).href);assert.equal(original.status(),200);assert.deepEqual(new Uint8Array(await original.body()),bytes)
+  const downloadPromise=page.waitForEvent('download');await page.getByRole('link',{name:'Export Word document',exact:true}).click();const download=await downloadPromise,wordBytes=new Uint8Array(await readFile(await download.path())),files=unzipSync(wordBytes),xml=strFromU8(files['word/document.xml'])
+  assert.equal(Object.keys(files).filter(k=>k.startsWith('word/media/')).length,3);assert.deepEqual(files['word/embeddings/original.pdf'],bytes);assert.ok(xml.indexOf('<w:drawing>')<xml.indexOf('Synthetic fixed document'));await capture('fixed-word-export')
  }finally{await context?.close();await browser?.close();await h?.close();await edge?.close()}
 }

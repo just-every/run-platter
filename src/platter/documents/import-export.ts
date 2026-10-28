@@ -1,3 +1,5 @@
+import { document as htmlDocument } from '../ui/shell'
+import { escape } from '../ui/shared'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import type { Bindings } from '../../auth.server'
 import { command } from '../commands'
@@ -68,12 +70,21 @@ export async function importDocument(env:Bindings,a:Actor,data:FormData){
  if(data.get('mode')==='template')await command(env,a,'template.save',{id:row.id,version:result.version,name:String(data.get('templateName')||file.name.replace(/\.docx$/i,''))})
  return {...result,report}
 }
-export async function exportDocument(env:Bindings,a:Actor,id:string,format:string,optionId?:string,size='letter'){
+export async function exportDocument(env:Bindings,a:Actor,id:string,format:string,optionId?:string,size='letter',rendered?:Record<string,any>){
  need(a.role!=='agent','A person exports proposal documents',403)
  const original=await permitted(env.DB,a,id),row=negotiatedView(original,await pendingNegotiation(env.DB,id)),view={...snapshot(row),clientName:(await env.DB.prepare('SELECT name FROM p_clients WHERE id=?').bind(row.client_id).first<any>())?.name}
  need(['pdf','docx'].includes(format),'Choose PDF or Word');need(['letter','a4'].includes(size),'Choose US Letter or A4')
  let bytes:Uint8Array,type:string
- if(format==='docx'){bytes=await writeWord(view,file=>mediaBytes(env.DB,row,file));type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
+ if(format==='docx'){
+  const fixed=documentOf(row).fixedPdf,images:Uint8Array[]=[]
+  if(fixed){
+   const file=await env.DB.prepare('SELECT sha256 FROM p_attachment_files WHERE id=?').bind(fixed.fileId).first<any>();need(file,'Fixed PDF not found',404)
+   if(!rendered)return htmlDocument('Export fixed pages to Word','<section class="panel" data-fixed-word-export data-source="/api/platter/document-media/'+escape(row.id)+'/'+escape(fixed.fileId)+'" data-id="'+escape(row.id)+'" data-sha="'+escape(file.sha256)+'"><h1>Preparing Word document</h1><p role="status">Rendering the original fixed pages in this browser. Keep this page open until the download is ready.</p><a href="/app/proposal?id='+escape(row.id)+'">Return to proposal</a></section><script type="module" src="/fixed-pages.js"></script>',{actor:a,path:'/app'})
+   need(rendered.sha256===file.sha256&&Array.isArray(rendered.images)&&rendered.images.length===fixed.pages,'The source PDF changed. Start this export again.',409)
+   let total=0
+   for(const encoded of rendered.images){need(typeof encoded==='string'&&/^[A-Za-z0-9+/]*={0,2}$/.test(encoded),'Provide rendered PNG pages');const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));total+=bytes.length;need(total<=20*1024*1024,'Rendered pages exceed the 20 MiB export limit',413);const probe=await PDFDocument.create();try{const image=await probe.embedPng(bytes);need(image.width*image.height<=16000000,'Rendered page dimensions are too large')}catch{need(false,'A rendered page is not a readable PNG')}images.push(bytes)}
+  }
+  bytes=await writeWord(view,file=>mediaBytes(env.DB,row,file),images);type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
  else{bytes=await offerPdf({...view,paperSize:size},optionId||view.options[0].id,await pdfFonts(env,row),[],file=>mediaBytes(env.DB,row,file));type='application/pdf'}
  return new Response(bytes.buffer as ArrayBuffer,{headers:{'content-type':type,'content-disposition':'attachment; filename="proposal-revision-'+row.revision+'.'+format+'"','cache-control':'no-store','x-content-type-options':'nosniff'}})
 }

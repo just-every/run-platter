@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "a9cd0cd1ecf0fd36fc2e2195e6bbc471d899eac82e453c548eb7c8f15bab9547",
+      "sha256": "a62f13fc22ad57840267a2e20e7dda6c0e56c9530dbd8c4ad1ab1cb4fb9f3268",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "ee0a6bc25b251d378654228ad230034c8219936f956f9f0c7cee5fbe12d04e56",
+      "sha256": "1a56d3e225e566bb5a4530a27ed61359ea95b0773ef66b735baa38952b5cba4c",
       "executable": false
     },
     "deploy-demo.json": {
@@ -126,11 +126,11 @@
       "executable": false
     },
     "docs/contract-behavior.md": {
-      "sha256": "18f7348fd4d4009426b466d839fe86d43aeaa66f3078ea18ade125faec11af75",
+      "sha256": "291408a4b0fdcbd2d7567182d3f99c2465f4f6ea88371f50a7f753cedde1497a",
       "executable": false
     },
     "docs/contract/COVERAGE.json": {
-      "sha256": "3aab802323b55f46640ea62862ae31a3af2861aeeb6434c6714e517e58eba1a4",
+      "sha256": "7135d7dbec822232c7ebf439e3a30c1785c03dd18863030160550d4589f5957b",
       "executable": false
     },
     "docs/contract/DONE-AUDIT.md": {
@@ -2754,11 +2754,11 @@
       "executable": false
     },
     "src/platter/reports/report-state.ts": {
-      "sha256": "691d04199c60bbf259f350e39f640bc8c24b0e3c133dcf814c7651ea0669870e",
+      "sha256": "fc5cffe2a32abe32324f1397858f533de0ffc15fccf34560f7bab33de1105094",
       "executable": false
     },
     "src/platter/reports/schedules.ts": {
-      "sha256": "eb87bfefd1dd6469385cad78699701be4ac7d2954d82e23d28e1a47de05984df",
+      "sha256": "6d45ad9c411900d14a1ddd1de4f62823c90dcc592556614160dfe46132338e45",
       "executable": false
     },
     "src/platter/reports/zone.ts": {
@@ -2998,7 +2998,7 @@
       "executable": false
     },
     "src/platter/ui/report-schedules.ts": {
-      "sha256": "e394ffdb700a3000ab24dd046d01e1272d392cb0ddf0de31c843b66b3e2691a4",
+      "sha256": "9f7f7365c9fdcda27a4d514cbe6e2110d66abad68cd3b68d5c558f04fe906970",
       "executable": false
     },
     "src/platter/ui/section-locks.ts": {
@@ -3226,7 +3226,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "10d0ff498591f6e5d64bed16dc3c1ead7d53cf3e6a410fe067c846c1ba54f61e",
+      "sha256": "c49364fd3362a0df65aa6d5046f5d16c5107558cfc776b9fdb35e7a56679f186",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {
@@ -3246,7 +3246,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "3d69aa04673fad450789a16a80d55d8a8bd1c22d3edbbdf2ae27ac1695b41e9b",
+      "sha256": "5b3a5bb64eee2da7c939b5986a91dc323533d4e4a273d25fbd0ee8b6d4462be4",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

@@ -578,7 +578,7 @@ test('SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by uplo
  assert.equal((await h.state(member)).proposals.find(x=>x.id===p.id).acceptance.signedCopy.id,a.signedCopy.id)
  const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows;assert.ok(audit.some(x=>x.action==='acceptance.upload'&&x.subject===p.id&&x.actor_id&&x.occurred_at),'TEAM-004 acceptance.upload')
 }))
-test('FOLLOW-005 / EDIT-016 / REPORT-005 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures',{timeout:60000},()=>run(async h=>{
+test('FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures',{timeout:60000},()=>run(async h=>{
  assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
  await h.send('/auth/invite',{email:'colleague@studio.example',displayName:'Colleague',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('colleague@studio.example')
  const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
@@ -694,7 +694,7 @@ test('EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and 
 })
 
 
-test('SEND-004 / TEAM-004 calendar expiry warns unsigned only, supports same-link reopening and reissue, and never expires accepted agreements', {timeout:60000}, ()=>run(async h=>{
+test('SEND-004 / SEND-013 / TEAM-004 calendar expiry warns unsigned only, supports same-link reopening and reissue, and never expires accepted agreements', {timeout:60000}, ()=>run(async h=>{
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303);await setup.text()
  const worker=await h.mf.getWorker(),fire=async at=>worker.scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'}),at=value=>Date.parse(value)
  await fire(at('2027-03-01T15:00:00Z'))
@@ -761,7 +761,7 @@ test('SEND-004 / TEAM-004 calendar expiry warns unsigned only, supports same-lin
 }))
 
 
-test('SEND-010 / FOLLOW-002 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval',()=>run(async h=>{
+test('SEND-010 / SEND-015 / FOLLOW-009 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval',()=>run(async h=>{
  const {p,path}=await sent(h),cookie=await verified(h,path)
  await h.send('/auth/invite',{email:'sales@studio.example',displayName:'Sales colleague',role:'member',returnTo:'/app'},h.owner)
  const member=await h.signIn('sales@studio.example')
@@ -847,7 +847,7 @@ test('EDIT-012 duplicate accepted content into an independent member-owned draft
  const key=await h.cmd('agent.create',{label:'Draft only'});assert.equal((await h.send('/api/platter/agent/command',{name:'proposal.duplicate',input:{id:p.id,version:before.version}},'',{authorization:'Bearer '+key.token})).status,403)
 }))
 
-test('EDIT-018 member-only exact-revision previews share selection math and never change business state',()=>run(async h=>{
+test('EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state',()=>run(async h=>{
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
  const {p,client}=await draft(h)
  const upload=new FormData();upload.set('id',p.id);upload.set('version','1');upload.set('file',new File(['%PDF preview attachment'],'campaign.pdf',{type:'application/pdf'}))
@@ -903,7 +903,7 @@ test('EDIT-018 member-only exact-revision previews share selection math and neve
  const final=(await h.state()).proposals.find(row=>row.id===p.id);assert.equal(final.acceptance.totalCents,430003);assert.equal(final.acceptance.depositCents,143320);assert.equal(final.scope,'New negotiated scope for preview.')
 }))
 
-test('FOLLOW-002 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal',()=>run(h=>followupJourney(h,{offer,verified})))
+test('FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal',()=>run(h=>followupJourney(h,{offer,verified})))
 
 test('EDIT-009 conditional sections match selected preview, client, PDF and immutable agreement; revisions, copies and negotiations retain rules',async()=>{
  const h=await harness({assetsDirectory:'public'});try{
@@ -1201,7 +1201,7 @@ test('EDIT-016 body phrase search returns exactly three of 500 proposals includi
 }))
 
 
-test('SEND-006 self-test mail uses only the active sign-in address, previews an unsent revision and atomically limits daily rehearsals without sending an offer',()=>run(async h=>{
+test('SEND-014 self-test mail uses only the active sign-in address, previews an unsent revision and atomically limits daily rehearsals without sending an offer',()=>run(async h=>{
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
  const {client,p}=await draft(h)
  const input={id:p.id,version:1,subject:'Proposal for Northstar',message:'Hi Avery,\nPlease review the photography scope.'}
@@ -1758,7 +1758,7 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
  }finally{await h.close()}
 })
 
-test('TEAM-001 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content',()=>run(async h=>{
+test('TEAM-007 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content',()=>run(async h=>{
  const east=await h.cmd('team.create',{name:'East'}),west=await h.cmd('team.create',{name:'West'}),people={}
  for(const role of ['admin','manager','sales','content_editor','viewer','billing','other']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role:role==='other'?'sales':role,teams:[role==='other'?west.id:east.id]});people[role]={cookie,id}}
  const folder=await h.cmd('folder.save',{kind:'template',name:'East templates',teams:[east.id],shareConsent:true},people.manager.cookie),library=await h.cmd('folder.save',{kind:'library',name:'East library',teams:[east.id],shareConsent:true},people.content_editor.cookie)
@@ -1868,7 +1868,7 @@ test('TEAM-001 / EDIT-015 template locks survive starts, copies and personal tem
  await h.cmd('proposal.unlock',{id:copy.id,version:2,section:'terms'},people.manager.cookie);await h.cmd('proposal.unlock',{id:copy.id,version:1,section:'terms'},people.manager.cookie,409)
 }))
 
-test('TEAM-001 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses',async()=>{
+test('TEAM-006 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses',async()=>{
  const mailCalls=[],h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-2900'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mailCalls.push(await request.json());return Response.json({id:'synthetic-platter-'+(3000+mailCalls.length)})}})
  const inviteToken=address=>new URL(mailCalls.findLast(m=>m.to.includes(address)).text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get('token')
  const joinInvite=async address=>{const r=await h.send('/auth/confirm',{token:inviteToken(address)});assert.equal(r.status,303,r.text);return r.cookie}

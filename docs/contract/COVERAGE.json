@@ -297,7 +297,32 @@
     {
       "file": "CONTRACT.md",
       "line": 66,
-      "text": "**HTTP-001 \u2014 Authorized domain dispatch.** Every proposal, client, import and invoice handler checks a native Base owner or member session, or a revocable owner-bound agent key, before it reads or writes. Browser mutations require the configured Origin and Host and refuse cross-site requests. Which role may take which action is `TEAM-001`, with approving and sending set by `APPROVE-003`; every refusal is a 403 with no write. Signed-out readers of `/app` are sent to sign-in, and unknown routes return real 404s. **Acceptance evidence:** Through HTTP: read state signed out (401), post a mutation from a foreign Origin (403), call a domain command with a revoked agent key (401) and as a member for an owner-only action (403).",
+      "text": "**HTTP-001 \u2014 Authorized domain dispatch.**",
+      "to": "clause",
+      "ids": [
+        "HTTP-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 66,
+      "text": "Every proposal, client, import and invoice handler checks a native Base owner or member session, or a revocable owner-bound agent key, before it reads or writes.",
+      "to": "base",
+      "ids": [
+        "BASE-ACCESS-002",
+        "BASE-AGENT-005"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 66,
+      "text": "Browser mutations require the configured Origin and Host and refuse cross-site requests. Which role may take which action is `TEAM-001`, with approving and sending set by `APPROVE-003`; every refusal is a 403 with no write. Signed-out readers of `/app` are sent to sign-in, and unknown routes return real 404s. **Acceptance evidence:** Through HTTP: read state signed out (401), post a mutation from a foreign Origin (403), call a domain command with a revoked agent key (401) and as a member for an owner-only action (403).",
       "to": "clause",
       "ids": [
         "HTTP-001"
@@ -447,7 +472,31 @@
     {
       "file": "CONTRACT.md",
       "line": 85,
-      "text": "**MAIL-001 \u2014 Durable proposal mail with honest outcomes.** Local proposal and verification mail is captured without a provider. Hosted mail is queued durably in the same transaction as the action that sends it, claimed before contacting the configured sender, and records an uncertain outcome without a blind retry. Provider acceptance is shown as accepted by the provider, never as delivered; `SEND-002` adds delivery and bounce states. **Acceptance evidence:** A Workers journey with a provider fake at the network edge: send, see the row claimed before the call, return accepted, then return a timeout and see the row left uncertain and not resent.",
+      "text": "**MAIL-001 \u2014 Durable proposal mail with honest outcomes.** Local proposal and verification mail is captured without a provider. Hosted mail is queued durably in the same transaction as the action that sends it, claimed before contacting the configured sender, and records an uncertain outcome without a blind retry.",
+      "to": "clause",
+      "ids": [
+        "MAIL-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 85,
+      "text": "Provider acceptance is shown as accepted by the provider, never as delivered;",
+      "to": "base",
+      "ids": [
+        "BASE-MAIL-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 85,
+      "text": "`SEND-002` adds delivery and bounce states. **Acceptance evidence:** A Workers journey with a provider fake at the network edge: send, see the row claimed before the call, return accepted, then return a timeout and see the row left uncertain and not resent.",
       "to": "clause",
       "ids": [
         "MAIL-001"
@@ -780,7 +829,31 @@
     {
       "file": "CONTRACT.md",
       "line": 154,
-      "text": "The client reads, chooses options, comments, signs and pays on a phone as well as on a desktop. The client page meets WCAG 2.2 AA, works with keyboard and screen reader, and needs no app or account.",
+      "text": "The client reads, chooses options, comments, signs and pays on a phone as well as on a desktop.",
+      "to": "clause",
+      "ids": [
+        "EDIT-007"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 154,
+      "text": "The client page meets WCAG 2.2 AA, works with keyboard and screen reader,",
+      "to": "base",
+      "ids": [
+        "BASE-ACCESSIBILITY-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 154,
+      "text": "and needs no app or account.",
       "to": "clause",
       "ids": [
         "EDIT-007"
@@ -2794,7 +2867,31 @@
     {
       "file": "CONTRACT.md",
       "line": 552,
-      "text": "The client page discloses that views are measured. Platter uses no third-party trackers, stores IP addresses only as truncated locations, and keeps engagement data for a retention period the owner sets. Engagement data is included in erasure (`PRIV-001`) and in exports.",
+      "text": "The client page discloses that views are measured.",
+      "to": "clause",
+      "ids": [
+        "TRACK-004"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 552,
+      "text": "Platter uses no third-party trackers,",
+      "to": "base",
+      "ids": [
+        "BASE-PUBLIC-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 552,
+      "text": "stores IP addresses only as truncated locations, and keeps engagement data for a retention period the owner sets. Engagement data is included in erasure (`PRIV-001`) and in exports.",
       "to": "clause",
       "ids": [
         "TRACK-004"
@@ -5620,7 +5717,31 @@
     {
       "file": "CONTRACT.md",
       "line": 1085,
-      "text": "Members sign in through SAML or OIDC from [Auth](https://github.com/just-every/run-auth), Okta, Microsoft Entra ID or Google Workspace, and are created, updated and removed through SCIM with role mapping. Removing a member ends their sessions and keeps their proposals with a new owner.",
+      "text": "Members sign in through SAML or OIDC from [Auth](https://github.com/just-every/run-auth), Okta, Microsoft Entra ID or Google Workspace, and are created, updated and removed through SCIM with role mapping.",
+      "to": "clause",
+      "ids": [
+        "TEAM-002"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1085,
+      "text": "Removing a member ends their sessions",
+      "to": "base",
+      "ids": [
+        "BASE-SIGNIN-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1085,
+      "text": "and keeps their proposals with a new owner.",
       "to": "clause",
       "ids": [
         "TEAM-002"
@@ -6343,7 +6464,32 @@
     {
       "file": "CONTRACT.md",
       "line": 1247,
-      "text": "Archives and restore cover everything in the product: templates, library, catalog, media, signed PDFs and certificates, payment and invoice records, reports' source data and integration mappings, under `PORT-001`'s rules. Provider credentials never travel. Every record kind supported today must round-trip, including clients, draft/sent/accepted proposals, revisions, approval history, immutable acceptances, retained invoice files and client-import originals, journal and provenance. `EDIT-002`, `EDIT-003`, `CAT-001`, `EDIT-006`, `EDIT-010`, `SIGN-005`, `PAY-001` to `PAY-009`, `REPORT-001` to `REPORT-005`, `CRM-001` to `CRM-004`, `AUTO-001` to `AUTO-004` and `SEC-001` inherit archive/restore coverage of their new record kinds and credential exclusion before shipping. Provider connection metadata now round-trips while encrypted credentials stay local; agent keys, native sessions, client invitations, verification state and mail stay local under `PORT-001`.",
+      "text": "Archives and restore cover everything in the product: templates, library, catalog, media, signed PDFs and certificates, payment and invoice records, reports' source data and integration mappings, under `PORT-001`'s rules.",
+      "to": "clause",
+      "ids": [
+        "PORT-002"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1247,
+      "text": "Provider credentials never travel.",
+      "to": "base",
+      "ids": [
+        "BASE-DATA-001",
+        "BASE-SECRET-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1247,
+      "text": "Every record kind supported today must round-trip, including clients, draft/sent/accepted proposals, revisions, approval history, immutable acceptances, retained invoice files and client-import originals, journal and provenance. `EDIT-002`, `EDIT-003`, `CAT-001`, `EDIT-006`, `EDIT-010`, `SIGN-005`, `PAY-001` to `PAY-009`, `REPORT-001` to `REPORT-005`, `CRM-001` to `CRM-004`, `AUTO-001` to `AUTO-004` and `SEC-001` inherit archive/restore coverage of their new record kinds and credential exclusion before shipping. Provider connection metadata now round-trips while encrypted credentials stay local; agent keys, native sessions, client invitations, verification state and mail stay local under `PORT-001`.",
       "to": "clause",
       "ids": [
         "PORT-002"
@@ -6709,7 +6855,16 @@
     {
       "file": "CONTRACT.md",
       "line": 1331,
-      "text": "Every agent action is logged with the data it read, what it produced, the model used and who approved it. Agents can draft, analyze and request, and can never approve prices, send, sign, refund or write off. The owner sets a monthly model budget and can pause any agent at once.",
+      "text": "Every agent action is logged",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-009"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1331,
+      "text": "with the data it read, what it produced, the model used and who approved it. Agents can draft, analyze and request, and can never approve prices, send, sign, refund or write off. The owner sets a monthly model budget and can pause any agent at once.",
       "to": "clause",
       "ids": [
         "AGENT-009"

@@ -4,7 +4,7 @@ import { richLibraryPropagation, richLibrarySource } from './library-fixture.mjs
 import { documentFixture } from './document-fixture.mjs'
 import { templatesHttp } from './templates-http.mjs'
 import { followupJourney } from './followup-journey.mjs'
-import { test } from 'node:test'
+import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile, readdir } from 'node:fs/promises'
 import { unstable_splitSqlQuery } from 'wrangler'
@@ -2869,4 +2869,125 @@ test('AUTO-004 published route reference matches live methods and webhook schema
   const emitted=(await h.db.prepare('SELECT * FROM p_webhook_events').all()).results;assert.deepEqual([...new Set(emitted.map(e=>e.type))].sort(),['proposal.approved','proposal.created','proposal.declined','proposal.expired','proposal.lost','proposal.revised','proposal.sent','proposal.signed','proposal.withdrawn','proposal.won'])
   for(const event of emitted){assert.ok(events[event.type]);validate(spec.value.components.schemas.LifecycleEvent,{id:event.id,type:event.type,occurredAt:event.occurred_at,data:{id:event.proposal_id,revision:event.revision,status:event.status}})}
  }finally{await h.close()}
+})
+
+async function apiSentFixture(h,clientId){
+ const p=await h.cmd('proposal.prepare',{...offer,clientId})
+ await h.cmd('proposal.approve',{id:p.id,version:1,revision:1})
+ const share=await h.cmd('proposal.send',{id:p.id,version:2})
+ return {p,path:new URL(share.shareUrl).pathname}
+}
+
+describe('AUTO-004 terminal proposal projections',()=>{
+ test('scoped status and analytics distinguish withdrawn and expired offers from live offers',()=>run(async h=>{
+  const key=(await h.send('/api/platter/v1/keys',{label:'Synthetic status reader',scopes:['proposals.read','analytics.read']},h.owner)).value
+  const read=path=>h.send('/api/platter/v1'+path,undefined,'',{authorization:'Bearer '+key.token})
+  const withdrawn=await sent(h)
+  await h.cmd('proposal.withdraw',{id:withdrawn.p.id,version:3,reason:'Synthetic withdrawal',notice:false})
+  const expiring=await apiSentFixture(h,withdrawn.client.id)
+  await h.cmd('expiry.set',{id:expiring.p.id,version:3,mode:'days',days:1})
+  const live=await apiSentFixture(h,withdrawn.client.id),accepted=await apiSentFixture(h,withdrawn.client.id),cookie=await verified(h,accepted.path)
+  assert.equal((await h.send(accepted.path+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},cookie)).status,200)
+  const deadline=(await h.state()).proposals.find(p=>p.id===expiring.p.id).expiry.deadlineAt
+  const before=await read('/proposals');assert.equal(before.status,200)
+  assert.equal(before.value.find(p=>p.id===withdrawn.p.id).status,'withdrawn')
+  assert.equal(before.value.find(p=>p.id===expiring.p.id).status,'sent')
+  assert.deepEqual((await read('/analytics')).value,[{status:'accepted',count:1},{status:'sent',count:2},{status:'withdrawn',count:1}])
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(deadline+1),cron:'*/15 * * * *'})
+  const after=await read('/proposals');assert.equal(after.status,200)
+  assert.equal(after.value.find(p=>p.id===withdrawn.p.id).status,'withdrawn')
+  assert.equal(after.value.find(p=>p.id===expiring.p.id).status,'expired')
+  assert.equal(after.value.find(p=>p.id===live.p.id).status,'sent')
+  assert.equal(after.value.find(p=>p.id===accepted.p.id).status,'accepted')
+  assert.deepEqual((await read('/analytics')).value,[{status:'accepted',count:1},{status:'expired',count:1},{status:'sent',count:1},{status:'withdrawn',count:1}])
+  await h.cmd('expiry.remove',{id:expiring.p.id,version:4})
+  assert.equal((await read('/proposals')).value.find(p=>p.id===expiring.p.id).status,'sent')
+  assert.deepEqual((await read('/analytics')).value,[{status:'accepted',count:1},{status:'sent',count:2},{status:'withdrawn',count:1}])
+ }))
+})
+
+describe('AUTO-004 negotiated lifecycle delivery',()=>{
+ test('receiver gets revised and approved events for each negotiated revision before it is sent',async()=>{
+  const received=[],h=await harness({migrateThrough:'0078_public_api.sql',outboundService:async request=>{received.push(await request.json());return new Response(null,{status:204})}})
+  try{
+   await h.db.batch(unstable_splitSqlQuery(await readFile('migrations/core/0079_negotiated_webhooks.sql','utf8')).map(sql=>h.db.prepare(sql)))
+   assert.equal((await h.send('/api/platter/v1/webhooks',{url:'https://hooks.example.com/negotiated',consent:true},h.owner)).status,200)
+   const {p,client,path}=await sent(h)
+   await h.cmd('proposal.negotiate',{...offer,id:p.id,clientId:client.id,version:3,scope:'Synthetic negotiated scope'})
+   const cron=async()=>{await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})}
+   await cron()
+   const revised=received.filter(e=>e.type==='proposal.revised'&&e.data.id===p.id)
+   assert.deepEqual(revised.map(e=>e.data),[{id:p.id,revision:2,status:'draft'}])
+   assert.equal(received.filter(e=>e.type==='proposal.approved'&&e.data.revision===2).length,0)
+   assert.equal((await h.send(path)).status,200,'negotiating preserves the original live invitation')
+   await h.cmd('proposal.approve',{id:p.id,version:4,revision:2})
+   await cron()
+   assert.deepEqual(received.filter(e=>e.type==='proposal.approved'&&e.data.revision===2).map(e=>e.data),[{id:p.id,revision:2,status:'approved'}])
+   await h.cmd('proposal.revise',{...offer,id:p.id,clientId:client.id,version:5,scope:'Synthetic third revision'})
+   await h.cmd('proposal.approve',{id:p.id,version:6,revision:3})
+   await cron()
+   assert.deepEqual(received.filter(e=>e.type==='proposal.revised'&&e.data.revision===3).map(e=>e.data),[{id:p.id,revision:3,status:'draft'}])
+   assert.deepEqual(received.filter(e=>e.type==='proposal.approved'&&e.data.revision===3).map(e=>e.data),[{id:p.id,revision:3,status:'approved'}])
+   const share=await h.cmd('proposal.send',{id:p.id,version:7});assert.ok(share.shareUrl)
+   await cron()
+   assert.deepEqual(received.filter(e=>e.type==='proposal.sent'&&e.data.revision===3).map(e=>e.data),[{id:p.id,revision:3,status:'sent'}])
+   assert.equal(new Set(received.map(e=>e.id)).size,received.length,'completed deliveries are not replayed')
+   assert.deepEqual(received.filter(e=>e.type==='proposal.revised').map(e=>e.data.revision),[2,3])
+   assert.deepEqual(received.filter(e=>e.type==='proposal.approved').map(e=>e.data.revision).sort(),[1,2,3])
+  }finally{await h.close()}
+ })
+})
+
+describe('AUTO-004 complete lifecycle receiver coverage',()=>{
+ test('receiver obtains all ten lifecycle types including every terminal outcome',async()=>{
+  const received=[],h=await harness({outboundService:async request=>{received.push(await request.json());return new Response(null,{status:204})}})
+  try{
+   assert.equal((await h.send('/api/platter/v1/webhooks',{url:'https://hooks.example.com/lifecycle',consent:true},h.owner)).status,200)
+   const {p,client}=await draft(h)
+   await h.cmd('proposal.revise',{...offer,id:p.id,clientId:client.id,version:1,scope:'Synthetic revised scope'})
+   await h.cmd('proposal.approve',{id:p.id,version:2,revision:2})
+   const share=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+   assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},cookie)).status,200)
+   const withdrawn=await apiSentFixture(h,client.id);await h.cmd('proposal.withdraw',{id:withdrawn.p.id,version:3,reason:'Synthetic withdrawn',notice:false})
+   const lost=await apiSentFixture(h,client.id);await h.cmd('proposal.lose',{id:lost.p.id,version:3,reason:'Synthetic lost',notice:false})
+   const declined=await apiSentFixture(h,client.id),declineCookie=await verified(h,declined.path)
+   assert.equal((await h.send(declined.path+'/action?name=decline',{revision:1,reason:'Synthetic declined'},declineCookie)).status,410)
+   const won=await apiSentFixture(h,client.id);await h.cmd('proposal.win',{id:won.p.id,version:3,reason:'Synthetic won'})
+   const expiring=await apiSentFixture(h,client.id);await h.cmd('expiry.set',{id:expiring.p.id,version:3,mode:'days',days:1})
+   const deadline=(await h.state()).proposals.find(row=>row.id===expiring.p.id).expiry.deadlineAt
+   for(let tick=0;tick<3;tick++)await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(deadline+1+tick),cron:'*/15 * * * *'})
+   const data=type=>received.filter(e=>e.type===type).map(e=>e.data)
+   assert.deepEqual(data('proposal.revised'),[{id:p.id,revision:2,status:'draft'}])
+   assert.ok(data('proposal.withdrawn').some(d=>d.id===withdrawn.p.id&&d.revision===1&&d.status==='withdrawn'))
+   assert.deepEqual(data('proposal.declined'),[{id:declined.p.id,revision:1,status:'declined'}])
+   assert.deepEqual(data('proposal.lost'),[{id:lost.p.id,revision:1,status:'lost'}])
+   assert.deepEqual(data('proposal.won'),[{id:won.p.id,revision:1,status:'won'}])
+   assert.deepEqual(data('proposal.expired'),[{id:expiring.p.id,revision:1,status:'expired'}])
+   assert.ok(data('proposal.created').some(d=>d.id===p.id&&d.revision===1&&d.status==='draft'))
+   assert.ok(data('proposal.approved').some(d=>d.id===p.id&&d.revision===2&&d.status==='approved'))
+   assert.ok(data('proposal.sent').some(d=>d.id===p.id&&d.revision===2&&d.status==='sent'))
+   assert.deepEqual(data('proposal.signed'),[{id:p.id,revision:2,status:'accepted'}])
+   const log=await h.send('/api/platter/v1/deliveries',undefined,h.owner);assert.equal(log.status,200)
+   assert.equal(log.value.length,received.length)
+   assert.ok(log.value.every(d=>d.status==='delivered'&&d.attempts===1&&d.httpStatus===204))
+  }finally{await h.close()}
+ })
+})
+
+describe('AUTO-004 independently documented authority',()=>{
+ test('each published method and route declares its independently expected scope',()=>run(async h=>{
+  const response=await h.send('/api/platter/v1/openapi.json');assert.equal(response.status,200)
+  const expected=[
+   ['get','/openapi.json','public'],['get','/reference','public'],
+   ['post','/keys','session:owner'],['get','/keys','session:owner'],['post','/keys/{id}/revoke','session:owner'],
+   ['get','/templates','templates.read'],['post','/proposals','proposals.write'],
+   ['post','/proposals/{id}/variables','proposals.write'],['get','/proposals','proposals.read'],
+   ['get','/analytics','analytics.read'],['get','/payments','payments.read'],['get','/agreements','agreements.read'],
+   ['post','/webhooks','session:owner'],['get','/webhooks','session:owner'],
+   ['post','/webhooks/{id}/revoke','session:owner'],['get','/deliveries','session:owner'],
+  ]
+  for(const [method,path,scope] of expected)assert.equal(response.value.paths['/api/platter/v1'+path]?.[method]?.['x-scope'],scope,method+' '+path)
+  const documented=Object.entries(response.value.paths).flatMap(([path,methods])=>Object.keys(methods).map(method=>method+' '+path)).sort()
+  assert.deepEqual(documented,expected.map(([method,path])=>method+' /api/platter/v1'+path).sort())
+ }))
 })

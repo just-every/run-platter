@@ -24,6 +24,7 @@
     "vite.config.ts"
   ],
   "exclude": [
+    "src/base/modules/**/tests",
     "src/modules/**/tests",
     "src/modules/**/live-proof",
     "src/modules/import-kit/src/door"

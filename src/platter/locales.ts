@@ -156,6 +156,29 @@ export const spanish: Record<string, string> = {
  'Email reminders are stopped for this proposal revision. This does not change the proposal or your decision.': 'Los recordatorios están detenidos para esta revisión. La propuesta y su decisión no cambian.',
  'I accept the selected option, scope and deposit.': 'Acepto la opción elegida, el alcance y el anticipo.',
  'I accept the selected option, scope, deposit and payment schedule.': 'Acepto la opción elegida, el alcance, el anticipo y el calendario de pagos.',
+ 'Subtotal before tax: ': 'Subtotal antes de impuestos: ',
+ 'Sales tax: ': 'Impuesto sobre las ventas: ',
+ ' tax (': ' — impuesto (',
+ 'Tax address (': 'Dirección fiscal (',
+ 'One-off total: ': 'Total de pago único: ',
+ 'First-year value: ': 'Valor del primer año: ',
+ ' · renewal date ': ' · fecha de renovación ',
+ 'state': 'estado',
+ 'county': 'condado',
+ 'city': 'ciudad',
+ 'district': 'distrito',
+ 'service': 'servicio',
+ 'billing': 'facturación',
+ 'week': 'semana',
+ 'month': 'mes',
+ 'quarter': 'trimestre',
+ 'year': 'año',
+ 'Deposit': 'Anticipo',
+ 'Acceptance': 'Aceptación',
+ 'Monthly retainer': 'Servicio mensual',
+ 'One-off balance': 'Saldo de pago único',
+ 'Yes': 'Sí',
+ 'No': 'No',
  'Proposal withdrawn': 'Propuesta retirada',
  'Contact the firm': 'Contacte con la empresa',
  'This proposal has been withdrawn. Contact ': 'Esta propuesta se ha retirado. Contacte con ',
@@ -242,7 +265,8 @@ export const spanish: Record<string, string> = {
  'An accepted agreement cannot be declined': 'No se puede rechazar un acuerdo ya aceptado',
  'The change could not be completed. Reload and try again.': 'No se pudo completar el cambio. Vuelva a cargar e inténtelo de nuevo.',
 }
-const keys = Object.keys(spanish).filter(key => !['email',' role'].includes(key)).sort((a,b) => b.length-a.length)
+const exactOnly = new Set(['email',' role','state','county','city','district','service','billing','week','month','quarter','year','Deposit','Acceptance','Monthly retainer','One-off balance','Yes','No'])
+const keys = Object.keys(spanish).filter(key => !exactOnly.has(key)).sort((a,b) => b.length-a.length)
 const matcher = new RegExp(keys.map(key => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g')
 export function clientText(text: string, locale: ClientLocale): string {
  if(locale !== 'es')return text

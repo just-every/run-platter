@@ -73,7 +73,7 @@ async function folderFor(env:Bindings,job:any,authorize:()=>Promise<string>,reco
  const db=env.DB,key=[job.account_id,job.root_folder,job.client_id],where='account_id=? AND root_folder=? AND client_id=?'
  let folder=await db.prepare('SELECT * FROM p_archive_folders WHERE '+where).bind(...key).first<any>()
  if(!folder){
-  need(!reconcile,'No reserved client folder to reconcile',409)
+  if(reconcile)return '' // No folder write was attempted; future dispatch may reserve one.
   const id=await driveId(authorize)
   await db.prepare("INSERT INTO p_archive_folders VALUES(?,?,?,?,?,'reserved') ON CONFLICT DO NOTHING").bind(...key,id,clean(job.client_name)+' - '+job.client_id).run()
   folder=await db.prepare('SELECT * FROM p_archive_folders WHERE '+where).bind(...key).first<any>()
@@ -101,7 +101,7 @@ async function processArchive(env:Bindings,job:any,reconcile=false){
  const folder=await folderFor(env,job,authorize,reconcile)
  for(const kind of ['agreement','certificate']){
   let file=await db.prepare('SELECT * FROM p_archive_files WHERE proposal_id=? AND kind=?').bind(job.proposal_id,kind).first<any>()
-  if(reconcile){need(file,'This archive has unwritten files; reconciliation never creates or retries uploads',409);await checkDrivePdf(authorize,file);await db.prepare("UPDATE p_archive_files SET status='complete' WHERE proposal_id=? AND kind=?").bind(job.proposal_id,kind).run();continue}
+  if(reconcile){if(!file)continue;await checkDrivePdf(authorize,file);await db.prepare("UPDATE p_archive_files SET status='complete' WHERE proposal_id=? AND kind=?").bind(job.proposal_id,kind).run();continue}
   if(file?.status==='complete')continue
   need(!file,'This file already has a reserved write; reconcile before continuing',409)
   const bytes=new Uint8Array(kind==='agreement'?artifacts.document:artifacts.certificate),digest=await sha256(bytes),id=await driveId(authorize),name=archiveName(job)+' - '+kind+'.pdf'
@@ -110,7 +110,11 @@ async function processArchive(env:Bindings,job:any,reconcile=false){
   catch(error){await db.prepare("UPDATE p_archive_files SET status='uncertain' WHERE proposal_id=? AND kind=?").bind(job.proposal_id,kind).run();throw error}
  }
  await execution(env,job)
- await db.prepare("UPDATE p_archive_jobs SET status='complete',reason=NULL,completed_at=? WHERE proposal_id=?").bind(Date.now(),job.proposal_id).run()
+ const remaining=await db.prepare("SELECT count(*) AS n FROM p_archive_files WHERE proposal_id=? AND status='complete'").bind(job.proposal_id).first<{n:number}>()
+ if(reconcile&&remaining?.n!==2){
+  // Only never-attempted artifacts may resume after every reserved write verifies.
+  await db.prepare("UPDATE p_archive_jobs SET status='queued',reason='Reserved Drive writes verified. Unwritten artifacts are queued.',started_at=NULL WHERE proposal_id=?").bind(job.proposal_id).run()
+ }else await db.prepare("UPDATE p_archive_jobs SET status='complete',reason=NULL,completed_at=? WHERE proposal_id=?").bind(Date.now(),job.proposal_id).run()
 }
 async function held(env:Bindings,job:any,error:unknown){
  const reason=error instanceof Error&&('status' in error)?error.message:'Drive outcome is uncertain. Reconcile the reserved files; no automatic upload retry.'

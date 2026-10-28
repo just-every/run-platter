@@ -3383,6 +3383,46 @@ test('AUTO-002 completed agreements archive exact PDFs once under explicit curre
   history=(await h.send('/api/platter/archives',undefined,h.owner)).value
   assert.equal(history.jobs.find(j=>j.proposal_id===uncertain.proposal.id).status,'complete');assert.equal(posts(),afterUnknown)
   assert.equal([...fake.files.values()].filter(f=>f.parents?.includes(driveRoot)).length,1)
+  // Losing the first acknowledgement must not strand the never-attempted certificate.
+  fake.setUncertain(true,'agreement')
+  const firstUncertain=await completeDriveAgreement(h,'First PDF acknowledgement lost',signed.client.id);await tick()
+  const firstFiles=()=>[...fake.files.values()].filter(f=>f.name.includes('First PDF acknowledgement lost'))
+  assert.equal(firstFiles().length,1)
+  const firstPosts=posts();await tick();assert.equal(posts(),firstPosts)
+  const storedAgreement=firstFiles()[0],originalBytes=storedAgreement.bytes
+  storedAgreement.bytes=Buffer.from('synthetic-platter-changed-document')
+  await h.cmd('archive.reconcile',{id:firstUncertain.proposal.id},h.owner,409)
+  history=(await h.send('/api/platter/archives',undefined,h.owner)).value
+  assert.equal(history.jobs.find(j=>j.proposal_id===firstUncertain.proposal.id).status,'held')
+  assert.equal(posts(),firstPosts,'a mismatched provider document cannot authorize another upload')
+  await tick();assert.equal(posts(),firstPosts)
+  storedAgreement.bytes=originalBytes
+  await h.cmd('archive.reconcile',{id:firstUncertain.proposal.id})
+  assert.equal(posts(),firstPosts,'reconciliation only reads already reserved writes')
+  history=(await h.send('/api/platter/archives',undefined,h.owner)).value
+  assert.equal(history.jobs.find(j=>j.proposal_id===firstUncertain.proposal.id).status,'queued')
+  await Promise.all([tick(),h.cmd('archive.dispatch',{})])
+  assert.equal(posts(),firstPosts+1,'only the previously unwritten certificate is uploaded')
+  assert.equal(firstFiles().length,2)
+  for(const kind of ['agreement','certificate']){
+   const response=await h.mf.dispatchFetch(h.origin+firstUncertain.path+'/'+kind+'.pdf',{headers:{cookie:firstUncertain.cookie}})
+   assert.equal(response.status,200)
+   assert.deepEqual(firstFiles().find(f=>f.name.endsWith(' - '+kind+'.pdf')).bytes,Buffer.from(await response.arrayBuffer()))
+  }
+  history=(await h.send('/api/platter/archives',undefined,h.owner)).value
+  assert.equal(history.jobs.find(j=>j.proposal_id===firstUncertain.proposal.id).status,'complete')
+  // A lost folder acknowledgement is also verified before any document write.
+  fake.setUncertain(true,'folder')
+  const folderClient=await h.cmd('client.save',{name:'Synthetic second archive client',email:['synthetic-platter-second-client','example.test'].join('@')})
+  const folderUncertain=await completeDriveAgreement(h,'Client folder acknowledgement lost',folderClient.id);await tick()
+  const folderPosts=posts();await tick();assert.equal(posts(),folderPosts)
+  await h.cmd('archive.reconcile',{id:folderUncertain.proposal.id})
+  assert.equal(posts(),folderPosts)
+  await tick();assert.equal(posts(),folderPosts+2)
+  history=(await h.send('/api/platter/archives',undefined,h.owner)).value
+  assert.equal(history.jobs.find(j=>j.proposal_id===folderUncertain.proposal.id).status,'complete')
+  assert.equal([...fake.files.values()].filter(f=>f.appProperties?.platterClient===folderUncertain.client.id).length,1)
+  fake.setUncertain(false)
   // Demotion invalidates execution even though the connection and old consent remain.
   const demoted=await completeDriveAgreement(h,'Demoted archive agreement',signed.client.id)
   await h.cmd('member.set',{operatorId:admin.id,role:'sales',version:1,teams:[]})

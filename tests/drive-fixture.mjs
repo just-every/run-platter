@@ -7,7 +7,7 @@ export const driveToken='synthetic-platter-archive-token'
 export const driveSettings={version:0,accountId:driveAccount,connectionVersion:1,folderId:driveRoot,pattern:'{client} - {title} - {date} - r{revision}',consent:true}
 export function driveFixture(){
  const files=new Map([[driveRoot,{id:driveRoot,name:'Completed agreements',mimeType:'application/vnd.google-apps.folder',capabilities:{canAddChildren:true}}]]),calls=[]
- let sequence=0,uncertain=false,hook
+ let sequence=0,uncertain=false,uncertainKind='certificate',hook
  const outboundService=async request=>{
   const url=new URL(request.url);calls.push({url:url.href,method:request.method})
   assert.equal(url.hostname,'www.googleapis.com');assert.equal(request.headers.get('authorization'),'Bearer '+driveToken)
@@ -26,14 +26,14 @@ export function driveFixture(){
    assert.ok(!files.has(metadata.id),'a provider id must never be uploaded twice')
    files.set(metadata.id,{...metadata,capabilities:{canAddChildren:true},bytes})
    // A lost acknowledgement can happen after Drive has durably stored the file.
-   if(uncertain&&metadata.name.endsWith(' - certificate.pdf'))return new Response('synthetic-platter-lost-acknowledgement',{status:503})
+   if(uncertain&&(metadata.name.endsWith(' - '+uncertainKind+'.pdf')||(uncertainKind==='folder'&&metadata.mimeType==='application/vnd.google-apps.folder')))return new Response('synthetic-platter-lost-acknowledgement',{status:503})
    return Response.json({id:metadata.id})
   }
   const file=files.get(url.pathname.split('/').at(-1));if(!file)return new Response(null,{status:404})
   if(url.searchParams.get('alt')==='media')return new Response(file.bytes,{headers:{'content-type':'application/pdf'}})
   const {bytes,...metadata}=file;return Response.json(metadata)
  }
- return {files,calls,outboundService,setUncertain:value=>{uncertain=value},setHook:value=>{hook=value}}
+ return {files,calls,outboundService,setUncertain:(value,kind='certificate')=>{uncertain=value;uncertainKind=kind},setHook:value=>{hook=value}}
 }
 export async function connectDrive(h,cookie=h.owner){
  await h.cmd('provider.connect',{provider:'google_drive',version:0,token:driveToken,consent:true},cookie)

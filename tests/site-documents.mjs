@@ -796,6 +796,14 @@ test('AUTO-002 Settings authorizes Drive archiving and shows completed and held 
   assert.equal(await page.getByRole('alert').count(),0);assert.equal(await panel.getByRole('button',{name:'Reconcile archive',exact:true}).count(),0)
   assert.equal(fake.calls.filter(c=>c.method==='POST').length,posts)
   assert.equal(await panel.getByRole('listitem').count(),2)
+  fake.setUncertain(true,'agreement');await completeDriveAgreement(h,'First PDF acknowledgement lost',signed.client.id);await fire();await page.reload()
+  assert.match(await panel.innerText(),/only artifacts never attempted are queued/)
+  const firstPosts=fake.calls.filter(c=>c.method==='POST').length
+  await panel.getByRole('button',{name:'Reconcile archive',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0)
+  assert.match(await panel.innerText(),/Reserved Drive writes verified. Unwritten artifacts are queued/)
+  assert.equal(fake.calls.filter(c=>c.method==='POST').length,firstPosts)
+  assert.equal(await panel.getByRole('button',{name:'Process queued archives',exact:true}).count(),1)
   assert.ok(await panel.locator('button,input').evaluateAll(nodes=>nodes.every(node=>parseFloat(getComputedStyle(node).fontSize)>=13)))
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
   const screenshots=process.env.PLATTER_SCREENSHOTS
@@ -806,6 +814,12 @@ test('AUTO-002 Settings authorizes Drive archiving and shows completed and held 
    await panel.screenshot({path:join(screenshots,'AUTO-002-settings-390.png')})
   }
   await page.setViewportSize({width:1440,height:1000})
+  await panel.getByRole('button',{name:'Process queued archives',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0)
+  assert.equal(fake.calls.filter(c=>c.method==='POST').length,firstPosts+1)
+  assert.equal(await panel.getByRole('listitem').count(),3)
+  assert.equal(await panel.getByRole('button',{name:'Process queued archives',exact:true}).count(),0)
+  assert.equal(await panel.getByRole('button',{name:'Reconcile archive',exact:true}).count(),0)
   await panel.getByRole('button',{name:'Revoke archiving authorization',exact:true}).click()
   assert.match(await panel.innerText(),/Archiving is inactive/)
  }finally{await context?.close();await browser?.close();await edge.close();await h.close()}

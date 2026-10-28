@@ -951,9 +951,12 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectDrive(h)
   const completed=await completeDriveAgreement(h)
   await h.cmd('archive.dispatch',{})
+  fake.setUncertain(true,'agreement')
+  const held=await completeDriveAgreement(h,'Uncertain first PDF history',completed.client.id)
+  await h.cmd('archive.dispatch',{})
   const queued=await completeDriveAgreement(h,'Queued archive history',completed.client.id)
   const tables=['p_archive_settings','p_archive_jobs','p_archive_files','p_archive_folders','p_agreement_artifacts'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
-  assert.deepEqual(before.p_archive_jobs.map(j=>j.status).sort(),['complete','queued'])
+  assert.deepEqual(before.p_archive_jobs.map(j=>j.status).sort(),['complete','held','queued'])
   const artifacts={}
   for(const kind of ['agreement','certificate']){
    const response=await h.mf.dispatchFetch(h.origin+completed.path+'/'+kind+'.pdf',{headers:{cookie:completed.cookie}});assert.equal(response.status,200);artifacts[kind]=Buffer.from(await response.arrayBuffer())
@@ -981,5 +984,9 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   await h.cmd('archive.configure',{...driveSettings,version:1,connectionVersion:2},owner)
   const calls=restoredFake.calls.length;await h.cmd('archive.dispatch',{},owner);assert.equal(restoredFake.calls.length,calls)
   await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
+  await h.cmd('archive.reconcile',{id:held.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
+  const heldHistory=(await h.send('/api/platter/archives',undefined,owner)).value.jobs.find(j=>j.proposal_id===held.proposal.id)
+  assert.equal(heldHistory.status,'held');assert.equal(heldHistory.executable,0)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_archive_files WHERE proposal_id=?').bind(held.proposal.id).first()).n,1)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

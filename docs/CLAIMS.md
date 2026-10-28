@@ -716,7 +716,7 @@ Evidence: None recorded.
 
 Status: **partial**.
 
-Gap: OneDrive, SharePoint, Box, Chest, full agreement attachments, payment-gated completion, configured multi-recipient completion and live-provider qualification remain. Conservative owner and admin authorization default: explicit verified account, destination folder and naming pattern; configuration, connection and authorizing role versions checked before each request; uncertain writes held without automatic replay. Restores confer no credentials or execution authority. SEND-003 and SIGN-004 retain their recorded authority holds.
+Gap: OneDrive, SharePoint, Box, Chest, full agreement attachments, payment-gated completion, configured multi-recipient completion and live-provider qualification remain. Conservative owner and admin authorization default awaits ct approval: explicit verified account, destination folder and naming pattern; configuration, connection and authorizing role versions checked before each request; uncertain writes held without automatic replay. Restores confer no credentials or execution authority. SEND-003 and SIGN-004 retain their recorded authority holds.
 
 Evidence: `tests/platter.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 

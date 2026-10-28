@@ -3213,6 +3213,10 @@
       "sha256": "03ef4cfedc4a53c329471361e3b1fdfc86eb8a5b6b4d95ca535068035fa5b2d6",
       "executable": false
     },
+    "tests/performance-browser.mjs": {
+      "sha256": "0185e8e89f5b0af199e363e7807ca3282412f3d328931982a1a711af04847285",
+      "executable": false
+    },
     "tests/performance-fixture.mjs": {
       "sha256": "001e2dc0e6fed0980dfe172f838a028503f036ed8bf76e3dfeca8f6c4ca08d0d",
       "executable": false
@@ -3270,7 +3274,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "e1df543ba4b4dc336ed5e1a925b90434ed2c28d129b43aa671ff6a0a44b84895",
+      "sha256": "b706f87787edd396e13e230db11aea28c45897882d45efdb9e371952a2d419e5",
       "executable": false
     },
     "tests/site.test.mjs": {

@@ -126,7 +126,7 @@
       "executable": false
     },
     "docs/contract-behavior.md": {
-      "sha256": "b1420d5d0b95975c415d0358033b6cb5613114dda028b790b08483ce2de812b1",
+      "sha256": "89a1e644d2f73ff3fed458cfa3df7137af42991c5ebf4ff341b98438881a4ab6",
       "executable": false
     },
     "docs/contract/COVERAGE.json": {
@@ -3110,7 +3110,7 @@
       "executable": false
     },
     "src/server.ts": {
-      "sha256": "d9670ad77f0995540373ffcce04ee220d360d9240bca1bc17093f90d2cb0f8ee",
+      "sha256": "32002117342441059a72a7c230a66920c45984dce99cf9abe71355e6bee35674",
       "executable": false
     },
     "src/site/docs.ts": {
@@ -3354,7 +3354,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "97546c9f1ee65e97cc337bde42f067fcd4e00a219cb04c83d240908887c0041a",
+      "sha256": "954df9821e4d8dcc0e7c84eeb0e9ace35e9bc35120a038c122bd2866806984f6",
       "executable": false
     },
     "tests/site.test.mjs": {

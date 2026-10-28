@@ -377,7 +377,7 @@ test('SIGN-008 desktop and phone record a client-signed copy as accepted by uplo
  }finally{await browser?.close();await app?.close()}
 })
 
-test('REPORT-005 desktop and phone export the filtered pipeline CSV and schedule weekly email in the installation time zone', {timeout:120000}, async()=>{
+test('REPORT-005 / REPORT-006 desktop and phone export the filtered pipeline CSV and schedule weekly email in the installation time zone', {timeout:120000}, async()=>{
  let app,browser
  try{
   browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
@@ -385,7 +385,7 @@ test('REPORT-005 desktop and phone export the filtered pipeline CSV and schedule
   for(const width of [1440,390]){
    app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
    try{
-    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`REPORT-005-${name}-${width}.png`),fullPage:true})}
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`REPORT-005-006-${name}-${width}.png`),fullPage:true})}
     assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}

@@ -150,3 +150,26 @@ Client fields currently support required or optional text, dates and checkboxes 
 Preview the exact unsent revision before approving. Package and optional-item conditions govern document sections in the preview, client page, selected unsigned PDF and accepted snapshot. Verified clients can ask about a block and can suggest tracked text edits where you explicitly enable them. Accepting a suggestion creates a separate unapproved draft; it never changes the live offer. Unsigned PDFs use US Letter pages, the chosen brand, uploaded images and video stills, two-column text and the same block order, with the revision and “Not signed” on every page.
 
 Test qualification uses test-only `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY` injected into `node ./tests/stripe-sandbox.mjs`. After `pnpm build`, `node ./tests/collection-browser.mjs` exercises the real Payment Element at 1440 and 390. The journeys refund successful test charges and cancel unfinished intents; Stripe retains those records. They create no webhook endpoint.
+
+### One-off and recurring pricing
+
+A pricing line or optional item can recur weekly, monthly, quarterly or annually.
+Set its start date and number of installments, up to 120. Unit prices apply to
+each installment; package totals include the whole agreed term. The client sees
+the one-off amount, each recurring rate and the first-year value separately.
+The first year starts on the earliest selected recurring start date and ends
+before its first anniversary. Monthly dates clip to the last day of shorter
+months. The renewal date is the next interval after the agreed term.
+
+The schedule retains every installment and credits the deposit against the
+one-off amount first, then the earliest recurring installments. Discounts are
+allocated in integer cents; a final installment can carry a rounding adjustment.
+Use recurring pricing lines instead of a separate percentage retainer in the
+payment-term settings. Existing milestone and net terms still apply. Preview,
+client review, PDF and acceptance use the same selected quantities and cents.
+The accepted schedule is frozen. These terms authorize no automatic payment,
+renewal, invoice or message; PAY-003 and RENEW-002 must consume the frozen terms
+when those execution capabilities ship.
+
+The follow-up queue ranks package values using one-off value plus the first
+year of recurring fees, retaining separate currency totals.

@@ -1,3 +1,4 @@
+import { recurrenceEditor } from './recurring'
 import { displayOptions } from '../discounts'
 import { escape, hidden, money } from './shared'
 
@@ -10,6 +11,7 @@ function lineEditor(line: any = {}): string {
     ${textInput('Quantity', 'quantity', line.quantity ?? '1', 'required inputmode="decimal" pattern="(?=.*[1-9])[0-9]+([.][0-9]{1,3})?" title="Enter a positive quantity with up to three decimal places, at most 1000000."')}
     ${textInput('Unit', 'unit', line.unit, 'required maxlength="40" placeholder="e.g. hours, guests, items"')}
     ${textInput('Unit price in USD', 'unitPrice', line.unitPrice, 'required inputmode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" title="Enter a USD amount with up to two decimal places, at most 10000000."')}
+    ${recurrenceEditor(line,'pricing')}
     ${textInput('Group (optional)', 'group', line.group, 'maxlength="200"')}
     ${textInput('Line discount (%)', 'discountPercent', (line.discountBps??0)/100, 'inputmode="decimal"')}
     ${textInput('Line discount in USD', 'discountAmount', ((line.discountFixedCents??0)/100).toFixed(2), 'inputmode="decimal"')}
@@ -43,7 +45,7 @@ function lineDetails(line: any, currency: string): string {
     <dl><dt>Quantity</dt><dd>${escape(line.quantity)}</dd><dt>Unit</dt><dd>${escape(line.unit || '—')}</dd>
     ${line.unitPrice!==undefined?`<dt>Unit price</dt><dd>${money(Number(line.unitPrice) * 100, currency)}</dd>`:''}
     ${line.group ? `<dt>Group</dt><dd>${escape(line.group)}</dd>` : ''}
-    ${line.discountBps||line.discountFixedCents?`<dt>Line discount</dt><dd>${escape((line.discountBps??0)/100)}% and ${money(line.discountFixedCents??0,currency)}</dd>`:''}${line.groupDiscountBps||line.groupDiscountFixedCents?`<dt>Group discount</dt><dd>${escape((line.groupDiscountBps??0)/100)}% and ${money(line.groupDiscountFixedCents??0,currency)} once for ${escape(line.group)}</dd>`:''}<dt>Line total</dt><dd>${money(line.lineTotalCents, currency)}</dd></dl></article></li>`
+    ${line.discountBps||line.discountFixedCents?`<dt>Line discount</dt><dd>${escape((line.discountBps??0)/100)}% and ${money(line.discountFixedCents??0,currency)}</dd>`:''}${line.groupDiscountBps||line.groupDiscountFixedCents?`<dt>Group discount</dt><dd>${escape((line.groupDiscountBps??0)/100)}% and ${money(line.groupDiscountFixedCents??0,currency)} once for ${escape(line.group)}</dd>`:''}${line.recurrence?`<dt>Recurring terms</dt><dd>${escape(line.recurrence.interval)} · ${line.recurrence.term} installments from ${escape(line.recurrence.startsOn)}</dd>`:""}<dt>${line.recurrence?"Term total":"Line total"}</dt><dd>${money(line.lineTotalCents, currency)}</dd></dl></article></li>`
 }
 
 export function pricingTables(options: any[], currency: string): string {

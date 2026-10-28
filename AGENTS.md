@@ -140,9 +140,8 @@ Native-session/runtime evidence: https://github.com/runeditrun/base/tree/a06bd06
 
 ## Lander-Regenerate
 
-`CONTRACT.md` is the acceptance and status source. Run
-`node scripts/contract-docs.mjs write` after changing it, then
-`node scripts/contract-docs.mjs check`. This regenerates `ACCEPTANCE.md`,
-`docs/CLAIMS.md` and the Status summary counts. Regenerate the edition source
-lock last with `node scripts/edition-authoring/cli.mjs lock`, then check it
-with `node scripts/edition-authoring/cli.mjs check`.
+CONTRACT.md is the acceptance and status source. After changing it, run
+`node scripts/contract-docs.mjs write` and `node scripts/contract-docs.mjs check`.
+Commit ACCEPTANCE.md and docs/CLAIMS.md with CONTRACT.md, then regenerate
+the source lock with `node scripts/edition-authoring/cli.mjs lock` and check
+it with `node scripts/edition-authoring/cli.mjs check`.

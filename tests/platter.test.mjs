@@ -2766,66 +2766,115 @@ test('TRACK-003 forwarded viewers verify their own mailbox before owner conversi
 }))
 
 test('REPORT-002 100 decided proposals match hand-computed metrics in every grouping and scheduled CSV',()=>run(async h=>{
- const {salesFixture,expectedPerformance,metricValues}=await import('./performance-fixture.mjs'),f=await salesFixture(h)
- for(const dimension of ['owner','template','service','segment','quarter']){
-  const report=await h.send('/api/platter/performance?groupBy='+dimension,undefined,h.owner);assert.equal(report.status,200,report.text);assert.equal(report.value.count,100)
-  const keys={owner:[f.own.id,f.other.id],template:f.templates.map(t=>t.id),service:f.catalog.map(c=>c.id),segment:['Agency','Enterprise'],quarter:['2025-Q1','2025-Q2']}[dimension]
-  assert.deepEqual(report.value.rows.map(r=>r.key).sort(),[...keys].sort(),dimension+' explicit group set')
-  assert.deepEqual(keys.map(key=>metricValues(report.value.rows.find(r=>r.key===key))),expectedPerformance[dimension],dimension+' exact independent metrics')
-  assert.deepEqual(metricValues(report.value.totals[0]),[100,50,50,5000,4,5,200000,{Budget:20,Timing:30}])
- }
- const filtered=await h.send('/api/platter/performance?groupBy=quarter&segment=Agency&quarter=2025-Q1',undefined,h.owner);assert.equal(filtered.value.count,25);assert.deepEqual(metricValues(filtered.value.rows[0]),[25,20,5,8000,2,3,100000,{Budget:5}])
- assert.equal((await h.send('/api/platter/performance?segment=Absent',undefined,h.owner)).value.count,0)
- assert.equal((await h.send('/api/platter/performance?groupBy=private',undefined,h.owner)).status,400)
- const screen=await h.send('/app?view=sales-performance',undefined,h.owner);assert.equal(screen.status,200);assert.match(screen.text,/100 decided proposals/);assert.match(screen.text,/60.00%/)
- const query='groupBy=quarter&segment=Agency',csv=await h.send('/api/platter/performance.csv?'+query,undefined,h.owner);assert.equal(csv.status,200);assert.match(csv.text,/2025-Q1,USD,25,20,5,80.00,2,20,3,20,1000.00/)
- const second=await h.signIn(f.other.email)
- for(const path of ['/api/platter/performance','/api/platter/performance.csv','/app?view=sales-performance'])assert.equal((await h.send(path,undefined,second)).status,403)
- assert.equal((await h.send('/api/platter/performance')).status,401)
- await h.cmd('report.schedule',{report:'sales-performance',filters:query,cadence:'weekly',weekday:1,hour:9,recipients:[h.auth.OWNER_EMAIL,f.other.email]})
- const schedule=(await h.state()).reportSchedules[0];await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(schedule.nextRunAt),cron:'*/15 * * * *'});await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(schedule.nextRunAt),cron:'*/15 * * * *'})
- const mail=(await h.state()).reportOutbox;assert.equal(mail.length,2);for(const m of mail){assert.match(m.subject,/sales performance/);assert.ok(m.body.includes(csv.text),'weekly report matches the filtered screen CSV');assert.match(m.body,/50 decided proposals/)}
- const promotion=await h.send('/auth/operator/role',{operatorId:f.other.id,role:'admin'},h.owner);assert.equal(promotion.status,200)
- const admin=await h.signIn(f.other.email);assert.equal((await h.send('/api/platter/performance',undefined,admin)).status,403);assert.equal((await h.state(admin)).salesHistory,undefined);assert.deepEqual((await h.state(admin)).reportOutbox,[]);assert.deepEqual((await h.state(admin)).reportSchedules,[])
- await h.cmd('report.schedule',{report:'sales-performance',cadence:'weekly',weekday:1,hour:9,recipients:[f.other.email]},admin,403)
- await h.db.prepare("UPDATE p_payment_records SET received_on=(SELECT substr(datetime(a.accepted_at/1000,'unixepoch'),1,10) FROM p_acceptances a WHERE a.proposal_id=p_payment_records.proposal_id)").run()
- assert.equal((await h.send('/api/platter/performance',undefined,h.owner)).value.totals[0].medianTimeToPayMs,0,'same-day date-only receipts have zero elapsed days')
- // Missing sign and payment facts remain null, rather than being invented from creation or invoice exports.
- await h.db.prepare('UPDATE p_expiry SET sent_at=NULL').run();await h.db.prepare('DELETE FROM p_payment_records').run()
- const unknown=await h.send('/api/platter/performance',undefined,h.owner);assert.equal(unknown.value.totals[0].medianTimeToSignMs,null);assert.equal(unknown.value.totals[0].medianTimeToPayMs,null)
- const historical=await h.db.prepare("SELECT * FROM p_proposals WHERE id='synthetic-platter-history-3-24'").first(),aud={...historical,id:'synthetic-platter-aud',currency:'AUD'},columns=Object.keys(aud)
- await h.db.prepare(`INSERT INTO p_proposals(${columns.join(',')}) VALUES(${columns.map(()=>'?').join(',')})`).bind(...Object.values(aud)).run();await h.cmd('proposal.win',{id:aud.id,version:1,reason:'Budget'})
- const currencies=(await h.send('/api/platter/performance',undefined,h.owner)).value.totals;assert.deepEqual(currencies.map(r=>[r.currency,r.decided,r.won,r.averageDealCents]),[['AUD',1,1,400000],['USD',100,50,200000]],'an explicit won override is counted without combining currencies')
+ const {reportPerformance}=await import('./performance-http.mjs');await reportPerformance(h)
 }))
 
 test('AI-004 historical range and three linked examples never change prices before explicit apply',()=>run(async h=>{
- const {salesFixture}=await import('./performance-fixture.mjs'),f=await salesFixture(h),before=await h.db.prepare('SELECT options,version FROM p_proposals WHERE id=?').bind(f.draft.id).first()
- // Distractors independently challenge the item, segment, currency and unit boundaries.
- const original=await h.db.prepare("SELECT * FROM p_proposals WHERE id='synthetic-platter-history-0-24'").first()
- for(const [n,patch] of [{client_id:f.clients[1].id},{catalogId:f.catalog[1].id},{currency:'AUD'},{unit:'hour'},{won:true}].entries()){
-  const row={...original,id:'synthetic-platter-distractor-'+n,...(patch.client_id?{client_id:patch.client_id}:{}),...(patch.currency?{currency:patch.currency}:{})},options=JSON.parse(row.options)
-  Object.assign(options[0].tables[0].lines[0],{unitPrice:'0.01',...(patch.catalogId?{catalogId:patch.catalogId}:{}),...(patch.unit?{unit:patch.unit}:{})});row.options=JSON.stringify(options)
-  const columns=Object.keys(row);await h.db.prepare(`INSERT INTO p_proposals(${columns.join(',')}) VALUES(${columns.map(()=>'?').join(',')})`).bind(...Object.values(row)).run()
-  await h.db.prepare("INSERT INTO p_outcome_records(proposal_id,revision,kind,actor_id,actor_role,actor_email,occurred_at,reason) VALUES(?,1,?,?,'owner',?,?,'Budget')").bind(row.id,patch.won?'won':'lost',f.own.id,f.own.email,Date.UTC(2025,0,15)).run()
- }
- let p=(await h.state()).proposals.find(p=>p.id===f.draft.id),suggestion=p.priceSuggestions[0]
- assert.equal(p.priceSuggestions.length,1);assert.deepEqual([suggestion.minCents,suggestion.maxCents,suggestion.suggestedCents,suggestion.sampleSize],[100000,400000,250000,50]);assert.equal(suggestion.examples.length,3);assert.equal(new Set(suggestion.examples.map(e=>e.id)).size,3)
- const screen=await h.send('/app/proposal?id='+f.draft.id,undefined,h.owner);assert.equal(screen.status,200);for(const example of suggestion.examples){assert.ok(screen.text.includes('/app/proposal?id='+example.id));assert.equal((await h.send('/app/proposal?id='+example.id,undefined,h.owner)).status,200)}
- assert.deepEqual(await h.db.prepare('SELECT options,version FROM p_proposals WHERE id=?').bind(f.draft.id).first(),before,'read and suggestion leave price unchanged')
- const input={id:f.draft.id,version:1,optionId:'one',tableIndex:0,lineIndex:0,suggestedCents:250000}
- await h.cmd('proposal.share',{id:f.draft.id,operatorId:f.other.id});const member=await h.signIn(f.other.email);assert.equal((await h.send('/app/proposal?id='+f.draft.id,undefined,member)).status,200);await h.cmd('pricing.suggested',input,member,403);await h.cmd('pricing.suggested',{...input,suggestedCents:1},h.owner,409)
- await h.cmd('pricing.suggested',input)
- p=(await h.state()).proposals.find(p=>p.id===f.draft.id);assert.equal(p.options[0].tables[0].lines[0].unitPrice,'2500.00');assert.equal(p.options[0].tables[0].lines[0].catalogId,f.catalog[0].id);assert.equal(p.options[0].cents,500000);assert.equal(p.status,'draft');assert.equal(p.approved_at,null)
- await h.cmd('pricing.suggested',input,h.owner,409)
- await h.cmd('client.segment',{id:f.clients[0].id,segment:'No comparable history'})
- // Reclassify only the current client: all its historical rows move with that classification; the other segment still never contributes.
- await h.cmd('client.segment',{id:f.clients[0].id,segment:''});p=(await h.state()).proposals.find(p=>p.id===f.draft.id);assert.deepEqual(p.priceSuggestions,[])
- await h.cmd('client.segment',{id:f.clients[0].id,segment:'Agency'})
- await h.cmd('proposal.approve',{id:p.id,version:p.version,revision:p.revision});const approved=(await h.state()).proposals.find(v=>v.id===p.id);await h.cmd('proposal.send',{id:p.id,version:approved.version});const sent=(await h.state()).proposals.find(v=>v.id===p.id);await h.cmd('pricing.suggested',{...input,version:sent.version},h.owner,409)
- await h.cmd('pricing.suggested',{...input,id:'synthetic-platter-history-0-00',version:1},h.owner,409)
- const native=await h.cmd('proposal.prepare',{...f.base,clientId:f.clients[0].id,title:'Native catalog comparison'})
- await h.cmd('catalog.insert',{id:native.id,version:1,catalogId:f.catalog[0].id,catalogVersion:1,optionId:'one',quantity:'1'})
- const linked=(await h.state()).proposals.find(p=>p.id===native.id).priceSuggestions;assert.equal(linked.length,1);assert.equal(linked[0].catalogId,f.catalog[0].id);assert.equal(linked[0].sampleSize,50,'native catalog insertion retains the historical comparison identity')
-
- assert.ok((await h.send('/api/platter/audit?action=pricing.suggested',undefined,h.owner)).value.rows.some(r=>r.subject===p.id))
+ const {priceHistory}=await import('./performance-http.mjs');await priceHistory(h)
 }))
+
+test('PRICE-003 recurring fees keep exact schedules, first-year queue value and immutable selected documents',async()=>{
+ const h=await harness({assetsDirectory:'public'});try{
+ const {recurringJourney}=await import('./recurring-journey.mjs')
+ await recurringJourney(h,{offer,verified})
+ }finally{await h.close()}
+})
+
+test('AUTO-004 scoped REST drafting, immutable owner keys and human-only authority',async()=>{
+ const h=await harness();try{
+  const api=(path,input,token,cookie='')=>h.send('/api/platter/v1'+path,input,cookie,token?{authorization:'Bearer '+token}:{})
+  const client=await h.cmd('client.save',{name:'Synthetic API client',email:'synthetic-platter-94@studio.example'}),p=await h.cmd('proposal.prepare',{...offer,title:'Plan for {{Client.Company}}',scope:'Contact {{Contact.Title}} at {{Client.Company}}.',clientId:client.id}),template=await h.cmd('template.save',{id:p.id,version:1,name:'Synthetic API template'})
+  assert.equal((await api('/keys',{label:'No session',scopes:['proposals.write']})).status,401)
+  await h.send('/auth/invite',{email:'synthetic-platter-91@studio.example',displayName:'API member',role:'member',returnTo:'/app'},h.owner)
+  const member=await h.signIn('synthetic-platter-91@studio.example')
+  assert.equal((await api('/keys',{label:'Member key',scopes:['proposals.write']},null,member)).status,403)
+  assert.equal((await h.send('/api/platter/v1/keys',{label:'Unsafe origin',scopes:['proposals.write']},h.owner,{origin:'https://elsewhere.example'})).status,403)
+  const readonly=(await api('/keys',{label:'Read only',scopes:['proposals.read']},null,h.owner)).value
+  assert.equal((await api('/proposals',{templateId:template.id,templateVersion:1,clientId:client.id},readonly.token)).status,403)
+  const key=(await api('/keys',{label:'Draft and selected reads',scopes:['proposals.write','templates.read','proposals.read','analytics.read','payments.read','agreements.read']},null,h.owner)).value
+  const templates=await api('/templates',undefined,key.token);assert.equal(templates.status,200);assert.deepEqual(templates.value,[{id:template.id,name:'Synthetic API template',version:1}])
+  const made=await api('/proposals',{templateId:template.id,templateVersion:1,clientId:client.id},key.token);assert.equal(made.status,200,made.text)
+  const rows=await api('/proposals',undefined,key.token);assert.equal(rows.status,200);assert.deepEqual(rows.value.map(r=>[r.id,r.status]).sort(),[[p.id,'draft'],[made.value.id,'draft']].sort())
+  assert.deepEqual((await api('/analytics',undefined,key.token)).value,[{status:'draft',count:2}])
+  assert.deepEqual((await api('/payments',undefined,key.token)).value,[])
+  assert.deepEqual((await api('/agreements',undefined,key.token)).value,[])
+  for(const verb of ['approve','send','sign','refund'])assert.equal((await api('/proposals/'+made.value.id+'/'+verb,{},key.token)).status,404)
+  assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+readonly.token})).status,403,'REST scopes cannot escape through the legacy agent door')
+  assert.equal((await api('/keys/'+key.id,{scopes:['proposals.read']},null,h.owner)).status,404)
+  assert.doesNotMatch((await api('/keys',undefined,null,h.owner)).text,new RegExp(key.token+'|'+readonly.token))
+  await h.cmd('proposal.approve',{id:made.value.id,version:1,revision:1});const missing=await h.send('/api/platter/command',{name:'proposal.send',input:{id:made.value.id,version:2}},h.owner);assert.equal(missing.status,409);assert.match(missing.text,/Contact.Title/);assert.match(missing.text,/Client.Company/)
+  assert.equal((await api('/proposals/'+made.value.id+'/variables',{version:2,values:{'Client.Company':'Synthetic client','Contact.Title':'Director'}},readonly.token)).status,403)
+  const filled=await api('/proposals/'+made.value.id+'/variables',{version:2,values:{'Client.Company':'Synthetic client','Contact.Title':'Director'}},key.token);assert.equal(filled.status,200,filled.text)
+  const current=(await h.state()).proposals.find(r=>r.id===made.value.id);assert.equal(current.scope,'Contact Director at Synthetic client.');assert.equal(current.title,'Plan for Synthetic client');assert.equal(current.status,'draft');assert.equal(current.approved_by,null)
+  await h.cmd('proposal.approve',{id:made.value.id,version:3,revision:2});const sent=await h.cmd('proposal.send',{id:made.value.id,version:4});assert.ok(sent.shareUrl)
+  assert.equal((await api('/proposals/'+made.value.id+'/variables',{version:5,values:{'Client.Company':'Changed'}},key.token)).status,400)
+  const path=new URL(sent.shareUrl).pathname,cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic API signer',optionId:'one',consent:true},cookie)).status,200)
+  const payment=await h.cmd('payment.record',{id:made.value.id,method:'wire',amount:'600',receivedOn:'2026-10-25',reference:'synthetic-platter-95',consent:true})
+  assert.deepEqual((await api('/payments',undefined,key.token)).value,[{id:payment.id,proposalId:made.value.id,amountCents:60000,currency:'USD',method:'wire',receivedOn:'2026-10-25'}])
+  const agreements=(await api('/agreements',undefined,key.token)).value;assert.equal(agreements.length,1);assert.equal(agreements[0].id,made.value.id);assert.equal(agreements[0].totalCents,240000);assert.equal(agreements[0].revision,2)
+  assert.equal((await api('/proposals',undefined,readonly.token)).value.find(r=>r.id===made.value.id).status,'accepted')
+  for(const route of ['/templates','/analytics','/payments','/agreements'])assert.equal((await api(route,undefined,readonly.token)).status,403)
+  await api('/keys/'+key.id+'/revoke',{},null,h.owner);assert.equal((await api('/templates',undefined,key.token)).status,401)
+  await h.db.prepare('UPDATE p_agent_keys SET expires_at=0 WHERE id=?').bind(readonly.id).run();assert.equal((await api('/proposals',undefined,readonly.token)).status,401)
+ }finally{await h.close()}
+})
+
+test('AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation',async()=>{
+ const {createHmac}=await import('node:crypto'),received=[]
+ let refuse=true,revokeDuringDelivery=null
+ const h=await harness({outboundService:async request=>{received.push({url:request.url,body:await request.text(),headers:Object.fromEntries(request.headers)});if(revokeDuringDelivery){const id=revokeDuringDelivery;revokeDuringDelivery=null;assert.equal((await h.send('/api/platter/v1/webhooks/'+id+'/revoke',{},h.owner)).status,200)}return new Response(refuse?'synthetic-platter-92':null,{status:refuse?503:204})}})
+ try{
+  const api=(path,input,cookie=h.owner)=>h.send('/api/platter/v1'+path,input,cookie)
+  assert.equal((await api('/webhooks',{url:'https://hooks.example.com/events',consent:false})).status,400)
+  for(const url of ['http://hooks.example.com/events','https://127.0.0.1/events','https://localhost/events','https://hooks.example.com/events?token=private'])assert.equal((await api('/webhooks',{url,consent:true})).status,400)
+  const hook=(await api('/webhooks',{url:'https://hooks.example.com/events',consent:true})).value;assert.ok(hook.secret)
+  const {p,path}=await sent(h),cookie=await verified(h,path)
+  const accepted=await h.send(path+'/action?name=accept',{name:'Synthetic Signer',optionId:'one',consent:true},cookie);assert.equal(accepted.status,200)
+  const now=Date.now()+1000,cron=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+  await cron(now)
+  let log=await api('/deliveries');assert.equal(log.status,200);assert.deepEqual(log.value.map(d=>d.type).sort(),['proposal.approved','proposal.created','proposal.sent','proposal.signed'])
+  assert.ok(log.value.every(d=>d.status==='retry'&&d.attempts===1&&d.httpStatus===503),'all failed deliveries are retained for retry')
+  const sentEvent=received.find(r=>JSON.parse(r.body).type==='proposal.sent'),signedEvent=received.find(r=>JSON.parse(r.body).type==='proposal.signed')
+  assert.ok(sentEvent&&signedEvent)
+  for(const r of received){const event=JSON.parse(r.body);assert.equal(r.url,hook.url);assert.equal(r.headers['platter-event-id'],event.id);assert.equal(r.headers['platter-signature'],'v1='+createHmac('sha256',hook.secret).update(r.headers['platter-timestamp']+'.'+r.body).digest('hex'));assert.notEqual(r.headers['platter-signature'],'v1='+createHmac('sha256',hook.secret).update(r.headers['platter-timestamp']+'.'+r.body+' ').digest('hex'));assert.deepEqual(Object.keys(event.data).sort(),['id','revision','status']);assert.equal(event.data.id,p.id);assert.doesNotMatch(r.body,/cost|margin|email|token|secret|scope/i)}
+  refuse=false;await cron(now+60001)
+  log=await api('/deliveries');assert.ok(log.value.every(d=>d.status==='delivered'&&d.attempts===2&&d.httpStatus===204))
+  assert.equal(received.filter(r=>JSON.parse(r.body).id===JSON.parse(sentEvent.body).id).length,2,'retry keeps the same event id')
+  const n=received.length;await cron(now+120002);assert.equal(received.length,n,'delivered events are not resent')
+  assert.doesNotMatch((await api('/webhooks')).text,new RegExp(hook.secret))
+  assert.doesNotMatch((await h.state()).proposals.map(p=>JSON.stringify(p)).join(''),new RegExp(hook.secret))
+  await api('/webhooks/'+hook.id+'/revoke',{});const client=(await h.state()).clients[0];await h.cmd('proposal.prepare',{...offer,clientId:client.id});await cron(now+180003);assert.equal(received.length,n,'revocation stops future delivery')
+  const second=(await api('/webhooks',{url:'https://hooks.example.com/second',consent:true})).value
+  const queued=await h.cmd('proposal.prepare',{...offer,clientId:client.id});await h.cmd('proposal.approve',{id:queued.id,version:1,revision:1});revokeDuringDelivery=second.id
+  await cron(now+240004);assert.equal(received.length,n+1,'revocation during one request withholds the other preselected deliveries')
+ }finally{await h.close()}
+})
+
+test('AUTO-004 published route reference matches live methods and webhook schemas both ways',async()=>{
+ const h=await harness();try{
+  const spec=await h.send('/api/platter/v1/openapi.json');assert.equal(spec.status,200)
+  const reference=await h.send('/api/platter/v1/reference');assert.equal(reference.status,200)
+  const documented=[]
+  for(const [path,methods] of Object.entries(spec.value.paths))for(const [method,operation] of Object.entries(methods)){
+   assert.ok(operation['x-scope']);documented.push(method.toUpperCase()+' '+path)
+   const response=await h.send(path.replace('{id}','synthetic-platter-93'),method==='post'?{}:undefined)
+   assert.notEqual(response.status,404,'documented route exists: '+method+' '+path)
+  }
+  const rendered=[...reference.text.matchAll(/data-route="([^"]+)"/g)].map(m=>m[1]);assert.deepEqual(rendered.sort(),documented.sort())
+  assert.equal((await h.send('/api/platter/v1/not-registered')).status,404)
+  const validate=(schema,value)=>{assert.equal(Array.isArray(value)?'array':Number.isInteger(value)?'integer':typeof value,schema.type);if(schema.enum)assert.ok(schema.enum.includes(value));if(schema.type==='object'){for(const key of schema.required)assert.ok(Object.hasOwn(value,key));assert.deepEqual(Object.keys(value).sort(),Object.keys(schema.properties).sort());for(const [key,item] of Object.entries(value))validate(schema.properties[key],item)}}
+  const events=spec.value['x-webhook-events'];assert.ok(Object.keys(events).length>=2)
+  for(const [type,event] of Object.entries(events)){validate(spec.value.components.schemas.LifecycleEvent,event.example);assert.equal(event.example.type,type);assert.ok(reference.text.includes(type))}
+  const {p,client}=await draft(h);await h.cmd('proposal.revise',{...offer,clientId:client.id,id:p.id,version:1,scope:'Synthetic revised scope'});await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const share=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+  assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},cookie)).status,200)
+  const make=()=>h.cmd('proposal.prepare',{...offer,clientId:client.id})
+  const withdrawn=await make();await h.cmd('proposal.approve',{id:withdrawn.id,version:1,revision:1});await h.cmd('proposal.send',{id:withdrawn.id,version:2});await h.cmd('proposal.withdraw',{id:withdrawn.id,version:3,reason:'Synthetic withdrawn',notify:'no'})
+  const lost=await make();await h.cmd('proposal.approve',{id:lost.id,version:1,revision:1});await h.cmd('proposal.send',{id:lost.id,version:2});await h.cmd('proposal.lose',{id:lost.id,version:3,reason:'Synthetic lost',notify:'no'})
+  const declined=await make();await h.cmd('proposal.approve',{id:declined.id,version:1,revision:1});const declineShare=await h.cmd('proposal.send',{id:declined.id,version:2}),declinePath=new URL(declineShare.shareUrl).pathname,declineCookie=await verified(h,declinePath);assert.equal((await h.send(declinePath+'/action?name=decline',{revision:1,reason:'Synthetic declined'},declineCookie)).status,410)
+  const won=await make();await h.cmd('proposal.approve',{id:won.id,version:1,revision:1});await h.cmd('proposal.send',{id:won.id,version:2});await h.cmd('proposal.win',{id:won.id,version:3,reason:'Synthetic won',notify:'no'})
+  const expiring=await make();await h.cmd('expiry.set',{id:expiring.id,version:1,mode:'days',days:1});await h.cmd('proposal.approve',{id:expiring.id,version:2,revision:1});await h.cmd('proposal.send',{id:expiring.id,version:3})
+  const deadline=(await h.state()).proposals.find(r=>r.id===expiring.id).expiry.deadlineAt;await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(deadline+1),cron:'*/15 * * * *'})
+  const emitted=(await h.db.prepare('SELECT * FROM p_webhook_events').all()).results;assert.deepEqual([...new Set(emitted.map(e=>e.type))].sort(),['proposal.approved','proposal.created','proposal.declined','proposal.expired','proposal.lost','proposal.revised','proposal.sent','proposal.signed','proposal.withdrawn','proposal.won'])
+  for(const event of emitted){assert.ok(events[event.type]);validate(spec.value.components.schemas.LifecycleEvent,{id:event.id,type:event.type,occurredAt:event.occurred_at,data:{id:event.proposal_id,revision:event.revision,status:event.status}})}
+ }finally{await h.close()}
+})

@@ -1,3 +1,4 @@
+import { feeLines } from '../recurring'
 import { depositCents, paymentTerms, scheduleLines } from '../payment-terms'
 import { displayOptions } from '../discounts'
 import { documentOf } from './blocks'
@@ -46,8 +47,9 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  if(selected.discount&&!selected.concealDiscount)pdf.text(`Package discount: ${selected.discount.bps/100}% off ${amount(selected.discount.grossCents,currency)}; discount ${amount(selected.discount.cents,currency)}${selected.discount.fixedCents?`; fixed reduction ${amount(selected.discount.fixedCents,currency)}`:''}`)
  pdf.text(`Selected option total: ${amount(selected.cents, currency)}`)
  pdf.text(`Deposit due: ${amount(deposit(selected.cents), currency)}`)
- if(selection.paymentSchedule){pdf.heading('Payment schedule');pdf.text('Informational schedule. No automatic charges or invoices. Monthly retainers are additional to the package price.');for(const line of scheduleLines(selection.paymentSchedule,currency))pdf.text(line)}
- if(selection.items.length){pdf.heading('Selected optional items');for(const item of selection.items)pdf.text(`${item.label}: ${item.quantity} x ${amount(item.unitCents,currency)} = ${amount(item.totalCents,currency)}`)}
+ for(const line of feeLines(selection.fees,currency))pdf.text(line)
+ if(selection.paymentSchedule){pdf.heading('Payment schedule');pdf.text('Informational schedule. No automatic charges or invoices. Recurring pricing installments are included in the term total; any separately configured monthly retainer is additional.');for(const line of scheduleLines(selection.paymentSchedule,currency))pdf.text(line)}
+ if(selection.items.length){pdf.heading('Selected optional items');for(const item of selection.items)pdf.text(`${item.label}: ${item.quantity} x ${amount(item.unitCents,currency)}${item.recurrence?` x ${item.recurrence.term} installments`:""} = ${amount(item.totalCents,currency)}`)}
 
  const doc=documentOf(view)
  if(doc.brand?.logoId){need(media,'Document media is unavailable',503);await pdf.image(await media(doc.brand.logoId),80)}
@@ -59,7 +61,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   else if(block.type==='image'||block.type==='video'){need(media,'Document media is unavailable',503);await pdf.image(await media(block.type==='video'?block.posterId!:block.assetId!));if(block.type==='video'){pdf.text('Video: '+(block.alt??block.title));if(mediaLink)pdf.link(mediaLink(block.assetId!))}if(block.text)pdf.text(block.text)}
   else if(block.type==='gallery'){need(media,'Document media is unavailable',503);for(const image of block.images??[]){await pdf.image(await media(image.assetId));pdf.text(image.alt)}if(block.text)pdf.text(block.text)}
   else if(block.type==='embed'){need(media,'Document media is unavailable',503);await pdf.image(await media(block.posterId!));pdf.text(block.alt??block.title);pdf.link(block.url!);if(block.text)pdf.text(block.text)}
-  else if(block.type==='pricing'){const o=displayOptions(options).find((o:any)=>o.id===block.optionId),t=o?.tables?.[block.tableIndex??0];if(t){pdf.heading(t.name);for(const l of t.lines){pdf.text(`${l.group?l.group+': ':''}${l.name}: ${l.quantity} ${l.unit}${l.unitPrice!==undefined?' x '+amount(Math.round(Number(l.unitPrice)*100),currency):''} = ${amount(l.lineTotalCents,currency)}`);if(l.description)pdf.text(l.description);if(l.discountBps||l.discountFixedCents)pdf.text(`Line discount for ${l.name}: ${(l.discountBps??0)/100}% and ${amount(l.discountFixedCents??0,currency)}`);if(l.groupDiscountBps||l.groupDiscountFixedCents)pdf.text(`Group discount for ${l.group}: ${(l.groupDiscountBps??0)/100}% and ${amount(l.groupDiscountFixedCents??0,currency)} once`)}for(const g of t.groups)pdf.text(`${g.name||'Ungrouped'} subtotal: ${amount(g.subtotalCents,currency)}`);pdf.text(`Table subtotal: ${amount(t.subtotalCents,currency)}`)}}
+  else if(block.type==='pricing'){const o=displayOptions(options).find((o:any)=>o.id===block.optionId),t=o?.tables?.[block.tableIndex??0];if(t){pdf.heading(t.name);for(const l of t.lines){pdf.text(`${l.group?l.group+': ':''}${l.name}: ${l.quantity} ${l.unit}${l.unitPrice!==undefined?' x '+amount(Math.round(Number(l.unitPrice)*100),currency):''}${l.recurrence?` x ${l.recurrence.term} installments`:''} = ${amount(l.lineTotalCents,currency)}`);if(l.description)pdf.text(l.description);if(l.discountBps||l.discountFixedCents)pdf.text(`Line discount for ${l.name}: ${(l.discountBps??0)/100}% and ${amount(l.discountFixedCents??0,currency)}`);if(l.groupDiscountBps||l.groupDiscountFixedCents)pdf.text(`Group discount for ${l.group}: ${(l.groupDiscountBps??0)/100}% and ${amount(l.groupDiscountFixedCents??0,currency)} once`)}for(const g of t.groups)pdf.text(`${g.name||'Ungrouped'} subtotal: ${amount(g.subtotalCents,currency)}`);pdf.text(`Table subtotal: ${amount(t.subtotalCents,currency)}`)}}
   else if(block.type==='columns')pdf.columns(block.text.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'),(block.second??'').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'))
   else {pdf.text(block.text.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'));if(block.second)pdf.text(block.second.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/_([^_]+)_/g,'$1'))}
  }
@@ -79,7 +81,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   for(const [tableIndex,table] of (option.tables??[]).entries()){
    if(doc.blocks.some(b=>b.type==='pricing'&&b.optionId===option.id&&b.tableIndex===tableIndex))continue
    pdf.heading(table.name)
-   for(const line of table.lines){pdf.text(`${line.group ? line.group+': ' : ''}${line.name}`,12);if(line.description)pdf.text(line.description);pdf.text(`${line.quantity} ${line.unit}${line.unitPrice!==undefined?' x '+amount(Number(line.unitPrice.replace('.','')),currency):''} = ${amount(line.lineTotalCents,currency)}`)}
+   for(const line of table.lines){pdf.text(`${line.group ? line.group+': ' : ''}${line.name}`,12);if(line.description)pdf.text(line.description);pdf.text(`${line.quantity} ${line.unit}${line.unitPrice!==undefined?' x '+amount(Number(line.unitPrice.replace('.','')),currency):''}${line.recurrence?` x ${line.recurrence.term} installments`:''} = ${amount(line.lineTotalCents,currency)}`)}
    for(const line of table.lines){if(line.discountBps||line.discountFixedCents)pdf.text(`Line discount for ${line.name}: ${(line.discountBps??0)/100}% and ${amount(line.discountFixedCents??0,currency)}`);if(line.groupDiscountBps||line.groupDiscountFixedCents)pdf.text(`Group discount for ${line.group}: ${(line.groupDiscountBps??0)/100}% and ${amount(line.groupDiscountFixedCents??0,currency)} once`)}
    for(const group of table.groups)pdf.text(`${group.name||'Ungrouped'} subtotal: ${amount(group.subtotalCents,currency)}`)
    pdf.text(`Table subtotal: ${amount(table.subtotalCents,currency)}`,12)

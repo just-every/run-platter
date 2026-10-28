@@ -760,3 +760,22 @@ test('REPORT-002 and AI-004 compiled report filters and explicit price applicati
   await capture('applied')
  }finally{await context?.close();await browser?.close();await h?.close();await edge?.close()}
 })
+
+test('AUTO-004 compiled public API reference exposes scoped operations and signed event examples', {timeout:120000},async()=>{
+ let app,browser
+ try{
+  app=await installedApp({scheduled:true})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  const context=await browser.newContext({viewport:{width:1440,height:900}}),page=await context.newPage()
+  try{
+   assert.equal((await page.goto(app.origin+'/api/platter/v1/reference')).status(),200)
+   const spec=await (await context.request.get(app.origin+'/api/platter/v1/openapi.json')).json()
+   assert.equal(await page.locator('[data-route]').count(),Object.values(spec.paths).reduce((n,methods)=>n+Object.keys(methods).length,0))
+   for(const event of Object.keys(spec['x-webhook-events']))assert.equal(await page.getByRole('heading',{name:event,exact:true}).count(),1)
+   for(const width of [1440,390]){
+    await page.setViewportSize({width,height:900});await page.evaluate(async()=>{await document.fonts.ready})
+    if(process.env.PLATTER_SCREENSHOTS){await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true});await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,'AUTO-004-reference-'+width+'.png'),fullPage:true})}
+   }
+  }finally{await context.close()}
+ }finally{await browser?.close();await app?.close()}
+})

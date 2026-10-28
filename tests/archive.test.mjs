@@ -40,7 +40,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
   try {
     for (const path of [source,restored,erased]) await checkout(path)
     await exec(process.execPath, [resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'], { cwd:source, env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'}, maxBuffer:2e6 })
-    h=await harness({root:source,assetsDirectory:'public'})
+    h=await harness({root:source,assetsDirectory:'public',outboundService:()=>new Response(null,{status:204})})
     const p=await h.cmd('client.save',{name:'Temporary joiner',email:'temporary@studio.example'})
     const key=await h.cmd('agent.create',{label:'Excluded secret'})
     assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,200)
@@ -55,7 +55,13 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     await h.cmd('proposal.approve',{id:proposal.id,version:1,revision:1})
     await h.cmd('proposal.revise',{...offer,id:proposal.id,version:2,scope:'Studio photographs, usage licence and delivery'})
     await h.cmd('proposal.approve',{id:proposal.id,version:3,revision:2})
+    const restKey=(await h.send('/api/platter/v1/keys',{label:'Synthetic archive key',scopes:['proposals.read']},h.owner)).value
+    const webhook=(await h.send('/api/platter/v1/webhooks',{url:'https://hooks.example.com/archive',consent:true},h.owner)).value
+    assert.ok(restKey.token&&webhook.secret)
     const shared=await h.cmd('proposal.send',{id:proposal.id,version:4}),path=new URL(shared.shareUrl).pathname
+    await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+1000),cron:'*/15 * * * *'})
+    const webhookDeliveries=(await h.send('/api/platter/v1/deliveries',undefined,h.owner)).value
+    assert.deepEqual(webhookDeliveries.map(d=>d.type),['proposal.sent']);assert.ok(webhookDeliveries.every(d=>d.status==='delivered'))
     assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
     const code=(await h.state()).outbox.find(x=>x.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
     const verified=await h.send(path+'/action?name=code.verify',{code})
@@ -210,6 +216,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
     await command(source,['export','--output',old,'--no-queue'])
     const bytes=await readFile(old,'utf8')
+    for(const excluded of [restKey.token,webhook.secret])assert.ok(!bytes.includes(excluded),'API credentials stay local')
     assert.ok(bytes.includes('Temporary joiner'))
     for(const excluded of [replyKey,replyAddress,createHash('sha256').update(replyKey).digest('hex'),productionOwner.split('=')[1]])assert.ok(!bytes.includes(excluded),'FOLLOW-004 reply capability, hosted session and transport stay local')
     for(const excluded of ['Excluded secret','token_hash',key.token,createHash('sha256').update(key.token).digest('hex'),new URL(withdrawnShare.shareUrl).pathname.slice(3),new URL(shared.shareUrl).pathname.slice(3),new URL(pendingShare.shareUrl).pathname.slice(3),verified.cookie.split('=')[1],identity.owner.split('=')[1]])assert.ok(!bytes.includes(excluded),'credentials and private invitations stay local')
@@ -243,6 +250,9 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal((await h.send(path,undefined,verified.cookie)).status,404)
     const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
     const restoredState=await h.state(restoredOwner)
+    const restoredHooks=(await h.send('/api/platter/v1/webhooks',undefined,restoredOwner)).value;assert.equal(restoredHooks.length,1);assert.equal(restoredHooks[0].id,webhook.id);assert.equal(restoredHooks[0].url,webhook.url);assert.equal(restoredHooks[0].connected,0)
+    assert.deepEqual((await h.send('/api/platter/v1/deliveries',undefined,restoredOwner)).value,webhookDeliveries)
+    assert.equal((await h.send('/api/platter/v1/proposals',undefined,'',{authorization:'Bearer '+restKey.token})).status,401)
     for(const key of ['views','alerts','holds'])assert.deepEqual(restoredState.tracking[key],beforeTracking[key])
     assert.equal(restoredState.tracking.settings.enabled,false);assert.equal(restoredState.tracking.settings.alerts,false);assert.equal(restoredState.tracking.settings.retention_days,90)
     const retainedAuditIds=new Set(beforeAuditView.map(row=>row.id)),restoredAuditView=(await h.send('/api/platter/audit',undefined,restoredOwner)).value.rows.filter(row=>retainedAuditIds.has(row.id))

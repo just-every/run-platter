@@ -1,3 +1,4 @@
+import { feeLines } from '../recurring'
 import { itemChoices } from './packages'
 import { escape, hidden, money, panel, proposalPath } from './shared'
 import { document } from './shell'
@@ -10,7 +11,7 @@ export function previewSelection(view:any) {
  const selected=view.preview.selection
  const identity=[...new URLSearchParams(view.preview.query)].filter(([key])=>!['optionId','items'].includes(key)).map(([key,value])=>hidden(key,value)).join('')
  const choices=view.options.map((option:any)=>`<option value="${escape(option.id)}"${option.id===selected.option.id?' selected':''}>${escape(option.label)}</option>`).join('')
- return panel('Preview selection',`<form method="get" action="/app/preview/client">${identity}${hidden('itemsOptionId',selected.option.id)}<label for="preview-option">Choose one option</label><select id="preview-option" name="optionId">${choices}</select>${itemChoices(selected.option,selected)}<button>Update preview selection</button></form><output aria-label="Selected total">${money(selected.option.cents,view.currency)}</output><p>Deposit due: <output aria-label="Selected deposit">${money(selected.deposit,view.currency)}</output></p>`)
+ return panel('Preview selection',`${feeLines(selected.fees,view.currency).map(line=>'<p>'+escape(line)+'</p>').join('')}<form method="get" action="/app/preview/client">${identity}${hidden('itemsOptionId',selected.option.id)}<label for="preview-option">Choose one option</label><select id="preview-option" name="optionId">${choices}</select>${itemChoices(selected.option,selected)}<button>Update preview selection</button></form><output aria-label="Selected total">${money(selected.option.cents,view.currency)}</output><p>Deposit due: <output aria-label="Selected deposit">${money(selected.deposit,view.currency)}</output></p>`)
 }
 
 export function previewFrame(row:any,width:string,optionId:string,query:URLSearchParams) {

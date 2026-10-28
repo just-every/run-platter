@@ -1,4 +1,4 @@
-import { inClientLocale, ui, clientText } from '../locales'
+import { inClientLocale, ui, clientText, clientLocale } from '../locales'
 import { recipientClientPanel } from './recipients'
 import { collectionPanel } from './collection'
 import { paymentTerms } from '../payment-terms'
@@ -20,6 +20,7 @@ import { document } from './shell'
 
 // The client reads every time in the installation's zone, the same as the owner sees the same event.
 export function renderClient(view: any, token: string, feedback?: Feedback): Response {
+  view={...view,clientLocale:view.clientLocale??clientLocale(view)}
   feedback=feedback?{...feedback,...(feedback.error?{error:clientText(feedback.error,view.clientLocale??'en')}:{}),...(feedback.message?{message:clientText(feedback.message,view.clientLocale??'en')}:{})}:feedback
   const response=inClientLocale(view.clientLocale??'en',()=>inZone(view.timeZone, () => view.verificationRequired&&!view.verified?recipientVerification(view,token,feedback):clientDocument(view, token, feedback)))
   if(view.embedOrigin)response.headers.set('Content-Security-Policy',response.headers.get('Content-Security-Policy')!.replace("frame-ancestors 'none'",'frame-ancestors '+view.embedOrigin))

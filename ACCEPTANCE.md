@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 12 | 97 | 50 | 159 |
+| Core | 11 | 98 | 50 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 12 | 97 | 54 | 163 |
+| Full target | 11 | 98 | 54 | 163 |
 
 Judged from the code and tests at commit `56c6fb72f04a58cdc5d169af6fd59b0996a3745c` (28 October 2026). Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -199,7 +199,7 @@ Core · target · **partial** · Cites BASE-INPUT-002, BASE-INPUT-003, BASE-ACCE
 1. A browser journey at 1440 and 390 pixels builds a proposal from blank with every block type, reorders by drag and by keyboard, applies a brand kit, reloads and sees the same document, and exports a PDF whose pages carry the same blocks in order; the `EDIT-011` budget journey passes on the same build.
 
 **Evidence.** `tests/site.test.mjs` — “EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths” (registered through tests/site-documents.mjs); `tests/platter.test.mjs`; `tests/archive.test.mjs`; `tests/editor-budget.mjs` — “Forty-page reference proposal with 4x CPU editor and phone client budgets”
-**Gap.** Delivered: The document journey builds all block types, applies branding, reorders by keyboard/drag, reloads and compares real PDF order; the separate budget runner measures the reference document. Missing “EDIT-001 complete branded drag-and-drop proposal editor journey”: The editor and throttled reference-performance journeys have a single recorded acceptance receipt on the same built candidate; the budget job is separate from push Verify.
+**Gap.** Delivered: The document journey builds all block types, applies branding, reorders by keyboard/drag, reloads and compares real PDF order; the separate budget runner defines the reference measurements but has no completed passing run. Missing “EDIT-001 complete branded drag-and-drop proposal editor journey”: The editor and throttled reference-performance journeys have a single recorded acceptance receipt on the same built candidate; the budget job is separate from push Verify.
 
 #### EDIT-002 — Proposal templates
 
@@ -347,7 +347,7 @@ Core · target · **done** · Cites BASE-INPUT-003, BASE-DATA-001 · Rules D-1
 
 #### EDIT-011 — Large-proposal performance budget
 
-Core · target · **done** · Rules D-1
+Core · target · **partial** · Rules D-1
 
 **Requirement.** The editor and client page stay fast on the proposals agencies actually send. The reference document is 40 US Letter pages with 30 images (2400-pixel JPEGs of about 500 KB each) and four pricing tables of 15 lines. Measured in Chromium at 1440 by 900 pixels with the CPU throttled 4×: the editor opens from navigation to editable (the first block accepts input) in at most 3 seconds; keystroke-to-paint latency over 200 keystrokes typed into a block on page 30 has a p95 of at most 100 ms; a drag reorder of a section completes, from drop to repainted order, in at most 300 ms; and a pricing-table quantity edit shows the server-confirmed total in at most 500 ms. The client page of the same proposal at 390 pixels with the same throttle reaches largest contentful paint in at most 2.5 seconds and loads images below the fold lazily. A measure over budget is a failing acceptance run. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-011).
 
@@ -355,7 +355,7 @@ Core · target · **done** · Rules D-1
 1. A browser journey creates the reference proposal through the public API, applies the 4× throttle, opens it at 1440 pixels and records time to editable, the p95 of 200 keystroke-to-paint intervals (Event Timing API), one drag reorder and one quantity edit, then opens the client page at 390 pixels and records largest contentful paint; the run reports each measured value and fails if any exceeds its budget.
 
 **Evidence.** `tests/editor-budget.mjs` — “Forty-page reference proposal with 4x CPU editor and phone client budgets”; `.github/workflows/verify.yml`; `tests/platter.test.mjs`
-**Gap.** None.
+**Gap.** Delivered: The cited HTTP quantity-edit journey checks server-confirmed totals, retained document content, approval invalidation and bounds/scope/version refusals. Missing “EDIT-011 complete forty-page 4×-CPU performance journey”: after a successful application build, complete the reference editor-to-phone workflow, including a measured drag drop and repainted order, server-confirmed quantity timing, phone LCP/lazy images, PDF page/image counts and the final report of every timing budget. The judged local executions stopped at the drag-drop wait without a completed report; push Verify skips the separately dispatched budget job. No numerical budget exceedance is inferred.
 
 #### EDIT-012 — Duplicate a proposal for another client
 

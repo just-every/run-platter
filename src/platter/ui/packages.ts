@@ -1,3 +1,4 @@
+import { ui, clientEnum } from '../locales'
 import { taxFields } from './taxes'
 import { taxLines } from '../taxes'
 import { feeLines } from '../recurring'
@@ -44,9 +45,9 @@ export const selectionChoices = (selection:any) => (selection?.items??[]).map((x
 export function itemChoices(option:any, selection:any): string {
  return (option.optionalItems??[]).map((item:any)=>{
   const chosen=selection?.items?.find((x:any)=>x.id===item.id)
-  return `<fieldset><legend>${escape(item.label)}</legend><label class="choice"><input type="checkbox" name="add.${escape(item.id)}" value="yes"${chosen?' checked':''}><span>Add ${escape(item.label)} — ${money(item.unitCents,'USD')}${item.recurrence?` per ${escape(item.recurrence.interval)} for ${item.recurrence.term} installments from ${escape(item.recurrence.startsOn)}`:" each"}</span></label>
+  return ui`<fieldset><legend>${escape(item.label)}</legend><label class="choice"><input type="checkbox" name="add.${escape(item.id)}" value="yes"${chosen?' checked':''}><span>Add ${escape(item.label)} — ${money(item.unitCents,'USD')}${item.recurrence?ui` per ${escape(clientEnum(item.recurrence.interval))} for ${item.recurrence.term} installments from ${escape(item.recurrence.startsOn)}`:ui(" each")}</span></label>
   <label>Quantity for ${escape(item.label)}<input type="number" name="qty.${escape(item.id)}" value="${escape(chosen?.quantity??item.quantity)}" min="${item.min}" max="${item.max}" step="1"${item.editable?'':' readonly'} required></label>
-  <p class="muted">${item.editable?`Choose ${item.min} to ${item.max}.`:`Fixed quantity: ${item.quantity}.`}</p></fieldset>`
+  <p class="muted">${item.editable?ui`Choose ${item.min} to ${item.max}.`:ui`Fixed quantity: ${item.quantity}.`}</p></fieldset>`
  }).join('')
 }
 export function selectedSummary(selection:any,currency:string,reviewLabel?:string): string {
@@ -55,8 +56,8 @@ export function selectedSummary(selection:any,currency:string,reviewLabel?:strin
  const total=selection.totalCents??selection.option?.cents,deposit=selection.depositCents??selection.deposit
  const conceal=selection.concealDiscount||selection.option?.concealDiscount
  const discount=conceal?0:selection.discountCents??selection.option?.discount?.cents,bps=selection.discountBps??selection.option?.discount?.bps
- const contents=`${taxLines(selection.tax,currency).map(line=>'<p>'+escape(line)+'</p>').join('')}${feeLines(selection.fees,currency).map(line=>'<p>'+escape(line)+'</p>').join('')}${review?`<p>Package: ${escape(reviewLabel)}</p>`:''}<ul>${(selection.items??[]).map((x:any)=>`<li>${escape(x.label)} · ${x.quantity} × ${money(x.unitCents,currency)}${x.recurrence?` × ${x.recurrence.term} installments`:""} = ${money(x.totalCents,currency)}</li>`).join('')}</ul>${discount?`<p>Package discount: ${escape(bps/100)}% · −${money(discount,currency)}</p>`:''}<p>Total: <output aria-label="Selected total">${money(total,currency)}</output></p><p>Deposit due: <output aria-label="Selected deposit">${money(deposit,currency)}</output></p>`
+ const contents=ui`${taxLines(selection.tax,currency,ui).map(line=>'<p>'+escape(line)+'</p>').join('')}${feeLines(selection.fees,currency,ui).map(line=>'<p>'+escape(line)+'</p>').join('')}${review?ui`<p>Package: ${escape(reviewLabel)}</p>`:''}<ul>${(selection.items??[]).map((x:any)=>`<li>${escape(x.label)} · ${x.quantity} × ${money(x.unitCents,currency)}${x.recurrence?ui` × ${x.recurrence.term} installments`:""} = ${money(x.totalCents,currency)}</li>`).join('')}</ul>${discount?ui`<p>Package discount: ${escape(bps/100)}% · −${money(discount,currency)}</p>`:''}<p>Total: <output aria-label="Selected total">${money(total,currency)}</output></p><p>Deposit due: <output aria-label="Selected deposit">${money(deposit,currency)}</output></p>`
  // A native fragment target restores reading/focus after the GET review, even
  // without JavaScript. Other summary surfaces retain their existing markup.
- return review?`<section class="panel" id="selection-review" tabindex="-1" aria-labelledby="selection-heading"><h2 id="selection-heading">Your selection</h2>${contents}</section>`:panel('Your selection',contents)
+ return review?ui`<section class="panel" id="selection-review" tabindex="-1" aria-labelledby="selection-heading"><h2 id="selection-heading">Your selection</h2>${contents}</section>`:panel(ui('Your selection'),contents)
 }

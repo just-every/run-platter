@@ -1,4 +1,5 @@
 import { archiveCommand } from './archiving/jobs'
+import { clientLocale, saveClientLocale } from './locales'
 import { hasTaxable, taxRequest, optionTax, resolveTax, saveTaxRate, validateTaxOptions, type TaxSnapshot } from './taxes'
 import { resolveVariables, editableVariableFields, missingMerge, clientVariableFields } from './variables'
 import { recipientCommand, recipientInvitations, recipientInput } from './recipients'
@@ -71,6 +72,7 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
+ if(name==='proposal.locale')return saveClientLocale(db,a,p)
  if(name==='tax.rate')return saveTaxRate(db,a,p)
  let tax:TaxSnapshot|undefined
  if(['proposal.prepare','proposal.revise','proposal.negotiate'].includes(name)){
@@ -197,7 +199,8 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='invoice.export')return exportInvoice(db,a,p)
  if(name==='proposal.approve'||name==='proposal.send'){
   const old=await proposal(db,p.id);exact(old,p)
-  const pending=await pendingNegotiation(db,old.id);if(name==='proposal.send'){const offered=snapshot(negotiatedView(old,pending)).options;need(!hasTaxable(offered)||optionTax(offered),'Set explicit owner-configured tax addresses before sending taxable items.',409);const missing=[...new Set([...unfilledVariables(snapshot(negotiatedView(old,pending))),...missingMerge(negotiatedView(old,pending))])];need(!missing.length,'Fill variables before sending: '+missing.join(', '),409)}assertDiscountDates(snapshot(negotiatedView(old,pending)).options,at)
+  const pending=await pendingNegotiation(db,old.id);if(name==='proposal.send'){
+   if(clientLocale(old)==='es'){need(!old.recipient_plan||old.recipient_plan==='[]','Spanish currently requires a single client mailbox',409);need(!await db.prepare('SELECT 1 FROM p_collection_policy WHERE proposal_id=?').bind(old.id).first(),'Turn off collection before sending in Spanish',409);need(!p.mailRepliesConsent||p.mailRepliesConsent==='no','Spanish invitation reply disclosure is not available',409)}const offered=snapshot(negotiatedView(old,pending)).options;need(!hasTaxable(offered)||optionTax(offered),'Set explicit owner-configured tax addresses before sending taxable items.',409);const missing=[...new Set([...unfilledVariables(snapshot(negotiatedView(old,pending))),...missingMerge(negotiatedView(old,pending))])];need(!missing.length,'Fill variables before sending: '+missing.join(', '),409)}assertDiscountDates(snapshot(negotiatedView(old,pending)).options,at)
   if(pending)return negotiationCommand(env,a,name,p,old)
   need(['draft','approved','sent'].includes(old.status),'Only an open proposal can be sent',409);const approval=await approvalPlan(db,old,a);need(approval.complete,'Approve this revision before sending',409);const token=secret(),client=await db.prepare('SELECT c.*,COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(old.id,old.client_id).first<any>(),shareUrl=env.AUTH_ORIGIN+'/p/'+token
   const invitations=await recipientInvitations(env,a,p,old,at)

@@ -21,7 +21,7 @@ export async function previewResponse(request:Request,env:Bindings) {
  const media=url.pathname.match(/^\/app\/preview\/client\/media\/([\w-]+)$/)
  const file=url.pathname.match(/^\/app\/preview\/client\/attachments\/([\w-]+)$/)
  need(request.method==='GET'&&(['/app/preview','/app/preview/client'].includes(url.pathname)||file||media),'Preview actions cannot be submitted',403)
- const original=await env.DB.prepare('SELECT p.*,c.name AS clientName,c.email AS clientEmail FROM p_proposals p JOIN p_clients c ON c.id=p.client_id WHERE p.id=?').bind(url.searchParams.get('id')??'').first<any>()
+ const original=await env.DB.prepare('SELECT p.*,lang.locale AS client_locale,c.name AS clientName,c.email AS clientEmail FROM p_proposals p JOIN p_clients c ON c.id=p.client_id LEFT JOIN p_client_locales lang ON lang.proposal_id=p.id WHERE p.id=?').bind(url.searchParams.get('id')??'').first<any>()
  need(original,'Proposal not found',404)
  const pending=await pendingNegotiation(env.DB,original.id),row=negotiatedView(original,pending)
  need(pending||['draft','approved'].includes(row.status),'Preview an unsent revision',409)

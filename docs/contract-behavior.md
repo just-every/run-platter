@@ -64,6 +64,10 @@ Template defaults inherit EDIT-014’s PDF-download enable/disable setting and i
 
 A shared library holds sections, images, videos, case studies, team bios, testimonials, terms and pricing tables, with folders, tags and search. Owners, admins, managers and content editors create and edit library items, and every member who edits proposals inserts them (`TEAM-001`). A member inserts an item as a linked copy (updated when the library item changes, until the proposal is sent) or as a detached copy. Sent and accepted proposals never change when the library does. Each item shows where it is used and when it last changed.
 
+The shared library holds text sections, case studies, bios, testimonials, terms, validated images and videos, and USD pricing tables. Team folders, tags and case-insensitive search ship. Media and tables are saved from placed blocks in a proposal the library editor may edit, with explicit consent to its library audience; validated originals are retained independently. Pricing insertion targets a chosen package and recalculates integer-cent totals. Linked changes create unapproved draft revisions atomically, including negotiated drafts; detached copies, sent revisions and accepted content remain frozen. Manual changes permanently detach the affected copy. Usage lists retain only proposals the reader may already view and show copy mode, frozen state and last-change time.
+
+CT approval (24 October 2026, 04:45 UTC): a current proposal editor must explicitly consent at insertion to recipient display and future linked draft edits; usage grants no access beyond existing proposal visibility; sent and accepted content stays frozen. EDIT-002 and EDIT-005 inherit independent copied content, and EDIT-006 inherits consent and exact frozen media custody for future media capabilities.
+
 ## EDIT-004
 
 Text and pricing can use variables: client company, contact name and title, address, deal name and amount, sender details, dates and custom fields, filled from Platter records or from the linked HubSpot, Salesforce or Orbit deal (`CRM-001` to `CRM-003`). Template role slots (`SIGN-012`) are filled the same way, from the client's contacts or the deal's contacts. A variable with no value is flagged in the editor, and sending is refused until each one is filled or deliberately cleared. The sent revision freezes the filled values.
@@ -79,6 +83,12 @@ All imported blocks, fixed pages and media extend EDIT-014’s exact unsigned PD
 ## EDIT-006
 
 Proposals embed images and galleries, uploaded video, YouTube, Vimeo, Loom and Wistia video, a Dial or Calendly booking link and embedded PDFs. Embeds come from an allowlist with a content security policy, render on phones, and show a still and a link in the PDF export. Uploaded media is stored with the proposal and travels in archives (`PORT-002`).
+
+Uploaded images and videos, ordered galleries, canonical YouTube, Vimeo, Loom and Wistia video frames, Calendly booking frames and Google Drive PDF previews ship. Uploaded originals stay with the proposal; external content retains its canonical URL and uploaded poster.
+
+CT approval (24 October 2026, 08:09 UTC): owner and admins control the audited external-content setting, off on fresh installs; only those roles change external blocks, and author consent stays in the revision. Viewers opt in on each page load. Before opt-in there are no provider requests, cookies or browser storage; frames use the exact allowlist, a sandbox, no referrer and CSP frame sources. The owner kill switch replaces external content with a plain placeholder naming its provider on the next load.
+
+EDIT-002, EDIT-003 and EDIT-005 inherit these consent and frozen-media obligations for future media carriers.
 
 ## EDIT-007
 
@@ -286,6 +296,8 @@ The engagement timeline inherits EDIT-014’s successful PDF-download events and
 
 FOLLOW-002 inherits real viewed/unopened queue reasons and the original seven-proposal A, C, D, F, E, B, G ordering before tracking ships; extend its named public-door journey.
 
+Tracking and alerts are off until the owner explicitly opts in; only the owner reads recipient, verification, device and coarse location detail. Current senders receive generic live in-app notices after a fresh access check. Retention defaults to 90 days and the owner can choose 1 through 365 days. Explicit per-proposal erasure and retention honor holds. Only trusted edge city, region and country are stored, never request addresses; measurement pages suppress external embeds. Exports retain business history but exclude tracking authority, and restores require fresh consent. Erasure invalidates older archive checkpoints.
+
 ## TRACK-002
 
 For each view, Platter measures time spent on each section and on pricing, which packages and items were toggled, and which attachments were opened, and summarizes engagement per recipient.
@@ -299,6 +311,8 @@ When a link is opened by someone other than its recipient (a new device and netw
 ## TRACK-004
 
 The client page discloses that views are measured. Platter uses no third-party trackers, stores IP addresses only as truncated locations, and keeps engagement data for a retention period the owner sets. Engagement data is included in erasure (`PRIV-001`) and in exports.
+
+The current owner-consent, private-detail and trusted-edge rules are TRACK-001 under RL-22. Retention defaults to 90 days; the owner selects 1 through 365 days. Explicit per-proposal erasure and retention honor holds. Measurement pages suppress external embeds. Exports retain business history but exclude tracking authority, restores require fresh consent, and erasure invalidates older archive checkpoints.
 
 ## FOLLOW-001
 

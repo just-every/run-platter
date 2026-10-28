@@ -222,13 +222,13 @@ Core · target · **partial** · Rules D-1
 
 Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-003 · Rules D-1
 
-**Requirement.** A shared library holds sections, images, videos, case studies, team bios, testimonials, terms and pricing tables, with folders, tags and search. Owners, admins, managers and content editors create and edit library items, and every member who edits proposals inserts them (`TEAM-001`). A member inserts an item as a linked copy (updated when the library item changes, until the proposal is sent) or as a detached copy. Sent and accepted proposals never change when the library does. Each item shows where it is used and when it last changed. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-003).
+**Requirement.** A shared library holds sections, images, videos, case studies, team bios, testimonials, terms and pricing tables, with folders, tags and search. Owners, admins, managers and content editors create and edit library items, and every member who edits proposals inserts them (`TEAM-001`). A member inserts an item as a linked copy (updated when the library item changes, until the proposal is sent) or as a detached copy. Sent and accepted proposals never change when the library does. Each item shows where it is used and when it last changed. Under RL-23, the current proposal editor explicitly consents at insertion to recipient display and future linked draft edits. Usage grants no access beyond existing proposal visibility. EDIT-002 and EDIT-005 inherit independent copied content; EDIT-006 inherits consent and exact frozen media custody for future media capabilities. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-003).
 
 **Acceptance.**
 1. Insert a linked and a detached case study into a draft and a sent proposal, edit the library item, and see only the linked copy in the draft change; the item's usage list names all three.
 
 **Evidence.** `tests/platter.test.mjs` — “EDIT-003 linked draft copies propagate atomically while detached, sent and accepted copies retain exact content”; `tests/site.test.mjs` — “EDIT-003 linked and detached library insertion, frozen sending and scoped usage at desktop and phone widths” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
-**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
+**Gap.** Delivered: The shared library holds text sections, case studies, bios, testimonials, terms, validated images and videos, and USD pricing tables. Team folders, tags and case-insensitive search ship. Media and tables are saved from placed blocks in a proposal the library editor may edit, with explicit consent to its library audience; validated originals are retained independently. Pricing insertion targets a chosen package and recalculates integer-cent totals. Linked changes create unapproved draft revisions atomically, including negotiated drafts; detached copies, sent revisions and accepted content remain frozen. Manual changes permanently detach the affected copy. Usage lists retain only proposals the reader may already view and show copy mode, frozen state and last-change time. The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### EDIT-004 — Variables from client, deal and CRM records
 
@@ -287,13 +287,13 @@ Core · target · **done** · From EDIT-005 · Rules D-1
 
 Core · target · **partial** · Cites BASE-INPUT-002, BASE-INPUT-003, BASE-PUBLIC-001 · Rules D-1
 
-**Requirement.** Proposals embed images and galleries, uploaded video, YouTube, Vimeo, Loom and Wistia video, a Dial or Calendly booking link and embedded PDFs. Embeds come from an allowlist with a content security policy, render on phones, and show a still and a link in the PDF export. Uploaded media is stored with the proposal and travels in archives (`PORT-002`). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-006).
+**Requirement.** Proposals embed images and galleries, uploaded video, YouTube, Vimeo, Loom and Wistia video, a Dial or Calendly booking link and embedded PDFs. Embeds come from an allowlist with a content security policy, render on phones, and show a still and a link in the PDF export. Uploaded media is stored with the proposal and travels in archives (`PORT-002`). Under RL-24, the audited external-content control is off on fresh installs; only owners and admins change it or external blocks, and author consent stays in the revision. Viewers opt in on every page load, with no provider requests, cookies or browser storage before consent. The owner kill switch replaces external content with a plain placeholder naming its provider on the next load. EDIT-002, EDIT-003 and EDIT-005 inherit these consent and frozen-media obligations for future media carriers. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-006).
 
 **Acceptance.**
 1. Add an uploaded video, a Loom link and a gallery, view on a 390-pixel phone and play the video, export the PDF and see stills with links, and try an embed from a host outside the allowlist (refused).
 
 **Evidence.** `tests/platter.test.mjs` — “EDIT-001 display media requires consent and live edit scope, stays private until placed and keeps exact bytes through copies and templates”; `tests/site.test.mjs` — “EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
-**Gap.** The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
+**Gap.** Delivered: Uploaded images and videos, ordered galleries, canonical YouTube, Vimeo, Loom and Wistia video frames, Calendly booking frames and Google Drive PDF previews ship. Uploaded originals stay with the proposal; external content retains its canonical URL and uploaded poster. The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it.
 
 #### EDIT-007 — Mobile client review
 
@@ -919,7 +919,7 @@ Core · target · **partial** · From SEND-010 · Cites BASE-AUDIT-001 · Rules 
 
 Core · target · **partial** · Cites BASE-PUBLIC-001, BASE-MAIL-001
 
-**Requirement.** Platter records each verified or unverified view of a client link with time, recipient, approximate location and device class, and alerts the sender on first open and on a return visit after a quiet period the owner sets (30 minutes by default). The proposal shows a view timeline. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#track-001).
+**Requirement.** Platter records each verified or unverified view of a client link with time, recipient, approximate location and device class, and alerts the sender on first open and on a return visit after a quiet period the owner sets (30 minutes by default). The proposal shows a view timeline. Under RL-22, tracking and alerts stay off until the owner explicitly opts in. Only the owner reads recipient, verification, device and coarse location detail; current senders receive generic live in-app notices after a fresh access check. Locations come only from trusted edge city, region and country, never request addresses. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#track-001).
 
 **Acceptance.**
 1. Open the proposal as two recipients on desktop and phone; the sender gets an alert and the timeline lists both views with device class and approximate location (city, region and country from the request address through an IP-location fixture: Austin, Texas, United States for the first and Portland, Oregon, United States for the second).
@@ -956,7 +956,7 @@ Core · target · **partial**
 
 Core · target · **partial** · Cites BASE-PUBLIC-001, BASE-DATA-003
 
-**Requirement.** The client page discloses that views are measured.  Engagement data is included in erasure (`PRIV-001`) and in exports. Stored locations are truncated; engagement retention is owner-selected and engagement joins erasure and exports. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#track-004).
+**Requirement.** The client page discloses that views are measured.  Engagement data is included in erasure (`PRIV-001`) and in exports. Stored locations are truncated; engagement retention is owner-selected and engagement joins erasure and exports. RL-22 requires owner opt-in under TRACK-001, a 90-day retention default selectable from 1 through 365 days, and holds honored by retention and explicit per-proposal erasure. Measurement pages suppress external embeds. Exports retain business history but exclude tracking authority; restores require fresh consent. Erasure invalidates older archive checkpoints. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#track-004).
 
 **Acceptance.**
 1. Open the client page and see the disclosure; inspect network requests for third-party hosts (none); read a stored view and find no full IP address; set 90-day retention and see older views removed.

@@ -100,3 +100,27 @@ Explicit owner/admin verified destination consent; generic channel text and prot
 Ct approved this authority floor on 28 October 2026 at 08:10 UTC: the native owner holds the authority; no delegated or agent authority is added. The current native owner alone manages recipient roles, explicitly sends invitations or creates additional mailbox-bound viewing links, and authorizes an exact framing origin. Stakeholder conversion, copies and restores never invite anyone automatically or restore invitation authority. No split or deferral applies. Full template-role management remains with SIGN-011, and provider-specific recipient checks remain with SIGN-006.
 
 This records the approved authority clarification without adding acceptance points or granting delegated authority.
+
+### RL-22 — Owner-consented private engagement tracking
+
+- Date: 2026-10-23
+- Ruler: ct
+- Governs: TRACK-001, TRACK-004
+
+Policy applied from ct's 23 October 2026 ruling: tracking and alerts are off until the owner explicitly opts in; only the owner reads recipient, verification, device and coarse location detail. Current senders receive generic live in-app notices after a fresh access check. Retention defaults to 90 days and the owner can choose 1 through 365 days. Explicit per-proposal erasure and retention honor holds. Only trusted edge city, region and country are stored, never request addresses; measurement pages suppress external embeds. Exports retain business history but exclude tracking authority, and restores require fresh consent. Erasure invalidates older archive checkpoints.
+
+### RL-23 — Explicit library insertion consent and scoped usage
+
+- Date: 2026-10-24 (04:45 UTC)
+- Ruler: ct
+- Governs: EDIT-003, EDIT-002, EDIT-005, EDIT-006
+
+CT approval (24 October 2026, 04:45 UTC): a current proposal editor must explicitly consent at insertion to recipient display and future linked draft edits; usage grants no access beyond existing proposal visibility; sent and accepted content stays frozen.
+
+### RL-24 — External content consent and owner controls
+
+- Date: 2026-10-24 (08:09 UTC)
+- Ruler: ct
+- Governs: EDIT-006, EDIT-002, EDIT-003, EDIT-005
+
+CT approval (24 October 2026, 08:09 UTC): owner and admins control the audited external-content setting, off on fresh installs; only those roles change external blocks, and author consent stays in the revision. Viewers opt in on each page load. Before opt-in there are no provider requests, cookies or browser storage; frames use the exact allowlist, a sandbox, no referrer and CSP frame sources. The owner kill switch replaces external content with a plain placeholder naming its provider on the next load.

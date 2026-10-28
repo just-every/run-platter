@@ -1767,6 +1767,8 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   const read=async query=>{const r=await h.send('/api/platter/pipeline?'+query,undefined,h.owner);assert.equal(r.status,200,r.text);return r.value}
   const native=await read(filters)
   assert.deepEqual(native.rows.map(r=>r.id),[first.id,later.id])
+  assert.equal(native.rows[0].recordedRevenue.mrrCents,120000,'The accepted monthly fee is booked MRR')
+  assert.equal(native.rows[0].accounting.status,'Not linked','Real receipts without linked accounting evidence cannot claim reconciliation')
   assert.deepEqual(native.totals,[{currency:'USD',count:2,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:360000,refundedCents:0,netReceivedCents:360000,uncertainRefundCents:0,exportedDepositCents:0,mrrCents:120000,invoicedCents:0,outstandingCents:0,overdueCents:0,accountingPaidCents:0,accountingDifferenceCents:0}])
   assert.equal(native.rows[0].bookedOn,'2099-01-15')
   assert.deepEqual(native.rows.map(r=>[r.recordedRevenue.oneOffCents,r.recordedRevenue.firstYearCents,r.recordedRevenue.receivedCents]),[[250000,1690000,120000],[0,0,240000]])
@@ -1823,6 +1825,8 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_revenue_invoices').first()).n,3,'A replay refresh never duplicates an invoice')
   const accountingFilters=new URLSearchParams(filters);accountingFilters.set('invoicedFrom','2099-04-01');accountingFilters.set('invoicedTo','2099-06-30');accountingFilters.set('asOf','2099-07-01')
   const accounting=await read(accountingFilters)
+  assert.equal(accounting.rows.find(r=>r.id===first.id).recordedRevenue.overdueCents,630000,'Only balances past their due date are overdue')
+  assert.equal(accounting.rows.find(r=>r.id===later.id).recordedRevenue.overdueCents,0,'An invoice due today is not overdue')
   assert.deepEqual(accounting.totals,[{currency:'USD',count:2,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:360000,refundedCents:0,netReceivedCents:360000,uncertainRefundCents:0,exportedDepositCents:0,mrrCents:120000,invoicedCents:1350000,outstandingCents:990000,overdueCents:630000,accountingPaidCents:610000,accountingDifferenceCents:0}])
   assert.deepEqual(accounting.rows.map(r=>r.accounting.status),['Matched','Matched'])
   assert.equal((await read(new URLSearchParams({...Object.fromEntries(accountingFilters),asOf:'2099-07-02'}))).totals[0].overdueCents,990000,'An invoice due today becomes overdue tomorrow')

@@ -3228,3 +3228,69 @@ test('PRICE-005 owner tax follows selected quantities and discounts, freezes rat
  const destination=await h.cmd('client.save',{name:'Synthetic destination',email:h.auth.OWNER_EMAIL}),copy=await h.cmd('proposal.duplicate',{id:p.id,version:4,clientId:destination.id})
  assert.ok((await h.state()).proposals.find(x=>x.id===copy.id).options.every(o=>!o.tax));await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1});await h.cmd('proposal.send',{id:copy.id,version:2},h.owner,409)
 }finally{await h.close()}})
+
+test('AUTO-002 completed agreements archive exact PDFs once under explicit current Drive authority and reconcile uncertain writes without replay',async()=>{
+ const {driveFixture,driveSettings,driveRoot,connectDrive,completeDriveAgreement}=await import('./drive-fixture.mjs'),fake=driveFixture(),h=await harness({assetsDirectory:'public',outboundService:fake.outboundService})
+ try{
+  const before=await sent(h),oldCookie=await verified(h,before.path)
+  assert.equal((await h.send(before.path+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},oldCookie)).status,200)
+  await h.send('/auth/invite',{email:['synthetic-platter-admin','example.test'].join('@'),displayName:'Archive administrator',role:'member',returnTo:'/app'},h.owner)
+  const adminCookie=await h.signIn(['synthetic-platter-admin','example.test'].join('@')),admin=(await h.state(adminCookie)).actor
+  await h.cmd('archive.configure',driveSettings,adminCookie,403);assert.equal(fake.calls.length,0)
+  await h.cmd('member.set',{operatorId:admin.id,role:'admin',version:0,teams:[]})
+  await connectDrive(h,adminCookie)
+  const calls=fake.calls.length
+  await h.cmd('archive.configure',{...driveSettings,version:1,consent:false},h.owner,400)
+  await h.cmd('archive.configure',{...driveSettings,version:0},h.owner,409)
+  await h.cmd('archive.configure',{...driveSettings,version:1,accountId:'synthetic-platter-wrong-account'},h.owner,409)
+  assert.equal(fake.calls.length,calls)
+  assert.equal((await h.send('/api/platter/archives',undefined,'')).status,401)
+  const signed=await completeDriveAgreement(h),worker=await h.mf.getWorker(),tick=()=>worker.scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  assert.equal((await h.send(signed.path+'/action?name=accept',signed.input,signed.cookie)).status,200)
+  let history=(await h.send('/api/platter/archives',undefined,h.owner)).value
+  assert.equal(history.jobs.length,1);assert.equal(history.jobs[0].status,'queued')
+  assert.equal(history.jobs[0].proposal_id,signed.proposal.id,'enabling never backfills historical agreements')
+  await Promise.all([tick(),tick(),h.cmd('archive.dispatch',{})])
+  history=(await h.send('/api/platter/archives',undefined,h.owner)).value;assert.equal(history.jobs[0].status,'complete')
+  const folder=[...fake.files.values()].find(f=>f.parents?.includes(driveRoot));assert.ok(folder);assert.equal(folder.appProperties.platterClient,signed.client.id);assert.ok(folder.name.startsWith('Synthetic archive client - '))
+  const artifacts=await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(signed.proposal.id).first()
+  const {createHash}=await import('node:crypto')
+  for(const kind of ['agreement','certificate']){
+   const uploaded=[...fake.files.values()].find(f=>f.name.endsWith(' - '+kind+'.pdf'))
+   assert.ok(uploaded);assert.deepEqual(uploaded.parents,[folder.id]);assert.equal(uploaded.name,'Synthetic archive client - Synthetic archive agreement - '+new Date(history.jobs[0].accepted_at).toISOString().slice(0,10)+' - r1 - '+kind+'.pdf')
+   const download=await h.mf.dispatchFetch(h.origin+signed.path+'/'+kind+'.pdf',{headers:{cookie:signed.cookie}});assert.equal(download.status,200)
+   const bytes=Buffer.from(await download.arrayBuffer());assert.deepEqual(uploaded.bytes,bytes);assert.deepEqual(Buffer.from(kind==='agreement'?artifacts.document:artifacts.certificate),bytes)
+   assert.equal(uploaded.appProperties.platterSha256,createHash('sha256').update(bytes).digest('hex'))
+  }
+  const facts=JSON.parse(artifacts.facts);assert.equal(facts.documentSha256,createHash('sha256').update(Buffer.from(artifacts.document)).digest('hex'))
+  const posts=()=>fake.calls.filter(c=>c.method==='POST').length,completedPosts=posts();await tick();assert.equal(posts(),completedPosts)
+  // A second agreement uses the same client folder. A lost acknowledgement is held, never replayed.
+  fake.setUncertain(true)
+  const uncertain=await completeDriveAgreement(h,'Uncertain archive agreement',signed.client.id);await tick()
+  history=(await h.send('/api/platter/archives',undefined,h.owner)).value
+  assert.equal(history.jobs.find(j=>j.proposal_id===uncertain.proposal.id).status,'held')
+  const afterUnknown=posts();await tick();await h.cmd('archive.dispatch',{});assert.equal(posts(),afterUnknown)
+  await h.cmd('archive.reconcile',{id:uncertain.proposal.id})
+  history=(await h.send('/api/platter/archives',undefined,h.owner)).value
+  assert.equal(history.jobs.find(j=>j.proposal_id===uncertain.proposal.id).status,'complete');assert.equal(posts(),afterUnknown)
+  assert.equal([...fake.files.values()].filter(f=>f.parents?.includes(driveRoot)).length,1)
+  // Demotion invalidates execution even though the connection and old consent remain.
+  const demoted=await completeDriveAgreement(h,'Demoted archive agreement',signed.client.id)
+  await h.cmd('member.set',{operatorId:admin.id,role:'sales',version:1,teams:[]})
+  const noCalls=fake.calls.length;await tick();assert.equal(fake.calls.length,noCalls)
+  history=(await h.send('/api/platter/archives',undefined,h.owner)).value;assert.equal(history.settings.active,false);assert.equal(history.jobs.find(j=>j.proposal_id===demoted.proposal.id).status,'held')
+  await h.cmd('archive.dispatch',{},adminCookie,403);await h.cmd('archive.reconcile',{id:demoted.proposal.id},adminCookie,403)
+  assert.equal((await h.send('/api/platter/archives',undefined,adminCookie)).status,403);assert.equal(fake.calls.length,noCalls)
+  await h.cmd('archive.configure',{...driveSettings,version:1},h.owner)
+  await completeDriveAgreement(h,'Disconnected archive agreement',signed.client.id)
+  await h.cmd('provider.disconnect',{provider:'google_drive',version:1})
+  const disconnected=fake.calls.length;await tick();assert.equal(fake.calls.length,disconnected)
+  // The configuration is also rechecked between individual network requests.
+  const {driveToken}=await import('./drive-fixture.mjs');await h.cmd('provider.connect',{provider:'google_drive',version:2,token:driveToken,consent:true})
+  await h.cmd('archive.configure',{...driveSettings,version:2,connectionVersion:3})
+  await completeDriveAgreement(h,'Revoked during dispatch',signed.client.id)
+  let revoked=false;fake.setHook(async request=>{if(!revoked&&new URL(request.url).pathname.endsWith('/generateIds')){revoked=true;await h.cmd('archive.revoke',{version:3})}})
+  const preRevokePosts=posts();await tick();assert.equal(revoked,true);assert.equal(posts(),preRevokePosts)
+  const audit=await h.send('/api/platter/audit?action=archive.configure',undefined,h.owner);assert.ok(audit.value.rows.length>=3)
+ }finally{await h.close()}
+})

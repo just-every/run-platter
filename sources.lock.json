@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "476d6b79380cdc17bb9574fbf18cea66aece791139daf0e9faf2afcc83b5ab74",
+      "sha256": "501c8d1f35b60f71c9da52933393742273afecfd26851624e70b041ac211431b",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "48386976ae7297d292c726e3a63d4d8b5111cc821235485cba19f9bc07d22ede",
+      "sha256": "6dae7545e47ea9a5b8b8a768d327d6cb65c73ada0c8a144996e4faff62bf9ea3",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "b4fe879fdc97351a530743a89c7be5a60495946944dac5de9d8885c28a35c175",
+      "sha256": "b23d5411c00383802cb15188bed4ac9ff191689f12519d5626c57c00e569f2a0",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -2362,7 +2362,7 @@
       "executable": false
     },
     "src/platter/archive-policy.mjs": {
-      "sha256": "3f4c7d9bb39d6e95f8c1e083d731fe66ad1b3421596d4b5ac315f393b18ce6e8",
+      "sha256": "29ab9af4f4706c9a1ebc40f5abb9a2739b3f126b648c5dbe0e1ecf4a0690c18d",
       "executable": false
     },
     "src/platter/attachment-commands.ts": {
@@ -2418,7 +2418,7 @@
       "executable": false
     },
     "src/platter/commands.ts": {
-      "sha256": "7311eb8f43897622d59ed3f6036a40a2b96c7208e658ab33f4a277dd6db21358",
+      "sha256": "3b15cce472500babec90a515b6c5d40f42833b7fb258dce73de7fedde23373d7",
       "executable": false
     },
     "src/platter/conditional.ts": {
@@ -2550,7 +2550,7 @@
       "executable": false
     },
     "src/platter/http.ts": {
-      "sha256": "a06279567860bfc9962e7e12acf319f801c015dd1229be458c8170c52c24b399",
+      "sha256": "4c19cd305ca239f7ed65f4282a3042fdea08fe437ff65f8f3e58cf36e747d7ad",
       "executable": false
     },
     "src/platter/internal-pricing.ts": {
@@ -2810,7 +2810,7 @@
       "executable": false
     },
     "src/platter/signing.ts": {
-      "sha256": "7d2f9dcfabd76655bd4c4c2a0a0c8c0e6e19ccc166c1ad9f62b7fdfcc327e339",
+      "sha256": "1227eaebdd32a55dfde8aadb08d990e6e197a8d00005f7a5b12b177409b5f412",
       "executable": false
     },
     "src/platter/sms.ts": {
@@ -2822,7 +2822,7 @@
       "executable": false
     },
     "src/platter/state.ts": {
-      "sha256": "3828cadc4687e4040764d1058219bd20334bf60f5438bec3141cd2f4aab0e612",
+      "sha256": "27693bb3e0ef7f89cb2ab064c64da7396a004ff24b7786e90325ea388e27da80",
       "executable": false
     },
     "src/platter/suggestions.ts": {
@@ -2958,7 +2958,7 @@
       "executable": false
     },
     "src/platter/ui/index.ts": {
-      "sha256": "1e20831316a7816f18a57cef4fce47ea95435c20c044388e73c7b4c0cfdfc08a",
+      "sha256": "9e257335d55329c1885bd1feca4c60817dae378e911317aae5acc3ffb71f8e8e",
       "executable": false
     },
     "src/platter/ui/internal-pricing.ts": {
@@ -3106,7 +3106,7 @@
       "executable": false
     },
     "src/server.ts": {
-      "sha256": "d9670ad77f0995540373ffcce04ee220d360d9240bca1bc17093f90d2cb0f8ee",
+      "sha256": "02b292b5db426a48b2ace8fd354465e828859b16caef7e9ebea09492085ef911",
       "executable": false
     },
     "src/site/docs.ts": {
@@ -3306,7 +3306,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "7e3f810fc993e8f81fe23fbb833de8759e98f85c56d7239936cb63b1db2cd4e7",
+      "sha256": "28fc5de8db065854a3d51e1e3aee1ef769e2bc4c9bd0d9a699ad6e755e7901d1",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3398,7 +3398,7 @@
       "executable": false
     },
     "tests/worker.ts": {
-      "sha256": "bbe0c6a9d994a63326e8f231de0f4cad69a1a907a2f54e0a25c7c4d2eea5a55d",
+      "sha256": "7d3c31ee041f35f81dfa75e6e22a2d79aed673b5ab03c04325df384d5c7bb3dd",
       "executable": false
     },
     "tsconfig.json": {

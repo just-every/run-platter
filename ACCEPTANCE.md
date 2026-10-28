@@ -914,13 +914,13 @@ Gap: No automations.
 
 ## AUTO-002 — Completed documents archived to file storage
 
-Status: **missing**.
+Status: **partial**.
 
-Signed PDFs, certificates and attachments are filed to Google Drive, Microsoft OneDrive or SharePoint, Box or [Chest](https://github.com/just-every/run-chest) in a folder per client, named by a pattern the admin sets. *Acceptance:* Connect a Google Drive fake, complete an agreement and see the PDF and certificate in the client's folder with the configured name. *Status:* missing. No document archiving.
+Signed PDFs, certificates and attachments are filed to Google Drive, Microsoft OneDrive or SharePoint, Box or [Chest](https://github.com/just-every/run-chest) in a folder per client, named by a pattern the admin sets. *Acceptance:* Connect a Google Drive fake, complete an agreement and see the PDF and certificate in the client's folder with the configured name. *Status:* partial. `tests/platter.test.mjs` — “AUTO-002 completed agreements archive exact PDFs once under explicit current Drive authority and reconcile uncertain writes without replay” proves the Google Drive network-edge fake through public configuration and real mailbox-verified single-client completion with collection off, exact immutable PDF and certificate bytes and hashes, configured filenames and client folders, concurrent once-only dispatch, current authority and connection refusals, and read-only reconciliation of uncertain uploads. Gap: OneDrive, SharePoint, Box, Chest, full agreement attachments, payment-gated completion, configured multi-recipient completion and live-provider qualification remain. Browser and restored-history proof are pending. Conservative owner and admin authorization default: explicit verified account, destination folder and naming pattern; configuration, connection and authorizing role versions checked before each request; uncertain writes held without automatic replay. Restores confer no credentials or execution authority. SEND-003 and SIGN-004 retain their recorded authority holds.
 
-Evidence: None recorded.
+Evidence: `tests/platter.test.mjs`
 
-Gap: No document archiving.
+Gap: OneDrive, SharePoint, Box, Chest, full agreement attachments, payment-gated completion, configured multi-recipient completion and live-provider qualification remain. Browser and restored-history proof are pending. Conservative owner and admin authorization default: explicit verified account, destination folder and naming pattern; configuration, connection and authorizing role versions checked before each request; uncertain writes held without automatic replay. Restores confer no credentials or execution authority. SEND-003 and SIGN-004 retain their recorded authority holds.
 
 ## AUTO-003 — Team chat notifications
 

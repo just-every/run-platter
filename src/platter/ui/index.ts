@@ -45,7 +45,7 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
         content = proposalPage(state, id, url.searchParams, feedback); break
       }
       case '/app/clients': title = 'Clients'; above = eyebrow(`Clients · ${count((state.clients ?? []).length, 'client')} on file`); layout = 'clients-page'; content = clientsPage(state); break
-      case '/app/import': title = 'Client import'; above = eyebrow('Move in · clients, contacts and catalog'); content = importPage(state, feedback); break
+      case '/app/import': title = 'Import'; above = eyebrow('Move in · documents, clients and catalog'); content = importPage(state, feedback); break
       case '/app/access': title = 'Agent access'; above = eyebrow('Agents · keys and send requests'); content = accessPage(state); break
       default: return renderMissing()
     }

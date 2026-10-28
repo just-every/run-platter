@@ -47,7 +47,7 @@ import { installationZone } from './reports/report-state'
 import { runtimeBindings,type Bindings } from '../auth.server'
 import { principal,credentialCommand } from './credentials'
 import { command } from './commands'
-import { importCommand } from './movein'
+import { importCommand, documentImportCommand, importedOriginal } from './movein'
 import { state } from './state'
 import { pipeline } from './pipeline'
 import { pipelineCsv } from './reports/pipeline-csv'
@@ -109,6 +109,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    if(path==='/api/platter/watch')return json({watcher:await watcherState(env,actor,url.searchParams.get('id'))})
    if(path==='/api/platter/sms')return json(await smsHistory(env,actor,url.searchParams.get('id')))
    if(path==='/api/platter/internal-pricing.pdf'){const response=await internalPricingPdf(env,actor,url.searchParams);await recordAudit(env.DB,actor,'pricing.export',String(url.searchParams.get('id')));return response}
+   if(path==='/api/platter/imported-original')return await importedOriginal(env.DB,actor,url.searchParams)
    if(path==='/api/platter/business-original')return await businessOriginal(env,actor,url.searchParams)
    if(path==='/api/platter/client-original'){const response=await clientOriginal(env,actor,url.searchParams);await recordAudit(env.DB,actor,'import.journal',String(url.searchParams.get('job')));return response}
    if(path==='/api/platter/business-records'){need(actor.role==='owner','Only the owner reads imported business records',403);return json(await businessRecords(env.DB,actor))}
@@ -126,9 +127,9 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   }else if(['/app/action','/api/platter/command','/api/platter/agent/command'].includes(path)){
    const p=await body(request,path==='/app/action'&&url.searchParams.get('name')?.startsWith('business-import.')?6_200_000:150000),name=path==='/app/action'?url.searchParams.get('name')??'':String(p.name??''),input=path==='/app/action'?p:p.input as Record<string,unknown>;need(input&&typeof input==='object'&&!Array.isArray(input),'Provide an input object');submitted=input
    if(isAgent)need(['proposal.prepare','proposal.revise'].includes(name),'Agents only prepare proposal drafts',403)
-   let result=name==='member.invite'?await inviteMember(env,actor,input,request):name==='send-request.resolve'?await resolveSendRequest(env.DB,actor,input):name.startsWith('agent.')?await credentialCommand(env.DB,actor,name,input):name.startsWith('import.')?await importCommand(env.DB,actor,name,input):await command(env,actor,name,input)
+   let result=name==='member.invite'?await inviteMember(env,actor,input,request):name==='send-request.resolve'?await resolveSendRequest(env.DB,actor,input):name.startsWith('agent.')?await credentialCommand(env.DB,actor,name,input):name.startsWith('document-import.')?await documentImportCommand(env.DB,actor,name,input):name.startsWith('import.')?await importCommand(env.DB,actor,name,input):await command(env,actor,name,input)
    const subject=String(name==='member.zone'?actor.id:name==='workspace.defaults'?'installation':(result as any)?.job?.id??(result as any)?.id??input.id??'clients');if(name!=='dispute.authorize'&&!name.startsWith('question.')&&name!=='proposal.withdraw'&&name!=='proposal.lose'&&name!=='proposal.test-mail')await recordAudit(env.DB,actor,name,subject)
-   if(path==='/app/action'){if(name==='proposal.duplicate'||name==='template.start')return new Response(null,{status:303,headers:{...headers,location:'/app/proposal?id='+encodeURIComponent(String((result as any).id))}});if(name.startsWith('business-import.'))result={...result as any,businessInput:input};if(['import.preview','import.apply'].includes(name))result={...result as any,csv:input.csv};const returnPath=back==='/app/proposal'?back+'?id='+encodeURIComponent(String(input.id??(result as any)?.id??'')):back;return renderApp(await state(env,actor),returnPath,{message:name==='dispute.submit'?String(result.message??'This submission is already recorded. Check its status below.'):name==='member.invite'?String(result.message??'Invitation sent. The selected role and teams apply only after verified acceptance.'):name==='payment.refund'?String(result.message??'Refund request already recorded. Check its status below.'):name==='proposal.test-mail'?'Test queued to your sign-in address. No client invitation was sent.':'Saved.',result})}
+   if(path==='/app/action'){if(name==='proposal.duplicate'||name==='template.start')return new Response(null,{status:303,headers:{...headers,location:'/app/proposal?id='+encodeURIComponent(String((result as any).id))}});if(name.startsWith('document-import.'))result={...result as any,documentMovein:true};if(name.startsWith('business-import.'))result={...result as any,businessInput:input};if(['import.preview','import.apply'].includes(name))result={...result as any,csv:input.csv};const returnPath=back==='/app/proposal'?back+'?id='+encodeURIComponent(String(input.id??(result as any)?.id??'')):back;return renderApp(await state(env,actor),returnPath,{message:name==='dispute.submit'?String(result.message??'This submission is already recorded. Check its status below.'):name==='member.invite'?String(result.message??'Invitation sent. The selected role and teams apply only after verified acceptance.'):name==='payment.refund'?String(result.message??'Refund request already recorded. Check its status below.'):name==='proposal.test-mail'?'Test queued to your sign-in address. No client invitation was sent.':'Saved.',result})}
    return json(result)
   }
   return path.startsWith('/app')?renderMissing():json({error:'Not found'},404)

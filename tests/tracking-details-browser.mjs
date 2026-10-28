@@ -43,7 +43,7 @@ test('TRACK-001 and TRACK-004 client disclosure, first-party measurement and pri
     for(const [key,seconds] of [['pricing',40],['block:case-stable',5]]){const actual=measured.reading.find(r=>r.section===key)?.milliseconds??0;assert.ok(Math.abs(actual-seconds*1000)<=2000,key+' measured '+actual+' ms');}
     assert.deepEqual(measured.choices.map(c=>[c.sequence,c.option_id,c.items]),[[1,'one',[]],[2,'two',[]],[3,'one',[]],[4,'one',[{id:'rush',quantity:1}]],[5,'one',[{id:'rush',quantity:2}]],[6,'one',[]]])
     console.log('TRACK_TIMING '+JSON.stringify({width,viewId,pricing:measured.reading.find(r=>r.section==='pricing').milliseconds,caseStudy:measured.reading.find(r=>r.section==='block:case-stable').milliseconds,hiddenPause:5000,choices:measured.choices.length}))
-    const [download]=await Promise.all([viewer.waitForEvent('download'),viewer.getByRole('link',{name:'synthetic-platter-1.txt',exact:true}).click()]);assert.equal(download.suggestedFilename(),'synthetic-platter-1.txt')
+    const [download]=await Promise.all([viewer.waitForEvent('download'),viewer.getByRole('link',{name:/^synthetic-platter-1\.txt · \d+ bytes$/}).click()]);assert.equal(download.suggestedFilename(),'synthetic-platter-1.txt')
     const afterOpen=await (await owner.request.get(app.origin+'/api/platter/engagement?id='+p.id)).json();assert.equal(afterOpen.views.find(v=>v.id===viewId).attachments[0].filename,'synthetic-platter-1.txt');assert.equal(afterOpen.recipients[0].attachments.length,1)
     await visibility('visible')
     await capture(viewer,'client-disclosure')

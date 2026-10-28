@@ -541,6 +541,10 @@
       "sha256": "3c245c6071355a82003f63a4f97be5b721900de8e52f2ed35567604495cbd497",
       "executable": false
     },
+    "migrations/core/0086_tracking_history.sql": {
+      "sha256": "c3520dd099b7650ac0eae79e45cc1a343f210b719f85b358598400aa0501c2d1",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -2550,7 +2554,7 @@
       "executable": false
     },
     "src/platter/http.ts": {
-      "sha256": "cf57c898c56230373354799032ce1dbaa69f84b700b9509826cca572f3bfc3f6",
+      "sha256": "fa1fa2117b3d34fd5f9ec879cc293bb51156c3574158e323a9a571cd84afa385",
       "executable": false
     },
     "src/platter/internal-pricing.ts": {
@@ -3394,7 +3398,7 @@
       "executable": false
     },
     "tests/tracking-details-browser.mjs": {
-      "sha256": "0fa15b6202c1a4cc347188ed1534f6696c0ad0bdf5870059ce22050d6a538259",
+      "sha256": "c5baa9de1df20e91ba1cc6ebe0db5ac6d04c57ab5d9d5c4b17b3ad345f7269fc",
       "executable": false
     },
     "tests/worker.ts": {

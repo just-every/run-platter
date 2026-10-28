@@ -586,7 +586,7 @@
       "executable": false
     },
     "public/app/shell.css": {
-      "sha256": "698bc4b7886544e31dbe1b7cad1eeef76d639b408019bdaca1af2a13497fd346",
+      "sha256": "7cbb0781abdcb5749a96f992ab2190d51962fa18a5c15eedeff99065a4a47b53",
       "executable": false
     },
     "public/brand/apple-touch-icon.png": {
@@ -2810,7 +2810,7 @@
       "executable": false
     },
     "src/platter/signing.ts": {
-      "sha256": "866bf96f340aa842370fb2297d57142f21f616b36752cce0a85387fb90f2dfe9",
+      "sha256": "154daf11a69f1b75877922f77a02ea37f1d81c93f263edde564c66558b4b1bfd",
       "executable": false
     },
     "src/platter/sms.ts": {
@@ -3278,7 +3278,7 @@
       "executable": false
     },
     "tests/locale-browser.mjs": {
-      "sha256": "cce88d25be46b4134e03912e832643bf1e483753b027fdffbddcf5bcad431e2f",
+      "sha256": "3dbc54d8d0b87605cde98d4a2b964383eba1b5a70910e9b2ecb73cefd01e2002",
       "executable": false
     },
     "tests/mail.test.mjs": {

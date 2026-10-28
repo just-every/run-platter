@@ -34,7 +34,7 @@ export function documentBlocks(view:any,mediaBase='',suffix=''){
   else if(b.type==='columns')body+='<div class="document-column-grid"><div>'+richText(b.text)+'</div><div>'+richText(b.second??'')+'</div></div>'
   else if(b.type==='quote')body+='<blockquote>'+richText(b.text)+'</blockquote>'
   else body+=richText(b.text)
-  return '<section class="document-block document-'+escape(b.type)+'" data-document-block="'+escape(b.id)+'">'+body+'</section>'
+  return '<section class="document-block document-'+escape(b.type)+'" data-document-block="'+escape(b.id)+'" data-engagement-section="block:'+escape(b.id)+'">'+body+'</section>'
  }).join('')+'</article>'
 }
 export function documentBrandCss(view:any){const b=documentOf(view).brand;return b?`.proposal-document{--document-accent:${b.accent};color:${b.ink};background:${b.paper};font-family:${b.font==='serif'?'var(--pl-serif)':'var(--pl-sans)'}}`:''}

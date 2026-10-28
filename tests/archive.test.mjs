@@ -190,6 +190,8 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const measuredPage=await h.send(path,undefined,verified.cookie);assert.equal(measuredPage.status,200)
     const measuredView=measuredPage.text.match(/data-engagement-view="([^"]+)"/)[1]
     assert.equal((await h.send(path+'/engagement',{viewId:measuredView,section:'pricing',milliseconds:0,optionId:'two'},verified.cookie)).status,200)
+    for(const [choiceSequence,optionId] of [[1,'two'],[2,'one'],[3,'two']])assert.equal((await h.send(path+'/engagement',{viewId:measuredView,readings:{'block:case':0},choiceSequence,optionId},verified.cookie)).status,200)
+    const trackedFile=frozenAttachments[0];assert.equal((await h.send(path+'/attachments/'+trackedFile.id+'?viewId='+measuredView,undefined,verified.cookie)).status,200)
     await h.cmd('tracking.hold',{id:proposal.id,held:'yes',reason:'Synthetic archive hold'})
     const beforeTracking=(await h.state()).tracking
     assert.equal(beforeTracking.views.length,1);assert.equal(beforeTracking.alerts.length,1);assert.equal(beforeTracking.holds.length,1)
@@ -260,6 +262,10 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.deepEqual(restoredAuditView,beforeAuditView,'TEAM-004 restores the complete audit view including reasons and sender routes/addresses')
     const restoredEngagement=(await h.send('/api/platter/engagement?id='+proposal.id,undefined,restoredOwner)).value
     assert.deepEqual(restoredEngagement.views,engagementBefore.views,'Exact view, reading and choices survive public CLI restore')
+    assert.deepEqual(restoredEngagement.recipients,engagementBefore.recipients,'Recipient summaries, stable block readings, repeated choices and attachment opens survive exactly')
+    assert.equal(restoredEngagement.views[0].attachments[0].file_id,trackedFile.id)
+    assert.deepEqual(restoredEngagement.views[0].choices.map(c=>c.option_id),['two','one','two'])
+    assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_tracking_transport').first()).n,0)
     assert.equal(restoredEngagement.settings.enabled,false,'Restore requires fresh measurement consent')
     assert.deepEqual((await h.send('/api/platter/engagement?id='+pending.id,undefined,restoredOwner)).value.stakeholders,stakeholderBefore,'Verified stakeholder records survive without mailbox capabilities')
     assert.deepEqual(business(restoredState),before)

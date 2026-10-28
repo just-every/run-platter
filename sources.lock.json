@@ -2522,7 +2522,7 @@
       "executable": false
     },
     "src/platter/documents/import-export.ts": {
-      "sha256": "2eb811b9e2ceff60cbd54eadde528c75339ba5bb375b4d71046ff0e9094536c1",
+      "sha256": "a86dc3a41f887e5bbac7aef574cba2cc7ec90db4525b0297ce3d5c422df35d4d",
       "executable": false
     },
     "src/platter/documents/media.ts": {
@@ -2678,15 +2678,15 @@
       "executable": false
     },
     "src/platter/movein/document-import.ts": {
-      "sha256": "7fcb05015709bc5c56b4ab548c0ae6c35eeec2dc58ab6e8a2430a365a7e333fd",
+      "sha256": "dfed0d5e2e12fdcba331c607d9dced608a6c7dabd70860954baf342121488c37",
       "executable": false
     },
     "src/platter/movein/document-source.ts": {
-      "sha256": "c5cb22bd1e1bb34217b8af59b803c07877f299d0bd4e0f5794baa33959190ac7",
+      "sha256": "fa132074a86693be7b9a593a8e427b8a85539120a4d359c0572c5cb948797aa3",
       "executable": false
     },
     "src/platter/movein/document-targets.ts": {
-      "sha256": "56a15532c98e95fbdc6274106bfb55754395a55a9cae942779983eae3f32d78b",
+      "sha256": "a031e1e511cc08cad5c3005e84ef8e5a51fb5c252fd12cac1657f66f13747284",
       "executable": false
     },
     "src/platter/movein/errors.ts": {
@@ -2978,7 +2978,7 @@
       "executable": false
     },
     "src/platter/ui/document-movein.ts": {
-      "sha256": "34dab72ce5402ddf0b60b2b7df1162bb5fe00e3fc7fcc72cf56796190011fef9",
+      "sha256": "633fb7f0b77893fc989ce4c5eecf788b2718fd1127f5639a72af41237b41dbe6",
       "executable": false
     },
     "src/platter/ui/duplicate.ts": {
@@ -3310,7 +3310,7 @@
       "executable": false
     },
     "tests/document-movein-fixture.mjs": {
-      "sha256": "95792ef031e4a99f029d59156fef5ceca668a7db322cdde6418ffc582e18ce57",
+      "sha256": "aa1f5c7591e4a0b4f58a874f270859d8f49707097b4f7926d62d1f6852fcd351",
       "executable": false
     },
     "tests/drive-fixture.mjs": {

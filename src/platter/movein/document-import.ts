@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { planD1Import, createD1ImportJob, applyD1ImportBatches, undoD1Import, readD1ImportJob, readD1ImportOriginals,
  canonicalJson, sha256, d1RequestContext, type D1ImportContext, type ImportMapping } from '../../modules/import-kit/src/d1/index.ts'
 import { documentSource, documentNamespace, type UploadedDocument } from './document-source'
+import { nativeDocumentSource, moveinMapping } from './document-native'
 import { documentDestination, documentTargets } from './document-targets'
 import { fail, requiredText } from './errors'
 import type { Actor } from './index'
@@ -18,7 +19,7 @@ const context=(db:D1Database,actor:Actor):D1ImportContext=>d1RequestContext({
 })
 const mapping:ImportMapping={version:'exported-documents-v1',map(record){
  const payload=record.payload as any
- return {effects:[{targetKind:'documents',targetId:record.sourceId,value:payload.value}]}
+ return {effects:[{targetKind:payload.targetKind??'documents',targetId:record.sourceId,value:payload.value}]}
 }}
 async function session(db:D1Database,actor:Actor,id:unknown) {
  await documentOwner(db,actor)
@@ -50,14 +51,14 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    const id=randomUUID(),label=String(input.label??'Document move-in').trim()
    if (!label || label.length>150) fail('invalid_input',400,'Name the move-in in 150 characters or fewer')
    await db.batch([db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN '+ownerSql+' THEN 1 ELSE 0 END').bind(actor.id),
-    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label) VALUES(?,?,?)').bind(id,actor.id,label)])
+    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label,created_at) VALUES(?,?,?,?)').bind(id,actor.id,label,Date.now())])
    return {id}
   }
   const movein=await session(db,actor,input.id),id=movein.id
   if (name==='document-import.upload-start') {
    if (movein.fingerprint) fail('import_frozen',409,'This reviewed move-in is frozen. Start another move-in for additional files')
    const hash=String(input.sha256),size=Number(input.size),filename=String(input.filename)
-   if (!/^[a-f0-9]{64}$/.test(hash)||!Number.isSafeInteger(size)||size<1||size>5*1024*1024||filename.length>200||!/^([^/\\\x00-\x1f]+)\.(zip|pdf|csv)$/i.test(filename)) fail('invalid_upload',400,'Choose a ZIP, PDF or report CSV up to 5 MiB')
+   if (!/^[a-f0-9]{64}$/.test(hash)||!Number.isSafeInteger(size)||size<1||size>5*1024*1024||filename.length>200||!/^([^/\\\x00-\x1f]+)\.(zip|pdf|csv|docx)$/i.test(filename)) fail('invalid_upload',400,'Choose a ZIP, PDF, Word document or CSV up to 5 MiB')
    const prior=await db.prepare('SELECT * FROM p_document_uploads WHERE movein_id=? AND sha256=?').bind(id,hash).first<any>()
    if (prior) { if(prior.size!==size)fail('upload_conflict',409);return {sha256:hash,received:prior.received,complete:Boolean(prior.complete)} }
    const total=await db.prepare('SELECT COALESCE(SUM(size),0) AS bytes,COUNT(*) AS count FROM p_document_uploads WHERE movein_id=?').bind(id).first<any>()
@@ -94,27 +95,33 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
   }
   const kit=context(db,actor)
   if (name==='document-import.preview'||name==='document-import.apply') {
-   const selected=choices(input)
+   const selected=choices(input),reviewedMapping=moveinMapping(input)
    if(movein.fingerprint) {
-    if(name==='document-import.preview'||input.fingerprint!==movein.fingerprint||canonicalJson(selected)!==movein.choices_json)fail('review_fingerprint_mismatch',409,'Continue the exact reviewed import from its history')
+    if(name==='document-import.preview'||input.fingerprint!==movein.fingerprint||canonicalJson(selected)!==movein.choices_json||canonicalJson(reviewedMapping)!==movein.mapping_json)fail('review_fingerprint_mismatch',409,'Continue the exact reviewed import from its history')
     if(movein.job_id)return {id,job:await applyD1ImportBatches(movein.job_id,kit),report:JSON.parse(movein.report_json)}
    }
-   const prepared=await documentSource(await uploaded(db,id),selected,id)
+   const prepared=await documentSource(await uploaded(db,id),selected,id,reviewedMapping)
+   const resources=await nativeDocumentSource(db,actor,movein,prepared.source,prepared.files,prepared.documents,reviewedMapping)
+   const drafts=resources.filter(r=>r.kind==='draft').length
+   const report=Object.assign(prepared.report,{resources,arrivedDrafts:drafts,arrivedResources:resources.filter(r=>r.kind!=='draft').reduce((n,r)=>n+(r.count??1),0),held:prepared.report.held-drafts})
+   if(resources.length)report.notes=report.notes.filter(n=>!n.startsWith('Open documents are retained'))
+   if(Object.keys(reviewedMapping).length)prepared.source.artifacts.push({name:'reviewed-file-destinations.json',sha256:sha256(canonicalJson(reviewedMapping)),size:Buffer.byteLength(canonicalJson(reviewedMapping)),original:{status:'available',base64:Buffer.from(canonicalJson(reviewedMapping)).toString('base64')}})
    const plan=await planD1Import(prepared.source,mapping,kit)
    // A second import never replaces an already retained original or its attribution.
    const prior=await db.prepare('SELECT id FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?').bind(documentDestination,actor.id,id).first<any>()
    const existing:string[]=[]
    if(!prior)for(const p of prepared.documents)if(await db.prepare('SELECT 1 FROM p_imported_documents WHERE id=?').bind(p.id).first())existing.push(p.id)
+   if(!prior)for(const entry of plan.entries)for(const effect of entry.effects)if(effect.targetKind!=='documents'&&await documentTargets.read(db,documentDestination,effect.targetKind,effect.targetId))existing.push(effect.targetId)
    if(existing.length) {
     prepared.report.held+=existing.length
     prepared.report.arrived-=prepared.documents.filter(p=>existing.includes(p.id)&&p.signatureEvidence.length).length
    }
-   const canApply=prepared.canApply&&existing.length===0
-   if(name==='document-import.preview')return {id,kind:'Document move-in',fingerprint:plan.fingerprint,...prepared,source:undefined,canApply,choices:selected,existing}
+   const canApply=prepared.canApply&&existing.length===0&&!plan.diagnostics.some(d=>d.severity==='error')
+   if(name==='document-import.preview')return {id,kind:'Document move-in',fingerprint:plan.fingerprint,...prepared,files:prepared.files.map(({bytes,...file})=>file),resources,diagnostics:plan.diagnostics,source:undefined,canApply,choices:selected,mapping:reviewedMapping,existing}
    if(input.fingerprint!==plan.fingerprint)fail('review_fingerprint_mismatch',409,'Preview the exact uploaded bytes and report choices again')
    if(!canApply)fail('document_import_needs_review',409,'Resolve ambiguous report matches and existing-document conflicts before applying')
    await db.batch([db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN '+ownerSql+' AND EXISTS(SELECT 1 FROM p_document_moveins WHERE id=? AND (fingerprint IS NULL OR fingerprint=?)) THEN 1 ELSE 0 END').bind(actor.id,id,plan.fingerprint),
-    db.prepare('UPDATE p_document_moveins SET fingerprint=?,choices_json=?,report_json=? WHERE id=?').bind(plan.fingerprint,canonicalJson(selected),canonicalJson(prepared.report),id)])
+    db.prepare('UPDATE p_document_moveins SET fingerprint=?,choices_json=?,report_json=?,mapping_json=? WHERE id=?').bind(plan.fingerprint,canonicalJson(selected),canonicalJson(prepared.report),canonicalJson(reviewedMapping),id)])
    const job=await createD1ImportJob(plan,{...kit,reviewedFingerprint:plan.fingerprint,operationKey:id})
    await db.prepare('UPDATE p_document_moveins SET job_id=? WHERE id=? AND fingerprint=?').bind(job.id,id,plan.fingerprint).run()
    return {id,job:await applyD1ImportBatches(job.id,kit),report:prepared.report}

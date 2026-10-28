@@ -100,7 +100,7 @@ Evidence: `tests/platter.test.mjs`, `tests/platter.test.mjs`, `tests/site.test.m
 
 Status: **partial**.
 
-Gap: Native client fields, custom values and explicitly chosen HubSpot deals fill text and prices; missing values refuse send and sent values stay frozen. Destination copies refill without changing the source. Remaining: Salesforce and Orbit deal adapters, template recipient role refill, variable conditions, inherited PDF and archive assertions, and browser proof. Connected deal reads currently require owner or admin authority.
+Gap: Native client fields, custom values and explicitly chosen HubSpot or Salesforce deals fill text and prices; missing values refuse send and sent values stay frozen. Destination copies and template recipient roles refill independently. Variable-conditioned blocks exclude private source patterns from client JSON. Remaining: Orbit contact refill requires its scoped contact API, which the current Orbit public API does not expose; inherited PDF and archive proof and phone browser proof remain. Connected deal reads use the conservative owner or admin authority floor.
 
 Evidence: `tests/platter.test.mjs`
 
@@ -108,7 +108,7 @@ Evidence: `tests/platter.test.mjs`
 
 Status: **partial**.
 
-Gap: Word uploads create editable headings, text, lists, text tables and embedded images; merge tokens and quote rows map with unmatched and missing-image reports. Heading 1 text sections import as library items. Fixed PDF originals retain exact bytes, support positioned fields and appended pricing. Word and US Letter or A4 PDF exports retain editable blocks, pricing and images. Remaining: rich library section imports, complete fixed-page Word export, inherited archive and conditional-carrier proof, and browser proof.
+Gap: Word uploads create editable headings, text, lists, text tables and embedded images; merge tokens and quote rows map with unmatched and missing-image reports. Heading 1 sections import as library items, with rich sections retaining media and pricing for independent detached insertion. Fixed PDF originals retain exact bytes, support positioned signature, initials, date and text fields, appended pricing and frozen payment schedules. Word and US Letter or A4 PDF exports retain editable blocks, pricing and images. Remaining: complete fixed-page Word export, inherited archive and conditional-carrier proof and phone browser proof. Imported rich library sections currently insert only as detached copies.
 
 Evidence: `tests/platter.test.mjs`
 

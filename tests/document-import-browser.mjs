@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict'
+import {mkdir} from 'node:fs/promises'
+import {join} from 'node:path'
+import {chromium} from '@playwright/test'
+import {PDFDocument,StandardFonts} from 'pdf-lib'
+import {harness} from './harness.mjs'
+import {browserEdge} from './browser-edge.mjs'
+import {wordFixture} from './document-import-fixture.mjs'
+export async function documentImportBrowser(width=1440){
+ let edge,h,browser,context
+ try{
+  edge=await browserEdge();h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin});edge.attach(h)
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']});context=await browser.newContext({viewport:{width,height:1000},ignoreHTTPSErrors:true})
+  const [name,value]=h.owner.split('=');await context.addCookies([{name,value,url:h.origin}]);const page=await context.newPage(),screens=process.env.PLATTER_SCREENSHOTS
+  const capture=async label=>{await page.evaluate(()=>document.fonts.ready);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'document screens fit the viewport');if(screens){await mkdir(screens,{recursive:true});await page.screenshot({path:join(screens,'EDIT-004-005-'+label+'-'+width+'.png'),fullPage:true})}}
+  await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  await page.goto(h.origin+'/app/clients');await page.getByLabel('Client name',{exact:true}).fill('Synthetic browser client');await page.getByLabel('Client email',{exact:true}).fill(['synthetic-platter-401','example.test'].join('@'));await page.getByLabel('Contact name (optional)').fill('Casey Lane');await page.getByLabel('Contact title (optional)').fill('Director');await page.getByLabel('Postal address (optional)').fill('40 Synthetic Street');await capture('client-fields');await page.getByRole('button',{name:'Add client',exact:true}).click()
+  const client=(await h.state()).clients.find(c=>c.name==='Synthetic browser client'),p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic browser document',scope:'Hello {{Contact.Name}}, {{Custom.Subject}}.',optionOne:'Studio',priceOne:'1200',optionTwo:'Campaign',priceTwo:'2400',depositPercent:'25'})
+  await page.goto(h.origin+'/app/proposal?id='+p.id)
+  const variablePanel=page.locator('section.panel').filter({has:page.getByRole('heading',{name:'Variables',exact:true})})
+  assert.match(await variablePanel.innerText(),/Unfilled variables:.*Contact.Name.*Custom.Subject/s)
+  await variablePanel.getByLabel('Custom.Subject',{exact:true}).fill('A considered proposal');await variablePanel.getByRole('button',{name:'Fill proposal variables'}).click()
+  assert.equal(await page.locator('textarea[name=scope]').inputValue(),'Hello Casey Lane, A considered proposal.');assert.match(await page.locator('body').innerText(),/All recorded variables are filled/);await capture('filled-variables')
+  let upload=page.locator('details').filter({has:page.getByText('Import Word or PDF',{exact:true})});await upload.locator('summary').click();await upload.getByLabel('Source document').setInputFiles({name:'synthetic-platter-401.docx',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',buffer:Buffer.from(await wordFixture({rows:4,images:2,tokens:false}))});await upload.getByRole('checkbox').check();await upload.getByRole('button',{name:'Import document',exact:true}).click()
+  assert.equal((await h.state()).proposals.find(r=>r.id===p.id).document.blocks.length,9);await page.locator('[data-block-id]').first().waitFor();assert.equal(await page.locator('[data-block-id]').count(),9);assert.equal(await page.getByRole('heading',{name:'Document files',exact:true}).count(),1)
+  const first=page.locator('[data-block-id]').first();await first.getByLabel('Block heading',{exact:true}).fill('Edited imported heading');await page.locator('[data-document-save]').click();await page.waitForFunction(()=>document.querySelector('[data-document-editor]')?.dataset.saveState==='saved');assert.equal((await h.state()).proposals.find(r=>r.id===p.id).document.blocks[0].title,'Edited imported heading')
+  const icon=first.getByRole('button',{name:'Duplicate block',exact:true});await icon.focus();assert.equal(await first.getByRole('tooltip').filter({hasText:'Duplicate block'}).isVisible(),true);await capture('word-blocks')
+  await page.reload();const filePanel=page.locator('section.panel').filter({has:page.getByRole('heading',{name:'Document files',exact:true})}),link=filePanel.getByRole('link',{name:'Export Word document',exact:true});const word=await context.request.get(new URL(await link.getAttribute('href'),h.origin).href);assert.equal(word.status(),200);assert.match(word.headers()['content-type'],/wordprocessingml/)
+  const fixed=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic fixed document',scope:'Fixed pages and live terms.',optionOne:'Studio',priceOne:'1200',optionTwo:'Campaign',priceTwo:'2400',depositPercent:'25'}),source=await PDFDocument.create(),font=await source.embedFont(StandardFonts.Helvetica);for(let i=1;i<=3;i++)source.addPage().drawText('Synthetic fixed page '+i,{font,x:48,y:700});const bytes=await source.save()
+  await page.goto(h.origin+'/app/proposal?id='+fixed.id);upload=page.locator('details').filter({has:page.getByText('Import Word or PDF',{exact:true})});await upload.locator('summary').click();await upload.getByLabel('Source document').setInputFiles({name:'synthetic-platter-402.pdf',mimeType:'application/pdf',buffer:Buffer.from(bytes)});await upload.getByRole('checkbox').check();await upload.getByRole('button',{name:'Import document',exact:true}).click()
+  assert.match(await page.locator('body').innerText(),/3 fixed PDF pages/)
+  await page.locator('[data-block-type]').selectOption('signature');await page.locator('[data-block-add]').click();const signature=page.locator('[data-block-id]').last();await signature.getByLabel('Fixed PDF page (blank for appended field)').fill('3');await page.locator('[data-document-save]').click();await page.waitForFunction(()=>document.querySelector('[data-document-editor]')?.dataset.saveState==='saved');assert.equal((await h.state()).proposals.find(r=>r.id===fixed.id).document.blocks[0].page,3);await capture('fixed-page-field')
+  await page.reload();const originalLink=page.getByRole('link',{name:'Download original PDF',exact:true}),original=await context.request.get(new URL(await originalLink.getAttribute('href'),h.origin).href);assert.equal(original.status(),200);assert.deepEqual(new Uint8Array(await original.body()),bytes)
+ }finally{await context?.close();await browser?.close();await h?.close();await edge?.close()}
+}

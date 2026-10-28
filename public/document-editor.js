@@ -68,6 +68,7 @@
      const conditions=new Map();for(const o of options){conditions.set(o.id,'Only '+o.label);for(const i of o.optionalItems??[])conditions.set('item:'+i.id,'Only with '+i.label);}
      for(const [id,label] of conditions){const opt=element('option',{value:id},label);opt.selected=block.condition===id;select.append(opt);}select.addEventListener('change',()=>{checkpoint();if(select.value)block.condition=select.value;else delete block.condition;schedule();});wrap.append(select);card.append(wrap);
     }
+    if(!['field','signature'].includes(block.type)){const match=/^variable:([^=]+)=(.*)$/.exec(block.condition??'');let variable=match?.[1]??'',expected=match?.[2]??'';const update=()=>{if(variable)block.condition='variable:'+variable+'='+expected;else delete block.condition;};card.append(control('Visibility variable (optional)','visibilityVariable',variable,v=>{variable=v;update();}),control('Required variable value','visibilityValue',expected,v=>{expected=v;update();}));}
     if(locked){card.append(element('p',{class:'muted'},block.type==='embed'?'Only the owner or an admin changes external content.':'This section is locked. You can move this section; ask an owner, admin or team manager to unlock it before changing its content.'));for(const node of card.querySelectorAll('input,textarea,select'))node.disabled=true;}
     container.append(card);
    }

@@ -3,6 +3,7 @@ import { providerCredential, providerJson } from './connections'
 import { editablePackages, pricingInput } from './pricing'
 import { editableTerms } from './payment-terms'
 import { need, type Actor } from './model'
+import { currentTime } from './expiry-time'
 export const variableToken=/\{\{\s*([A-Za-z][A-Za-z0-9_.]{0,99})\s*\}\}/g
 export type MergeFields={patterns:Record<string,string>;values:Record<string,string>;deal?:{provider:string;id:string}}
 export function variableNames(value:unknown):string[]{const names=new Set<string>();walk(value,(v)=>{for(const m of v.matchAll(variableToken))names.add(m[1]);return v});return [...names].sort()}
@@ -22,18 +23,26 @@ export function editableVariableFields(row:any){return {clientId:row.client_id,t
 async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFields['deal']){
  const c=await env.DB.prepare('SELECT * FROM p_clients WHERE id=?').bind(clientId).first<any>();need(c,'Client not found',404)
  const profile=JSON.parse(c.variable_fields??'{}'),sender=await env.DB.prepare('SELECT display_name FROM oa_operators WHERE id=?').bind(a.id).first<any>(),name=sender?.display_name??''
- const values:Record<string,string>={'Client.Company':c.name,'Client.Email':c.email,'Client.LastName':profile.lastName??profile.contactName?.split(' ').slice(1).join(' ')??'','Client.Name':profile.contactName??'','Client.FirstName':profile.firstName??profile.contactName?.split(' ')[0]??'','Client.Title':profile.title??'','Contact.Name':profile.contactName??'','Contact.Title':profile.title??'','Client.Address':profile.address??'','Sender.Name':name,'Sender.LastName':name.split(' ').slice(1).join(' '),'Date.Today':new Date(await (await import('./expiry-time')).currentTime(env.DB)).toISOString().slice(0,10),'Sender.FirstName':name.split(' ')[0],'Sender.Email':a.email,...Object.fromEntries(Object.entries(profile.custom??{}).map(([k,v])=>['Custom.'+k,String(v)]))}
+ const values:Record<string,string>={'Client.Company':c.name,'Client.Email':c.email,'Client.LastName':profile.lastName??profile.contactName?.split(' ').slice(1).join(' ')??'','Client.Name':profile.contactName??'','Client.FirstName':profile.firstName??profile.contactName?.split(' ')[0]??'','Client.Title':profile.title??'','Contact.Name':profile.contactName??'','Contact.Title':profile.title??'','Client.Address':profile.address??'','Sender.Name':name,'Sender.LastName':name.split(' ').slice(1).join(' '),'Date.Today':new Date(await currentTime(env.DB)).toISOString().slice(0,10),'Sender.FirstName':name.split(' ')[0],'Sender.Email':a.email,...Object.fromEntries(Object.entries(profile.custom??{}).map(([k,v])=>['Custom.'+k,String(v)]))}
  for(const key of Object.keys(values))if(!values[key])delete values[key]
  if(deal){
   need(['owner','admin'].includes(a.role),'Only owner and admins read connected deals',403)
-  need(deal.provider==='hubspot','This deal provider is not connected yet',409)
-  const {secret}=await providerCredential(env,'workspace:hubspot')
+  need(deal.provider!=='orbit','Orbit currently exposes deal fields but no scoped contact-read route. Its contact API is required for complete variable refill.',409)
+  const {secret}=await providerCredential(env,'workspace:'+deal.provider)
+  if(deal.provider==='salesforce'){
+   need(typeof secret.instanceOrigin==='string','Reconnect Salesforce with a verified REST instance before reading opportunities',409)
+   const d=await providerJson(secret.instanceOrigin+'/services/data/v64.0/sobjects/Opportunity/'+encodeURIComponent(deal.id)+'?fields=Name,Amount,Account.Name,Account.BillingStreet',secret.token)
+   if(d.Name)values['Deal.Name']=String(d.Name);if(d.Amount!==undefined&&d.Amount!==null)values['Deal.Amount']=String(d.Amount);if(d.Account?.Name)values['Client.Company']=String(d.Account.Name);if(d.Account?.BillingStreet)values['Client.Address']=String(d.Account.BillingStreet)
+   const roles=await providerJson(secret.instanceOrigin+'/services/data/v64.0/query?q='+encodeURIComponent("SELECT Contact.FirstName,Contact.LastName,Contact.Title,Contact.Email FROM OpportunityContactRole WHERE OpportunityId = '"+deal.id+"' AND IsPrimary = true"),secret.token),contact=roles.records?.[0]?.Contact
+   if(contact){for(const [key,v]of Object.entries({'Client.FirstName':contact.FirstName,'Client.LastName':contact.LastName,'Client.Name':[contact.FirstName,contact.LastName].filter(Boolean).join(' '),'Contact.Name':[contact.FirstName,contact.LastName].filter(Boolean).join(' '),'Contact.Title':contact.Title,'Client.Title':contact.Title,'Client.Email':contact.Email}))if(v)values[key]=String(v)}
+   return values
+  }
   const d=await providerJson('https://api.hubapi.com/crm/v3/objects/deals/'+encodeURIComponent(deal.id)+'?properties=dealname,amount&associations=contacts',secret.token),props=d.properties??{}
   if(props.dealname)values['Deal.Name']=String(props.dealname)
   if(props.amount!==undefined&&props.amount!==null)values['Deal.Amount']=String(props.amount)
   const id=d.associations?.contacts?.results?.[0]?.id
   if(id){const contact=await providerJson('https://api.hubapi.com/crm/v3/objects/contacts/'+encodeURIComponent(id)+'?properties=firstname,lastname,jobtitle,company,address',secret.token),p=contact.properties??{}
-   for(const [key,v]of Object.entries({'Client.Company':p.company,'Client.FirstName':p.firstname,'Client.Name':[p.firstname,p.lastname].filter(Boolean).join(' '),'Contact.Name':[p.firstname,p.lastname].filter(Boolean).join(' '),'Client.Title':p.jobtitle,'Contact.Title':p.jobtitle,'Client.Address':p.address}))if(v)values[key]=String(v)
+   for(const [key,v]of Object.entries({'Client.Company':p.company,'Client.FirstName':p.firstname,'Client.LastName':p.lastname,'Client.Name':[p.firstname,p.lastname].filter(Boolean).join(' '),'Contact.Name':[p.firstname,p.lastname].filter(Boolean).join(' '),'Client.Title':p.jobtitle,'Contact.Title':p.jobtitle,'Client.Address':p.address}))if(v)values[key]=String(v)
   }
  }
  return values
@@ -62,3 +71,6 @@ export function clientVariableFields(value:any){
  return result
 }
 export function missingMerge(row:any){const doc=typeof row.document==='string'?JSON.parse(row.document):row.document,merge=mergeFields(doc?.merge);return merge?variableNames(Object.values(merge.patterns)).filter(k=>!Object.hasOwn(merge.values,k)):[]}
+
+export const variableCondition=(value:string)=>/^variable:([A-Za-z][A-Za-z0-9_.]{0,99})=(.{0,200})$/.exec(value)
+export function variableVisible(condition:string,values:Record<string,string>={}){const parsed=variableCondition(condition);return Boolean(parsed&&Object.hasOwn(values,parsed[1])&&values[parsed[1]]===parsed[2])}

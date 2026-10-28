@@ -1,4 +1,4 @@
-import { mergeFields, type MergeFields } from '../variables'
+import { variableCondition, variableVisible, mergeFields, type MergeFields } from '../variables'
 import { embedUrl } from './embeds'
 import { need } from '../model'
 
@@ -41,7 +41,7 @@ export function proposalDocument(value:unknown,options?:any[],clientId?:string):
    need(!options||options.some(o=>o.id===b.optionId&&o.tables?.[b.tableIndex]),'Choose an existing package pricing table')
    block.optionId=b.optionId;block.tableIndex=b.tableIndex
   }
-  if(b.condition){need(typeof b.condition==='string'&&/^(?:item:)?[a-zA-Z0-9_-]{1,80}$/.test(b.condition)&&(!options||options.some(o=>b.condition.startsWith('item:')?o.optionalItems?.some((i:any)=>'item:'+i.id===b.condition):o.id===b.condition)),'Choose an offered package or optional item for block visibility');block.condition=b.condition}
+  if(b.condition){need(typeof b.condition==='string'&&(variableCondition(b.condition)||/^(?:item:)?[a-zA-Z0-9_-]{1,80}$/.test(b.condition)&&(!options||options.some(o=>b.condition.startsWith('item:')?o.optionalItems?.some((i:any)=>'item:'+i.id===b.condition):o.id===b.condition))),'Choose an offered package or optional item for block visibility');block.condition=b.condition}
   return block
  })
  let brand:ProposalDocument['brand']
@@ -55,7 +55,7 @@ export function proposalDocument(value:unknown,options?:any[],clientId?:string):
 }
 export function documentOf(row:any){return proposalDocument(row.document)}
 export function documentFields(row:any){const doc=documentOf(row);return doc.blocks.length||doc.brand||doc.merge||doc.fixedPdf?{document:doc}:{}}
-export function selectedDocument(value:unknown,optionId:string,items:{id:string}[]=[]){const doc=proposalDocument(value);return {...doc,blocks:doc.blocks.filter(b=>!b.condition||(b.condition.startsWith('item:')?items.some(i=>'item:'+i.id===b.condition):b.condition===optionId))}}
+export function selectedDocument(value:unknown,optionId:string,items:{id:string}[]=[]){const {merge,importReport,...doc}=proposalDocument(value);return {...doc,blocks:doc.blocks.filter(b=>!b.condition||(variableCondition(b.condition)?variableVisible(b.condition,merge?.values):b.condition.startsWith('item:')?items.some(i=>'item:'+i.id===b.condition):b.condition===optionId)).map(b=>{if(!b.condition||!variableCondition(b.condition))return b;const {condition,...block}=b;return block})}}
 export function documentText(value:unknown){const doc=proposalDocument(value);return doc.blocks.map(b=>[b.type,b.title,b.text,b.second??'',b.alt??'',...(b.images??[]).map(image=>image.alt)].filter(Boolean).join('\n')).join('\n\n')}
 
 /** The single Client slot is rebound deliberately when a person chooses a new client. */

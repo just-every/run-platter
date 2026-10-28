@@ -56,6 +56,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  if(doc.brand?.logoId){need(media,'Document media is unavailable',503);await pdf.image(await media(doc.brand.logoId),80)}
  if(doc.brand?.name)pdf.heading(doc.brand.name)
  for(const block of doc.blocks){
+  if(block.page)continue
   if(block.type==='page_break'){pdf.pageBreak();continue}
   if(block.title)pdf.heading(block.title)
   if(block.type==='field'||block.type==='signature'){pdf.text((block.type==='signature'?'Client signature (not signed)':(block.required?'Required ':'Optional ')+block.fieldKind+' field')+': '+block.title);if(block.text)pdf.text(block.text)}

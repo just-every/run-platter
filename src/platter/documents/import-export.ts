@@ -54,9 +54,9 @@ export async function importDocument(env:Bindings,a:Actor,data:FormData){
    need(['owner','admin','manager','content_editor'].includes(a.role),'A library editor imports sections',403)
    const sections:{title:string;blocks:any[]}[]=[];for(const part of parts){if(part.type==='heading'&&part.headingLevel===1)sections.push({title:part.title,blocks:[]});if(sections.length)sections.at(-1)!.blocks.push(part)}
    need(sections.length>0,'Library import needs Heading 1 sections')
-   // Library sections retain the editable text. Rich sections stay in the proposal until saved with their media consent.
-   need(!parts.some(p=>['image','pricing'].includes(p.type)),'Import rich sections into a proposal first, then save their placed media or pricing to the library')
-   for(const section of sections){const content=section.blocks.map(b=>[b.title,b.text].filter(Boolean).join('\n')).join('\n\n');need(content.length<=10000,'Each library section must be at most 10000 characters');const id=crypto.randomUUID();writes.push(db.prepare('INSERT INTO p_library_items(id,title,kind,content,updated_by,updated_at) VALUES(?,?,?,?,?,?)').bind(id,section.title,'section',content,a.id,Date.now()))}
+   for(const section of sections){const content=section.blocks.map(b=>[b.title,b.text].filter(Boolean).join('\n')).join('\n\n');need(content.length<=10000,'Each library section must be at most 10000 characters');const id=crypto.randomUUID();writes.push(db.prepare('INSERT INTO p_library_items(id,title,kind,content,updated_by,updated_at) VALUES(?,?,?,?,?,?)').bind(id,section.title,'section',content,a.id,Date.now()))
+    if(section.blocks.some(b=>['image','pricing','table'].includes(b.type))){writes.push(db.prepare('INSERT INTO p_imported_library(item_id,document,options) VALUES(?,?,?)').bind(id,JSON.stringify({version:1,blocks:section.blocks}),JSON.stringify(tables)));for(const b of section.blocks.filter(b=>b.type==='image'))writes.push(db.prepare('INSERT INTO p_library_media(item_id,file_id) VALUES(?,?)').bind(id,b.assetId))}
+   }
    await commit(db,a,writes,false,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))",values:[row.id,original.version]});return {id:row.id,libraryItems:sections.length,report}
   }
   document.blocks.push(...parts);fields.pricingTables=tables
@@ -81,7 +81,7 @@ export async function exportDocument(env:Bindings,a:Actor,id:string,format:strin
 export async function fixedPagesPdf(bytes:Uint8Array,generated:Uint8Array,view:any){
  const original=await PDFDocument.load(bytes),out=await PDFDocument.create(),font=await out.embedFont(StandardFonts.Helvetica)
  for(const page of await out.copyPages(original,original.getPageIndices())){out.addPage(page);page.drawText('Not signed, revision '+view.revision,{x:24,y:16,size:9,font,color:rgb(.25,.25,.25)})}
- for(const block of documentOf(view).blocks.filter(b=>b.page))if(block.type==='signature'||block.type==='field'){const page=out.getPage(block.page!-1);page.drawText(block.title+(block.type==='signature'?' (not signed)':''),{x:block.x??48,y:block.y??100,size:12,font,color:rgb(.2,.2,.2)})}
+ for(const block of documentOf(view).blocks.filter(b=>b.page))if(block.type==='signature'||block.type==='field'){const page=out.getPage(block.page!-1);need((block.x??48)<page.getWidth()-20&&(block.y??100)<page.getHeight()-20,'Place fields inside their fixed page');page.drawText(block.title+(block.type==='signature'?' (not signed)':''),{x:block.x??48,y:block.y??100,size:12,font,color:rgb(.2,.2,.2)})}
  const appended=await PDFDocument.load(generated);for(const page of await out.copyPages(appended,appended.getPageIndices()))out.addPage(page)
  return out.save()
 }

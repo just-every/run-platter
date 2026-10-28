@@ -609,7 +609,8 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items', {timeout:180000},async()=>{
+// Two CLI transfers and full schema replay use the broader custody journey's bounded wait.
+test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items', {timeout:360000},async()=>{
  const inbound=inboundMailFixture(),mailboxWires=[]
  const disputeDeadline=Math.floor(Date.now()/1000)+86400
  const temporary=await mkdtemp(join(tmpdir(),'platter-team-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')

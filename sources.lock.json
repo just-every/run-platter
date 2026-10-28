@@ -198,7 +198,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "2f423fde62d155d55a46a5bf20e3fc0e79abb88302e3bc67f6c56a23517ed063",
+      "sha256": "2c6028cf115bd44b0af243b3897f8844f84688a79419bcae9d13216c9b9f0d42",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -2758,7 +2758,7 @@
       "executable": false
     },
     "src/platter/reports/accounting.ts": {
-      "sha256": "deb6cb04192e5e6a8ef5ca8efefcf483a74d13e6e25ce04e3a55741e0c00c7f4",
+      "sha256": "1761790584e12dace6273995d1a765922bdaad1a57f140ac24d28903b67c4b7d",
       "executable": false
     },
     "src/platter/reports/pipeline-csv.ts": {
@@ -2766,7 +2766,7 @@
       "executable": false
     },
     "src/platter/reports/recorded-revenue.ts": {
-      "sha256": "85ac3bee3d93c14d43acba0f88c6906250348969327363f352ad1e896b556b47",
+      "sha256": "e296f1a4450196ce910114cdee8649c204c6e075135a2475688869466d83f2c5",
       "executable": false
     },
     "src/platter/reports/report-state.ts": {
@@ -3186,7 +3186,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "67bd497f8c82bb94a0122caf7f0d77f5d6179f3cefe2cdeada5d511f45113468",
+      "sha256": "1f1ad1aae52f4bb011fd15fb8841f365597defff7f0e298103b6f7fb953eb1d5",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3282,7 +3282,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "d01ecf03c5ea866e353047001bd20f3acd74399e293af763b176c0e506ecbe2b",
+      "sha256": "f74214b99b99b64a596691ceecf8bbf999071b10db099b0366aa84fce78de0db",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3322,7 +3322,7 @@
       "executable": false
     },
     "tests/revenue-fixture.mjs": {
-      "sha256": "3c397d6ac1ada840f0a1d428200d728b17f69a41e9505a675a4051ef7bc674d3",
+      "sha256": "867a9365eb419ce9f74b5e68bf3890ab32131487a49b2542ef4f30b4c8ac8386",
       "executable": false
     },
     "tests/signer-replacement-http.mjs": {

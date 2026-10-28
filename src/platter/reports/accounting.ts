@@ -21,7 +21,7 @@ export async function refreshRevenueInvoice(env:Bindings,a:Actor,p:Record<string
  const acceptance=await db.prepare('SELECT revision,currency FROM p_acceptances WHERE proposal_id=?').bind(id).first<any>()
  need(acceptance,'Accept the proposal before linking an invoice',409)
  const {connection,secret}=await providerCredential(env,'workspace:quickbooks')
- need(!await db.prepare('SELECT 1 FROM p_revenue_invoices WHERE proposal_id=? AND account_id!=?').bind(id,connection.account_id).first(),'This agreement is linked to another accounting company. Reconnect that company.',409)
+ need(!await db.prepare('SELECT 1 FROM p_revenue_invoices WHERE account_id!=?').bind(connection.account_id).first(),'Revenue snapshots belong to another accounting company. Reconnect that company.',409)
  const old=await db.prepare('SELECT * FROM p_revenue_invoices WHERE account_id=? AND invoice_id=?').bind(connection.account_id,invoiceId).first<any>()
  need(!old||old.proposal_id===id,'This invoice already belongs to another agreement',409)
  const version=Number(p.version)
@@ -33,7 +33,7 @@ export async function refreshRevenueInvoice(env:Bindings,a:Actor,p:Record<string
  need(!old||token>=old.sync_token,'QuickBooks returned an older invoice revision',409)
  const issued=providerDate(invoice.TxnDate),due=providerDate(invoice.DueDate),total=providerCents(invoice.TotalAmt),balance=providerCents(invoice.Balance)
  need(due>=issued&&balance<=total,'QuickBooks invoice dates or balance are inconsistent',409)
- if(old&&token===old.sync_token)need(old.issued_on===issued&&old.due_on===due&&old.total_cents===total&&old.balance_cents===balance,'QuickBooks changed an invoice without a new revision',409)
+ if(old&&token===old.sync_token)need(old.issued_on===issued&&old.due_on===due&&old.total_cents===total,'QuickBooks changed an invoice without a new revision',409)
  await commit(db,a,[db.prepare('INSERT INTO p_revenue_invoices(account_id,invoice_id,proposal_id,revision,currency,issued_on,due_on,total_cents,balance_cents,sync_token,observed_at,recorded_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account_id,invoice_id) DO UPDATE SET issued_on=excluded.issued_on,due_on=excluded.due_on,total_cents=excluded.total_cents,balance_cents=excluded.balance_cents,sync_token=excluded.sync_token,observed_at=excluded.observed_at,recorded_by=excluded.recorded_by,version=p_revenue_invoices.version+1')
   .bind(connection.account_id,invoiceId,id,acceptance.revision,acceptance.currency,issued,due,total,balance,token,Date.now(),a.id)],false,{
    sql:"EXISTS(SELECT 1 FROM p_connections WHERE id='workspace:quickbooks' AND account_id=? AND version=? AND status='connected' AND broken_at IS NULL) AND COALESCE((SELECT version FROM p_revenue_invoices WHERE account_id=? AND invoice_id=?),0)=? AND EXISTS(SELECT 1 FROM p_acceptances WHERE proposal_id=? AND revision=? AND currency=?)",

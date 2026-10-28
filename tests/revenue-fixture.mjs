@@ -7,11 +7,12 @@ export function revenueOffer(term=12){
 }
 
 // Advance only the installation fixture clock; each agreement is accepted through its real invitation.
-export async function acceptRevenue(h,{clientId,cookie=h.owner,term=12,currency='USD',date='2099-01-15',title='Setup and care',approver=h.owner}){
+export async function acceptRevenue(h,{clientId,cookie=h.owner,term=12,interval='monthly',rate='1200',currency='USD',date='2099-01-15',title='Setup and care',approver=h.owner}){
  const old=await h.db.prepare('SELECT observed_at FROM p_expiry_clock WHERE singleton=1').first()
  try{
   await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET observed_at=excluded.observed_at').bind(Date.parse(date+'T12:00:00Z')).run()
-  const input={...revenueOffer(term),clientId,title},p=await h.cmd('proposal.prepare',input,cookie)
+  const fixture=revenueOffer(term);Object.assign(fixture.pricingTables[0].lines[1],{interval,unitPrice:rate})
+  const input={...fixture,clientId,title},p=await h.cmd('proposal.prepare',input,cookie)
   // Current creation offers USD; this seeded historical currency is never inferred or converted.
   if(currency!=='USD')await h.db.prepare('UPDATE p_proposals SET currency=? WHERE id=?').bind(currency,p.id).run()
   let row=(await h.state()).proposals.find(r=>r.id===p.id)

@@ -1843,12 +1843,51 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   await h.cmd('revenue.invoice.refresh',link(first.id,b,1))
   const mismatch=await read(accountingFilters),firstRow=mismatch.rows.find(r=>r.id===first.id)
   assert.equal(firstRow.accounting.status,'Mismatch');assert.equal(firstRow.recordedRevenue.accountingDifferenceCents,-10000);assert.equal(firstRow.recordedRevenue.receivedCents,120000);assert.deepEqual((await h.state()).proposals.find(p=>p.id===first.id).acceptance,frozen)
+  invoices.get(b).Balance=6400
+  await h.cmd('revenue.invoice.refresh',link(first.id,b,2))
+  assert.equal((await read(accountingFilters)).rows.find(r=>r.id===first.id).accounting.status,'Matched','A refreshed applied-payment balance can reconcile without changing the invoice revision')
   unchanged=await snapshots()
   duringInvoice=async()=>{duringInvoice=undefined;await h.db.prepare("UPDATE p_connections SET status='disconnected',version=version+1 WHERE id='workspace:quickbooks'").run()}
-  await h.cmd('revenue.invoice.refresh',link(first.id,b,2),h.owner,409)
+  await h.cmd('revenue.invoice.refresh',link(first.id,b,3),h.owner,409)
   assert.equal(await snapshots(),unchanged,'Revoking the connection during provider I/O prevents a write')
-  await h.cmd('revenue.invoice.refresh',link(first.id,b,2),h.owner,409)
+  await h.cmd('revenue.invoice.refresh',link(first.id,b,3),h.owner,409)
   assert.equal(await snapshots(),unchanged,'A disconnected credential cannot refresh historical snapshots')
+  await h.cmd('provider.connect',{provider:'quickbooks',version:2,realmId:'synthetic-platter-4600',token:'synthetic-platter-4601',consent:true})
+  const adminId=(await h.state(people.admin)).actor.id
+  duringInvoice=async()=>{duringInvoice=undefined;await h.db.prepare("UPDATE p_members SET role='sales',version=version+1 WHERE operator_id=?").bind(adminId).run()}
+  await h.cmd('revenue.invoice.refresh',link(first.id,b,3),people.admin,409)
+  assert.equal(await snapshots(),unchanged,'Revoking administrator authority during provider I/O prevents a write')
+  invoices.get(b).SyncToken='0'
+  await h.cmd('revenue.invoice.refresh',link(first.id,b,3),h.owner,409)
+  invoices.get(b).SyncToken='1';invoices.get(b).Balance=8000
+  await h.cmd('revenue.invoice.refresh',link(first.id,b,3),h.owner,409)
+  assert.equal(await snapshots(),unchanged,'Old revisions and impossible balances cannot replace verified facts')
+  await h.cmd('provider.connect',{provider:'quickbooks',version:3,realmId:'synthetic-platter-4605',token:'synthetic-platter-4601',consent:true})
+  await h.cmd('revenue.invoice.refresh',link(first.id,b,0),h.owner,409)
+  assert.equal(await snapshots(),unchanged,'Changing the connected company cannot mix invoice authorities for an agreement')
+  for(const [index,[interval,rate,mrr]] of [['weekly','1200',520000],['quarterly','1200',40000],['annual','1200',10000],['annual','0.06',1]].entries()){
+   const title='Normalized revenue '+index,agreement=await acceptRevenue(h,{clientId:client.id,interval,rate,term:2,title})
+   const normalized=await read(new URLSearchParams({view:'recorded-revenue',q:title}))
+   assert.deepEqual(normalized.rows.map(r=>[r.id,r.recordedRevenue.mrrCents]),[[agreement.id,mrr]],'Monthly equivalents use exact accepted rates with cent rounding')
+  }
+  const retainer=await h.cmd('proposal.prepare',{clientId:client.id,title:'Additional monthly retainer revenue',scope:'One-off delivery with additional monthly care',packages:[{id:'one',label:'Delivery',price:'2500'}],depositPercent:'25',paymentTerms:{netDays:30,milestones:[],retainer:{percent:10,startsOn:'2099-01-31',months:24}}})
+  let retainerRow=(await h.state()).proposals.find(r=>r.id===retainer.id)
+  if(!retainerRow.approval.complete){await h.cmd('proposal.approve',{id:retainer.id,version:retainerRow.version,revision:retainerRow.revision});retainerRow=(await h.state()).proposals.find(r=>r.id===retainer.id)}
+  const retainerPath=new URL((await h.cmd('proposal.send',{id:retainer.id,version:retainerRow.version})).shareUrl).pathname,retainerCookie=await verified(h,retainerPath)
+  assert.equal((await h.send(retainerPath+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},retainerCookie)).status,200)
+  const retainerReport=await read(new URLSearchParams({view:'recorded-revenue',q:'Additional monthly retainer revenue'}))
+  assert.deepEqual(retainerReport.rows.map(r=>[r.valueCents,r.recordedRevenue.oneOffCents,r.recordedRevenue.mrrCents,r.recordedRevenue.firstYearCents]),[[850000,250000,25000,550000]],'Additional frozen monthly retainers contribute to booked term, MRR and the first year without changing the one-off fee')
+  await h.cmd('provider.connect',{provider:'quickbooks',version:4,realmId:'synthetic-platter-4600',token:'synthetic-platter-4601',consent:true})
+  const onlyInvoice=await acceptRevenue(h,{clientId:client.id,date:'2098-01-15',title:'Invoice-only revenue'})
+  const unpaid='synthetic-platter-4606'
+  invoices.set(unpaid,{Id:unpaid,SyncToken:'0',CurrencyRef:{value:'USD'},TxnDate:'2099-05-01',DueDate:'2099-06-01',TotalAmt:1000,Balance:1000})
+  await h.cmd('revenue.invoice.refresh',link(onlyInvoice.id,unpaid))
+  const unpaidFilters=new URLSearchParams(accountingFilters);unpaidFilters.set('q','Invoice-only revenue')
+  const unpaidReport=await read(unpaidFilters)
+  assert.deepEqual(unpaidReport.rows.map(r=>[r.id,r.valueCents,r.recordedRevenue.mrrCents,r.recordedRevenue.receivedCents,r.recordedRevenue.invoicedCents,r.recordedRevenue.overdueCents]),[[onlyInvoice.id,0,0,0,100000,100000]],'An issued unpaid invoice remains visible when neither bookings nor receipts match their independent periods')
+
+
+
 
 
 

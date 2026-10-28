@@ -1,3 +1,4 @@
+import { occurrence } from '../recurring'
 import { scope } from '../permissions'
 import { need, type Actor } from '../model'
 export const revenueReaders=['owner','admin','manager','sales','viewer','billing']
@@ -46,13 +47,16 @@ export function periodRevenue(p:any,dates:Record<string,string>,now=Date.now()){
  const difference=invoices.length?(p.recordedRevenue?.netReceivedCents??0)-accountingPaidCents:0
  const accounting={status:!invoices.length?'Not linked':difference===0?'Matched':'Mismatch',invoiceCount:invoices.length,refreshedAt:invoices.length?Math.min(...invoices.map((i:any)=>i.observed_at)):null}
  // Normalize immutable installment rates, rounding each line to the nearest cent.
- const recurring=fees?.recurring??[],retainer=p.acceptance.selection?.paymentSchedule?.rows?.find((r:any)=>r.kind==='retainer')
+ const recurring=fees?.recurring??[],retainers=p.acceptance.paymentSchedule?.rows?.filter((r:any)=>r.kind==='retainer')??[],retainer=retainers[0]
+ const retainerYearEnd=retainer?occurrence({interval:'annual',term:1,startsOn:retainer.date},1):''
+ const bookedValue=p.acceptance.totalCents+total(retainers,'amountCents')
+ const firstYear=fees?.firstYearCents??p.acceptance.totalCents+total(retainers.filter((r:any)=>r.date<retainerYearEnd),'amountCents')
  const mrr=recurring.reduce((n:number,r:any)=>n+monthlyRate(r),0)+(retainer?.amountCents??0)
 
- return {included:booked||receipts.length>0||selected.length>0,bookedOn,accounting,valueCents:booked?p.acceptance.totalCents:0,recordedRevenue:{
+ return {included:booked||receipts.length>0||selected.length>0,bookedOn,accounting,valueCents:booked?bookedValue:0,recordedRevenue:{
   mrrCents:booked?mrr:0,invoicedCents:total(selected,'total_cents'),outstandingCents:total(selected,'balance_cents'),overdueCents:total(selected.filter((i:any)=>i.due_on<asOf),'balance_cents'),accountingPaidCents,accountingDifferenceCents:difference,
   oneOffCents:booked?(fees?.oneOffCents??p.acceptance.totalCents):0,
-  firstYearCents:booked?(fees?.firstYearCents??p.acceptance.totalCents):0,
+  firstYearCents:booked?firstYear:0,
   receivedCents,refundedCents,netReceivedCents:receivedCents-refundedCents,
   uncertainRefundCents:sum('uncertainRefundCents'),exportedDepositCents:booked?(p.recordedRevenue?.exportedDepositCents??0):0,
  }}

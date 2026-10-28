@@ -796,7 +796,7 @@ Evidence: `src/platter/pipeline.ts`, `src/platter/ui/pipeline.ts`, `tests/platte
 
 Status: **done**.
 
-Evidence: `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
+Evidence: `tests/platter.test.mjs`, `tests/performance-http.mjs`, `tests/site-lifecycle.mjs`, `tests/performance-browser.mjs`, `tests/archive.test.mjs`
 
 ## REPORT-003 — Content and pricing performance
 
@@ -956,7 +956,7 @@ Evidence: `src/platter/mcp.ts`, `src/platter/send-requests.ts`, `tests/platter.t
 
 Status: **done**.
 
-Evidence: `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
+Evidence: `tests/platter.test.mjs`, `tests/performance-http.mjs`, `tests/site-lifecycle.mjs`, `tests/performance-browser.mjs`, `tests/archive.test.mjs`
 
 ## PRIV-001 — Erasure across contacts, tracking and synced systems
 

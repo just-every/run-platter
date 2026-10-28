@@ -1012,7 +1012,7 @@ Status: **done**.
 
 Reports show win rate, time to sign, time to pay, average deal value and lost reasons by owner, template, service, client segment and period. *Acceptance:* From a fixture of 100 decided proposals, see win rate, median time to sign, median time to pay, average deal value and lost-reason counts by owner, template, service, client segment and quarter, each matching the fixture's hand-computed values. *Status:* done. Owner-only sales performance now groups 100 decided proposals by owner, template, catalog service, explicit client segment and UTC decision quarter. Accepted agreements and explicit won overrides are wins; declined and lost records are losses, and open proposals are excluded. Signing measures recorded send to acceptance; payment measures acceptance to the first recorded receipt, retaining date precision and zero for same-day receipts. Missing facts remain unrecorded. Average deal value uses wins; currencies stay separate, and a proposal with several services appears once in each service group. REPORT-005 exports and schedules the same filtered figures to explicitly named active people; PORT-002 retains all source facts and schedules. No model or provider call is made.
 
-Evidence: `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
+Evidence: `tests/platter.test.mjs`, `tests/performance-http.mjs`, `tests/site-lifecycle.mjs`, `tests/performance-browser.mjs`, `tests/archive.test.mjs`
 
 ## REPORT-003 — Content and pricing performance
 
@@ -1214,7 +1214,7 @@ Status: **done**.
 
 For each line item, Platter suggests a price range from the firm's own accepted and lost proposals for the same catalog item and client segment, with the sample size and examples shown. The member decides; suggestions are never applied silently. *Acceptance:* From a fixture history, see a suggested range with sample size and three linked examples, and see the price unchanged until the member applies it. *Status:* done. The owner sees observed minimum, maximum and median unit prices for each catalog-linked line, restricted to the same catalog identity, unit, currency and explicit client segment in the firm's own accepted or lost history. Accepted history uses the selected option; lost history uses offered prices. The sample count is distinct proposals, and up to three unique linked examples identify the historical offers and outcomes. Unclassified clients or absent comparable history receive no invented range. An explicit version-checked Apply action revises an unsent draft and clears approval under APPROVE-003; reads never change a price, and members, stale inputs and sent offers are refused. Catalog identities and segments survive PORT-002 archives; no outbound model call is made.
 
-Evidence: `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
+Evidence: `tests/platter.test.mjs`, `tests/performance-http.mjs`, `tests/site-lifecycle.mjs`, `tests/performance-browser.mjs`, `tests/archive.test.mjs`
 
 ## PRIV-001 — Erasure across contacts, tracking and synced systems
 

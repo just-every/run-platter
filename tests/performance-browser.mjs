@@ -21,9 +21,9 @@ export async function performanceBrowser(){
    for(const width of [1440,390]){
     await page.setViewportSize({width,height:900})
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,name+' fits '+width)
-    const small=await page.locator('main').evaluate(root=>[...root.querySelectorAll('*')].filter(e=>e.children.length===0&&e.textContent.trim()&&e.getClientRects().length&&parseFloat(getComputedStyle(e).fontSize)<13).map(e=>e.tagName))
+    const small=await page.locator('main').evaluate(root=>[...root.querySelectorAll('*')].filter(e=>e.children.length===0&&e.textContent.trim()&&e.getClientRects().length&&parseFloat(getComputedStyle(e).fontSize)<13).map(e=>({tag:e.tagName,classes:e.className,text:e.textContent.slice(0,80),size:getComputedStyle(e).fontSize})))
     assert.deepEqual(small,[],name+' readable text at '+width)
-    if(process.env.PLATTER_SCREENSHOTS){await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true});await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`performance-${name}-${width}.png`),fullPage:true})}
+    if(process.env.PLATTER_SCREENSHOTS){await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true});await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`performance-${name}-${width}.png`),fullPage:true});if(['suggestion','applied'].includes(name))await page.locator('[data-price-suggestion]').screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`performance-${name}-detail-${width}.png`)})}
    }
    await page.setViewportSize({width:1440,height:900})
   }

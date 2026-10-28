@@ -46,3 +46,5 @@ p{margin:6px 0 14px;text-wrap:pretty}
  h1{font-size:38px;letter-spacing:-.03em;margin-bottom:12px}
  h2{font-size:21px}
 }
+
+@media(max-width:600px){.proposals-page>.eyebrow,.clients-page>.eyebrow,.proposal-page>.eyebrow{font-size:13px}}

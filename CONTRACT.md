@@ -157,7 +157,7 @@ A buyer replacing an incumbent needs the whole job, so the target is the whole j
 
 #### SIGN-002 — Immutable acceptance with an integer-cent deposit
 
-**Requirement.** Acceptance requires a verified mailbox, a typed full name, one offered option and explicit consent. One D1 transaction retains the exact approved snapshot, signer, consent text and time, and calculates the deposit in integer cents, rounding to the nearest cent. A second acceptance returns the first; nothing in the product edits an accepted agreement. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-002).
+**Requirement.** Acceptance requires a verified mailbox, a typed full name, one offered option and explicit consent. Acceptance atomically retains the exact approved snapshot, signer, consent text and time, and calculates the deposit in integer cents, rounding to the nearest cent. A second acceptance returns the first; nothing in the product edits an accepted agreement. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-002).
 
 **Acceptance.**
 1. Accept with an unknown option (400), accept option two with consent, accept again with another name and option, and read back the first acceptance with total 420000 and deposit 105000 cents.

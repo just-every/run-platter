@@ -36,6 +36,12 @@ test('SITE-001 built homepage opens run instructions, Markdown docs work without
         assert.equal(new URL(page.url()).pathname, '/docs/proposals')
         assert.ok(await page.locator('article').innerText())
         await capture(page, 'docs-proposals', width)
+        if (width === 1440) {
+          for (const document of ['contract', 'acceptance']) {
+            assert.equal((await page.goto(site.origin + '/docs/' + document)).status(), 200)
+            assert.doesNotMatch(await page.locator('article').innerText(), /<!--|Generated from CONTRACT\.md by contract-docs/)
+          }
+        }
         await page.goto(site.origin + '/docs')
         await capture(page, 'docs', width)
         assert.equal((await page.goto(app.origin)).status(), 200)

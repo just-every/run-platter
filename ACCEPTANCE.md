@@ -32,7 +32,7 @@ Core · published · **partial** · Cites BASE-ACCESS-002, BASE-ACCESS-004, BASE
 4. A member attempts an owner-only invoice export and import: neither changes records.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/http.ts`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Owner-only invoice/import attempts are refused without record changes. Expected statuses are checked by tests/harness.mjs, outside this clause’s cited evidence; the complete no-write outcome is not asserted here.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Owner-only invoice/import attempts are refused without record changes. Expected statuses are checked by tests/harness.mjs, outside this clause’s cited evidence; the complete no-write outcome is not asserted here.
 
 #### ACCESS-001 — Proposal preparation grants
 
@@ -46,7 +46,7 @@ Core · published · **partial** · Cites BASE-AGENT-004, BASE-AGENT-005, BASE-A
 3. Revoke the grant and read context again: access is refused.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/credentials.ts`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Company-policy decisions under held. No asserting line in the old cited evidence. all-autonomous policies. No asserting line in the old cited evidence.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Company-policy decisions under held. No asserting line in the old cited evidence. all-autonomous policies. No asserting line in the old cited evidence.
 
 ### Approval, sending and acceptance
 
@@ -62,7 +62,7 @@ Core · published · **partial** · Cites BASE-AGENT-007, BASE-AGENT-008
 3. A manager’s approval under a matching rule binds the same exact revision.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/commands.ts`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Stale approval. The expected-status assertions for these actions live in the uncited harness. send-after-edit refusal. The expected-status assertions for these actions live in the uncited harness. Every retained approval’s approver. No asserting line in the old cited evidence. role. No asserting line in the old cited evidence. rule. No asserting line in the old cited evidence. time are read together. No asserting line in the old cited evidence.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Stale approval. The expected-status assertions for these actions live in the uncited harness. send-after-edit refusal. The expected-status assertions for these actions live in the uncited harness. Every retained approval’s approver. No asserting line in the old cited evidence. role. No asserting line in the old cited evidence. rule. No asserting line in the old cited evidence. time are read together. No asserting line in the old cited evidence.
 
 #### PROP-002 — Sending freezes the offer
 
@@ -74,7 +74,7 @@ Core · published · **partial** · Cites BASE-ROLE-001
 1. Send an approved proposal, try to revise it (409), send a fresh invitation and confirm the old link is refused and the offer unchanged.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/commands.ts`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Frozen-offer revision refusal. The expected-status assertion is in tests/harness.mjs, outside the cited files.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Frozen-offer revision refusal. The expected-status assertion is in tests/harness.mjs, outside the cited files.
 
 #### SIGN-001 — Verified-mailbox acceptance
 
@@ -91,7 +91,7 @@ Core · published · **partial** · Rules D-1
 6. The verification cookie is private to its invitation, HttpOnly and SameSite Strict; another revision gains no authority.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/signing.ts`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: A previously valid unconsumed code is refused specifically after its expiry. The expiry case reuses an already-exhausted condition and submits an arbitrary code, so it does not isolate expiry. Ten-code invitation ceiling. No asserting line in the old cited evidence. exactly ten-minute lifetime. No asserting line in the old cited evidence. Cookie path and SameSite/HttpOnly flags. Cookie presence alone does not assert these properties. another revision’s denied authority. Cookie presence alone does not assert these properties.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: A previously valid unconsumed code is refused specifically after its expiry. The expiry case reuses an already-exhausted condition and submits an arbitrary code, so it does not isolate expiry. Ten-code invitation ceiling. No asserting line in the old cited evidence. exactly ten-minute lifetime. No asserting line in the old cited evidence. Cookie path and SameSite/HttpOnly flags. Cookie presence alone does not assert these properties. another revision’s denied authority. Cookie presence alone does not assert these properties.
 
 #### SIGN-002 — Immutable acceptance with an integer-cent deposit
 
@@ -103,7 +103,7 @@ Core · published · **partial** · Rules D-1
 1. Accept with an unknown option (400), accept option two with consent, accept again with another name and option, and read back the first acceptance with total 420000 and deposit 105000 cents.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/signing.ts`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Replay retains the first selected option. Signer. money are read. but the repeated acceptance’s exact option id is not read back in this case.
+**Gap.** All listed acceptance outcomes are traced in DONE-AUDIT. The published conservative demotion is retained pending a fresh ct judgment; this rewrite makes no status promotion.
 
 #### INV-001 — One retained deposit invoice per acceptance
 
@@ -115,7 +115,7 @@ Core · published · **partial**
 1. Export an unaccepted proposal (409), export an accepted one twice concurrently and get one invoice, and download its CSV.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/invoices.ts`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Unaccepted invoice export is refused. Expected-status assertion is in the uncited harness.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Unaccepted invoice export is refused. Expected-status assertion is in the uncited harness.
 
 ### Clients, erasure and archives
 
@@ -132,7 +132,7 @@ Core · published · **partial** · Cites BASE-DATA-001
 4. Undo restores the previous clients; a changed imported client or one with dependent proposals prevents undo.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/movein/index.ts`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Changed-file apply refuses the reviewed fingerprint. Expected-status assertion lives in the uncited harness. Changed imported client prevents undo. The cited journey does not assert this separate changed-client case.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Changed-file apply refuses the reviewed fingerprint. Expected-status assertion lives in the uncited harness. Changed imported client prevents undo. The cited journey does not assert this separate changed-client case.
 
 #### ERASE-001 — Bounded client erasure
 
@@ -144,7 +144,7 @@ Core · published · **partial** · Cites BASE-DATA-003, BASE-DATA-006, BASE-DAT
 1. Erase a client with a draft (409), erase with the wrong name (400), erase an unused client, then restore an older archive with the newer erasure journal and find the client absent.
 
 **Evidence.** `tests/platter.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Draft. wrong-name refusals. Expected-status assertions are in the uncited harness.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Draft. wrong-name refusals. Expected-status assertions are in the uncited harness.
 
 #### PORT-001 — Validated archives and restore
 
@@ -158,7 +158,7 @@ Core · published · **partial** · Cites BASE-DATA-001, BASE-BACKUP-001
 3. An older archive after erasure is refused without the newer erasure journal.
 
 **Evidence.** `tests/archive.test.mjs`, `src/platter/archive-policy.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: All record. The archive journey asserts many records but never compares the complete re-exported part manifest. attachment parts are identical after export/import/re-export. The archive journey asserts many records but never compares the complete re-exported part manifest.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: All record. The archive journey asserts many records but never compares the complete re-exported part manifest. attachment parts are identical after export/import/re-export. The archive journey asserts many records but never compares the complete re-exported part manifest.
 
 ### Mail and the public site
 
@@ -188,7 +188,7 @@ Core · published · **partial** · Cites BASE-DOCS-001, BASE-PUBLIC-001
 3. Open the installed home and see the Lobby.
 
 **Evidence.** `tests/site.test.mjs`, `scripts/verification/run.mjs`, `src/site/pages.ts`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Run Platter opens the run page. Browser assertions are in tests/site-lifecycle.mjs, while the cited tests/site.test.mjs only imports suites. Markdown is readable with JavaScript disabled. Browser assertions are in tests/site-lifecycle.mjs, while the cited tests/site.test.mjs only imports suites. Installed home is the Lobby. Browser assertions are in tests/site-lifecycle.mjs, while the cited tests/site.test.mjs only imports suites.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Run Platter opens the run page. Browser assertions are in tests/site-lifecycle.mjs, while the cited tests/site.test.mjs only imports suites. Markdown is readable with JavaScript disabled. Browser assertions are in tests/site-lifecycle.mjs, while the cited tests/site.test.mjs only imports suites. Installed home is the Lobby. Browser assertions are in tests/site-lifecycle.mjs, while the cited tests/site.test.mjs only imports suites.
 
 ### Authoring and branding
 
@@ -202,7 +202,7 @@ Core · target · **partial** · Cites BASE-INPUT-002, BASE-INPUT-003, BASE-ACCE
 1. A browser journey at 1440 and 390 pixels builds a proposal from blank with every block type, reorders by drag and by keyboard, applies a brand kit, reloads and sees the same document, and exports a PDF whose pages carry the same blocks in order; the `EDIT-011` budget journey passes on the same build.
 
 **Evidence.** `tests/site.test.mjs`, `tests/platter.test.mjs`, `tests/archive.test.mjs`, `tests/editor-budget.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every palette block. drag. keyboard reorder. brand. reload. same-order PDF at 1440. Assertions are in imported browser helpers. not the old cited wrapper. The same complete browser flow at 390. Assertions are in imported browser helpers. Performance proof on the same exact build as the editor browser flow. No assertion in the cited files binds the two receipts to the same candidate.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every palette block. drag. keyboard reorder. brand. reload. same-order PDF at 1440. Assertions are in imported browser helpers. not the old cited wrapper. The same complete browser flow at 390. Assertions are in imported browser helpers. Performance proof on the same exact build as the editor browser flow. No assertion in the cited files binds the two receipts to the same candidate.
 
 #### EDIT-002 — Proposal templates
 
@@ -231,7 +231,7 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-003 · Rules D-
 1. Insert a linked and a detached case study into a draft and a sent proposal, edit the library item, and see only the linked copy in the draft change; the item's usage list names all three.
 
 **Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Linked draft changes while detached. The linked-propagation assertion is in tests/library-fixture.mjs, outside the old Evidence set. sent. The linked-propagation assertion is in tests/library-fixture.mjs, outside the old Evidence set. accepted copies do not. The linked-propagation assertion is in tests/library-fixture.mjs, outside the old Evidence set. Usage names exactly all three copies. No directly cited asserting line establishes the exact usage list.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Linked draft changes while detached. The linked-propagation assertion is in tests/library-fixture.mjs, outside the old Evidence set. sent. The linked-propagation assertion is in tests/library-fixture.mjs, outside the old Evidence set. accepted copies do not. The linked-propagation assertion is in tests/library-fixture.mjs, outside the old Evidence set. Usage names exactly all three copies. No directly cited asserting line establishes the exact usage list.
 
 #### EDIT-004 — Variables from client, deal and CRM records
 
@@ -296,7 +296,7 @@ Core · target · **partial** · Cites BASE-INPUT-002, BASE-INPUT-003, BASE-PUBL
 1. Add an uploaded video, a Loom link and a gallery, view on a 390-pixel phone and play the video, export the PDF and see stills with links, and try an embed from a host outside the allowlist (refused).
 
 **Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Uploaded video. The browser helpers are not in the old Evidence set. gallery render. The browser helpers are not in the old Evidence set. play at 390. The browser helpers are not in the old Evidence set. PDF has still images. The old cited wrappers do not assert every named carrier. links. The old cited wrappers do not assert every named carrier. Outside-allowlist embed refusal. A command status in a helper is not an asserting line in the cited file.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Uploaded video. The browser helpers are not in the old Evidence set. gallery render. The browser helpers are not in the old Evidence set. play at 390. The browser helpers are not in the old Evidence set. PDF has still images. The old cited wrappers do not assert every named carrier. links. The old cited wrappers do not assert every named carrier. Outside-allowlist embed refusal. A command status in a helper is not an asserting line in the cited file.
 
 #### EDIT-007 — Mobile client review
 
@@ -326,13 +326,15 @@ Core · target · **missing** · Cites BASE-PUBLIC-002, BASE-MAIL-001 · Rules D
 
 Core · target · **partial** · Rules D-1
 
-**Requirement.** A section can be shown only when a package, optional item or variable has a given value, so choosing the Premium package shows its deliverables and timeline. The accepted agreement and PDF contain exactly what the client saw for their selection. For the proposal this applies to the scope and terms sections, each conditioned on one offered package or one optional item (`PRICE-002`), including the selected unsigned client PDF (`EDIT-014`). An optional-item condition shows its section only while the client's chosen package has that item added, at any allowed quantity; a package without the item never shows it. Each future capability inherits the same conditional visibility and exact-selection assertions before shipping: `EDIT-001` added sections, `EDIT-004` variables, `EDIT-005` added PDF carriers and `SIGN-005` signed agreement PDFs. Unconditional legacy content remains visible for every selection. Members check each selection's sections before sending in the `EDIT-018` preview. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-009).
+**Requirement.** Sections can depend on a package, optional item or variable value. Each selection’s client page, unsigned and signed PDFs and immutable agreement contain exactly its visible sections. Optional-item conditions require that the chosen package contains and selects that item at an allowed quantity; unconditional content remains visible. Members compare selections in EDIT-018. Detailed condition custody is in [proposal behavior](docs/contract-behavior.md#edit-009).
 
 **Acceptance.**
 1. Make a timeline section depend on the Premium package, accept the Standard package and see the section absent from the agreement and PDF, then accept Premium on another copy and see it present.
 
+2. A variable-dependent section follows the filled variable on preview, client page, agreement and PDF.
+
 **Evidence.** `src/platter/conditional.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: The accepted selection’s agreement and PDF preserve exactly the visible sections. The representative assertions exercise the sections; variable-dependent conditions in the Requirement remain unproved.
+**Gap.** Package- and optional-item visibility is asserted through client/PDF/acceptance carriers. Variable-dependent visibility on preview, client, agreement and PDF remains unproved.
 
 #### EDIT-010 — Attachments and vendor documents
 
@@ -371,7 +373,7 @@ Core · target · **partial** · Rules D-1
 4. Acme’s agreement remains byte-identical.
 
 **Evidence.** `src/platter/duplicate.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Destination variables. The original full-target combination is not asserted by its old cited files. role slots. The original full-target combination is not asserted by its old cited files. every payment. The original full-target combination is not asserted by its old cited files. delivery setting are copied. The original full-target combination is not asserted by its old cited files. Copy has no payment records. No explicit read of a populated source payment collection establishes this absence. Mandatory. Expected refusal statuses are asserted in the uncited harness; the full role/variable combination is not read back. optional approval copy branches. Expected refusal statuses are asserted in the uncited harness; the full role/variable combination is not read back.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Destination variables. The original full-target combination is not asserted by its old cited files. role slots. The original full-target combination is not asserted by its old cited files. every payment. The original full-target combination is not asserted by its old cited files. delivery setting are copied. The original full-target combination is not asserted by its old cited files. Copy has no payment records. No explicit read of a populated source payment collection establishes this absence. Mandatory. Expected refusal statuses are asserted in the uncited harness; the full role/variable combination is not read back. optional approval copy branches. Expected refusal statuses are asserted in the uncited harness; the full role/variable combination is not read back.
 
 #### EDIT-021 — Duplicate lifecycle and file custody
 
@@ -387,7 +389,7 @@ Core · target · **partial** · From EDIT-012 · Rules D-1
 5. Archive and restore the copy’s files, content and settings exactly.
 
 **Evidence.** `src/platter/duplicate.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every lifecycle authority. Individual null fields do not prove an uninspected collection. including payments. Individual null fields do not prove an uninspected collection. is absent. Individual null fields do not prove an uninspected collection. Stale refusal. Old key behavior has a hard-coded refusal, not the required policy matrix. company-policy standard copy behavior. Old key behavior has a hard-coded refusal, not the required policy matrix. Compiled copy form. The browser assertions are outside the old Evidence set. independent source at 1440 and 390. The browser assertions are outside the old Evidence set.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every lifecycle authority. Individual null fields do not prove an uninspected collection. including payments. Individual null fields do not prove an uninspected collection. is absent. Individual null fields do not prove an uninspected collection. Stale refusal. Old key behavior has a hard-coded refusal, not the required policy matrix. company-policy standard copy behavior. Old key behavior has a hard-coded refusal, not the required policy matrix. Compiled copy form. The browser assertions are outside the old Evidence set. independent source at 1440 and 390. The browser assertions are outside the old Evidence set.
 
 #### EDIT-013 — Documents without pricing
 
@@ -423,7 +425,7 @@ Core · target · **partial** · Cites BASE-ROLE-001 · Rules D-1
 1. Lock the terms section in a template; as a sales member try to edit it in the editor and through the API (both refused); as a content editor try to unlock it in a proposal (403); as an admin unlock it in one proposal and edit it, and see the unlock in the audit log and approval required before sending.
 
 **Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Terms editing through both editor and API is refused to sales. The compiled editor assertion is in an uncited imported browser helper. Content editor cannot unlock. The complete multi-outcome combination lacks asserting lines in the old Evidence files; expected statuses use the uncited harness. admin unlock changes audit. The complete multi-outcome combination lacks asserting lines in the old Evidence files; expected statuses use the uncited harness. requires approval. The complete multi-outcome combination lacks asserting lines in the old Evidence files; expected statuses use the uncited harness.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Terms editing through both editor and API is refused to sales. The compiled editor assertion is in an uncited imported browser helper. Content editor cannot unlock. The complete multi-outcome combination lacks asserting lines in the old Evidence files; expected statuses use the uncited harness. admin unlock changes audit. The complete multi-outcome combination lacks asserting lines in the old Evidence files; expected statuses use the uncited harness. requires approval. The complete multi-outcome combination lacks asserting lines in the old Evidence files; expected statuses use the uncited harness.
 
 #### EDIT-016 — Proposal search and folders
 
@@ -462,7 +464,7 @@ Core · target · **partial** · Rules D-1
 4. Viewing as signer 2 shows only signer 2’s fields.
 
 **Evidence.** `src/platter/preview.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Desktop/phone compiled banner identifies exact revision. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. recipient. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. The full three-package tax/deposit/schedule/conditional selection equals the sent page. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. Out-of-bounds quantity eleven is refused. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. Only signer two’s assigned fields appear. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Desktop/phone compiled banner identifies exact revision. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. recipient. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. The full three-package tax/deposit/schedule/conditional selection equals the sent page. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. Out-of-bounds quantity eleven is refused. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. Only signer two’s assigned fields appear. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set.
 
 #### EDIT-022 — Preview isolation and exact approval link
 
@@ -478,7 +480,7 @@ Core · target · **partial** · From EDIT-018 · Cites BASE-ROLE-001, BASE-AUDI
 5. Preview audit records retain actor, subject and server time through archive; refusals add no preview audit.
 
 **Evidence.** `src/platter/preview.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Pending approver follows an exact revision-one approval-request link. The old preview fixture uses owner/member links rather than the named full request flow. A person outside proposal scope sees no preview content. An HTTP status alone is not a no-content assertion. Exact preview audit survives public CLI restore. Archive assertions compare broader data. this point’s specific preview outcome is not isolated in the old Evidence set.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Pending approver follows an exact revision-one approval-request link. The old preview fixture uses owner/member links rather than the named full request flow. A person outside proposal scope sees no preview content. An HTTP status alone is not a no-content assertion. Exact preview audit survives public CLI restore. Archive assertions compare broader data. this point’s specific preview outcome is not isolated in the old Evidence set.
 
 ### Catalog and pricing
 
@@ -504,7 +506,7 @@ Core · target · **partial** · Rules D-1
 1. Build two tables with 12 lines, quantities and units, and see the server totals match a cent-exact fixture; send malformed quantities and prices (400); reload and see identical totals in the client page and the PDF.
 
 **Evidence.** `src/platter/pricing.ts`, `src/platter/ui/pricing.ts`, `tests/platter.test.mjs`, `tests/pricing-journey.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every malformed quantity. Expected status assertions are in the uncited harness. price is refused with the named status. Expected status assertions are in the uncited harness.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every malformed quantity. Expected status assertions are in the uncited harness. price is refused with the named status. Expected status assertions are in the uncited harness.
 
 #### PRICE-002 — Packages and optional items the client chooses
 
@@ -516,7 +518,7 @@ Core · target · **partial** · Rules D-1
 1. Offer three packages and two optional items with an editable quantity between 1 and 10; as the client choose the middle package, add one item and set quantity 4; the server totals, agreement and PDF all show that selection; quantity 11 is refused.
 
 **Evidence.** `src/platter/selection.ts`, `src/platter/conditional.ts`, `src/platter/paper-acceptance.ts`, `src/platter/ui/paper.ts`, `src/platter/ui/packages.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/packages-journey.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Agreement and PDF both retain every field of the same middle-package quantity-four selection. The target requires equality across every carrier, not a single successful read or subset of money fields.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Agreement and PDF both retain every field of the same middle-package quantity-four selection. The target requires equality across every carrier, not a single successful read or subset of money fields.
 
 #### PRICE-003 — One-off and recurring fees
 
@@ -540,7 +542,7 @@ Core · target · **partial** · Rules D-1
 1. Apply 10% to a group and $500 off the total, see cent-exact totals; set an approval threshold of 15% and see a 20% discount require approval before sending.
 
 **Evidence.** `tests/platter.test.mjs`, `tests/pricing-journey.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Ten percent at group scope plus $500 total discount matches the fixture. The cited discount cases assert different combinations, without the complete named group-plus-total case.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Ten percent at group scope plus $500 total discount matches the fixture. The cited discount cases assert different combinations, without the complete named group-plus-total case.
 
 #### PRICE-005 — US sales tax
 
@@ -579,7 +581,7 @@ Core · target · **partial** · Rules D-1
 2. Start a proposal from a template whose terms are a 30% deposit and a net-15 milestone: the proposal opens with those terms; change its deposit to 25% and the template still holds 30%.
 
 **Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/packages-journey.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: The exact 30%-deposit/two-milestone/monthly/net-15 schedule is shown. The old evidence tests several schedule selections; the full named combination and both reads are not asserted together. frozen at acceptance. The old evidence tests several schedule selections; the full named combination and both reads are not asserted together. A template’s 30%-deposit/net-15 terms survive an independently edited 25% proposal. The copied payment-term fields are not all asserted in the old Evidence set.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: The exact 30%-deposit/two-milestone/monthly/net-15 schedule is shown. The old evidence tests several schedule selections; the full named combination and both reads are not asserted together. frozen at acceptance. The old evidence tests several schedule selections; the full named combination and both reads are not asserted together. A template’s 30%-deposit/net-15 terms survive an independently edited 25% proposal. The copied payment-term fields are not all asserted in the old Evidence set.
 
 #### PRICE-008 — First-release AUD agreements stay exact
 
@@ -643,7 +645,7 @@ Core · target · **partial** · Cites BASE-ROLE-001
 3. A parallel rule routes edited legal terms to a named admin (counsel) and a named billing user (finance) at once: it completes only when both approve, in either order, and one rejection stops it; a second billing user not named in the rule is refused (403), and saving a rule that names a sales member is refused (400).
 
 **Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Saved threshold rules are the manager-above-$25,000. The rule-save operation’s expected-status assertions are in the uncited harness. owner-above-15% configuration. The rule-save operation’s expected-status assertions are in the uncited harness. Both parallel completion orders. Each named branch must be asserted in a cited file; command execution alone does not read back every result. rejection. Each named branch must be asserted in a cited file; command execution alone does not read back every result. unnamed billing refusal. Each named branch must be asserted in a cited file; command execution alone does not read back every result. invalid sales-rule save. Each named branch must be asserted in a cited file; command execution alone does not read back every result.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Saved threshold rules are the manager-above-$25,000. The rule-save operation’s expected-status assertions are in the uncited harness. owner-above-15% configuration. The rule-save operation’s expected-status assertions are in the uncited harness. Both parallel completion orders. Each named branch must be asserted in a cited file; command execution alone does not read back every result. rejection. Each named branch must be asserted in a cited file; command execution alone does not read back every result. unnamed billing refusal. Each named branch must be asserted in a cited file; command execution alone does not read back every result. invalid sales-rule save. Each named branch must be asserted in a cited file; command execution alone does not read back every result.
 
 #### APPROVE-002 — Approval requests that reach the approver
 
@@ -672,7 +674,7 @@ Core · target · **partial** · Cites BASE-AGENT-007, BASE-AGENT-008
 5. Only owner/admin change the proposal policy; the change retains actor and time.
 
 **Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Unruled $3,000 sales send has no approval record. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Manager approves matching $30,000. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. owning sales sends. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Every role. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. outside-team refusal changes no record. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Each owner/admin/manager no-rule default selects exactly the eligible decider. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Only authorized policy edits persist with actor/time. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Unruled $3,000 sales send has no approval record. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Manager approves matching $30,000. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. owning sales sends. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Every role. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. outside-team refusal changes no record. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Each owner/admin/manager no-rule default selects exactly the eligible decider. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Only authorized policy edits persist with actor/time. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness.
 
 #### APPROVE-004 — Approval reevaluation on the exact revision
 
@@ -688,7 +690,7 @@ Core · target · **partial** · From APPROVE-003 · Cites BASE-AGENT-007
 5. An agent-prepared proposal’s commitment decision follows the company’s policy after human revisions as well as before them.
 
 **Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Sending after edit is refused until the next approval. Expected-status assertion lives in the uncited harness. Highest optional-quantity maximum. Every computed fact is not read back at its decision. currency-preserving threshold facts. Every computed fact is not read back at its decision. First-draft legal comparison. No asserting line in the old cited evidence. sequence/id tie order. No asserting line in the old cited evidence. Parallel order. The exact rejection/readback branches are not all asserted in the old files. rejected-revision refusal. The exact rejection/readback branches are not all asserted in the old files. Company-policy commitment decisions after both agent. No asserting line in the old cited evidence. human revisions. No asserting line in the old cited evidence.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Sending after edit is refused until the next approval. Expected-status assertion lives in the uncited harness. Highest optional-quantity maximum. Every computed fact is not read back at its decision. currency-preserving threshold facts. Every computed fact is not read back at its decision. First-draft legal comparison. No asserting line in the old cited evidence. sequence/id tie order. No asserting line in the old cited evidence. Parallel order. The exact rejection/readback branches are not all asserted in the old files. rejected-revision refusal. The exact rejection/readback branches are not all asserted in the old files. Company-policy commitment decisions after both agent. No asserting line in the old cited evidence. human revisions. No asserting line in the old cited evidence.
 
 ### Sending and delivery
 
@@ -706,7 +708,7 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-SECRET-001, BASE-MAIL
 5. Provider refusal changes the next send’s route and records the installation sender.
 
 **Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Both mailbox providers send. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. then revoked grants visibly fall back. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. Different sign-in alias/SMTP sender reaches client. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. timeline. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. audit. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. Every duplicate/unverified/no-SMTP address refusal stores nothing. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. Role demotion leaves no outbound mailbox message. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. Provider refusal produces the fallback sender in every recorded location. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome.
+**Gap.** All listed acceptance outcomes are traced in DONE-AUDIT. The published conservative demotion is retained pending a fresh ct judgment; this rewrite makes no status promotion.
 
 #### SEND-011 — Inbound client reply custody
 
@@ -721,7 +723,7 @@ Core · target · **partial** · From SEND-001 · Cites BASE-ROLE-001, BASE-SECR
 4. Reply history retains the claimed sender and receiving-server authentication results.
 
 **Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Both provider paths retain client replies on the proposal timeline. Only the available receiving adapter path is asserted, not both providers’ complete reply flow. Auto/bulk replies create neither reply nor notification. The complete absence pair is not asserted in the old cited set. Reply cap produces exactly one durable owner notice. No complete cap-to-notice assertion was located in the old cited files. Reply retains claimed From. receiving-server authentication results. Both fields must be read back. not inferred from intake success.
+**Gap.** All listed acceptance outcomes are traced in DONE-AUDIT. The published conservative demotion is retained pending a fresh ct judgment; this rewrite makes no status promotion.
 
 #### SEND-002 — Delivery status and bounce handling
 
@@ -736,7 +738,7 @@ Core · target · **partial** · Cites BASE-MAIL-001, BASE-OPS-003 · Rules D-1
 4. At desktop and phone widths, read delivery history.
 
 **Evidence.** `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Delivered. The complete listed branch set needs asserting lines, rather than a provider callback status alone. deferred-then-delivered. The complete listed branch set needs asserting lines, rather than a provider callback status alone. hard bounce each display their state. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Both signed-provider correlations. The complete listed branch set needs asserting lines, rather than a provider callback status alone. replay. The complete listed branch set needs asserting lines, rather than a provider callback status alone. terminal regression cases. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Queued/complained/uncertain remain distinct. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Compiled delivery history at 1440 and 390. Browser assertions are outside the cited wrapper file.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Delivered. The complete listed branch set needs asserting lines, rather than a provider callback status alone. deferred-then-delivered. The complete listed branch set needs asserting lines, rather than a provider callback status alone. hard bounce each display their state. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Both signed-provider correlations. The complete listed branch set needs asserting lines, rather than a provider callback status alone. replay. The complete listed branch set needs asserting lines, rather than a provider callback status alone. terminal regression cases. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Queued/complained/uncertain remain distinct. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Compiled delivery history at 1440 and 390. Browser assertions are outside the cited wrapper file.
 
 #### SEND-012 — Bounce correction follow-up
 
@@ -752,7 +754,7 @@ Core · target · **partial** · From SEND-002 · Cites BASE-MAIL-001, BASE-OPS-
 5. Desktop/phone journeys exercise correction; archive restores open and resolved corrections without mail or invitation credentials.
 
 **Evidence.** `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Hard bounce creates both sender notice. The complete combination is not established by a cited asserting line for each listed effect. separate follow-up. The complete combination is not established by a cited asserting line for each listed effect. Current sender correction rotates link/session. The complete combination is not established by a cited asserting line for each listed effect. preserves offer/client. The complete combination is not established by a cited asserting line for each listed effect. routes verification to corrected address. The complete combination is not established by a cited asserting line for each listed effect. Provider acceptance closes correction while uncertainty leaves it open. The complete combination is not established by a cited asserting line for each listed effect. Dismissal retains the entered reason. The complete combination is not established by a cited asserting line for each listed effect. Both desktop/phone correction. The complete combination is not established by a cited asserting line for each listed effect. exact open/resolved CLI restore. The complete combination is not established by a cited asserting line for each listed effect.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Hard bounce creates both sender notice. The complete combination is not established by a cited asserting line for each listed effect. separate follow-up. The complete combination is not established by a cited asserting line for each listed effect. Current sender correction rotates link/session. The complete combination is not established by a cited asserting line for each listed effect. preserves offer/client. The complete combination is not established by a cited asserting line for each listed effect. routes verification to corrected address. The complete combination is not established by a cited asserting line for each listed effect. Provider acceptance closes correction while uncertainty leaves it open. The complete combination is not established by a cited asserting line for each listed effect. Dismissal retains the entered reason. The complete combination is not established by a cited asserting line for each listed effect. Both desktop/phone correction. The complete combination is not established by a cited asserting line for each listed effect. exact open/resolved CLI restore. The complete combination is not established by a cited asserting line for each listed effect.
 
 #### SEND-003 — Recipients, roles and sharing
 
@@ -780,7 +782,7 @@ Core · target · **partial** · Rules D-1
 5. Expiry changes and reopen requests survive archive without transport authority.
 
 **Evidence.** `src/platter/expiry.ts`, `src/platter/expiry-time.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Accepted never expires. Every independent clock branch must have a readback assertion. reinvite keeps clock. Every independent clock branch must have a readback assertion. negotiation restarts period. Every independent clock branch must have a readback assertion. Expiry settings. The complete outcome is not isolated in the cited archive assertions. reopen requests survive restore without transport authority. The complete outcome is not isolated in the cited archive assertions.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Accepted never expires. Every independent clock branch must have a readback assertion. reinvite keeps clock. Every independent clock branch must have a readback assertion. negotiation restarts period. Every independent clock branch must have a readback assertion. Expiry settings. The complete outcome is not isolated in the cited archive assertions. reopen requests survive restore without transport authority. The complete outcome is not isolated in the cited archive assertions.
 
 #### SEND-013 — Unsigned-recipient expiry warnings
 
@@ -795,7 +797,7 @@ Core · target · **partial** · From SEND-004 · Rules D-1
 4. Settings and warning facts survive archive without sending authority.
 
 **Evidence.** `src/platter/expiry.ts`, `src/platter/expiry-time.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every unsigned signer receives one warning. The additional recipient assertions live in tests/recipients-http.mjs, outside the old Evidence set. every signed signer receives none. The additional recipient assertions live in tests/recipients-http.mjs, outside the old Evidence set. Extension moves the warning date without stale delivery. No asserting line in the old cited evidence. Repeated processing gives one warning. No asserting line in the old cited evidence. uncertain transport stays held. No asserting line in the old cited evidence. All warning facts/settings restore without sending authority. No asserting line in the old cited evidence.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every unsigned signer receives one warning. The additional recipient assertions live in tests/recipients-http.mjs, outside the old Evidence set. every signed signer receives none. The additional recipient assertions live in tests/recipients-http.mjs, outside the old Evidence set. Extension moves the warning date without stale delivery. No asserting line in the old cited evidence. Repeated processing gives one warning. No asserting line in the old cited evidence. uncertain transport stays held. No asserting line in the old cited evidence. All warning facts/settings restore without sending authority. No asserting line in the old cited evidence.
 
 #### SEND-005 — Completion and activity notifications
 
@@ -896,7 +898,7 @@ Core · target · **partial** · Cites BASE-ROLE-001 · Rules D-1
 5. An accepted agreement cannot be withdrawn.
 
 **Evidence.** `src/platter/withdrawal.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Each signer/approver/viewer/CC/shared/replaced link refuses all proposal content. The full recipient proof lives in tests/recipients-http.mjs; an HTTP 410 alone cannot assert content absence. Every email/text reminder is cancelled. Each independent channel must be asserted after withdrawal. every unpaid payment link is refused. Each independent channel must be asserted after withdrawal. Questions. sales/correction follow-ups. expiry warnings all stop. Separate lifecycle assertions are required for each named work item. Out-of-scope sender withdrawal leaves no changes. A refusal status alone is insufficient for the no-effect outcome. Accepted agreement withdrawal is refused. Expected-status assertion lives in the uncited harness.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Each signer/approver/viewer/CC/shared/replaced link refuses all proposal content. The full recipient proof lives in tests/recipients-http.mjs; an HTTP 410 alone cannot assert content absence. Every email/text reminder is cancelled. Each independent channel must be asserted after withdrawal. every unpaid payment link is refused. Each independent channel must be asserted after withdrawal. Questions. sales/correction follow-ups. expiry warnings all stop. Separate lifecycle assertions are required for each named work item. Out-of-scope sender withdrawal leaves no changes. A refusal status alone is insufficient for the no-effect outcome. Accepted agreement withdrawal is refused. Expected-status assertion lives in the uncited harness.
 
 #### SEND-015 — Withdrawal receipt and approved reissue
 
@@ -912,7 +914,7 @@ Core · target · **partial** · From SEND-010 · Cites BASE-AUDIT-001 · Rules 
 5. Desktop/phone journeys exercise sender, withdrawn-client, audit, report and reissue screens; archive preserves read-only history without invitation authority.
 
 **Evidence.** `src/platter/withdrawal.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Notice per recipient. The full recipient inventory is not asserted in the old cited set. no notice when disabled. The full recipient inventory is not asserted in the old cited set. Partially signed withdrawal retains the first signature as void. The assertion is in tests/recipients-http.mjs, not the old cited files. Timeline/audit actor/time/reason plus report counts/totals. The exact entered reason must be read back in both records. New revision works. Each recipient and previous authority must be checked after reissue. every old link remains refused. Each recipient and previous authority must be checked after reissue. Compiled 1440/390 screens. The old browser wrapper has no asserting line. read-only CLI history without authority. The old browser wrapper has no asserting line.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Notice per recipient. The full recipient inventory is not asserted in the old cited set. no notice when disabled. The full recipient inventory is not asserted in the old cited set. Partially signed withdrawal retains the first signature as void. The assertion is in tests/recipients-http.mjs, not the old cited files. Timeline/audit actor/time/reason plus report counts/totals. The exact entered reason must be read back in both records. New revision works. Each recipient and previous authority must be checked after reissue. every old link remains refused. Each recipient and previous authority must be checked after reissue. Compiled 1440/390 screens. The old browser wrapper has no asserting line. read-only CLI history without authority. The old browser wrapper has no asserting line.
 
 ### Engagement tracking
 
@@ -963,7 +965,7 @@ Core · target · **partial** · Cites BASE-PUBLIC-001, BASE-DATA-003
 1. Open the client page and see the disclosure; inspect network requests for third-party hosts (none); read a stored view and find no full IP address; set 90-day retention and see older views removed.
 
 **Evidence.** `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Client network makes no third-party request. A full network-host absence assertion is not in the old cited files; a rendered page alone is insufficient.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Client network makes no third-party request. A full network-host absence assertion is not in the old cited files; a rendered page alone is insufficient.
 
 ### Follow-up and negotiation
 
@@ -1009,7 +1011,7 @@ Core · target · **partial**
 4. Equal-date/reason ties and currency-separated totals follow [queue behavior](docs/contract-behavior.md#follow-002).
 
 **Evidence.** `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Personal-owner time-zone boundaries. The existing queue uses installation time-zone fixtures. All equal-date/reason sent-time/proposal-number. Current stable-id behavior does not establish future proposal-number ties. currency tie outcomes. Current stable-id behavior does not establish future proposal-number ties.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Personal-owner time-zone boundaries. The existing queue uses installation time-zone fixtures. All equal-date/reason sent-time/proposal-number. Current stable-id behavior does not establish future proposal-number ties. currency tie outcomes. Current stable-id behavior does not establish future proposal-number ties.
 
 #### FOLLOW-009 — Follow-up lifecycle and action history
 
@@ -1025,7 +1027,7 @@ Core · target · **partial** · From FOLLOW-002
 5. History retains actor, time, action and reason through archive; notification transport and invitations do not return.
 
 **Evidence.** `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Notice leaves work open. All listed decisions require separate assertion lines. reason-free dismissal is refused. All listed decisions require separate assertion lines. Every creation/revision action. No asserting line in the old cited evidence. explicit reopening retains the right due date. No asserting line in the old cited evidence. Acceptance. decline. withdrawal. unanswered question lifecycles reconcile. Checking one terminal case does not cover the full named branch set. Every history field. No asserting line in the old cited evidence. authority absence survives restore. No asserting line in the old cited evidence.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Notice leaves work open. All listed decisions require separate assertion lines. reason-free dismissal is refused. All listed decisions require separate assertion lines. Every creation/revision action. No asserting line in the old cited evidence. explicit reopening retains the right due date. No asserting line in the old cited evidence. Acceptance. decline. withdrawal. unanswered question lifecycles reconcile. Checking one terminal case does not cover the full named branch set. Every history field. No asserting line in the old cited evidence. authority absence survives restore. No asserting line in the old cited evidence.
 
 #### FOLLOW-010 — Follow-up reporting and team visibility
 
@@ -1039,7 +1041,7 @@ Core · target · **partial** · From FOLLOW-002 · Cites BASE-ROLE-001
 3. Desktop and phone screens show the same queue and totals.
 
 **Evidence.** `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: All sales/manager team-scope queues use the current owner. The full role-scope branch set is not asserted in the old evidence. Compiled 1440 and 390 queue screens. Asserting browser helpers are not in the old cited Evidence set.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: All sales/manager team-scope queues use the current owner. The full role-scope branch set is not asserted in the old evidence. Compiled 1440 and 390 queue screens. Asserting browser helpers are not in the old cited Evidence set.
 
 #### FOLLOW-003 — Expiry and renewal notifications
 
@@ -1073,7 +1075,7 @@ Core · target · **partial** · Cites BASE-AGENT-007, BASE-MAIL-001
 6. Export and restore answered and open threads through the public CLI, excluding genuine issued reply capabilities.
 
 **Evidence.** `src/platter/questions.ts`, `src/platter/question-replies.ts`, `src/platter/ui/questions.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Client pricing question. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. app answer. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. exact notification. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. queue removal. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. retained agreement thread. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Scope/terms. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. every unverified/stale/invalid-section refusal. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Member queue. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. held-policy agent answer. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Every signed intake authority. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. expiry. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. replay. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. no-second-notification outcome. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Compiled owner/client/queue/agreement at both widths. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Answered/open CLI threads with genuine reply credentials excluded. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Client pricing question. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. app answer. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. exact notification. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. queue removal. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. retained agreement thread. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Scope/terms. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. every unverified/stale/invalid-section refusal. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Member queue. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. held-policy agent answer. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Every signed intake authority. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. expiry. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. replay. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. no-second-notification outcome. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Compiled owner/client/queue/agreement at both widths. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Answered/open CLI threads with genuine reply credentials excluded. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes.
 
 #### FOLLOW-005 — Decline reasons and won or lost outcomes
 
@@ -1320,7 +1322,7 @@ Core · target · **partial** · Rules D-1
 2. With payment due, sign, fail the payment and see the agreement accepted with the deposit due.
 
 **Evidence.** `tests/collection-browser.mjs`, `tests/stripe-sandbox.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Due-deposit amount remains outstanding after the declined payment. The cited browser assertion checks accepted state; a separate exact due-money readback is needed.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Due-deposit amount remains outstanding after the declined payment. The cited browser assertion checks accepted state; a separate exact due-money readback is needed.
 
 #### PAY-003 — Milestone and recurring payment schedules
 
@@ -1680,7 +1682,7 @@ Core · target · **partial** · Cites BASE-ROLE-001
 3. Edits keep the original sales owner, including the sponsor of an agent-prepared proposal.
 
 **Evidence.** `src/platter/pipeline.ts`, `src/platter/ui/pipeline.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every role’s full visible report set. The matrix includes unimplemented content/revenue specialist reports.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every role’s full visible report set. The matrix includes unimplemented content/revenue specialist reports.
 
 #### REPORT-002 — Win rate and sales performance
 
@@ -1729,7 +1731,7 @@ Core · target · **partial**
 1. Export the pipeline: every screen row, count and per-currency total matches CSV in the same order.
 
 **Evidence.** `src/platter/reports/schedules.ts`, `src/platter/reports/pipeline-csv.ts`, `src/platter/reports/zone.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every visible screen row. A partial field or amount match is insufficient to establish the complete row reconciliation. count. A partial field or amount match is insufficient to establish the complete row reconciliation. currency total equals exported CSV. A partial field or amount match is insufficient to establish the complete row reconciliation.
+**Gap.** All listed acceptance outcomes are traced in DONE-AUDIT. The published conservative demotion is retained pending a fresh ct judgment; this rewrite makes no status promotion.
 
 #### REPORT-006 — Scheduled report delivery
 
@@ -1744,7 +1746,7 @@ Core · target · **partial** · From REPORT-005 · Cites BASE-MAIL-001, BASE-RO
 4. Schedules survive archive without email transport.
 
 **Evidence.** `src/platter/reports/schedules.ts`, `src/platter/reports/pipeline-csv.ts`, `src/platter/reports/zone.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Weekly win-rate report reaches two people with exact screen rows/figures and CSV. REPORT-002 win-rate does not exist; pipeline fallback does not assert it. Pipeline scheduled exact data across DST. Each boundary and every row/total must be read, not just dispatch status. Once-only run. Every independent branch needs its own assertion. inactive recipients. Every independent branch needs its own assertion. uncertain delivery across downtime. Every independent branch needs its own assertion. Schedules restore without transport. This part’s old Evidence set omits the archive assertion file.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Weekly win-rate report reaches two people with exact screen rows/figures and CSV. REPORT-002 win-rate does not exist; pipeline fallback does not assert it. Once-only run. Every independent branch needs its own assertion. inactive recipients. Every independent branch needs its own assertion. uncertain delivery across downtime. Every independent branch needs its own assertion. Schedules restore without transport. This part’s old Evidence set omits the archive assertion file.
 
 ### Team administration
 
@@ -1907,7 +1909,7 @@ Core · target · **partial** · Cites BASE-AUDIT-001, BASE-AGENT-009, BASE-OPS-
 4. Archive and restore preserve the proposal audit exactly.
 
 **Evidence.** `src/platter/audit.ts`, `src/platter/auth-audit.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Compiled admin/owner audit. The old browser Evidence file imports the assertion helpers rather than containing them. unauthorized readers at 1440/390. The old browser Evidence file imports the assertion helpers rather than containing them.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Compiled admin/owner audit. The old browser Evidence file imports the assertion helpers rather than containing them. unauthorized readers at 1440/390. The old browser Evidence file imports the assertion helpers rather than containing them.
 
 #### TEAM-005 — Security review pack for procurement
 
@@ -2028,7 +2030,7 @@ Core · target · **partial** · Cites BASE-ACCESSIBILITY-001 · Register R-4, R
 1. A browser journey at 390 pixels completes each of those actions, the sends and answers as a sales member and the approval as a manager; the same approval attempted by the sales member is refused (403).
 
 **Evidence.** `tests/site.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Sales template/send/answer/queue. All browser asserting lines are outside the sole old cited wrapper. manager approval. All browser asserting lines are outside the sole old cited wrapper. sales refusal at 390. All browser asserting lines are outside the sole old cited wrapper.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Sales template/send/answer/queue. All browser asserting lines are outside the sole old cited wrapper. manager approval. All browser asserting lines are outside the sole old cited wrapper. sales refusal at 390. All browser asserting lines are outside the sole old cited wrapper.
 
 #### MOB-002 — iOS and Android apps with push notifications
 
@@ -2085,7 +2087,7 @@ Core · target · **partial** · Cites BASE-AGENT-001, BASE-AGENT-002, BASE-AGEN
 6. Use the queue at desktop/phone widths and archive requests and resolutions without credentials.
 
 **Evidence.** `src/platter/mcp.ts`, `src/platter/send-requests.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: MCP search. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. schema. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. draft/revision/status. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. engagement. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. One retained send request with unchanged business state before execution. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Held. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. all-autonomous company-policy execution. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. revoked/foreign-origin refusal. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Stale revision. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. dismissal. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. exact fulfillment. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Premature/unauthorized queue refusal. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. absence of credentials. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Compiled queue at both widths. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. exact credential-free CLI restore. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: MCP search. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. schema. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. draft/revision/status. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. engagement. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. One retained send request with unchanged business state before execution. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Held. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. all-autonomous company-policy execution. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. revoked/foreign-origin refusal. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Stale revision. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. dismissal. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. exact fulfillment. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Premature/unauthorized queue refusal. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. absence of credentials. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Compiled queue at both widths. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. exact credential-free CLI restore. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target.
 
 #### AI-004 — Explainable price suggestions
 
@@ -2125,7 +2127,7 @@ Core · target · **partial** · Cites BASE-DATA-001, BASE-SECRET-001
 2. Inspect that populated archive: no provider token, agent key, native session, invitation, verification state or mail is carried.
 
 **Evidence.** `tests/archive.test.mjs`, `src/platter/archive-policy.mjs`
-**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every product record/attachment part is identical on re-export. Named subset comparisons do not establish a complete part inventory equality. Every provider/agent/native/verification/mail credential kind is absent from the populated archive. Every named exclusion requires a mechanism assertion; one empty table is insufficient.
+**Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every product record/attachment part is identical on re-export. Named subset comparisons do not establish a complete part inventory equality. Every provider/agent/native/verification/mail credential kind is absent from the populated archive. Every named exclusion requires a mechanism assertion; one empty table is insufficient.
 
 #### SEC-001 — Provider credential custody
 

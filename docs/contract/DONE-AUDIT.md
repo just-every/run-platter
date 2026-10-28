@@ -38,9 +38,6 @@ Old reference: `b9f84d99d60dce690c63cc1ec156ab06c2e77372`.
 | SIGN-002 | 1 | Replay retains the first signer. | `tests/platter.test.mjs:51` | asserted |
 | SIGN-002 | 1 | Retained total is 420000 cents. | `tests/platter.test.mjs:51` | asserted |
 | SIGN-002 | 1 | Retained deposit is 105000 cents. | `tests/platter.test.mjs:51` | asserted |
-| SIGN-002 | 1 | Replay retains the first selected option. Signer. | none | none |
-| SIGN-002 | 1 | money are read. | none | none |
-| SIGN-002 | 1 | but the repeated acceptance’s exact option id is not read back in this case. | none | none |
 | INV-001 | 1 | Unaccepted invoice export is refused. Expected-status assertion is in the uncited harness. | none | none |
 | INV-001 | 1 | Concurrent exports have one id. | `tests/platter.test.mjs:52` | asserted |
 | INV-001 | 1 | One invoice record exists. | `tests/platter.test.mjs:52` | asserted |
@@ -89,7 +86,6 @@ Old reference: `b9f84d99d60dce690c63cc1ec156ab06c2e77372`.
 | EDIT-006 | 1 | Outside-allowlist embed refusal. A command status in a helper is not an asserting line in the cited file. | none | none |
 | EDIT-009 | 1 | Standard excludes the conditional timeline from client and PDF. | `tests/platter.test.mjs:923` | asserted |
 | EDIT-009 | 1 | Premium includes the conditional timeline. | `tests/platter.test.mjs:923` | asserted |
-| EDIT-009 | 1 | The accepted selection’s agreement and PDF preserve exactly the visible sections. The representative assertions exercise the sections; variable-dependent conditions in the Requirement remain unproved. | none | none |
 | EDIT-010 | 1 | Client downloads the original W-9 bytes. | `tests/platter.test.mjs:424` | asserted |
 | EDIT-010 | 1 | Replacing defaults leaves the sent revision snapshot unchanged. | `tests/platter.test.mjs:433` | asserted |
 | EDIT-011 | 1 | Editable within three seconds. | `tests/editor-budget.mjs:75` | asserted |
@@ -209,20 +205,6 @@ Old reference: `b9f84d99d60dce690c63cc1ec156ab06c2e77372`.
 | APPROVE-004 | 4 | rejected-revision refusal. The exact rejection/readback branches are not all asserted in the old files. | none | none |
 | APPROVE-004 | 5 | Company-policy commitment decisions after both agent. No asserting line in the old cited evidence. | none | none |
 | APPROVE-004 | 5 | human revisions. No asserting line in the old cited evidence. | none | none |
-| SEND-001 | 1 | Both mailbox providers send. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. | none | none |
-| SEND-001 | 1 | then revoked grants visibly fall back. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. | none | none |
-| SEND-001 | 2 | Different sign-in alias/SMTP sender reaches client. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. | none | none |
-| SEND-001 | 2 | timeline. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. | none | none |
-| SEND-001 | 2 | audit. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. | none | none |
-| SEND-001 | 3 | Every duplicate/unverified/no-SMTP address refusal stores nothing. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. | none | none |
-| SEND-001 | 4 | Role demotion leaves no outbound mailbox message. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. | none | none |
-| SEND-001 | 5 | Provider refusal produces the fallback sender in every recorded location. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. | none | none |
-| SEND-011 | 1 | Both provider paths retain client replies on the proposal timeline. Only the available receiving adapter path is asserted, not both providers’ complete reply flow. | none | none |
-| SEND-011 | 2 | Auto/bulk replies create neither reply nor notification. The complete absence pair is not asserted in the old cited set. | none | none |
-| SEND-011 | 3 | Reply cap produces exactly one durable owner notice. No complete cap-to-notice assertion was located in the old cited files. | none | none |
-| SEND-011 | 4 | Reply retains claimed From. | none | none |
-| SEND-011 | 4 | receiving-server authentication results. Both fields must be read back. | none | none |
-| SEND-011 | 4 | not inferred from intake success. | none | none |
 | SEND-002 | 1 | Delivered. The complete listed branch set needs asserting lines, rather than a provider callback status alone. | none | none |
 | SEND-002 | 1 | deferred-then-delivered. The complete listed branch set needs asserting lines, rather than a provider callback status alone. | none | none |
 | SEND-002 | 1 | hard bounce each display their state. The complete listed branch set needs asserting lines, rather than a provider callback status alone. | none | none |
@@ -331,12 +313,7 @@ Old reference: `b9f84d99d60dce690c63cc1ec156ab06c2e77372`.
 | REPORT-001 | 2 | Every role’s full visible report set. The matrix includes unimplemented content/revenue specialist reports. | none | none |
 | REPORT-001 | 3 | Edits retain sales ownership. | `tests/platter.test.mjs:220` | asserted |
 | REPORT-001 | 3 | Agent drafts retain sponsor ownership. | `tests/platter.test.mjs:224` | asserted |
-| REPORT-005 | 1 | Every visible screen row. A partial field or amount match is insufficient to establish the complete row reconciliation. | none | none |
-| REPORT-005 | 1 | count. A partial field or amount match is insufficient to establish the complete row reconciliation. | none | none |
-| REPORT-005 | 1 | currency total equals exported CSV. A partial field or amount match is insufficient to establish the complete row reconciliation. | none | none |
-| REPORT-005 | 2 | Future reports inherit export; retained in Requirement. | none | moved |
 | REPORT-006 | 1 | Weekly win-rate report reaches two people with exact screen rows/figures and CSV. REPORT-002 win-rate does not exist; pipeline fallback does not assert it. | none | none |
-| REPORT-006 | 2 | Pipeline scheduled exact data across DST. Each boundary and every row/total must be read, not just dispatch status. | none | none |
 | REPORT-006 | 3 | Once-only run. Every independent branch needs its own assertion. | none | none |
 | REPORT-006 | 3 | inactive recipients. Every independent branch needs its own assertion. | none | none |
 | REPORT-006 | 3 | uncertain delivery across downtime. Every independent branch needs its own assertion. | none | none |
@@ -378,3 +355,37 @@ Old reference: `b9f84d99d60dce690c63cc1ec156ab06c2e77372`.
 | FOLLOW-009 | 1 | The separate bounce correction remains open. | `tests/followup-journey.mjs:83` | asserted |
 | NEG-001 | 1 | Replacement client page shows old and changed prices. | `tests/platter.test.mjs:127` | asserted |
 | NEG-001 | 1 | Replacement client page shows changed scope. | `tests/platter.test.mjs:127` | asserted |
+| SIGN-002 | 1 | Replay retains option two: exact total remains 420000 rather than option one’s 240000. | `tests/platter.test.mjs:51` | asserted |
+| SEND-001 | 1 | Google send reaches the provider once. | `tests/mail.test.mjs:628` | asserted |
+| SEND-001 | 1 | Microsoft send reaches its provider once. | `tests/mail.test.mjs:635` | asserted |
+| SEND-001 | 1 | Revoked/refused Google grant falls back visibly. | `tests/mail.test.mjs:694` | asserted |
+| SEND-001 | 1 | Refused Microsoft grant falls back visibly. | `tests/mail.test.mjs:683` | asserted |
+| SEND-001 | 2 | Verified alias is recorded as Google sender at the client-facing transport. | `tests/mail.test.mjs:581` | asserted |
+| SEND-001 | 2 | Microsoft SMTP address is the message sender. | `tests/mail.test.mjs:585` | asserted |
+| SEND-001 | 2 | Google attribution records person, route, address and outcome. | `tests/mail.test.mjs:629` | asserted |
+| SEND-001 | 2 | Microsoft attribution records its route, address and outcome. | `tests/mail.test.mjs:635` | asserted |
+| SEND-001 | 2 | Timeline names sender and provider-accepted state. | `tests/mail.test.mjs:633` | asserted |
+| SEND-001 | 2 | Audit retains actual actor and sender address. | `tests/mail.test.mjs:632` | asserted |
+| SEND-001 | 3 | Every refused duplicate/unverified/no-SMTP connection preserves all bindings. | `tests/mail.test.mjs:620` | asserted |
+| SEND-001 | 3 | Each attempted bad connection has its expected refusal. | `tests/mail.test.mjs:604` | asserted |
+| SEND-001 | 4 | Role demotion causes no outbound provider request. | `tests/mail.test.mjs:678` | asserted |
+| SEND-001 | 5 | Fallback records installation sender. | `tests/mail.test.mjs:685` | asserted |
+| SEND-001 | 5 | Fallback connection visibly becomes broken. | `tests/mail.test.mjs:682` | asserted |
+| SEND-001 | 5 | Fallback notice is visible. | `tests/mail.test.mjs:683` | asserted |
+| SEND-011 | 1 | Both Google and Microsoft incoming replies retain exact text. | `tests/mail.test.mjs:653` | asserted |
+| SEND-011 | 1 | Each reply appears on its proposal page. | `tests/mail.test.mjs:655` | asserted |
+| SEND-011 | 1 | Neither proposal nor approval decision changes from reply. | `tests/mail.test.mjs:654` | asserted |
+| SEND-011 | 2 | Automatic/bulk messages leave no record, notification, audit or state change. | `tests/mail.test.mjs:647` | asserted |
+| SEND-011 | 3 | Reply cap notifies owner only once. | `tests/mail.test.mjs:671` | asserted |
+| SEND-011 | 3 | Non-owner receives no cap notice. | `tests/mail.test.mjs:668` | asserted |
+| SEND-011 | 4 | Claimed From, SPF and DKIM fields are retained from the provider result. | `tests/mail.test.mjs:653` | asserted |
+| SEND-011 | 4 | Displayed From remains explicitly unproven. | `tests/mail.test.mjs:656` | asserted |
+| REPORT-005 | 1 | Every filtered row and field equals the screen in order. | `tests/platter.test.mjs:591` | asserted |
+| REPORT-005 | 1 | CSV count and exact currency total equal the fixture. | `tests/platter.test.mjs:592` | asserted |
+| REPORT-005 | 2 | Other reports inherit the export boundary retained in the Requirement. | none | moved |
+| REPORT-006 | 2 | Weekly run stays at 08:00 in its configured zone. | `tests/platter.test.mjs:623` | asserted |
+| REPORT-006 | 2 | A daylight-saving transition changes the UTC instant by an hour. | `tests/platter.test.mjs:624` | asserted |
+| REPORT-006 | 2 | Scheduled messages contain every screen row with run-time age. | `tests/platter.test.mjs:619` | asserted |
+| REPORT-006 | 2 | Scheduled count and currency total match the screen. | `tests/platter.test.mjs:618` | asserted |
+| EDIT-009 | 1 | Accepted Standard omits the timeline while Premium includes it in the immutable snapshot. | `tests/platter.test.mjs:934` | asserted |
+| EDIT-009 | 2 | Variable-dependent visibility on every carrier is unproved; package-condition assertions do not establish this outcome. | none | none |

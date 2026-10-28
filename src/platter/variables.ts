@@ -42,8 +42,8 @@ async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFiel
   if(props.dealname)values['Deal.Name']=String(props.dealname)
   if(props.amount!==undefined&&props.amount!==null)values['Deal.Amount']=String(props.amount)
   const id=d.associations?.contacts?.results?.[0]?.id
-  if(id){const contact=await providerJson('https://api.hubapi.com/crm/v3/objects/contacts/'+encodeURIComponent(id)+'?properties=firstname,lastname,jobtitle,company,address',secret.token),p=contact.properties??{}
-   for(const [key,v]of Object.entries({'Client.Company':p.company,'Client.FirstName':p.firstname,'Client.LastName':p.lastname,'Client.Name':[p.firstname,p.lastname].filter(Boolean).join(' '),'Contact.Name':[p.firstname,p.lastname].filter(Boolean).join(' '),'Client.Title':p.jobtitle,'Contact.Title':p.jobtitle,'Client.Address':p.address}))if(v)values[key]=String(v)
+  if(id){const contact=await providerJson('https://api.hubapi.com/crm/v3/objects/contacts/'+encodeURIComponent(id)+'?properties=firstname,lastname,jobtitle,company,address,email',secret.token),p=contact.properties??{}
+   for(const [key,v]of Object.entries({'Client.Company':p.company,'Client.FirstName':p.firstname,'Client.LastName':p.lastname,'Client.Name':[p.firstname,p.lastname].filter(Boolean).join(' '),'Contact.Name':[p.firstname,p.lastname].filter(Boolean).join(' '),'Client.Title':p.jobtitle,'Contact.Title':p.jobtitle,'Client.Address':p.address,'Client.Email':p.email}))if(v)values[key]=String(v)
   }
  }
  return values

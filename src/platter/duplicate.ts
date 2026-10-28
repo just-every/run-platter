@@ -29,7 +29,9 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
  const id = crypto.randomUUID(), at = await currentTime(db)
  const attachments = copyAttachments(typeof displayed.attachments === 'string' ? JSON.parse(displayed.attachments) : displayed.attachments)
  const options = typeof displayed.options === 'string' ? JSON.parse(displayed.options) : displayed.options
- const row = { recipient_plan:recipientPlan(displayed).map((r,i)=>({...r,email:documentOf(displayed).merge?.patterns['/recipientPlan/'+i+'/email']?r.email:null})), document:bindDocument(displayed.document,clientId), id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '', section_conditions: displayed.section_conditions??{},
+ const copiedDocument=bindDocument(displayed.document,clientId)
+ if(input.title===undefined&&!titleLocked&&copiedDocument.merge?.patterns['/title'])copiedDocument.merge.patterns['/title']+=' (copy)'
+ const row = { recipient_plan:recipientPlan(displayed).map((r,i)=>({...r,email:documentOf(displayed).merge?.patterns['/recipientPlan/'+i+'/email']?r.email:null})), document:copiedDocument, id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '', section_conditions: displayed.section_conditions??{},
   payment_terms:paymentTerms(displayed), revision: 1, deposit_bps: displayed.deposit_bps, options, currency: displayed.currency, attachments }
  await commit(db, a, [
   db.prepare(`INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,

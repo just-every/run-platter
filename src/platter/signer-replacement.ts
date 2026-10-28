@@ -14,7 +14,7 @@ export async function replaceSigner(env:Bindings,a:Actor,input:Record<string,unk
  need(row.status==='sent','Only an unsigned sent signer can be replaced',409)
  const plan=recipientPlan(row),slotId=plan.length?text(input.recipientId,'a signer slot'):'client'
  const slot=plan.find(r=>r.id===slotId)
- if(plan.length){need(slot&&['signer','countersigner'].includes(slot.role),'Choose a signer slot');need(!await db.prepare('SELECT 1 FROM p_recipient_signatures WHERE proposal_id=? AND revision=? AND slot_id=?').bind(row.id,row.revision,slotId).first(),'A signed recipient cannot be replaced',409)}
+ if(plan.length){need(a.role==='owner','Only the current owner replaces a configured recipient',403);need(slot&&['signer','countersigner'].includes(slot.role),'Choose a signer slot');need(!await db.prepare('SELECT 1 FROM p_recipient_signatures WHERE proposal_id=? AND revision=? AND slot_id=?').bind(row.id,row.revision,slotId).first(),'A signed recipient cannot be replaced',409)}
  const share=await db.prepare('SELECT s.*,COALESCE(s.recipient,c.email) AS email FROM p_shares s JOIN p_clients c ON c.id=? WHERE s.proposal_id=? AND s.revision=? AND s.slot_id=?').bind(row.client_id,row.id,row.revision,slotId).first<any>()
  need(share,'Send a current invitation before replacing a signer',409)
  const recipient=email(input.recipient),reason=text(input.reason,'the replacement reason',1000)

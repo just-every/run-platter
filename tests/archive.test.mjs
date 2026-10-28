@@ -443,8 +443,8 @@ test('PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores re-expor
     ? item.row.id===original.row.id
     : item.row.proposal_id===original.row.proposal_id&&item.row.revision===original.row.revision))
    assert.equal(matches.length,1,original.table+' retained exactly once by its primary key')
-   const {currency,document,payment_terms,previous_sent_revision,sales_owner_id,sales_owner_name,terms,attachments,section_conditions,...unchanged}=matches[0].row
-   if(original.table==='p_proposals'){assert.equal(payment_terms,null,'Legacy payment terms stay absent');assert.deepEqual(JSON.parse(document),{},'EDIT-001 legacy proposals have no added blocks');assert.deepEqual(JSON.parse(section_conditions),{},'EDIT-009 legacy proposals remain unconditional');assert.equal(terms,'');assert.deepEqual(JSON.parse(attachments),[]);assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision');assert.equal(sales_owner_id,null);assert.equal(sales_owner_name,null,'legacy sales ownership is not inferred')}
+   const {currency,document,payment_terms,previous_sent_revision,sales_owner_id,sales_owner_name,terms,attachments,section_conditions,recipient_plan,...unchanged}=matches[0].row
+   if(original.table==='p_proposals'){assert.deepEqual(JSON.parse(recipient_plan),[],'Legacy proposals gain no recipient roles or authority');assert.equal(payment_terms,null,'Legacy payment terms stay absent');assert.deepEqual(JSON.parse(document),{},'EDIT-001 legacy proposals have no added blocks');assert.deepEqual(JSON.parse(section_conditions),{},'EDIT-009 legacy proposals remain unconditional');assert.equal(terms,'');assert.deepEqual(JSON.parse(attachments),[]);assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision');assert.equal(sales_owner_id,null);assert.equal(sales_owner_name,null,'legacy sales ownership is not inferred')}
    assert.equal(currency,'AUD');assert.deepEqual(unchanged,original.row,original.table+' first-release bytes and amounts unchanged')
   }
  } finally {await h?.close();await rm(temporary,{recursive:true,force:true})}

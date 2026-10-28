@@ -1,3 +1,4 @@
+import { recipientPlan } from '../recipients'
 import { fieldSlot } from '../documents/blocks'
 import { displayOptions } from '../discounts'
 import { documentOf } from '../documents/blocks'
@@ -17,8 +18,8 @@ export function documentBlocks(view:any,mediaBase='',suffix=''){
   if(b.type==='field'||b.type==='signature'){
    if(view.recipientProgress&&view.status!=='accepted'&&fieldSlot(b,view.recipientProgress.clientSlot)!==view.recipientProgress.recipient.id)return ''
    const value=view.acceptance?.fieldValues?.[b.id]??view.recipientProgress?.ownFields?.[b.id],disabled=view.preview||!view.verified||view.status==='accepted'||view.recipientProgress?.signed||view.recipientProgress&&!view.recipientProgress.ready,name=(b.type==='signature'?'signature:':'field:')+b.id
-   body+='<p class="muted">Assigned to '+escape(b.recipientRole==='slot'?b.recipientId:'Client')+' recipient role.</p>'
-   if(view.status==='accepted')body+='<p>'+escape(value===undefined?'Not collected':value===true?'Yes':value===false?'No':value)+'</p>'
+   body+='<p class="muted">'+(b.recipientRole==='slot'?'Assigned to '+escape(recipientPlan(view).find(r=>r.id===b.recipientId)?.name??'this recipient')+' recipient role.':'Assigned to the Client recipient'+(b.recipientId?'':' role')+'.')+'</p>'
+   if(view.status==='accepted'||view.recipientProgress?.signed)body+='<p>'+escape(value===undefined?'Not collected':value===true?'Yes':value===false?'No':value)+'</p>'
    else {const kind=b.type==='signature'?'text':b.fieldKind,required=b.type==='signature'||b.required;body+='<label>'+escape(b.type==='signature'?'Type your full name for '+b.title:b.title)+'<input form="platter-acceptance" name="'+escape(name)+'" type="'+escape(kind)+'"'+(kind==='checkbox'?' value="yes"':' maxlength="1000"')+(required?' required':'')+(disabled?' disabled':'')+'></label>'+(b.type==='signature'?'<p>By accepting below, you adopt this typed name as your signature for this block. It must match your acceptance name.</p>':'')}
    if(b.text)body+=richText(b.text)
   }

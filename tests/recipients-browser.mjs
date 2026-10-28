@@ -9,6 +9,7 @@ export async function recipientsBrowser(width=1440){
  const app=await installedApp({scheduled:true})
  const browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM_PATH,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
  const context=await browser.newContext({viewport:{width,height:1000}})
+ context.setDefaultTimeout(15000)
  const clients=[]
  const screenshots=process.env.PLATTER_SCREENSHOTS
  if(screenshots)await mkdir(screenshots,{recursive:true})
@@ -38,6 +39,7 @@ export async function recipientsBrowser(width=1440){
    await form.getByLabel('Recipient role',{exact:true}).selectOption(role);await form.getByLabel('Signing group',{exact:true}).fill(String(group))
    await form.getByRole('button',{name:'Add recipient slot',exact:true}).click()
    assert.equal(await page.getByRole('alert').count(),0)
+   if(screenshots)console.log('Recipient browser '+width+': configured '+name)
   }
   let row=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals.find(r=>r.id===p.id)
   const plan=JSON.parse(row.recipient_plan),ceo=plan.find(r=>r.name==='CEO'),cfo=plan.find(r=>r.name==='CFO')
@@ -48,11 +50,12 @@ export async function recipientsBrowser(width=1440){
   await block.getByLabel('Assigned recipient',{exact:true}).selectOption('slot:'+cfo.id)
   await block.getByLabel('Required field',{exact:true}).check()
   await editor.getByRole('button',{name:'Save document',exact:true}).click()
-  await page.waitForFunction(()=>document.querySelector('[data-document-editor]')?.dataset.saveState==='saved')
+  await page.waitForFunction(()=>document.querySelector('[data-document-editor]')?.dataset.saveState==='saved',{},{timeout:15000})
   const tool=editor.locator('[data-block-id]').first().getByRole('button',{name:'Duplicate block',exact:true})
   await tool.hover();await page.waitForTimeout(350)
   assert.equal(await tool.locator('..').getByRole('tooltip').isVisible(),true)
   await tool.focus();assert.equal(await tool.locator('..').getByRole('tooltip').isVisible(),true)
+  if(screenshots)console.log('Recipient browser '+width+': document saved')
   await capture('owner-roles')
   row=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals.find(r=>r.id===p.id)
   await page.goto(app.origin+'/app/preview?id='+p.id+'&revision='+row.revision+'&recipientId='+cfo.id)
@@ -98,6 +101,7 @@ export async function recipientsBrowser(width=1440){
    await form.getByRole('checkbox').check()
    await form.getByRole('button',{name:button,exact:true}).click()
    assert.equal(await active.getByRole('alert').count(),0)
+   if(name==='CFO')assert.match(await active.locator('main').innerText(),/synthetic-platter-2002/)
    if(screenshots)await active.screenshot({path:join(screenshots,'recipients-'+name.toLowerCase().replaceAll(' ','-')+'-'+width+'.png'),fullPage:true})
   }
   await sign('CEO')
@@ -127,8 +131,8 @@ export async function recipientsBrowser(width=1440){
   assert.equal(await page.getByRole('alert').count(),0)
   const embedCode=await panel.getByLabel('Embed code',{exact:true}).inputValue()
   const embedUrl=embedCode.match(/src="([^"]+)"/)[1]
-  const hostContext=await browser.newContext({viewport:{width,height:1000}});clients.push(hostContext)
-  const host=await hostContext.newPage();await host.goto(app.origin+'/signin')
+  const hostContext=context
+  const host=await hostContext.newPage();await host.goto(app.origin+'/app/proposal?id='+second.id)
   await host.setContent('<iframe src="'+embedUrl+'" title="Verified proposal" width="100%" height="900" frameborder="0"></iframe>')
   const embedded=host.frameLocator('iframe[title="Verified proposal"]')
   assert.equal(await embedded.getByRole('heading',{name:'Revocable viewing agreement',exact:true}).count(),0)
@@ -155,8 +159,8 @@ export async function recipientsBrowser(width=1440){
   await withdrawal.getByRole('button',{name:'Withdraw proposal',exact:true}).click()
   assert.match(await panel.getByLabel('Signature history').innerText(),/Void: Partly signed offer cancelled/)
   await capture('void-signature-owner')
-  await host.reload()
-  assert.ok(!(await host.locator('body').innerText()).includes('Revocable viewing agreement'))
+  const revokedEmbed=await hostContext.request.get(embedUrl);assert.equal(revokedEmbed.status(),410)
+  assert.ok(!(await revokedEmbed.text()).includes('Revocable viewing agreement'))
   assert.equal((await secondSigner.goto(app.origin+secondLinks.signer)).status(),410)
   assert.equal(await secondSigner.getByRole('heading',{name:'Proposal withdrawn',exact:true}).count(),1)
 

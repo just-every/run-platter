@@ -53,6 +53,21 @@ export async function signingOrderHttp(h){
   assert.equal((await decision(h,p.links.owner,sessions.owner)).status,200)
   assert.equal((await h.state()).proposals.find(r=>r.id===p.id).status,'accepted')
  }
+ const replacement=await recipientFixture(h,'Replace an unsigned CFO',roles(h.auth.OWNER_EMAIL))
+ const ceoCookie=await verifyRecipient(h,replacement.links.ceo)
+ assert.equal((await decision(h,replacement.links.ceo,ceoCookie)).status,200)
+ const beforeReplacement=(await h.state()).proposals.find(r=>r.id===replacement.id)
+ const replaced=await h.cmd('signer.replace',{id:replacement.id,version:beforeReplacement.version,recipientId:'cfo',recipient:address(1011),reason:'New authorized CFO'})
+ const newPath=new URL(replaced.shareUrl).pathname
+ assert.equal((await h.send(replacement.links.cfo)).status,410)
+ assert.equal((await h.send(replacement.links.ceo+'/data.json',undefined,ceoCookie)).status,200)
+ const newCfo=await verifyRecipient(h,newPath)
+ assert.equal((await decision(h,newPath,newCfo)).status,200)
+ const ownerCookie=await verifyRecipient(h,replacement.links.owner)
+ assert.equal((await decision(h,replacement.links.owner,ownerCookie)).status,200)
+ const completion=(await h.db.prepare("SELECT recipient FROM p_mail WHERE proposal_id=? AND subject LIKE 'Agreement complete:%'").bind(replacement.id).all()).results
+ assert.deepEqual(completion.map(r=>r.recipient).sort(),[address(1001),address(1011),h.auth.OWNER_EMAIL].sort())
+
 }
 export async function recipientRolesHttp(h){
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
@@ -60,6 +75,9 @@ export async function recipientRolesHttp(h){
  const plan=[roles(h.auth.OWNER_EMAIL)[0],{id:'finance',name:'CFO approver',email:address(1003),role:'approver',group:1},{id:'viewer',name:'Viewer',email:address(1004),role:'viewer',group:1},{id:'cc',name:'CC',email:address(1005),role:'cc',group:1}]
  const p=await recipientFixture(h,'Recipient roles',plan),sessions={}
  assert.equal(new Set(Object.values(p.links)).size,4)
+ const unreminded=(await h.state()).proposals.find(r=>r.id===p.id)
+ await h.cmd('reminder.configure',{id:p.id,version:unreminded.version,enabled:true,consent:true,timeZone:'UTC'},h.owner,409)
+
  for(const [id,path] of Object.entries(p.links)){
   const invitation=await h.send(path);assert.equal(invitation.status,200);assert.ok(!invitation.text.includes(p.offer.title))
   assert.equal((await h.send(path+'/data.json')).status,401)
@@ -91,8 +109,38 @@ export async function recipientRolesHttp(h){
  }
  assert.equal((await h.send(p.links.ceo+'/data.json',undefined,sessions.ceo)).status,200)
  assert.equal((await decision(h,p.links.ceo,sessions.ceo)).status,200)
+ const negotiation=await recipientFixture(h,'Revocation during negotiation',[...roles(h.auth.OWNER_EMAIL),{id:'viewer',name:'Negotiated viewer',email:address(1004),role:'viewer',group:1}])
+ let negotiated=(await h.state()).proposals.find(r=>r.id===negotiation.id)
+ await h.cmd('proposal.negotiate',{...negotiation.offer,id:negotiation.id,version:negotiated.version,scope:'Revised approved scope'})
+ negotiated=(await h.state()).proposals.find(r=>r.id===negotiation.id)
+ await h.cmd('recipient.remove',{id:negotiation.id,version:negotiated.version,recipientId:'viewer'})
+ negotiated=(await h.state()).proposals.find(r=>r.id===negotiation.id)
+ assert.ok(!JSON.parse(negotiated.recipient_plan).some(r=>r.id==='viewer'))
+ await h.cmd('proposal.approve',{id:negotiation.id,version:negotiated.version,revision:negotiated.revision})
+ negotiated=(await h.state()).proposals.find(r=>r.id===negotiation.id)
+ const replacement=await h.cmd('proposal.send',{id:negotiation.id,version:negotiated.version})
+ assert.deepEqual(replacement.recipients.map(r=>r.id),['ceo','cfo','owner'],'a pending revision cannot resurrect a removed viewer')
+ assert.equal((await h.send(negotiation.links.viewer)).status,410)
+ const memberEmail=address(4000)
+ await h.send('/auth/invite',{email:memberEmail,displayName:'Unprivileged member',role:'member',returnTo:'/app'},h.owner)
+ const member=await h.signIn(memberEmail)
+ const beforeDenied=await h.state()
+ await h.cmd('recipient.share',{id:p.id,version:beforeDenied.proposals.find(r=>r.id===p.id).version,recipientName:'Refused viewer',recipientEmail:address(4001),shareConsent:true},member,403)
+ await h.cmd('recipient.save',{id:p.id,version:beforeDenied.proposals.find(r=>r.id===p.id).version,recipients:roles(h.auth.OWNER_EMAIL)},member,403)
+ assert.deepEqual(await h.state(),beforeDenied,'non-owner recipient operations make no writes')
+ for(const missingRole of ['signer','approver','countersigner']){
+  const blank=await h.cmd('proposal.prepare',{...p.offer,title:'Unfilled '+missingRole})
+  const plan=[...roles(h.auth.OWNER_EMAIL),{id:'finance',name:'Finance approval',email:address(1003),role:'approver',group:1}].map(r=>r.role===missingRole?{...r,email:null}:r)
+  const configured=await h.cmd('recipient.save',{id:blank.id,version:1,recipients:plan})
+  await h.cmd('proposal.approve',{id:blank.id,version:configured.version,revision:configured.revision})
+  await h.cmd('proposal.send',{id:blank.id,version:configured.version+1},h.owner,409)
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_shares WHERE proposal_id=?').bind(blank.id).first()).n,0,missingRole+' slot prevents every invitation')
+ }
  const source=await h.cmd('proposal.prepare',{...p.offer,title:'Role slot source'})
- const configured=await h.cmd('recipient.save',{id:source.id,version:1,recipients:roles(h.auth.OWNER_EMAIL)})
+ const pricing=(await h.state()).proposals.find(r=>r.id===source.id).internalPricing
+ const cost=await h.cmd('pricing.cost',{id:source.id,version:1,lineKey:pricing.lines[0].key,unitCost:'80'})
+ const configured=await h.cmd('recipient.save',{id:source.id,version:cost.version,recipients:roles(h.auth.OWNER_EMAIL)})
+ assert.equal((await h.state()).proposals.find(r=>r.id===source.id).internalPricing.lines[0].unitCostCents,8000,'adding recipient roles preserves private cost records')
  const document={version:1,blocks:[
   {id:'ceo-detail',type:'field',title:'CEO purchase order',text:'',recipientRole:'slot',recipientId:'ceo',fieldKind:'text',required:true},
   {id:'cfo-detail',type:'field',title:'CFO reference',text:'',recipientRole:'slot',recipientId:'cfo',fieldKind:'text',required:true},
@@ -116,7 +164,10 @@ export async function recipientRolesHttp(h){
  }
  assert.deepEqual(await h.state(),beforePreview,'recipient previews create no revision, decision, invitation, mail or tracking')
  // Saving a template again changes only future drafts, never the started role snapshot.
- await h.cmd('recipient.save',{id:source.id,version:fieldRevision.version,recipients:roles(h.auth.OWNER_EMAIL).map(r=>r.id==='cfo'?{...r,group:1}:r)})
+ const changedRoles=await h.cmd('recipient.save',{id:source.id,version:fieldRevision.version,recipients:roles(h.auth.OWNER_EMAIL).map(r=>r.id==='cfo'?{...r,group:1}:r)})
+ const changedTemplate=await h.cmd('template.save',{id:source.id,version:changedRoles.version,templateId:template.id,templateVersion:template.version,name:'Updated leadership roles'})
+ const later=await h.cmd('template.start',{id:template.id,version:changedTemplate.version,clientId:p.offer.clientId})
+ assert.equal(JSON.parse((await h.state()).proposals.find(r=>r.id===later.id).recipient_plan).find(r=>r.id==='cfo').group,1)
  assert.deepEqual(JSON.parse((await h.state()).proposals.find(r=>r.id===started.id).recipient_plan),copied)
  const filled=await h.cmd('recipient.save',{id:row.id,version:row.version,recipients:roles(h.auth.OWNER_EMAIL)})
  await h.cmd('proposal.approve',{id:row.id,version:filled.version,revision:filled.revision})

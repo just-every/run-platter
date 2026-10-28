@@ -334,9 +334,9 @@ Evidence: `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.t
 
 Status: **partial**.
 
-Gap: Verified forwarded stakeholders can be explicitly recorded by the owner as approver recipients through TRACK-003. No invitation or signing authority is granted by this record. Gap: Separate signer, approver, viewer and CC links, template roles, field order, recipient previews, removal, shared links and embedding remain; all-recipient SEND-010 revocation must extend its named journey before any new link ships. Explicit owner conversion and no automatic invitation are the conservative defaults pending ct approval.
+Gap: Policy default adopted under the standing scope rule, pending ct approval: the current owner alone manages recipient roles, explicitly sends invitations or creates additional mailbox-bound viewing links, and authorizes an exact framing origin. Stakeholder conversion, copies and restores never invite anyone automatically or restore invitation authority. Scoped delegation and provider boundaries remain unapproved; the full template-role management duties remain with SIGN-011. SEND-003 stays PARTIAL pending ct approval of this default.
 
-Evidence: `tests/platter.test.mjs`, `tests/tracking-details-browser.mjs`
+Evidence: `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
 
 ## SEND-004 — Expiry and reopening
 
@@ -492,11 +492,11 @@ Evidence: `src/platter/signing.ts`, `tests/platter.test.mjs`
 
 ## SIGN-004 — Multiple signers, signing order and countersignature
 
-Status: **missing**.
+Status: **partial**.
 
-Gap: One client signer only.
+Gap: Policy default adopted under the standing scope rule, pending ct approval: only the current owner configures roles, sends or replaces configured recipient invitations and countersigns; each recipient verifies their own mailbox. Additional viewing links require explicit audited consent, including the exact framing origin when embedded. Restoring records restores no invitation or framing authority. Scoped non-owner sending and replacement remain outside this interim boundary, and provider-specific recipient checks remain SIGN-006 work. SIGN-004 stays PARTIAL until ct approves the authority default; no legal or provider qualification is claimed.
 
-Evidence: None recorded.
+Evidence: `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
 
 ## SIGN-005 — Signed agreement PDF and certificate of completion
 

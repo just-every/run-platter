@@ -1,3 +1,4 @@
+import { copyCosts } from './internal-pricing'
 import { documentOf, fieldSlot } from './documents/blocks'
 import type { Bindings } from '../auth.server'
 import { commit, email, exact, need, secret, snapshot, text, type Actor } from './model'
@@ -78,6 +79,7 @@ export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record
  await commit(db,a,[
   db.prepare("UPDATE p_proposals SET recipient_plan=?,revision=?,version=version+1,status='draft',approved_by=NULL,approved_at=NULL WHERE id=?").bind(JSON.stringify(next),revision,row.id),
   db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(row.id),
+  copyCosts(db,row.id,row.revision,row.id,revision),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,?,?,?,?,?)').bind(row.id,revision,JSON.stringify(snapshot(updated)),a.email,at,row.currency),
  ],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))",values:[row.id,row.version]})
  return {id:row.id,version:row.version+1,revision}

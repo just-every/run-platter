@@ -14,7 +14,7 @@ export async function pendingNegotiation(db: D1Database, id: string) {
  return db.prepare('SELECT * FROM p_negotiations WHERE proposal_id=?').bind(id).first<any>()
 }
 export function negotiatedView(offer: any, pending: any) {
- return pending ? { ...offer,payment_terms:null, ...JSON.parse(pending.snapshot), status: pending.approved_by ? 'approved' : 'draft', prepared_by: pending.prepared_by, approved_by: pending.approved_by, approved_at: pending.approved_at, negotiating: true, sentRevision: offer.revision } : offer
+ return pending ? { ...offer,payment_terms:null, ...JSON.parse(pending.snapshot), recipient_plan:offer.recipient_plan, status: pending.approved_by ? 'approved' : 'draft', prepared_by: pending.prepared_by, approved_by: pending.approved_by, approved_at: pending.approved_at, negotiating: true, sentRevision: offer.revision } : offer
 }
 
 export async function negotiationCommand(env: Bindings, actor: Actor, name: string, input: Record<string, unknown>, offer: any, fields?: any) {
@@ -51,7 +51,7 @@ export async function negotiationCommand(env: Bindings, actor: Actor, name: stri
  guard.sql+=' AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?';guard.values.push(approval.policyVersion)
  const next = JSON.parse(pending.snapshot);assertDiscountDates(next.options,at)
  guard.sql+=' AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))';guard.values.push(discountDeadline(next.options),at)
- const invitations=await recipientInvitations(env,actor,input,{...offer,...next},at)
+ const invitations=await recipientInvitations(env,actor,input,{...offer,...next,recipient_plan:offer.recipient_plan},at)
  const token = secret(), shareUrl = env.AUTH_ORIGIN + '/p/' + token
  const client = await db.prepare('SELECT COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(offer.id,offer.client_id).first<any>()
  await commit(db, actor, [

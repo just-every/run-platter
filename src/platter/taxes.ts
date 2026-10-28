@@ -65,10 +65,10 @@ export function selectionTax(option:any,items:any[],subtotalCents:number){
  const components=option.tax.components.map((r:TaxRate)=>({...r,taxableCents,taxCents:Number((BigInt(taxableCents)*BigInt(r.bps)+5000n)/10000n)})),taxCents=components.reduce((n:number,r:any)=>n+r.taxCents,0)
  return {...option.tax,subtotalCents,taxableCents,taxCents,components,lines:parts.map((p,i)=>({label:p.label,taxable:p.taxable,taxCode:p.taxCode,netCents:net[i]}))}
 }
-export function taxLines(tax:any,currency='USD'){
+export function taxLines(tax:any,currency='USD',tr:(value:string)=>string=value=>value){
  if(!tax)return []
  const money=(n:number)=>currency+' '+(n/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}),a=tax.addressKind==='service'?tax.serviceAddress:tax.billingAddress
- return ['Subtotal before tax: '+money(tax.subtotalCents),'Sales tax: '+money(tax.taxCents),...tax.components.map((c:any)=>c.jurisdiction+' '+c.level+' tax ('+c.bps/100+'%): '+money(c.taxCents)), 'Tax address ('+tax.addressKind+'): '+[a.line1,a.city,a.region,a.postalCode,a.country].join(', ')]
+ return [tr('Subtotal before tax: ')+money(tax.subtotalCents),tr('Sales tax: ')+money(tax.taxCents),...tax.components.map((c:any)=>c.jurisdiction+' '+tr(c.level)+tr(' tax (')+c.bps/100+'%): '+money(c.taxCents)), tr('Tax address (')+tr(tax.addressKind)+'): '+[a.line1,a.city,a.region,a.postalCode,a.country].join(', ')]
 }
 
 export function taxRequest(p:Record<string,any>){

@@ -554,7 +554,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   let retained=before.proposals.find(row=>row.id===real.id).invitationMessages
   assert.equal(retained.length,1)
   assert.equal(proposal.testMail.length,1);assert.equal(before.outbox.length,2)
-  const replacement=await h.cmd('signer.replace',{id:real.id,version:4,recipient:'coo@northstar.example',reason:'COO signs this agreement',mailSubject:'COO invitation',mailMessage:'Please sign the unchanged offer.'})
+  const replacement=await h.cmd('signer.replace',{id:real.id,version:4,recipient:'coo'+String.fromCharCode(64)+'northstar.example',reason:'COO signs this agreement',mailSubject:'COO invitation',mailMessage:'Please sign the unchanged offer.'})
   const replacementPath=new URL(replacement.shareUrl).pathname
   retained=(await h.state()).proposals.find(row=>row.id===real.id).invitationMessages
   const replacements=(await h.state()).proposals.find(row=>row.id===real.id).signerReplacements

@@ -96,3 +96,9 @@ export async function fixedPagesPdf(bytes:Uint8Array,generated:Uint8Array,view:a
  const appended=await PDFDocument.load(generated);for(const page of await out.copyPages(appended,appended.getPageIndices()))out.addPage(page)
  return out.save()
 }
+
+export async function fixedPagePreview(db:D1Database,row:any){
+ const fixed=documentOf(row).fixedPdf;need(fixed,'Fixed PDF not found',404)
+ const empty=await PDFDocument.create(),bytes=await fixedPagesPdf(await mediaBytes(db,row,fixed.fileId),await empty.save({addDefaultPage:false}),row)
+ return new Response(bytes.buffer as ArrayBuffer,{headers:{'content-type':'application/pdf','content-disposition':'inline; filename="fixed-pages-revision-'+row.revision+'.pdf"','cache-control':'no-store','x-content-type-options':'nosniff'}})
+}

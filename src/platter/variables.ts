@@ -5,7 +5,7 @@ import { editableTerms } from './payment-terms'
 import { need, type Actor } from './model'
 import { currentTime } from './expiry-time'
 export const variableToken=/\{\{\s*([A-Za-z][A-Za-z0-9_.]{0,99})\s*\}\}/g
-export type MergeFields={patterns:Record<string,string>;values:Record<string,string>;deal?:{provider:string;id:string}}
+export type MergeFields={patterns:Record<string,string>;values:Record<string,string>;deal?:{provider:string;id:string};conditions?:string[]}
 export function variableNames(value:unknown):string[]{const names=new Set<string>();walk(value,(v)=>{for(const m of v.matchAll(variableToken))names.add(m[1]);return v});return [...names].sort()}
 function walk(value:any,fn:(v:string,path:string)=>any,path=''):any{return typeof value==='string'?fn(value,path):Array.isArray(value)?value.map((v,i)=>walk(v,fn,path+'/'+i)):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([k])=>k!=='merge').map(([k,v])=>[k,walk(v,fn,path+'/'+k)])):value}
 export function mergeFields(value:any):MergeFields|undefined{
@@ -16,7 +16,8 @@ export function mergeFields(value:any):MergeFields|undefined{
  for(const [key,v]of Object.entries(value.values)){need(/^[A-Za-z][A-Za-z0-9_.]{0,99}$/.test(key)&&typeof v==='string'&&v.length<=10000&&!variableNames(v).length,'Use plain text variable values');values[key]=v}
  need(Object.keys(patterns).length<=500,'Use at most 500 variable fields')
  const deal=value.deal;if(deal)need(['hubspot','salesforce','orbit'].includes(deal.provider)&&typeof deal.id==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(deal.id),'Choose a valid linked deal')
- return {patterns,values,...(deal?{deal:{provider:deal.provider,id:deal.id}}:{})}
+ const conditions=value.conditions??[];need(Array.isArray(conditions)&&conditions.length<=500&&conditions.every(k=>typeof k==='string'&&/^[A-Za-z][A-Za-z0-9_.]{0,99}$/.test(k)),'Use named visibility variables')
+ return {patterns,values,...(conditions.length?{conditions:[...new Set(conditions)]}:{}),...(deal?{deal:{provider:deal.provider,id:deal.id}}:{})}
 }
 const replace=(text:string,values:Record<string,string>)=>text.replace(variableToken,(original,key)=>Object.hasOwn(values,key)?values[key]:original)
 export function editableVariableFields(row:any){return {clientId:row.client_id,title:row.title,scope:row.scope,terms:row.terms??'',depositPercent:row.deposit_bps/100,packages:editablePackages(typeof row.options==='string'?JSON.parse(row.options):row.options),pricingTables:pricingInput(typeof row.options==='string'?JSON.parse(row.options):row.options),recipientPlan:typeof row.recipient_plan==='string'?JSON.parse(row.recipient_plan):row.recipient_plan??[],sectionConditions:row.section_conditions??{},document:typeof row.document==='string'?JSON.parse(row.document):row.document,paymentTerms:editableTerms(row)}}
@@ -49,16 +50,18 @@ async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFiel
 }
 /** Resolve only requested token fields. Original patterns survive for independent destination refills. */
 export async function resolveVariables(env:Bindings,a:Actor,input:Record<string,any>,rebind=false){
- let p=structuredClone(input);for(const key of ['packages','pricingTables','document'])if(typeof p[key]==='string'){try{p[key]=JSON.parse(p[key])}catch{}}
+ let p=structuredClone(input);for(const key of ['packages','pricingTables','document','sectionConditions'])if(typeof p[key]==='string'){try{p[key]=JSON.parse(p[key])}catch{}}
  if(!p.packages&&[p.optionOne,p.optionTwo,p.priceOne,p.priceTwo].some(v=>variableNames(v).length))p.packages=[{id:'one',label:p.optionOne,price:p.priceOne},{id:'two',label:p.optionTwo,price:p.priceTwo}]
  const old=mergeFields(p.document?.merge),patterns:Record<string,string>={},previous=old?.values??{},deal=p.variableDeal===undefined?(rebind?undefined:old?.deal):p.variableDeal||undefined
- if(!old&&!p.variableValues&&!p.variableDeal)return {fields:p,merge:undefined}
- const values={...await recordValues(env,a,String(p.clientId),deal),...(!rebind?previous:{}),...(p.variableValues??{})}
+ const conditionNames=new Set<string>();walk(p,v=>{const parsed=variableCondition(v);if(parsed)conditionNames.add(parsed[1]);return v})
+ if(!old&&!p.variableValues&&!p.variableDeal&&!conditionNames.size)return {fields:p,merge:undefined}
+ const context=await recordValues(env,a,String(p.clientId),p.variableDeal!==undefined?deal:undefined)
+ const values=rebind?{...context,...(p.variableValues??{})}:p.variableDeal!==undefined?{...previous,...context,...(p.variableValues??{})}:{...context,...previous,...(p.variableValues??{})}
  for(const [key,value]of Object.entries(values))need(typeof value==='string'&&value.length<=10000&&!variableNames(value).length,'Use plain text variable values')
  if(rebind&&old)for(const [path,pattern]of Object.entries(old.patterns)){const keys=path.slice(1).split('/');let parent=p;for(const key of keys.slice(0,-1)){if(parent[key]===undefined)break;parent=parent[key]}if(parent&&typeof parent==='object')parent[keys.at(-1)!]=pattern}
  p=walk(p,(v,path)=>{if(path.startsWith('/variable'))return v;const original=old?.patterns[path],pattern=original&&(rebind||replace(original,previous)===v)?original:variableNames(v).length?v:undefined;if(!pattern)return v;patterns[path]=pattern;const filled=replace(pattern,values);return variableNames(filled).length&&/(?:price|unitPrice|quantity)$/i.test(path)?'0.01':filled})
- if(!Object.keys(patterns).length)return {fields:p,merge:undefined}
- const used=variableNames(Object.values(patterns)),merge=mergeFields({patterns,values:Object.fromEntries(Object.entries(values).filter(([k])=>used.includes(k))),...(deal?{deal}:{})})!
+ if(!Object.keys(patterns).length&&!conditionNames.size)return {fields:p,merge:undefined}
+ const used=[...new Set([...variableNames(Object.values(patterns)),...conditionNames])],merge=mergeFields({patterns,conditions:[...conditionNames],values:Object.fromEntries(Object.entries(values).filter(([k])=>used.includes(k))),...(deal?{deal}:{})})!
  p.document={...(p.document??{version:1,blocks:[]}),merge}
  return {fields:p,merge}
 }
@@ -70,7 +73,7 @@ export function clientVariableFields(value:any){
  for(const [key,v]of Object.entries(custom)){need(/^[A-Za-z][A-Za-z0-9_]{0,50}$/.test(key)&&typeof v==='string'&&v.length<=1000,'Use named plain text custom fields');result.custom[key]=v}
  return result
 }
-export function missingMerge(row:any){const doc=typeof row.document==='string'?JSON.parse(row.document):row.document,merge=mergeFields(doc?.merge);return merge?variableNames(Object.values(merge.patterns)).filter(k=>!Object.hasOwn(merge.values,k)):[]}
+export function missingMerge(row:any){const doc=typeof row.document==='string'?JSON.parse(row.document):row.document,merge=mergeFields(doc?.merge);return merge?[...new Set([...variableNames(Object.values(merge.patterns)),...(merge.conditions??[])])].filter(k=>!Object.hasOwn(merge.values,k)):[]}
 
 export const variableCondition=(value:string)=>/^variable:([A-Za-z][A-Za-z0-9_.]{0,99})=(.{0,200})$/.exec(value)
 export function variableVisible(condition:string,values:Record<string,string>={}){const parsed=variableCondition(condition);return Boolean(parsed&&Object.hasOwn(values,parsed[1])&&values[parsed[1]]===parsed[2])}

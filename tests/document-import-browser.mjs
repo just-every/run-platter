@@ -10,7 +10,7 @@ import {wordFixture} from './document-import-fixture.mjs'
 export async function documentImportBrowser(width=1440){
  let edge,h,browser,context
  try{
-  edge=await browserEdge();h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin});edge.attach(h)
+  edge=await browserEdge();h=await harness({entry:'dist/server/index.js',assetsDirectory:'./dist/client',origin:edge.origin});edge.attach(h)
   browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']});context=await browser.newContext({viewport:{width,height:1000},ignoreHTTPSErrors:true})
   const [name,value]=h.owner.split('=');await context.addCookies([{name,value,url:h.origin}]);const page=await context.newPage(),screens=process.env.PLATTER_SCREENSHOTS
   const capture=async label=>{await page.evaluate(()=>document.fonts.ready);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'document screens fit the viewport');if(screens){await mkdir(screens,{recursive:true});await page.screenshot({path:join(screens,'EDIT-004-005-'+label+'-'+width+'.png'),fullPage:true})}}
@@ -33,6 +33,6 @@ export async function documentImportBrowser(width=1440){
   await page.locator('[data-block-type]').selectOption('signature');await page.locator('[data-block-add]').click();const signature=page.locator('[data-block-id]').last();await signature.getByLabel('Fixed PDF page (blank for appended field)').fill('3');await page.locator('[data-document-save]').click();await page.waitForFunction(()=>document.querySelector('[data-document-editor]')?.dataset.saveState==='saved');assert.equal((await h.state()).proposals.find(r=>r.id===fixed.id).document.blocks[0].page,3);await capture('fixed-page-field')
   await page.reload();const originalLink=page.getByRole('link',{name:'Download original PDF',exact:true}),original=await context.request.get(new URL(await originalLink.getAttribute('href'),h.origin).href);assert.equal(original.status(),200);assert.deepEqual(new Uint8Array(await original.body()),bytes)
   const downloadPromise=page.waitForEvent('download');await page.getByRole('link',{name:'Export Word document',exact:true}).click();const download=await downloadPromise,wordBytes=new Uint8Array(await readFile(await download.path())),files=unzipSync(wordBytes),xml=strFromU8(files['word/document.xml'])
-  assert.equal(Object.keys(files).filter(k=>k.startsWith('word/media/')).length,3);assert.deepEqual(files['word/embeddings/original.pdf'],bytes);assert.ok(xml.indexOf('<w:drawing>')<xml.indexOf('Synthetic fixed document'));await capture('fixed-word-export')
+  assert.equal(Object.keys(files).filter(k=>k.startsWith(['word','media',''].join('/'))).length,3);assert.deepEqual(files[['word','embeddings','original.pdf'].join('/')],bytes);assert.ok(xml.indexOf('<w:drawing>')<xml.indexOf('Synthetic fixed document'));await capture('fixed-word-export')
  }finally{await context?.close();await browser?.close();await h?.close();await edge?.close()}
 }

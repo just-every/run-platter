@@ -28,6 +28,7 @@ export async function libraryCommand(db:D1Database,a:Actor,name:string,p:Record<
  const storedKind=richLibraryKinds.includes(kind)?'section':kind
  const at=Date.now(),writes=old?[db.prepare('UPDATE p_library_items SET title=?,kind=?,content=?,version=version+1,updated_by=?,updated_at=? WHERE id=?').bind(title,storedKind,content,a.id,at,id)]:[db.prepare('INSERT INTO p_library_items(id,title,kind,content,updated_by,updated_at) VALUES(?,?,?,?,?,?)').bind(id,title,storedKind,content,a.id,at)]
  writes.push(db.prepare('UPDATE p_library_items SET folder_id=?,rich_kind=?,tags=? WHERE id=?').bind(folderId,richLibraryKinds.includes(kind)?kind:null,JSON.stringify([...new Set(tags)]),id))
+ if(imported)writes.push(db.prepare("UPDATE p_imported_library SET document=json_set(document,'$.blocks[0].title',?) WHERE item_id=?").bind(title,id))
  if(captured.files!==null&&!imported)writes.push(db.prepare('DELETE FROM p_library_media WHERE item_id=?').bind(id),...captured.files.map(file=>db.prepare('INSERT INTO p_library_media(item_id,file_id) VALUES(?,?)').bind(id,file)))
  if(old)writes.push(...await propagateLibrary(db,a,{...old,kind:libraryKind(old)},{title,content,kind},at))
  await commit(db,a,writes,false,{sql:previous.sql+' AND '+next.sql+' AND '+captured.guard.sql+(old?' AND EXISTS(SELECT 1 FROM p_library_items WHERE id=? AND version=?)':''),values:[...previous.values,...next.values,...captured.guard.values,...(old?[id,old.version]:[])]})

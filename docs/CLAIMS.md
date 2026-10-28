@@ -738,9 +738,7 @@ Evidence: `tests/mail.test.mjs`
 
 ## AUTO-004 — Public REST API and webhooks
 
-Status: **partial**.
-
-Gap: The ct demotion remains in force pending fresh acceptance of the corrected public status and analytics, negotiated revision events, all ten receiver deliveries and independently expected documented scopes. Exact-candidate Verify and guarded landing receipts remain pending; AUTO-004 must remain partial until ct accepts.
+Status: **done**.
 
 Evidence: `src/platter/api/index.ts`, `src/platter/api/webhooks.ts`, `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
 

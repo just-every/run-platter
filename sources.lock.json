@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "5a18ea48218a056731043e972e5d13f2ff8bf852cab65575262af1f3f3541c0c",
+      "sha256": "2a377382b99b784f9f755b49a672d94c1c879c8721c903690f0718c3912af559",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "073ad2ca47d19793996259dbf3751031306f7b86aa7996d9c26751d49115a1fb",
+      "sha256": "a8605e2897a1eca72de37ed13d42ce87b9460fdc715a4e0e4530b371503c7811",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "21de320860f6ee5721e7b7126c6251a4d332f3da00e9575b76d2934e7192c2e8",
+      "sha256": "d5f5249277fe1822244e0df1ccc863e1e7ead76cb92e69c7824407238d70f45c",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -535,6 +535,10 @@
     },
     "migrations/core/0084_owner_taxes.sql": {
       "sha256": "1d8dfc830ea1fc5a73d11e1495d5b3c5ba7e74d812e6a07091aafa3654fd2d02",
+      "executable": false
+    },
+    "migrations/core/0085_catalog_defaults.sql": {
+      "sha256": "3c245c6071355a82003f63a4f97be5b721900de8e52f2ed35567604495cbd497",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -1178,7 +1182,7 @@
       "executable": false
     },
     "public/pricing.js": {
-      "sha256": "e2c52f60a99593f807214ddf03cfa769ce9ad205a82ca699deb74210657d1564",
+      "sha256": "be516b9262c9d9b431a06f1762c113ef1841a5e59466eeeece2bf7ab113522de",
       "executable": false
     },
     "public/rer-theme.css": {
@@ -2378,11 +2382,15 @@
       "executable": false
     },
     "src/platter/business-records.ts": {
-      "sha256": "cd0956d548ee476192ab18d26682bdde18a4c8fbc76d7916385742bb353c2916",
+      "sha256": "3fea29cd5bbaf278a5aee82a9962e184487ee7569ad6b58f9e7d39791071cb38",
+      "executable": false
+    },
+    "src/platter/catalog-import.ts": {
+      "sha256": "18e324fa6502af7d809f45e48cd44501d3f71f1a4d77ca709a496648bdaa14d1",
       "executable": false
     },
     "src/platter/catalog.ts": {
-      "sha256": "69217ec898b0557427bf38c42131b268a6c7893d14f72aaa10e1d74f2d756657",
+      "sha256": "8b5cc5473219f7e4cd847be7b1771c649ed9a2149a046e4faefdda4d5510df7a",
       "executable": false
     },
     "src/platter/client-data.ts": {
@@ -2614,7 +2622,7 @@
       "executable": false
     },
     "src/platter/movein/business-presets.ts": {
-      "sha256": "a7e389b170db8d980b3f2d0266754fd63acda3465c619f9ca97cb3b8bdaffd67",
+      "sha256": "dc021e65faa4800328d21fd0dddc6ebcf7b476c295506df826d10d764150a181",
       "executable": false
     },
     "src/platter/movein/business-source.ts": {
@@ -2718,7 +2726,7 @@
       "executable": false
     },
     "src/platter/pricing.ts": {
-      "sha256": "7a02306a14020c0b736b159be30121bc283db8ad0d498bb65c33cb2296d3893a",
+      "sha256": "6a4dacf922344e993e98f679c9558973c50d8a4f6514f31b91a4f1de8cf5882f",
       "executable": false
     },
     "src/platter/question-replies.ts": {
@@ -2738,7 +2746,7 @@
       "executable": false
     },
     "src/platter/recurring.ts": {
-      "sha256": "f707abe1214d70504b9f7fcf12a44a6bcfd233ef306b94848d8db65522435ecb",
+      "sha256": "de675a5d5b013e996dc4a517b40c8068f563e0928337dbd139949c242456a450",
       "executable": false
     },
     "src/platter/reminder-message-defaults.ts": {
@@ -2858,7 +2866,7 @@
       "executable": false
     },
     "src/platter/ui/audit.ts": {
-      "sha256": "7a4cf3e5216e6aadb21445b665aed5dc937f3ed39e9e54c9f6688633653fc075",
+      "sha256": "cc3909827f9841bb17c48923b99b0a282251b67751ef582a527b3de2bf44ce8d",
       "executable": false
     },
     "src/platter/ui/blocks.ts": {
@@ -2866,7 +2874,7 @@
       "executable": false
     },
     "src/platter/ui/business-import.ts": {
-      "sha256": "7950fef3f7c268f7c57644e3a588dbec431b1e24e5a8d441dae01d972f73648a",
+      "sha256": "ff8a5de47f386d86db0c818ca636cba814c7058367e2a578106a994e4b611236",
       "executable": false
     },
     "src/platter/ui/catalog-shelf.ts": {
@@ -2874,7 +2882,7 @@
       "executable": false
     },
     "src/platter/ui/catalog.ts": {
-      "sha256": "736494ce093acacfb88fba56940d0419263812b02d792393e8cb02b0ea95bcb2",
+      "sha256": "91b21eacf66f09f141afddbcaa72b14c0744c00d0cfaefd3dc5f8bff57228fdd",
       "executable": false
     },
     "src/platter/ui/client-pdf.ts": {
@@ -2990,7 +2998,7 @@
       "executable": false
     },
     "src/platter/ui/pricing.ts": {
-      "sha256": "a310efd8e57c098dc983c58929143942e57a870f36d6213999b769f475f4ecee",
+      "sha256": "2d9707de539a90539698cc98e30868494cfa17589dfab499d9d8039e09ebc329",
       "executable": false
     },
     "src/platter/ui/proposals.ts": {
@@ -3190,7 +3198,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "2f3c5a8b5f7a3788d555599421a10cd86c7349852e0cfad8ed86ce3b289981c5",
+      "sha256": "e9a3d80b3eb847e190c0afd6a52cb1a7f8c5f7ccd95bc369232bceb8c93fcfb2",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3199,6 +3207,18 @@
     },
     "tests/business-import-fixture.mjs": {
       "sha256": "68508e6099444976dcf32d9835d988420e7f34481641e90aa03c7257397731e7",
+      "executable": false
+    },
+    "tests/catalog-browser.mjs": {
+      "sha256": "2243513828d2408937d9bd928d40a6538e3f114d48da14f29fe6187b367ced47",
+      "executable": false
+    },
+    "tests/catalog-fixture.mjs": {
+      "sha256": "24a264557f4ae5a30a2ee5220f07439d1e4fd800f8f8f0470b377fdc63ad5448",
+      "executable": false
+    },
+    "tests/catalog-journey.mjs": {
+      "sha256": "97b661bc76abfc8fb2b173e4a47bd7c1ef4df2150fc591ca92c6295366d9a52c",
       "executable": false
     },
     "tests/catalog-socket-edge.ts": {
@@ -3286,7 +3306,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "e43587eccb5ce18ff27063e43861265d5a015c68bc9696deaece6670dd56ff52",
+      "sha256": "7e3f810fc993e8f81fe23fbb833de8759e98f85c56d7239936cb63b1db2cd4e7",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3338,7 +3358,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "e39b000ba2558cbae38d8ad51353e9c98d9d9a26db2678b0af8d956559d8e430",
+      "sha256": "3df9eb538a3168cd528d8477c95e5be9ba78973837e7aeba8dc03af9d66e6f47",
       "executable": false
     },
     "tests/site-harness.mjs": {

@@ -2,6 +2,11 @@ import { calendarDate } from './expiry-time'
 import { allocateNet } from './discounts'
 import { need } from './model'
 
+export const catalogIntervals=['one-off','weekly','monthly','quarterly','annual'] as const
+export function catalogInterval(input:unknown){
+ need(typeof input==='string'&&(catalogIntervals as readonly string[]).includes(input),'Choose a supported catalog recurrence')
+ return input as typeof catalogIntervals[number]
+}
 export type Recurrence={interval:'weekly'|'monthly'|'quarterly'|'annual';term:number;startsOn:string}
 export function recurrenceInput(input:any):{recurrence?:Recurrence} {
  const interval=input.interval??input.recurrence?.interval

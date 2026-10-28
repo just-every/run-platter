@@ -5,7 +5,7 @@ import { calendarDate } from './expiry-time'
 import { dollars, need, text } from './model'
 
 export interface PriceLine {
- taxable?:boolean; taxCode?:string; catalogId?:string; recurrence?:Recurrence; name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number; grossCents?:number; discountBps?:number; discountFixedCents?:number; groupDiscountBps?:number; groupDiscountFixedCents?:number
+ incomeAccount?:string; taxable?:boolean; taxCode?:string; catalogId?:string; recurrence?:Recurrence; name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number; grossCents?:number; discountBps?:number; discountFixedCents?:number; groupDiscountBps?:number; groupDiscountFixedCents?:number
 }
 export interface PriceTable {
  name: string; lines: PriceLine[]; groups: { name: string; subtotalCents: number }[]; subtotalCents: number; thresholdBps?:number
@@ -48,7 +48,8 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
    const name = text(line.name, 'a line name'), unit = text(line.unit, 'a unit', 40)
    groups.set(group.trim(), boundedTotal(BigInt(groups.get(group.trim()) ?? 0) + BigInt(lineTotalCents)))
    const catalogId=line.catalogId===undefined||line.catalogId===''?undefined:text(line.catalogId,'a catalog reference',200)
-   return { ...taxFlags(line),...(catalogId?{catalogId}:{}),...recurring,name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{grossCents,discountBps,discountFixedCents,groupDiscountBps,groupDiscountFixedCents}:{}) }
+   const incomeAccount=line.incomeAccount?text(line.incomeAccount,'an income account',100):undefined
+   return { ...(incomeAccount?{incomeAccount}:{}),...taxFlags(line),...(catalogId?{catalogId}:{}),...recurring,name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{grossCents,discountBps,discountFixedCents,groupDiscountBps,groupDiscountFixedCents}:{}) }
   })
   let thresholdBps=Math.max(0,...lines.map(l=>l.grossCents?Math.ceil((l.grossCents-l.lineTotalCents)*10000/l.grossCents):0))
   for(const group of groups.keys()){
@@ -74,7 +75,7 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
 export function pricingInput(options: any[]) {
  return options.flatMap(option => (option.tables ?? []).map((table: PriceTable) => ({
   optionId: option.id, name: table.name,
-  lines: table.lines.map(({ taxable,taxCode,catalogId,recurrence,name, description, quantity, unit, unitPrice, group, discountBps, discountFixedCents, groupDiscountBps, groupDiscountFixedCents }) => ({ ...taxFlags({taxable,taxCode}),...(catalogId?{catalogId}:{}),...(recurrence?{recurrence}:{}),name, description, quantity, unit, unitPrice, group,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{discountPercent:(discountBps??0)/100,discountAmount:((discountFixedCents??0)/100).toFixed(2),groupDiscountPercent:(groupDiscountBps??0)/100,groupDiscountAmount:((groupDiscountFixedCents??0)/100).toFixed(2)}:{}) })),
+  lines: table.lines.map(({ incomeAccount,taxable,taxCode,catalogId,recurrence,name, description, quantity, unit, unitPrice, group, discountBps, discountFixedCents, groupDiscountBps, groupDiscountFixedCents }) => ({ ...(incomeAccount?{incomeAccount}:{}),...taxFlags({taxable,taxCode}),...(catalogId?{catalogId}:{}),...(recurrence?{recurrence}:{}),name, description, quantity, unit, unitPrice, group,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{discountPercent:(discountBps??0)/100,discountAmount:((discountFixedCents??0)/100).toFixed(2),groupDiscountPercent:(groupDiscountBps??0)/100,groupDiscountAmount:((groupDiscountFixedCents??0)/100).toFixed(2)}:{}) })),
  })))
 }
 

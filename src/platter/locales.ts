@@ -1,3 +1,4 @@
+import eventTranslations from './locale-events'
 import french from './locale-fr'
 import german from './locale-de'
 import portuguese from './locale-pt'
@@ -1142,6 +1143,7 @@ const paymentTranslations:Record<string,string[]> = {
  ]
 }
 for(const [key,values] of Object.entries(paymentTranslations))for(const [i,locale] of (['es','fr','de','pt'] as const).entries())catalogs[locale][key]=values[i]
+for(const [key,values] of Object.entries(eventTranslations))for(const [i,locale] of (['es','fr','de','pt'] as const).entries())catalogs[locale][key]=values[i]
 const exactOnly = new Set(['email',' role','state','county','city','district','service','billing','week','month','quarter','year','Deposit','Acceptance','Monthly retainer','One-off balance','Yes','No','signer','countersigner','approver','viewer','cc'])
 const keys = Object.keys(spanish).filter(key => !exactOnly.has(key)).sort((a,b) => b.length-a.length)
 const matcher = new RegExp(keys.map(key => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g')

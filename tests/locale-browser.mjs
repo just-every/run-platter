@@ -1,3 +1,4 @@
+import { localeProviderBrowser } from './locale-providers.mjs'
 import assert from 'node:assert/strict'
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -9,13 +10,13 @@ import { configureTaxes, taxPackages, taxRequest, taxTables } from './taxes-fixt
 
 async function englishClientCopy() {
  const words=new Set()
- for(const file of ['client','shell','shared','expiry','questions','attachments','paper','suggestions','packages','pricing','payment-terms','blocks','recipients','electronic-records','../electronic-records-text']) {
+ for(const file of ['client','shell','shared','expiry','questions','attachments','paper','suggestions','packages','pricing','payment-terms','blocks','collection','recipients','electronic-records','../electronic-records-text','../tracking/stakeholders']) {
   const source=ts.createSourceFile(file,await readFile('./src/platter/ui/'+file+'.ts','utf8'),ts.ScriptTarget.Latest,true)
   const collect=node=>{
    if(ts.isStringLiteral(node)||ts.isNoSubstitutionTemplateLiteral(node)||ts.isTemplateHead(node)||ts.isTemplateMiddle(node)||ts.isTemplateTail(node)) {
     for(const part of node.text.replace(/<[^>]*(?:>|$)/g,'\0').split('\0')) {
      const text=part.replace(/^[\s"'<>/=]+|[\s"'<>/=]+$/g,'').trim()
-     if(text.length>=4&&!['Platter','Total'].includes(text)&&(/[A-Z][a-z]{3}/.test(text)||/[a-z]{3} [a-z]{3}/.test(text)))words.add(text)
+     if(text.length>=4&&!['Platter','Total','Apple Pay','Google Pay'].includes(text)&&(/[A-Z][a-z]{3}/.test(text)||/[a-z]{3} [a-z]{3}/.test(text)))words.add(text)
     }
    }
    ts.forEachChild(node,collect)
@@ -181,6 +182,20 @@ export async function localeBrowser(width=1440) {
   const stateAfterSend=await (await request.get(app.origin+'/api/platter/state')).json(),issued=stateAfterSend.proposals.find(r=>r.id===multi.id)
   assert.equal(issued.status,'sent')
   const links=Object.fromEntries(issued.recipientLinks.map(r=>[r.slot_id,app.origin+'/p/'+r.token]))
+  const shared=await cmd('recipient.share',{id:multi.id,version:issued.version,recipientName:'Synthetic shared viewer',recipientEmail:email(9795),locale:'es',shareConsent:true,embedOrigin:app.origin})
+  const deniedEmbed=await request.get(links.viewer+'?embed=1');assert.equal(deniedEmbed.status(),403)
+  await page.route(app.origin+'/synthetic-embed',route=>route.fulfill({contentType:'text/html',body:'<iframe src="'+shared.embedUrl+'" title="Synthetic embedded proposal" style="width:100%;height:850px;border:0"></iframe>'}))
+  await page.goto(app.origin+'/synthetic-embed')
+  const frame=page.frameLocator('iframe')
+  const [embeddedCode]=await Promise.all([page.waitForResponse(r=>r.url().includes('name=code.request')&&r.request().method()==='POST'),frame.getByRole('button',{name:'Enviar código de verificación',exact:true}).click()]);assert.equal(embeddedCode.status(),200,await embeddedCode.text())
+  const sharedMail=(await (await request.get(app.origin+'/api/platter/state')).json()).outbox.find(m=>m.proposal_id===multi.id&&m.recipient===email(9795)&&/\b\d{6}\b/.test(m.body))
+  await frame.getByLabel('Código de verificación por correo electrónico').fill(sharedMail.body.match(/\b\d{6}\b/)[0]);await frame.getByRole('button',{name:'Verificar correo electrónico',exact:true}).click()
+  await frame.getByRole('heading',{name:'Su rol de destinatario',exact:true}).waitFor();assert.equal(await frame.locator('html').getAttribute('lang'),'es');assert.ok((await frame.locator('body').innerText()).includes(authored.scope))
+  assert.equal(await frame.locator('form#platter-acceptance').count(),0)
+  await capture('embedded-spanish-viewer')
+  assert.equal((await request.post(shared.shareUrl+'/action?name=accept',{headers,data:{name:'Synthetic viewer',optionId:'one',consent:true}})).status(),403)
+  await cmd('recipient.remove',{id:multi.id,version:issued.version+1,recipientId:shared.recipientId})
+  const removed=await request.get(shared.shareUrl);assert.equal(removed.status(),410);assert.ok(!(await removed.text()).includes(authored.scope));assert.match(await removed.text(),/<html lang="es">/)
   for(const [id,prefix] of [['ceo','Su propuesta: '],['cfo','Votre proposition : '],['approver','Sua proposta: '],['viewer','Ihr Angebot: '],['owner','Your proposal: ']]){
    const mail=stateAfterSend.outbox.find(m=>m.proposal_id===multi.id&&m.recipient===recipients.find(r=>r.id===id).email)
    assert.equal(mail.subject,prefix+authored.title)
@@ -220,6 +235,45 @@ export async function localeBrowser(width=1440) {
   }
   const multiCertificate=await request.get(links.owner+'/certificate.json');assert.equal(multiCertificate.status(),200)
   const multiFacts=await multiCertificate.json();assert.deepEqual(multiFacts.signers.map(s=>s.language),['es','fr','pt','en'])
+  const completedMail=(await (await request.get(app.origin+'/api/platter/state')).json()).outbox.filter(m=>m.proposal_id===multi.id)
+  for(const [id,prefix] of [['ceo','Acuerdo completo: '],['cfo','Accord terminé : '],['approver','Acordo concluído: '],['viewer','Vertrag abgeschlossen: '],['owner','Agreement complete: ']]){
+   assert.ok(completedMail.some(m=>m.recipient===recipients.find(r=>r.id===id).email&&m.subject===prefix+authored.title),'completion mail follows '+id+' language')
+  }
   await capture('recipient-completion')
+  const correction=await cmd('proposal.prepare',{...authored,clientId:client.id,priceOne:'2400',priceTwo:'4200',depositPercent:'25'})
+  await cmd('proposal.locale',{id:correction.id,version:1,locale:'es'});await cmd('proposal.approve',{id:correction.id,version:2,revision:1})
+  const original=await cmd('proposal.send',{id:correction.id,version:3})
+  await page.goto(original.shareUrl);await capture('replacement-original')
+  await page.goto(app.origin+'/app/proposal?id='+correction.id)
+  const replacementForm=page.locator('form[action*="signer.replace"]')
+  await replacementForm.locator('input[name="recipient"]').fill(email(9796));await replacementForm.locator('input[name="reason"]').fill('Synthetic mailbox correction')
+  await replacementForm.locator('select[name="locale"]').selectOption('fr')
+  await replacementForm.getByRole('button',{name:'Replace using recipient-language defaults',exact:true}).click()
+  await page.locator('.notice a[href*="/p/"]').waitFor()
+  const freshLink=await page.locator('.notice a[href*="/p/"]').getAttribute('href')
+  assert.equal((await request.get(original.shareUrl)).status(),410)
+  await page.goto(freshLink);assert.equal(await page.locator('html').getAttribute('lang'),'fr')
+  await page.getByRole('button',{name:'Envoyer le code de vérification',exact:true}).click()
+  const replacementMail=(await (await request.get(app.origin+'/api/platter/state')).json()).outbox.find(m=>m.proposal_id===correction.id&&m.subject==='Votre code de vérification Platter')
+  await page.getByLabel('Code de vérification par e-mail').fill(replacementMail.body.match(/\b\d{6}\b/)[0]);await page.getByRole('button',{name:'Vérifier l’adresse e-mail',exact:true}).click()
+  await page.getByRole('radio',{name:/Studio essentials/}).check();await page.getByLabel('Votre nom complet',{exact:true}).fill('Synthetic replacement')
+  await page.locator('form#platter-acceptance input[name="consent"]').check();await page.getByRole('button',{name:'Accepter la proposition',exact:true}).click()
+  assert.equal(await page.getByRole('heading',{name:'Proposition acceptée',exact:true}).count(),1)
+  const replacementFacts=await (await request.get(freshLink+'/certificate.json')).json();assert.equal(replacementFacts.language,'fr')
+  await capture('replacement-french-complete')
+  await cmd('tracking.settings',{enabled:'yes',alerts:'no',retentionDays:90,quietMinutes:30,consent:'yes'})
+  const forwarded=await cmd('proposal.prepare',{...authored,clientId:client.id,priceOne:'2400',priceTwo:'4200',depositPercent:'25'})
+  await cmd('proposal.locale',{id:forwarded.id,version:1,locale:'es'});await cmd('proposal.approve',{id:forwarded.id,version:2,revision:1})
+  const forwardedLink=(await cmd('proposal.send',{id:forwarded.id,version:3})).shareUrl
+  await page.goto(forwardedLink)
+  const stakeholder=page.locator('form[action$="/stakeholder"]')
+  await stakeholder.locator('[name="name"]').fill('Synthetic stakeholder');await stakeholder.locator('[name="email"]').fill(email(9797));await stakeholder.locator('[name="consent"]').check();await stakeholder.getByRole('button').click()
+  assert.equal(await page.getByRole('heading',{name:'Revise su correo electrónico',exact:true}).count(),1);await capture('stakeholder-code')
+  const stakeholderMail=(await (await request.get(app.origin+'/api/platter/state')).json()).outbox.find(m=>m.proposal_id===forwarded.id&&m.recipient===email(9797))
+  assert.equal(stakeholderMail.subject,'Verifique su correo de participante')
+  await page.getByLabel('Código de verificación de participante').fill(stakeholderMail.body.match(/\b\d{6}\b/)[0]);await page.getByRole('button',{name:'Verificar correo de participante',exact:true}).click()
+  assert.equal(await page.getByRole('heading',{name:'Participante identificado',exact:true}).count(),1);await capture('stakeholder-verified')
+  assert.equal((await request.post(forwardedLink+'/action?name=accept',{headers,data:{name:'Synthetic stakeholder',optionId:'one',consent:true}})).status(),401)
+  await localeProviderBrowser(width,browser,screenshots,catalog)
  } finally {await context?.close();await browser?.close();await app?.close()}
 }

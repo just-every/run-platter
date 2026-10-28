@@ -1,4 +1,4 @@
-import { clientLocale, clientText, recipientMailLocale, retireInvitations } from './locales'
+import { clientLocale, clientText, clientLocales, recipientMailLocale, retireInvitations } from './locales'
 import { copyCosts } from './internal-pricing'
 import { documentOf, fieldSlot } from './documents/blocks'
 import type { Bindings } from '../auth.server'
@@ -46,8 +46,11 @@ export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record
    need((url.protocol==='https:'||written===env.AUTH_ORIGIN)&&url.origin===written&&!url.hostname.includes('*')&&!url.username&&!url.password,'Use an exact secure site origin without a path, credentials or wildcard')
    origin=url.origin
   }
+  const locale=p.locale===undefined?row.client_locale??'en':String(p.locale)
+  need(clientLocales.includes(locale as any)||locale==='auto','Choose a supported client language')
   const token=secret()
   await commit(db,a,[
+   db.prepare('INSERT INTO p_recipient_locales(proposal_id,slot_id,locale) VALUES(?,?,?)').bind(row.id,recipient.id,locale),
    db.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient,slot_id,embed_origin) VALUES(?,?,?,?,?,?)').bind(row.id,row.revision,token,recipient.email,recipient.id,origin),
    db.prepare('UPDATE p_proposals SET recipient_plan=?,version=version+1 WHERE id=?').bind(JSON.stringify([...plan,recipient]),row.id),
   ],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status='sent')",values:[row.id,row.version,row.revision]})

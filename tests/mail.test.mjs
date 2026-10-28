@@ -29,7 +29,7 @@ const mailRows = async h => (await h.db.prepare('SELECT * FROM p_mail ORDER BY c
 
 test('EDIT-017 Spanish invitation and mailbox code retain authored mail and consume localized code transport', async()=>{
  const sent=[]
- const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9701'},outboundService:async request=>{sent.push(await request.json());return Response.json({id:'synthetic-platter-'+(9702+sent.length)})}})
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9701',MAIL_WEBHOOK_KEY:'synthetic-platter-9700',QUESTION_REPLY_DOMAIN:'reply.platter.example.com'},outboundService:async request=>{sent.push(await request.json());return Response.json({id:'synthetic-platter-'+(9702+sent.length)})}})
  try{
   const id=await approved(h)
   await h.cmd('proposal.locale',{id,version:2,locale:'es'})
@@ -43,13 +43,53 @@ test('EDIT-017 Spanish invitation and mailbox code retain authored mail and cons
   const verification=await h.send(path+'/action?name=code.verify',{code});assert.equal(verification.status,200,verification.text)
   assert.equal((await h.db.prepare('SELECT body FROM p_mail WHERE proposal_id=? AND subject=?').bind(id,sent[1].subject).first()).body,'Verification code consumed')
   assert.equal((await h.send(path+'/action?name=code.verify',{code})).status,401)
+  const question=await h.send(path+'/action?name=question.create',{section:'scope',revision:1,text:'Your proposal: authored question stays exact.'},verification.cookie)
+  assert.equal(question.status,200,question.text)
+  const questionId=(await h.state()).proposals.find(p=>p.id===id).questions[0].id
+  await h.cmd('question.answer',{id,questionId,text:'Scope of work — authored answer stays exact.'})
+  assert.equal(sent.at(-1).subject,'Respuesta a su pregunta: '+offer.title)
+  assert.ok(sent.at(-1).text.includes('Your proposal: authored question stays exact.'));assert.ok(sent.at(-1).text.includes('Scope of work — authored answer stays exact.'))
+  assert.ok(!sent.at(-1).text.includes('The firm answered your'))
+  const oldCookie=verification.cookie,previousVersion=(await h.state()).proposals.find(p=>p.id===id).version
+  const replacement=await h.cmd('signer.replace',{id,version:previousVersion,recipient:'synthetic-platter-9709'+String.fromCharCode(64)+'example.test',reason:'Synthetic mailbox correction',locale:'fr',localizedDefaults:'yes'})
+  const replacementPath=new URL(replacement.shareUrl).pathname
+  assert.equal(sent.at(-1).subject,'Votre proposition : '+offer.title)
+  const oldPage=await h.send(path,undefined,oldCookie);assert.equal(oldPage.status,410);assert.match(oldPage.text,/<html lang="es">/);assert.ok(!oldPage.text.includes(offer.scope))
+  assert.equal((await h.send(replacementPath+'/action?name=accept',{optionId:'one',name:'Synthetic signer',consent:true},oldCookie)).status,401)
+  assert.equal((await h.send(replacementPath+'/action?name=code.request',{})).status,200)
+  assert.equal(sent.at(-1).subject,'Votre code de vérification Platter')
+  const replacementCode=sent.at(-1).text.match(/\b\d{6}\b/)[0]
+  const newVerified=await h.send(replacementPath+'/action?name=code.verify',{code:replacementCode});assert.equal(newVerified.status,200)
+  await h.cmd('proposal.withdraw',{id,version:(await h.state()).proposals.find(p=>p.id===id).version,reason:'Scope of work — authored reason stays exact.'})
+  assert.equal(sent.at(-1).subject,'Proposition retirée : '+offer.title);assert.ok(sent.at(-1).text.includes('Scope of work — authored reason stays exact.'))
   const second=await approved(h)
   await h.cmd('proposal.locale',{id:second,version:2,locale:'es'})
   const subject='Your proposal: escrito por la empresa',message='Review your proposal and verify your email before accepting:\nTexto propio sin traducción.'
-  await h.cmd('proposal.send',{id:second,version:3,mailSubject:subject,mailMessage:message})
-  assert.equal(sent.at(-1).subject,subject);assert.ok(sent.at(-1).text.startsWith(message+'\n\n'))
+  await h.cmd('proposal.send',{id:second,version:3,mailSubject:subject,mailMessage:message,mailRepliesConsent:true})
+  assert.equal(sent.at(-1).subject,subject);assert.ok(sent.at(-1).text.startsWith(message+'\n\n'));assert.ok(sent.at(-1).text.includes('Puede responder una vez'));assert.ok(!sent.at(-1).text.includes('You may reply once'))
   const history=(await h.state()).proposals.find(p=>p.id===second).invitationMessages[0]
   assert.equal(history.subject,subject);assert.equal(history.message,message)
+  const worker=await h.mf.getWorker(),tick=async date=>worker.scheduled({scheduledTime:new Date(date),cron:'*/15 * * * *'})
+  await tick('2030-06-01T12:00:00Z')
+  for(const [index,[language,warning,footer]] of [
+   ['es','Aviso de vencimiento: ','Para detener los recordatorios'],
+   ['fr','Avis d’expiration : ','Pour arrêter les rappels'],
+   ['de','Ablaufwarnung: ','Um Erinnerungen zu stoppen'],
+   ['pt','Aviso de vencimento: ','Para suspender os lembretes'],
+   ['en','Expiry warning: ','To stop reminders'],
+  ].entries()){
+   const next=await approved(h)
+   await h.cmd('proposal.locale',{id:next,version:2,locale:language})
+   await h.cmd('reminder.configure',{id:next,version:3,enabled:false,timeZone:'Etc/UTC',cap:0})
+   await h.cmd('expiry.set',{id:next,version:4,mode:'date',date:'2030-06-02',warningDays:1})
+   await h.cmd('proposal.send',{id:next,version:5})
+   const subject='Your proposal: authored follow-up '+index,message='Scope of work — authored reminder stays exact.'
+   await h.cmd('reminder.send',{id:next,requestId:'synthetic-platter-'+(9740+index),subject,message})
+   assert.equal(sent.at(-1).subject,subject);assert.ok(sent.at(-1).text.startsWith(message+'\n\n'));assert.ok(sent.at(-1).text.includes(footer))
+   await tick('2030-06-01T12:'+String(index+1).padStart(2,'0')+':00Z')
+   const warningMail=sent.find(m=>m.subject===warning+offer.title)
+   assert.ok(warningMail,'expiry warning in '+language);if(language!=='en')assert.ok(!warningMail.text.includes('This proposal expires at the start of'))
+  }
  }finally{await h.close()}
 })
 

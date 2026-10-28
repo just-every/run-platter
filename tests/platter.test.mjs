@@ -3001,3 +3001,28 @@ test('SIGN-004 sequential and parallel recipient groups complete only after ever
  try{const {signingOrderHttp}=await import('./recipients-http.mjs');await signingOrderHttp(h)}finally{await h.close()}
 })
 test('SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP',()=>run(async h=>{const {recipientRolesHttp}=await import('./recipients-http.mjs');await recipientRolesHttp(h)}))
+
+test('EDIT-004 linked deal variables refuse missing values, freeze the sent revision and refill destination copies',async()=>{
+ let dealName='Synthetic first deal',company='Synthetic Alpha',title=null,amount='1250.00'
+ const h=await harness({outboundService:async request=>{const url=new URL(request.url);if(url.pathname==='/account-info/v3/details')return Response.json({portalId:8001});if(url.pathname.includes('/deals/'))return Response.json({properties:{dealname:dealName,amount},associations:{contacts:{results:[{id:'synthetic-platter-201'}]}}});if(url.pathname.includes('/contacts/'))return Response.json({properties:{firstname:'Avery',lastname:'Chen',jobtitle:title,company,address:'10 Synthetic Street'}});return new Response(null,{status:404})}})
+ try{
+  const a=await h.cmd('client.save',{name:'Synthetic Alpha',email:['synthetic-platter-201','example.test'].join('@')}),b=await h.cmd('client.save',{name:'Synthetic Beta',email:['synthetic-platter-202','example.test'].join('@'),variableFields:{contactName:'Casey Lane',title:'Buyer',address:'20 Synthetic Street',custom:{Region:'West'}}})
+  await h.cmd('provider.connect',{provider:'hubspot',version:0,token:'synthetic-platter-203',consent:true})
+  let p=await h.cmd('proposal.prepare',{...offer,clientId:a.id,title:'Offer for {{Client.Company}}',scope:'Hello {{Client.FirstName}}, {{Contact.Title}}: {{Deal.Name}}',priceOne:'{{Deal.Amount}}',variableDeal:{provider:'hubspot',id:'synthetic-platter-204'}})
+  const get=async id=>(await h.state()).proposals.find(p=>p.id===id)
+  let current=await get(p.id);assert.equal(current.title,'Offer for Synthetic Alpha');assert.equal(current.options[0].cents,125000);assert.match(current.scope,/\{\{Contact.Title\}\}/)
+  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1})
+  const refused=await h.send('/api/platter/command',{name:'proposal.send',input:{id:p.id,version:2}},h.owner);assert.equal(refused.status,409);assert.match(refused.text,/Contact.Title/)
+  await h.cmd('proposal.variables',{id:p.id,version:2,values:{'Contact.Title':'Director'}})
+  current=await get(p.id);assert.equal(current.scope,'Hello Avery, Director: Synthetic first deal');assert.equal(current.status,'draft');assert.equal(current.approved_by,null)
+  await h.cmd('proposal.approve',{id:p.id,version:3,revision:2});const sent=await h.cmd('proposal.send',{id:p.id,version:4}),path=new URL(sent.shareUrl).pathname,before=(await h.send(path)).text,source=JSON.stringify(await get(p.id))
+  company='Changed Alpha';dealName='Changed first deal';amount='9999.00'
+  assert.equal((await h.send(path)).text,before,'sent page does not refresh CRM data');await h.cmd('proposal.variables',{id:p.id,version:5,values:{'Contact.Title':'Changed'}},h.owner,409)
+  company='Synthetic Beta';title='Buyer';dealName='Destination deal';amount='3200.00'
+  const copy=await h.cmd('proposal.duplicate',{id:p.id,version:5,clientId:b.id,deal:{provider:'hubspot',id:'synthetic-platter-205'}}),next=await get(copy.id)
+  assert.equal(next.title,'Offer for Synthetic Beta (copy)');assert.equal(next.scope,'Hello Avery, Buyer: Destination deal');assert.equal(next.options[0].cents,320000);assert.equal(JSON.stringify(await get(p.id)),source,'all source bytes stay unchanged')
+  await h.cmd('proposal.variables',{id:copy.id,version:1,fields:{terms:'Region {{Custom.Region}}. Optional {{Custom.Note}}.'},values:{'Custom.Note':''}})
+  assert.equal((await get(copy.id)).terms,'Region West. Optional .')
+  await h.cmd('provider.disconnect',{provider:'hubspot',version:1});await h.cmd('proposal.duplicate',{id:p.id,version:5,clientId:b.id,deal:{provider:'hubspot',id:'synthetic-platter-205'}},h.owner,409)
+ }finally{await h.close()}
+})

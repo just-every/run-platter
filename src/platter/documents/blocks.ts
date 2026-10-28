@@ -1,10 +1,11 @@
+import { mergeFields, type MergeFields } from '../variables'
 import { embedUrl } from './embeds'
 import { need } from '../model'
 
 export const blockTypes = ['cover','heading','text','image','video','gallery','embed','columns','pricing','quote','bio','case_study','terms','field','signature','page_break'] as const
 export type BlockType = typeof blockTypes[number]
 export interface ProposalBlock { id:string; type:BlockType; title:string; text:string; second?:string; optionId?:string; tableIndex?:number; condition?:string; assetId?:string; posterId?:string; alt?:string; images?:{assetId:string;alt:string}[]; url?:string; consent?:boolean; fieldKind?:'text'|'date'|'checkbox'; required?:boolean; recipientRole?:'client'|'slot'; recipientId?:string }
-export interface ProposalDocument { version:1; blocks:ProposalBlock[]; brand?:{name:string; accent:string; ink:string; paper:string; font:'sans'|'serif'; cover:string;logoId?:string} }
+export interface ProposalDocument { version:1; blocks:ProposalBlock[]; merge?:MergeFields; brand?:{name:string; accent:string; ink:string; paper:string; font:'sans'|'serif'; cover:string;logoId?:string} }
 const string=(value:unknown,max:number,label:string)=>{need(typeof value==='string'&&value.length<=max&& !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value),'Enter '+label+' (up to '+max+' characters)');return value}
 const color=(value:unknown)=>{need(typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value),'Use six-digit brand colors');return value.toLowerCase()}
 const luminance=(hex:string)=>{const parts=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4);return parts[0]*0.2126+parts[1]*0.7152+parts[2]*0.0722}
@@ -43,12 +44,13 @@ export function proposalDocument(value:unknown,options?:any[],clientId?:string):
  })
  let brand:ProposalDocument['brand']
  if(parsed.brand){const b=parsed.brand;need(b&&typeof b==='object'&&!Array.isArray(b),'Invalid brand kit');const accent=color(b.accent),ink=color(b.ink),paper=color(b.paper);need(contrast(ink,paper)>=4.5&&contrast(accent,paper)>=4.5,'Brand text and accent must have at least 4.5:1 contrast against the paper');need(['sans','serif'].includes(b.font),'Choose a supported brand font');brand={name:string(b.name??'',200,'a brand name'),accent,ink,paper,font:b.font,cover:string(b.cover??'',200,'a default cover heading'),...(b.logoId?{logoId:string(b.logoId,80,'a logo file id')}:{})}}
- const document:ProposalDocument={version:1,blocks,...(brand?{brand}:{})}
+ const merge=mergeFields(parsed.merge)
+ const document:ProposalDocument={version:1,blocks,...(brand?{brand}:{}),...(merge?{merge}:{})}
  need(new TextEncoder().encode(JSON.stringify(document)).length<=100000,'Document exceeds the 100 KB content limit')
  return document
 }
 export function documentOf(row:any){return proposalDocument(row.document)}
-export function documentFields(row:any){const doc=documentOf(row);return doc.blocks.length||doc.brand?{document:doc}:{}}
+export function documentFields(row:any){const doc=documentOf(row);return doc.blocks.length||doc.brand||doc.merge?{document:doc}:{}}
 export function selectedDocument(value:unknown,optionId:string,items:{id:string}[]=[]){const doc=proposalDocument(value);return {...doc,blocks:doc.blocks.filter(b=>!b.condition||(b.condition.startsWith('item:')?items.some(i=>'item:'+i.id===b.condition):b.condition===optionId))}}
 export function documentText(value:unknown){const doc=proposalDocument(value);return doc.blocks.map(b=>[b.type,b.title,b.text,b.second??'',b.alt??'',...(b.images??[]).map(image=>image.alt)].filter(Boolean).join('\n')).join('\n\n')}
 

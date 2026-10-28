@@ -98,11 +98,11 @@ Evidence: `tests/platter.test.mjs`, `tests/platter.test.mjs`, `tests/site.test.m
 
 ## EDIT-004 — Variables from client, deal and CRM records
 
-Status: **missing**.
+Status: **partial**.
 
-Gap: No variables or merge fields.
+Gap: Native client fields, custom values and explicitly chosen HubSpot deals fill text and prices; missing values refuse send and sent values stay frozen. Destination copies refill without changing the source. Remaining: Salesforce and Orbit deal adapters, template recipient role refill, variable conditions, inherited PDF and archive assertions, and browser proof. Connected deal reads currently require owner or admin authority.
 
-Evidence: None recorded.
+Evidence: `tests/platter.test.mjs`
 
 ## EDIT-005 — Word and PDF import and export
 

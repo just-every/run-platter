@@ -128,13 +128,13 @@ Gap: The shared library holds text sections, case studies, bios, testimonials, t
 
 ## EDIT-004 — Variables from client, deal and CRM records
 
-Status: **missing**.
+Status: **partial**.
 
-Text and pricing can use variables: client company, contact name and title, address, deal name and amount, sender details, dates and custom fields, filled from Platter records or from the linked HubSpot, Salesforce or Orbit deal (`CRM-001` to `CRM-003`). Template role slots (`SIGN-011`) are filled the same way, from the client's contacts or the deal's contacts. A variable with no value is flagged in the editor, and sending is refused until each one is filled or deliberately cleared. The sent revision freezes the filled values. Before shipping, extend EDIT-012 duplication assertions to refill every variable from the destination client and deal while leaving the source byte-identical. *Acceptance:* Create a proposal from a HubSpot deal fake with a missing contact title, see the send refused naming that variable, fill it, send, change the deal in the fake, and see the sent proposal unchanged. *Status:* missing. No variables or merge fields.
+Text and pricing can use variables: client company, contact name and title, address, deal name and amount, sender details, dates and custom fields, filled from Platter records or from the linked HubSpot, Salesforce or Orbit deal (`CRM-001` to `CRM-003`). Template role slots (`SIGN-011`) are filled the same way, from the client's contacts or the deal's contacts. A variable with no value is flagged in the editor, and sending is refused until each one is filled or deliberately cleared. The sent revision freezes the filled values. Before shipping, extend EDIT-012 duplication assertions to refill every variable from the destination client and deal while leaving the source byte-identical. *Acceptance:* Create a proposal from a HubSpot deal fake with a missing contact title, see the send refused naming that variable, fill it, send, change the deal in the fake, and see the sent proposal unchanged. *Status:* partial. Native client fields, custom values and explicitly chosen HubSpot deals fill text and prices; missing values refuse send and sent values stay frozen. Destination copies refill without changing the source. Remaining: Salesforce and Orbit deal adapters, template recipient role refill, variable conditions, inherited PDF and archive assertions, and browser proof. Connected deal reads currently require owner or admin authority.
 
-Evidence: None recorded.
+Evidence: `tests/platter.test.mjs`
 
-Gap: No variables or merge fields.
+Gap: Native client fields, custom values and explicitly chosen HubSpot deals fill text and prices; missing values refuse send and sent values stay frozen. Destination copies refill without changing the source. Remaining: Salesforce and Orbit deal adapters, template recipient role refill, variable conditions, inherited PDF and archive assertions, and browser proof. Connected deal reads currently require owner or admin authority.
 
 ## EDIT-005 — Word and PDF import and export
 

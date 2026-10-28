@@ -1,3 +1,5 @@
+import { resolveVariables, editableVariableFields } from './variables'
+import { proposalFields } from './commands'
 import { documentMediaIds } from './documents/media'
 import { methodsInput } from './collection-policy'
 import { documentOf, bindDocument } from './documents/blocks'
@@ -89,7 +91,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  exact(template, input)
  const personal = starter ? null : template as any
  const access=starter?{sql:'1',values:[]}:await folderGuard(db,a,personal.folder_id,'template')
- const content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
+ let content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
+ if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...editableVariableFields(content),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);content={...content,...proposalFields(fill.fields)}}
  const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)
  need(content.currency === 'USD', 'Personal templates require USD content', 409)

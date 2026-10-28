@@ -1198,7 +1198,7 @@
       "executable": false
     },
     "public/platter.js": {
-      "sha256": "481be01fb6a5ea8870d48a2d17b9477e95f2a74e4c546e878703ed3a8bb0453e",
+      "sha256": "390c3bc846203f30c2607bd7adb80e557f39cab8e134b06d981747c0fec218bb",
       "executable": false
     },
     "public/pricing.js": {
@@ -3450,7 +3450,7 @@
       "executable": false
     },
     "tests/tracking-details-browser.mjs": {
-      "sha256": "e768235c2e64a7943012ce2fe583d058774a413369cb360374a04d16bb1e44e2",
+      "sha256": "074259a5b5219f0a12233778e7182efd7dbce7a638381b453173e4c496164cce",
       "executable": false
     },
     "tests/worker.ts": {

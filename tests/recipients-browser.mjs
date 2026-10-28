@@ -78,7 +78,11 @@ export async function recipientsBrowser(width=1440){
    const clientPage=await ctx.newPage()
    await clientPage.goto(app.origin+paths[r.id])
    assert.equal(await clientPage.getByRole('heading',{name:offer.title,exact:true}).count(),0)
-   await clientPage.getByRole('button',{name:'Send verification code',exact:true}).click()
+   const [codeResponse]=await Promise.all([
+    clientPage.waitForResponse(response=>new URL(response.url()).pathname===paths[r.id]+'/action'&&new URL(response.url()).searchParams.get('name')==='code.request'),
+    clientPage.getByRole('button',{name:'Send verification code',exact:true}).click(),
+   ])
+   assert.equal(codeResponse.status(),200)
    const code=(await app.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND recipient=? AND subject='Your Platter verification code' ORDER BY rowid DESC LIMIT 1").bind(proposalId,r.email).first()).body.match(/\b\d{6}\b/)[0]
    await clientPage.getByLabel('Email verification code',{exact:true}).fill(code)
    await clientPage.getByRole('button',{name:'Verify email',exact:true}).click()
@@ -155,7 +159,11 @@ export async function recipientsBrowser(width=1440){
   await host.setContent('<iframe src="'+embedUrl+'" title="Verified proposal" width="100%" height="900" frameborder="0"></iframe>')
   const embedded=host.frameLocator('iframe[title="Verified proposal"]')
   assert.equal(await embedded.getByRole('heading',{name:'Revocable viewing agreement',exact:true}).count(),0)
-  await embedded.getByRole('button',{name:'Send verification code',exact:true}).click()
+  const [embedCodeResponse]=await Promise.all([
+   host.waitForResponse(response=>new URL(response.url()).pathname===new URL(embedUrl).pathname+'/action'&&new URL(response.url()).searchParams.get('name')==='code.request'),
+   embedded.getByRole('button',{name:'Send verification code',exact:true}).click(),
+  ])
+  assert.equal(embedCodeResponse.status(),200)
   const embedMail=(await app.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND recipient=? AND subject='Your Platter verification code' ORDER BY rowid DESC LIMIT 1").bind(second.id,address(1009)).first()).body.match(/\b\d{6}\b/)[0]
   await embedded.getByLabel('Email verification code',{exact:true}).fill(embedMail);await embedded.getByRole('button',{name:'Verify email',exact:true}).click()
   await embedded.getByRole('heading',{name:'Revocable viewing agreement',exact:true}).waitFor()

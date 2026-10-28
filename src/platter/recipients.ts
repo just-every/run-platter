@@ -42,7 +42,7 @@ export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record
   if(p.embedOrigin){
    const written=text(p.embedOrigin,'an exact site origin',2000)
    let url:URL;try{url=new URL(written)}catch{need(false,'Use an exact secure site origin')}
-   need((url.protocol==='https:'||written===env.AUTH_ORIGIN)&&url.origin===written&&!url.username&&!url.password,'Use an exact secure site origin without a path, credentials or wildcard')
+   need((url.protocol==='https:'||written===env.AUTH_ORIGIN)&&url.origin===written&&!url.hostname.includes('*')&&!url.username&&!url.password,'Use an exact secure site origin without a path, credentials or wildcard')
    origin=url.origin
   }
   const token=secret()

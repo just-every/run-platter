@@ -154,10 +154,15 @@ export async function recipientRolesHttp(h){
  }
  const shareRow=(await h.state()).proposals.find(r=>r.id===p.id),mailBefore=(await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n
  await h.cmd('recipient.share',{id:p.id,version:shareRow.version,recipientName:'Shared viewer',recipientEmail:address(1006),embedOrigin:h.origin},h.owner,400)
+ for(const embedOrigin of ['https://synthetic-platter.example/path','https://*.synthetic-platter.example']){
+  const before=await h.state()
+  await h.cmd('recipient.share',{id:p.id,version:shareRow.version,recipientName:'Refused framing',recipientEmail:address(4004),embedOrigin,shareConsent:true},h.owner,400)
+  assert.deepEqual(await h.state(),before,'an inexact framing origin creates no viewing authority')
+ }
  const shared=await h.cmd('recipient.share',{id:p.id,version:shareRow.version,recipientName:'Shared viewer',recipientEmail:address(1006),embedOrigin:h.origin,shareConsent:true})
  const sharedPath=new URL(shared.shareUrl).pathname
  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n,mailBefore,'sharing does not send an automatic invitation')
- const embedded=await h.send(sharedPath+'?embed=1');assert.equal(embedded.status,200);assert.ok(embedded.headers.get('content-security-policy').includes('frame-ancestors '+h.origin));assert.ok(!embedded.text.includes(p.offer.title))
+ const embedded=await h.send(sharedPath+'?embed=1');assert.equal(embedded.status,200);assert.equal(embedded.headers.get('content-security-policy').split(';').map(directive=>directive.trim()).find(directive=>directive.startsWith('frame-ancestors ')),'frame-ancestors '+h.origin);assert.ok(!embedded.text.includes(p.offer.title))
  for(const suffix of ['/data.json','/attachments/synthetic-platter-1','/media/synthetic-platter-1'])assert.equal((await h.send(sharedPath+suffix)).status,401)
  const sharedCookie=await verifyRecipient(h,sharedPath)
  assert.ok((await h.send(sharedPath+'?embed=1',undefined,sharedCookie)).text.includes(p.offer.title))
@@ -196,6 +201,51 @@ export async function recipientRolesHttp(h){
  await h.cmd('recipient.share',{id:p.id,version:beforeDenied.proposals.find(r=>r.id===p.id).version,recipientName:'Refused viewer',recipientEmail:address(4001),shareConsent:true},member,403)
  await h.cmd('recipient.save',{id:p.id,version:beforeDenied.proposals.find(r=>r.id===p.id).version,recipients:roles(h.auth.OWNER_EMAIL)},member,403)
  assert.deepEqual(await h.state(),beforeDenied,'non-owner recipient operations make no writes')
+ // Give both people ordinary Send scope so the recipient authority floor is the refusal.
+ await h.cmd('proposal.share',{id:p.id,collaboratorEmail:memberEmail})
+ const adminEmail=address(4002)
+ await h.send('/auth/invite',{email:adminEmail,displayName:'Native administrator',role:'admin',returnTo:'/app'},h.owner)
+ const admin=await h.signIn(adminEmail)
+ const authority=await h.cmd('proposal.prepare',{...p.offer,title:'Owner recipient authority'})
+ const authorityPlan=[plan[0],plan[2]]
+ const configuredAuthority=await h.cmd('recipient.save',{id:authority.id,version:1,recipients:authorityPlan})
+ await h.cmd('proposal.share',{id:authority.id,collaboratorEmail:memberEmail})
+ await h.cmd('proposal.approve',{id:authority.id,version:configuredAuthority.version,revision:configuredAuthority.revision})
+ const key=await h.cmd('agent.create',{label:'Synthetic recipient authority'})
+ const readAuthority=()=>Promise.all(['p_proposals','p_revisions','p_shares','p_mail','p_audit'].map(table=>h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all().then(result=>result.results)))
+ const refusedWithoutWrites=async action=>{const before=await readAuthority();await action();assert.deepEqual(await readAuthority(),before,'refused recipient authority changes no record, invitation or mail')}
+ for(const actor of [member,admin]){
+  await refusedWithoutWrites(()=>h.cmd('recipient.save',{id:authority.id,version:configuredAuthority.version+1,recipients:authorityPlan},actor,403))
+  await refusedWithoutWrites(()=>h.cmd('proposal.send',{id:authority.id,version:configuredAuthority.version+1},actor,403))
+ }
+ const ownerInvitations=await h.cmd('proposal.send',{id:authority.id,version:configuredAuthority.version+1})
+ assert.deepEqual(ownerInvitations.recipients.map(recipient=>recipient.id),['ceo','viewer'])
+ const sentAuthority=(await h.state()).proposals.find(row=>row.id===authority.id)
+ const actions=[
+  ['recipient.share',{id:authority.id,version:sentAuthority.version,recipientName:'Refused viewer',recipientEmail:address(4003),shareConsent:true,embedOrigin:h.origin}],
+  ['recipient.remove',{id:authority.id,version:sentAuthority.version,recipientId:'viewer'}],
+  ['proposal.send',{id:authority.id,version:sentAuthority.version}],
+ ]
+ for(const [name,input] of actions){
+  for(const actor of [member,admin])await refusedWithoutWrites(()=>h.cmd(name,input,actor,403))
+  await refusedWithoutWrites(async()=>assert.equal((await h.send('/api/platter/agent/command',{name,input},'',{authorization:'Bearer '+key.token})).status,403,'an owner-bound drafting key has no recipient authority'))
+ }
+ await refusedWithoutWrites(async()=>assert.equal((await h.send('/api/platter/agent/command',{name:'recipient.save',input:{id:authority.id,version:sentAuthority.version,recipients:authorityPlan}},'',{authorization:'Bearer '+key.token})).status,403))
+ await h.cmd('agent.revoke',{id:key.id})
+ assert.equal((await h.send('/api/platter/agent/command',{name:'recipient.share',input:actions[0][1]},'',{authorization:'Bearer '+key.token})).status,401,'a revoked key cannot regain invitation authority')
+ const viewerInvitation=new URL(ownerInvitations.recipients.find(recipient=>recipient.id==='viewer').shareUrl).pathname
+ const authorityViewer=await verifyRecipient(h,viewerInvitation)
+ assert.equal((await h.send(viewerInvitation+'/data.json',undefined,authorityViewer)).status,200,'refused revocation leaves the owner invitation intact')
+ await h.cmd('recipient.remove',{id:authority.id,version:sentAuthority.version,recipientId:'viewer'})
+ assert.equal((await h.send(viewerInvitation+'/data.json',undefined,authorityViewer)).status,410,'the owner revokes the same invitation')
+ const original=(await h.state()).proposals.find(row=>row.id===authority.id)
+ const duplicate=await h.cmd('proposal.duplicate',{id:authority.id,version:original.version,clientId:p.offer.clientId})
+ const copiedAuthority=(await h.state()).proposals.find(row=>row.id===duplicate.id)
+ assert.deepEqual(JSON.parse(copiedAuthority.recipient_plan),[{...plan[0],email:null}],'a duplicate copies the role without mailbox authority')
+ assert.equal((await h.db.prepare('SELECT count(*) n FROM p_shares WHERE proposal_id=?').bind(duplicate.id).first()).n,0)
+ assert.equal((await h.db.prepare('SELECT count(*) n FROM p_mail WHERE proposal_id=?').bind(duplicate.id).first()).n,0)
+ await h.cmd('proposal.approve',{id:duplicate.id,version:copiedAuthority.version,revision:copiedAuthority.revision})
+ await h.cmd('proposal.send',{id:duplicate.id,version:copiedAuthority.version+1},h.owner,409)
  for(const missingRole of ['signer','approver','countersigner']){
   const blank=await h.cmd('proposal.prepare',{...p.offer,title:'Unfilled '+missingRole})
   const plan=[...roles(h.auth.OWNER_EMAIL),{id:'finance',name:'Finance approval',email:address(1003),role:'approver',group:1}].map(r=>r.role===missingRole?{...r,email:null}:r)

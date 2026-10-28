@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "31b7286831963df6142c6902e7d2bab4be9003e797d31a2eb332b98153e06945",
+      "sha256": "bfd5ea31ba4d05d2374d397fc8aed683dce354aaf1cff8055214ba97c3eea4e6",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "c029b654da587d7e5908fd6321614465dd7505fdef86107dc9ee52bbeab96f32",
+      "sha256": "a55f5481cfc18e84eb967765c92220af856e5b6a5d3e851fdbe8d1c689d61fb5",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "cd134bf017663971fd06009d4f8c820f5b482e1dfe488e207f9b74ad1f3ed1f2",
+      "sha256": "ebb30d30e26eb4ec640b8d72d76275dfd2714e98253e911bb51c947924e4632a",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -1199,6 +1199,10 @@
     },
     "rer-setup.json": {
       "sha256": "b42f939665afc4d08d08662b44d0650abf74d80034198c1977b8ddd250c44185",
+      "executable": false
+    },
+    "RULINGS.md": {
+      "sha256": "ad9cc53e38daf45fa26d11374fac6f32aea63a4b2e9e5e11b4268942e5e959ed",
       "executable": false
     },
     "RUN-LOCALLY.md": {
@@ -2726,7 +2730,7 @@
       "executable": false
     },
     "src/platter/recipients.ts": {
-      "sha256": "79d7ba2e8574a73627a1f69753b5c467a73f64b6dfec98154e23716263a4e268",
+      "sha256": "1fea5a11ac5788d6b68264f93bf1201d30cb8f31ae162184bc53c5b21b9afbb9",
       "executable": false
     },
     "src/platter/recurring.ts": {
@@ -3270,7 +3274,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "a4ecff479ac9d2753663842be257e73831eca687d20f1311cf34a4053e44855b",
+      "sha256": "e2fa393986db81840bbd695b7bb264c717e3e95fbba715c54793508d6f74bd35",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3286,11 +3290,11 @@
       "executable": false
     },
     "tests/recipients-browser.mjs": {
-      "sha256": "cddd3aeba94ffd759de58ecebaf7992290d09b2b81bef06da8fe4a641c5dedf3",
+      "sha256": "f9a1e945d4e2ac2446cb71aa74b7181d35d399b3bb1a54c18faaee79ece5f1fa",
       "executable": false
     },
     "tests/recipients-http.mjs": {
-      "sha256": "ce0186a6c4e4b247b652f89381dadbc7f2359b7c62001754c219b8c50978ccc4",
+      "sha256": "68b80316376e6acceaf94f963585ae89adba2b9a9b495a8392d6bb6d58d39787",
       "executable": false
     },
     "tests/recurring-browser.mjs": {

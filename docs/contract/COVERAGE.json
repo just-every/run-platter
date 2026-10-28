@@ -442,7 +442,76 @@
     {
       "file": "CONTRACT.md",
       "line": 67,
-      "text": "**ACCESS-001 \u2014 Revocable agent keys that only draft.** An owner issues an agent key with a label and a 30-day expiry, stored only as a hash and bound to that owner's current account version. An agent key can read context and prepare or revise drafts, and nothing else: it cannot add clients, approve prices, send offers or export invoices. Revoking the key, or the owner losing the owner role, ends its access at once. Drafts an agent prepares are attributed to the key, and a draft prepared or last revised by an agent key always needs a person's approval before it is sent (`PROP-001`), even where the approval policy lets proposals that match no rule go without one (`APPROVE-003`). **Acceptance evidence:** Create a key, prepare a draft with it, try to approve and add a client with it (403), revoke it, and read context with it again (401).",
+      "text": "**ACCESS-001 \u2014 Revocable agent keys that only draft.**",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 67,
+      "text": "An owner issues an agent key with a label and a 30-day expiry, stored only as a hash and bound to that owner's current account version. An agent key can read context and prepare or revise drafts",
+      "to": "clause",
+      "ids": [
+        "ACCESS-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 67,
+      "text": ", and nothing else: it cannot add clients, approve prices, send offers or export invoices.",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 67,
+      "text": "Revoking the key, or the owner losing the owner role, ends its access at once. Drafts an agent prepares are attributed to the key",
+      "to": "clause",
+      "ids": [
+        "ACCESS-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 67,
+      "text": ", and a draft prepared or last revised by an agent key always needs a person's approval before it is sent (`PROP-001`), even where the approval policy lets proposals that match no rule go without one (`APPROVE-003`).",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 67,
+      "text": "**Acceptance evidence:** Create a key, prepare a draft with it,",
+      "to": "clause",
+      "ids": [
+        "ACCESS-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 67,
+      "text": "try to approve and add a client with it (403),",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 67,
+      "text": "revoke it, and read context with it again (401).",
       "to": "clause",
       "ids": [
         "ACCESS-001"
@@ -457,7 +526,28 @@
     {
       "file": "CONTRACT.md",
       "line": 71,
-      "text": "**PROP-001 \u2014 Approval binds the exact revision.** Every approval names one exact revision. Saving a new revision clears every approval the proposal holds, so a changed price, scope or term can never be sent on an earlier approval, and each approval is recorded with its approver, role, rule, revision and time. Who may approve and send, and which proposals need approval at all, is the approval policy of `APPROVE-003`. Its default, which every installation starts with and keeps until the owner changes it, is the first release's rule: every proposal needs approval, and only a person with the owner role approves. A draft prepared or last revised by an agent key (`ACCESS-001`) always needs a person's approval, whatever the policy says. `APPROVE-001` and `APPROVE-003` decide which approvals apply; neither can remove the exact-revision binding. **Acceptance evidence:** Under the default policy: approve a stale revision (409), approve the current one as the owner, revise the price, try to send (409), approve the new revision and send; two approval records exist, each naming its revision. The same binding for a manager's approval under a rule is part of the `APPROVE-003` journey.",
+      "text": "**PROP-001 \u2014 Approval binds the exact revision.** Every approval names one exact revision. Saving a new revision clears every approval the proposal holds, so a changed price, scope or term can never be sent on an earlier approval, and each approval is recorded with its approver, role, rule, revision and time. Who may approve and send, and which proposals need approval at all, is the approval policy of `APPROVE-003`. Its default, which every installation starts with and keeps until the owner changes it, is the first release's rule: every proposal needs approval, and only a person with the owner role approves.",
+      "to": "clause",
+      "ids": [
+        "PROP-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 71,
+      "text": "A draft prepared or last revised by an agent key (`ACCESS-001`) always needs a person's approval, whatever the policy says.",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 71,
+      "text": "`APPROVE-001` and `APPROVE-003` decide which approvals apply; neither can remove the exact-revision binding. **Acceptance evidence:** Under the default policy: approve a stale revision (409), approve the current one as the owner, revise the price, try to send (409), approve the new revision and send; two approval records exist, each naming its revision. The same binding for a manager's approval under a rule is part of the `APPROVE-003` journey.",
       "to": "clause",
       "ids": [
         "PROP-001"
@@ -2115,7 +2205,73 @@
     {
       "file": "CONTRACT.md",
       "line": 390,
-      "text": "One approval policy governs every proposal, negotiated revision (`NEG-001`), duplicate (`EDIT-012`), drafted proposal (`AI-001`), move-in reissue (`MIG-005`), public signing link (`SEND-009`) and approval made from a phone (`MOB-001`), using the roles of `TEAM-001`. **Who approves:** the owner, admins and managers, each only for an approval step whose rule names them or their role (`APPROVE-001`), and a manager only for proposals owned by their team; a billing user only for a step whose rule names them personally, such as finance approving payment terms; sales members, content editors, viewers and agent keys never approve, nor does a billing user on a step that does not name them (403, no write). **Who sends:** the owner and admins send any proposal, managers send their team's, and sales members send their own, including proposals shared with them as a collaborator (`TEAM-001`); sending includes fresh invitations (`PROP-002`), revisions (`NEG-001`), signer replacements (`SEND-007`) and withdrawal (`SEND-010`); content editors, viewers, billing users and agent keys never send (403). **What needs approval:** a proposal needs approval when an `APPROVE-001` rule matches its current revision. The owner or an admin sets \"approval required for every proposal\": when it is on, a proposal that matches no rule needs approval from the policy's default approver (the owner, or the admin or manager role the owner names); when it is off, a proposal that matches no rule is sent by anyone who may send it, with no approval record, as with an incumbent template that carries no approval workflow. A draft prepared or last revised by an agent key always needs approval from an approver role, whatever the setting. A new installation starts with the setting on and the owner as default approver, which is the first release's behavior (`PROP-001`). **Binding:** every approval that applies binds the exact revision (`PROP-001`); an edit clears all of them and the rules are evaluated again against the new revision. Only the owner and admins change the policy, and each change is in the audit log (`TEAM-004`).",
+      "text": "One approval policy governs every proposal, negotiated revision (`NEG-001`), duplicate (`EDIT-012`), drafted proposal (`AI-001`), move-in reissue (`MIG-005`), public signing link (`SEND-009`) and approval made from a phone (`MOB-001`), using the roles of `TEAM-001`. **Who approves:** the owner, admins and managers, each only for an approval step whose rule names them or their role (`APPROVE-001`), and a manager only for proposals owned by their team; a billing user only for a step whose rule names them personally, such as finance approving payment terms; sales members, content editors, viewers",
+      "to": "clause",
+      "ids": [
+        "APPROVE-003",
+        "APPROVE-004"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 390,
+      "text": "and agent keys never approve,",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 390,
+      "text": "nor does a billing user on a step that does not name them (403, no write). **Who sends:** the owner and admins send any proposal, managers send their team's, and sales members send their own, including proposals shared with them as a collaborator (`TEAM-001`); sending includes fresh invitations (`PROP-002`), revisions (`NEG-001`), signer replacements (`SEND-007`) and withdrawal (`SEND-010`); content editors, viewers, billing users",
+      "to": "clause",
+      "ids": [
+        "APPROVE-003",
+        "APPROVE-004"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 390,
+      "text": "and agent keys never send (403).",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 390,
+      "text": "**What needs approval:** a proposal needs approval when an `APPROVE-001` rule matches its current revision. The owner or an admin sets \"approval required for every proposal\": when it is on, a proposal that matches no rule needs approval from the policy's default approver (the owner, or the admin or manager role the owner names); when it is off, a proposal that matches no rule is sent by anyone who may send it, with no approval record, as with an incumbent template that carries no approval workflow.",
+      "to": "clause",
+      "ids": [
+        "APPROVE-003",
+        "APPROVE-004"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 390,
+      "text": "A draft prepared or last revised by an agent key always needs approval from an approver role, whatever the setting.",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 390,
+      "text": "A new installation starts with the setting on and the owner as default approver, which is the first release's behavior (`PROP-001`). **Binding:** every approval that applies binds the exact revision (`PROP-001`); an edit clears all of them and the rules are evaluated again against the new revision. Only the owner and admins change the policy, and each change is in the audit log (`TEAM-004`).",
       "to": "clause",
       "ids": [
         "APPROVE-003",
@@ -3513,16 +3669,7 @@
       "file": "CONTRACT.md",
       "line": 638,
       "text": "Unattended outcome synchronization under a standing grant is separate from FOLLOW-005's explicit consent to one exact revision, destination and stage field map. The 25 October 2026, 18:40 UTC ct ruling requires this missing row; the current slice grants no standing authority.",
-      "to": "clause",
-      "ids": [
-        "FOLLOW-007"
-      ],
-      "also": [
-        {
-          "to": "docs",
-          "path": "docs/contract-behavior.md"
-        }
-      ]
+      "to": "changelog"
     },
     {
       "file": "CONTRACT.md",
@@ -3845,7 +3992,28 @@
     {
       "file": "CONTRACT.md",
       "line": 708,
-      "text": "Until `TEAM-001` adds the admin role, only the owner records an acceptance by upload, and only for a sent proposal's current sent, approved revision; the owner chooses the one offered option the client signed, and its total and integer-cent deposit are calculated and frozen as in `SIGN-002`. The signed date is the calendar date written on the paper (`YYYY-MM-DD`, no time zone), never later than the current date in UTC+14; the acceptance time is when the owner recorded it. The owner's attestation is stored as the acceptance's consent text. Every screen labels the agreement \"Accepted by upload: signed outside Platter. Platter did not verify this signature.\" and never shows the client's mailbox as the signer's; Platter e-signatures show their own method. The uploaded file, at most 10 MB, is kept immutably with the agreement in any format the owner uploads (no format or signature check is claimed) and is only ever served as a download (`Content-Disposition: attachment`, `nosniff`); owners and members download it, agents never do, and the client invitation page shows the accepted-by-upload record without serving the file. Recording discards a pending `NEG-001` draft as an e-signed acceptance does, a later client acceptance attempt returns the recorded acceptance, and a recorded acceptance is never replaced. Today the deposit request is the owner's deposit invoice export, which proceeds exactly as for any acceptance; `PAY-001`, `PAY-002`, `PAY-008`, `HAND-001` and `HAND-002` treat an acceptance by upload as an acceptance before they ship.",
+      "text": "Until `TEAM-001` adds the admin role, only the owner records an acceptance by upload, and only for a sent proposal's current sent, approved revision; the owner chooses the one offered option the client signed, and its total and integer-cent deposit are calculated and frozen as in `SIGN-002`. The signed date is the calendar date written on the paper (`YYYY-MM-DD`, no time zone), never later than the current date in UTC+14; the acceptance time is when the owner recorded it. The owner's attestation is stored as the acceptance's consent text. Every screen labels the agreement \"Accepted by upload: signed outside Platter. Platter did not verify this signature.\" and never shows the client's mailbox as the signer's; Platter e-signatures show their own method. The uploaded file, at most 10 MB, is kept immutably with the agreement in any format the owner uploads (no format or signature check is claimed) and is only ever served as a download (`Content-Disposition: attachment`, `nosniff`); owners and members download it,",
+      "to": "clause",
+      "ids": [
+        "SIGN-008"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 708,
+      "text": "agents never do,",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 708,
+      "text": "and the client invitation page shows the accepted-by-upload record without serving the file. Recording discards a pending `NEG-001` draft as an e-signed acceptance does, a later client acceptance attempt returns the recorded acceptance, and a recorded acceptance is never replaced. Today the deposit request is the owner's deposit invoice export, which proceeds exactly as for any acceptance; `PAY-001`, `PAY-002`, `PAY-008`, `HAND-001` and `HAND-002` treat an acceptance by upload as an acceptance before they ship.",
       "to": "clause",
       "ids": [
         "SIGN-008"
@@ -6417,7 +6585,28 @@
     {
       "file": "CONTRACT.md",
       "line": 1203,
-      "text": "A member pastes notes, uploads a transcript or picks an email thread or a recorded Zoom, Google Meet or Microsoft Teams call, and Platter drafts a proposal from the firm's templates, library and catalog, starting from the template's role slots (`SIGN-011`) with the people named in the source offered for each slot, and with the template's reminder schedule and expiry period (`FOLLOW-006`). Each drafted section cites the source line it came from. The draft is sent only by a person who may send it, under the `APPROVE-003` policy like any proposal; a draft an agent key prepared always needs a person's approval (`PROP-001`).",
+      "text": "A member pastes notes, uploads a transcript or picks an email thread or a recorded Zoom, Google Meet or Microsoft Teams call, and Platter drafts a proposal from the firm's templates, library and catalog, starting from the template's role slots (`SIGN-011`) with the people named in the source offered for each slot, and with the template's reminder schedule and expiry period (`FOLLOW-006`). Each drafted section cites the source line it came from. The draft is sent only by a person who may send it, under the `APPROVE-003` policy like any proposal",
+      "to": "clause",
+      "ids": [
+        "AI-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1203,
+      "text": "; a draft an agent key prepared always needs a person's approval (`PROP-001`).",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1205,
+      "text": "*Acceptance:* Draft from a fixture transcript; every section cites a transcript line; prices come only from catalog items;",
       "to": "clause",
       "ids": [
         "AI-001"
@@ -6432,17 +6621,8 @@
     {
       "file": "CONTRACT.md",
       "line": 1205,
-      "text": "*Acceptance:* Draft from a fixture transcript; every section cites a transcript line; prices come only from catalog items; under the default policy the draft needs approval before sending, and the same draft prepared through an agent key is refused at send (409) until a manager or the owner approves it even with \"approval required for every proposal\" off.",
-      "to": "clause",
-      "ids": [
-        "AI-001"
-      ],
-      "also": [
-        {
-          "to": "docs",
-          "path": "docs/contract-behavior.md"
-        }
-      ]
+      "text": "under the default policy the draft needs approval before sending, and the same draft prepared through an agent key is refused at send (409) until a manager or the owner approves it even with \"approval required for every proposal\" off.",
+      "to": "changelog"
     },
     {
       "file": "CONTRACT.md",
@@ -6739,7 +6919,7 @@
     {
       "file": "CONTRACT.md",
       "line": 1267,
-      "text": "The agent reads discovery call transcripts (Zoom, Google Meet, Microsoft Teams or an uploaded recording), the email thread, CRM deal notes and the firm's past winning proposals, and drafts the scope with two or three priced packages from the catalog. Every requirement, assumption and exclusion cites its source. The agent flags what the client asked that the firm does not offer. A member edits, and because an agent prepared it the draft always needs a person's approval from an approver role before it is sent (`PROP-001`, `APPROVE-003`).",
+      "text": "The agent reads discovery call transcripts (Zoom, Google Meet, Microsoft Teams or an uploaded recording), the email thread, CRM deal notes and the firm's past winning proposals, and drafts the scope with two or three priced packages from the catalog. Every requirement, assumption and exclusion cites its source. The agent flags what the client asked that the firm does not offer.",
       "to": "clause",
       "ids": [
         "AGENT-001"
@@ -6750,6 +6930,12 @@
           "path": "docs/contract-behavior.md"
         }
       ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1267,
+      "text": "A member edits, and because an agent prepared it the draft always needs a person's approval from an approver role before it is sent (`PROP-001`, `APPROVE-003`).",
+      "to": "changelog"
     },
     {
       "file": "CONTRACT.md",
@@ -6919,7 +7105,28 @@
     {
       "file": "CONTRACT.md",
       "line": 1307,
-      "text": "The agent reads delivery actuals and change requests from Gauge, Asana, Jira, Vector or email, compares them with the accepted inclusions and exclusions, and prepares a separately priced change order linked to the original agreement. The delivery lead confirms the scope difference, an approver role approves the price under `APPROVE-003` (an agent-prepared change order always needs approval), and the client accepts and pays the change order on its own. The original agreement and its history never change.",
+      "text": "The agent reads delivery actuals and change requests from Gauge, Asana, Jira, Vector or email, compares them with the accepted inclusions and exclusions, and prepares a separately priced change order linked to the original agreement. The delivery lead confirms the scope difference, an approver role approves the price under `APPROVE-003`",
+      "to": "clause",
+      "ids": [
+        "AGENT-006"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1307,
+      "text": "(an agent-prepared change order always needs approval)",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1307,
+      "text": ", and the client accepts and pays the change order on its own. The original agreement and its history never change.",
       "to": "clause",
       "ids": [
         "AGENT-006"
@@ -7036,7 +7243,7 @@
     {
       "file": "CONTRACT.md",
       "line": 1331,
-      "text": "with the data it read, what it produced, the model used and who approved it. Agents can draft, analyze and request, and can never approve prices, send, sign, refund or write off.",
+      "text": "with the data it read, what it produced, the model used and who approved it.",
       "to": "clause",
       "ids": [
         "AGENT-009"
@@ -7051,6 +7258,12 @@
     {
       "file": "CONTRACT.md",
       "line": 1331,
+      "text": "Agents can draft, analyze and request, and can never approve prices, send, sign, refund or write off.",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1331,
       "text": "The owner sets a monthly model budget and can pause any agent at once.",
       "to": "base",
       "ids": [
@@ -7060,7 +7273,7 @@
     {
       "file": "CONTRACT.md",
       "line": 1333,
-      "text": "*Acceptance:* Run each agent once; the ledger lists inputs, outputs and approvals for each; an agent's attempt to send or refund is refused;",
+      "text": "*Acceptance:* Run each agent once; the ledger lists inputs, outputs and approvals for each;",
       "to": "clause",
       "ids": [
         "AGENT-009"
@@ -7071,6 +7284,12 @@
           "path": "docs/contract-behavior.md"
         }
       ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1333,
+      "text": "an agent's attempt to send or refund is refused;",
+      "to": "changelog"
     },
     {
       "file": "CONTRACT.md",

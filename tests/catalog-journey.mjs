@@ -16,6 +16,7 @@ export async function catalogJourney(h,{client,people,offer,verified}){
  assert.deepEqual(await h.state(),before,'refused promotions preserve all public business state')
  const promoted=await h.cmd('business-import.promote',{...selection,fingerprint:preview.fingerprint}),item=promoted.items[0],second=promoted.items[1]
  assert.equal((await h.state()).catalogItems.length,count+2)
+ for(const role of ['admin','manager','sales','content_editor','billing']){const visible=(await h.state(people[role])).catalogItems.find(r=>r.id===item.id);assert.equal(Object.hasOwn(visible,'source_id'),false);assert.equal(Object.hasOwn(visible,'source_version'),false)}
  const afterPromotion=await h.state();await h.cmd('business-import.promote',{...selection,fingerprint:preview.fingerprint},h.owner,409);assert.deepEqual(await h.state(),afterPromotion,'replay never duplicates priced items')
  const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id}),insert={id:p.id,version:1,catalogId:item.id,catalogVersion:1,optionId:'one',quantity:'2'}
  const beforeInsert=await h.state()

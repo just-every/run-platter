@@ -10,7 +10,7 @@ export const catalogReaders=[...catalogEditors,'sales','content_editor','billing
 export async function catalogState(db:D1Database,a:Actor){
  if(!catalogReaders.includes(a.role))return []
  const rows=(await db.prepare('SELECT * FROM p_priced_catalog ORDER BY name,id').all<any>()).results
- return rows.map(({unit_cost_cents,...row})=>({...row,...(costReaders.includes(a.role)?{unitCostCents:unit_cost_cents}:{})}))
+ return rows.map(({unit_cost_cents,source_id,source_version,...row})=>({...row,...(a.role==='owner'?{source_id,source_version}:{}),...(costReaders.includes(a.role)?{unitCostCents:unit_cost_cents}:{})}))
 }
 export function catalogValues(p:Record<string,any>,old?:any){
  const sku=text(p.sku,'a SKU',100),name=text(p.name,'an item name'),unit=String(p.unit),description=String(p.description??''),unitCents=dollars(p.unitPrice,'a USD unit price')

@@ -396,6 +396,126 @@
       "name": "0065_proposal_search.sql",
       "sha256": "74d04326b798da6eccbb994b6deca0ccae1f64736bb3b2f281f9019c1742eb0b",
       "sql": "CREATE TABLE p_proposal_folders(id TEXT PRIMARY KEY,name TEXT NOT NULL,version INTEGER NOT NULL DEFAULT 1,updated_by TEXT NOT NULL REFERENCES oa_operators(id),updated_at INTEGER NOT NULL);\nCREATE TABLE p_proposal_folder_teams(folder_id TEXT NOT NULL REFERENCES p_proposal_folders(id),team_id TEXT NOT NULL REFERENCES p_teams(id),PRIMARY KEY(folder_id,team_id));\nCREATE TABLE p_proposal_filing(proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),folder_id TEXT REFERENCES p_proposal_folders(id),version INTEGER NOT NULL DEFAULT 1);\nCREATE TABLE p_attachment_search(file_id TEXT PRIMARY KEY REFERENCES p_attachment_files(id),content TEXT NOT NULL);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0066_rich_block_locks.sql",
+      "sha256": "e5e01980fc0795a2087e4e75b4fcea3b9a8a36a0e03dedfeb4feae36086fe070",
+      "sql": "CREATE TABLE p_template_block_locks(template_id TEXT NOT NULL REFERENCES p_personal_templates(id),section TEXT NOT NULL CHECK(section GLOB 'block:*'),PRIMARY KEY(template_id,section));\nCREATE TABLE p_proposal_block_locks(proposal_id TEXT NOT NULL REFERENCES p_proposals(id),section TEXT NOT NULL CHECK(section GLOB 'block:*'),PRIMARY KEY(proposal_id,section));\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0067_outcome_settings.sql",
+      "sha256": "500b3a65b59caadfa6e4d8b04c8fa1073dfb49a52de179abcd0e5912cb8efe08",
+      "sql": "-- Preserve historical outcome rows; new records use an additive table.\nCREATE TABLE p_outcome_records (\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n revision INTEGER NOT NULL,\n kind TEXT NOT NULL CHECK(kind IN ('declined','lost','won')),\n actor_id TEXT NOT NULL,\n actor_role TEXT NOT NULL CHECK(actor_role IN ('owner','admin','manager','sales','client')),\n actor_email TEXT NOT NULL,\n occurred_at INTEGER NOT NULL,\n reason TEXT NOT NULL,\n PRIMARY KEY(proposal_id,revision)\n);\nCREATE TABLE p_outcome_settings(singleton INTEGER PRIMARY KEY CHECK(singleton=1),version INTEGER NOT NULL,reasons TEXT NOT NULL);\nCREATE TABLE p_crm_outcome_bindings (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id), revision INTEGER NOT NULL, version INTEGER NOT NULL,\n account_id TEXT NOT NULL, connection_version INTEGER NOT NULL, deal_id TEXT NOT NULL,\n pipeline_id TEXT NOT NULL, won_stage TEXT NOT NULL, lost_stage TEXT NOT NULL,\n actor_id TEXT NOT NULL, configured_at INTEGER NOT NULL\n);\n-- Execution authority never leaves this installation in an archive.\nCREATE TABLE p_crm_outcome_authority(proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),binding_version INTEGER NOT NULL);\nCREATE TABLE p_crm_outcome_attempts (\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),revision INTEGER NOT NULL,\n kind TEXT NOT NULL,account_id TEXT NOT NULL,deal_id TEXT NOT NULL,stage_id TEXT NOT NULL,\n status TEXT NOT NULL CHECK(status IN ('sending','confirmed','uncertain','withheld')),\n attempted_at INTEGER NOT NULL,confirmed_at INTEGER,\n PRIMARY KEY(proposal_id,revision)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0068_crm_outcome_consents.sql",
+      "sha256": "b6dd390f144270e3c62d31e13b4565ead99ec8e1964e66395489d3539c5fce86",
+      "sql": "-- Consent history is portable; execution authority remains installation-local.\nCREATE TABLE p_crm_outcome_consents (\n audit_id TEXT PRIMARY KEY REFERENCES p_audit(id),\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n revision INTEGER NOT NULL, binding_version INTEGER NOT NULL,\n account_id TEXT NOT NULL, connection_version INTEGER NOT NULL,\n deal_id TEXT NOT NULL, pipeline_id TEXT NOT NULL,\n won_stage TEXT NOT NULL, lost_stage TEXT NOT NULL,\n UNIQUE(proposal_id,binding_version)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0069_payment_terms.sql",
+      "sha256": "d06b61aad39a218e70df05f49df4cf6f1c21688f4c681462ca7a8c38753382b4",
+      "sql": "-- Optional offer terms. No legacy record or frozen snapshot is rewritten.\nALTER TABLE p_proposals ADD COLUMN payment_terms TEXT;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0070_collection.sql",
+      "sha256": "79ffb4000a749d58fdf9bce5f78368df1dfe7422003efa6e0038d34a75b39ccd",
+      "sql": "-- Collection is opt-in: absence of a policy preserves existing signing.\nCREATE TABLE p_collection_policy (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),\n completion TEXT NOT NULL CHECK(completion IN ('required','due'))\n);\n\n-- Reserve one deposit before provider calls and retain it through uncertain outcomes.\n-- Provider client secrets are response-only and must never be written here.\nCREATE TABLE p_collection_intents (\n id TEXT PRIMARY KEY,\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n revision INTEGER NOT NULL CHECK(revision>0),\n account_id TEXT NOT NULL,\n provider_intent TEXT UNIQUE,\n provider_mandate TEXT,\n cents INTEGER NOT NULL CHECK(cents>0),\n deposit_cents INTEGER NOT NULL CHECK(deposit_cents>0),\n fee_cents INTEGER NOT NULL DEFAULT 0 CHECK(fee_cents>=0),\n billing_state TEXT NOT NULL DEFAULT '',\n currency TEXT NOT NULL,\n method TEXT NOT NULL CHECK(method IN ('card','ach','apple_pay','google_pay')),\n status TEXT NOT NULL,\n authorization TEXT NOT NULL,\n authorized_at INTEGER,\n created_at INTEGER NOT NULL,\n updated_at INTEGER NOT NULL,\n UNIQUE(proposal_id,revision)\n);\n\nCREATE TABLE p_collection_fees (\n singleton INTEGER PRIMARY KEY CHECK(singleton=1),\n bps INTEGER NOT NULL CHECK(bps>=0 AND bps<=300),\n allowed_states TEXT NOT NULL,\n prohibited_states TEXT NOT NULL,\n version INTEGER NOT NULL DEFAULT 1\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0071_sms.sql",
+      "sha256": "949a7e960609b91d681c7674a07a9bbb371c0f3008b494e08b640537590798d0",
+      "sql": "-- Consent and link-free business history survive restore; execution authority does not.\nCREATE TABLE p_sms_consent (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n phone TEXT NOT NULL, time_zone TEXT NOT NULL, evidence TEXT NOT NULL,\n actor_id TEXT NOT NULL, consented_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_authority (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n share_hash TEXT NOT NULL, actor_id TEXT NOT NULL, member_version INTEGER NOT NULL,\n consented_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_optouts (phone TEXT PRIMARY KEY, stopped_at INTEGER NOT NULL);\nCREATE TABLE p_sms_runs (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n phone TEXT NOT NULL, time_zone TEXT NOT NULL, actor_id TEXT NOT NULL,\n kind TEXT NOT NULL CHECK(kind IN ('invitation','manual','scheduled')),\n slot TEXT NOT NULL, settings_version INTEGER, message TEXT NOT NULL, queued_at INTEGER NOT NULL, due_at INTEGER NOT NULL,\n status TEXT NOT NULL CHECK(status IN ('queued','sending','accepted','delivered','failed','held','cancelled')),\n provider_id TEXT UNIQUE, request_id TEXT NOT NULL UNIQUE,\n UNIQUE(proposal_id,revision,kind,slot)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0072_watchers.sql",
+      "sha256": "7b5d521ab2d067892b5a4daec3a1d472c1528310f6064e12b609d4a5b9710922",
+      "sql": "CREATE TABLE p_watchers (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n revision INTEGER NOT NULL, operator_id TEXT NOT NULL REFERENCES oa_operators(id),\n email_enabled INTEGER NOT NULL CHECK(email_enabled IN (0,1)),\n slack_route TEXT REFERENCES p_notification_routes(id), events TEXT NOT NULL,\n cursors TEXT NOT NULL, version INTEGER NOT NULL, updated_at INTEGER NOT NULL,\n UNIQUE(proposal_id,operator_id)\n);\nCREATE TABLE p_watcher_authority (\n watcher_id TEXT PRIMARY KEY REFERENCES p_watchers(id), version INTEGER NOT NULL,\n member_version INTEGER NOT NULL\n);\nALTER TABLE p_notification_outbox ADD COLUMN watcher_id TEXT REFERENCES p_watchers(id);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0073_signer_methods.sql",
+      "sha256": "039529e21ad9242b39f4b41d11bdd110813eccf59d0e119eef64e1abe4882793",
+      "sql": "CREATE TABLE p_signer_methods (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n method TEXT NOT NULL CHECK(method IN ('mailbox code','SMS code')),\n configured_by TEXT NOT NULL, configured_at INTEGER NOT NULL\n);\nALTER TABLE p_shares ADD COLUMN code_method TEXT NOT NULL DEFAULT 'mailbox code';\nALTER TABLE p_shares ADD COLUMN session_method TEXT NOT NULL DEFAULT 'mailbox code';\nALTER TABLE p_shares ADD COLUMN session_verified_at INTEGER;\nCREATE TABLE p_signature_facts (\n proposal_id TEXT PRIMARY KEY REFERENCES p_acceptances(proposal_id), revision INTEGER NOT NULL,\n method TEXT NOT NULL CHECK(method IN ('mailbox code','SMS code')), verified_at INTEGER\n);\nCREATE TABLE p_agreement_artifacts (\n proposal_id TEXT PRIMARY KEY REFERENCES p_acceptances(proposal_id), revision INTEGER NOT NULL,\n document BLOB NOT NULL, certificate BLOB NOT NULL, facts TEXT NOT NULL\n);\n\nCREATE TRIGGER p_frozen_signature_facts BEFORE UPDATE ON p_signature_facts BEGIN SELECT RAISE(ABORT,'Signature facts are immutable'); END;\nCREATE TRIGGER p_frozen_agreement_artifacts BEFORE UPDATE ON p_agreement_artifacts BEGIN SELECT RAISE(ABORT,'Agreement artifacts are immutable'); END;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0074_signer_replacement.sql",
+      "sha256": "5533049c9c20d53c20a83ac6ccd6382355165590bb59f939168e04dc408d66f9",
+      "sql": "-- Business history contains no invitation credentials.\nCREATE TABLE p_signer_replacements (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n revision INTEGER NOT NULL, old_recipient TEXT NOT NULL, new_recipient TEXT NOT NULL,\n actor_id TEXT NOT NULL, actor_email TEXT NOT NULL, replaced_at INTEGER NOT NULL,\n reason TEXT NOT NULL, signing_position INTEGER NOT NULL CHECK(signing_position>0),\n required_method TEXT NOT NULL\n);\n-- Revoked capabilities are installation-local and never restored from archives.\nCREATE TABLE p_replaced_links (\n token TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL\n);\nALTER TABLE p_shares ADD COLUMN signing_position INTEGER NOT NULL DEFAULT 1 CHECK(signing_position>0);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0075_collaboration.sql",
+      "sha256": "ac6e7c751140789ba28e098c440f2d354495fe4402e7a6f31546b3d9bb07b1f2",
+      "sql": "CREATE TABLE p_internal_threads (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n block_id TEXT NOT NULL, block_title TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('comment','assignment')),\n text TEXT NOT NULL, author_id TEXT NOT NULL REFERENCES oa_operators(id), recipient_id TEXT REFERENCES oa_operators(id),\n due_date TEXT, created_at INTEGER NOT NULL, resolved_at INTEGER, resolved_by TEXT REFERENCES oa_operators(id), version INTEGER NOT NULL DEFAULT 1\n);\nCREATE TABLE p_collaboration_events (\n id TEXT PRIMARY KEY, thread_id TEXT NOT NULL REFERENCES p_internal_threads(id), proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n revision INTEGER NOT NULL, actor_id TEXT NOT NULL REFERENCES oa_operators(id), recipient_id TEXT NOT NULL REFERENCES oa_operators(id), created_at INTEGER NOT NULL\n);\nCREATE TABLE p_collaboration_authority (event_id TEXT PRIMARY KEY REFERENCES p_collaboration_events(id));\nCREATE TABLE p_collaboration_routes (route_id TEXT PRIMARY KEY REFERENCES p_notification_routes(id), configured_by TEXT NOT NULL REFERENCES oa_operators(id), created_at INTEGER NOT NULL);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0076_tracking.sql",
+      "sha256": "a6940d65e3bf35135fd07ae28c95bdcd993b8b2c19e3ce9b2ef3a510bf9f344d",
+      "sql": "CREATE TABLE p_tracking_settings(singleton INTEGER PRIMARY KEY CHECK(singleton=1), retention_days INTEGER NOT NULL DEFAULT 90 CHECK(retention_days BETWEEN 1 AND 365), quiet_minutes INTEGER NOT NULL DEFAULT 30 CHECK(quiet_minutes BETWEEN 1 AND 1440));\nINSERT INTO p_tracking_settings(singleton) VALUES(1);\nCREATE TABLE p_tracking_authority(singleton INTEGER PRIMARY KEY CHECK(singleton=1), alerts INTEGER NOT NULL CHECK(alerts IN (0,1)), authorized_at INTEGER NOT NULL);\nCREATE TABLE p_views(id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL, recipient TEXT NOT NULL, verified INTEGER NOT NULL, viewed_at INTEGER NOT NULL, city TEXT, region TEXT, country TEXT, device TEXT NOT NULL);\nCREATE INDEX p_views_proposal_time ON p_views(proposal_id,viewed_at);\nCREATE TABLE p_tracking_alerts(id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), recipient TEXT NOT NULL, sender_id TEXT, alerted_at INTEGER NOT NULL, kind TEXT NOT NULL);\nCREATE TABLE p_tracking_holds(proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id), reason TEXT NOT NULL, held_at INTEGER NOT NULL);\nCREATE INDEX p_tracking_alerts_quiet ON p_tracking_alerts(proposal_id,recipient,alerted_at);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0077_tracking_details.sql",
+      "sha256": "82278abcd99260dd4e236ae9b71c9160002ee10505218e2eba43393c12363414",
+      "sql": "CREATE TABLE p_tracking_transport(view_id TEXT PRIMARY KEY REFERENCES p_views(id) ON DELETE CASCADE,share_hash TEXT NOT NULL);\nCREATE TABLE p_tracking_reading(view_id TEXT NOT NULL REFERENCES p_views(id) ON DELETE CASCADE,section TEXT NOT NULL,milliseconds INTEGER NOT NULL,PRIMARY KEY(view_id,section));\nCREATE TABLE p_tracking_choices(view_id TEXT NOT NULL REFERENCES p_views(id) ON DELETE CASCADE,option_id TEXT NOT NULL,items TEXT NOT NULL,observed_at INTEGER NOT NULL,PRIMARY KEY(view_id,option_id,items));\nCREATE TABLE p_tracking_stakeholders(id TEXT PRIMARY KEY,proposal_id TEXT NOT NULL REFERENCES p_proposals(id),revision INTEGER NOT NULL,name TEXT NOT NULL,email TEXT NOT NULL,verified_at INTEGER NOT NULL,role TEXT NOT NULL DEFAULT 'stakeholder',UNIQUE(proposal_id,revision,email));\nCREATE TABLE p_tracking_challenges(id TEXT PRIMARY KEY,proposal_id TEXT NOT NULL REFERENCES p_proposals(id),revision INTEGER NOT NULL,name TEXT NOT NULL,email TEXT NOT NULL,code_hash TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0078_public_api.sql",
+      "sha256": "8f8fe4b004951889c94d5d0af8d03eeac70d1face96e69bce93ec5bffe11549b",
+      "sql": "-- Immutable machine scopes use the existing live owner-bound credential guard.\nCREATE TABLE p_rest_keys(key_id TEXT PRIMARY KEY REFERENCES p_agent_keys(id),scopes TEXT NOT NULL);\nCREATE TRIGGER p_rest_scopes_immutable BEFORE UPDATE ON p_rest_keys BEGIN SELECT RAISE(ABORT,'Issue a replacement key to change scopes'); END;\nCREATE TABLE p_webhooks(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL,owner_version INTEGER NOT NULL,url TEXT NOT NULL,created_at INTEGER NOT NULL,revoked_at INTEGER);\nCREATE TABLE p_webhook_secrets(webhook_id TEXT PRIMARY KEY REFERENCES p_webhooks(id),sealed TEXT NOT NULL);\nCREATE TABLE p_webhook_events(id TEXT PRIMARY KEY,type TEXT NOT NULL,proposal_id TEXT NOT NULL,revision INTEGER NOT NULL,status TEXT NOT NULL,occurred_at INTEGER NOT NULL);\nCREATE TABLE p_webhook_deliveries(id TEXT PRIMARY KEY,webhook_id TEXT NOT NULL REFERENCES p_webhooks(id),event_id TEXT NOT NULL REFERENCES p_webhook_events(id),attempts INTEGER NOT NULL DEFAULT 0,next_at INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'pending',http_status INTEGER,lease_until INTEGER,UNIQUE(webhook_id,event_id));\nCREATE TRIGGER p_webhook_created AFTER INSERT ON p_proposals BEGIN\n INSERT INTO p_webhook_events VALUES(lower(hex(randomblob(16))),'proposal.created',NEW.id,NEW.revision,NEW.status,CAST(unixepoch('subsec')*1000 AS INTEGER));\nEND;\nCREATE TRIGGER p_webhook_changed AFTER UPDATE OF status,revision ON p_proposals WHEN NEW.status!=OLD.status OR NEW.revision!=OLD.revision BEGIN\n INSERT INTO p_webhook_events VALUES(lower(hex(randomblob(16))),CASE WHEN NEW.status='accepted' THEN 'proposal.signed' WHEN NEW.status='sent' THEN 'proposal.sent' WHEN NEW.status='approved' THEN 'proposal.approved' ELSE 'proposal.revised' END,NEW.id,NEW.revision,NEW.status,CAST(unixepoch('subsec')*1000 AS INTEGER));\nEND;\nCREATE TRIGGER p_webhook_withdrawn AFTER INSERT ON p_withdrawals BEGIN\n INSERT INTO p_webhook_events VALUES(lower(hex(randomblob(16))),'proposal.withdrawn',NEW.proposal_id,NEW.revision,'withdrawn',NEW.withdrawn_at);\nEND;\nCREATE TRIGGER p_webhook_declined AFTER INSERT ON p_outcome_records BEGIN\n INSERT INTO p_webhook_events VALUES(lower(hex(randomblob(16))),CASE WHEN NEW.kind='declined' THEN 'proposal.declined' WHEN NEW.kind='won' THEN 'proposal.won' ELSE 'proposal.lost' END,NEW.proposal_id,NEW.revision,NEW.kind,NEW.occurred_at);\nEND;\nCREATE INDEX p_webhook_due ON p_webhook_deliveries(status,next_at);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0079_negotiated_webhooks.sql",
+      "sha256": "91fd7d26dd87bc4d089ae2d3c164f7163afc86856a015e2666f1b3d2c6d602d8",
+      "sql": "-- Negotiated drafts live beside the frozen sent offer. Retain each event in the\n-- same transaction as its revision or approval, without replaying prior history.\nCREATE TRIGGER p_webhook_negotiated_created AFTER INSERT ON p_negotiations BEGIN\n INSERT INTO p_webhook_events VALUES(lower(hex(randomblob(16))),'proposal.revised',NEW.proposal_id,NEW.revision,'draft',NEW.prepared_at);\nEND;\nCREATE TRIGGER p_webhook_negotiated_revised AFTER UPDATE OF revision ON p_negotiations WHEN NEW.revision!=OLD.revision BEGIN\n INSERT INTO p_webhook_events VALUES(lower(hex(randomblob(16))),'proposal.revised',NEW.proposal_id,NEW.revision,'draft',NEW.prepared_at);\nEND;\nCREATE TRIGGER p_webhook_negotiated_approved AFTER UPDATE OF approved_by,approved_at ON p_negotiations WHEN NEW.approved_by IS NOT NULL AND NEW.approved_at IS NOT NULL AND OLD.approved_by IS NULL BEGIN\n INSERT INTO p_webhook_events VALUES(lower(hex(randomblob(16))),'proposal.approved',NEW.proposal_id,NEW.revision,'approved',NEW.approved_at);\nEND;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0080_recipients.sql",
+      "sha256": "a3c6b3c51460cfa275e2d45e94b753e58f67bc10351ae271a0fb92e0573902b5",
+      "sql": "-- Preserve the original invitation and verification state while allowing one\n-- independently verified invitation per configured recipient slot.\nCREATE TABLE p_shares_next (\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n token TEXT NOT NULL UNIQUE, code_hash TEXT, code_expires INTEGER,\n code_attempts INTEGER NOT NULL DEFAULT 0, code_generation INTEGER NOT NULL DEFAULT 0,\n code_sent_at INTEGER, session_hash TEXT, session_expires INTEGER, recipient TEXT,\n code_method TEXT NOT NULL DEFAULT 'mailbox code',\n session_method TEXT NOT NULL DEFAULT 'mailbox code', session_verified_at INTEGER,\n signing_position INTEGER NOT NULL DEFAULT 1 CHECK(signing_position>0),\n slot_id TEXT NOT NULL DEFAULT 'client', PRIMARY KEY(proposal_id,slot_id)\n);\nINSERT INTO p_shares_next(proposal_id,revision,token,code_hash,code_expires,code_attempts,code_generation,code_sent_at,session_hash,session_expires,recipient,code_method,session_method,session_verified_at,signing_position)\n SELECT proposal_id,revision,token,code_hash,code_expires,code_attempts,code_generation,code_sent_at,session_hash,session_expires,recipient,code_method,session_method,session_verified_at,signing_position FROM p_shares;\nDROP TABLE p_shares;\nALTER TABLE p_shares_next RENAME TO p_shares;\nALTER TABLE p_proposals ADD COLUMN recipient_plan TEXT NOT NULL DEFAULT '[]';\nCREATE TABLE p_recipient_signatures (\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n slot_id TEXT NOT NULL, role TEXT NOT NULL, name TEXT NOT NULL, email TEXT NOT NULL,\n signed_at INTEGER NOT NULL, method TEXT NOT NULL, verified_at INTEGER,\n consent TEXT NOT NULL, snapshot TEXT NOT NULL,\n PRIMARY KEY(proposal_id,revision,slot_id)\n);\nCREATE TRIGGER p_frozen_recipient_signature BEFORE UPDATE ON p_recipient_signatures\n BEGIN SELECT RAISE(ABORT,'Signatures are immutable'); END;\nCREATE TABLE p_void_signatures (\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n voided_at INTEGER NOT NULL, reason TEXT NOT NULL, PRIMARY KEY(proposal_id,revision)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0081_recipient_embedding.sql",
+      "sha256": "e6a8a51f9398da3a53e61fee758ca96c014378c4189063f08f08ea4de41a519c",
+      "sql": "-- Framing consent belongs to a live invitation and is never restored.\nALTER TABLE p_shares ADD COLUMN embed_origin TEXT;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0082_merge_fields.sql",
+      "sha256": "24af9d3d4ef70f34b86ea2ec0897143c119c82fc30d3a03a643be03c562d9c61",
+      "sql": "ALTER TABLE p_clients ADD COLUMN variable_fields TEXT NOT NULL DEFAULT '{}';\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0083_imported_library.sql",
+      "sha256": "d184ae2af8236340e1d7042e10f89af77eba649b2b63ad2b985ae5a7ea66f0a3",
+      "sql": "CREATE TABLE p_imported_library (\n item_id TEXT PRIMARY KEY REFERENCES p_library_items(id),\n document TEXT NOT NULL CHECK(json_valid(document)),\n options TEXT NOT NULL CHECK(json_valid(options))\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0084_owner_taxes.sql",
+      "sha256": "1d8dfc830ea1fc5a73d11e1495d5b3c5ba7e74d812e6a07091aafa3654fd2d02",
+      "sql": "-- Owner-configured jurisdiction rates are business records; revision snapshots carry the rates used.\nCREATE TABLE p_tax_settings (\n singleton INTEGER PRIMARY KEY CHECK(singleton=1),\n rates TEXT NOT NULL,\n version INTEGER NOT NULL DEFAULT 1\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0085_catalog_defaults.sql",
+      "sha256": "3c245c6071355a82003f63a4f97be5b721900de8e52f2ed35567604495cbd497",
+      "sql": "ALTER TABLE p_priced_catalog ADD COLUMN default_recurrence TEXT NOT NULL DEFAULT 'one-off' CHECK(default_recurrence IN ('one-off','weekly','monthly','quarterly','annual'));\nALTER TABLE p_priced_catalog ADD COLUMN taxable INTEGER NOT NULL DEFAULT 0 CHECK(taxable IN (0,1));\nALTER TABLE p_priced_catalog ADD COLUMN tax_code TEXT NOT NULL DEFAULT '';\nALTER TABLE p_priced_catalog ADD COLUMN income_account TEXT NOT NULL DEFAULT '';\nALTER TABLE p_priced_catalog ADD COLUMN source_id TEXT;\nALTER TABLE p_priced_catalog ADD COLUMN source_version INTEGER;\nCREATE UNIQUE INDEX p_priced_catalog_source ON p_priced_catalog(source_id) WHERE source_id IS NOT NULL;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",
@@ -411,7 +531,6 @@
     "MAIL_FROM": "",
     "MAIL_RELAY_URL": "",
     "MAIL_ACCOUNT_ID": "",
-    "OWNER_EMAIL": "",
     "IDENTITY_PROVIDER": "",
     "GOOGLE_MAIL_CLIENT_ID": "",
     "MICROSOFT_MAIL_CLIENT_ID": "",

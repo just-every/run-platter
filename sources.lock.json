@@ -630,7 +630,7 @@
       "executable": false
     },
     "public/docs/document-import.html": {
-      "sha256": "c905136ded6e296e689aee3ea0462c0ad295b3665bb8f4d0e06009bb28f22f0c",
+      "sha256": "852d54a84e1c35634bc50bd80783627a92707a0fe12148bef4b8555ba4c8e2c2",
       "executable": false
     },
     "public/document-editor.js": {
@@ -2478,7 +2478,7 @@
       "executable": false
     },
     "src/platter/documents/import-export.ts": {
-      "sha256": "479c8a5ab4581a1b160687dabb3c2908f6720aa6f8f054fad3c9109c3249c342",
+      "sha256": "bf80bd916f71282f58b968b72a87d30209c4ca1c2f4237aa392157797d9a0483",
       "executable": false
     },
     "src/platter/documents/media.ts": {
@@ -2486,7 +2486,7 @@
       "executable": false
     },
     "src/platter/documents/offer-pdf.ts": {
-      "sha256": "a1ef139d27942ee5ea0b211dd301c5503b8ce681684c926931a45777f764e3eb",
+      "sha256": "27174e321c7a9564a1ebcea2f49c90c6f144530d3b5bebd31f632fce2e588220",
       "executable": false
     },
     "src/platter/documents/pdf-fonts.ts": {
@@ -2534,7 +2534,7 @@
       "executable": false
     },
     "src/platter/http.ts": {
-      "sha256": "74f41267fb5a327524b2e861788dc37462d43b84137fc2bf547148b719e44342",
+      "sha256": "a06279567860bfc9962e7e12acf319f801c015dd1229be458c8170c52c24b399",
       "executable": false
     },
     "src/platter/internal-pricing.ts": {
@@ -2910,7 +2910,7 @@
       "executable": false
     },
     "src/platter/ui/document-import.ts": {
-      "sha256": "12ff77aee154ab67b3d2fa401ec460fc6e286f883bc081289a4d929cc4cdd84b",
+      "sha256": "6320d4fffd6c36f6d41d5605adb086230ccfb793bb60c96d038241ded66c8645",
       "executable": false
     },
     "src/platter/ui/duplicate.ts": {
@@ -3270,7 +3270,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "41c790b44967c83c94e1ac2441a10b1b4d8cb4f1c984c0f7221f154559316626",
+      "sha256": "a4ecff479ac9d2753663842be257e73831eca687d20f1311cf34a4053e44855b",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

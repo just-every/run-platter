@@ -1,3 +1,4 @@
+import fontkit from '@pdf-lib/fontkit'
 import { document as htmlDocument } from '../ui/shell'
 import { escape } from '../ui/shared'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
@@ -89,16 +90,21 @@ export async function exportDocument(env:Bindings,a:Actor,id:string,format:strin
  return new Response(bytes.buffer as ArrayBuffer,{headers:{'content-type':type,'content-disposition':'attachment; filename="proposal-revision-'+row.revision+'.'+format+'"','cache-control':'no-store','x-content-type-options':'nosniff'}})
 }
 /** Preserve the original artifact separately; composed downloads mark every original page unsigned. */
-export async function fixedPagesPdf(bytes:Uint8Array,generated:Uint8Array,view:any){
- const original=await PDFDocument.load(bytes),out=await PDFDocument.create(),font=await out.embedFont(StandardFonts.Helvetica)
- for(const page of await out.copyPages(original,original.getPageIndices())){out.addPage(page);page.drawText('Not signed, revision '+view.revision,{x:24,y:16,size:9,font,color:rgb(.25,.25,.25)})}
- for(const block of documentOf(view).blocks.filter(b=>b.page))if(block.type==='signature'||block.type==='field'){const page=out.getPage(block.page!-1);need((block.x??48)<page.getWidth()-20&&(block.y??100)<page.getHeight()-20,'Place fields inside their fixed page');page.drawText(block.title+(block.type==='signature'?' (not signed)':''),{x:block.x??48,y:block.y??100,size:12,font,color:rgb(.2,.2,.2)})}
+export async function fixedPagesPdf(bytes:Uint8Array,generated:Uint8Array,view:any,signed=false,fontBytes:(Uint8Array|ArrayBuffer)[]=[]){
+ const original=await PDFDocument.load(bytes),out=await PDFDocument.create();out.registerFontkit(fontkit)
+ const fonts=fontBytes.length?await Promise.all(fontBytes.map(bytes=>out.embedFont(bytes,{subset:true}))):[await out.embedFont(StandardFonts.Helvetica)],coverage=fonts.map(font=>new Set(font.getCharacterSet())),segmenter=new Intl.Segmenter(undefined,{granularity:'grapheme'})
+ const draw=(page:any,text:string,x:number,y:number,size:number)=>{const complete=coverage.findIndex(set=>Array.from(text,c=>c.codePointAt(0)!).every(point=>set.has(point)));if(complete>=0){page.drawText(text,{x,y,size,font:fonts[complete],color:rgb(.2,.2,.2)});return}const runs:{index:number;text:string}[]=[];for(const {segment}of segmenter.segment(text)){const index=coverage.findIndex(set=>Array.from(segment,c=>c.codePointAt(0)!).every(point=>set.has(point)));need(index>=0,'A fixed-page field needs a font covering its text',422);const last=runs.at(-1);if(last?.index===index)last.text+=segment;else runs.push({index,text:segment})}for(const run of runs){const font=fonts[run.index];page.drawText(run.text,{x,y,size,font,color:rgb(.2,.2,.2)});x+=font.widthOfTextAtSize(run.text,size)}}
+ for(const page of await out.copyPages(original,original.getPageIndices())){out.addPage(page);draw(page,(signed?'Signed agreement':'Not signed')+', revision '+view.revision,24,16,9)}
+ for(const block of documentOf(view).blocks.filter(b=>b.page))if(block.type==='signature'||block.type==='field'){const page=out.getPage(block.page!-1);need((block.x??48)<page.getWidth()-20&&(block.y??100)<page.getHeight()-20,'Place fields inside their fixed page');const value=view.fieldValues?.[block.id];draw(page,signed&&value!==undefined?block.title+': '+String(value):block.title+(block.type==='signature'&&!signed?' (not signed)':''),block.x??48,block.y??100,12)}
  const appended=await PDFDocument.load(generated);for(const page of await out.copyPages(appended,appended.getPageIndices()))out.addPage(page)
  return out.save()
 }
 
-export async function fixedPagePreview(db:D1Database,row:any){
+export async function fixedPagePreview(env:Bindings,row:any,verified=false){
+ const db=env.DB
  const fixed=documentOf(row).fixedPdf;need(fixed,'Fixed PDF not found',404)
- const empty=await PDFDocument.create(),bytes=await fixedPagesPdf(await mediaBytes(db,row,fixed.fileId),await empty.save({addDefaultPage:false}),row)
+ const accepted=row.status==='accepted'?await db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=? AND revision=?').bind(row.id,row.revision).first<any>():null
+ const view=accepted&&verified?{...row,fieldValues:JSON.parse(accepted.snapshot).fieldValues}:row
+ const empty=await PDFDocument.create(),bytes=await fixedPagesPdf(await mediaBytes(db,row,fixed.fileId),await empty.save({addDefaultPage:false}),view,Boolean(accepted),await pdfFonts(env,row))
  return new Response(bytes.buffer as ArrayBuffer,{headers:{'content-type':'application/pdf','content-disposition':'inline; filename="fixed-pages-revision-'+row.revision+'.pdf"','cache-control':'no-store','x-content-type-options':'nosniff'}})
 }

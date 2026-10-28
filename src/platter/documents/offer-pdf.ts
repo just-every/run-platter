@@ -103,6 +103,6 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   pdf.gap(6)
  }
  if(signer){pdf.heading('Signature');pdf.text('Signed by: '+signer.name);pdf.text('Recipient: '+signer.email);pdf.text('Verification method: '+signer.method);pdf.text('Accepted at: '+new Date(signer.acceptedAt).toISOString());pdf.text('Consent: '+signer.consent)}
- const generated=await pdf.document.save();if(doc.fixedPdf){need(media,'Fixed PDF is unavailable',503);return fixedPagesPdf(await media(doc.fixedPdf.fileId),generated,view)}
+ const generated=await pdf.document.save();if(doc.fixedPdf){need(media,'Fixed PDF is unavailable',503);return fixedPagesPdf(await media(doc.fixedPdf.fileId),generated,view,Boolean(signer),fontBytes)}
  return generated
 }

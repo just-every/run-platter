@@ -1412,7 +1412,7 @@ The homepage (`src/site/landing/`, built 20 Oct 2026 from the owner-approved pag
 
 ## Status
 
-Judged from the code and tests at commit `0edaff763579e8798ad6eb753cbe44922ee1e5fd` (27 October 2026).
+Judged from the code and tests at commit `3604e36411fd9e3a90e84c87c7f03685976720fd` (28 October 2026). AUTO-004 remains partial under the ct demotion of 27 October 2026 at 23:04Z; the four named gaps require fresh judgment after correction.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |

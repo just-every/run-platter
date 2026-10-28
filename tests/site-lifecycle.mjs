@@ -743,6 +743,7 @@ test('AUTO-004 compiled public API reference exposes scoped operations and signe
    const spec=await (await context.request.get(app.origin+'/api/platter/v1/openapi.json')).json()
    assert.equal(await page.locator('[data-route]').count(),Object.values(spec.paths).reduce((n,methods)=>n+Object.keys(methods).length,0))
    for(const event of Object.keys(spec['x-webhook-events']))assert.equal(await page.getByRole('heading',{name:event,exact:true}).count(),1)
+   for(const route of ['POST /api/platter/v1/proposals','POST /api/platter/v1/proposals/{id}/variables'])assert.match(await page.locator('[data-route="'+route+'"]').innerText(),/Scope: proposals\.write/,'reference preserves drafting authority for '+route)
    for(const width of [1440,390]){
     await page.setViewportSize({width,height:900});await page.evaluate(async()=>{await document.fonts.ready})
     if(process.env.PLATTER_SCREENSHOTS){await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true});await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,'AUTO-004-reference-'+width+'.png'),fullPage:true})}

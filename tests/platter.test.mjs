@@ -141,6 +141,9 @@ test('EDIT-017 mailbox languages preserve authority, verification limits, author
  assert.equal((await decide('second')).status,200)
  const complete=await h.send(paths.first+'/certificate.json',undefined,cookies.first);assert.equal(complete.status,200,complete.text)
  assert.deepEqual(complete.value.signers.map(r=>r.language),['es','fr'])
+ const completedPdf=await h.mf.dispatchFetch(h.origin+paths.first+'/certificate.pdf',{headers:{cookie:cookies.first}});assert.equal(completedPdf.status,200)
+ const certificateText=(await pdfPages(new Uint8Array(await completedPdf.arrayBuffer()))).join(' ')
+ assert.match(certificateText,/Language shown: Spanish \(es\)/);assert.match(certificateText,/Language shown: French \(fr\)/)
  const previousSignatures=(await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(multi.id).all()).results
  assert.equal((await decide('second')).status,200)
  assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(multi.id).all()).results,previousSignatures)

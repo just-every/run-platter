@@ -3238,7 +3238,7 @@
       "executable": false
     },
     "tests/recipients-http.mjs": {
-      "sha256": "097bf482953af423b7f9345fb710e69d3aca1137cecf74bd106009719955eb1c",
+      "sha256": "8cb2abe0fe82027a0489f029242663020ab3294a6afd3f847f5ab8b97f5051bc",
       "executable": false
     },
     "tests/recurring-browser.mjs": {

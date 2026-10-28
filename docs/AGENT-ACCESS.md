@@ -2,6 +2,14 @@
 
 Give an agent access to proposal context and draft preparation. You remain responsible for approving the exact offer, sending it and exporting its invoice.
 
+Business-signed company-policy access is not available in this edition yet. The
+shared agent-door source and additive schema are prepared, but the production
+Worker still uses the draft-only interface described below. Enabling company
+agents for mail, SMS, reminders and scheduled reports also requires a shared
+door hook that retains the verified consent identity and rechecks it before a
+queued effect executes. Until that hook is available, these source additions do
+not grant any new authority or establish company-policy conformance.
+
 ## Create a key
 
 1. Sign in to your installed Platter app as the owner.

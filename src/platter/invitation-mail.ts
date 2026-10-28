@@ -1,3 +1,4 @@
+import { clientLocale } from './locales'
 import { resendReplyAvailable } from './question-reply-mail'
 import type { Bindings } from '../auth.server'
 import { proposalMail, queueMail } from './mail'
@@ -6,12 +7,12 @@ import { need, text, type Actor } from './model'
 /** Queue transport and retain link-free invitation text in the caller's atomic send. */
 export function invitationMail(
  env: Bindings, actor: Actor, input: Record<string, unknown>,
- offer: { id: string; title: string; revision: number },
+ offer: { id: string; title: string; revision: number; client_locale?: string },
  recipient: string, shareUrl: string, at: number,
 ): D1PreparedStatement[] {
  let subject: string, message: string, body: string
  if (input.mailSubject === undefined && input.mailMessage === undefined) {
-  const defaults = proposalMail(offer.title, shareUrl)
+  const defaults = proposalMail(offer.title, shareUrl, clientLocale(offer))
   subject = defaults[0]
   body = defaults[1]
   message = body.slice(0, -(shareUrl.length + 1))

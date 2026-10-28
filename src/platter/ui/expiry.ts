@@ -1,9 +1,10 @@
+import { ui } from '../locales'
 import { date, escape, field, form, hidden, panel, proposalPath } from './shared'
 
 export function expiryLabel(expiry: any): string {
- if (!expiry || expiry.mode === 'never') return 'No expiry date.'
- if (!expiry.date) return `Expires ${escape(expiry.days)} calendar days after sending.`
- return `Expires at the start of ${escape(expiry.date)} (${escape(expiry.timeZone)}).`
+ if (!expiry || expiry.mode === 'never') return ui('No expiry date.')
+ if (!expiry.date) return ui`Expires ${escape(expiry.days)} calendar days after sending.`
+ return ui`Expires at the start of ${escape(expiry.date)} (${escape(expiry.timeZone)}).`
 }
 
 export function expiryPanel(state: any, p: any): string {
@@ -33,10 +34,10 @@ export function clientExpiryPanel(view: any, publicForm: (name: string, body: st
  if (view.status === 'accepted' || view.acceptance) return ''
  const expiry = view.expiry
  if (!expiry) return ''
- if (!expiry.expired) return panel('Offer expiry', `<p>${expiryLabel(expiry)}</p>`)
+ if (!expiry.expired) return panel(ui('Offer expiry'), `<p>${expiryLabel(expiry)}</p>`)
  const pending = (expiry.reopenRequests ?? []).some((r: any) => !r.resolvedAt && r.revision === view.revision && r.deadlineAt === expiry.deadlineAt)
- return panel('This proposal has expired', `<p>${expiryLabel(expiry)} Acceptance is closed.</p>`
-  + (!view.verified ? '<p>Verify your '+(view.verificationMethod==='SMS code'?'identity':'email')+' below to ask the firm to reopen this offer.</p>'
-    : pending ? '<p role="status">Your request to reopen this proposal has been saved. The firm can extend this offer or send you a revised one.</p>'
-      : '<p>Ask the firm to reopen this offer so you can accept it.</p>' + publicForm('expiry.reopen', '<button>Request reopening</button>')))
+ return panel(ui('This proposal has expired'), ui`<p>${expiryLabel(expiry)} Acceptance is closed.</p>`
+  + (!view.verified ? ui('<p>Verify your ')+(view.verificationMethod==='SMS code'?'identity':ui('email'))+ui(' below to ask the firm to reopen this offer.</p>')
+    : pending ? ui('<p role="status">Your request to reopen this proposal has been saved. The firm can extend this offer or send you a revised one.</p>')
+      : ui('<p>Ask the firm to reopen this offer so you can accept it.</p>') + publicForm('expiry.reopen', ui('<button>Request reopening</button>'))))
 }

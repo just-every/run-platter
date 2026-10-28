@@ -364,7 +364,7 @@ Evidence: `src/platter/test-mail.ts`, `src/platter/invitation-mail.ts`, `src/pla
 
 Status: **partial**.
 
-Gap: Gap: Independent multiple signers and ordered or parallel signing from SIGN-004 are unimplemented, so replacement at a later signing position remains unproved. SIGN-006’s government ID and explicitly selected link-only methods and their replacement journeys remain required. The current single signing position and current mailbox or SMS requirement are retained; these proofs do not establish the full original journey. SEND-007 remains partial.
+Gap: Gap: The SIGN-004 HTTP and compiled-browser journeys now prove replacement at position 2, preserving earlier signatures and order, refusing duplicate participant mailboxes and retaining the replacement in the certificate. The owner-only configured-recipient authority default remains pending ct approval under SIGN-004 and SEND-003. SIGN-006’s government ID and explicitly selected link-only methods and their replacement journeys remain required. The single-recipient mailbox or SMS requirement and the configured-recipient mailbox requirement are retained; these proofs do not establish the full original journey. SEND-007 remains partial.
 
 Evidence: `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
 

@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "39bfb1581989b04590824139fb0dc8e4f5df1f1b70bd57509dad678992780903",
+      "sha256": "6126d64381fec8f2e6426318bc16b974aaa4e403a76caa0905dd6e07f9ff5d77",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "5eaac94426e05cfb779a7cbd1092dffb9e06df64a610b99d868435d9842b8628",
+      "sha256": "96cc29dfb48850f8026cf711f678d36702ca59b846761324b7d2465f3964885b",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "67ef7c4ad425bd923ae2488baa6214495f18cee52c380e4fe047326e59c67d43",
+      "sha256": "c77d897ade78b1915310a740fe317c246af06119e30ec614ee56469e654c3217",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -2758,7 +2758,7 @@
       "executable": false
     },
     "src/platter/signer-replacement.ts": {
-      "sha256": "b02f950912c90af62b9f485c6c0e3dd24857de4ca13a83963ddda5d7a579f605",
+      "sha256": "c06ea6e00fa36a4a4f8894de75f5cdb921eadbd3b5f707727f17b6840e3a2996",
       "executable": false
     },
     "src/platter/signing.ts": {
@@ -3218,7 +3218,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "c1e3b957c9aad0d7a66cc1410a3072faeb1888cc62adb0d2e973c19a56611c66",
+      "sha256": "c7423b8497ee002c13e68cdd746a6b3ce5e3dc5f66738af3f312688100b11b43",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3234,11 +3234,11 @@
       "executable": false
     },
     "tests/recipients-browser.mjs": {
-      "sha256": "b9511e945c174174036389c7e0c5b13c3dfba51b275e00e75053c031d60cabf1",
+      "sha256": "cddd3aeba94ffd759de58ecebaf7992290d09b2b81bef06da8fe4a641c5dedf3",
       "executable": false
     },
     "tests/recipients-http.mjs": {
-      "sha256": "025f3e284049f27d20f0fe723dfb52dcd4b695dac91df20514af24cc3a5ad482",
+      "sha256": "d26612bed4e66120b0d59264b4cf22667169b88c060ac00daa5093c8e225c267",
       "executable": false
     },
     "tests/recurring-browser.mjs": {

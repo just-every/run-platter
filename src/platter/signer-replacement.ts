@@ -19,6 +19,7 @@ export async function replaceSigner(env:Bindings,a:Actor,input:Record<string,unk
  need(share,'Send a current invitation before replacing a signer',409)
  const recipient=email(input.recipient),reason=text(input.reason,'the replacement reason',1000)
  need(recipient!==share.email.toLowerCase(),'Choose a different signer')
+ need(!plan.some(r=>r.id!==slotId&&r.email===recipient),'Each recipient needs their own mailbox')
  if(slot?.role==='countersigner')need(recipient===a.email.toLowerCase()&&a.role==='owner','Only the owner countersigns',403)
  const method=plan.length?'mailbox code':await signerMethod(db,row.id,row.revision),at=await currentTime(db),token=secret(),shareUrl=env.AUTH_ORIGIN+'/p/'+token,id=crypto.randomUUID()
  const writes=[

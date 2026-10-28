@@ -54,17 +54,44 @@ export async function signingOrderHttp(h){
   assert.equal((await h.state()).proposals.find(r=>r.id===p.id).status,'accepted')
  }
  const replacement=await recipientFixture(h,'Replace an unsigned CFO',roles(h.auth.OWNER_EMAIL))
+ const oldCfoCookie=await verifyRecipient(h,replacement.links.cfo)
+ const configured=(await h.state()).proposals.find(r=>r.id===replacement.id)
+ const beforeRefusal=await h.state()
+ for(const recipient of [address(1001).toUpperCase(),h.auth.OWNER_EMAIL]){
+  await h.cmd('signer.replace',{id:replacement.id,version:configured.version,recipientId:'cfo',recipient,reason:'CFO handover'},h.owner,400)
+  assert.deepEqual(await h.state(),beforeRefusal,'replacement cannot merge independently assigned recipient mailboxes')
+ }
  const ceoCookie=await verifyRecipient(h,replacement.links.ceo)
  assert.equal((await decision(h,replacement.links.ceo,ceoCookie)).status,200)
  const beforeReplacement=(await h.state()).proposals.find(r=>r.id===replacement.id)
+ const approvals=(await h.db.prepare('SELECT * FROM p_approvals WHERE proposal_id=?').bind(replacement.id).all()).results
+ const signature=(await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(replacement.id).all()).results
  const replaced=await h.cmd('signer.replace',{id:replacement.id,version:beforeReplacement.version,recipientId:'cfo',recipient:address(1011),reason:'New authorized CFO'})
  const newPath=new URL(replaced.shareUrl).pathname
- assert.equal((await h.send(replacement.links.cfo)).status,410)
+ const afterReplacement=(await h.state()).proposals.find(r=>r.id===replacement.id)
+ assert.equal(afterReplacement.revision,beforeReplacement.revision)
+ assert.deepEqual((await h.db.prepare('SELECT * FROM p_approvals WHERE proposal_id=?').bind(replacement.id).all()).results,approvals)
+ assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(replacement.id).all()).results,signature)
+ assert.equal(JSON.parse(afterReplacement.recipient_plan).find(r=>r.id==='cfo').group,2)
+ assert.equal(afterReplacement.signerReplacements[0].signing_position,2)
+ for(const door of ['', '/data.json','/agreement.pdf','/certificate.json','/action?name=accept']){
+  const r=await h.send(replacement.links.cfo+door,door.includes('/action')?{name:'Old CFO',optionId:'one',consent:true}:undefined,oldCfoCookie)
+  assert.equal(r.status,410,door);assert.ok(!r.text.includes(replacement.offer.title))
+ }
+ assert.equal((await decision(h,newPath,oldCfoCookie)).status,401,'replacement cannot reuse the former CFO session')
  assert.equal((await h.send(replacement.links.ceo+'/data.json',undefined,ceoCookie)).status,200)
+ const ownerCookie=await verifyRecipient(h,replacement.links.owner)
+ assert.equal((await decision(h,replacement.links.owner,ownerCookie)).status,409,'replacement preserves the unfinished CFO step')
  const newCfo=await verifyRecipient(h,newPath)
  assert.equal((await decision(h,newPath,newCfo)).status,200)
- const ownerCookie=await verifyRecipient(h,replacement.links.owner)
+ const signed=(await h.state()).proposals.find(r=>r.id===replacement.id)
+ await h.cmd('signer.replace',{id:replacement.id,version:signed.version,recipientId:'cfo',recipient:address(1012),reason:'Already signed'},h.owner,409)
  assert.equal((await decision(h,replacement.links.owner,ownerCookie)).status,200)
+ const certificate=await h.send(newPath+'/certificate.json',undefined,newCfo)
+ assert.equal(certificate.status,200,certificate.text)
+ assert.deepEqual(certificate.value.signers.map(r=>[r.slotId,r.email]),[['ceo',address(1001)],['cfo',address(1011)],['owner',h.auth.OWNER_EMAIL]])
+ assert.equal(certificate.value.replacements[0].reason,'New authorized CFO')
+ assert.equal(certificate.value.replacements[0].signing_position,2)
  const completion=(await h.db.prepare("SELECT recipient FROM p_mail WHERE proposal_id=? AND subject LIKE 'Agreement complete:%'").bind(replacement.id).all()).results
  assert.deepEqual(completion.map(r=>r.recipient).sort(),[address(1001),address(1011),h.auth.OWNER_EMAIL].sort())
 

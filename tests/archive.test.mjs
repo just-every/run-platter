@@ -912,3 +912,45 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
   assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_invoices').first()).n,0)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority', {timeout:180000},async()=>{
+ const {driveFixture,driveToken,driveSettings,connectDrive,completeDriveAgreement}=await import('./drive-fixture.mjs')
+ const temporary=await mkdtemp(join(tmpdir(),'platter-drive-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=driveFixture();let h
+ try{
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectDrive(h)
+  const completed=await completeDriveAgreement(h)
+  await h.cmd('archive.dispatch',{})
+  const queued=await completeDriveAgreement(h,'Queued archive history',completed.client.id)
+  const tables=['p_archive_settings','p_archive_jobs','p_archive_files','p_archive_folders','p_agreement_artifacts'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
+  assert.deepEqual(before.p_archive_jobs.map(j=>j.status).sort(),['complete','queued'])
+  const artifacts={}
+  for(const kind of ['agreement','certificate']){
+   const response=await h.mf.dispatchFetch(h.origin+completed.path+'/'+kind+'.pdf',{headers:{cookie:completed.cookie}});assert.equal(response.status,200);artifacts[kind]=Buffer.from(await response.arrayBuffer())
+  }
+  const certificate=(await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).value
+  await h.close();h=undefined
+  const archive=join(temporary,'drive.rer');await command(source,['export','--output',archive])
+  const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(driveToken))
+  const records=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
+  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0)
+  await command(restored,['import','--input',archive,'--yes'])
+  const restoredFake=driveFixture();h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:restoredFake.outboundService})
+  for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table],table+' retains exact history')
+  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'});assert.equal(restoredFake.calls.length,0)
+  const owner=await h.signIn(h.auth.OWNER_EMAIL)
+  for(const kind of ['agreement','certificate']){
+   const response=await h.mf.dispatchFetch(h.origin+'/api/platter/'+kind+'.pdf?id='+completed.proposal.id,{headers:{cookie:owner}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),artifacts[kind])
+  }
+  assert.deepEqual((await h.send('/api/platter/certificate.json?id='+completed.proposal.id,undefined,owner)).value,certificate)
+  const history=(await h.send('/api/platter/archives',undefined,owner)).value;assert.equal(history.settings.active,false);assert.ok(history.jobs.every(j=>!j.executable))
+  assert.equal((await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).status,404)
+  // Even reconnecting and explicitly authorizing future agreements cannot replay imported jobs.
+  await h.cmd('provider.connect',{provider:'google_drive',version:1,token:driveToken,consent:true},owner)
+  await h.cmd('archive.configure',{...driveSettings,version:1,connectionVersion:2},owner)
+  const calls=restoredFake.calls.length;await h.cmd('archive.dispatch',{},owner);assert.equal(restoredFake.calls.length,calls)
+  await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

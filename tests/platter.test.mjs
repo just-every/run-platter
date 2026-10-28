@@ -3309,6 +3309,11 @@ test('AUTO-002 completed agreements archive exact PDFs once under explicit curre
    assert.equal(uploaded.appProperties.platterSha256,createHash('sha256').update(bytes).digest('hex'))
   }
   const facts=JSON.parse(artifacts.facts);assert.equal(facts.documentSha256,createHash('sha256').update(Buffer.from(artifacts.document)).digest('hex'))
+  const parallel=await Promise.all([completeDriveAgreement(h,'Parallel archive one',signed.client.id),completeDriveAgreement(h,'Parallel archive two',signed.client.id)])
+  await Promise.all([tick(),tick()]);await tick()
+  const parallelHistory=(await h.send('/api/platter/archives',undefined,h.owner)).value.jobs
+  for(const agreement of parallel)assert.equal(parallelHistory.find(j=>j.proposal_id===agreement.proposal.id).status,'complete')
+
   const posts=()=>fake.calls.filter(c=>c.method==='POST').length,completedPosts=posts();await tick();assert.equal(posts(),completedPosts)
   // A second agreement uses the same client folder. A lost acknowledgement is held, never replayed.
   fake.setUncertain(true)

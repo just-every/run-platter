@@ -20,7 +20,7 @@ export function archiveName(job:any){return clean(job.pattern.replace(/\{(client
 /** Called inside the signature transaction, never by scanning restored acceptances. */
 export function archiveCompletion(db:D1Database,id:string){return [
  db.prepare(`INSERT INTO p_archive_jobs(proposal_id,revision,settings_version,account_id,root_folder,pattern,client_id,client_name,title,accepted_at,status)
- SELECT a.proposal_id,a.revision,s.version,s.account_id,s.root_folder,s.pattern,p.client_id,c.name,p.title,a.accepted_at,'queued'
+ SELECT a.proposal_id,a.revision,s.version,s.account_id,s.root_folder,s.pattern,p.client_id,COALESCE(json_extract(a.snapshot,'$.clientName'),c.name),json_extract(a.snapshot,'$.title'),a.accepted_at,'queued'
  FROM p_acceptances a JOIN p_proposals p ON p.id=a.proposal_id JOIN p_clients c ON c.id=p.client_id
  JOIN p_signature_facts f ON f.proposal_id=a.proposal_id AND f.revision=a.revision
  CROSS JOIN p_archive_settings s WHERE a.proposal_id=? AND f.method='mailbox code'
@@ -117,13 +117,18 @@ async function held(env:Bindings,job:any,error:unknown){
  await env.DB.prepare("UPDATE p_archive_jobs SET status='held',reason=? WHERE proposal_id=?").bind(reason,job.proposal_id).run()
 }
 export async function runArchives(env:Bindings){
- const db=env.DB
+ const db=env.DB,token=crypto.randomUUID(),now=Date.now()
+ const lock=await db.prepare('INSERT INTO p_archive_dispatch_lock VALUES(1,?,?) ON CONFLICT(singleton) DO UPDATE SET token=excluded.token,expires_at=excluded.expires_at WHERE expires_at<? RETURNING token').bind(token,now+900000,now).first()
+ if(!lock)return
+ try{
  await db.prepare("UPDATE p_archive_jobs SET status='held',reason='Interrupted archive. Reconcile the reserved files; no automatic upload retry.' WHERE status IN ('running','reconciling') AND started_at<?").bind(Date.now()-900000).run()
  const jobs=(await db.prepare("SELECT j.* FROM p_archive_jobs j JOIN p_archive_job_authority g ON g.proposal_id=j.proposal_id WHERE j.status='queued' ORDER BY j.accepted_at LIMIT 10").all<any>()).results
  for(const job of jobs){
+  const lease=await db.prepare('UPDATE p_archive_dispatch_lock SET expires_at=? WHERE singleton=1 AND token=? RETURNING token').bind(Date.now()+900000,token).first();if(!lease)return
   const claimed=await db.prepare("UPDATE p_archive_jobs SET status='running',started_at=? WHERE proposal_id=? AND status='queued' RETURNING proposal_id").bind(Date.now(),job.proposal_id).first();if(!claimed)continue
   try{await processArchive(env,job)}catch(error){await held(env,job,error)}
  }
+ }finally{await db.prepare('DELETE FROM p_archive_dispatch_lock WHERE singleton=1 AND token=?').bind(token).run()}
 }
 async function reconcileArchive(env:Bindings,id:string){
  const job=await env.DB.prepare("UPDATE p_archive_jobs SET status='reconciling',started_at=? WHERE proposal_id=? AND status='held' RETURNING *").bind(Date.now(),id).first<any>()

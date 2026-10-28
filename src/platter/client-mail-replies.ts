@@ -25,7 +25,7 @@ export async function clientMailReplyResponse(request:Request,env:Bindings){
   const {message,token,email,ignored}=await authenticatedReply(request,env,true)
   if(ignored)return new Response(null,{status:204,headers:{'cache-control':'no-store'}})
   const keyhash=await hash(token),db=env.DB
-  const k=await db.prepare("SELECT k.*,p.client_id,p.status,p.revision AS current_revision,s.token AS current_token,m.status AS mail_status FROM p_mail_reply_keys k JOIN p_proposals p ON p.id=k.proposal_id JOIN p_shares s ON s.proposal_id=p.id JOIN p_mail m ON m.id=k.mail_id WHERE k.keyhash=?").bind(keyhash).first<any>()
+  const k=await db.prepare("SELECT k.*,p.client_id,p.status,p.revision AS current_revision,s.token AS current_token,m.status AS mail_status FROM p_mail_reply_keys k JOIN p_proposals p ON p.id=k.proposal_id JOIN p_shares s ON s.proposal_id=p.id AND (s.recipient=k.recipient OR s.recipient IS NULL) JOIN p_mail m ON m.id=k.mail_id WHERE k.keyhash=?").bind(keyhash).first<any>()
   need(k&&k.mail_status==='accepted'&&['sent','accepted'].includes(k.status)&&k.current_revision===k.revision&&await hash(k.current_token)===k.share_hash,'This reply address is no longer current',409)
   need(message.from.toLowerCase()===k.recipient.toLowerCase(),'Reply from the invited client mailbox',403)
   const at=Date.now(),id=crypto.randomUUID(),sourceKey=await hash('resend:'+email.id)

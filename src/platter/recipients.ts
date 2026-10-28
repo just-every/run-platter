@@ -45,6 +45,8 @@ export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record
   await commit(db,a,[
    db.prepare('INSERT INTO p_replaced_links(token,proposal_id,revision) SELECT token,proposal_id,revision FROM p_shares WHERE proposal_id=? AND slot_id=? ON CONFLICT DO NOTHING').bind(row.id,id),
    db.prepare('DELETE FROM p_shares WHERE proposal_id=? AND slot_id=?').bind(row.id,id),
+   db.prepare("UPDATE p_mail SET status='uncertain',held_reason='recipient_removed' WHERE proposal_id=? AND recipient=? AND status='pending'").bind(row.id,removed.email),
+   db.prepare('DELETE FROM p_mail_reply_keys WHERE proposal_id=? AND recipient=?').bind(row.id,removed.email),
    db.prepare('UPDATE p_proposals SET recipient_plan=?,version=version+1 WHERE id=?').bind(JSON.stringify(next),row.id),
   ],true,{sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?)',values:[row.id,row.version]})
   return {id:row.id}

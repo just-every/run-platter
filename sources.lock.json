@@ -2358,7 +2358,7 @@
       "executable": false
     },
     "src/platter/client-mail-replies.ts": {
-      "sha256": "74cced4f685ca3fc14fcfa8ced1a06d1fb28f6153b818a05d54b47df0dd8aaef",
+      "sha256": "5c042f45878d3be277379fb23f3d00878086d05351467ecbd6d92bd981288d0b",
       "executable": false
     },
     "src/platter/collaboration.ts": {
@@ -2438,7 +2438,7 @@
       "executable": false
     },
     "src/platter/documents/agreement.ts": {
-      "sha256": "95bc76d225b1d3ad0c932f75ac98c1fbc68c8524f38d7154942e1b77474edcb5",
+      "sha256": "2f511e7d1a16a6cf36fca71e7ce0455d349a4fd555e95e542aecf6101e93d9f3",
       "executable": false
     },
     "src/platter/documents/blocks.ts": {
@@ -2694,7 +2694,7 @@
       "executable": false
     },
     "src/platter/recipients.ts": {
-      "sha256": "64e1378171aa8d0276358462f279c0a93888a30e3eebc0a3e87da5806792bdfa",
+      "sha256": "4d88f92e29ba73bc8d72c52508f0af9505ba98113905b5fb8686d7410c20f3ce",
       "executable": false
     },
     "src/platter/recurring.ts": {
@@ -2774,7 +2774,7 @@
       "executable": false
     },
     "src/platter/state.ts": {
-      "sha256": "374de1f999696f0d7a8bfa80a2b7de4c53a81026af5d74983a6927aaa43b3c95",
+      "sha256": "538840ac3a0649405fae014eb569d568c00f902d252116333820a38fc5676bce",
       "executable": false
     },
     "src/platter/suggestions.ts": {
@@ -2910,7 +2910,7 @@
       "executable": false
     },
     "src/platter/ui/invitation-mail.ts": {
-      "sha256": "d854dffb1be16fe61c63722ff2123b47c5e8974481477d00a664e7e0173864a2",
+      "sha256": "8fbc43eb2f0dc2d81e062fe92f963f5f32135841d2293f851667b17e415a8975",
       "executable": false
     },
     "src/platter/ui/library.ts": {
@@ -2938,7 +2938,7 @@
       "executable": false
     },
     "src/platter/ui/preview.ts": {
-      "sha256": "4aa6cca2acc4b0c51b4add356888b7431865dd3633c5343a07e5efad140f5e70",
+      "sha256": "be335ddd045ba74bbf9ff7695d7aadf448bde080c3e24da1a2837990fda6ae2a",
       "executable": false
     },
     "src/platter/ui/pricing.ts": {
@@ -2954,7 +2954,7 @@
       "executable": false
     },
     "src/platter/ui/recipients.ts": {
-      "sha256": "f5809f61c98d5e2e1c6035f8d57406e8d405f02ef4e7989f4db40e4f93d6417c",
+      "sha256": "0383b67d7c1b9c643b1e8e899679fb3ce8771999ac560a640c309f1b35333e59",
       "executable": false
     },
     "src/platter/ui/recurring.ts": {
@@ -3130,7 +3130,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "71731620a11b1b9ffdc75ec116ba95f3cb3391fff5fc93026b8f3c8b07e3656a",
+      "sha256": "d4fdf313c212b7031943e0ad24a449b559695313aa078559b8f4b7f18f2f45fe",
       "executable": false
     },
     "tests/browser-edge.mjs": {

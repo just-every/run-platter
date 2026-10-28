@@ -17,7 +17,7 @@ export function previewSelection(view:any) {
 
 export function previewFrame(row:any,width:string,optionId:string,query:URLSearchParams) {
  const identity=hidden('id',row.id)+hidden('revision',row.revision)+hidden('optionId',optionId)+(query.has('items')?hidden('items',query.get('items')):'')
- const recipients=recipientPlan(row),selector=recipients.length?'<label>Preview recipient<select name="recipientId">'+recipients.map(r=>'<option value="'+escape(r.id)+'"'+(query.get('recipientId')===r.id?' selected':'')+'>'+escape(r.name)+' · '+escape(r.role)+'</option>').join('')+'</select></label>':''
+ const recipients=recipientPlan(row),selector=recipients.length?'<label>Preview recipient<select name="recipientId" aria-label="Preview recipient">'+recipients.map(r=>'<option value="'+escape(r.id)+'"'+(query.get('recipientId')===r.id?' selected':'')+'>'+escape(r.name)+' · '+escape(r.role)+'</option>').join('')+'</select></label>':''
  const body=`<p><strong>Preview · Revision ${escape(row.revision)} · Viewing as ${escape(row.clientName)} (${escape(row.clientEmail)})</strong></p><p><a href="${proposalPath(row.id)}">Back to editor</a></p><form method="get" action="/app/preview">${identity}${selector}<label>Preview width<select name="width"><option value="1440"${width==='1440'?' selected':''}>Desktop — 1440 pixels</option><option value="390"${width==='390'?' selected':''}>Phone — 390 pixels</option></select></label><button>Change preview width</button></form><div class="preview-viewport"><iframe title="Client-page preview" width="${width}" height="1100" src="/app/preview/client?${escape(query)}"></iframe></div>`
  return document('Client-page preview',body)
 }

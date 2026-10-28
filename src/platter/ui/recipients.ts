@@ -7,7 +7,7 @@ export function recipientsPanel(state:any,p:any){
  const fields=(r:any={})=>hidden('id',p.id)+hidden('version',p.version)+(r.id?hidden('recipientId',r.id):'')+
   field('Recipient name','recipientName',r.name??'','required maxlength="200"')+
   field('Recipient email','recipientEmail',r.email??'','type="email" maxlength="254"')+
-  '<label>Recipient role<select name="recipientRole">'+[['signer','Signer'],['approver','Client approver'],['viewer','Viewer'],['cc','CC'],['countersigner','Owner countersigner']].map(([value,label])=>'<option value="'+value+'"'+(r.role===value?' selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
+  '<label>Recipient role<select name="recipientRole" aria-label="Recipient role">'+[['signer','Signer'],['approver','Client approver'],['viewer','Viewer'],['cc','CC'],['countersigner','Owner countersigner']].map(([value,label])=>'<option value="'+value+'"'+(r.role===value?' selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
   field('Signing group','recipientGroup',r.group??1,'type="number" min="1" max="10000" required')
  const rows=plan.map(r=>{
   const signature=p.recipientSignatures?.find((s:any)=>s.slot_id===r.id)

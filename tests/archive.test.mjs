@@ -541,6 +541,23 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const certificate=await h.send(replacementPath+'/certificate.json',undefined,verified.cookie);assert.equal(certificate.status,200,certificate.text)
   const artifacts=(await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(real.id).all()).results
 
+  const {recipientFixture,roles,verifyRecipient,decision}=await import('./recipients-http.mjs')
+  const multi=await recipientFixture(h,'Retained multiple signatures',roles(h.auth.OWNER_EMAIL)),sessions={}
+  for(const [id,path] of Object.entries(multi.links))sessions[id]=await verifyRecipient(h,path)
+  for(const id of ['ceo','cfo','owner'])assert.equal((await decision(h,multi.links[id],sessions[id])).status,200)
+  const multiCertificate=await h.send(multi.links.owner+'/certificate.json',undefined,sessions.owner)
+  assert.equal(multiCertificate.status,200,multiCertificate.text)
+  assert.deepEqual(multiCertificate.value.signers.map(s=>s.slotId),['ceo','cfo','owner'])
+  const voided=await recipientFixture(h,'Retained void signatures',roles(h.auth.OWNER_EMAIL)),voidCookie=await verifyRecipient(h,voided.links.ceo)
+  assert.equal((await decision(h,voided.links.ceo,voidCookie)).status,200)
+  const partial=(await h.state()).proposals.find(r=>r.id===voided.id)
+  const shared=await h.cmd('recipient.share',{id:voided.id,version:partial.version,recipientName:'Shared archive viewer',recipientEmail:'synthetic-platter-9001'+String.fromCharCode(64)+'example.test',embedOrigin:h.origin,shareConsent:true})
+  const withdrawRow=(await h.state()).proposals.find(r=>r.id===voided.id)
+  await h.cmd('proposal.withdraw',{id:voided.id,version:withdrawRow.version,reason:'Void before completion',notice:true})
+  const signatures=(await h.db.prepare('SELECT * FROM p_recipient_signatures ORDER BY proposal_id,revision,slot_id').all()).results
+  const voids=(await h.db.prepare('SELECT * FROM p_void_signatures ORDER BY proposal_id,revision').all()).results
+  assert.equal(signatures.length,4);assert.equal(voids.length,1)
+
   await h.close();h=null
   const archive=join(temporary,'source.rer')
   await command(source,['export','--output',archive])
@@ -549,6 +566,10 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.ok(!bytes.includes('[Test] Archive rehearsal only'))
   assert.ok(!bytes.includes(new URL(invitation.shareUrl).pathname))
   assert.ok(!bytes.includes(replacementPath))
+  for(const path of [...Object.values(multi.links),...Object.values(voided.links),new URL(shared.shareUrl).pathname])assert.ok(!bytes.includes(path),'archive contains no recipient capability')
+  assert.equal(records.filter(item=>item.table==='p_shares').length,0)
+  assert.deepEqual(records.filter(item=>item.table==='p_recipient_signatures').map(item=>item.row).sort((a,b)=>a.proposal_id.localeCompare(b.proposal_id)||a.revision-b.revision||a.slot_id.localeCompare(b.slot_id)),signatures)
+  assert.deepEqual(records.filter(item=>item.table==='p_void_signatures').map(item=>item.row),voids)
   assert.equal(records.filter(item=>item.table==='p_replaced_links').length,0)
   assert.deepEqual(records.filter(item=>item.table==='p_signer_replacements').map(item=>item.row),replacements)
   assert.deepEqual(records.filter(item=>item.table==='p_invitation_messages').map(item=>item.row).sort((a,b)=>a.id.localeCompare(b.id)),[...retained].sort((a,b)=>a.id.localeCompare(b.id)))
@@ -566,6 +587,11 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.deepEqual(after.proposals.find(row=>row.id===real.id).signerReplacements,replacements)
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(real.id).all()).results,artifacts)
   assert.equal((await h.send('/api/platter/certificate.json?id='+real.id,undefined,owner)).text,certificate.text)
+  assert.equal((await h.send('/api/platter/certificate.json?id='+multi.id,undefined,owner)).text,multiCertificate.text)
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures ORDER BY proposal_id,revision,slot_id').all()).results,signatures)
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_void_signatures ORDER BY proposal_id,revision').all()).results,voids)
+  for(const path of [...Object.values(multi.links),...Object.values(voided.links),new URL(shared.shareUrl).pathname])assert.equal((await h.send(path)).status,404)
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_shares').first()).n,0)
   assert.equal((await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n,0)
   const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})
   assert.equal(setup.status,303)

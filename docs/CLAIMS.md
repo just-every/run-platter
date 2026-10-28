@@ -742,7 +742,7 @@ Evidence: `tests/mail.test.mjs`
 
 Status: **partial**.
 
-Gap: Withdrawn and expired offers are reported as sent by the public status and analytics routes, without assertions for either state. Negotiated revisions emit neither revised nor approved lifecycle webhooks, without assertions for either event on that path. Delivery of revised, withdrawn, declined, lost, won and expired webhooks is not asserted through the receiver. Correct scopes for each documented route lack an independent expected-value assertion.
+Gap: The ct demotion remains in force pending fresh acceptance of the corrected public status and analytics, negotiated revision events, all ten receiver deliveries and independently expected documented scopes. Exact-candidate Verify and guarded landing receipts remain pending; AUTO-004 must remain partial until ct accepts.
 
 Evidence: `src/platter/api/index.ts`, `src/platter/api/webhooks.ts`, `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
 

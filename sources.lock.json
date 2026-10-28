@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "c5e1e2bdef7c5499e3017f6a41f869f8d01608dc32e292537d7fb6947f57bba0",
+      "sha256": "191dd78e7a47b29cf91576744896910419e1ca935267f53aa5c58c7ac5410d49",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "34dd5a381fb3a942e55c132d09e23f2640be2a61c77e73dcdf0cc6491c032857",
+      "sha256": "2c2aa38d11316c5ccbc1ae7250f8b6bac01ac8fedc72f64b548eab1f84cd4290",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "31562653776a539c004c3d733f9720b247ca81eb0b7aadb2849cd36741ef926e",
+      "sha256": "a5804435970fc20aac723defb44acc392c6db0dfa62d2107c213f9eb5ebc5fd3",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -511,6 +511,10 @@
     },
     "migrations/core/0078_public_api.sql": {
       "sha256": "8f8fe4b004951889c94d5d0af8d03eeac70d1face96e69bce93ec5bffe11549b",
+      "executable": false
+    },
+    "migrations/core/0079_negotiated_webhooks.sql": {
+      "sha256": "91fd7d26dd87bc4d089ae2d3c164f7163afc86856a015e2666f1b3d2c6d602d8",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -2758,7 +2762,7 @@
       "executable": false
     },
     "src/platter/state.ts": {
-      "sha256": "1fc0b3c18a2925cb0eb805bec4c157ea426d530656a1b0a79bac568e5052e628",
+      "sha256": "ca71e4ab7899a0c0532ea6aeda85e980d6bce7243643c63b22a5aafb83b02645",
       "executable": false
     },
     "src/platter/suggestions.ts": {
@@ -3246,7 +3250,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "db6c85eb130aff8eb4555de4e7a814327386636b70a3a3baf1ed48aa8f82a046",
+      "sha256": "531013574923de5883aea423095e713f736385787a19c86e8a0231ad3d3bf2c6",
       "executable": false
     },
     "tests/site.test.mjs": {

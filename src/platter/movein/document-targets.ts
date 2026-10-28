@@ -50,7 +50,7 @@ const destination=(kind:string)=>businessKinds.includes(kind)?businessDestinatio
 export const documentTargets:D1TargetAdapter={
  async read(db,d,kind,id){const row=await adapter(kind).read(db,destination(kind),kind,id);return row?{...row,destination:d}:undefined},
  matches(row,d,kind,id){return adapter(kind).matches(row?{...row,destination:destination(kind)}:null,destination(kind),kind,id)},
- write(row){return adapter(row.targetKind).write({...row,destination:destination(row.targetKind)})},
+ write(row){const writes=adapter(row.targetKind).write({...row,destination:destination(row.targetKind)});if(row.targetKind==='contacts'&&(row.value as any).email)writes.unshift(sql("INSERT INTO ik_d1_assertions(ok) SELECT NOT EXISTS(SELECT 1 FROM p_contacts WHERE json_extract(data_json,'$.email')=?)",(row.value as any).email));return writes},
  remove(d,kind,id){return adapter(kind).remove(destination(kind),kind,id)},
  async list(db,d){const rows=[];for(const a of [originals,nativeTargets,businessTargets])rows.push(...await a.list(db,a===businessTargets?businessDestination:d));return rows.map(row=>({...row,destination:d}))},
  matchesCount(count){return sql('((SELECT COUNT(*) FROM p_imported_documents)+(SELECT COUNT(*) FROM p_document_native_imports)+(SELECT COUNT(*) FROM p_companies)+(SELECT COUNT(*) FROM p_contacts)+(SELECT COUNT(*) FROM p_catalog_items))=?',count)},

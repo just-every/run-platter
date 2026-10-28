@@ -485,7 +485,7 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('MIG-006 public CLI archives imported business records, original CSV and image bytes with undo custody', {timeout:180000},async()=>{
+test('MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody', {timeout:180000},async()=>{
  const {businessCsv,applyBusiness,undoBusiness,fileHost}=await import('./business-import-fixture.mjs')
  const temporary=await mkdtemp(join(tmpdir(),'platter-business-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
  let h
@@ -496,12 +496,34 @@ test('MIG-006 public CLI archives imported business records, original CSV and im
   h=await harness({root:source,...options})
   const contacts=await applyBusiness(h,{kind:'contacts',format:'platter',csv:await businessCsv('platter-contacts.csv')})
   const catalog=await applyBusiness(h,{kind:'catalog',format:'pandadoc',csv:await businessCsv('pandadoc-catalog.csv')})
+  const {moveinFixture,applyMovein,hash}=await import('./document-movein-fixture.mjs'),documentFixture=await moveinFixture()
+  const movein=await applyMovein(h,documentFixture)
+  const documentJournal=await h.cmd('document-import.journal',{id:movein.id}),beforeDocuments=(await h.state()).importedDocuments
+  const nativeClient=await h.cmd('client.save',{name:'Synthetic retained dependency',email:h.auth.OWNER_EMAIL})
+  const dependency=await h.cmd('proposal.prepare',{clientId:nativeClient.id,title:'Synthetic retained dependency',scope:'Synthetic retained dependency',optionOne:'One',priceOne:'100',optionTwo:'Two',priceTwo:'200',depositPercent:'0'})
   const before=(await h.state()).businessRecords,journal=await h.cmd('business-import.journal',{id:catalog.job.id})
   const identity={auth:h.auth,owner:h.owner};await h.close();h=null
   const file=join(temporary,'business.rer');await command(source,['export','--output',file,'--no-queue']);await command(restored,['import','--input',file,'--yes','--no-queue'])
   h=await harness({root:restored,...identity,...options})
   const cookie=await h.signIn(identity.auth.OWNER_EMAIL)
   assert.deepEqual((await h.state(cookie)).businessRecords,before)
+  assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments)
+  const restoredDocumentJournal=await h.cmd('document-import.journal',{id:movein.id},cookie)
+  assert.deepEqual(restoredDocumentJournal.originals,documentJournal.originals)
+  assert.deepEqual(restoredDocumentJournal.provenance,documentJournal.provenance)
+  assert.deepEqual(restoredDocumentJournal.report,documentJournal.report)
+  for(const bytes of documentFixture.originals){
+   const response=await h.mf.dispatchFetch(h.origin+'/api/platter/imported-original?document='+hash(bytes),{headers:{cookie}})
+   assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)
+  }
+  const originalId=hash(documentFixture.originals[0])
+  await h.db.prepare('INSERT INTO p_imported_document_links(document_id,proposal_id) VALUES(?,?)').bind(originalId,dependency.id).run()
+  await h.cmd('document-import.undo',{id:movein.id},cookie,409)
+  assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments)
+  await h.db.prepare('DELETE FROM p_imported_document_links WHERE document_id=?').bind(originalId).run()
+  await h.cmd('document-import.undo',{id:movein.id},cookie)
+  assert.deepEqual((await h.state(cookie)).importedDocuments,[])
+  assert.ok((await h.cmd('document-import.journal',{id:movein.id},cookie)).provenance.every(p=>p.reversed))
   const after=await h.cmd('business-import.journal',{id:catalog.job.id},cookie)
   assert.deepEqual(after.originals,journal.originals);assert.deepEqual(after.provenance,journal.provenance)
   const image=before.catalog.find(c=>c.images.length).images[0]

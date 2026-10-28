@@ -769,3 +769,68 @@ test('CAT-001 reviewed CSV promotion and explicit recurring insertion preserve i
   await catalogBrowser({origin:h.origin,owner,sales,op,page,review,command,state,capture:async()=>{},client,width:1440})
  }finally{await owner?.close();await sales?.close();await browser?.close();await edge.close();await h.close()}
 })
+
+test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in', {timeout:180000},async()=>{
+ const {moveinFixture,hash}=await import('./document-movein-fixture.mjs'),fixture=await moveinFixture()
+ let app,browser
+ try{
+  app=await installedApp()
+  browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage()
+  const capture=async phase=>{
+   if(!process.env.PLATTER_SCREENSHOTS)return
+   await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true})
+   for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000})
+    await page.evaluate(async()=>{await document.fonts.ready})
+    await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,'MIG-007-'+phase+'-'+width+'.png'),fullPage:true})
+   }
+   await page.setViewportSize({width:1440,height:1000})
+  }
+  assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic platter owner'},maxRedirects:0})).status(),303)
+  await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  await page.goto(app.origin+'/app/import')
+  await page.getByLabel('Move-in name',{exact:true}).fill('Synthetic exported documents')
+  await page.getByRole('button',{name:'Start document move-in',exact:true}).click()
+  let section=page.locator('section').filter({has:page.getByRole('heading',{name:'Synthetic exported documents',exact:true})})
+  const id=await section.locator('[data-document-upload]').getAttribute('data-movein')
+  const api=async(name,input)=>{
+   const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name:'document-import.'+name,input:{id,...input}}})
+   assert.equal(response.status(),200,await response.text());return response.json()
+  }
+  const file=fixture.zips[0],sha256=hash(file.bytes),half=Math.floor(file.bytes.length/2)
+  await api('upload-start',{filename:file.filename,sha256,size:file.bytes.length})
+  await api('upload-chunk',{sha256,position:0,base64:file.bytes.subarray(0,half).toString('base64')})
+  await page.reload();assert.match(await section.innerText(),/Upload interrupted/)
+  await section.getByLabel('Exported files').setInputFiles(fixture.zips.map(z=>({name:z.filename,mimeType:'application/zip',buffer:z.bytes})))
+  await section.getByRole('button',{name:'Upload or resume files',exact:true}).click()
+  await page.waitForURL('**/app/import')
+  await page.waitForFunction(()=>Array.from(document.querySelectorAll('[data-document-upload]')).every(f=>!f.querySelector('input[type=file]').files.length))
+  await section.getByRole('button',{name:'Preview document move-in',exact:true}).click()
+  assert.equal(await section.getByRole('button',{name:'Apply reviewed document move-in',exact:true}).count(),0)
+  assert.match(await section.innerText(),/Arrived agreements\s+4\s+Held for review\s+2\s+Unmapped items\s+2/)
+  const select=section.locator('select[name^="match:"]').filter({has:page.locator('option[value="'+hash(fixture.originals[2])+'"]')})
+  await select.selectOption(hash(fixture.originals[2]))
+  await section.getByRole('button',{name:'Review report matches',exact:true}).click()
+  assert.match(await section.innerText(),/Arrived agreements\s+4\s+Held for review\s+1\s+Unmapped items\s+2/)
+  await capture('review')
+  await section.getByRole('button',{name:'Apply reviewed document move-in',exact:true}).click()
+  const retained=page.locator('section').filter({has:page.getByRole('heading',{name:'Retained imported originals',exact:true})})
+  assert.equal(await retained.getByRole('link',{name:'Download original PDF',exact:true}).count(),5)
+  assert.equal(await retained.getByText('Read-only retained agreement',{exact:true}).count(),4)
+  for(const bytes of fixture.originals){
+   const response=await context.request.get(app.origin+'/api/platter/imported-original?document='+hash(bytes))
+   assert.equal(response.status(),200);assert.deepEqual(await response.body(),bytes)
+  }
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+  await capture('retained')
+  await section.getByRole('button',{name:'Open document journal',exact:true}).click()
+  assert.match(await section.innerText(),/5 document changes recorded/)
+  assert.ok(await section.getByRole('link',{name:/Download uploads/}).count()>=3)
+  await capture('journal')
+  await section.getByRole('button',{name:'Undo document move-in',exact:true}).click()
+  assert.equal(await page.getByRole('heading',{name:'Retained imported originals',exact:true}).count(),0)
+  assert.match(await section.innerText(),/Import undone/)
+  await context.close()
+ }finally{await browser?.close();await app?.close()}
+})

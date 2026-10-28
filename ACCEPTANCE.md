@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 13 | 92 | 54 | 159 |
+| Core | 9 | 96 | 54 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 13 | 92 | 58 | 163 |
+| Full target | 9 | 96 | 58 | 163 |
 
 Judged from the code and tests at commit `b2551363bd49d431add363e7ee97bed57938c394` (28 October 2026). Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -405,7 +405,7 @@ Core · target · **missing** · Rules D-1
 
 #### EDIT-014 — Client PDF download before signing
 
-Core · target · **done** · Cites BASE-ROLE-001 · Rules D-1
+Core · target · **partial** · Cites BASE-ROLE-001 · Rules D-1
 
 **Requirement.** A recipient can download a PDF of the revision they are viewing before signing, so their procurement team can circulate it, unless the firm turns this off per proposal or template. The PDF carries the selection made so far, the revision number and "Not signed" on every page, and each download is on the timeline (`TRACK-001`). The signed agreement PDF remains `SIGN-005`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-014).
 
@@ -413,7 +413,7 @@ Core · target · **done** · Cites BASE-ROLE-001 · Rules D-1
 1. As a verified client, choose a package and download the PDF: every page reads "Not signed, revision 2" and shows the chosen package, and the timeline lists the download; turn downloads off on another proposal and see no download action and the PDF route refused (403).
 
 **Evidence.** `src/platter/documents/client-pdf.ts`, `src/platter/documents/offer-pdf.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Every-page unsigned watermark, selected aggregate content, download history and disabled-door refusal are asserted. A selected-package identifier on each individual page is not asserted; aggregate PDF text is insufficient.
 
 #### EDIT-015 — Locked template sections
 
@@ -623,7 +623,7 @@ Core · target · **done** · Cites BASE-ROLE-001, BASE-MAIL-001
 
 #### COLLAB-003 — Version history with compare and restore
 
-Core · target · **done**
+Core · target · **partial**
 
 **Requirement.** Every saved revision is listed with author and time. A member compares any two revisions, with text, line-item and price changes highlighted, and restores an earlier draft revision as a new revision that needs approval again. This covers every field and priced option the product supports today. `PRICE-001` inherits comparison of each added line-item field before it ships; `EDIT-001` and `PRICE-007` inherit comparison and restoration of their added document and payment-term fields. Restore retains the proposal identity, creates the next revision under the current actor and time, preserves earlier snapshots, clears current approval and is refused for sent or accepted offers. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#collab-003).
 
@@ -631,7 +631,7 @@ Core · target · **done**
 1. Make three revisions, compare the first and third and see the changed price and text, restore the first as revision four and see approval required.
 
 **Evidence.** `src/platter/history.ts`, `src/platter/ui/history.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`
-**Gap.** None.
+**Gap.** Three saved revisions, exact comparisons and an unapproved restored revision four are asserted. Blocking its send until a new approval is asserted in tests/harness.mjs, outside the old Evidence set.
 
 #### APPROVE-001 — Approval rules and routing
 
@@ -920,7 +920,7 @@ Core · target · **partial** · From SEND-010 · Cites BASE-AUDIT-001 · Rules 
 
 #### TRACK-001 — View tracking and live open alerts
 
-Core · target · **done** · Cites BASE-PUBLIC-001, BASE-MAIL-001
+Core · target · **partial** · Cites BASE-PUBLIC-001, BASE-MAIL-001
 
 **Requirement.** Platter records each verified or unverified view of a client link with time, recipient, approximate location and device class, and alerts the sender on first open and on a return visit after a quiet period the owner sets (30 minutes by default). The proposal shows a view timeline. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#track-001).
 
@@ -929,7 +929,7 @@ Core · target · **done** · Cites BASE-PUBLIC-001, BASE-MAIL-001
 2. With a 30-minute quiet period, the first recipient's return visit 10 minutes later raises no alert and a visit 45 minutes after that raises one return-visit alert.
 
 **Evidence.** `tests/platter.test.mjs`, `tests/followup-journey.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Recipient view records, coarse location/device fields and quiet-period alerts are asserted. The rendered timeline’s city, region, country and device fields for both views are not asserted in a cited file; tests/site-lifecycle.mjs imports tests/tracking-browser.mjs.
 
 #### TRACK-002 — Section-level reading analytics
 
@@ -1229,7 +1229,7 @@ Core · target · **partial** · Rules D-1
 
 #### SIGN-008 — Acceptance on the client's own paper
 
-Core · target · **done** · Cites BASE-INPUT-003, BASE-AGENT-007 · Rules D-1
+Core · target · **partial** · Cites BASE-INPUT-003, BASE-AGENT-007 · Rules D-1
 
 **Requirement.** When a client signs through their own procurement or signing system, the owner uploads the signed copy, records who signed and when, and attests to it. The agreement is marked accepted by upload, distinct from Platter e-signature, and payments and handoff proceed as for any acceptance. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-008).
 
@@ -1237,7 +1237,7 @@ Core · target · **done** · Cites BASE-INPUT-003, BASE-AGENT-007 · Rules D-1
 1. Upload a client-signed PDF for a sent proposal, record signer and date, and see the agreement marked accepted by upload with the file, followed by the deposit request.
 
 **Evidence.** `src/platter/paper-acceptance.ts`, `src/platter/paper-record.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`
-**Gap.** None.
+**Gap.** Uploaded signer/date, exact retained file, distinct acceptance label and owner deposit-invoice CSV are asserted. A following client-facing deposit request is not asserted.
 
 #### SIGN-009 — Recipient delegation of signing
 

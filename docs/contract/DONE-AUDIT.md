@@ -57,7 +57,8 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | PORT-001 | 2 | Populated and corrupt imports have the expected failure exit. | `tests/archive.test.mjs:27` | asserted |
 | PORT-001 | 3 | Old archive refusal specifically identifies erasure. | `tests/archive.test.mjs:381` | asserted |
 | MAIL-001 | 1 | Proposal and verification captures make no provider call. | `tests/mail.test.mjs:254` | asserted |
-| MAIL-001 | 1 | Both captures retain proposal and recipient. | `tests/mail.test.mjs:243` | asserted |
+| MAIL-001 | 1 | Both captured messages retain their proposal id. | `tests/mail.test.mjs:243` | asserted |
+| MAIL-001 | 1 | Both captured messages retain their recipient. | `tests/mail.test.mjs:243` | asserted |
 | MAIL-001 | 2 | Mail claim is persisted before provider contact. | `tests/mail.test.mjs:324` | asserted |
 | MAIL-001 | 2 | Offer is already sent in the same claim. | `tests/mail.test.mjs:325` | asserted |
 | MAIL-001 | 3 | Timeout leaves uncertainty. | `tests/mail.test.mjs:370` | asserted |
@@ -111,7 +112,10 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | EDIT-012 | 5 | Inheritance of future record kinds is a scope boundary, retained in the Requirement. | none | moved |
 | EDIT-021 | 1 | Every current lifecycle source remains unchanged. | `tests/platter.test.mjs:843` | asserted |
 | EDIT-021 | 1 | An unsent negotiated draft is copied. | `tests/platter.test.mjs:846` | asserted |
-| EDIT-021 | 2 | Copy starts draft revision one with its new preparer. | `tests/platter.test.mjs:826` | asserted |
+| EDIT-021 | 2 | Copy starts as a draft. | `tests/platter.test.mjs:826` | asserted |
+| EDIT-021 | 2 | Copy starts at revision one. | `tests/platter.test.mjs:826` | asserted |
+| EDIT-021 | 2 | Copy identifies its new preparing person. | `tests/platter.test.mjs:826` | asserted |
+| EDIT-021 | 2 | Copy identifies its new sales owner. | `tests/platter.test.mjs:826` | asserted |
 | EDIT-021 | 2 | Copy expiry has no started clock. | `tests/platter.test.mjs:828` | asserted |
 | EDIT-021 | 2 | Every lifecycle authority. Individual null fields do not prove an uninspected collection. | none | none |
 | EDIT-021 | 2 | including payments. Individual null fields do not prove an uninspected collection. | none | none |
@@ -144,7 +148,9 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | EDIT-022 | 3 | Pending approver follows an exact revision-one approval-request link. The old preview fixture uses owner/member links rather than the named full request flow. | none | none |
 | EDIT-022 | 4 | Signed-out and client-only sessions cannot preview. | `tests/platter.test.mjs:894` | asserted |
 | EDIT-022 | 4 | A person outside proposal scope sees no preview content. An HTTP status alone is not a no-content assertion. | none | none |
-| EDIT-022 | 5 | Preview audit identifies actor, subject and time. | `tests/platter.test.mjs:876` | asserted |
+| EDIT-022 | 5 | Preview audit identifies its actor. | `tests/platter.test.mjs:876` | asserted |
+| EDIT-022 | 5 | Preview audit identifies its subject. | `tests/platter.test.mjs:876` | asserted |
+| EDIT-022 | 5 | Preview audit records server time. | `tests/platter.test.mjs:876` | asserted |
 | EDIT-022 | 5 | Refusals add no audit row. | `tests/platter.test.mjs:886` | asserted |
 | EDIT-022 | 5 | Exact preview audit survives public CLI restore. Archive assertions compare broader data. | none | none |
 | EDIT-022 | 5 | this point’s specific preview outcome is not isolated in the old Evidence set. | none | none |
@@ -153,7 +159,9 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | EDIT-021 | 5 | Copied content, files and delivery settings survive restore exactly. | `tests/archive.test.mjs:284` | asserted |
 | MAIL-001 | 3 | The timed-out mail is contacted only once after later dispatches. | `tests/mail.test.mjs:385` | asserted |
 | PRICE-001 | 1 | Two tables retain their cent-exact subtotals. | `tests/platter.test.mjs:956` | asserted |
-| PRICE-001 | 1 | All twelve lines retain quantity/unit/price fields. | `tests/platter.test.mjs:960` | asserted |
+| PRICE-001 | 1 | Every pricing line retains its quantity. | `tests/platter.test.mjs:960` | asserted |
+| PRICE-001 | 1 | Every pricing line retains its unit. | `tests/platter.test.mjs:960` | asserted |
+| PRICE-001 | 1 | Every pricing line retains its unit price. | `tests/platter.test.mjs:960` | asserted |
 | PRICE-001 | 1 | Malformed input writes no proposal. | `tests/platter.test.mjs:973` | asserted |
 | PRICE-001 | 1 | Every malformed quantity. Expected status assertions are in the uncited harness. | none | none |
 | PRICE-001 | 1 | price is refused with the named status. Expected status assertions are in the uncited harness. | none | none |
@@ -163,7 +171,7 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | PRICE-002 | 1 | Quantity eleven is refused. | `tests/platter.test.mjs:1020` | asserted |
 | PRICE-002 | 1 | Agreement and PDF both retain every field of the same middle-package quantity-four selection. The target requires equality across every carrier, not a single successful read or subset of money fields. | none | none |
 | PRICE-003 | 1 | Client summary shows one-off, monthly and first-year values. | `tests/recurring-journey.mjs:14` | asserted |
-| PRICE-003 | 1 | Acceptance retains matching scheduled amounts. | `tests/recurring-journey.mjs:41` | asserted |
+| PRICE-003 | 1 | Acceptance retains matching scheduled amounts. | `tests/recurring-journey.mjs:79` | asserted |
 | PRICE-004 | 1 | Ten percent at group scope plus $500 total discount matches the fixture. The cited discount cases assert different combinations, without the complete named group-plus-total case. | none | none |
 | PRICE-004 | 1 | A twenty-percent discount triggers approval. | `tests/platter.test.mjs:2175` | asserted |
 | PRICE-007 | 1 | The exact 30%-deposit/two-milestone/monthly/net-15 schedule is shown. The old evidence tests several schedule selections; the full named combination and both reads are not asserted together. | none | none |
@@ -253,7 +261,11 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | SEND-015 | 4 | every old link remains refused. Each recipient and previous authority must be checked after reissue. | none | none |
 | SEND-015 | 5 | Compiled 1440/390 screens. The old browser wrapper has no asserting line. | none | none |
 | SEND-015 | 5 | read-only CLI history without authority. The old browser wrapper has no asserting line. | none | none |
-| TRACK-001 | 1 | Desktop and phone views retain city/region/country and verified state. | `tests/platter.test.mjs:2637` | asserted |
+| TRACK-001 | 1 | Desktop and phone view records retain the city. | `tests/platter.test.mjs:2637` | asserted |
+| TRACK-001 | 1 | Desktop and phone view records retain the region. | `tests/platter.test.mjs:2637` | asserted |
+| TRACK-001 | 1 | Desktop and phone view records retain the country. | `tests/platter.test.mjs:2637` | asserted |
+| TRACK-001 | 1 | Desktop and phone view records retain device class. | `tests/platter.test.mjs:2637` | asserted |
+| TRACK-001 | 1 | Desktop and phone view records retain verified state. | `tests/platter.test.mjs:2637` | asserted |
 | TRACK-001 | 1 | Both recipient addresses are retained. | `tests/platter.test.mjs:2642` | asserted |
 | TRACK-001 | 1 | Sender receives a return alert. | `tests/platter.test.mjs:2647` | asserted |
 | TRACK-001 | 2 | Ten-minute revisit does not create a second alert. | `tests/platter.test.mjs:2634` | asserted |
@@ -307,7 +319,12 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | PAY-002 | 1 | Successful deposit completes agreement. | `tests/collection-browser.mjs:95` | asserted |
 | PAY-002 | 2 | Due completion stays accepted after decline. | `tests/collection-browser.mjs:86` | asserted |
 | PAY-002 | 2 | Due-deposit amount remains outstanding after the declined payment. The cited browser assertion checks accepted state; a separate exact due-money readback is needed. | none | none |
-| REPORT-001 | 1 | Thirty visible rows match status, owner, client, value, action and age. | `tests/platter.test.mjs:190` | asserted |
+| REPORT-001 | 1 | Each visible pipeline row has the expected status. | `tests/platter.test.mjs:190` | asserted |
+| REPORT-001 | 1 | Each visible pipeline row has the expected owner. | `tests/platter.test.mjs:190` | asserted |
+| REPORT-001 | 1 | Each visible pipeline row has the expected client. | `tests/platter.test.mjs:190` | asserted |
+| REPORT-001 | 1 | Each visible pipeline row has the expected value. | `tests/platter.test.mjs:190` | asserted |
+| REPORT-001 | 1 | Each visible pipeline row has the expected next action. | `tests/platter.test.mjs:190` | asserted |
+| REPORT-001 | 1 | Each visible pipeline row has the expected age. | `tests/platter.test.mjs:190` | asserted |
 | REPORT-001 | 1 | Count and total reconcile with the entire fixture. | `tests/platter.test.mjs:191` | asserted |
 | REPORT-001 | 1 | Filter sets and sort order match fixture. | `tests/platter.test.mjs:208` | asserted |
 | REPORT-001 | 2 | Every role’s full visible report set. The matrix includes unimplemented content/revenue specialist reports. | none | none |
@@ -318,7 +335,10 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | REPORT-006 | 3 | inactive recipients. Every independent branch needs its own assertion. | none | none |
 | REPORT-006 | 3 | uncertain delivery across downtime. Every independent branch needs its own assertion. | none | none |
 | REPORT-006 | 4 | Schedules restore without transport. This part’s old Evidence set omits the archive assertion file. | none | none |
-| TEAM-004 | 1 | Each current action retains actor, role, subject and time. | `tests/platter.test.mjs:280` | asserted |
+| TEAM-004 | 1 | Each current audit action retains its actor. | `tests/platter.test.mjs:280` | asserted |
+| TEAM-004 | 1 | Each current audit action retains its actor role. | `tests/platter.test.mjs:280` | asserted |
+| TEAM-004 | 1 | Each current audit action retains its subject. | `tests/platter.test.mjs:280` | asserted |
+| TEAM-004 | 1 | Each current audit action retains server time. | `tests/platter.test.mjs:280` | asserted |
 | TEAM-004 | 1 | Filtered CSV is exactly the ordered row fields. | `tests/platter.test.mjs:297` | asserted |
 | TEAM-004 | 2 | Agent and verified client actor ids are distinct. | `tests/platter.test.mjs:281` | asserted |
 | TEAM-004 | 2 | Unknown invitation actor stays unidentified. | `tests/platter.test.mjs:283` | asserted |
@@ -362,8 +382,13 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | SEND-001 | 1 | Refused Microsoft grant falls back visibly. | `tests/mail.test.mjs:683` | asserted |
 | SEND-001 | 2 | Verified alias is recorded as Google sender at the client-facing transport. | `tests/mail.test.mjs:581` | asserted |
 | SEND-001 | 2 | Microsoft SMTP address is the message sender. | `tests/mail.test.mjs:585` | asserted |
-| SEND-001 | 2 | Google attribution records person, route, address and outcome. | `tests/mail.test.mjs:629` | asserted |
-| SEND-001 | 2 | Microsoft attribution records its route, address and outcome. | `tests/mail.test.mjs:635` | asserted |
+| SEND-001 | 2 | Google attribution records the sending person. | `tests/mail.test.mjs:629` | asserted |
+| SEND-001 | 2 | Google attribution records the Google route. | `tests/mail.test.mjs:629` | asserted |
+| SEND-001 | 2 | Google attribution records the mailbox address. | `tests/mail.test.mjs:629` | asserted |
+| SEND-001 | 2 | Google attribution records the actual outcome. | `tests/mail.test.mjs:629` | asserted |
+| SEND-001 | 2 | Microsoft attribution records the Microsoft route. | `tests/mail.test.mjs:635` | asserted |
+| SEND-001 | 2 | Microsoft attribution records the mailbox address. | `tests/mail.test.mjs:635` | asserted |
+| SEND-001 | 2 | Microsoft attribution records the actual outcome. | `tests/mail.test.mjs:635` | asserted |
 | SEND-001 | 2 | Timeline names sender and provider-accepted state. | `tests/mail.test.mjs:633` | asserted |
 | SEND-001 | 2 | Audit retains actual actor and sender address. | `tests/mail.test.mjs:632` | asserted |
 | SEND-001 | 3 | Every refused duplicate/unverified/no-SMTP connection preserves all bindings. | `tests/mail.test.mjs:620` | asserted |
@@ -378,7 +403,9 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | SEND-011 | 2 | Automatic/bulk messages leave no record, notification, audit or state change. | `tests/mail.test.mjs:647` | asserted |
 | SEND-011 | 3 | Reply cap notifies owner only once. | `tests/mail.test.mjs:671` | asserted |
 | SEND-011 | 3 | Non-owner receives no cap notice. | `tests/mail.test.mjs:668` | asserted |
-| SEND-011 | 4 | Claimed From, SPF and DKIM fields are retained from the provider result. | `tests/mail.test.mjs:653` | asserted |
+| SEND-011 | 4 | Inbound reply retains its claimed From. | `tests/mail.test.mjs:653` | asserted |
+| SEND-011 | 4 | Inbound reply retains provider SPF result. | `tests/mail.test.mjs:653` | asserted |
+| SEND-011 | 4 | Inbound reply retains provider DKIM result. | `tests/mail.test.mjs:653` | asserted |
 | SEND-011 | 4 | Displayed From remains explicitly unproven. | `tests/mail.test.mjs:656` | asserted |
 | REPORT-005 | 1 | Every filtered row and field equals the screen in order. | `tests/platter.test.mjs:591` | asserted |
 | REPORT-005 | 1 | CSV count and exact currency total equal the fixture. | `tests/platter.test.mjs:592` | asserted |
@@ -394,3 +421,10 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | SEND-003 | 1 | Removing the viewer revokes their link. The assertions are in tests/recipients-http.mjs, which the old Status Evidence does not cite. | none | none |
 | SEND-003 | 1 | Stakeholder conversion sends no automatic invitation. | `tests/platter.test.mjs:2766` | asserted |
 | SEND-003 | 1 | Stakeholder conversion creates no invitation authority. | `tests/platter.test.mjs:2767` | asserted |
+| EDIT-014 | 1 | Each individual PDF page identifies the chosen package; aggregate PDF text does not assert this per-page outcome. | none | none |
+| COLLAB-003 | 1 | Restored revision four cannot be sent until it is approved again; the expected-status assertion is in tests/harness.mjs, outside this clause’s old Evidence set. | none | none |
+| SIGN-008 | 1 | The accepted-by-upload agreement is followed by a client-facing deposit request; owner invoice export and its CSV are asserted, while this outbound request is not. | none | none |
+| TRACK-001 | 1 | The rendered proposal timeline shows city for both recipient views. API record assertions do not assert that rendered field; the cited browser file only imports tests/tracking-browser.mjs. | none | none |
+| TRACK-001 | 1 | The rendered proposal timeline shows region for both recipient views. API record assertions do not assert that rendered field; the cited browser file only imports tests/tracking-browser.mjs. | none | none |
+| TRACK-001 | 1 | The rendered proposal timeline shows country for both recipient views. API record assertions do not assert that rendered field; the cited browser file only imports tests/tracking-browser.mjs. | none | none |
+| TRACK-001 | 1 | The rendered proposal timeline shows device class for both recipient views. API record assertions do not assert that rendered field; the cited browser file only imports tests/tracking-browser.mjs. | none | none |

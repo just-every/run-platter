@@ -8,13 +8,13 @@ A claim is done when every clause behind it is done, missing when every one is m
 | --- | --- | --- | --- |
 | 1 | Branded proposals from your templates and catalog | `EDIT-001` partial; `EDIT-002` partial; `CAT-001` partial | partial |
 | 2 | Sent from your own mailbox | `SEND-001` partial; `SEND-011` partial | partial |
-| 3 | Shows what each client read | `TRACK-001` done; `TRACK-002` partial | partial |
+| 3 | Shows what each client read | `TRACK-001` partial; `TRACK-002` partial | partial |
 | 4 | Collects the signature and deposit together | `SIGN-001` partial; `SIGN-003` partial; `PAY-001` partial; `PAY-002` partial | partial |
 | 5 | Good / Better / Best packages, add-ons, Austin sales tax, 50% deposit | `PRICE-001` partial; `PRICE-002` partial; `PRICE-005` missing; `PRICE-007` partial | partial |
 | 6 | HubSpot deal won, QuickBooks invoice paid | `CRM-001` missing; `ACCT-001` missing | missing |
 | 7 | 100% free, open source alternative to PandaDoc, Proposify and Better Proposals; MIT licensed | `MIG-001` missing; `MIG-002` missing; `MIG-003` missing | missing |
 | 8 | Run Platter (the one-line start) | `SITE-001` partial | partial |
-| 9 | Sent, read, back and forth, signed, first payment, per proposal | `SEND-001` partial; `SEND-011` partial; `TRACK-001` done; `NEG-001` done; `SIGN-003` partial; `PAY-001` partial; `PAY-002` partial; `PAY-004` missing | partial |
+| 9 | Sent, read, back and forth, signed, first payment, per proposal | `SEND-001` partial; `SEND-011` partial; `TRACK-001` partial; `NEG-001` done; `SIGN-003` partial; `PAY-001` partial; `PAY-002` partial; `PAY-004` missing | partial |
 | 10 | The agent drafts a priced proposal from a Zoom call, each line cited | `AGENT-001` partial; `AI-001` partial | partial |
 | 11 | Proposal agents use the company’s class policy for drafting and sending | `ACCESS-001` partial; `PROP-001` partial | partial |
 | 12 | Lines from the catalog; items not in it left out | `CAT-001` partial; `PRICE-001` partial | partial |
@@ -30,7 +30,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 22 | The resend uses the address on Tom's HubSpot contact | `CRM-001` missing | missing |
 | 23 | Retainers: $1,200.00/mo × 12, $650.00/mo × 6 | `PRICE-003` done; `PAY-003` missing | partial |
 | 24 | Clients ask on the page; the firm replies | `FOLLOW-004` partial | partial |
-| 25 | Rev 2 with every change marked; the rev 1 link retired | `NEG-001` done; `COLLAB-003` done; `PROP-002` partial | partial |
+| 25 | Rev 2 with every change marked; the rev 1 link retired | `NEG-001` done; `COLLAB-003` partial; `PROP-002` partial | partial |
 | 26 | Signed on her phone | `EDIT-007` partial; `SIGN-001` partial | partial |
 | 27 | Two client signers in order, each with a mailbox code | `SIGN-001` partial; `SIGN-004` partial | partial |
 | 28 | ESIGN consent, drawn and typed signatures | `SIGN-003` partial | partial |

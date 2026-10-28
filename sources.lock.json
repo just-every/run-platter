@@ -3313,6 +3313,10 @@
       "sha256": "3fcc357679d6bb6c867046f9e8d127ee7f7847e6e49ec73cd609a140e12fbe30",
       "executable": false
     },
+    "tests/revenue-fixture.mjs": {
+      "sha256": "3c397d6ac1ada840f0a1d428200d728b17f69a41e9505a675a4051ef7bc674d3",
+      "executable": false
+    },
     "tests/signer-replacement-http.mjs": {
       "sha256": "3fe3642bdbd3b1e78b20c52b3548f2d1695882420964c4f3381c5cb6b52cb891",
       "executable": false

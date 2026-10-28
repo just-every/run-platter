@@ -86,6 +86,8 @@ jobs:
           node-version: 22.20.0
       - run: corepack enable && corepack prepare pnpm@10.12.4 --activate
       - run: pnpm install --frozen-lockfile
+      - name: Check generated contract documents
+        run: node src/base/contract-docs.mjs check
       - name: Install Chromium
         if: matrix.shard == 'runtime' || matrix.shard == 'browser_documents'
         run: |
@@ -117,6 +119,8 @@ jobs:
           node-version: 22.20.0
       - run: corepack enable && corepack prepare pnpm@10.12.4 --activate
       - run: pnpm install --frozen-lockfile
+      - name: Check generated contract documents
+        run: node src/base/contract-docs.mjs check
       - name: Install Chromium
         run: |
           set -euo pipefail

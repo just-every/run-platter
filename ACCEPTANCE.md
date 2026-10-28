@@ -2,18 +2,18 @@
 
 # Accept a Platter installation
 
-The primary journey: Exercise the capabilities and acceptance journeys below.
+The primary journey: write and price a proposal, approve its exact revision, send, follow up and negotiate, sign, collect payment, reconcile, hand off delivery and renew.
 
 ## Progress
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 51 | 39 | 51 | 141 |
-| Agent surface | 0 | 0 | 0 | 0 |
+| Core | 13 | 92 | 54 | 159 |
+| Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 51 | 39 | 51 | 141 |
+| Full target | 13 | 92 | 58 | 163 |
 
-Judged from the code and tests at commit `83c5300be4eee707af37fecfe7b53016a3fe3e05` (28 October 2026). PRICE-003 retains main’s assertion repairs and judgment. AUTO-004 remains partial under the ct demotion of 27 October 2026 at 23:04Z; the corrected behavior and new assertions require fresh judgment. No ct acceptance or landing receipt is claimed. Field proof register: 0 rows; 0 passed, 0 failed, 0 not run.
+Judged from the code and tests at commit `83c5300be4eee707af37fecfe7b53016a3fe3e05` (28 October 2026). PRICE-003 retains main’s assertion repairs and judgment. AUTO-004 remains partial under the ct demotion of 27 October 2026 at 23:04Z; the corrected behavior and new assertions require fresh judgment. No ct acceptance or landing receipt is claimed. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -21,180 +21,194 @@ Judged from the code and tests at commit `83c5300be4eee707af37fecfe7b53016a3fe3e
 
 #### HTTP-001 — Authorized domain dispatch
 
-Core · published · **done**
+Core · published · **partial** · Cites BASE-ACCESS-002, BASE-ACCESS-004, BASE-ROLE-001
 
-**Requirement.** Every proposal, client, import and invoice handler checks a native Base owner or member session, or a revocable owner-bound agent key, before it reads or writes. Browser mutations require the configured Origin and Host and refuse cross-site requests. Which role may take which action is `TEAM-001`, with approving and sending set by `APPROVE-003`; every refusal is a 403 with no write. Signed-out readers of `/app` are sent to sign-in, and unknown routes return real 404s.
+**Requirement.** The proposal, client, import and invoice doors use TEAM-001 rights and APPROVE-003 proposal authority. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#http-001).
 
 **Acceptance.**
-1. Through HTTP: read state signed out (401), post a mutation from a foreign Origin (403), call a domain command with a revoked agent key (401) and as a member for an owner-only action (403).
+1. Read proposal state while signed out: no private record is returned.
+2. Attempt a client mutation from a foreign origin: no client is written.
+3. Revoke a proposal key and attempt another domain command: no command runs.
+4. A member attempts an owner-only invoice export and import: neither changes records.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/http.ts`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Owner-only invoice/import attempts are refused without record changes. Expected statuses are checked by tests/harness.mjs, outside this clause’s cited evidence; the complete no-write outcome is not asserted here.
 
-#### ACCESS-001 — Revocable agent keys that only draft
+#### ACCESS-001 — Proposal preparation grants
 
-Core · published · **done**
+Core · published · **partial** · Cites BASE-AGENT-004, BASE-AGENT-005, BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** An owner issues an agent key with a label and a 30-day expiry, stored only as a hash and bound to that owner's current account version. An agent key can read context and prepare or revise drafts, and nothing else: it cannot add clients, approve prices, send offers or export invoices. Revoking the key, or the owner losing the owner role, ends its access at once. Drafts an agent prepares are attributed to the key, and a draft prepared or last revised by an agent key always needs a person's approval before it is sent (`PROP-001`), even where the approval policy lets proposals that match no rule go without one (`APPROVE-003`).
+**Requirement.** A person grants proposal context and preparation access. Proposal preparation and revision carry standard; client creation carries standard; sending carries external and commitment; price approval and signatures carry commitment; invoice export carries standard. The company policy decides these calls, within the sponsor’s proposal rights. The legacy-key migration details are in [proposal behavior](docs/contract-behavior.md#access-001).
 
 **Acceptance.**
-1. Create a key, prepare a draft with it, try to approve and add a client with it (403), revoke it, and read context with it again (401).
+1. Create a labelled grant and prepare a proposal attributed to it.
+2. Under a held company policy, price approval waits for the named person and client creation follows its standard rule; under the all-autonomous company policy, each permitted call runs.
+3. Revoke the grant and read context again: access is refused.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/credentials.ts`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Company-policy decisions under held. No asserting line in the old cited evidence. all-autonomous policies. No asserting line in the old cited evidence.
 
 ### Approval, sending and acceptance
 
 #### PROP-001 — Approval binds the exact revision
 
-Core · published · **done**
+Core · published · **partial** · Cites BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** Every approval names one exact revision. Saving a new revision clears every approval the proposal holds, so a changed price, scope or term can never be sent on an earlier approval, and each approval is recorded with its approver, role, rule, revision and time. Who may approve and send, and which proposals need approval at all, is the approval policy of `APPROVE-003`. Its default, which every installation starts with and keeps until the owner changes it, is the first release's rule: every proposal needs approval, and only a person with the owner role approves. A draft prepared or last revised by an agent key (`ACCESS-001`) always needs a person's approval, whatever the policy says. `APPROVE-001` and `APPROVE-003` decide which approvals apply; neither can remove the exact-revision binding.
+**Requirement.** Every proposal approval binds one exact revision. Revised scope, price or terms clear prior approvals. APPROVE-001 and APPROVE-003 choose the applicable proposal approval steps. An agent’s binding decision carries commitment and follows company policy. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#prop-001).
 
 **Acceptance.**
-1. Under the default policy: approve a stale revision (409), approve the current one as the owner, revise the price, try to send (409), approve the new revision and send; two approval records exist, each naming its revision.
-2. The same binding for a manager's approval under a rule is part of the `APPROVE-003` journey.
+1. Under the held proposal policy, a stale approval is refused; approve the current revision, revise its price and attempt to send: sending waits for the new revision’s approval.
+2. After approving the new revision and sending, two retained approval records identify their respective revisions, approvers, roles, rules and times.
+3. A manager’s approval under a matching rule binds the same exact revision.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/commands.ts`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Stale approval. The expected-status assertions for these actions live in the uncited harness. send-after-edit refusal. The expected-status assertions for these actions live in the uncited harness. Every retained approval’s approver. No asserting line in the old cited evidence. role. No asserting line in the old cited evidence. rule. No asserting line in the old cited evidence. time are read together. No asserting line in the old cited evidence.
 
 #### PROP-002 — Sending freezes the offer
 
-Core · published · **done**
+Core · published · **partial** · Cites BASE-ROLE-001
 
-**Requirement.** Sending freezes the approved revision: its scope, options and prices can no longer be edited in place. Anyone who may send the proposal under `APPROVE-003` (the owner, under the default policy) can send a fresh invitation, which rotates the client link and clears any verification session without changing the offer, so it needs no new approval. A change after sending is a new revision under `NEG-001`, never an edit to what the client already holds.
+**Requirement.** Sending freezes the approved revision: its scope, options and prices can no longer be edited in place. Anyone who may send the proposal under `APPROVE-003` (the owner, under the default policy) can send a fresh invitation, which rotates the client link and clears any verification session without changing the offer, so it needs no new approval. A change after sending is a new revision under `NEG-001`, never an edit to what the client already holds. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#prop-002).
 
 **Acceptance.**
 1. Send an approved proposal, try to revise it (409), send a fresh invitation and confirm the old link is refused and the offer unchanged.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/commands.ts`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Frozen-offer revision refusal. The expected-status assertion is in tests/harness.mjs, outside the cited files.
 
 #### SIGN-001 — Verified-mailbox acceptance
 
-Core · published · **done**
+Core · published · **partial** · Rules D-1
 
-**Requirement.** A client invitation grants access only to its own frozen offer. Acceptance needs a mailbox verification code: six digits, single use, valid for 10 minutes, at most five attempts, one request a minute and ten codes per invitation. Verification grants acceptance authority only for that invitation and revision, through an HttpOnly, SameSite=Strict cookie scoped to the invitation path. The code stays the default identity check for every proposal; a firm that wants the incumbents' link-only acceptance chooses it explicitly per proposal or template under `SIGN-006`, and the certificate records the method.
+**Requirement.** A client invitation grants only its frozen offer. Mailbox verification is the initial signing method; the firm can explicitly choose SIGN-006 alternatives. Verification binds the invitation and revision. [Proposal behavior](docs/contract-behavior.md#sign-001) states code and cookie limits.
 
 **Acceptance.**
-1. Accept before verifying (401), verify, submit a code again (401), exhaust five wrong attempts and see the right code refused, expire a code and see it refused.
+1. Acceptance before mailbox verification is refused.
+2. A valid six-digit mailbox code verifies its invitation; reusing it is refused.
+3. Five wrong attempts exhaust a code, including a later correct attempt.
+4. An expired code is refused.
+5. Requests are limited to one per minute and ten per invitation; codes expire after ten minutes.
+6. The verification cookie is private to its invitation, HttpOnly and SameSite Strict; another revision gains no authority.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/signing.ts`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: A previously valid unconsumed code is refused specifically after its expiry. The expiry case reuses an already-exhausted condition and submits an arbitrary code, so it does not isolate expiry. Ten-code invitation ceiling. No asserting line in the old cited evidence. exactly ten-minute lifetime. No asserting line in the old cited evidence. Cookie path and SameSite/HttpOnly flags. Cookie presence alone does not assert these properties. another revision’s denied authority. Cookie presence alone does not assert these properties.
 
 #### SIGN-002 — Immutable acceptance with an integer-cent deposit
 
-Core · published · **done**
+Core · published · **partial** · Rules D-1
 
-**Requirement.** Acceptance requires a verified mailbox, a typed full name, one offered option and explicit consent. One D1 transaction retains the exact approved snapshot, signer, consent text and time, and calculates the deposit in integer cents, rounding to the nearest cent. A second acceptance returns the first; nothing in the product edits an accepted agreement.
+**Requirement.** Acceptance requires a verified mailbox, a typed full name, one offered option and explicit consent. One D1 transaction retains the exact approved snapshot, signer, consent text and time, and calculates the deposit in integer cents, rounding to the nearest cent. A second acceptance returns the first; nothing in the product edits an accepted agreement. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-002).
 
 **Acceptance.**
 1. Accept with an unknown option (400), accept option two with consent, accept again with another name and option, and read back the first acceptance with total 420000 and deposit 105000 cents.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/signing.ts`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Replay retains the first selected option. Signer. money are read. but the repeated acceptance’s exact option id is not read back in this case.
 
 #### INV-001 — One retained deposit invoice per acceptance
 
-Core · published · **done**
+Core · published · **partial**
 
-**Requirement.** An owner exports the accepted deposit as an invoice record. A unique proposal-to-invoice binding makes concurrent and repeated exports return one retained invoice with one number, and the export can be downloaded again without creating another. Re-downloading never authorizes posting the same invoice to accounting twice; `ACCT-004` carries this one-invoice rule into live accounting sync. The first release writes a Xero-format CSV; the export rejects proposals that are not accepted. Spreadsheet formula characters in client-controlled cells are neutralized.
+**Requirement.** An owner exports the accepted deposit as an invoice record. A unique proposal-to-invoice binding makes concurrent and repeated exports return one retained invoice with one number, and the export can be downloaded again without creating another. Re-downloading never authorizes posting the same invoice to accounting twice; `ACCT-004` carries this one-invoice rule into live accounting sync. The first release writes a Xero-format CSV; the export rejects proposals that are not accepted. Spreadsheet formula characters in client-controlled cells are neutralized. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#inv-001).
 
 **Acceptance.**
 1. Export an unaccepted proposal (409), export an accepted one twice concurrently and get one invoice, and download its CSV.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/invoices.ts`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Unaccepted invoice export is refused. Expected-status assertion is in the uncited harness.
 
 ### Clients, erasure and archives
 
 #### IMPORT-001 — Reviewed client CSV move-in with undo
 
-Core · published · **done**
+Core · published · **partial** · Cites BASE-DATA-001
 
-**Requirement.** The client CSV kit previews the exact source bytes without writing, and applies only the file whose fingerprint was reviewed. Base import-kit retains the original, its fingerprint, a journal and reversible native writes. Re-applying returns the same job. Undo restores the previous state and refuses when an imported client has changed or has dependent proposals.
+**Requirement.** A reviewed client CSV becomes native clients through the Base import door. Client dependencies prevent unsafe undo. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#import-001).
 
 **Acceptance.**
-1. Preview `fixtures/clients.csv`, apply a changed file against the reviewed fingerprint (409), apply the reviewed file, read the journal, re-apply, undo, and see an undo refused once a proposal uses an imported client.
+1. Preview the client fixture without writing clients.
+2. Applying changed bytes against the reviewed fingerprint is refused.
+3. Apply the reviewed bytes, read their original and journal, and replay: the same import job is returned.
+4. Undo restores the previous clients; a changed imported client or one with dependent proposals prevents undo.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/movein/index.ts`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Changed-file apply refuses the reviewed fingerprint. Expected-status assertion lives in the uncited harness. Changed imported client prevents undo. The cited journey does not assert this separate changed-client case.
 
 #### ERASE-001 — Bounded client erasure
 
-Core · published · **done**
+Core · published · **partial** · Cites BASE-DATA-003, BASE-DATA-006, BASE-DATA-001
 
-**Requirement.** An owner erases a client by typing the exact client name. Erasure is limited to clients with no proposals and no import history; agreements remain retained business records. Erasure writes a portability fence, so an older archive cannot restore the erased client and in-flight transfers are invalidated.
+**Requirement.** An owner erases a client by typing the exact client name. Erasure is limited to clients with no proposals and no import history; agreements remain retained business records. Erasure writes a portability fence, so an older archive cannot restore the erased client and in-flight transfers are invalidated. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#erase-001).
 
 **Acceptance.**
 1. Erase a client with a draft (409), erase with the wrong name (400), erase an unused client, then restore an older archive with the newer erasure journal and find the client absent.
 
 **Evidence.** `tests/platter.test.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Draft. wrong-name refusals. Expected-status assertions are in the uncited harness.
 
 #### PORT-001 — Validated archives and restore
 
-Core · published · **done**
+Core · published · **partial** · Cites BASE-DATA-001, BASE-BACKUP-001
 
-**Requirement.** RER archives preserve clients, proposals, revisions, approvals, immutable acceptances and deposit invoices. Credentials, sessions, client invitation links, verification state and mail do not travel. Restore requires an empty destination and valid integrity, and refuses an older archive without a newer erasure journal. Sent offers need fresh invitations after restore.
+**Requirement.** The Platter archive carries clients, proposals, revisions, approvals, immutable acceptances and deposit invoices. It carries no credentials, sessions, invitation links, verification authority or mail. Sent offers require fresh invitations after restore. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#port-001).
 
 **Acceptance.**
-1. Through the public CLI: export, import into an empty checkout and re-export identical parts, refuse a populated destination (4), refuse a damaged archive (1), and refuse an older archive after an erasure (4).
+1. Export, restore to an empty installation and re-export: the record and attachment parts are identical.
+2. A populated destination and a damaged archive are refused.
+3. An older archive after erasure is refused without the newer erasure journal.
 
 **Evidence.** `tests/archive.test.mjs`, `src/platter/archive-policy.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: All record. The archive journey asserts many records but never compares the complete re-exported part manifest. attachment parts are identical after export/import/re-export. The archive journey asserts many records but never compares the complete re-exported part manifest.
 
 ### Mail and the public site
 
 #### MAIL-001 — Durable proposal mail with honest outcomes
 
-Core · published · **done**
+Core · published · **done** · Cites BASE-MAIL-001, BASE-OPS-003, BASE-OPS-004
 
-**Requirement.** Local proposal and verification mail is captured without a provider. Hosted mail is queued durably in the same transaction as the action that sends it, claimed before contacting the configured sender, and records an uncertain outcome without a blind retry. Provider acceptance is shown as accepted by the provider, never as delivered; `SEND-002` adds delivery and bounce states.
+**Requirement.** Proposal and verification mail share the offer transaction. Local development captures these messages. The seed’s delivery and bounce outcomes are SEND-002. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#mail-001).
 
 **Acceptance.**
-1. A Workers journey with a provider fake at the network edge: send, see the row claimed before the call, return accepted, then return a timeout and see the row left uncertain and not resent.
+1. Send a proposal and request mailbox verification locally: both messages are captured without a provider request.
+2. With a mail-provider fake, the proposal and mail row exist and are claimed before provider contact.
+3. A provider timeout leaves the message uncertain; processing again sends no duplicate.
 
 **Evidence.** `src/platter/mail.ts`, `tests/mail.test.mjs`
 **Gap.** None.
 
 #### SITE-001 — Public run site and documentation
 
-Core · published · **done**
+Core · published · **partial** · Cites BASE-DOCS-001, BASE-PUBLIC-001
 
-**Requirement.** The public run site is built with `rer build --site`. Its homepage's Run Platter action opens `/run`, and `/docs` renders the repository's Markdown guides without JavaScript. The installed root stays the shared Lobby. Run-site deployment is guarded by `RUN_SITE_DEPLOY` and stays off until its gate.
+**Requirement.** The public run site’s Run Platter action opens the runnable product. Its guides work without JavaScript; the installed home remains the shared Lobby. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#site-001).
 
 **Acceptance.**
-1. Build the site, open `/` and follow Run Platter to `/run`, open `/docs` with JavaScript disabled, and open the installed `/` to see the Lobby.
+1. Build the public site and follow Run Platter to the run page.
+2. Open the guides without JavaScript and read their Markdown content.
+3. Open the installed home and see the Lobby.
 
 **Evidence.** `tests/site.test.mjs`, `scripts/verification/run.mjs`, `src/site/pages.ts`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Run Platter opens the run page. Browser assertions are in tests/site-lifecycle.mjs, while the cited tests/site.test.mjs only imports suites. Markdown is readable with JavaScript disabled. Browser assertions are in tests/site-lifecycle.mjs, while the cited tests/site.test.mjs only imports suites. Installed home is the Lobby. Browser assertions are in tests/site-lifecycle.mjs, while the cited tests/site.test.mjs only imports suites.
 
 ### Authoring and branding
 
 #### EDIT-001 — Branded drag-and-drop proposal editor
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-INPUT-002, BASE-INPUT-003, BASE-ACCESSIBILITY-001 · Rules D-1
 
-**Requirement.** A member builds a proposal from blocks: cover page, heading, rich text, image, video, columns, pricing table (`PRICE-001`), quote or testimonial, team bio, case study, terms, form field (`SIGN-007`), signature block and page break. Every signature block and field is assigned to one recipient, or in a template to one recipient role (`SIGN-011`). Blocks are added from a palette, reordered by drag or keyboard, duplicated and deleted with undo. A brand kit sets the logo, colors, fonts and a default cover. One document renders as a responsive web page for the client and as a paginated US Letter PDF (`EDIT-005`) with the same content, and members and approvers see that client page for an unsent revision through the preview of `EDIT-018`. Edits autosave under the version guard of `COLLAB-001`, and the editor meets the large-proposal performance budget of `EDIT-011`.
-
-All added blocks and media extend EDIT-014’s exact-revision, selected-price and every-page unsigned PDF journey before shipping.
-
-Implemented document semantics: the Client role binds each current form/signature block to the proposal’s invited client and is rebound when a person chooses the destination client for a duplicate or template start. SIGN-004 and SIGN-011 inherit additional participants and roles; SIGN-003, SIGN-005 and SIGN-007 retain their disclosure, adopted-signature, certificate, file-collection and downstream-value obligations. Display-media uploads require explicit consent and use separate scoped references; EDIT-006 inherits its external embeds and galleries without making ordinary attachments inline. A pricing block places an existing table; remove or reassign its placement before changing that package’s table count.
+**Requirement.** A member builds a proposal from blocks: cover page, heading, rich text, image, video, columns, pricing table (`PRICE-001`), quote or testimonial, team bio, case study, terms, form field (`SIGN-007`), signature block and page break. Every signature block and field is assigned to one recipient, or in a template to one recipient role (`SIGN-011`). Blocks are added from a palette, reordered by drag or keyboard, duplicated and deleted with undo. A brand kit sets the logo, colors, fonts and a default cover. One document renders as a responsive web page for the client and as a paginated US Letter PDF (`EDIT-005`) with the same content, and members and approvers see that client page for an unsent revision through the preview of `EDIT-018`. Edits autosave under the version guard of `COLLAB-001`, and the editor meets the large-proposal performance budget of `EDIT-011`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-001).
 
 **Acceptance.**
 1. A browser journey at 1440 and 390 pixels builds a proposal from blank with every block type, reorders by drag and by keyboard, applies a brand kit, reloads and sees the same document, and exports a PDF whose pages carry the same blocks in order; the `EDIT-011` budget journey passes on the same build.
 
-**Evidence.** `tests/site.test.mjs` — “EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths” (blank document, every block, actions, brand, persistence, preview, ordered PDF and tooltips at 1440/390); `tests/platter.test.mjs` — “EDIT-001 document revisions preserve ordered blocks and brand through preview, restore, copies, templates, negotiation and exact client PDF”, “EDIT-001 block saves enforce live proposal scope, stale versions, content bounds, safe brand values and locked terms”, “EDIT-001 display media requires consent and live edit scope, stays private until placed and keeps exact bytes through copies and templates”, “EDIT-001 Client-assigned required fields and typed signature blocks validate at signing and freeze exact values with the selected agreement”, and “EDIT-001 new sections inherit verified questions and opt-in tracked edits without changing the sent document or bypassing review”; `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority”; `tests/editor-budget.mjs` — forty-page 4×-CPU journey, run separately on the exact candidate (all EDIT-011 timing budgets)
-**Gap.** None.
+**Evidence.** `tests/site.test.mjs`, `tests/platter.test.mjs`, `tests/archive.test.mjs`, `tests/editor-budget.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every palette block. drag. keyboard reorder. brand. reload. same-order PDF at 1440. Assertions are in imported browser helpers. not the old cited wrapper. The same complete browser flow at 390. Assertions are in imported browser helpers. Performance proof on the same exact build as the editor browser flow. No assertion in the cited files binds the two receipts to the same candidate.
 
 #### EDIT-002 — Proposal templates
 
-Core · target · **partial**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** Owners, admins, managers and content editors publish templates (layout, blocks, default pricing tables, terms, payment methods (`PAY-001`), deposit and payment schedule (`PRICE-007`), reminder schedule and expiry period (`FOLLOW-006`), variables, and recipient roles with their assigned fields, signing order and pre-assigned recipients under `SIGN-011`) that members start proposals from; a proposal started from a template opens with the template's role slots to fill. Platter ships starter templates for US agencies, consultancies, IT managed services, creative studios and professional services. Any member who edits proposals can save one as a personal template they own; only the template roles of `TEAM-001` edit shared templates. Templates have owners, folders and access rules (`TEAM-001`), and changing a template never changes proposals already created from it.
-
-Template defaults inherit EDIT-014’s PDF-download enable/disable setting and identical named PDF assertions before shipping.
+**Requirement.** Owners, admins, managers and content editors publish templates (layout, blocks, default pricing tables, terms, payment methods (`PAY-001`), deposit and payment schedule (`PRICE-007`), reminder schedule and expiry period (`FOLLOW-006`), variables, and recipient roles with their assigned fields, signing order and pre-assigned recipients under `SIGN-011`) that members start proposals from; a proposal started from a template opens with the template's role slots to fill. Platter ships starter templates for US agencies, consultancies, IT managed services, creative studios and professional services. Any member who edits proposals can save one as a personal template they own; only the template roles of `TEAM-001` edit shared templates. Templates have owners, folders and access rules (`TEAM-001`), and changing a template never changes proposals already created from it. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-002).
 
 **Acceptance.**
 1. Create a template with a pricing table and variables, start two proposals from it, edit the template, and confirm both proposals are unchanged while a third proposal picks up the edit.
@@ -209,23 +223,21 @@ Template defaults inherit EDIT-014’s PDF-download enable/disable setting and i
 
 #### EDIT-003 — Reusable content library
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-003 · Rules D-1
 
-**Requirement.** A shared library holds sections, images, videos, case studies, team bios, testimonials, terms and pricing tables, with folders, tags and search. Owners, admins, managers and content editors create and edit library items, and every member who edits proposals inserts them (`TEAM-001`). A member inserts an item as a linked copy (updated when the library item changes, until the proposal is sent) or as a detached copy. Sent and accepted proposals never change when the library does. Each item shows where it is used and when it last changed.
+**Requirement.** A shared library holds sections, images, videos, case studies, team bios, testimonials, terms and pricing tables, with folders, tags and search. Owners, admins, managers and content editors create and edit library items, and every member who edits proposals inserts them (`TEAM-001`). A member inserts an item as a linked copy (updated when the library item changes, until the proposal is sent) or as a detached copy. Sent and accepted proposals never change when the library does. Each item shows where it is used and when it last changed. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-003).
 
 **Acceptance.**
 1. Insert a linked and a detached case study into a draft and a sent proposal, edit the library item, and see only the linked copy in the draft change; the item's usage list names all three.
 
-**Evidence.** `tests/platter.test.mjs` — “EDIT-003 linked draft copies propagate atomically while detached, sent and accepted copies retain exact content” proves linked and detached case-study insertion, all three usage entries, atomic draft propagation, approval invalidation, immutable sent and accepted content, independent copies and template starts, permanent manual detachment, rich-media replacement with exact original bytes, and recalculated pricing tables. `tests/platter.test.mjs` — “EDIT-003 insertion enforces live role, folder and proposal scope, consent, stale versions and locked terms without writes” proves absent or revoked consent and revoked editor access refuse insertion without writes, live role and folder scope, stale-version and locked-term refusals, rollback and usage privacy. `tests/site.test.mjs` — “EDIT-003 linked and detached library insertion, frozen sending and scoped usage at desktop and phone widths” proves native creation and insertion, tags and search, exact visible content, usage and change labels, existing icon tooltips, image decoding and video playback at 1440 and 390. `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority” proves rich library payloads, tags, usages, exact media bytes, independent restored insertion and resumed linked-only draft updates through export and import. Existing named TEAM-001 role and folder journeys prove library editing rights and folder audiences.
-**Gap.** The shared library holds text sections, case studies, bios, testimonials, terms, validated images and videos, and USD pricing tables. Team folders, tags and case-insensitive search ship. Media and tables are saved from placed blocks in a proposal the library editor may edit, with explicit consent to its library audience; validated originals are retained independently. Pricing insertion targets a chosen package and recalculates integer-cent totals. Linked changes create unapproved draft revisions atomically, including negotiated drafts; detached copies, sent revisions and accepted content remain frozen. Manual changes permanently detach the affected copy. Usage lists retain only proposals the reader may already view and show copy mode, frozen state and last-change time. CT approval (24 October 2026, 04:45 UTC): a current proposal editor must explicitly consent at insertion to recipient display and future linked draft edits; usage grants no access beyond existing proposal visibility; sent and accepted content stays frozen. EDIT-002 and EDIT-005 inherit independent copied content, and EDIT-006 inherits consent and exact frozen media custody for future media capabilities.
+**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Linked draft changes while detached. The linked-propagation assertion is in tests/library-fixture.mjs, outside the old Evidence set. sent. The linked-propagation assertion is in tests/library-fixture.mjs, outside the old Evidence set. accepted copies do not. The linked-propagation assertion is in tests/library-fixture.mjs, outside the old Evidence set. Usage names exactly all three copies. No directly cited asserting line establishes the exact usage list.
 
 #### EDIT-004 — Variables from client, deal and CRM records
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** Text and pricing can use variables: client company, contact name and title, address, deal name and amount, sender details, dates and custom fields, filled from Platter records or from the linked HubSpot, Salesforce or Orbit deal (`CRM-001` to `CRM-003`). Template role slots (`SIGN-011`) are filled the same way, from the client's contacts or the deal's contacts. A variable with no value is flagged in the editor, and sending is refused until each one is filled or deliberately cleared. The sent revision freezes the filled values.
-
-Before shipping, extend EDIT-012 duplication assertions to refill every variable from the destination client and deal while leaving the source byte-identical.
+**Requirement.** Text and pricing can use variables: client company, contact name and title, address, deal name and amount, sender details, dates and custom fields, filled from Platter records or from the linked HubSpot, Salesforce or Orbit deal (`CRM-001` to `CRM-003`). Template role slots (`SIGN-011`) are filled the same way, from the client's contacts or the deal's contacts. A variable with no value is flagged in the editor, and sending is refused until each one is filled or deliberately cleared. The sent revision freezes the filled values. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-004).
 
 **Acceptance.**
 1. Create a proposal from a HubSpot deal fake with a missing contact title, see the send refused naming that variable, fill it, send, change the deal in the fake, and see the sent proposal unchanged.
@@ -235,74 +247,98 @@ Before shipping, extend EDIT-012 duplication assertions to refill every variable
 
 #### EDIT-005 — Word and PDF import and export
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** A member uploads a Word (.docx) file, such as a template or document downloaded as Microsoft Word from PandaDoc, Proposify or Better Proposals, and gets editable blocks (`EDIT-001`) with headings, paragraphs, lists, tables and images kept. Incumbent merge tokens, such as PandaDoc's `[Client.Company]`, `[Client.FirstName]` and `[Sender.FirstName]`, become `EDIT-004` variables through a published mapping table; a token with no mapping becomes a custom variable and is listed. A table whose header row names price, quantity or SKU columns (a quote or pricing table) becomes a `PRICE-001` pricing table: a row whose SKU, or failing that its name, matches a `CAT-001` item becomes a priced line item linked to that item at the row's quantity and price, and a row that matches nothing becomes an unlinked line item at its own name and price and is listed as unmatched for the member to link or keep. Images that the source file dropped, such as those PandaDoc leaves out of quote tables in its Word downloads, are listed as missing, never invented. A .docx can instead be imported as content library items (`EDIT-003`): the file is split at each Heading 1, and each part becomes one item named by its heading. A PDF upload is never converted to editable blocks. It becomes fixed pages, kept byte-identical, that carry signature, initials, date and form fields (`SIGN-003`, `SIGN-007`); the member can append editor blocks after them, including a pricing table, and set a payment schedule (`PRICE-007`), so a fixed-page document can still take payment at acceptance. Any proposal exports to PDF (US Letter or A4) and to Word: headings become Word heading styles, each pricing table becomes a Word table with every line's name, quantity, unit price and total, and images are embedded. The signed agreement PDF is `SIGN-005`.
-
-All imported blocks, fixed pages and media extend EDIT-014’s exact unsigned PDF assertions before shipping.
+**Requirement.** Word imports become editable proposal blocks with headings, paragraphs, lists, tables and images. Published token mappings create variables; unmapped tokens become listed custom variables. Quote tables match catalog items by SKU then name, retaining quantity and price; unmatched rows and missing images are listed. Word library imports split at each Heading 1. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-005).
 
 **Acceptance.**
-1. Import a catalog CSV, then upload a PandaDoc-shaped .docx template with headings, an image, `[Client.Company]` and `[Sender.FirstName]` tokens and a six-row quote table, five of whose SKUs are in the catalog and one of which is not: the result is a template whose blocks are editable, whose tokens are variables, and whose pricing table holds six priced line items, five linked to their catalog items and one listed as unmatched.
-2. Upload a .docx of 10 Heading 1 sections as library items and get 10 items named by those headings.
-3. Upload a PDF: its pages stay byte-identical and uneditable, a signature field is placed on page 3, and a pricing table appended after the last page totals the lines added.
-4. Export a proposal with three headings, a four-line pricing table and two images to .docx and PDF: the .docx has the three headings as Word heading styles, a Word table with each of the four lines' name, quantity, unit price and total, and both images embedded; the PDF has the same blocks in the same order.
+1. Import a PandaDoc-shaped Word template with headings, an image, company and sender tokens and six quote rows: the blocks are editable, tokens are variables, five SKU matches are linked and the unknown row is listed.
+2. Unmapped tokens become named custom variables; missing source images are reported rather than invented.
+3. Import ten Heading 1 sections as library content: ten items carry those headings.
+
+**Evidence.** None.
+**Gap.** No import or export of documents.
+
+#### EDIT-019 — Fixed PDF pages with signing fields
+
+Core · target · **missing** · From EDIT-005 · Rules D-1
+
+**Requirement.** An imported PDF keeps its original pages, with signing, initials, date and form fields. Editor blocks and a pricing table can follow the fixed pages, and the document can collect its scheduled payment.
+
+**Acceptance.**
+1. Upload a PDF: its original pages remain byte-identical and uneditable.
+2. Place a signature field on page 3; append pricing after the last page and verify its added lines total correctly.
+3. Fixed pages and added blocks retain the exact-revision unsigned-download behavior of EDIT-014.
+
+**Evidence.** None.
+**Gap.** No import or export of documents.
+
+#### EDIT-020 — Word and PDF exports
+
+Core · target · **missing** · From EDIT-005 · Rules D-1
+
+**Requirement.** Proposals export to US Letter or A4 PDF and Word. The signed agreement PDF remains SIGN-005.
+
+**Acceptance.**
+1. Export three headings, a four-line pricing table and two images to Word: headings use Word heading styles, the table carries every name, quantity, unit price and total, and both images are embedded.
+2. The PDF contains the same blocks in the same order.
 
 **Evidence.** None.
 **Gap.** No import or export of documents.
 
 #### EDIT-006 — Embedded rich media
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-INPUT-002, BASE-INPUT-003, BASE-PUBLIC-001 · Rules D-1
 
-**Requirement.** Proposals embed images and galleries, uploaded video, YouTube, Vimeo, Loom and Wistia video, a Dial or Calendly booking link and embedded PDFs. Embeds come from an allowlist with a content security policy, render on phones, and show a still and a link in the PDF export. Uploaded media is stored with the proposal and travels in archives (`PORT-002`).
+**Requirement.** Proposals embed images and galleries, uploaded video, YouTube, Vimeo, Loom and Wistia video, a Dial or Calendly booking link and embedded PDFs. Embeds come from an allowlist with a content security policy, render on phones, and show a still and a link in the PDF export. Uploaded media is stored with the proposal and travels in archives (`PORT-002`). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-006).
 
 **Acceptance.**
 1. Add an uploaded video, a Loom link and a gallery, view on a 390-pixel phone and play the video, export the PDF and see stills with links, and try an embed from a host outside the allowlist (refused).
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` — named point-by-point journeys above
-**Gap.** Uploaded images and videos, ordered galleries, canonical YouTube, Vimeo, Loom and Wistia video frames, Calendly booking frames and Google Drive PDF previews ship. Uploaded originals stay with the proposal; external content retains its canonical URL and uploaded poster. CT approval (24 October 2026, 08:09 UTC): owner and admins control the audited external-content setting, off on fresh installs; only those roles change external blocks, and author consent stays in the revision. Viewers opt in on each page load. Before opt-in there are no provider requests, cookies or browser storage; frames use the exact allowlist, a sandbox, no referrer and CSP frame sources. The owner kill switch replaces external content with a plain placeholder naming its provider on the next load. Evidence: `tests/platter.test.mjs` — “EDIT-001 display media requires consent and live edit scope, stays private until placed and keeps exact bytes through copies and templates” proves consent, live authority, no-write refusals, invalid-host refusal, all provider URL canonicalization, audited setting changes, kill-switch refusal for members, frozen originals, PDF stills and actionable URI annotations. `tests/site.test.mjs` — “EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths” proves native gallery and embed editing, video playback, decoded gallery images, the recorded before-consent and after-consent request log, absent provider cookies and browser storage, fresh consent after reload, booking and PDF frames, plain provider-named kill-switch placeholders, sandbox and no-referrer attributes, all PDF stills and links, no overflow and icon tooltips at 1440 and 390. `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority” proves exact media bytes and frozen gallery, video, booking and PDF-preview custody through export and import. The 08:09 UTC approval requires blocked content to name its provider; the disabled Loom, Calendly and Google Drive placeholders are asserted at both widths. Admin changes and all other product-role denials, per-change audit rows, retained author consent and exact CSP origins are asserted in the named media HTTP journey. EDIT-002, EDIT-003 and EDIT-005 inherit these consent and frozen-media obligations for future media carriers.
+**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Uploaded video. The browser helpers are not in the old Evidence set. gallery render. The browser helpers are not in the old Evidence set. play at 390. The browser helpers are not in the old Evidence set. PDF has still images. The old cited wrappers do not assert every named carrier. links. The old cited wrappers do not assert every named carrier. Outside-allowlist embed refusal. A command status in a helper is not an asserting line in the cited file.
 
 #### EDIT-007 — Mobile client review
 
-Core · target · **partial**
+Core · target · **partial** · Cites BASE-ACCESSIBILITY-001 · Rules D-1 · Register R-4, R-5
 
-**Requirement.** The client reads, chooses options, comments, signs and pays on a phone as well as on a desktop. The client page meets WCAG 2.2 AA, works with keyboard and screen reader, and needs no app or account.
+**Requirement.** The client reads, chooses options, comments, signs and pays on a phone as well as on a desktop. Clients need no app or product account. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-007).
 
 **Acceptance.**
-1. A browser journey at 390 pixels opens an invitation, verifies the mailbox, changes an optional item, comments, signs and pays with a Stripe test card; an axe scan reports no WCAG 2.2 AA violations and a keyboard-only run completes the same journey.
+1. A browser journey at 390 pixels opens an invitation, verifies the mailbox, changes an optional item, comments, signs and pays with a Stripe test card; the Base accessibility journey passes on the same client flow.
 
 **Evidence.** `src/platter/ui/client.ts`, `src/platter/ui/packages.ts`, `src/platter/ui/shared.ts`, `tests/site.test.mjs`, `tests/mobile-client-journey.mjs`
 **Gap.** Named EDIT-007 built-browser journeys at 1440 and 390 pixels complete invitation, mailbox verification, conditional package selection, adding an optional item and raising its quantity, comments and immutable acceptance of the selected total and deposit with keyboard-only client interaction and axe WCAG 2.2 AA scans at every step. Verification, comments and refusal pages preserve the reviewed package and optional items, and submission feedback receives keyboard focus. Package review uses a native fragment target to focus a named selection region containing the chosen package, optional-item quantities and exact USD total/deposit, including with application JavaScript disabled. Named EDIT-007 assertions expose current scope, grouped pricing and selection through browser accessibility APIs, correct an out-of-range quantity by keyboard, and download exact attachment bytes and the selected unsigned PDF before accepting. Gap: Stripe test-card payment (PAY-001/PAY-002) and assistive-technology verification of the complete rich-content/payment journey remain; this slice does not establish full WCAG conformity.
 
 #### EDIT-008 — Custom domain and branded client experience
 
-Core · target · **missing**
+Core · target · **missing** · Cites BASE-PUBLIC-002, BASE-MAIL-001 · Rules D-1 · Register R-10
 
-**Requirement.** An owner serves client links from their own domain, such as `proposals.example.com`, and sends from their own domain with SPF, DKIM and DMARC alignment checked before use. The client page, emails and PDF carry the firm's brand and no Platter branding.
+**Requirement.** An owner serves client links from their own domain, such as `proposals.example.com`, and sends from their own domain with SPF, DKIM and DMARC alignment checked before use. The client page, emails and PDF carry the firm's brand and no Platter branding. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-008).
 
 **Acceptance.**
-1. Configure a custom hostname and sending domain in a staging account, see the DNS checks pass, send, and open the client link on the custom domain with no Platter branding in page, email or PDF.
+1. Configure a hostname and sending domain through official-schema provider fakes: DNS checks pass, and the resulting client page, email and PDF contain the firm’s brand and no Platter branding.
 
 **Evidence.** None.
 **Gap.** Client links use the installation origin with Platter styling.
 
 #### EDIT-009 — Conditional content by package
 
-Core · target · **done**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** A section can be shown only when a package, optional item or variable has a given value, so choosing the Premium package shows its deliverables and timeline. The accepted agreement and PDF contain exactly what the client saw for their selection. Today this applies to the scope and terms sections, each conditioned on one offered package or one optional item (`PRICE-002`), including the selected unsigned client PDF (`EDIT-014`). An optional-item condition shows its section only while the client's chosen package has that item added, at any allowed quantity; a package without the item never shows it. Each future capability inherits the same conditional visibility and exact-selection assertions before shipping: `EDIT-001` added sections, `EDIT-004` variables, `EDIT-005` added PDF carriers and `SIGN-005` signed agreement PDFs. Unconditional legacy content remains visible for every selection. Members check each selection's sections before sending in the `EDIT-018` preview.
+**Requirement.** A section can be shown only when a package, optional item or variable has a given value, so choosing the Premium package shows its deliverables and timeline. The accepted agreement and PDF contain exactly what the client saw for their selection. For the proposal this applies to the scope and terms sections, each conditioned on one offered package or one optional item (`PRICE-002`), including the selected unsigned client PDF (`EDIT-014`). An optional-item condition shows its section only while the client's chosen package has that item added, at any allowed quantity; a package without the item never shows it. Each future capability inherits the same conditional visibility and exact-selection assertions before shipping: `EDIT-001` added sections, `EDIT-004` variables, `EDIT-005` added PDF carriers and `SIGN-005` signed agreement PDFs. Unconditional legacy content remains visible for every selection. Members check each selection's sections before sending in the `EDIT-018` preview. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-009).
 
 **Acceptance.**
 1. Make a timeline section depend on the Premium package, accept the Standard package and see the section absent from the agreement and PDF, then accept Premium on another copy and see it present.
 
 **Evidence.** `src/platter/conditional.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Current scope/terms and document blocks obey package or optional-item visibility; the named EDIT-001 HTTP and 1440/390 browser journeys extend preview, selected PDF and accepted-document custody. Future variable and signed-PDF carriers still inherit.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: The accepted selection’s agreement and PDF preserve exactly the visible sections. The representative assertions exercise the sections; variable-dependent conditions in the Requirement remain unproved.
 
 #### EDIT-010 — Attachments and vendor documents
 
-Core · target · **done**
+Core · target · **done** · Cites BASE-INPUT-003, BASE-DATA-001 · Rules D-1
 
-**Requirement.** A proposal carries attachments such as the firm's W-9, certificate of insurance, MSA or case-study PDFs. The firm stores its current W-9 and insurance certificate once and attaches them by default. Attachments are frozen with the sent revision and listed in the signed agreement package. Owner-only vendor settings keep immutable W-9 and insurance file versions; new proposals copy the current defaults. Owner/member people may upload arbitrary files or refresh current defaults on an unsent draft or approved proposal; either creates a new draft revision and clears approval. Existing revisions and sent offers never resolve a later default. Client links download only files in that exact sent revision, under the same invitation access as its offer; bytes are download-only and are not sent to an external provider. The immutable accepted snapshot retains file references with byte digests; the owner/client agreement package lists the same file versions, filenames and byte sizes. All original bytes and current defaults survive PORT-002 archives. SIGN-005 inherits the same list in its signed PDF package and TEAM-001 inherits scoped person authority before shipping.
+**Requirement.** A proposal carries attachments such as the firm's W-9, certificate of insurance, MSA or case-study PDFs. The firm stores its current W-9 and insurance certificate once and attaches them by default. Attachments are frozen with the sent revision and listed in the signed agreement package. Owner-only vendor settings keep immutable W-9 and insurance file versions; new proposals copy the current defaults. Owner/member people may upload arbitrary files or refresh current defaults on an unsent draft or approved proposal; either creates a new draft revision and clears approval. Existing revisions and sent offers never resolve a later default. Client links download only files in that exact sent revision, under the same invitation access as its offer; bytes are download-only and are not sent to an external provider. The immutable accepted snapshot retains file references with byte digests; the owner/client agreement package lists the same file versions, filenames and byte sizes. All original bytes and current defaults survive PORT-002 archives. SIGN-005 inherits the same list in its signed PDF package and TEAM-001 inherits scoped person authority before shipping. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-010).
 
 **Acceptance.**
 1. Upload a W-9 in settings, send a proposal, and as the client download the W-9; replace the W-9 in settings and see the sent proposal still carry the original.
@@ -312,41 +348,52 @@ Core · target · **done**
 
 #### EDIT-011 — Large-proposal performance budget
 
-Core · target · **done**
+Core · target · **done** · Rules D-1
 
-**Requirement.** The editor and client page stay fast on the proposals agencies actually send. The reference document is 40 US Letter pages with 30 images (2400-pixel JPEGs of about 500 KB each) and four pricing tables of 15 lines. Measured in Chromium at 1440 by 900 pixels with the CPU throttled 4× through the DevTools protocol (`Emulation.setCPUThrottlingRate`): the editor opens from navigation to editable (the first block accepts input) in at most 3 seconds; keystroke-to-paint latency over 200 keystrokes typed into a block on page 30 has a p95 of at most 100 ms; a drag reorder of a section completes, from drop to repainted order, in at most 300 ms; and a pricing-table quantity edit shows the server-confirmed total in at most 500 ms. The client page of the same proposal at 390 pixels with the same throttle reaches largest contentful paint in at most 2.5 seconds and loads images below the fold lazily. A measure over budget is a failing acceptance run.
+**Requirement.** The editor and client page stay fast on the proposals agencies actually send. The reference document is 40 US Letter pages with 30 images (2400-pixel JPEGs of about 500 KB each) and four pricing tables of 15 lines. Measured in Chromium at 1440 by 900 pixels with the CPU throttled 4×: the editor opens from navigation to editable (the first block accepts input) in at most 3 seconds; keystroke-to-paint latency over 200 keystrokes typed into a block on page 30 has a p95 of at most 100 ms; a drag reorder of a section completes, from drop to repainted order, in at most 300 ms; and a pricing-table quantity edit shows the server-confirmed total in at most 500 ms. The client page of the same proposal at 390 pixels with the same throttle reaches largest contentful paint in at most 2.5 seconds and loads images below the fold lazily. A measure over budget is a failing acceptance run. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-011).
 
 **Acceptance.**
 1. A browser journey creates the reference proposal through the public API, applies the 4× throttle, opens it at 1440 pixels and records time to editable, the p95 of 200 keystroke-to-paint intervals (Event Timing API), one drag reorder and one quantity edit, then opens the client page at 390 pixels and records largest contentful paint; the run reports each measured value and fails if any exceeds its budget.
 
-**Evidence.** `tests/editor-budget.mjs` — forty-page 4×-CPU journey (timeToEditableMs, 200 real keydown events and keystrokeP95Ms on page 30, dragReorderMs, quantityServerConfirmedMs, clientLcpMs at 390, lazy images, thirty original JPEGs and forty Letter PDF pages), run separately on the exact candidate; `.github/workflows/verify.yml` — separately dispatched editor_budget; `tests/platter.test.mjs` — “EDIT-011 server-confirmed quantity edits retain document content, clear approval and enforce bounds, scope and exact version”
+**Evidence.** `tests/editor-budget.mjs`, `.github/workflows/verify.yml`, `tests/platter.test.mjs`
 **Gap.** None.
 
 #### EDIT-012 — Duplicate a proposal for another client
 
-Core · target · **done**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** A member duplicates any proposal (draft, sent, accepted or lost) into a new draft for the same or another client. The copy keeps blocks, pricing tables, attachments and settings (payment methods and schedule, reminder schedule and expiry period, `FOLLOW-006`), refills variables (`EDIT-004`) from the new client and deal, keeps the source's recipient roles as slots (`SIGN-011`) with only the template's pre-assigned members filled, and clears the other recipients, approvals, views, comments, signatures and payments. The copy is a new proposal that carries none of the source's approvals and needs approval only where the `APPROVE-003` policy requires it for its own revision; the source is never changed.
-
-Current capability boundary (ct, 20 October 2026): DONE covers every proposal kind and field available today: draft, approved, sent, expired, withdrawn and accepted, including a displayed unsent negotiated revision. An owner or member duplicates for the same or another existing client; the copy preserves scope, terms, prices, original currency, deposit, attachment bytes, client-PDF setting and expiry configuration. It is a new draft at revision 1 owned by its preparing person, with no approvals, invitation authority, mail, views, comments, suggestions, signatures, invoice, payments or expiry transport state; the source remains unchanged. A days-based expiry copies calendar-day settings, not its previously calculated date; a fixed expiry date stays fixed. The default title appends " (copy)" and truncates the original title to fit 200 characters. EDIT-004 inherits refilling variables from the new client/deal; SIGN-011 inherits role slots with only template-preassigned members filled; FOLLOW-006 inherits payment/reminder/expiry settings; APPROVE-003 inherits both mandatory and optional approval cases. Each must extend the named EDIT-012 assertions before shipping. Any new document content, attachment or delivery/payment setting also inherits exact-copy coverage before shipping.
+**Requirement.** A person duplicates any draft, sent, accepted or lost proposal for the same or another client. The source remains unchanged; the copy is an independent new draft, with destination variables and recipient slots. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-012).
 
 **Acceptance.**
-1. Duplicate an accepted proposal for Acme into a draft for Beta Co: blocks and prices match, variables show Beta's contact, the recipient role slots are present with only the pre-assigned countersigner filled, and there are no approvals, views or signatures; its payment methods, reminder schedule and expiry period equal Acme's proposal; with "approval required for every proposal" on, its send is refused (409) until approved, and with it off and no rule matching, the sales member who owns it sends it at once; Acme's agreement is byte-identical.
-2. *Acceptance (current capabilities):* Current-capability acceptance: duplicate an accepted proposal for another client as a member, compare every current content/pricing/currency/deposit/attachment field and download the exact file bytes, confirm a new owner and draft revision 1 with no lifecycle authority or records, require owner approval before sending, and confirm the original agreement response is byte-identical.
-3. Duplicate every other current status, the same client and an unsent negotiated draft; each source remains unchanged.
-4. Verify copied PDF/expiry settings, an unstarted new expiry clock, stale-version refusal and agent refusal.
-5. At 1440 and 390 duplicate the accepted offer through the copy form, choose Beta Co, inspect the separate draft, approve and send it while the original stays accepted.
-6. Public CLI archive/restore retains the copied content, files and settings exactly.
-7. The variable/role/optional-approval cases above are mandatory before their named capabilities ship.
+1. Duplicate Acme’s accepted proposal for Beta: content, prices, files and delivery/payment settings match, variables show Beta and only template-preassigned recipient slots remain filled.
+2. The new draft contains no approvals, views, comments, signatures or payments.
+3. With approval required for all proposals, sending waits for approval; with it off and no matching rule, the owning sales member sends.
+4. Acme’s agreement remains byte-identical.
 
 **Evidence.** `src/platter/duplicate.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Destination variables. The original full-target combination is not asserted by its old cited files. role slots. The original full-target combination is not asserted by its old cited files. every payment. The original full-target combination is not asserted by its old cited files. delivery setting are copied. The original full-target combination is not asserted by its old cited files. Copy has no payment records. No explicit read of a populated source payment collection establishes this absence. Mandatory. Expected refusal statuses are asserted in the uncited harness; the full role/variable combination is not read back. optional approval copy branches. Expected refusal statuses are asserted in the uncited harness; the full role/variable combination is not read back.
+
+#### EDIT-021 — Duplicate lifecycle and file custody
+
+Core · target · **partial** · From EDIT-012 · Rules D-1
+
+**Requirement.** Copies preserve the source’s original currency, integer-cent deposit, exact attachment bytes, PDF setting and expiry configuration. A copied days-based period starts a new clock; an absolute date stays absolute. Title and record mechanics are in [proposal behavior](docs/contract-behavior.md#edit-012).
+
+**Acceptance.**
+1. Duplicate draft, approved, sent, expired, withdrawn and accepted proposals and an unsent negotiation, for both the same and another existing client; every source remains unchanged.
+2. Each copy starts at draft revision 1 owned by its preparer, with no invitation, mail, suggestion, invoice, expiry-transport or other lifecycle authority.
+3. Stale copy requests are refused; an agent’s copy follows standard company policy within its sponsor’s rights.
+4. At desktop and phone widths, copy through the form, choose Beta, inspect the separate draft, approve and send while the source remains accepted.
+5. Archive and restore the copy’s files, content and settings exactly.
+
+**Evidence.** `src/platter/duplicate.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every lifecycle authority. Individual null fields do not prove an uninspected collection. including payments. Individual null fields do not prove an uninspected collection. is absent. Individual null fields do not prove an uninspected collection. Stale refusal. Old key behavior has a hard-coded refusal, not the required policy matrix. company-policy standard copy behavior. Old key behavior has a hard-coded refusal, not the required policy matrix. Compiled copy form. The browser assertions are outside the old Evidence set. independent source at 1440 and 390. The browser assertions are outside the old Evidence set.
 
 #### EDIT-013 — Documents without pricing
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** A firm sends and signs documents that carry no pricing table, such as a statement of work, NDA, master services agreement or change authorization, built in the editor or uploaded as a PDF with fields (`EDIT-005`). Approval, sending, tracking, reminders and signing work as for any proposal; the payment step, deposit, invoice and accounting sync are skipped, and the agreement records that no amount was agreed.
+**Requirement.** A firm sends and signs documents that carry no pricing table, such as a statement of work, NDA, master services agreement or change authorization, built in the editor or uploaded as a PDF with fields (`EDIT-005`). Approval, sending, tracking, reminders and signing work as for any proposal; the payment step, deposit, invoice and accounting sync are skipped, and the agreement records that no amount was agreed. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-013).
 
 **Acceptance.**
 1. Upload a two-page NDA PDF, place signature and date fields for two signers, approve and send, and sign as both: the agreement completes with its signed PDF and certificate, no payment step is shown, no invoice exists and the accounting fake receives no call.
@@ -356,11 +403,9 @@ Core · target · **missing**
 
 #### EDIT-014 — Client PDF download before signing
 
-Core · target · **done**
+Core · target · **done** · Cites BASE-ROLE-001 · Rules D-1
 
-**Requirement.** A recipient can download a PDF of the revision they are viewing before signing, so their procurement team can circulate it, unless the firm turns this off per proposal or template. The PDF carries the selection made so far, the revision number and "Not signed" on every page, and each download is on the timeline (`TRACK-001`). The signed agreement PDF remains `SIGN-005`.
-
-Every document capability available today conforms: a mailbox-verified invited client downloads the exact sent revision with their selected package, optional items and quantities, currency and integer-cent deposit. Every US Letter page says "Not signed, revision N"; it is an unsigned offer, never a signed agreement PDF or certificate. The owner enables or disables downloads per proposal, without changing its content or approval; a disabled download is absent and the route returns 403. The TEAM-004 timeline records each successful download with client, revision, option and server time. Settings and download history travel in PORT-002 archives, while invitation credentials stay local. `EDIT-002` inherits the template default; `EDIT-001` and `EDIT-005` inherit all added blocks and media; `TRACK-001` inherits its engagement timeline. Each extends the same named PDF assertions before shipping; `PRICE-002` package, optional-item and quantity selections already meet them.
+**Requirement.** A recipient can download a PDF of the revision they are viewing before signing, so their procurement team can circulate it, unless the firm turns this off per proposal or template. The PDF carries the selection made so far, the revision number and "Not signed" on every page, and each download is on the timeline (`TRACK-001`). The signed agreement PDF remains `SIGN-005`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-014).
 
 **Acceptance.**
 1. As a verified client, choose a package and download the PDF: every page reads "Not signed, revision 2" and shows the chosen package, and the timeline lists the download; turn downloads off on another proposal and see no download action and the PDF route refused (403).
@@ -370,35 +415,33 @@ Every document capability available today conforms: a mailbox-verified invited c
 
 #### EDIT-015 — Locked template sections
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-ROLE-001 · Rules D-1
 
-**Requirement.** Template owners lock sections such as legal terms, warranties and payment terms. Members using the template can place and reorder a locked section but not edit it; owners, admins, managers and content editors lock and unlock sections in templates, and only the owner, an admin or a manager of the proposal's team unlocks one in a proposal (`TEAM-001`); and an unlock is recorded in the audit log (`TEAM-004`) and can trigger an approval rule (`APPROVE-001`). Locks are enforced on the server, not only in the editor.
+**Requirement.** Template owners lock sections such as legal terms, warranties and payment terms. Members using the template can place and reorder a locked section but not edit it; owners, admins, managers and content editors lock and unlock sections in templates, and only the owner, an admin or a manager of the proposal's team unlocks one in a proposal (`TEAM-001`); and an unlock is recorded in the audit log (`TEAM-004`) and can trigger an approval rule (`APPROVE-001`). Locks are enforced on the server, not only in the editor. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-015).
 
 **Acceptance.**
 1. Lock the terms section in a template; as a sales member try to edit it in the editor and through the API (both refused); as a content editor try to unlock it in a proposal (403); as an admin unlock it in one proposal and edit it, and see the unlock in the audit log and approval required before sending.
 
-**Evidence.** `tests/platter.test.mjs` — “TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval” proves template role rights, independent block edits and removal refused without writes, copied locks, template replacement refusal, live team scope, content-editor unlock refusal, audited admin unlock and legal approval. `tests/site.test.mjs` — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” proves template controls, locked editor fields, reorder, API refusal, removed-share scope, content-editor refusal, tooltips and admin unlock with legal approval at 1440 and 390 pixels. `tests/archive.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” proves exact lock and block custody, restored edit and unlock refusals, reordering and scoped manager unlock.
-**Gap.** Independent rich-block and native section locks survive template starts, proposal copies and personal templates. Locked content and visibility stay fixed while members reorder blocks and edit unlocked neighbours. Template lock rights follow TEAM-001; proposal unlocks require the owner, an admin or a current team manager, are audited, and subsequent terms edits require legal approval.
+**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Terms editing through both editor and API is refused to sales. The compiled editor assertion is in an uncited imported browser helper. Content editor cannot unlock. The complete multi-outcome combination lacks asserting lines in the old Evidence files; expected statuses use the uncited harness. admin unlock changes audit. The complete multi-outcome combination lacks asserting lines in the old Evidence files; expected statuses use the uncited harness. requires approval. The complete multi-outcome combination lacks asserting lines in the old Evidence files; expected statuses use the uncited harness.
 
 #### EDIT-016 — Proposal search and folders
 
-Core · target · **done**
+Core · target · **done** · Cites BASE-ROLE-001 · Rules D-1
 
-**Requirement.** Members search every proposal, template and agreement they may view under `TEAM-001` by title, client, contact, owner, status, amount, date and the full text of the content, including uploaded PDFs, and file proposals in folders with team access rules. Results and folders respect permissions on the server.
-
-When proposal numbering ships, extend FOLLOW-002 with proposal-number tie-breaking after value and sent time, replacing its stable-id interim tie-break and extending the named journey.
+**Requirement.** Members search every proposal, template and agreement they may view under `TEAM-001` by title, client, contact, owner, status, amount, date and the full text of the content, including uploaded PDFs, and file proposals in folders with team access rules. Results and folders respect permissions on the server. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-016).
 
 **Acceptance.**
 1. Seed 500 proposals; search a phrase that appears only in the body of two proposals and one uploaded PDF and get exactly those three within one second; file proposals in a team folder and see a member outside the team find none of them by search or by folder.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` — named point-by-point journeys above
-**Gap.** Proposal and agreement search combines literal case-insensitive content phrases, uploaded PDF text and existing metadata filters. Visible personal and shared templates search names, owner names, body text, media descriptions, pricing and PDF text, with owner, amount, age and folder filters for applicable template metadata; templates retain no client binding or proposal status. Uploaded PDF text uses the same immutable-file custody and permission checks as the original. Existing and restored files are indexed on demand within live proposal and template scope. Owner and admins create team-limited proposal folders and file documents under explicit audience confirmation; filing has its own version and never changes a frozen agreement. Folder membership restricts existing TEAM-001 visibility and grants no additional proposal access. Evidence: `tests/platter.test.mjs` — “EDIT-016 body phrase search returns exactly three of 500 proposals including an uploaded PDF with live folder permissions” now seeds exactly 500 proposals and asserts exactly three matches, two body matches and one uploaded PDF, in under one second; it also proves literal phrase handling, metadata and template filters, personal-template isolation, folder search and detail refusal for an outside member, live membership and revocation, and credential exclusion. This committed timing journey is also run directly on the exact candidate outside Verify. `tests/site.test.mjs` — “EDIT-016 / REPORT-001 desktop and phone pipeline filters, value sort, totals and clear filters use recorded proposal data” proves native folder creation, filing and filtering, template body matches, combined proposal filters, totals and CSV selection at 1440 and 390. `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority” proves retained folder versions and working PDF-content search after restore. Proposal numbering has not shipped; its existing FOLLOW-002 tie-break obligation remains conditional.
+**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** None.
 
 #### EDIT-017 — Client page in the client's language
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** Each recipient sees the client page, emails, disclosures (`SIGN-003`, `TRACK-004`), verification and signing steps in their language: at least English, Spanish, French, German and Portuguese, set per recipient or taken from the browser. The firm's own content is never machine-translated without the firm's approval (`AI-002`), and the certificate of completion (`SIGN-005`) records the language shown.
+**Requirement.** Each recipient sees the client page, emails, disclosures (`SIGN-003`, `TRACK-004`), verification and signing steps in their language: at least English, Spanish, French, German and Portuguese, set per recipient or taken from the browser. An agent’s translation edit carries standard and follows the company policy (`AI-002`), and the certificate of completion (`SIGN-005`) records the language shown. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-017).
 
 **Acceptance.**
 1. Set a recipient to Spanish: the invitation email, client page controls, ESIGN disclosure, verification and signing steps are in Spanish, the string catalog check finds no untranslated English string on those screens, and the certificate records Spanish.
@@ -408,22 +451,34 @@ Core · target · **missing**
 
 #### EDIT-018 — Client-page preview before sending
 
-Core · target · **done**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** Before a revision is sent, anyone who may view the proposal under `TEAM-001`, including a collaborator, and every approver named on a pending approval step for it (`APPROVE-001`, `APPROVE-003`) opens a preview of that exact revision's client page as it will render after sending, with a width switch between desktop (1440 pixels) and phone (390 pixels). The preview is interactive as the client page is: choosing a package, toggling optional items and changing client-editable quantities (`PRICE-002`) recalculate the totals, discounts, sales tax (`PRICE-005`), deposit and payment schedule (`PRICE-007`) and show or hide conditional sections (`EDIT-009`) through the same server calculation the client page uses, and the same quantity limits apply. The member chooses the recipient or template role to view as (`SEND-003`, `SIGN-011`) and sees only that recipient's assigned fields and signing step, in that recipient's language (`EDIT-017`). Variables show their filled values, and an unfilled one is marked as `EDIT-004` would block it. An unsent negotiated revision of a sent proposal (`NEG-001`) is previewed the same way. A preview cannot be signed, accepted, paid, declined, commented on or submitted: those controls show but are disabled, and the matching requests made from a preview are refused (403). Opening or using a preview creates no revision, clears no approval, records no view or reading analytics (`TRACK-001` to `TRACK-003`), schedules no reminder, starts no expiry and sends no mail or text. A banner the client never sees marks the page as a preview, names the revision and the recipient viewed as, and links back to the editor. The preview is served on a member-only route under the member's own session: it is never reachable from a client link or a client session, and a client share token opens only the sent client page. An approval request (`APPROVE-002`) links to the preview of the exact revision awaiting approval, and an approval given after previewing binds that same revision (`PROP-001`).
+**Requirement.** Before sending, viewers, collaborators and pending approvers preview the exact revision’s client page at desktop and phone widths. The recipient-role selection and language match the client, with filled variables or the same missing-variable warning. Draft and unsent negotiated revisions use the same preview. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-018).
 
 **Acceptance.**
-1. Build a draft with three packages (Basic, Standard and Premium), an optional item, a client-editable quantity limited to 1 to 10, a timeline section shown only for Premium, sales tax, a 30% deposit and two signers, each with their own fields.
-2. Open the preview at 1440 and 390 pixels: both widths render the client page under the preview banner naming revision 1.
-3. Choose Premium, add the optional item and set the quantity to 4: the totals, tax, deposit and payment schedule update and the Premium timeline section appears; after approval and sending, the same choices on the client page show the same amounts to the cent and the same sections.
-4. Setting the quantity to 11 in the preview is refused, as on the client page.
-5. View as signer 2: only signer 2's fields show, and sign, accept and pay requests from the preview are refused (403).
-6. Afterwards the revision number and approvals are unchanged, and the proposal timeline, the tracking store, the reminder schedule, the mail fake and the SMS fake hold nothing from the preview.
-7. Submit the draft for approval: the manager named on the pending step opens the preview from the link in the approval request (`APPROVE-002`) and sees revision 1.
-8. A member outside the proposal's team is refused (403). Requesting the preview route without a member session, including from the client's verified session after sending, returns 401 with none of the proposal. Current-capability obligation: every capability available today conforms: scope, terms, USD packages with optional items and quantities (`PRICE-002`) or historical AUD options with nearest-cent deposits, attachments, PDF controls, questions and opt-in text suggestions on the exact unsent draft or negotiated revision. Preview uses existing owner/member visibility; it grants no client invitation authority. EDIT-001/EDIT-005 inherit added content, PRICE-005/PRICE-007 tax and schedules on the PRICE-002 selection, EDIT-009 conditional sections, EDIT-004 variables, SEND-003/SIGN-011 recipient roles and fields, EDIT-017 language, TEAM-001 scoped member visibility, APPROVE-001/APPROVE-002/APPROVE-003 pending approver access and exact revision links, and TRACK-001–TRACK-003/FOLLOW-001/SEND-008 the absence of preview analytics, reminders and texts. FOLLOW-005, SIGN-003/SIGN-004/SIGN-007 and PAY-001/PAY-003/PAY-008 inherit disabled decline, signature and payment controls and direct-request refusals. Each must extend this same named journey before shipping; all full-target acceptance cases above remain mandatory then. Every later content, provider, record kind or public door inherits these preview obligations before shipping. *Acceptance (current capabilities):* Named EDIT-018 public HTTP and built browser journeys at 1440 and 390 open exact draft, approved and negotiated revisions as owner/member, switch the client viewport, select both fixed options through the same server calculation as acceptance, compare actual sent content and accepted total/deposit, refuse invalid selections and stale revisions, and show disabled client submissions with direct preview requests refused (403). Signed-out and client-only sessions receive 401 with no content. Preview interactions preserve the complete public business state, including revision, approval, mail, expiry and client authority; TEAM-004 records only the member preview action, actor, subject and server time. Refusals add no audit row, and PORT-002 preserves the preview audit through the public CLI.
+1. Preview a draft at 1440 and 390: the banner identifies revision 1, recipient and return to editor.
+2. With Basic, Standard and Premium, an optional item, quantity bounded 1–10, Premium-only timeline, tax, 30% deposit and two signers, choose Premium, its extra item and quantity 4: totals, tax, deposit, schedule and sections match the subsequently sent client page to the cent.
+3. Quantity 11 is refused in both preview and sent page.
+4. Viewing as signer 2 shows only signer 2’s fields.
 
 **Evidence.** `src/platter/preview.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Desktop/phone compiled banner identifies exact revision. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. recipient. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. The full three-package tax/deposit/schedule/conditional selection equals the sent page. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. Out-of-bounds quantity eleven is refused. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set. Only signer two’s assigned fields appear. Existing route assertions cover portions, but the complete named full-target outcome is not asserted in the old Evidence set.
+
+#### EDIT-022 — Preview isolation and exact approval link
+
+Core · target · **partial** · From EDIT-018 · Cites BASE-ROLE-001, BASE-AUDIT-001 · Rules D-1
+
+**Requirement.** Preview interactions create no client or business lifecycle effects. Approval requests open the exact revision awaiting the decision. These obligations apply to every content, provider, record kind and public door as it arrives.
+
+**Acceptance.**
+1. Signing, acceptance, payment, decline, comments and other submissions are visibly disabled; direct preview submissions are refused.
+2. After previewing, revision and approvals are unchanged, and timeline, tracking, reminders, expiry, mail and text contain no preview activity; only the member-preview audit is retained.
+3. The pending manager opens the approval-request preview of revision 1; their approval binds it.
+4. A person outside proposal scope is refused; signed-out and client-only sessions see no private preview.
+5. Preview audit records retain actor, subject and server time through archive; refusals add no preview audit.
+
+**Evidence.** `src/platter/preview.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Pending approver follows an exact revision-one approval-request link. The old preview fixture uses owner/member links rather than the named full request flow. A person outside proposal scope sees no preview content. An HTTP status alone is not a no-content assertion. Exact preview audit survives public CLI restore. Archive assertions compare broader data. this point’s specific preview outcome is not isolated in the old Evidence set.
 
 ### Catalog and pricing
 
@@ -431,7 +486,7 @@ Core · target · **done**
 
 Core · target · **partial**
 
-**Requirement.** A catalog holds services and products with name, description, SKU, unit (hour, day, month, project or each), USD unit price, internal cost, default recurrence, taxable flag and tax code, income account, and images (uploaded, or fetched from a URL at import), which a pricing table set to show images displays on the item's line in the editor, the client page and the PDF. It imports from CSV with a reviewed preview (as `IMPORT-001`) and syncs from QuickBooks Online or Xero items and HubSpot or Salesforce products (`ACCT-001`, `ACCT-002`, `CRM-001`, `CRM-002`). Pricing tables add items from it; price changes never alter sent proposals.
+**Requirement.** A catalog holds services and products with name, description, SKU, unit (hour, day, month, project or each), USD unit price, internal cost, default recurrence, taxable flag and tax code, income account, and images (uploaded, or fetched from a URL at import), which a pricing table set to show images displays on the item's line in the editor, the client page and the PDF. It imports from CSV with a reviewed preview (as `IMPORT-001`) and syncs from QuickBooks Online or Xero items and HubSpot or Salesforce products (`ACCT-001`, `ACCT-002`, `CRM-001`, `CRM-002`). Pricing tables add items from it; price changes never alter sent proposals. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#cat-001).
 
 **Acceptance.**
 1. Import 50 items from CSV with a preview, one row with an image URL served by a file-host fake, sync items from a QuickBooks Online fake, add two items to a pricing table set to show images and see the imported image on its line in the editor, the client page and the PDF, change an item's price, and see the sent proposal unchanged and a new draft use the new price.
@@ -441,67 +496,57 @@ Core · target · **partial**
 
 #### PRICE-001 — USD pricing tables with line items
 
-Core · target · **done**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** A proposal has any number of pricing tables in USD, each with line items (name, description, quantity, unit, unit price), groups, subtotals and a grand total. All arithmetic is in integer cents with stated rounding, and totals are recomputed on the server. This replaces the first release's two GST-free AUD options for every new proposal; existing records keep their form under `PRICE-008`.
-
-Each current package may carry any number of tables; its grand total is the sum of their subtotals. A package without tables keeps its explicitly entered fixed USD total. Quantities are positive thousandths of a named unit (0.001 to 1,000,000), unit prices are positive USD amounts with at most two decimal places, and each quantity × unit-price line rounds half up to the nearest cent before group, table and package summation. A package is between $0.01 and $10,000,000. Submitted subtotals and grand totals never override server arithmetic. Existing historical AUD proposals keep their original form. Tables, descriptions, quantities, units, prices, group subtotals and totals travel unchanged through exact-revision approval/send, member preview, comparison/restoration, duplication, negotiated drafts, the client page, selected unsigned PDF, acceptance and PORT-002 archives. Any PRICE-002 package can carry tables, and its selected optional items add to the table total; EDIT-001/EDIT-005 and SIGN-005 inherit their added document/PDF carriers before shipping.
+**Requirement.** A proposal has any number of pricing tables in USD, each with line items (name, description, quantity, unit, unit price), groups, subtotals and a grand total. All arithmetic is in integer cents with stated rounding, and totals are recomputed on the server. This replaces the first release's two GST-free AUD options for every new proposal; existing records keep their form under `PRICE-008`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#price-001).
 
 **Acceptance.**
 1. Build two tables with 12 lines, quantities and units, and see the server totals match a cent-exact fixture; send malformed quantities and prices (400); reload and see identical totals in the client page and the PDF.
 
 **Evidence.** `src/platter/pricing.ts`, `src/platter/ui/pricing.ts`, `tests/platter.test.mjs`, `tests/pricing-journey.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every malformed quantity. Expected status assertions are in the uncited harness. price is refused with the named status. Expected status assertions are in the uncited harness.
 
 #### PRICE-002 — Packages and optional items the client chooses
 
-Core · target · **done**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** A proposal offers any number of packages (good, better, best) and optional items the client can add or remove. Quantities can be client-editable within a minimum and maximum the firm sets. Totals, tax, deposit and the payment schedule update as the client chooses, and the agreement records exactly the selection signed. The sender and approvers try the same choices before sending in the `EDIT-018` preview, which uses the same calculation.
-
-Expanded package, optional-item and quantity choices extend EDIT-014’s selected-price and deposit assertions before shipping.
-
-Current-capability obligation: every capability available today conforms. A proposal offers one or more packages, each priced by a fixed USD amount or by `PRICE-001` tables, with any number of optional items. Each item has a USD unit price, a whole-number default quantity and inclusive minimum and maximum from 1 to 1,000,000, and is fixed or client-editable; items start unselected and each is chosen at most once. Switching packages starts a fresh optional-item selection on the server, including when JavaScript is unavailable. The server adds each selected quantity × unit price in integer cents to the package total, refuses a selected total over $10,000,000, and rounds the percentage deposit to the nearest cent, half up; that deposit is today's whole payment schedule, and no sales tax is calculated. The `EDIT-018` preview, the client page, the unsigned PDF (`EDIT-014`), typed acceptance and client-signed uploads (`SIGN-008`) use that one calculation, and a scope or terms section can depend on one package or one optional item (`EDIT-009`). `PRICE-005` (tax), `PRICE-007` (fixed deposits, milestones and net terms) and `PRICE-003` (recurring fees) inherit this obligation: before shipping, each makes its amounts follow the same package, optional-item and quantity selection in the preview, client page, PDF and frozen agreement, extending the named PRICE-002 journeys.
+**Requirement.** A proposal offers any number of packages (good, better, best) and optional items the client can add or remove. Quantities can be client-editable within a minimum and maximum the firm sets. Totals, tax, deposit and the payment schedule update as the client chooses, and the agreement records exactly the selection signed. The sender and approvers try the same choices before sending in the `EDIT-018` preview, which uses the same calculation. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#price-002).
 
 **Acceptance.**
 1. Offer three packages and two optional items with an editable quantity between 1 and 10; as the client choose the middle package, add one item and set quantity 4; the server totals, agreement and PDF all show that selection; quantity 11 is refused.
 
 **Evidence.** `src/platter/selection.ts`, `src/platter/conditional.ts`, `src/platter/paper-acceptance.ts`, `src/platter/ui/paper.ts`, `src/platter/ui/packages.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/packages-journey.mjs`, `tests/archive.test.mjs`
-**Gap.** Current packages, optional items, quantities, deposit and item- or package-conditioned sections; PRICE-005/PRICE-007/PRICE-003 inherit selection-driven tax and schedule amounts before shipping.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Agreement and PDF both retain every field of the same middle-package quantity-four selection. The target requires equality across every carrier, not a single successful read or subset of money fields.
 
 #### PRICE-003 — One-off and recurring fees
 
-Core · target · **done**
+Core · target · **done** · Rules D-1
 
-**Requirement.** Line items can be one-off or recurring (weekly, monthly, quarterly or annual) with a term and start date. The proposal shows one-off total, recurring amount per interval and first-year value separately. Recurring lines drive the payment schedule (`PAY-003`) and renewal date (`RENEW-002`).
-
-Before shipping, extend FOLLOW-002 value ordering with one-off total plus first-year recurring value, retaining exact currency labels and separate totals. Before shipping, one-off and recurring amounts on packages and optional items follow the client's `PRICE-002` selection in the `EDIT-018` preview, client page, PDF and frozen agreement, extending the named PRICE-002 journeys.
+**Requirement.** Line items can be one-off or recurring (weekly, monthly, quarterly or annual) with a term and start date. The proposal shows one-off total, recurring amount per interval and first-year value separately. Recurring lines drive the payment schedule (`PAY-003`) and renewal date (`RENEW-002`). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#price-003).
 
 **Acceptance.**
 1. Add a $2,500 one-off setup and a $1,200 monthly retainer for 12 months; the client page shows one-off $2,500, $1,200 a month and first-year value $16,900; acceptance creates a matching schedule.
 
-**Evidence.** `tests/platter.test.mjs` — “PRICE-003 recurring fees keep exact schedules, first-year queue value and immutable selected documents”; `tests/recurring-journey.mjs` — recurringJourney (intervals and dates, separate totals, matching schedule and renewal metadata, first-year queue ordering, selected preview and client PDF and frozen agreement); `tests/site-documents.mjs` — “PRICE-003 and PRICE-002 recurring line editing, preview, client selection and frozen agreement use the same amounts”; `tests/recurring-browser.mjs` — recurringBrowserJourney (compiled editor, preview, client and accepted selection; desktop assertion and desktop and phone proof).
+**Evidence.** `tests/platter.test.mjs`, `tests/recurring-journey.mjs`, `tests/site-documents.mjs`, `tests/recurring-browser.mjs`
 **Gap.** None.
 
 #### PRICE-004 — Discounts
 
-Core · target · **done**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** Discounts apply to a line, a group or the total, as a percentage or a fixed amount, optionally shown to the client and optionally expiring on a date. A discount over the threshold an admin sets routes the proposal for approval (`APPROVE-001`).
+**Requirement.** Discounts apply to a line, a group or the total, as a percentage or a fixed amount, optionally shown to the client and optionally expiring on a date. A discount over the threshold an admin sets routes the proposal for approval (`APPROVE-001`). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#price-004).
 
 **Acceptance.**
 1. Apply 10% to a group and $500 off the total, see cent-exact totals; set an approval threshold of 15% and see a 20% discount require approval before sending.
 
-**Evidence.** `tests/platter.test.mjs` — “PRICE-004 scoped discounts preserve exact selections, private margins, templates and public PDF and JSON custody”; `tests/pricing-journey.mjs` — pricingJourney; `tests/archive.test.mjs` — named role CLI journey
-**Gap.** `tests/platter.test.mjs` — “PRICE-004 scoped discounts preserve exact selections, private margins, templates and public PDF and JSON custody” (group and fixed reductions, cent-exact totals, selections and frozen outputs); “APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied” (15% threshold and 20% routing); `tests/site.test.mjs` — “PRICE-001 / COLLAB-003 / EDIT-014 / EDIT-018 desktop and phone create grouped line tables, edit and restore, preview, send, download and accept identical server totals”, calling pricingJourney in `tests/pricing-journey.mjs` (editor and approval summaries, controls and client totals at 1440 and 390); `tests/archive.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” (custody)
+**Evidence.** `tests/platter.test.mjs`, `tests/pricing-journey.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Ten percent at group scope plus $500 total discount matches the fixture. The cited discount cases assert different combinations, without the complete named group-plus-total case.
 
 #### PRICE-005 — US sales tax
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** Each line is taxable or not under a tax code. Tax is calculated from the client's service or billing address by one of three methods the owner picks: owner-configured rates, Stripe Tax or Avalara AvaTax. Owner-configured rates are set per jurisdiction as state, county, city and special-district components with effective dates; Platter sums the components that apply to the address, computes tax on the taxable subtotal per jurisdiction in integer cents rounded half up, and freezes the rate used with the sent revision, so a later rate change never alters a sent quote. With Stripe Tax or AvaTax, Platter sends each line's amount, tax code and the addresses, applies the returned tax to the cent, and commits the AvaTax transaction when the invoice is issued. A tax-exempt client uploads an exemption or resale certificate, which is stored with the agreement. Tax shows as its own line and flows to invoices with the matching tax code (`ACCT-001`, `ACCT-002`). Platter calculates; filing returns stays with the tax service (see Honest boundaries).
-
-Before shipping, tax follows the client's `PRICE-002` package, optional-item and quantity selection in the `EDIT-018` preview, client page, PDF and frozen agreement, extending the named PRICE-002 journeys.
+**Requirement.** Each line is taxable or not under a tax code. Tax is calculated from the client's service or billing address by one of three methods the owner picks: owner-configured rates, Stripe Tax or Avalara AvaTax. Owner-configured rates are set per jurisdiction as state, county, city and special-district components with effective dates; Platter sums the components that apply to the address, computes tax on the taxable subtotal per jurisdiction in integer cents rounded half up, and freezes the rate used with the sent revision, so a later rate change never alters a sent quote. With Stripe Tax or AvaTax, Platter sends each line's amount, tax code and the addresses, applies the returned tax to the cent, and commits the AvaTax transaction when the invoice is issued. A tax-exempt client uploads an exemption or resale certificate, which is stored with the agreement. Tax shows as its own line and flows to invoices with the matching tax code (`ACCT-001`, `ACCT-002`). Platter calculates; filing returns stays with the tax service (see Honest boundaries). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#price-005).
 
 **Acceptance.**
 1. With owner-configured rates for Austin, Texas (state 6.25%, city 1% and transit authority 1%, 8.25% in all), quote a $1,000.00 taxable line and a $500.00 non-taxable line to an Austin client and see $82.50 tax as its own line, and the same quote to a Portland, Oregon client with $0.00 tax; give the city rate a new value with a future effective date and see the sent quote unchanged.
@@ -513,9 +558,9 @@ Before shipping, tax follows the client's `PRICE-002` package, optional-item and
 
 #### PRICE-006 — Internal cost and margin
 
-Core · target · **partial**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** Line items carry internal cost (from the catalog or entered), and the editor shows margin per line, per package and in total. Cost and margin are visible only to the roles `TEAM-001` allows (owner, admin, manager and billing) and never appear in the client page, PDF, client API or webhooks.
+**Requirement.** Line items carry internal cost (from the catalog or entered), and the editor shows margin per line, per package and in total. Cost and margin are visible only to the roles `TEAM-001` allows (owner, admin, manager and billing) and never appear in the client page, PDF, client API or webhooks. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#price-006).
 
 **Acceptance.**
 1. Price a package with costs, see margin per line and total as an owner, then load the client page, PDF, client API response and webhook payload and find no cost or margin; a sales role without cost access sees none either.
@@ -525,22 +570,22 @@ Core · target · **partial**
 
 #### PRICE-007 — Payment terms and schedules on the proposal
 
-Core · target · **done**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** Payment terms are part of the offer: a deposit as a percentage or fixed amount, milestones by date or by event (such as design approval), net 15 or net 30 invoices, and recurring charges. A proposal's terms are copied from its template (`EDIT-002`) when it is created, and the sender changes them per proposal before sending without changing the template. The client sees the schedule before signing, and the accepted schedule is frozen with the agreement and drives `PAY-002` and `PAY-003`. Before shipping, every schedule amount follows the client's `PRICE-002` package, optional-item and quantity selection in the `EDIT-018` preview, client page, PDF and frozen agreement, extending the named PRICE-002 journeys; today's percentage deposit already does.
+**Requirement.** Payment terms are part of the offer: a deposit as a percentage or fixed amount, milestones by date or by event (such as design approval), net 15 or net 30 invoices, and recurring charges. A proposal's terms are copied from its template (`EDIT-002`) when it is created, and the sender changes them per proposal before sending without changing the template. The client sees the schedule before signing, and the accepted schedule is frozen with the agreement and drives `PAY-002` and `PAY-003`. Before shipping, every schedule amount follows the client's `PRICE-002` package, optional-item and quantity selection in the `EDIT-018` preview, client page, PDF and frozen agreement, extending the named PRICE-002 journeys; today's percentage deposit already does. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#price-007).
 
 **Acceptance.**
 1. Set a 30% deposit, two milestones and a monthly retainer on net 15 terms; as the client see the schedule with dates and amounts; accept and read the same frozen schedule back.
 2. Start a proposal from a template whose terms are a 30% deposit and a net-15 milestone: the proposal opens with those terms; change its deposit to 25% and the template still holds 30%.
 
-**Evidence.** `tests/platter.test.mjs` — “PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-002 arbitrary packages and bounded optional quantities share server totals and immutable selection” (percentage and fixed deposits, dated and event milestones, monthly dates and cent amounts, net terms, selection projections, template isolation, frozen JSON, version restore and role refusals); `tests/site.test.mjs` — “MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads”, implemented by `tests/packages-journey.mjs` — “packagesJourney” (editor, template 30% to 25%, fixed deposit, preview and client selections, PDF and identical accepted page at 1440 and 390 pixels); `tests/archive.test.mjs` — named public CLI business-custody and first-release AUD journeys (exact frozen schedule bytes, fixed-deposit signed-copy custody and unchanged legacy fields); `tests/platter.test.mjs` — “APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied” (schedule review and revision invalidation)
-**Gap.** Percentage or fixed deposits, dated and event milestones, net 15 or net 30 terms and monthly retainers are informational offer terms. Owner, admins and scoped managers edit schedules; template starts and copies retain independent terms. Milestone percentages allocate the balance after the deposit with cumulative cent rounding. Monthly retainers are additional to the package price and use an explicit percentage of the selected package total, including chosen optional quantities. Sender-entered monthly dates clip to the last day of shorter months. Deposits are due at acceptance; net terms apply to milestones and retainers. The accepted calculated schedule freezes with the agreement. These terms create no automatic charge, invoice or outbound message; PAY-002, PAY-003, PAY-007, REPORT-004 and ACCT-007 inherit the exact frozen selected amounts before execution or reconciliation ships. Existing payment-term approval rules conservatively require review for structured schedules. Absent terms remain absent in legacy revision and acceptance snapshots; the new storage column is null without backfill.
+**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/packages-journey.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: The exact 30%-deposit/two-milestone/monthly/net-15 schedule is shown. The old evidence tests several schedule selections; the full named combination and both reads are not asserted together. frozen at acceptance. The old evidence tests several schedule selections; the full named combination and both reads are not asserted together. A template’s 30%-deposit/net-15 terms survive an independently edited 25% proposal. The copied payment-term fields are not all asserted in the old Evidence set.
 
 #### PRICE-008 — First-release AUD agreements stay exact
 
-Core · target · **done**
+Core · target · **done** · Rules D-1
 
-**Requirement.** Amounts carry an explicit currency. When an installation moves to USD pricing, proposals and agreements created under the first release keep their AUD, GST-free form, totals, deposit and invoice CSV exactly, labeled with their currency, and are never converted. New proposals use USD; revising or restoring an existing proposal retains its currency. The additive migration labels first-release rows AUD without rewriting their immutable snapshot strings or retained invoice bytes, including when restored from a pre-currency archive. Currency metadata applies to proposal, revision, acceptance and invoice records. USD deposit CSVs use `No Tax` because Platter does not yet calculate sales tax (`PRICE-005`); this is not a tax-exemption determination or evidence of successful accounting import (`ACCT-005`).
+**Requirement.** Amounts carry an explicit currency. When an installation moves to USD pricing, proposals and agreements created under the first release keep their AUD, GST-free form, totals, deposit and invoice CSV exactly, labeled with their currency, and are never converted. New proposals use USD; revising or restoring an existing proposal retains its currency. The additive migration labels first-release rows AUD without rewriting their immutable snapshot strings or retained invoice bytes, including when restored from a pre-currency archive. Currency metadata applies to proposal, revision, acceptance and invoice records. USD deposit CSVs use `No Tax` because Platter does not yet calculate sales tax (`PRICE-005`); this is not a tax-exemption determination or evidence of successful accounting import (`ACCT-005`). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#price-008).
 
 **Acceptance.**
 1. Restore a first-release archive with an accepted AUD proposal into a target build, and see the agreement, deposit and CSV byte-identical and labeled AUD while new proposals are USD.
@@ -554,7 +599,7 @@ Core · target · **done**
 
 Core · target · **partial**
 
-**Requirement.** Several members edit one draft at the same time and see each other's cursors and changes live. Concurrent text edits merge; a conflicting structural edit, such as editing a deleted block, is shown with a restore option and never resolved silently. Pricing edits are checked on the server.
+**Requirement.** Several members edit one draft at the same time and see each other's cursors and changes live. Concurrent text edits merge; a conflicting structural edit, such as editing a deleted block, is shown with a restore option and never resolved silently. Pricing edits are checked on the server. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#collab-001).
 
 **Acceptance.**
 1. A two-browser journey: two members type in the same section and see the same text within one second; one deletes a block the other is editing and the second is offered restore.
@@ -564,21 +609,21 @@ Core · target · **partial**
 
 #### COLLAB-002 — Internal comments, mentions and assignments
 
-Core · target · **done**
+Core · target · **done** · Cites BASE-ROLE-001, BASE-MAIL-001
 
-**Requirement.** Members leave internal comments on any block, mention a colleague, and assign a section to someone with a due date. Mentions and assignments notify by email and chat (`AUTO-003`). Internal comments are never visible to the client and never appear in the PDF or client API.
+**Requirement.** Members leave internal comments on any block, mention a colleague, and assign a section to someone with a due date. Mentions and assignments notify by email and chat (`AUTO-003`). Internal comments are never visible to the client and never appear in the PDF or client API. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#collab-002).
 
 **Acceptance.**
 1. Comment on a pricing table mentioning a colleague, who gets a notification and resolves it; assign a section; the client page, PDF and client API show no internal comment.
 
-**Evidence.** `tests/mail.test.mjs` — “COLLAB-002 scoped colleagues comment, receive consented generic email and chat, resolve and assign without exposing internal threads to clients” proves native-section, rich-block and negotiated-draft comments, colleague mentions and resolution, dated assignments, Slack and Teams notices, explicit consent, active proposal scope, stale and malformed no-write refusals, uncertain-send holds and exclusion from verified client pages, client JSON and downloaded PDF text. `tests/site-documents.mjs` — “COLLAB-002 internal comment, resolution and dated assignment work at desktop and phone widths” proves the compiled proposal and settings controls, persisted resolution and assignment, and existing icon-control tooltips at 1440 and 390. `tests/archive.test.mjs` — “APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority” proves exact internal-thread and event custody with no restored notification authority. Mentions and assignments use explicit per-event consent. Only owner and admins authorize an existing verified AUTO-003 route for collaboration; generic notices carry a session-protected link without comment text, proposal content or client details. Delivery rechecks current revision, active members, proposal scopes and route consent; uncertain attempts are held. Restoration retains threads but never reactivates outbound authority. These are the existing ct-approved AUTO-003 and APPROVE-002 notification obligations, applied to COLLAB-002. The same named HTTP journey now asserts exactly one audit row with actor ID and role, action, proposal subject and server epoch-millisecond time for every comment, assignment and resolution; workspace-wide route authorization records its verified route ID as subject. Every refused collaboration command retains the complete audit log, every product table, public business state and outbound email and chat counts.
+**Evidence.** `tests/mail.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 **Gap.** None.
 
 #### COLLAB-003 — Version history with compare and restore
 
 Core · target · **done**
 
-**Requirement.** Every saved revision is listed with author and time. A member compares any two revisions, with text, line-item and price changes highlighted, and restores an earlier draft revision as a new revision that needs approval again. This covers every field and priced option the product supports today. `PRICE-001` inherits comparison of each added line-item field before it ships; `EDIT-001` and `PRICE-007` inherit comparison and restoration of their added document and payment-term fields. Restore retains the proposal identity, creates the next revision under the current actor and time, preserves earlier snapshots, clears current approval and is refused for sent or accepted offers.
+**Requirement.** Every saved revision is listed with author and time. A member compares any two revisions, with text, line-item and price changes highlighted, and restores an earlier draft revision as a new revision that needs approval again. This covers every field and priced option the product supports today. `PRICE-001` inherits comparison of each added line-item field before it ships; `EDIT-001` and `PRICE-007` inherit comparison and restoration of their added document and payment-term fields. Restore retains the proposal identity, creates the next revision under the current actor and time, preserves earlier snapshots, clears current approval and is refused for sent or accepted offers. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#collab-003).
 
 **Acceptance.**
 1. Make three revisions, compare the first and third and see the changed price and text, restore the first as revision four and see approval required.
@@ -588,184 +633,230 @@ Core · target · **done**
 
 #### APPROVE-001 — Approval rules and routing
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-ROLE-001
 
-**Requirement.** Admins set approval rules by total value, discount, margin, payment terms, edited legal terms or template, and route each to named people or an approver role (owner, admin or manager, as `APPROVE-003` sets), in sequence or in parallel. A named person must hold the owner, admin, manager or billing role; a rule naming a sales member, content editor or viewer is refused when saved (400), and a named billing user approves only the steps that name them (`TEAM-001`). A rule applies to all proposals or to chosen templates, and a step whose condition does not hold for the current revision is skipped, as with the incumbents' conditional approvals. Whether a proposal that matches no rule needs approval at all is the `APPROVE-003` policy setting. `PROP-001`'s exact-revision binding applies to every approver.
-
-Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with awaiting approval, including filters, sorting, counts and totals under its visibility rules.
+**Requirement.** Admins set approval rules by total value, discount, margin, payment terms, edited legal terms or template, and route each to named people or an approver role (owner, admin or manager, as `APPROVE-003` sets), in sequence or in parallel. A named person must hold the owner, admin, manager or billing role; a rule naming a sales member, content editor or viewer is refused when saved (400), and a named billing user approves only the steps that name them (`TEAM-001`). A rule applies to all proposals or to chosen templates, and a step whose condition does not hold for the current revision is skipped, as with the incumbents' conditional approvals. Whether a proposal that matches no rule needs approval at all is the `APPROVE-003` policy setting. `PROP-001`'s exact-revision binding applies to every approver. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#approve-001).
 
 **Acceptance.**
 1. Set rules: over $25,000 needs a manager, a discount over 15% needs the owner.
 2. A $30,000 proposal with 20% discount needs both in order; editing after the first approval clears both.
 3. A parallel rule routes edited legal terms to a named admin (counsel) and a named billing user (finance) at once: it completes only when both approve, in either order, and one rejection stops it; a second billing user not named in the rule is refused (403), and saving a rule that names a sales member is refused (400).
 
-**Evidence.** `tests/platter.test.mjs` — “APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied” (conditions, scope, sequence and edit clearing); `tests/platter.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP” (parallel/rejection/role refusals); `tests/site.test.mjs` — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” (1440/390); `tests/platter.test.mjs` — named thirty-proposal REPORT-001 fixture (awaiting approval); `tests/archive.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” (custody)
-**Gap.** tests/platter.test.mjs — “APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied” proves the $30,000/20% manager-then-owner sequence, exact-revision clearing, skipped conditions, unknown or low-cost review, deposit and standard-term rules and template scopes and provenance. tests/platter.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP” proves parallel named admin and billing approvals in either order, rejection, unnamed-billing refusal and invalid sales approvers. tests/site.test.mjs — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” proves discount editing, clearing, manager then owner approval, send and client acceptance at 1440/390. The named thirty-proposal REPORT-001 fixture proves awaiting-approval filters/sorts/counts/totals; the named role CLI archive journey preserves every current condition, source template and exact decision. Current semantics: total thresholds compare gross value before discounts and maximum offered optional quantities; discount rules compare explicit scope percentages and effective line, group and package reductions, including fixed amounts; margin rules review missing costs and require all offered package and optional margins to meet the threshold with conservative optional cent rounding; payment-term rules compare the current deposit and optional exact standard terms. Current PRICE-004 scoped and fixed discounts inherit this evaluation, as proved by its named scoped discount journey. PRICE-007 schedules and net terms now require review under existing payment-term rules and clear revision approvals when changed, proved by the same condition journey. EDIT-002 future template fields inherit these rule and named-journey obligations before those fields ship.
+**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Saved threshold rules are the manager-above-$25,000. The rule-save operation’s expected-status assertions are in the uncited harness. owner-above-15% configuration. The rule-save operation’s expected-status assertions are in the uncited harness. Both parallel completion orders. Each named branch must be asserted in a cited file; command execution alone does not read back every result. rejection. Each named branch must be asserted in a cited file; command execution alone does not read back every result. unnamed billing refusal. Each named branch must be asserted in a cited file; command execution alone does not read back every result. invalid sales-rule save. Each named branch must be asserted in a cited file; command execution alone does not read back every result.
 
 #### APPROVE-002 — Approval requests that reach the approver
 
 Core · target · **partial**
 
-**Requirement.** An approval request reaches the approver by email, Slack, Microsoft Teams, Nook or mobile push, with a summary of what triggered the rule and a link to the client-page preview of the exact revision awaiting approval (`EDIT-018`). The approver approves or rejects with a note from the request, including on a phone (`MOB-001`). Overdue requests remind the approver and the requester sees who holds it.
+**Requirement.** An approval request reaches the approver by email, Slack, Microsoft Teams, Nook or mobile push, with a summary of what triggered the rule and a link to the client-page preview of the exact revision awaiting approval (`EDIT-018`). The approver approves or rejects with a note from the request, including on a phone (`MOB-001`). Overdue requests remind the approver and the requester sees who holds it. The ct-approved notification boundary requires owner/admin-verified destination consent, generic channel text with protected links, private detail only to eligible direct approvers, current session/revision/plan decisions, uncertain delivery held and restored routes inactive (RL-20). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#approve-002).
 
 **Acceptance.**
 1. Submit a proposal that needs approval: the Slack fake's request and the email each carry a link that opens the `EDIT-018` preview of the revision awaiting approval, under the approver's session.
 2. Approve it from the Slack fake's action, reject another from email with a note, and see an overdue reminder after the set delay.
 
-**Evidence.** Explicit consent queues email and verified Slack or Teams direct requests for currently eligible approvers. `tests/mail.test.mjs` — “APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once” proves revision preview links, noted approval and rejection, named holders, the configured delay and concurrent once-only reminder delivery. “APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests” proves stale revision, no-consent, wrong-member and uncertain-send refusals. `tests/site.test.mjs` — “APPROVE-002 email preview and decision links work under a member session at desktop and phone widths” proves the compiled preview and noted rejection at 1440 and 390. `tests/archive.test.mjs` — “APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority” proves exact history and inactive restored authority.
-**Gap.** Nook and mobile push, automatic next-step request creation, integrated notification settings and request controls, complete trigger details and a chat-native decision interaction remain. Conservative default adopted pending ct approval: explicit audited consent; owner and admins configure verified chat destinations; approval details only to the matching active approver; every decision requires the existing member session and current revision and plan. Uncertain delivery is held without automatic retry. Future Nook, MOB-002, COLLAB-002 and SEND-005 carriers inherit these authority and custody obligations.
+**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Nook and mobile push, automatic next-step request creation, integrated notification settings and request controls, complete trigger details and a chat-native decision interaction remain. Conservative default adopted  Uncertain delivery is held without automatic retry. Future Nook, MOB-002, COLLAB-002 and SEND-005 carriers inherit these authority and custody obligations.
 
 #### APPROVE-003 — Who approves, who sends and what needs approval
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** One approval policy governs every proposal, negotiated revision (`NEG-001`), duplicate (`EDIT-012`), drafted proposal (`AI-001`), move-in reissue (`MIG-005`), public signing link (`SEND-009`) and approval made from a phone (`MOB-001`), using the roles of `TEAM-001`. **Who approves:** the owner, admins and managers, each only for an approval step whose rule names them or their role (`APPROVE-001`), and a manager only for proposals owned by their team; a billing user only for a step whose rule names them personally, such as finance approving payment terms; sales members, content editors, viewers and agent keys never approve, nor does a billing user on a step that does not name them (403, no write). **Who sends:** the owner and admins send any proposal, managers send their team's, and sales members send their own, including proposals shared with them as a collaborator (`TEAM-001`); sending includes fresh invitations (`PROP-002`), revisions (`NEG-001`), signer replacements (`SEND-007`) and withdrawal (`SEND-010`); content editors, viewers, billing users and agent keys never send (403). **What needs approval:** a proposal needs approval when an `APPROVE-001` rule matches its current revision. The owner or an admin sets "approval required for every proposal": when it is on, a proposal that matches no rule needs approval from the policy's default approver (the owner, or the admin or manager role the owner names); when it is off, a proposal that matches no rule is sent by anyone who may send it, with no approval record, as with an incumbent template that carries no approval workflow. A draft prepared or last revised by an agent key always needs approval from an approver role, whatever the setting. A new installation starts with the setting on and the owner as default approver, which is the first release's behavior (`PROP-001`). **Binding:** every approval that applies binds the exact revision (`PROP-001`); an edit clears all of them and the rules are evaluated again against the new revision. Only the owner and admins change the policy, and each change is in the audit log (`TEAM-004`).
-
-Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with awaiting approval, including filters, sorting, counts and totals under its visibility rules.
-
-Before shipping, extend EDIT-012 duplication assertions for approval-required copies (409 until approval) and copies matching no rule when approval is off (the owning sales member sends immediately).
+**Requirement.** One proposal approval policy applies to originals, negotiations, copies, drafted proposals, import reissues, public-link templates and phone decisions. The TEAM-001 matrix defines eligible people and proposal scope. Agent binding decisions carry commitment, while sending carries external and commitment; the company’s policy decides their calls. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#approve-003).
 
 **Acceptance.**
-1. With a rule "over $25,000 needs a manager" and "approval required for every proposal" off: a sales member sends a $3,000 proposal that matches no rule, and the send succeeds with no approval record and no 409.
-2. A $30,000 proposal is approved by a manager and sent by the sales member who owns it.
-3. Editing it after that approval clears the manager's approval, and its send returns 409 until a manager approves the new revision.
-4. A sales member's attempt to approve it returns 403.
-5. A $3,000 draft prepared by an agent key is refused at send (409) until a manager approves it.
-6. A content editor's send returns 403, and a sales member's send of another member's proposal returns 403.
-7. Switch "approval required for every proposal" on: the unruled $3,000 send is refused (409) until the owner approves it.
-8. A sales member's attempt to change the policy returns 403, and the owner's change appears in the audit log with actor and time. A manager's approval of a proposal whose sales owner is outside their teams returns 403. The owner names the manager role as default approver: the unruled $3,000 proposal is approved by a manager of its team and sent; the owner then names the admin role instead, and on the next unruled proposal a manager's approval returns 403 while an admin's succeeds. Current rule semantics: total-value thresholds compare integer cents in the rule’s currency against the highest offered package including all optional quantities at their permitted maximum; currencies are never converted. Edited legal terms compare against the first draft. An agent’s original preparation remains approval-bound after a human revision. A policy or rule change reevaluates approval eligibility against the current revision; it never changes a sent offer’s content. A matching revision is rejected until revised after any rejection. Rule order uses the saved sequence then the stable rule id; parallel approvers within one rule may act in either order.
+1. With value above $25,000 routed to managers and no-rule approval off, the owning sales member sends an unruled $3,000 proposal without an approval record.
+2. A manager approves the $30,000 proposal, and the owning sales member sends it.
+3. Sales approval and content-editor sending are refused, as are sending another sales member’s proposal and a manager deciding outside their team.
+4. Turn no-rule approval on: the unruled proposal waits for the selected owner, admin or manager role; changing that role changes who may decide.
+5. Only owner/admin change the proposal policy; the change retains actor and time.
 
-**Evidence.** `tests/platter.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP” (off/on, scopes, agents, defaults and refusals); `tests/platter.test.mjs` — “TEAM-001 / APPROVE-003 native admins remain eligible named approvers and settings audit records identify the actual person or workspace” (admin/audit); `tests/site.test.mjs` — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” (1440/390); `tests/archive.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” (custody)
-**Gap.** One approval policy now covers all current preparation, template, duplication, negotiation, approval, sending and fresh-invitation doors. tests/platter.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP” proves unruled sales sends with no approval record, manager amount approval, exact-revision invalidation, sales/content-editor/foreign-owner refusals, agent-origin approval after human edits, policy authority and audit, manager team scope, owner/admin/manager defaults, approval-required and approval-free copies, and sales negotiation. tests/platter.test.mjs — “FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership” proves awaiting-approval filters, sorting, counts and totals under role visibility; tests/site.test.mjs — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” proves the sales and manager screens at 1440/390; tests/archive.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” proves policy and exact-revision custody.  tests/mail.test.mjs — “APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy” proves the matching active sender’s correction door, a foreign sender’s 403, and current-policy reapproval before a fresh corrected invitation. No acceptance point remains unproved for current doors; future doors named in the clause inherit this same policy before shipping.
+**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Unruled $3,000 sales send has no approval record. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Manager approves matching $30,000. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. owning sales sends. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Every role. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. outside-team refusal changes no record. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Each owner/admin/manager no-rule default selects exactly the eligible decider. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness. Only authorized policy edits persist with actor/time. The cited role journey contains substantial delivery, but does not assert this entire outcome through an assertion in the cited file; expected-status checks live in the uncited harness.
+
+#### APPROVE-004 — Approval reevaluation on the exact revision
+
+Core · target · **partial** · From APPROVE-003 · Cites BASE-AGENT-007
+
+**Requirement.** An edit clears all approvals and reevaluates the rules. Rule and policy changes reevaluate eligibility without changing sent content. Currency and sequence mechanics are in [proposal behavior](docs/contract-behavior.md#approve-003).
+
+**Acceptance.**
+1. Edit a manager-approved proposal: its approval clears and sending waits for a new decision.
+2. Total-value rules use the highest package with optional quantities at their allowed maximum in integer cents; currencies are not converted.
+3. Edited-terms conditions compare with the first draft; saved rule sequence and stable identity determine order.
+4. Parallel approvers act in either order; a rejection prevents sending until revision.
+5. An agent-prepared proposal’s commitment decision follows the company’s policy after human revisions as well as before them.
+
+**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Sending after edit is refused until the next approval. Expected-status assertion lives in the uncited harness. Highest optional-quantity maximum. Every computed fact is not read back at its decision. currency-preserving threshold facts. Every computed fact is not read back at its decision. First-draft legal comparison. No asserting line in the old cited evidence. sequence/id tie order. No asserting line in the old cited evidence. Parallel order. The exact rejection/readback branches are not all asserted in the old files. rejected-revision refusal. The exact rejection/readback branches are not all asserted in the old files. Company-policy commitment decisions after both agent. No asserting line in the old cited evidence. human revisions. No asserting line in the old cited evidence.
 
 ### Sending and delivery
 
 #### SEND-001 — Send from the firm's own mailbox
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-ROLE-001, BASE-SECRET-001, BASE-MAIL-001 · Rules D-1 · Register R-1
 
-**Requirement.** A member connects Gmail or Google Workspace (OAuth `gmail.send`) or Microsoft 365 or Outlook (Graph `Mail.Send`) and sends proposals, reminders and replies as themselves. Replies thread back to the proposal. Tokens follow `SEC-001`. Without a connected mailbox, mail goes through the installation's branded sender (`EDIT-008`).
-
-A member's own mailbox is one they sign in to at the provider and whose sending address the provider verifies: for Google, the account's verified address or a Gmail send-as alias the provider reports as verified; for Microsoft, the signed-in user's own SMTP mail address, never a sign-in name alone. It need not match the member's Platter sign-in address. Each mailbox address is bound to one member: an address that is another active member's sign-in address or is already connected by another member is refused, and only the member who connected it sends through it. Sending through it requires, at that moment, that the member is active and holds both the own-mailbox right of TEAM-001 and the right to send that message under its own clause (APPROVE-003 for proposals), and that the provider grant is current, carries the send permission and still verifies the address; a member without the sending right is refused (403, nothing sent). When only the mailbox fails, nothing is sent from it: the message goes through the installation's sender with a visible notice to the member, and the connection shows its broken state (SEC-001). The client sees the connected address as the sender. The proposal timeline and the audit log (TEAM-004) record, for every message, the member and whether their mailbox (with its address) or the installation's sender sent it, and its outcome as accepted by the provider, never as delivered (MAIL-001, SEND-002).
-
-Client reply custody (ct, 22 October 2026, 07:25 UTC): an emailed reply is a record, never an approval, signature or state change on the proposal. Store and show the sender’s claimed From address and Resend’s receiving-server SPF/DKIM results; From is never proven client identity. Drop auto-replies and bulk mail (Auto-Submitted, Precedence and out-of-office) without any record or notification. Cap replies per invitation and tell the owner once when the cap is reached. The current cap is one, with one durable owner-only in-app notice.
+**Requirement.** A member connects Gmail/Google Workspace or Microsoft 365/Outlook and sends proposals, reminders and replies from their verified mailbox. The mailbox may differ from the Platter sign-in address. Without a usable mailbox, the installation’s branded sender is used with a visible notice. [Mailbox behavior](docs/contract-behavior.md#send-001) records provider scopes and address verification.
 
 **Acceptance.**
-1. Connect Gmail and Microsoft 365 fakes, send a proposal from each, reply from the client side, and see each reply on the proposal timeline; revoke the token and see sending fall back with a visible notice.
-2. A sales member whose mailbox address differs from their sign-in address connects a Gmail fake that reports that address as a verified send-as alias, and a Microsoft fake whose SMTP mail address it is; each send shows that address as the sender to the client and on the timeline and audit log.
-3. Connecting an address that is another member's sign-in address or is already connected by another member, a Gmail address the provider does not report verified, or a Microsoft account without an SMTP mail address, is refused with nothing stored.
-4. After the member becomes a content editor, their send is refused (403) and nothing leaves the mailbox.
-5. After the provider fake refuses the stored grant, the next send goes through the installation's sender with a visible notice, the connection shows broken, and the timeline and audit log name the installation's sender.
+1. Connect each provider fake, send as that mailbox and revoke its grant: the next send uses the installation sender with a visible broken-connection notice.
+2. A provider-verified Google alias or Microsoft SMTP address differing from sign-in appears as sender to the client and in timeline and audit.
+3. An address owned or connected by another active member, an unverified Google address and a Microsoft account lacking an SMTP address are refused without storage.
+4. After the member loses send authority, no mailbox message leaves.
+5. Provider refusal changes the next send’s route and records the installation sender.
 
-**Evidence.** `tests/mail.test.mjs` — “SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail” (both provider connects/sends/client replies, every identity/scope/binding refusal, both revoked-grant fallbacks and demotion); `tests/site.test.mjs` — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” (OAuth, claimed-From/SPF/DKIM timeline, record-only notice, owner cap notice, attribution/broken/fallback at 1440/390); `tests/archive.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” (exact reply/provenance/attribution/notice custody without authority); `tests/mail.test.mjs` — “SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient quiet hours, caps and terminal decisions without retrying uncertain sends” and “SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh” (current reminder/native-answer mailbox sending and last-moment authority)
-**Gap.** OAuth authorization with state and PKCE, sealed refresh grants, current provider sending permission, verified Gmail primary/send-as addresses and Microsoft SMTP mail, one-member binding, and sending through the durable outbox now ship. CT ruling (22 October 2026, eaf743e) implemented for the outbound mailbox slice: the connected address may differ from sign-in; provider refusals visibly break the connection and fall back to the installation sender, while uncertain outbound attempts are held without fallback or retry. tests/mail.test.mjs — “SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail” proves both providers, negative identity/scope/binding cases, send-time role checks including a demotion during refresh, client-facing From, timeline/audit attribution, revoked-grant fallback and timeout custody. tests/site.test.mjs — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” proves both OAuth forms, sending, attribution, audit and broken/fallback screens at 1440/390. tests/archive.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” proves sender-attribution custody and exclusion of OAuth attempts/refresh grants with reconnection required and no restore calls. Direct access-token connections remain an interim identity-only door limited to sign-in addresses; they require OAuth reconnection for mailbox sending. CT reply ruling (22 October 2026, 07:25 UTC) implemented: a sending member explicitly consents per invitation (audited); the client sees a notice before replying, and one plain-text reply whose claimed From is the exact invited address is recorded through a private current-invitation capability and signed Resend receiving event, with no attachments or automatic outgoing action. An emailed reply is a record, never an approval, signature or proposal state change. The claimed From and Resend receiving-server SPF/DKIM results are stored and shown; From is never treated as proven client identity, and missing provider results are labelled unavailable rather than inferred from message headers. Auto-Submitted automatic replies, Precedence bulk/list/junk, list mail and out-of-office messages are discarded without a record or notification and do not consume the capability. Replies are capped at one per invitation; reaching that cap creates one durable owner-only in-app notice, atomically with the reply, without outbound mail. Replies inherit the proposal View scope and stay in archives; reply capabilities do not. Agent keys receive no client reply text. The named SEND-001 mail journey proves Gmail and Microsoft client replies, wrong sender/signature/capability-body refusals, replay refusal, fresh-invitation rotation and withdrawal; the named role browser journey shows both replies at 1440/390 and the named TEAM-001 archive journey retains their text without authority. No SEND-001 acceptance point remains unproved for the current native doors. The ct-approved per-invitation reply cap is one; unlimited replies and native Gmail/Microsoft inbox synchronization are not claimed. FOLLOW-001/FOLLOW-006 retain their own reminder-composer, multi-recipient, complete-inheritance and activation/restore-policy gaps; they do not widen mailbox authority. Future email reminder and reply doors inherit SEND-001’s provider-verified one-member binding, current sending permission, attribution, broken-state fallback and uncertain-attempt hold before shipping. The installation receiving route is not native Gmail/Microsoft inbox synchronization. No live provider acceptance or delivery is claimed; these journeys use network-edge fakes. The single-recipient reminder foundation is proved by tests/mail.test.mjs — “SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient quiet hours, caps and terminal decisions without retrying uncertain sends”, “FOLLOW-001 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap”, and “SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh”. These assert Gmail/Microsoft reminders and native answers from the connected address, installed-sender fallback, DST/quiet-hour delay, before-expiry timing, scheduled caps, every current terminal stop, concurrent claims, manual edited text/calendar limits, and no-call refusals after authority changes during refresh. The named role browser journey shows manual reminder records and verified opt-out at 1440/390; the named role CLI archive journey retains link-free settings/history while excluding execution authority and transport. FOLLOW-001/FOLLOW-006 adopted rollout default pending ct (those clauses remain PARTIAL): existing and restored settings do not activate outbound reminders; a current sending person explicitly and auditably consents per proposal, supplies the recipient IANA zone, and can disable the schedule; restores require fresh authorization. No recipient zone is inferred.
+**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Both mailbox providers send. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. then revoked grants visibly fall back. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. Different sign-in alias/SMTP sender reaches client. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. timeline. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. audit. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. Every duplicate/unverified/no-SMTP address refusal stores nothing. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. Role demotion leaves no outbound mailbox message. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome. Provider refusal produces the fallback sender in every recorded location. The old cited set proves portions of mailbox behavior; the full multi-location or no-effect combination lacks one assertion per outcome.
+
+#### SEND-011 — Inbound client reply custody
+
+Core · target · **partial** · From SEND-001 · Cites BASE-ROLE-001, BASE-SECRET-001, BASE-MAIL-001 · Rules D-1
+
+**Requirement.** Replies thread to their proposal without authorizing an approval, signature or proposal state change. The claimed sender and receiving provider’s authentication results remain labelled as claims, never verified client identity.
+
+**Acceptance.**
+1. Reply from the client side after sends through both mailbox fakes: each reply appears on the proposal timeline.
+2. Automatic and bulk replies create neither a record nor a notification.
+3. The per-invitation reply cap produces one durable owner notice when reached.
+4. Reply history retains the claimed sender and receiving-server authentication results.
+
+**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Both provider paths retain client replies on the proposal timeline. Only the available receiving adapter path is asserted, not both providers’ complete reply flow. Auto/bulk replies create neither reply nor notification. The complete absence pair is not asserted in the old cited set. Reply cap produces exactly one durable owner notice. No complete cap-to-notice assertion was located in the old cited files. Reply retains claimed From. receiving-server authentication results. Both fields must be read back. not inferred from intake success.
 
 #### SEND-002 — Delivery status and bounce handling
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-MAIL-001, BASE-OPS-003 · Rules D-1
 
-**Requirement.** Each send shows queued, accepted by provider, delivered, deferred, bounced or complained from signed provider webhooks. A bounce notifies the sender and opens a follow-up (`FOLLOW-002`) to correct the address. Provider acceptance is never shown as delivery.
-
-Today this covers the installation's signed-event providers, Resend and SendGrid. Cloudflare mail displays “Delivery events unavailable with this mail transport”; no signed HTTP event intake is claimed for it. Any transport that gains signed events, including future mailbox, recipient and SMS doors (`SEND-001`, `SEND-003`, `SEND-008`), inherits this obligation before shipping. Delivery means the provider reported recipient mail-server acceptance, never human receipt. Signed callbacks must correlate the provider message (or SendGrid's signed delivery id) and exact recipient; duplicate callbacks do not repeat work, and a terminal state cannot regress to queued, accepted or deferred.
-
-Under today's owner-only sending policy (`APPROVE-003`), the sending owner receives a durable in-app bounce notice and a separate open address-correction follow-up. Reading the notice does not close the follow-up. Only that active owner corrects the invitation address and explicitly sends a fresh invitation, rotating the old link and verification session under `PROP-002`, without changing client identity or the frozen offer. Verification codes go to the corrected invitation address. Provider acceptance of the correction closes the follow-up; an uncertain outcome keeps it open. The owner may instead dismiss it with a logged reason. Notices and logged follow-up actions survive `PORT-002` archives; mail bodies, links, attempt history and provider receipts remain excluded under `PORT-001`.
+**Requirement.** Each proposal send displays signed provider states: queued, provider accepted, delivered, deferred, bounced and complained. Correlation and transport details are in [delivery behavior](docs/contract-behavior.md#send-002). Transports without signed events label that limitation.
 
 **Acceptance.**
-1. Send three proposals through the installation's mail-provider fake that reports delivered, deferred then delivered, and hard bounce; see each state, the bounce notification and the follow-up item.
-2. Signed Resend and SendGrid public HTTP journeys assert correlation, replay refusal, complaint, queued and uncertain states, owner authority, reading without closing, explicit address correction and logged dismissal.
-3. Browser journeys at 1440 and 390 exercise the delivery history and correction; a public CLI journey restores both open and resolved bounce follow-ups.
-4. These fakes prove Platter's handling, not live provider delivery.
+1. Through the mail-provider fake, delivered, deferred-then-delivered and hard-bounce sends show their respective states.
+2. Resend and SendGrid callbacks correlate exact provider message and recipient; replay creates no duplicate and terminal states do not regress.
+3. Queued, complained and uncertain states remain distinct.
+4. At desktop and phone widths, read delivery history.
 
 **Evidence.** `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Delivered. The complete listed branch set needs asserting lines, rather than a provider callback status alone. deferred-then-delivered. The complete listed branch set needs asserting lines, rather than a provider callback status alone. hard bounce each display their state. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Both signed-provider correlations. The complete listed branch set needs asserting lines, rather than a provider callback status alone. replay. The complete listed branch set needs asserting lines, rather than a provider callback status alone. terminal regression cases. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Queued/complained/uncertain remain distinct. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Compiled delivery history at 1440 and 390. Browser assertions are outside the cited wrapper file.
+
+#### SEND-012 — Bounce correction follow-up
+
+Core · target · **partial** · From SEND-002 · Cites BASE-MAIL-001, BASE-OPS-003 · Rules D-1
+
+**Requirement.** A bounce notifies its sender and creates a separate address-correction follow-up. Reading the notice leaves the correction open. Correction rotates invitation authority without changing client identity or the frozen offer.
+
+**Acceptance.**
+1. The mail fake’s hard bounce produces both sender notice and follow-up.
+2. Only the current authorized sending person corrects the invitation; an explicit fresh send invalidates the earlier link and verification and sends codes to the corrected address.
+3. Provider acceptance of the correction closes its follow-up; uncertainty leaves it open.
+4. Dismissal requires a logged reason.
+5. Desktop/phone journeys exercise correction; archive restores open and resolved corrections without mail or invitation credentials.
+
+**Evidence.** `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Hard bounce creates both sender notice. The complete combination is not established by a cited asserting line for each listed effect. separate follow-up. The complete combination is not established by a cited asserting line for each listed effect. Current sender correction rotates link/session. The complete combination is not established by a cited asserting line for each listed effect. preserves offer/client. The complete combination is not established by a cited asserting line for each listed effect. routes verification to corrected address. The complete combination is not established by a cited asserting line for each listed effect. Provider acceptance closes correction while uncertainty leaves it open. The complete combination is not established by a cited asserting line for each listed effect. Dismissal retains the entered reason. The complete combination is not established by a cited asserting line for each listed effect. Both desktop/phone correction. The complete combination is not established by a cited asserting line for each listed effect. exact open/resolved CLI restore. The complete combination is not established by a cited asserting line for each listed effect.
 
 #### SEND-003 — Recipients, roles and sharing
 
-Core · target · **partial**
+Core · target · **partial** · Cites BASE-ROLE-001, BASE-PUBLIC-002 · Rules D-1
 
-**Requirement.** A proposal has any number of recipients with a role: signer, client-side approver, viewer or CC. A proposal created from a template starts with the template's role slots, fields and order (`SIGN-011`), and sending is refused (409) while a signer, approver or countersigner slot is unfilled. Each recipient has their own link and verification. Before sending, the sender previews the client page as each recipient (`EDIT-018`). The firm can also share by link (with verification) or embed the proposal on its site. Removing a recipient revokes their link, and withdrawing the proposal revokes every link at once (`SEND-010`). Replacing a signer on a sent proposal is `SEND-007`, and a signer delegating is `SIGN-009`.
-
-Every recipient role and shared link extends SEND-010 revocation and its named all-recipient 410, notice and no-content assertions before shipping.
+**Requirement.** A proposal has any number of recipients with a role: signer, client-side approver, viewer or CC. A proposal created from a template starts with the template's role slots, fields and order (`SIGN-011`), and sending is refused (409) while a signer, approver or countersigner slot is unfilled. Each recipient has their own link and verification. Before sending, the sender previews the client page as each recipient (`EDIT-018`). The firm can also share by link (with verification) or embed the proposal on its site. Removing a recipient revokes their link, and withdrawing the proposal revokes every link at once (`SEND-010`). Replacing a signer on a sent proposal is `SEND-007`, and a signer delegating is `SIGN-009`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#send-003).
 
 **Acceptance.**
 1. Add a signer, a CFO approver and a viewer; each opens their own link; the viewer cannot sign; remove the viewer and see their link refused.
 
-**Evidence.** `tests/platter.test.mjs` — “SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP” proves distinct signer, CFO approver, viewer and CC links; verification and forbidden signing; viewer and shared-link removal; each unfilled required role returning 409 without invitations; copied template slots and fields, independent order after template edits; recipient-only previews and field writes; owner-only management and verified viewing links with exact-origin embedding. Its named SEND-010 journey proves all-recipient withdrawal, notices and 410 responses without proposal content. `tests/site.test.mjs` — “SIGN-004 and SEND-003 owner recipient controls, own-field previews, ordered signing and viewer revocation” proves compiled forms, recipient previews, embedded verification and revocation. The named SEND-006 public CLI journey in `tests/archive.test.mjs` proves retained role and signature records without restored capabilities. The same HTTP journeys also prove consumed-code replay refusal, pairwise recipient-session isolation, withdrawal of approver and CC links using their own verified sessions, and approved reissue with fresh verification while every earlier link stays revoked.
-**Gap.** Policy default adopted under the standing scope rule, pending ct approval: the current owner alone manages recipient roles, explicitly sends invitations or creates additional mailbox-bound viewing links, and authorizes an exact framing origin. Stakeholder conversion, copies and restores never invite anyone automatically or restore invitation authority. Scoped delegation and provider boundaries remain unapproved; the full template-role management duties remain with SIGN-011. SEND-003 stays PARTIAL pending ct approval of this default.
+**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Policy default adopted under the standing scope rule, policy not yet ruled where noted in RULINGS: the current owner alone manages recipient roles, explicitly sends invitations or creates additional mailbox-bound viewing links, and authorizes an exact framing origin. Stakeholder conversion, copies and restores never invite anyone automatically or restore invitation authority. Scoped delegation and provider boundaries remain unapproved; the full template-role management duties remain with SIGN-011. SEND-003 stays PARTIAL policy not yet ruled where noted in RULINGS of this default.
 
 #### SEND-004 — Expiry and reopening
 
-Core · target · **done**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** A proposal expires a set number of days after it is sent (its expiry period, copied from its template or the workspace defaults under `FOLLOW-006`), or on a date the sender picks, or never when the sender removes it; the client page shows the expiry date. When the warning is on, each unsigned signer gets the `SEND-006` expiry notice the set number of days before expiry. The sender changes the expiry before and after sending. After expiry the client sees an expired page and can ask the firm to reopen it; the owner extends or reissues. An accepted agreement never expires.
-
-Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with expired, including filters, sorting, counts and totals under its visibility rules.
-
-Every capability available today conforms. The owner sets calendar days, an explicit YYYY-MM-DD date, or no expiry on a draft or sent offer. The installation time zone is UTC until set; the zone is copied at expiry configuration and first send, and an existing deadline keeps its stored zone until changed. The deadline is the start of the expiry date, with calendar-day arithmetic and daylight saving honored. An older sent offer with no retained send timestamp refuses a days-based setting (409), explains why on the owner offer, and offers an explicit date or negotiated reissue; creation time is never treated as send time. A fresh invitation keeps its first-send date and expiry; an approved negotiated revision sent under NEG-001 starts the period again. A fixed, honestly labeled automatic warning is queued once for the current unsigned signer at the start of its warning date; uncertain provider attempts are never resent blindly. Accepted agreements never expire. Verified clients request reopening; the owner extends/removes expiry on the same links or approves and sends a new negotiated revision. Requests, settings and warning facts survive PORT-002 without credentials or transport mail. TEAM-004 audits configuration, requests and warnings.
-
-`FOLLOW-006` inherits workspace/template defaults, `SEND-006` editable expiry notices and `SIGN-004` every unsigned recipient, each extending this same named calendar, warning and reopening journey before shipping.
+**Requirement.** The sender chooses an expiry period from sending, an absolute date or no expiry. The client sees the date. Calendar arithmetic follows the stored IANA zone and daylight saving. Changes follow [expiry behavior](docs/contract-behavior.md#send-004), never an invented send timestamp.
 
 **Acceptance.**
-1. Send with a 7-day expiry, advance the clock and see the client page expired with a reopen request, extend it, and accept.
-2. Send another proposal on 1 March with a 14-day expiry period and the warning on 1 day before: the client page shows 15 March, each unsigned signer's expiry notice reaches the mail fake on 14 March and the signed one gets none, and on 15 March the page is expired; extending it to 22 March reopens the same links.
+1. Send with seven-day expiry, advance to its date and read the expired page.
+2. The verified client requests reopening; extending to a later date reopens the same links and permits acceptance.
+3. On a 1 March send with fourteen days, the page shows 15 March and expires at its stored-zone boundary.
+4. An accepted agreement never expires; a fresh invitation keeps its first-send clock and a sent negotiated revision starts a new period.
+5. Expiry changes and reopen requests survive archive without transport authority.
 
 **Evidence.** `src/platter/expiry.ts`, `src/platter/expiry-time.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Accepted never expires. Every independent clock branch must have a readback assertion. reinvite keeps clock. Every independent clock branch must have a readback assertion. negotiation restarts period. Every independent clock branch must have a readback assertion. Expiry settings. The complete outcome is not isolated in the cited archive assertions. reopen requests survive restore without transport authority. The complete outcome is not isolated in the cited archive assertions.
+
+#### SEND-013 — Unsigned-recipient expiry warnings
+
+Core · target · **partial** · From SEND-004 · Rules D-1
+
+**Requirement.** The sender can enable a warning a chosen number of days before expiry. Its template follows SEND-006. SIGN-004 applies it to every unsigned recipient.
+
+**Acceptance.**
+1. For 15 March expiry and a one-day warning, each unsigned signer gets the warning on 14 March and no signed signer gets one.
+2. Extending expiry to 22 March moves the warning to its new date.
+3. Repeated processing produces one warning; uncertain transport remains held.
+4. Settings and warning facts survive archive without sending authority.
+
+**Evidence.** `src/platter/expiry.ts`, `src/platter/expiry-time.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every unsigned signer receives one warning. The additional recipient assertions live in tests/recipients-http.mjs, outside the old Evidence set. every signed signer receives none. The additional recipient assertions live in tests/recipients-http.mjs, outside the old Evidence set. Extension moves the warning date without stale delivery. No asserting line in the old cited evidence. Repeated processing gives one warning. No asserting line in the old cited evidence. uncertain transport stays held. No asserting line in the old cited evidence. All warning facts/settings restore without sending authority. No asserting line in the old cited evidence.
 
 #### SEND-005 — Completion and activity notifications
 
-Core · target · **partial**
+Core · target · **partial** · Cites BASE-ROLE-001, BASE-MAIL-001 · Rules D-1
 
-**Requirement.** The sender and watchers are notified when a proposal is first viewed, commented on, signed, declined, paid or fails payment, by email, Slack, Microsoft Teams, Nook or push, under per-person preferences that choose the events and channels for each person.
+**Requirement.** The sender and watchers are notified when a proposal is first viewed, commented on, signed, declined, paid or fails payment, by email, Slack, Microsoft Teams, Nook or push, under per-person preferences that choose the events and channels for each person. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#send-005).
 
 **Acceptance.**
 1. Watch a proposal with Slack and email on; open, comment, sign and pay as the client; see four notifications in each channel fake with links back to the proposal.
 2. A second watcher who turned view notifications off and chose email only gets three emails and no Slack message.
 
-**Evidence.** `tests/mail.test.mjs` — “SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links” proves the four real client events, four notices in each first-watcher carrier, the second watcher’s three emails without Slack or views, protected links, generic contents, first-view-only and once-only paid reconciliation. “SEND-005 personal notification revocation and lost proposal scope suppress queued and future sends” proves opt-in, preference versions, revocation and live scope. `tests/archive.test.mjs` — the existing notification public CLI journey preserves personal preferences without outbound authority.
+**Evidence.** `tests/mail.test.mjs`, `tests/archive.test.mjs`
 **Gap.** Decline and failed-payment events, personal Teams, Nook and push carriers, and settings controls with desktop and phone proof remain. Only explicitly consenting current scoped people receive generic events and protected links; view alerts additionally require current owner opt-in for that revision; preferences bind the exact proposal revision, direct Slack destinations must be verified for that person, and restoration does not activate sending. Existing APPROVE-002 and AUTO-003 consent and custody obligations remain.
 
 #### SEND-006 — Editable subject, message and shared email templates
 
-Core · target · **partial**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** Every send, reminder (`FOLLOW-001`), fresh invitation (`PROP-002`), revision send (`NEG-001`), signer replacement (`SEND-007`) and net-terms invoice (`PAY-008`) shows the email before it goes, with an editable subject and personal message. Admins keep shared email templates per event (send, reminder, expiry notice, invoice, completion) with variables from `EDIT-004` such as `{client.first_name}`, `{client.company}`, `{proposal.title}`, `{sender.name}` and `{proposal.expires_on}`; they set the default template per event and per proposal template, and can lock a template so members pick it but do not edit it. A variable with no value blocks the send as in `EDIT-004`. A scheduled reminder uses the template the sender chose, and the sender can edit its text before it goes. The exact subject and body sent, after filling, are kept on the proposal timeline with recipient and time and in the agreement package. The verification code email (`SIGN-001`) keeps fixed wording. Before sending, anyone who may edit or send the proposal sends a test to themselves: the filled subject, prefixed "[Test]", and body go only to the member's own sign-in address, never to a recipient, and the message's proposal link opens the `EDIT-018` preview under a member session instead of a client link. A test send needs no approval, freezes nothing, creates no revision, records no view, schedules no reminder, is never put in the agreement package, and is listed on the proposal timeline as a test send; it is limited to 10 per member per proposal per day (429).
-
-Editable expiry notices extend SEND-004’s named unsigned-warning, exact-date and one-claim assertions before shipping.
-
-Add an editable withdrawal notice template to SEND-010, with its exact subject/body and per-recipient assertions before shipping.
+**Requirement.** Proposal send, reminder, reinvitation, revision, replacement, invoice and completion messages use editable subjects and personal text. Shared templates declare event/proposal defaults, variables and locks. Filled subject/body, recipient and time remain on timeline and in the agreement. Verification code wording stays fixed. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#send-006).
 
 **Acceptance.**
-1. Save a template with subject "Proposal for {client.company}" and a body starting "Hi {client.first_name},"; send with it to Dana at Acme: the mail fake and the timeline both hold the subject "Proposal for Acme" and the body "Hi Dana," exactly.
-2. Edit the text of the scheduled second reminder: the first reminder in the mail fake carries the template text and the second carries the edited text.
-3. Send with an unfilled variable (refused, naming it); as a member edit a locked template's text (refused).
-4. On an unapproved draft, send a test to me: the mail fake holds exactly one message, to the member's own address, with the subject "[Test] Proposal for Acme"; its link opens the preview with the member's session and returns 401 without one; the proposal is still an unapproved draft at the same revision, with no tracking record, no reminder scheduled and no client link; a request that names another address for the test is refused (400), and the eleventh test that day is refused (429).
+1. Send the shared template to Dana at Acme: mail and timeline contain exactly “Proposal for Acme” and “Hi Dana,”.
+2. The first reminder uses template text; editing the scheduled second reminder changes only its sent text.
+3. An unfilled variable prevents sending and names that variable; an ordinary member cannot edit locked wording.
+
+**Evidence.** `src/platter/test-mail.ts`, `src/platter/invitation-mail.ts`, `src/platter/ui/invitation-mail.ts`, `tests/mail.test.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Test-to-self rehearsals retain their session-only preview, isolation and daily quota. Owners also edit subjects and personal messages for real invitations, fresh links and approved negotiated revisions; unresolved variables block the atomic send. The exact subject and personal message, recipient, revision, actor and queue time survive in the proposal timeline and PORT-002 archives; credential-bearing client links remain transport-only. Legacy API sends without custom fields keep their original mail bytes. Shared reminder-message defaults and proposal-template choices now ship, with owner/admin management, copied text, member locks and explicit supported-variable filling proved by tests/mail.test.mjs — “FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority”. Loading a message is review only and disables the schedule until fresh authorization; recipient first names are sender-supplied and are not copied to other-client drafts. A selected message keeps its copied source version; current locks are rechecked on member edits. Only reminder mail uses these shared-message controls today. Gap: shared/default/locked templates and variable filling for other email events, editable invoice/expiry/withdrawal/completion messages and a complete agreement package remain.
+
+#### SEND-014 — Private rehearsal email
+
+Core · target · **partial** · From SEND-006 · Rules D-1
+
+**Requirement.** A proposal editor or sender rehearses email only to their active sign-in mailbox. Its proposal link opens the member-only preview. It is labelled as a test and never enters the agreement package.
+
+**Acceptance.**
+1. On an unapproved draft, a rehearsal produces one message to the sender’s own address with the test subject prefix.
+2. Its preview link works with the member session and refuses a signed-out reader.
+3. No revision, approval, tracking, reminder or client-link authority changes; the timeline labels the test.
+4. A supplied alternative recipient is refused; the eleventh daily rehearsal for that member/proposal is refused.
 
 **Evidence.** `src/platter/test-mail.ts`, `src/platter/invitation-mail.ts`, `src/platter/ui/invitation-mail.ts`, `tests/mail.test.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
 **Gap.** Test-to-self rehearsals retain their session-only preview, isolation and daily quota. Owners also edit subjects and personal messages for real invitations, fresh links and approved negotiated revisions; unresolved variables block the atomic send. The exact subject and personal message, recipient, revision, actor and queue time survive in the proposal timeline and PORT-002 archives; credential-bearing client links remain transport-only. Legacy API sends without custom fields keep their original mail bytes. Shared reminder-message defaults and proposal-template choices now ship, with owner/admin management, copied text, member locks and explicit supported-variable filling proved by tests/mail.test.mjs — “FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority”. Loading a message is review only and disables the schedule until fresh authorization; recipient first names are sender-supplied and are not copied to other-client drafts. A selected message keeps its copied source version; current locks are rechecked on member edits. Only reminder mail uses these shared-message controls today. Gap: shared/default/locked templates and variable filling for other email events, editable invoice/expiry/withdrawal/completion messages and a complete agreement package remain.
 
 #### SEND-007 — Replace an unsigned signer on a sent proposal
 
-Core · target · **partial**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** When the client says someone else signs ("our COO signs, not me"), the sender replaces a recipient who has not signed on a sent proposal, with a reason. The offer, its revision and its approvals are unchanged and no re-approval is needed. The replaced recipient's link and verification session are revoked at once; the new signer gets their own link and identity check (`SIGN-001`, `SIGN-006`), the same place in the signing order (`SIGN-004`) and the message of `SEND-006`. The replacement (who, by whom, when and why) is on the timeline and in the certificate of completion (`SIGN-005`). A recipient who has signed can never be replaced, and nothing is replaced on an accepted agreement.
-
-Replacing a recipient preserves SEND-010 revocation: withdrawal leaves replaced and current invitation links refused; extend its named assertions before shipping.
+**Requirement.** When the client says someone else signs ("our COO signs, not me"), the sender replaces a recipient who has not signed on a sent proposal, with a reason. The offer, its revision and its approvals are unchanged and no re-approval is needed. The replaced recipient's link and verification session are revoked at once; the new signer gets their own link and identity check (`SIGN-001`, `SIGN-006`), the same place in the signing order (`SIGN-004`) and the message of `SEND-006`. The replacement (who, by whom, when and why) is on the timeline and in the certificate of completion (`SIGN-005`). A recipient who has signed can never be replaced, and nothing is replaced on an accepted agreement. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#send-007).
 
 **Acceptance.**
 1. Send revision 2 with the client CEO as signer and replace the CEO with the COO: the proposal is still revision 2 with its original approval and no new approval request; the CEO's link is refused; the COO verifies and signs; the certificate lists the replacement with reason and time.
 2. On another proposal sign as the CEO, then try to replace the CEO (409).
 
-**Evidence.** Current single and multiple signing positions support authorized unsigned-signer replacement without changing the frozen offer, revision or approvals. `tests/mail.test.mjs` — “SEND-007 unsigned replacement preserves the frozen offer, revokes old authority and retains certificate custody through races” proves revision 2, unchanged approval records, exact edited invitation, old content and signing door refusals, independent COO mailbox verification, actor and reason history, identical client and sender certificate and agreement bytes, signed-recipient refusal, stale and out-of-scope refusals, and replacement races with acceptance and withdrawal. The existing “SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes cannot replay sending authority” journey additionally proves replacement cancels queued texts, invalidates consent authority and retains an SMS requirement without mailbox fallback. `tests/site.test.mjs` — “SEND-007 desktop and phone replace the unsigned signer, refuse the old link, verify the COO and retain completion history” proves the current sender form, old-link refusal, verified completion and signed-recipient refusal at 1440 and 390. `tests/archive.test.mjs` — “SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority” proves exact replacement history and immutable certificate and PDF custody without restored invitations or queued transport.
-**Gap.** Gap: The SIGN-004 HTTP and compiled-browser journeys now prove replacement at position 2, preserving earlier signatures and order, refusing duplicate participant mailboxes and retaining the replacement in the certificate. The owner-only configured-recipient authority default remains pending ct approval under SIGN-004 and SEND-003. SIGN-006’s government ID and explicitly selected link-only methods and their replacement journeys remain required. The single-recipient mailbox or SMS requirement and the configured-recipient mailbox requirement are retained; these proofs do not establish the full original journey. SEND-007 remains partial.
+**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Gap: The SIGN-004 HTTP and compiled-browser journeys now prove replacement at position 2, preserving earlier signatures and order, refusing duplicate participant mailboxes and retaining the replacement in the certificate. The owner-only configured-recipient authority default remains policy not yet ruled where noted in RULINGS under SIGN-004 and SEND-003. SIGN-006’s government ID and explicitly selected link-only methods and their replacement journeys remain required. The single-recipient mailbox or SMS requirement and the configured-recipient mailbox requirement are retained; these proofs do not establish the full original journey. SEND-007 remains partial.
 
 #### SEND-008 — Sending and reminders by text message
 
-Core · target · **partial**
+Core · target · **partial** · Cites BASE-MAIL-001, BASE-ROLE-001 · Rules D-1 · Register R-3
 
-**Requirement.** A sender delivers the proposal link, reminders and completion notices by text message to a US mobile number through Twilio, alongside or instead of email. Texts go from a registered A2P 10DLC number or toll-free number, record the recipient's consent, honor STOP and HELP under carrier rules and the TCPA, respect the quiet hours of `FOLLOW-001`, and appear on the timeline with their delivery status.
-
-SMS reminders are cancelled atomically by SEND-010 withdrawal; extend its named clock-advance and recipient-notice assertions before shipping.
+**Requirement.** A sender delivers the proposal link, reminders and completion notices by text message to a US mobile number through Twilio, alongside or instead of email. Texts go from a registered A2P 10DLC number or toll-free number, record the recipient's consent, honor STOP and HELP under carrier rules and the TCPA, respect the quiet hours of `FOLLOW-001`, and appear on the timeline with their delivery status. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#send-008).
 
 **Acceptance.**
 1. With a Twilio fake: send a proposal by text and see the message with its link on the timeline with the delivery callback state; reply STOP and see later reminders by text suppressed while email reminders continue; a text reminder due at 6 am in the recipient's time zone waits until quiet hours end.
@@ -775,16 +866,15 @@ SMS reminders are cancelled atomically by SEND-010 withdrawal; extend its named 
 5. Public CLI restore retains exact history and suppression but restores no sending authority and replays no transport.
 6. An uncertain provider outcome remains held through repeated processing with no automatic retry.
 7. Assert actual timeline message content without credential-bearing links, distinct provider acceptance and delivery states, existing HELP behavior, and atomic withdrawal cancellation.
-8. These assertions supplement every original acceptance point.
 
-**Evidence.** Native authenticated SMS commands now retain explicit consent, supplied recipient zone, link-free message history and signed Twilio delivery state. `tests/mail.test.mjs` — “SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP preserve independent email reminders” proves sending, signed callbacks, HELP, number-wide STOP and continued email; “SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically cancels queued texts without duplicate transport” proves the 6 am to 8 am boundary, daily cap, concurrent claim, withdrawal cancellation and recipient notice; “SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes cannot replay sending authority” proves invitation invalidation and uncertain holds. The existing notification public CLI journey in `tests/archive.test.mjs` proves exact history without restored SMS authority.
-**Gap.** CT ruling, 26 October 2026: APPROVE WITH RIDERS for the SMS product default; status remains partial. Before any proposal text, reminder, completion notice or identity code, retain explicit recipient assent identifying the recipient and normalized US mobile number, the sending firm, the permitted SMS purposes, the disclosure text or immutable disclosure version shown, the assent time and collection method, and the recipient evidence supporting any sender-recorded entry. Bind the operational consent to the exact proposal revision and invitation without retaining invitation credentials in history. SMS consent does not establish electronic-signature consent, approval or Send authority. A changed revision, rotated invitation or changed recipient requires a fresh exact binding supported by applicable consent; historical consent never grants authority by itself. Require a valid supplied recipient IANA time zone, apply FOLLOW-001 quiet hours using the zone’s rules for the dispatch date, and defer texts due during quiet hours. Missing or invalid consent or zone prevents dispatch. Recheck current invitation validity, proposal state, consent, suppression and live proposal-specific Send authority before sender-controlled dispatch, including deferred dispatch. STOP suppresses all SMS purposes to that number across invitations in the installation, and provider-level suppression is also honored. START, a new invitation and sender edits do not reactivate SMS. Restored records retain history but restore no SMS sending or verification authority and replay no queued transport. Uncertain provider outcomes remain held with no automatic retry; provider acceptance is not delivery. SIGN-006 inherits this policy for identity-code texts. This ruling approves policy only and certifies no implementation, carrier acceptance or legal compliance. Gap: Completion texts, sender controls with desktop and phone proof, installer integration, production sender qualification and safe recipient re-enablement remain. Carrier acceptance, A2P 10DLC registration or toll-free verification as applicable, TCPA obligations and CTIA messaging requirements remain provider-proof or legal Gaps; none is certified by local fakes or this ruling. Recipient re-enablement requires a separately proven path with new recorded assent, provider eligibility, an explicit audited suppression change and fresh operational authority; START alone is insufficient. All original target and acceptance points remain required. The clause remains partial. Remaining rider proof includes complete recipient-assent fields and disclosure custody, all-purpose suppression across invitations and provider suppression, SMS daylight-saving deferral rechecks, and every SIGN-001 identity-code limit. The existing local fakes do not prove these additional riders.
+**Evidence.** `tests/mail.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Completion texts, sender controls with desktop and phone proof, installer integration, production sender qualification and safe recipient re-enablement remain. Carrier acceptance, A2P 10DLC registration or toll-free verification as applicable, TCPA obligations and CTIA messaging requirements remain provider-proof or legal Gaps; none is certified by local fakes or this ruling. Recipient re-enablement requires a separately proven path with new recorded assent, provider eligibility, an explicit audited suppression change and fresh operational authority; START alone is insufficient. All original target and acceptance points remain required. The clause remains partial. Remaining rider proof includes complete recipient-assent fields and disclosure custody, all-purpose suppression across invitations and provider suppression, SMS daylight-saving deferral rechecks, and every SIGN-001 identity-code limit. The existing local fakes do not prove these additional riders.
 
 #### SEND-009 — Reusable public signing link
 
-Core · target · **missing**
+Core · target · **missing** · Cites BASE-PUBLIC-001, BASE-PUBLIC-002, BASE-INPUT-001 · Rules D-1
 
-**Requirement.** A template can be published as a reusable public link or site embed, like PandaDoc Forms: any visitor enters their name, email and company and the template's form fields (`SIGN-007`), chooses optional items, verifies their mailbox (`SIGN-001`) and signs (`SIGN-003`) as the template role the firm marks as the public signer, while the template's other roles, such as a pre-assigned countersigner, keep their assignment (`SIGN-011`); each submission creates its own proposal and agreement from the template revision that was approved for publishing under `APPROVE-003`. The visitor cannot change prices or terms. The firm sets a submission cap and an expiry for the link itself; each submission's proposal takes the template's reminder schedule and expiry period, counted from the submission (`FOLLOW-006`). The firm can require its countersignature (`SIGN-004`) before an agreement completes, and can disable the link at once. Submissions reach the CRM (`CRM-001` to `CRM-004`), follow-up (`FOLLOW-002`), payment (`PAY-002`) and reports like any proposal.
+**Requirement.** A template can be published as a reusable public link or site embed, like PandaDoc Forms: any visitor enters their name, email and company and the template's form fields (`SIGN-007`), chooses optional items, verifies their mailbox (`SIGN-001`) and signs (`SIGN-003`) as the template role the firm marks as the public signer, while the template's other roles, such as a pre-assigned countersigner, keep their assignment (`SIGN-011`); each submission creates its own proposal and agreement from the template revision that was approved for publishing under `APPROVE-003`. The visitor cannot change prices or terms. The firm sets a submission cap and an expiry for the link itself; each submission's proposal takes the template's reminder schedule and expiry period, counted from the submission (`FOLLOW-006`). The firm can require its countersignature (`SIGN-004`) before an agreement completes, and can disable the link at once. Submissions reach the CRM (`CRM-001` to `CRM-004`), follow-up (`FOLLOW-002`), payment (`PAY-002`) and reports like any proposal. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#send-009).
 
 **Acceptance.**
 1. Publish a template with a $500.00 deposit as a public link and submit it as two visitors: two separate agreements exist, each with its own signer, field values, certificate and deposit; a request that changes a line price is refused (400); with countersignature required, neither completes until the owner countersigns; disable the link and see the next visit refused (410); edit the template and see the link refused until the new revision is approved for publishing.
@@ -794,83 +884,86 @@ Core · target · **missing**
 
 #### SEND-010 — Withdraw a sent proposal
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-ROLE-001 · Rules D-1
 
-**Requirement.** Anyone who may send a proposal under `APPROVE-003` withdraws it, with a reason, when it was sent in error or the deal is off. Withdrawal revokes every recipient's link and verification session at once (signers, approvers, viewers and CC, and links shared under `SEND-003`), cancels scheduled reminders by email and text (`FOLLOW-001`, `SEND-008`), voids its unpaid payment links (`PAY-001`) and closes its follow-ups (`FOLLOW-002`). A recipient opening a revoked link sees a withdrawn page with the firm's contact details and none of the proposal. Each recipient gets a notice using the `SEND-006` withdrawal template unless the sender turns the notice off. A proposal one signer has already signed can still be withdrawn before the agreement completes; that signer is told, and their signature stays in history marked void. A completed agreement is never withdrawn (409); it ends under its own terms. A withdrawn proposal is read-only, and the firm sends it again only as a new revision (`NEG-001`) under the approval policy, with new links. The withdrawal (who, when and why) is on the timeline and in the audit log (`TEAM-004`), and marking a proposal lost (`FOLLOW-005`) withdraws it the same way.
-
-Current capability boundary (ct, 20 October 2026): DONE covers the current single invited mailbox and owner-only sending policy. The owner withdraws with a non-empty reason, with notice on unless explicitly turned off. The withdrawn offer is read-only; old invitation, verification, PDF and attachment doors return a proposal-free 410 page with the withdrawing firm's contact address. Open client questions and bounce follow-ups close, expiry warnings stop, and the actor, time and reason remain in proposal history and the audit log. A new NEG-001 revision requires approval before reissue; old withdrawn links remain refused. SEND-003 and SEND-007 inherit revocation of every current or replaced recipient and sharing link; FOLLOW-001 and SEND-008 inherit cancellation of email/text reminders; PAY-001 inherits voiding unpaid payment links; FOLLOW-002 inherits follow-up closure; SIGN-004 inherits notification and retained void signatures after partial signing; FOLLOW-005 inherits the same withdrawal with notice off by default for a lost outcome; SEND-006 inherits the editable withdrawal notice template. Each capability must extend the named SEND-010 public-door assertions before it ships.
+**Requirement.** An authorized sender withdraws a sent proposal with a reason. It becomes read-only and every signer, client approver, viewer, CC, shared or replaced link and verification session is revoked. Recipients see a withdrawn page with the firm’s contact details and no proposal content. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#send-010).
 
 **Acceptance.**
-1. Send a proposal to a signer, a CFO approver, a viewer and a CC, with reminders scheduled and a deposit payment link, and withdraw it with the reason "Sent to the wrong client": all four links show the withdrawn page with none of the proposal and the client API returns 410 for each; no reminder goes when the clock passes its time; the payment link is refused; the mail fake holds one withdrawal notice per recipient; the timeline and audit log record actor, time and reason.
-2. A sales member's withdrawal of another member's proposal is refused (403).
-3. Withdraw a two-signer proposal after the first signer signed: the second signer's link is refused and the first signature shows as void.
-4. Withdrawing an accepted agreement is refused (409).
-5. Revise the withdrawn proposal into revision 2, approve and send it: its new links work and the revision 1 links stay refused.
-6. *Acceptance (current capabilities):* Current-capability acceptance: send to the one invited signer, verify, ask a question, set an expiry warning, and withdraw with "Sent to the wrong client".
-7. Every old client door returns 410 with no proposal content; the notice is captured once, questions leave the open queue, and the clock produces no warning.
-8. Timeline and audit retain actor, time and reason; pipeline filters/counts/totals include withdrawn. A member cannot withdraw (403), withdrawn mutations are refused (409), notice off sends no mail, and an accepted agreement cannot be withdrawn (409). Prepare revision 2, require approval, reissue and accept it; revision 1 stays 410. At 1440 and 390 use the send, withdrawal, revoked-client, audit, pipeline and revision-reissue screens. Public CLI restore preserves withdrawal history and the read-only state without invitation authority. The multi-recipient, partial-signature, reminder, payment-link and templated-notice cases above are mandatory before their named capabilities ship.
+1. Send to signer, CFO approver, viewer and CC with reminders and a deposit link; withdraw with “Sent to the wrong client”: all four links and client APIs refuse content.
+2. No scheduled email or text reminder runs after withdrawal, and every unpaid payment link is refused.
+3. Open questions and sales/correction follow-ups close; expiry warnings stop.
+4. A sender outside proposal scope cannot withdraw it.
+5. An accepted agreement cannot be withdrawn.
 
 **Evidence.** `src/platter/withdrawal.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Each signer/approver/viewer/CC/shared/replaced link refuses all proposal content. The full recipient proof lives in tests/recipients-http.mjs; an HTTP 410 alone cannot assert content absence. Every email/text reminder is cancelled. Each independent channel must be asserted after withdrawal. every unpaid payment link is refused. Each independent channel must be asserted after withdrawal. Questions. sales/correction follow-ups. expiry warnings all stop. Separate lifecycle assertions are required for each named work item. Out-of-scope sender withdrawal leaves no changes. A refusal status alone is insufficient for the no-effect outcome. Accepted agreement withdrawal is refused. Expected-status assertion lives in the uncited harness.
+
+#### SEND-015 — Withdrawal receipt and approved reissue
+
+Core · target · **partial** · From SEND-010 · Cites BASE-AUDIT-001 · Rules D-1
+
+**Requirement.** Withdrawal retains who acted, when and why in timeline and audit. Each recipient is notified unless the sender turns notice off. Partial signatures stay in history marked void. Reissue creates an approved new revision, never reactivates old authority.
+
+**Acceptance.**
+1. The mail fake holds one withdrawal notice per recipient; with notice off it holds none.
+2. After the first of two signatures, withdrawal refuses the second signer and retains the first as void.
+3. Timeline and audit retain actor, time and reason; reports include withdrawn counts and totals.
+4. Prepare revision 2, approve and send: new links work while revision 1 remains refused.
+5. Desktop/phone journeys exercise sender, withdrawn-client, audit, report and reissue screens; archive preserves read-only history without invitation authority.
+
+**Evidence.** `src/platter/withdrawal.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Notice per recipient. The full recipient inventory is not asserted in the old cited set. no notice when disabled. The full recipient inventory is not asserted in the old cited set. Partially signed withdrawal retains the first signature as void. The assertion is in tests/recipients-http.mjs, not the old cited files. Timeline/audit actor/time/reason plus report counts/totals. The exact entered reason must be read back in both records. New revision works. Each recipient and previous authority must be checked after reissue. every old link remains refused. Each recipient and previous authority must be checked after reissue. Compiled 1440/390 screens. The old browser wrapper has no asserting line. read-only CLI history without authority. The old browser wrapper has no asserting line.
 
 ### Engagement tracking
 
 #### TRACK-001 — View tracking and live open alerts
 
-Core · target · **done**
+Core · target · **done** · Cites BASE-PUBLIC-001, BASE-MAIL-001
 
-**Requirement.** Platter records each verified or unverified view of a client link with time, recipient, approximate location and device class, and alerts the sender on first open and on a return visit after a quiet period the owner sets (30 minutes by default). The proposal shows a view timeline.
-
-Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with viewed, including filters, sorting, counts and totals under its visibility rules.
-
-The engagement timeline inherits EDIT-014’s successful PDF-download events and identical named assertions before shipping.
-
-FOLLOW-002 inherits real viewed/unopened queue reasons and the original seven-proposal A, C, D, F, E, B, G ordering before tracking ships; extend its named public-door journey.
+**Requirement.** Platter records each verified or unverified view of a client link with time, recipient, approximate location and device class, and alerts the sender on first open and on a return visit after a quiet period the owner sets (30 minutes by default). The proposal shows a view timeline. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#track-001).
 
 **Acceptance.**
 1. Open the proposal as two recipients on desktop and phone; the sender gets an alert and the timeline lists both views with device class and approximate location (city, region and country from the request address through an IP-location fixture: Austin, Texas, United States for the first and Portland, Oregon, United States for the second).
 2. With a 30-minute quiet period, the first recipient's return visit 10 minutes later raises no alert and a visit 45 minutes after that raises one return-visit alert.
 
-**Evidence.** `tests/platter.test.mjs` — “TRACK-001 opted-in views retain trusted coarse location, verification and device with quiet-period owner alerts” asserts off by default, two successive invited recipients through the existing signer replacement door, Austin and Portland edge fixtures, desktop and phone, verified and unverified labels, first and return alerts at 0 and 55 minutes with none at 10, live sender scope and owner-only detail. The existing “FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership” extends viewed filters, sorts, counts, exact totals and sales, manager, viewer and admin visibility. `tests/followup-journey.mjs` — followupJourney asserts both the unmeasured fixture and measured A, C, D, F, E, B, G ordering. The existing “EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and every page marked; disabling refuses download without a write” repeats its exact PDF assertions and asserts both successful downloads in the engagement timeline. The named EDIT-018 preview journey asserts disclosure with no measured views; the named AI-003 MCP journey refuses detail to agent keys. `tests/site-lifecycle.mjs` — “TRACK-001 / TRACK-004 owner consent, private alerts, client disclosure and erasure at desktop and phone widths” asserts live notices without navigation and owner timeline at 1440 and 390. `tests/archive.test.mjs` — the existing “public CLI preserves business records and import custody, excludes credentials, and enforces restore fences” journey retains exact view and alert history without tracking authority.
+**Evidence.** `tests/platter.test.mjs`, `tests/followup-journey.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
 **Gap.** None.
 
 #### TRACK-002 — Section-level reading analytics
 
 Core · target · **partial**
 
-**Requirement.** For each view, Platter measures time spent on each section and on pricing, which packages and items were toggled, and which attachments were opened, and summarizes engagement per recipient.
-
-FOLLOW-002 inherits section-engagement queue reasons and its original seven-proposal ordering before shipping; extend its named journey.
+**Requirement.** For each view, Platter measures time spent on each section and on pricing, which packages and items were toggled, and which attachments were opened, and summarizes engagement per recipient. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#track-002).
 
 **Acceptance.**
 1. Run a scripted client session spending 40 seconds on pricing and 5 on the case study; the analytics show those times within 2 seconds and the toggled options.
 
-**Evidence.** `tests/platter.test.mjs` — “TRACK-002 reading events retain monotonic section times and validated package choices on the exact view”; `tests/tracking-details-browser.mjs` — “TRACK-001 and TRACK-004 client disclosure, first-party measurement and private owner controls work at desktop and phone widths”
+**Evidence.** `tests/platter.test.mjs`, `tests/tracking-details-browser.mjs`
 **Gap.** Opted-in client pages measure the most visible current section while the tab is visible, send same-origin cumulative readings, validate elapsed bounds, retain monotonic times and record valid package and optional-item selections per view. Named HTTP assertions prove 40-second pricing and 5-second scope readings and package choices; the desktop and phone journey proves actual first-party browser measurement. Gap: The committed exact-SHA scripted 40-second pricing and 5-second case-study session with the two-second tolerance, attachment-open attribution, complete toggle history and per-recipient summaries remain. FOLLOW-002 section-specific engagement reasons remain; its required original seven-proposal viewed ordering now passes. Owner-only access and explicit measurement consent await ct approval.
 
 #### TRACK-003 — Forwarded stakeholder identification
 
 Core · target · **partial**
 
-**Requirement.** When a link is opened by someone other than its recipient (a new device and network after a forward), Platter asks the viewer to identify themselves and verify their mailbox. The sender sees a new stakeholder with name and email, and can add them as a recipient.
+**Requirement.** When a link is opened by someone other than its recipient (a new device and network after a forward), Platter asks the viewer to identify themselves and verify their mailbox. The sender sees a new stakeholder with name and email, and can add them as a recipient. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#track-003).
 
 **Acceptance.**
 1. Forward a link to a second mailbox, open it there, identify and verify, and see a new stakeholder on the proposal that the sender converts into an approver.
 
-**Evidence.** `tests/platter.test.mjs` — “TRACK-003 forwarded viewers verify their own mailbox before owner conversion to an approver record without inherited signing authority”; `tests/tracking-details-browser.mjs` — “TRACK-001 and TRACK-004 client disclosure, first-party measurement and private owner controls work at desktop and phone widths”
-**Gap.** A forwarded viewer explicitly supplies a name and a different mailbox, consents to sharing, receives a bounded single-use code and verifies that mailbox. The owner sees the verified stakeholder and can explicitly record an approver recipient. This minimal SEND-003 door grants no invited-recipient signing authority and sends no new recipient invitation. Gap: Automatic new-device and new-network prompting remains; no fingerprint is stored. Full SEND-003 separate recipient invitations and operational approver delivery and decisions remain. Policy default adopted pending ct approval: explicit viewer identity-sharing consent, owner-only stakeholder visibility and conversion, and no automatic outbound invitation or signing authority.
+**Evidence.** `tests/platter.test.mjs`, `tests/tracking-details-browser.mjs`
+**Gap.** A forwarded viewer explicitly supplies a name and a different mailbox, consents to sharing, receives a bounded single-use code and verifies that mailbox. The owner sees the verified stakeholder and can explicitly record an approver recipient. This minimal SEND-003 door grants no invited-recipient signing authority and sends no new recipient invitation. Gap: Automatic new-device and new-network prompting remains; no fingerprint is stored. Full SEND-003 separate recipient invitations and operational approver delivery and decisions remain. Policy default adopted policy not yet ruled where noted in RULINGS: explicit viewer identity-sharing consent, owner-only stakeholder visibility and conversion, and no automatic outbound invitation or signing authority.
 
 #### TRACK-004 — Tracking disclosure and privacy limits
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-PUBLIC-001, BASE-DATA-003
 
-**Requirement.** The client page discloses that views are measured. Platter uses no third-party trackers, stores IP addresses only as truncated locations, and keeps engagement data for a retention period the owner sets. Engagement data is included in erasure (`PRIV-001`) and in exports.
+**Requirement.** The client page discloses that views are measured.  Engagement data is included in erasure (`PRIV-001`) and in exports. Stored locations are truncated; engagement retention is owner-selected and engagement joins erasure and exports. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#track-004).
 
 **Acceptance.**
 1. Open the client page and see the disclosure; inspect network requests for third-party hosts (none); read a stored view and find no full IP address; set 90-day retention and see older views removed.
 
-**Evidence.** `tests/platter.test.mjs` — “TRACK-004 disclosure, bounded retention and explicit erasure respect holds and owner authority” asserts disclosure, no stored request address, 90-day default, accepted bounds of 1 and 365, invalid bounds, older-view removal, hold refusal, confirmed per-proposal erasure, disabled measurement and audit. `tests/site-lifecycle.mjs` — “TRACK-001 / TRACK-004 owner consent, private alerts, client disclosure and erasure at desktop and phone widths” asserts the displayed disclosure and the exact same-origin request set, controls and erasure at 1440 and 390. `tests/archive.test.mjs` — the existing “public CLI preserves business records and import custody, excludes credentials, and enforces restore fences” journey asserts exact exported and restored views, alerts and holds, excluded tracking authority, fresh-consent defaults, refusal of a pre-erasure archive with the later journal, and preservation of the accepted agreement after engagement erasure. The existing “PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal” journey independently isolates tracking erasure before client erasure, uses a contained later journal, and asserts an erasure-specific refusal.
-**Gap.** None.
+**Evidence.** `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Client network makes no third-party request. A full network-host absence assertion is not in the old cited files; a rendered page alone is insufficient.
 
 ### Follow-up and negotiation
 
@@ -878,54 +971,81 @@ Core · target · **done**
 
 Core · target · **partial**
 
-**Requirement.** Each proposal has a reminder schedule: on or off, days after sending (for example 2, 5 and 9), days before expiry (for example 3) and a cap. It is copied from the proposal's template or the workspace defaults when the proposal is created (`FOLLOW-006`), and the sender changes it before and after sending. Scheduled reminders go to each unsigned recipient in the recipient's time zone outside quiet hours (8 pm to 8 am by default; the owner sets them). A reminder due inside quiet hours waits until they end. Reminders stop on acceptance, decline, expiry or the recipient's opt-out, and never exceed the cap the owner sets. Each reminder carries the subject and message of `SEND-006`, and every reminder is on the timeline. Whether scheduled reminders are on or off, anyone who may send the proposal under `APPROVE-003` sends a reminder by hand at any time to any unsigned recipient, with the editable `SEND-006` reminder message; a manual email reminder goes at once, a manual text reminder waits for quiet hours to end (`SEND-008`), each is on the timeline, manual reminders do not count toward the cap, and each recipient gets at most one manual reminder per calendar day in their time zone (a second is refused, 429).
-
-SEND-010 withdrawal cancels all scheduled email and text reminders; extend its named clock-advance assertions before shipping.
+**Requirement.** The sender chooses scheduled reminders after sending or before expiry and a cap. Settings inherit FOLLOW-006 snapshots. RL-101 requires explicit auditable current-Send authorization per proposal and an explicitly supplied recipient IANA zone; edits, revisions or sender demotion invalidate it. Opt-out and terminal stops persist independently. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#follow-001).
 
 **Acceptance.**
-1. Send to a recipient in Pacific time with reminders at 2, 5 and 9 days, quiet hours 8 pm to 8 am and a cap of 2, and advance the clock: two reminders arrive, each between 8 am and 8 pm Pacific (one due at 6 am Pacific arrives at 8 am), and the 9-day reminder is not sent because of the cap; on another proposal, accept after the first reminder and see no second; opt out and see none.
-2. On a sent proposal with two unsigned recipients and reminders off, send a manual reminder to the first with an edited message: exactly one reminder, with the edited text, reaches the mail fake and the timeline; a second manual reminder to the first the same day is refused (429), one to the second recipient goes, and one to the first the next day goes.
-3. A proposal created with no reminder settings of its own carries the `FOLLOW-006` defaults, as that journey checks.
+1. For Pacific recipients, days 2,5,9 with cap two produce exactly two reminders outside owner-chosen quiet hours; one due at 6 am waits until 8 am.
+2. Acceptance, decline, expiry, withdrawal and opt-out stop dispatch; no upgrade/copy/restore activates authority.
+3. Messages use SEND-006 text and each attempt appears on the timeline.
+4. The same authority and time-zone rules cover multiple unsigned recipients and every creation door.
 
-**Evidence.** `tests/mail.test.mjs` — named FOLLOW-001 / FOLLOW-006 snapshot/date journey; `tests/site.test.mjs` — named FOLLOW-001 / FOLLOW-006 1440/390 control journey; `tests/archive.test.mjs` — named role CLI custody journey
-**Gap.** Current single-recipient schedules and manual email reminders ship through sender forms, reminder.configure, reminder.send and the Worker cron. tests/mail.test.mjs — “FOLLOW-001 / FOLLOW-006 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority” proves copied schedules, March 1 send-preview dates and clock-advanced mail, editing a later scheduled message while retaining the first exact copy, off-schedule manual email and its 429 daily limit, and unchanged offer revision/approval. The existing three named reminder mail journeys prove recipient-zone quiet hours/DST, before-expiry timing, scheduled caps, every terminal stop, scoped authority, last-moment rechecks and uncertain holds. tests/site.test.mjs — “FOLLOW-001 / FOLLOW-006 sender controls, template delivery overrides, preview dates, manual email and inactive copies at desktop and phone widths” proves the sender composer, manual text/history, quiet-hour controls, dates and delivery timeline at 1440/390. tests/archive.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” proves link-free settings/history custody without restored execution authority. Shared reminder-message defaults, per-proposal-template choices, locks and the five current sender/client/proposal variables now ship. tests/mail.test.mjs — “FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority” proves owner/admin-only editing, default and template choices, explicit first-name input, missing-variable and locked-member no-write refusals, exact first/edited-second scheduled copies, review without activation, and no copied identity or authority. Existing browser and role CLI journeys additionally prove their 1440/390 controls and credential-free custody. Gap: multiple unsigned recipients (SEND-003/SIGN-004) remain. Conservative activation/restore default remains adopted pending ct: only a person with current proposal Send authority explicitly and auditably activates each proposal, supplies the recipient IANA zone, and can disable it; upgrades, copies and restores never activate outbound schedules. No zone is inferred. Until ct approves this default the clause remains PARTIAL.
+**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Sender-authorized scheduled reminders exist. Multiple unsigned recipients, every creation door, audit/timeline custody and opt-out persistence across revisions still need proof under RL-101; policy adoption certifies no implementation.
+
+#### FOLLOW-008 — Manual unsigned-recipient reminders
+
+Core · target · **partial** · From FOLLOW-001
+
+**Requirement.** A current sender can manually remind any unsigned recipient whether scheduled reminders are enabled or not. Manual reminders do not consume the scheduled cap; the per-recipient calendar-day limit follows their explicitly supplied zone.
+
+**Acceptance.**
+1. With schedules off and two unsigned recipients, an edited manual reminder to the first reaches mail and timeline exactly once.
+2. A second to that recipient that day is refused; one to the other recipient and another to the first next day succeed.
+3. Email dispatches immediately; text waits for the recipient’s quiet hours under SEND-008.
+
+**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Sender-authorized scheduled reminders exist. Multiple unsigned recipients, every creation door, audit/timeline custody and opt-out persistence across revisions still need proof under RL-101; policy adoption certifies no implementation.
 
 #### FOLLOW-002 — Next-action follow-up queue by sales owner
 
-Core · target · **done**
+Core · target · **partial**
 
-**Requirement.** Every open proposal has a sales owner, a next action and a due date. Each sales owner's queue, and a manager's view of the team, lists follow-ups in one stated order. First come overdue items (due before today in the owner's time zone), oldest due date first; then items due today; then upcoming items by due date. Within the same due date, the reason ranks: bounced email (`SEND-002`), then a client question waiting (`FOLLOW-004`), then a failed or overdue payment (`PAY-005`, `PAY-008`), then expiring within 3 days (`SEND-004`), then viewed but not signed (`TRACK-001`, `TRACK-002`), then unopened. Ties within one reason sort by proposal value (one-off total plus first-year recurring value), highest first, then by earliest sent time, then by proposal number, so the order is fully determined. A follow-up stays open until the owner completes it with a logged action, the client acts, or it is dismissed with a reason; a notification alone never closes it.
-
-This capability extends the `REPORT-001` dashboard and its named public-door fixture with due follow-ups, including filters, sorting, counts and totals under its visibility rules.
-
-SEND-010 withdrawal closes every open follow-up; extend its named queue assertions before shipping.
-
-*Acceptance (inherited by TRACK-001 and TRACK-002):* With the clock at 10 March, seed seven proposals for one owner: A $8,000 viewed, due 9 March; B $40,000 unopened, due 10 March; C $5,000 bounced, due 10 March; D $12,000 question waiting, due 10 March; E $20,000 viewed, due 10 March; F $30,000 viewed, due 10 March; G $9,000 unopened, due 12 March. The queue reads exactly A, C, D, F, E, B, G. Completing C with a logged call removes it; B's follow-up stays open after its notification is sent; dismissing E without a reason is refused (400).
-
-Every capability available today conforms. Sales actions use REPORT-001's recorded, stable sales owner, retaining its honest "Not recorded" legacy label without inferring an identity. The owner sees and filters the queue until TEAM-001 adds sales and manager team scopes. Each open draft, approved or sent proposal starts with its workflow next action and a due date equal to its creation day in the installation time zone; an explicit schedule saves a calendar date, reopens the sales action and retains the action history. A new revision starts a new action. Acceptance and SEND-010 withdrawal close the sales action. Completing or dismissing it retains who, when and the logged action or required reason; notification alone leaves it open. General completion never resolves SEND-002 corrections or FOLLOW-004 question threads: the sending owner retains correction authority, and unanswered questions remain in their question inbox until answered.
-
-Until personal zones exist, due dates and "today" use the installation's IANA time zone. Until tracking exists, every engagement label reads "Engagement unavailable" and all such proposals share one reason rank, without inferred unopened/viewed states. Current reasons are bounce, waiting question, future expiry deadlines from today through three calendar days ahead inclusive, then unavailable engagement. Equal-date/reason ties use the highest current one-off option in integer cents (face amounts, no exchange conversion), then earliest recorded first-send time (missing last), then stable proposal id until proposal numbers exist. Totals stay separate by currency. TEAM-001 inherits personal zones, sales and manager team visibility; TRACK-001/TRACK-002 inherit viewed/unopened reasons and the original seven-proposal ordering above; PAY-005/PAY-008 inherit failed/overdue payment reasons and closure; FOLLOW-005 inherits declined/lost closure; PRICE-003 inherits first-year recurring valuation; EDIT-016 inherits proposal-number ties when numbering ships. Each extends this named journey before shipping. REPORT-001 now includes inclusive due-today/overdue filtering, due-date sorting, counts, totals and saved-report/CSV output. PORT-002 retains schedules, resolutions and action history without mail or invitation authority.
-
-*Acceptance (current capabilities):* With the clock at 10 March, create the same seven amounts and due dates above, using a real bounce business record for C and a verified question for D. With engagement unavailable the exact order is A, C, D, B, F, E, G; the original viewed/unopened order is inherited above. Complete C with a logged call and retain its separate bounce correction; notify B and retain its open action; refuse a reason-free dismissal of E (400). Assert default actions, owner filtering, exact totals, expiry precedence, time-zone dates, deterministic sent-time/id ties, explicit reopening, acceptance and withdrawal closure, member/agent refusal, and logged actor/time/action custody. Extend REPORT-001's 30-proposal fixture with due filters, next action, sorting, counts and totals; exercise real screens at 1440/390 and restore open/completed actions through the public CLI.
+**Requirement.** Each sales owner’s queue and the manager’s team view order overdue dates first, then today, then upcoming. Within a date the reason order is bounce, unanswered question, failed/overdue payment, expiry within three days, viewed unsigned, then unopened. Ties use highest one-off plus first-year recurring value, earliest send and proposal number. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#follow-002).
 
 **Acceptance.**
-1. Status: **done**.
-2. Every open proposal has a sales owner, a next action and a due date.
-3. Each sales owner's queue, and a manager's view of the team, lists follow-ups in one stated order.
-4. First come overdue items (due before today in the owner's time zone), oldest due date first; then items due today; then upcoming items by due date.
-5. Within the same due date, the reason ranks: bounced email (`SEND-002`), then a client question waiting (`FOLLOW-004`), then a failed or overdue payment (`PAY-005`, `PAY-008`), then expiring within 3 days (`SEND-004`), then viewed but not signed (`TRACK-001`, `TRACK-002`), then unopened.
-6. Ties within one reason sort by proposal value (one-off total plus first-year recurring value), highest first, then by earliest sent time, then by proposal number, so the order is fully determined.
-7. A follow-up stays open until the owner completes it with a logged action, the client acts, or it is dismissed with a reason; a notification alone never closes it.
-8. This capability extends the `REPORT-001` dashboard and its named public-door fixture with due follow-ups, including filters, sorting, counts and totals under its visibility rules. SEND-010 withdrawal closes every open follow-up; extend its named queue assertions before shipping. *Acceptance (inherited by TRACK-001 and TRACK-002):* With the clock at 10 March, seed seven proposals for one owner: A $8,000 viewed, due 9 March; B $40,000 unopened, due 10 March; C $5,000 bounced, due 10 March; D $12,000 question waiting, due 10 March; E $20,000 viewed, due 10 March; F $30,000 viewed, due 10 March; G $9,000 unopened, due 12 March. The queue reads exactly A, C, D, F, E, B, G. Completing C with a logged call removes it; B's follow-up stays open after its notification is sent; dismissing E without a reason is refused (400). Every capability available today conforms. Sales actions use REPORT-001's recorded, stable sales owner, retaining its honest "Not recorded" legacy label without inferring an identity. The owner sees and filters the queue until TEAM-001 adds sales and manager team scopes. Each open draft, approved or sent proposal starts with its workflow next action and a due date equal to its creation day in the installation time zone; an explicit schedule saves a calendar date, reopens the sales action and retains the action history. A new revision starts a new action. Acceptance and SEND-010 withdrawal close the sales action. Completing or dismissing it retains who, when and the logged action or required reason; notification alone leaves it open. General completion never resolves SEND-002 corrections or FOLLOW-004 question threads: the sending owner retains correction authority, and unanswered questions remain in their question inbox until answered. Until personal zones exist, due dates and "today" use the installation's IANA time zone. Until tracking exists, every engagement label reads "Engagement unavailable" and all such proposals share one reason rank, without inferred unopened or viewed states. Current reasons are bounce, waiting question, future expiry deadlines from today through three calendar days ahead inclusive, then unavailable engagement. Equal-date or reason ties use the highest current one-off option in integer cents (face amounts, no exchange conversion), then earliest recorded first-send time (missing last), then stable proposal id until proposal numbers exist. Totals stay separate by currency. TEAM-001 inherits personal zones, sales and manager team visibility; TRACK-001 or TRACK-002 inherit viewed or unopened reasons and the original seven-proposal ordering above; PAY-005 or PAY-008 inherit failed or overdue payment reasons and closure; FOLLOW-005 inherits declined or lost closure; PRICE-003 inherits first-year recurring valuation; EDIT-016 inherits proposal-number ties when numbering ships. Each extends this named journey before shipping. REPORT-001 now includes inclusive due-today or overdue filtering, due-date sorting, counts, totals and saved-report or CSV output. PORT-002 retains schedules, resolutions and action history without mail or invitation authority. *Acceptance (current capabilities):* With the clock at 10 March, create the same seven amounts and due dates above, using a real bounce business record for C and a verified question for D. With engagement unavailable the exact order is A, C, D, B, F, E, G; the original viewed or unopened order is inherited above. Complete C with a logged call and retain its separate bounce correction; notify B and retain its open action; refuse a reason-free dismissal of E (400). Assert default actions, owner filtering, exact totals, expiry precedence, time-zone dates, deterministic sent-time or id ties, explicit reopening, acceptance and withdrawal closure, member or agent refusal, and logged actor or time or action custody. Extend REPORT-001's 30-proposal fixture with due filters, next action, sorting, counts and totals; exercise real screens at 1440/390 and restore open or completed actions through the public CLI. *Status:* done. Named FOLLOW-002 HTTP, REPORT-001 fixture, built desktop or phone and public CLI journeys assert current queue reasons, dates, ordering, reporting, authority and durable lifecycle. Named future clauses inherit their new capabilities before shipping. (`src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`) Evidence: `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+1. At 10 March, seed A $8,000 viewed due 9 March; B $40,000 unopened, C $5,000 bounced, D $12,000 question, E $20,000 viewed and F $30,000 viewed due today; G $9,000 unopened due 12 March: the exact order is A,C,D,F,E,B,G.
+2. Personal IANA zones determine overdue/today boundaries.
+3. With engagement unavailable, disclose it and retain the interim exact order A,C,D,B,F,E,G without inferring views.
+4. Equal-date/reason ties and currency-separated totals follow [queue behavior](docs/contract-behavior.md#follow-002).
 
 **Evidence.** `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Personal-owner time-zone boundaries. The existing queue uses installation time-zone fixtures. All equal-date/reason sent-time/proposal-number. Current stable-id behavior does not establish future proposal-number ties. currency tie outcomes. Current stable-id behavior does not establish future proposal-number ties.
+
+#### FOLLOW-009 — Follow-up lifecycle and action history
+
+Core · target · **partial** · From FOLLOW-002
+
+**Requirement.** Each open proposal has a stable sales owner, next action and due date. Completion records an action; dismissal records a reason. A notice alone never resolves work.
+
+**Acceptance.**
+1. Complete C with a logged call: it leaves the queue while its separate bounce correction remains open.
+2. Notify B: its follow-up remains open; dismiss E without a reason: the dismissal is refused.
+3. Creation and revision start the required action; explicit scheduling can reopen it.
+4. Acceptance, decline and withdrawal close the action; unanswered question threads remain until answered.
+5. History retains actor, time, action and reason through archive; notification transport and invitations do not return.
+
+**Evidence.** `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Notice leaves work open. All listed decisions require separate assertion lines. reason-free dismissal is refused. All listed decisions require separate assertion lines. Every creation/revision action. No asserting line in the old cited evidence. explicit reopening retains the right due date. No asserting line in the old cited evidence. Acceptance. decline. withdrawal. unanswered question lifecycles reconcile. Checking one terminal case does not cover the full named branch set. Every history field. No asserting line in the old cited evidence. authority absence survives restore. No asserting line in the old cited evidence.
+
+#### FOLLOW-010 — Follow-up reporting and team visibility
+
+Core · target · **partial** · From FOLLOW-002 · Cites BASE-ROLE-001
+
+**Requirement.** Follow-ups extend the pipeline with due-date filters and sorts, exact visible counts and totals. Legacy sales ownership stays “Not recorded” where absent.
+
+**Acceptance.**
+1. Extend the thirty-proposal pipeline fixture: due-today and overdue filters, next action, sorting, counts and totals match the visible fixture.
+2. Owner filters and team/own scopes match the current sales owner and manager team.
+3. Desktop and phone screens show the same queue and totals.
+
+**Evidence.** `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `tests/followup-journey.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: All sales/manager team-scope queues use the current owner. The full role-scope branch set is not asserted in the old evidence. Compiled 1440 and 390 queue screens. Asserting browser helpers are not in the old cited Evidence set.
 
 #### FOLLOW-003 — Expiry and renewal notifications
 
-Core · target · **partial**
+Core · target · **partial** · Cites BASE-ROLE-001, BASE-MAIL-001
 
-**Requirement.** The sender (the proposal's sales owner, and its watchers under `SEND-005`) is told before a sent, unaccepted proposal expires and before an accepted agreement's term ends or renews. These are notices to the firm, separate from `SEND-004`'s expiry warning to unsigned signers, and each has its own setting: the sender's expiry notice is on by default 3 days before expiry, the renewal notice is on by default 30 days before the term ends, and the signer warning is on by default 1 day before expiry (`FOLLOW-006`). The owner or an admin changes each lead time or turns either notice off for the workspace (`TEAM-001`), and the sender changes them per proposal like the other delivery settings of `FOLLOW-006`. Each notice goes by the sender's channels under `SEND-005` and opens a follow-up (`FOLLOW-002`) due on the notice day; a renewal notice offers `RENEW-002`. A proposal accepted, declined or withdrawn before the notice day gets no expiry notice, and a changed expiry date moves the notice with it.
+**Requirement.** The sender (the proposal's sales owner, and its watchers under `SEND-005`) is told before a sent, unaccepted proposal expires and before an accepted agreement's term ends or renews. These are notices to the firm, separate from `SEND-004`'s expiry warning to unsigned signers, and each has its own setting: the sender's expiry notice is on by default 3 days before expiry, the renewal notice is on by default 30 days before the term ends, and the signer warning is on by default 1 day before expiry (`FOLLOW-006`). The owner or an admin changes each lead time or turns either notice off for the workspace (`TEAM-001`), and the sender changes them per proposal like the other delivery settings of `FOLLOW-006`. Each notice goes by the sender's channels under `SEND-005` and opens a follow-up (`FOLLOW-002`) due on the notice day; a renewal notice offers `RENEW-002`. A proposal accepted, declined or withdrawn before the notice day gets no expiry notice, and a changed expiry date moves the notice with it. RL-102 keeps interim activation limited to the current recorded active sales owner with live proposal and channel authority. Terminal decisions suppress expiry notices, date changes move them, upgrades/restores grant no authority, and manual follow-ups are preserved. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#follow-003).
 
 **Acceptance.**
 1. With the workspace defaults (sender expiry notice 3 days before, renewal notice 30 days before, signer warning 1 day before), send a proposal on 1 March with a 14-day expiry, so it expires on 15 March: the sender's expiry notice and a follow-up due 12 March arrive on 12 March and not before, and each unsigned signer's warning reaches the mail fake on 14 March.
@@ -935,95 +1055,87 @@ Core · target · **partial**
 5. A fourth proposal accepted on 10 March with expiry on 15 March gets no expiry notice.
 6. A sales member's change to the workspace lead times is refused (403).
 
-**Evidence.** `tests/mail.test.mjs` — “FOLLOW-003 sender expiry notices create dated follow-ups independently of signer warnings and follow extensions, workspace defaults and terminal states” proves sender notice defaults of 3 days, stored renewal defaults of 30 days, explicit activation, delivery and a follow-up on the notice date, extension to a later notice date, independent signer warning, workspace disablement, accepted and withdrawn suppression, concurrent once-only delivery, and the sales workspace-default refusal. The named notification CLI test preserves settings without restoring outbound authority.
-**Gap.** Renewal execution and the RENEW-002 offer, SEND-005 watchers and their channel preferences, sender settings screens, default-on activation without per-proposal consent, template inheritance and public proof for declined offers remain. The stored renewal defaults do not execute renewal notices. Conservative default adopted pending ct approval: an authorized sender must explicitly consent per proposal; notices go only to the recorded active sales owner; upgrades and restores never activate outbound work. Existing open manual follow-ups are preserved instead of overwritten. RENEW-002, SEND-005 and FOLLOW-006 inherit the matching authority, timing and custody obligations.
+**Evidence.** `tests/mail.test.mjs`
+**Gap.** Recorded sender notices and dated follow-ups exist. Default-on execution without separate activation, watchers/preferences, template and sender settings, declined-offer proof and actual renewal offers remain unproved; stored thirty-day settings do not execute renewals. RL-102 resolves the policy, without changing partial status.
 
 #### FOLLOW-004 — Client questions and comments
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-AGENT-007, BASE-MAIL-001
 
-**Requirement.** A client asks a question or comments on any section from the proposal page. The firm answers in the same thread, by email reply or from the app; the client is notified. Open questions show on the proposal and in the queue until answered, and the thread is kept with the agreement.
-
-Every capability available today conforms. The mailbox-verified invited client comments on scope, pricing or terms on the exact current sent revision, including while acceptance is expired. The active owner answers from the app, and answers queue a notification to that question's verified client mailbox. Questions and answers retain their revision and remain in the agreement and PORT-002 archive. Until FOLLOW-002 supplies the follow-up queue, the owner-only open-question queue is on Proposals; an answer removes its question. Agents cannot answer. EDIT-001/EDIT-002 inherit added sections, TEAM-001 inherits scoped person roles and FOLLOW-002 inherits the question queue before shipping, each extending this same named journey.
-
-Email replies use a configured Resend receiving domain and signed email.received webhook, followed by fetching the real received message from Resend. The notice goes only to the active owner mailbox and carries a per-thread, one-use opaque Reply-To capability, valid for seven days. Acceptance requires the provider signature, the capability and the exact current active-owner From mailbox together. Capabilities are hashed at rest, sealed in queued transport, excluded from archives and never returned in app state. Expired, replayed, rotated and wrong-owner replies are refused. Re-noticing rotates the capability, and an app answer spends outstanding capabilities. The full plain-text reply, including quoted text, becomes the answer; a body containing a reply capability is refused. Attachments are refused. Other mail transports and unconfigured installations honestly instruct the owner to answer in the app; SEND-001 inherits additional authenticated inbound providers before shipping.
+**Requirement.** A client asks a question or comments on any section from the proposal page. The firm answers in the same thread, by email reply or from the app; the client is notified. Open questions show on the proposal and in the queue until answered, and the thread is kept with the agreement. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#follow-004).
 
 **Acceptance.**
 1. As the verified client comment on pricing; the owner answers from the app; the client receives the exact answer; the question leaves the queue; the accepted agreement lists the thread.
 2. Repeat scope and terms, refusing unverified, stale-revision and invalid-section writes.
-3. Assert member queue and agent answer refusal.
+3. Assert the member queue’s scoped refusal. Under the held company policy, an agent answer carrying external waits for the named person; under all-autonomous company policy a permitted answer runs.
 4. Through signed Resend HTTP intake and a real adapter at its network edge, assert exact thread/owner resolution, client notification, invalid signature, wrong sender, expiry, rotation, owner change and replay refusal with no second answer or notification.
 5. Exercise owner/client/queue/agreement at 1440 and 390.
 6. Export and restore answered and open threads through the public CLI, excluding genuine issued reply capabilities.
 
 **Evidence.** `src/platter/questions.ts`, `src/platter/question-replies.ts`, `src/platter/ui/questions.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Client pricing question. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. app answer. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. exact notification. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. queue removal. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. retained agreement thread. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Scope/terms. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. every unverified/stale/invalid-section refusal. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Member queue. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. held-policy agent answer. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Every signed intake authority. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. expiry. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. replay. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. no-second-notification outcome. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Compiled owner/client/queue/agreement at both widths. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes. Answered/open CLI threads with genuine reply credentials excluded. The full combination must be traced to separate old cited assertions; policy approval does not establish the engineering outcomes.
 
 #### FOLLOW-005 — Decline reasons and won or lost outcomes
 
 Core · target · **partial**
 
-**Requirement.** A client can decline with a reason. The firm marks a proposal won or lost with a reason from its own list, and can reopen a lost one as a new revision. A decline stops signing and payment on every recipient link, and marking a proposal lost withdraws it as `SEND-010` does, with the notice off by default. Outcomes sync to the CRM (`CRM-001` to `CRM-003`) and feed reporting (`REPORT-002`).
-
-Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with declined, including filters, sorting, counts and totals under its visibility rules.
-
-Marking lost invokes SEND-010 withdrawal with recipient notice off by default; extend its named revocation and notice-off assertions before shipping.
-
-Before shipping, extend FOLLOW-002 with declined/lost closure and the named queue assertions, retaining SEND-010 revocation semantics.
+**Requirement.** A client can decline with a reason. The firm marks a proposal won or lost with a reason from its own list, and can reopen a lost one as a new revision. A decline stops signing and payment on every recipient link, and marking a proposal lost withdraws it as `SEND-010` does, with the notice off by default. Outcomes sync to the CRM (`CRM-001` to `CRM-003`) and feed reporting (`REPORT-002`). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#follow-005).
 
 **Acceptance.**
 1. Decline as the client with the reason Budget, see the proposal lost and the HubSpot deal fake moved to Closed lost; mark another sent proposal lost and see each of its recipient links show the withdrawn page; reopen the declined one as a new revision and send.
 
-**Evidence.** `tests/platter.test.mjs` — named FOLLOW-005 outcome and thirty-proposal journeys; `tests/site.test.mjs` — named FOLLOW-005 journey; `tests/archive.test.mjs` — named role CLI journey
+**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
 **Gap.** `tests/platter.test.mjs` — “FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval” (Budget decline, HubSpot Closed lost fake, link revocation, follow-up closure, reopen and reapproval, configured reasons, won override, exact consent and stage-only holds); “FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership” (scoped reporting); `tests/site.test.mjs` — “FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision” (1440 and 390 screens); `tests/archive.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” (exact custody without execution authority)
 
 #### FOLLOW-006 — Default reminder schedule and expiry from the workspace and templates
 
 Core · target · **partial**
 
-**Requirement.** The owner or an admin sets the workspace defaults (the workspace settings right of `TEAM-001`): a reminder schedule (on or off, days after sending, days before expiry and the cap of `FOLLOW-001`) and an expiry period in days counted from sending, with an optional warning to unsigned signers a set number of days before expiry (`SEND-004`). A fresh installation starts with reminders on at 2, 5 and 9 days after sending and 3 days before expiry with a cap of 3, and an expiry period of 60 days with the warning on 1 day before; a workspace upgraded from the first release gets the same defaults for proposals created after the upgrade. A template (`EDIT-002`) can set its own reminder schedule, expiry period and warning, each overriding the workspace default, or leave either to follow the workspace. Every new proposal copies these settings when it is created: from its template where the template sets them, otherwise from the workspace. That holds whether a member starts it from a template or from blank (`EDIT-002`), creates it in bulk (`RENEW-001`), a visitor submits a public link (`SEND-009`, where the expiry counts from the submission) or it is drafted (`AI-001`); a duplicate (`EDIT-012`) takes the source proposal's settings. Because the settings are copied, a later change to the template or to the workspace defaults never alters a proposal already created. The send screen shows the reminder dates and expiry date the proposal will get, and the sender changes either before sending; anyone who may send the proposal under `APPROVE-003` changes them on a sent proposal, and a changed expiry keeps the reopen rules of `SEND-004`. These are delivery settings, not offer terms: changing them creates no revision and needs no new approval. Every change, with who made it, is on the timeline.
-
-Before shipping, workspace and template expiry defaults extend SEND-004’s named calendar, warning and reopening assertions.
-
-Before shipping, extend EDIT-012 duplication assertions to copy every source payment method, schedule, reminder and expiry setting without copying lifecycle state.
+**Requirement.** Owner/admin workspace defaults and per-template overrides set reminder days/cap, expiry period and signer-warning lead time. New proposals copy a settings snapshot; later workspace or template edits do not alter it. FOLLOW-001 owns execution authority under RL-101 and FOLLOW-003 owns internal notice authority under RL-102. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#follow-006).
 
 **Acceptance.**
-1. Set the workspace defaults to reminders at 3 and 7 days after sending and expiry after 30 days.
-2. Create a template that overrides them with reminders at 2, 5 and 9 days and expiry after 14 days.
-3. Create one proposal from the template and one from blank and send both on 1 March: the template proposal carries reminders on 3, 6 and 10 March and expires on 15 March, and the blank proposal carries reminders on 4 and 8 March and expires on 31 March, as the send screen showed before sending and the mail fake confirms as the clock advances.
-4. Change the template's reminders to 4 days: the proposal already created keeps 2, 5 and 9, and a new proposal from the template gets 4.
-5. Change the workspace expiry to 45 days: the blank proposal still expires on 31 March.
-6. On the sent template proposal, turn reminders off and send a manual reminder (`FOLLOW-001`): exactly one reminder reaches the mail fake and the timeline, and a second manual reminder to the same recipient the same day is refused (429).
-7. Extend the template proposal's expiry to 22 March and confirm no new revision or approval is created.
-8. A proposal duplicated from the template proposal (`EDIT-012`), a bulk-created proposal (`RENEW-001`), a public-link submission (`SEND-009`) and a drafted proposal (`AI-001`) from the same template each carry the template's 2, 5 and 9 days and 14-day expiry. A sales member's and a manager's change to the workspace defaults are refused (403, the defaults unchanged), and an admin's change is saved; a sales member's change to a shared template's expiry is refused (403).
+1. Set workspace reminders to days 3 and 7 with thirty-day expiry; a template overrides to days 2,5,9 and fourteen-day expiry.
+2. Send both on 1 March: the template reminders are 3,6,10 March with 15 March expiry; blank-proposal reminders are 4,8 March with 31 March expiry; preview and dispatch match.
+3. Change template reminders to day 4 and workspace expiry to forty-five days: existing snapshots remain unchanged while new proposals use the new values.
+4. Workspace changes by sales or managers and shared-template expiry changes by sales are refused; admin workspace changes persist.
 
-**Evidence.** `tests/mail.test.mjs` — named FOLLOW-001 / FOLLOW-006 snapshot and date journey; `tests/site.test.mjs` — named FOLLOW-001 / FOLLOW-006 1440/390 control journey; `tests/archive.test.mjs` — named role CLI custody journey; `tests/platter.test.mjs` — named pre-role upgrade journey
-**Gap.** Current blank, starter, personal or shared template and agent drafting doors resolve independent reminder, expiry and warning workspace inherit and template override choices at creation; duplication copies the source’s edited delivery snapshot, never its lifecycle or execution authority. Existing proposals are unchanged by later workspace and template edits. tests/mail.test.mjs — “FOLLOW-001 / FOLLOW-006 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority” proves the exact 2/5/9 versus 3/7-day March fixture, expiry dates and clock-advanced mail, 4-day template edit and 45-day workspace isolation, owner and admin settings authority with sales and manager no-write refusals, shared-template sales refusal, mixed inheritance, current agent drafting, copied payment-method/reminder/expiry fields, manual 429, moved inherited warning and same revision without reapproval extension. tests/site.test.mjs — “FOLLOW-001 / FOLLOW-006 sender controls, template delivery overrides, preview dates, manual email and inactive copies at desktop and phone widths” proves workspace and template controls, pre-send dates, sent editing, actor and time timeline and inactive copies at 1440/390. tests/platter.test.mjs — “TEAM-001 upgrading a pre-role database keeps former members as sales without inferring historical ownership” proves first-release upgrades leave existing proposals unchanged while future drafts copy on/2/5/9/before-3/cap-3/60-day/one-day settings without activation. tests/archive.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” proves inheritance/snapshot/history custody and fresh restore authorization. Gap: multiple-recipient execution (FOLLOW-001 and SEND-003), bulk creation (RENEW-001), public-link submissions (SEND-009), future payment execution defaults (PAY-003), and ct approval of the explicit per-proposal authorization, supplied recipient IANA zone and no activation on upgrade or restore default remain. These are this seed’s unimplemented foundations, not external account blockers. The clause remains PARTIAL.
+**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`, `tests/platter.test.mjs`
+**Gap.** Editable inherited snapshots exist. Full bulk/public-link/payment creation coverage, independent schedule authority, timeline/audit and opt-out-across-revision proof remain; RL-101 resolves execution policy.
 
-#### FOLLOW-007 — Unattended CRM sync under a standing grant
+#### FOLLOW-011 — Delivery snapshots across proposal creation
 
-Core · target · **missing**
+Core · target · **partial** · From FOLLOW-006 · Cites BASE-ROLE-001
 
-**Requirement.** Unattended outcome synchronization under a standing grant is separate from FOLLOW-005's explicit consent to one exact revision, destination and stage field map. The 25 October 2026, 18:40 UTC ct ruling requires this missing row; the current slice grants no standing authority.
+**Requirement.** Blank/template, bulk, public-link and drafted proposals inherit settings; copies inherit the source snapshot. Fresh installations and upgrades store the specified default settings without granting execution authority. [Delivery settings](docs/contract-behavior.md#follow-006) records their values.
 
 **Acceptance.**
-1. Status: **missing**.
-2. Unattended outcome synchronization under a standing grant is separate from FOLLOW-005's explicit consent to one exact revision, destination and stage field map.
-3. The 25 October 2026, 18:40 UTC ct ruling requires this missing row; the current slice grants no standing authority.
-4. *Status:* missing.
-5. No standing-grant execution exists.
-6. Its consent, scope and public-door assertions must be specified by ct before implementation; FOLLOW-005's audited, revision-bound stage-only consent remains the default.
-7. Evidence: None recorded.
-8. Gap: No standing-grant execution; ct must specify consent, scope and public-door assertions before implementation.
+1. Copies, bulk creation, public submission and AI drafting from the template retain days 2,5,9 and fourteen-day expiry; public-link expiry starts at submission.
+2. An authorized sender can change a sent proposal’s settings without revising offer terms or requiring another offer approval.
+3. Turning scheduled reminders off still allows the once-per-recipient-per-day manual reminder.
+4. Each change retains its actor on the timeline; edits, revisions and sender demotion invalidate earlier execution authorization.
+5. Upgrade, copy and restore carry settings but start inactive; recipient opt-out and terminal stops remain across revisions.
+6. Execution activation uses current proposal Send authority and an explicitly supplied recipient zone, never an inferred one.
 
-**Evidence.** —
-**Gap.** No standing-grant execution; ct must specify consent, scope and public-door assertions before implementation.
+**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`, `tests/platter.test.mjs`
+**Gap.** Editable inherited snapshots exist. Full bulk/public-link/payment creation coverage, independent schedule authority, timeline/audit and opt-out-across-revision proof remain; RL-101 resolves execution policy.
+
+#### FOLLOW-007 — Unattended CRM synchronization with a scoped grant
+
+Core · target · **missing** · Cites BASE-AGENT-005, BASE-AGENT-006, BASE-AGENT-007
+
+**Requirement.** Unattended outcome synchronization uses a revocable scoped CRM grant, separate from FOLLOW-005’s explicit consent to one exact revision, destination and stage field map. An agent synchronization call carries external and follows company policy. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#follow-007).
+
+**Acceptance.**
+1. Unattended outcome synchronization uses a revocable scoped grant separate from FOLLOW-005’s consent to one exact revision, destination and stage field map.
+
+**Evidence.** None.
+**Gap.** No unattended scoped-grant execution exists. ct must specify its consent, scope and public-door assertions; FOLLOW-005’s exact-revision stage-map consent remains the interim boundary.
 
 #### NEG-001 — Negotiated revisions after sending
 
-Core · target · **done**
+Core · target · **done** · Rules D-1
 
-**Requirement.** After sending, the firm can make a new revision in answer to the client. The revision follows the approval rules and policy again (`APPROVE-001`, `APPROVE-003`); sending it retires the earlier client link, and the client sees what changed since the version they saw. Acceptance always binds the exact current sent revision, and every earlier version stays in history. An unsent negotiation is stored separately from the live offer: the old invitation remains usable until the approved replacement is sent. If the client accepts the live offer first, that agreement wins and the unsent negotiation cannot be sent; its saved revisions remain in history. Editing the negotiated draft creates another revision and clears its approval. The current default approval policy remains owner approval for every negotiated revision; `APPROVE-001` and `APPROVE-003` inherit this path when their rule and role capabilities ship.
+**Requirement.** After sending, the firm can make a new revision in answer to the client. The revision follows the approval rules and policy again (`APPROVE-001`, `APPROVE-003`); sending it retires the earlier client link, and the client sees what changed since the version they saw. Acceptance always binds the exact current sent revision, and every earlier version stays in history. An unsent negotiation is stored separately from the live offer: the old invitation remains usable until the approved replacement is sent. If the client accepts the live offer first, that agreement wins and the unsent negotiation cannot be sent; its saved revisions remain in history. Editing the negotiated draft creates another revision and clears its approval. The current default approval policy remains owner approval for every negotiated revision; `APPROVE-001` and `APPROVE-003` inherit this path when their rule and role capabilities ship. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#neg-001).
 
 **Acceptance.**
 1. Send revision 1, revise the price, approve and send revision 2; the revision 1 link is refused; the client page shows the price change; acceptance records revision 2.
@@ -1033,9 +1145,9 @@ Core · target · **done**
 
 #### NEG-002 — Client-suggested text edits
 
-Core · target · **done**
+Core · target · **done** · Cites BASE-AGENT-006, BASE-AGENT-007 · Rules D-1
 
-**Requirement.** Where the firm allows it, a client suggests edits to text sections (not prices) as tracked suggestions. The firm accepts or rejects each one; accepted suggestions form a new revision under `NEG-001`. Contract lifecycle redlining of master agreements belongs to Locket (see Neighboring products). Scope and terms are the text sections currently supported; a person enables each section separately on the exact sent revision, off by default. The invited client verifies their mailbox before submitting an original-text/replacement pair; the original must occur exactly once. Decisions retain the source revision, client, time, original and replacement, reviewer, decision and resulting revision. Owner/member people review; agents cannot enable or decide. Accepting an edit creates an unapproved negotiated revision without changing the live offer, and later accepted edits clear approval again. TEAM-001 inherits scoped person authority; EDIT-001 and EDIT-002 inherit this opt-in tracked-suggestion behavior for their new text sections before shipping.
+**Requirement.** Where the firm allows it, a client suggests edits to text sections (not prices) as tracked suggestions. The firm accepts or rejects each one; accepted suggestions form a new revision under `NEG-001`. Contract lifecycle redlining of master agreements belongs to Locket (see Neighboring products). Scope and terms are the text sections currently supported; a person enables each section separately on the exact sent revision, off by default. The invited client verifies their mailbox before submitting an original-text/replacement pair; the original must occur exactly once. Decisions retain the source revision, client, time, original and replacement, reviewer, decision and resulting revision. Owner/member people review; agent enablement carries standard and a binding decision carries commitment, each following company policy. Accepting an edit creates an unapproved negotiated revision without changing the live offer, and later accepted edits clear approval again. TEAM-001 inherits scoped person authority; EDIT-001 and EDIT-002 inherit this opt-in tracked-suggestion behavior for their new text sections before shipping. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#neg-002).
 
 **Acceptance.**
 1. Allow suggestions on the terms section, suggest two edits as the client, accept one and reject one, and see revision 2 contain only the accepted edit.
@@ -1047,9 +1159,9 @@ Core · target · **done**
 
 #### SIGN-003 — ESIGN and UETA electronic signature
 
-Core · target · **partial**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** Signing meets the federal ESIGN Act and state UETA: each signer is shown the electronic records disclosure and consents before signing, can withdraw consent and ask for paper, and adopts a typed, drawn or uploaded signature. Signature, initials and date fields can be placed anywhere, each assigned to one signer or, in a template, one recipient role (`SIGN-011`), and a signer sees and fills only their own fields. Intent to sign is explicit, and the signed record is retained and reproducible.
+**Requirement.** Signing meets the federal ESIGN Act and state UETA: each signer is shown the electronic records disclosure and consents before signing, can withdraw consent and ask for paper, and adopts a typed, drawn or uploaded signature. Signature, initials and date fields can be placed anywhere, each assigned to one signer or, in a template, one recipient role (`SIGN-011`), and a signer sees and fills only their own fields. Intent to sign is explicit, and the signed record is retained and reproducible. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-003).
 
 **Acceptance.**
 1. Sign as a client who reads the disclosure and consents, draws a signature and initials three fields; a second client withdraws consent and the firm is told; a third client uploads a PNG of their signature and adopts it; the signed record reproduces the same document and each adopted signature.
@@ -1059,38 +1171,34 @@ Core · target · **partial**
 
 #### SIGN-004 — Multiple signers, signing order and countersignature
 
-Core · target · **partial**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** A proposal can require several signers on the client side and a countersignature from the firm, in a set order or in parallel groups. A template sets the order and groups for its roles, and they are copied into each proposal created from it (`SIGN-011`); changing the template later never changes a proposal's order. Each signer verifies separately; the agreement completes when the last required signature lands, and each party is told. A signer can be replaced by the sender (`SEND-007`) or, where allowed, delegate (`SIGN-009`) without changing the order.
-
-Before shipping, multiple signers extend SEND-004’s named warning journey so every unsigned signer receives the warning and each signed signer receives none.
-
-SEND-010 withdrawal before completion notifies every signer, revokes remaining links and retains prior signatures marked void; extend its named partial-signature assertions before shipping.
+**Requirement.** A proposal can require several signers on the client side and a countersignature from the firm, in a set order or in parallel groups. A template sets the order and groups for its roles, and they are copied into each proposal created from it (`SIGN-011`); changing the template later never changes a proposal's order. Each signer verifies separately; the agreement completes when the last required signature lands, and each party is told. A signer can be replaced by the sender (`SEND-007`) or, where allowed, delegate (`SIGN-009`) without changing the order. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-004).
 
 **Acceptance.**
 1. Require client CEO then CFO, then the firm's owner; the CFO cannot sign before the CEO; after all three the agreement is complete and each party gets the completion email.
 2. On another proposal, put two client signers in one parallel group followed by the firm's countersignature: the two sign in either order, the firm cannot countersign before both have signed, and the agreement completes after the countersignature.
 
-**Evidence.** `tests/platter.test.mjs` — “SIGN-004 sequential and parallel recipient groups complete only after every signature” proves CEO then CFO then owner, both parallel orders, the frozen package, completion mail to each party and unsigned slot replacement. The same journey refuses replacement with another assigned mailbox without writes, retains revision and approvals plus the earlier signature, preserves position 2, revokes the former CFO session and records the replacement in the final certificate. The same SIGN-004 journey transfers native ownership after the client signatures: the former owner’s verified countersignature is refused without changing signatures or completing the agreement, the successor replaces only that unsigned slot, the old link and session are refused, and the newly verified current owner completes the unchanged agreement with completion notices to the current parties. Its named SEND-004 calendar journey proves warnings reach each unsigned signer and no signed signer; its named SEND-010 withdrawal journey proves every recipient link returns 410 without content and prior signatures remain marked void. `tests/site.test.mjs` — “SIGN-004 and SEND-003 owner recipient controls, own-field previews, ordered signing and viewer revocation” proves the compiled screens, duplicate-mailbox refusal and later-slot replacement with fresh verification and preserved order. `tests/archive.test.mjs` — “SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority” proves exact signature, void and certificate custody without restored links.
-**Gap.** Policy default adopted under the standing scope rule, pending ct approval: only the current owner configures roles, sends or replaces configured recipient invitations and countersigns; each recipient verifies their own mailbox. Additional viewing links require explicit audited consent, including the exact framing origin when embedded. Restoring records restores no invitation or framing authority. Scoped non-owner sending and replacement remain outside this interim boundary, and provider-specific recipient checks remain SIGN-006 work. SIGN-004 stays PARTIAL until ct approves the authority default; no legal or provider qualification is claimed.
+**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Gap.** Policy default adopted under the standing scope rule, policy not yet ruled where noted in RULINGS: only the current owner configures roles, sends or replaces configured recipient invitations and countersigns; each recipient verifies their own mailbox. Additional viewing links require explicit audited consent, including the exact framing origin when embedded. Restoring records restores no invitation or framing authority. Scoped non-owner sending and replacement remain outside this interim boundary, and provider-specific recipient checks remain SIGN-006 work. SIGN-004 stays PARTIAL until ct approves the authority default; no legal or provider qualification is claimed.
 
 #### SIGN-005 — Signed agreement PDF and certificate of completion
 
-Core · target · **partial**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** On completion, Platter produces the signed agreement PDF and a certificate of completion listing each signer, verification method, consent, IP-derived location, user agent, timestamps and the SHA-256 hash of the document. Both parties can download them, they are emailed to each party, and the PDF is archived (`AUTO-002`).
+**Requirement.** On completion, Platter produces the signed agreement PDF and a certificate of completion listing each signer, verification method, consent, IP-derived location, user agent, timestamps and the SHA-256 hash of the document. Both parties can download them, they are emailed to each party, and the PDF is archived (`AUTO-002`). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-005).
 
 **Acceptance.**
 1. Complete a two-signer agreement, download the PDF and certificate as each party, recompute the SHA-256 and see it match the certificate, and find both attached to the completion email.
 
-**Evidence.** New single-client signatures retain their actual verification method and verification time when recorded. Immutable signed PDFs and method-bearing certificates are downloadable through scoped person and verified-client doors, with matching SHA-256. `tests/mail.test.mjs` — “SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash” proves both parties’ identical bytes, certificate hash, actual SMS and mailbox methods and refusal without verification. The named SIGN-006 compiled browser journey in `tests/site.test.mjs` proves signed downloads at 1440 and 390. The existing notification public CLI journey in `tests/archive.test.mjs` retains exact certificate and document bytes without restored invitations.
+**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
 **Gap.** Two-signer completion, completion-email attachments, full agreement attachment packaging, IP-derived location and user-agent recording remain. Missing historical methods are never inferred; currently unrecorded location and user agent are labelled not recorded. This prerequisite remains PARTIAL.
 
 #### SIGN-006 — Signer identity options
 
-Core · target · **partial**
+Core · target · **partial** · Rules D-1 · Register R-3
 
-**Requirement.** Per proposal, the firm chooses the identity check for each signer: mailbox code (`SIGN-001`, the default), link only, a text-message code to a US mobile number through Twilio, or government ID verification through Stripe Identity or Persona. Link only matches the incumbents' default for low-risk documents: possession of the personal link delivered to that recipient's mailbox is the check, it must be chosen explicitly per proposal or template, and a link opened on a new device and network after a forward (`TRACK-003`) still asks for the mailbox code before it can sign. The method used is recorded in the certificate.
+**Requirement.** Per proposal, the firm chooses the identity check for each signer: mailbox code (`SIGN-001`, the default), link only, a text-message code to a US mobile number through Twilio, or government ID verification through Stripe Identity or Persona. Link only matches the incumbents' default for low-risk documents: possession of the personal link delivered to that recipient's mailbox is the check, it must be chosen explicitly per proposal or template, and a link opened on a new device and network after a forward (`TRACK-003`) still asks for the mailbox code before it can sign. The method used is recorded in the certificate. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-006).
 
 **Acceptance.**
 1. Require SMS for one signer and ID verification for another with Twilio and Stripe Identity fakes; wrong SMS codes are limited as in `SIGN-001`; the certificate names each method.
@@ -1100,31 +1208,28 @@ Core · target · **partial**
 5. Exercise every SIGN-001 code limit, exact invitation and revision binding, quiet-hour deferral and current-authority checks.
 6. STOP blocks code delivery; START does not reactivate it, and no refusal silently downgrades the selected identity method.
 7. Record the actual completed method in the certificate without inferring missing historical evidence.
-8. These assertions supplement every original acceptance point.
 
-**Evidence.** Native SMS-code identity selection and the existing client verification form now retain the actual signing method. `tests/mail.test.mjs` — “SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash” proves five-attempt refusal, generation delay, single use, quiet hours, explicit consent, default mailbox verification and method-bearing certificates. `tests/site.test.mjs` — “SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the compiled client at desktop and phone widths” proves the text-code and signed-download screens at 1440 and 390.
-**Gap.** CT ruling, 26 October 2026: APPROVE WITH RIDERS for the inherited SMS product default; status remains partial. SMS identity codes inherit SEND-008’s recorded recipient consent and exact revision and invitation binding, supplied recipient IANA zone and quiet hours, live sender authority, number-wide STOP, refusal of START reactivation, no restored authority and no automatic retry after uncertainty. Recipient code requests additionally require a current invitation and a still-valid authorized SMS configuration; they confer no staff Send permission. Consent to receive a code is distinct from consent to electronic records and intent to sign. STOP blocks identity-code texts as well as other SMS purposes. Missing consent, an invalid zone, suppression or uncertainty does not silently select another identity method or weaken an SMS requirement. Mailbox code remains the default when no identity choice was made, and the certificate records only the method actually used. This ruling approves policy only and certifies no signer identity, implementation or legal compliance. Gap: Government ID verification through Stripe Identity or Persona, link-only signing with forwarded-device and network escalation, multiple signer roles, sender method-selection controls and safe recipient SMS re-enablement remain. The full SIGN-001 code limits and exact verification binding remain required. Carrier acceptance, A2P 10DLC registration or toll-free verification as applicable, TCPA obligations and CTIA messaging requirements remain provider-proof or legal Gaps inherited from SEND-008. All original target and acceptance points remain required. The clause remains partial. Remaining rider proof includes complete recipient-assent fields and disclosure custody, all-purpose suppression across invitations and provider suppression, SMS daylight-saving deferral rechecks, and every SIGN-001 identity-code limit. The existing local fakes do not prove these additional riders.
+**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`
+**Gap.** Government ID verification through Stripe Identity or Persona, link-only signing with forwarded-device and network escalation, multiple signer roles, sender method-selection controls and safe recipient SMS re-enablement remain. The full SIGN-001 code limits and exact verification binding remain required. Carrier acceptance, A2P 10DLC registration or toll-free verification as applicable, TCPA obligations and CTIA messaging requirements remain provider-proof or legal Gaps inherited from SEND-008. All original target and acceptance points remain required. The clause remains partial. Remaining rider proof includes complete recipient-assent fields and disclosure custody, all-purpose suppression across invitations and provider suppression, SMS daylight-saving deferral rechecks, and every SIGN-001 identity-code limit. The existing local fakes do not prove these additional riders.
 
 #### SIGN-007 — Fields collected at acceptance
 
-Core · target · **partial**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** The firm places fields the client fills at acceptance, each assigned to one recipient or template role (`SIGN-011`) so only that person fills it: PO number, billing contact, billing and service address, project start date, checkboxes, custom text and file uploads, such as a purchase order PDF or a certificate of insurance (PDF, PNG or JPEG up to 25 MB each). Required fields block signing; values freeze into the agreement and flow to invoices and the CRM, and uploaded files are kept byte-identical in the agreement package (`SIGN-005`) and listed on the certificate of completion.
+**Requirement.** The firm places fields the client fills at acceptance, each assigned to one recipient or template role (`SIGN-011`) so only that person fills it: PO number, billing contact, billing and service address, project start date, checkboxes, custom text and file uploads, such as a purchase order PDF or a certificate of insurance (PDF, PNG or JPEG up to 25 MB each). Required fields block signing; values freeze into the agreement and flow to invoices and the CRM, and uploaded files are kept byte-identical in the agreement package (`SIGN-005`) and listed on the certificate of completion. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-007).
 
 **Acceptance.**
 1. Require a PO number, a billing address and a PO PDF upload, try to sign without them (refused), fill them and upload the PDF, sign, and see the values in the agreement, the QuickBooks Online invoice fake and the HubSpot deal fake; the uploaded PDF in the agreement package has the same SHA-256 as the file uploaded, and the certificate lists it.
 2. A 30 MB upload and an .exe upload are refused.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` — named EDIT-001 Client-field/browser/CLI journeys
+**Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
 **Gap.** Client-assigned text, date and checkbox fields enforce required values at acceptance; typed signature blocks adopt the same acceptance name. Values freeze with the agreement and survive the public CLI. Evidence: tests/platter.test.mjs — “EDIT-001 Client-assigned required fields and typed signature blocks validate at signing and freeze exact values with the selected agreement”, tests/site.test.mjs — “EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths” and tests/archive.test.mjs — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority”. Gap: recipient roles beyond Client, file collection, invoice/CRM propagation and certificate listing remain.
 
 #### SIGN-008 — Acceptance on the client's own paper
 
-Core · target · **done**
+Core · target · **done** · Cites BASE-INPUT-003, BASE-AGENT-007 · Rules D-1
 
-**Requirement.** When a client signs through their own procurement or signing system, the owner uploads the signed copy, records who signed and when, and attests to it. The agreement is marked accepted by upload, distinct from Platter e-signature, and payments and handoff proceed as for any acceptance.
-
-Until `TEAM-001` adds the admin role, only the owner records an acceptance by upload, and only for a sent proposal's current sent, approved revision; the owner chooses the one offered option the client signed, and its total and integer-cent deposit are calculated and frozen as in `SIGN-002`. The signed date is the calendar date written on the paper (`YYYY-MM-DD`, no time zone), never later than the current date in UTC+14; the acceptance time is when the owner recorded it. The owner's attestation is stored as the acceptance's consent text. Every screen labels the agreement "Accepted by upload: signed outside Platter. Platter did not verify this signature." and never shows the client's mailbox as the signer's; Platter e-signatures show their own method. The uploaded file, at most 10 MB, is kept immutably with the agreement in any format the owner uploads (no format or signature check is claimed) and is only ever served as a download (`Content-Disposition: attachment`, `nosniff`); owners and members download it, agents never do, and the client invitation page shows the accepted-by-upload record without serving the file. Recording discards a pending `NEG-001` draft as an e-signed acceptance does, a later client acceptance attempt returns the recorded acceptance, and a recorded acceptance is never replaced. Today the deposit request is the owner's deposit invoice export, which proceeds exactly as for any acceptance; `PAY-001`, `PAY-002`, `PAY-008`, `HAND-001` and `HAND-002` treat an acceptance by upload as an acceptance before they ship.
+**Requirement.** When a client signs through their own procurement or signing system, the owner uploads the signed copy, records who signed and when, and attests to it. The agreement is marked accepted by upload, distinct from Platter e-signature, and payments and handoff proceed as for any acceptance. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-008).
 
 **Acceptance.**
 1. Upload a client-signed PDF for a sent proposal, record signer and date, and see the agreement marked accepted by upload with the file, followed by the deposit request.
@@ -1134,9 +1239,9 @@ Until `TEAM-001` adds the admin role, only the owner records an acceptance by up
 
 #### SIGN-009 — Recipient delegation of signing
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** Where the firm turns delegation on for a proposal or template, a signer who is not the right person delegates from their own link to a named person with email (and a mobile number when that signer's check is SMS). The delegate must pass the identity check set for that signer (`SIGN-006`) before seeing the agreement; the delegator's link is revoked; the sender is notified and can undo the delegation before the delegate signs. Delegation never changes the offer, revision, approvals or signing order, is refused once the delegator has signed or when delegation is off, and is recorded in the certificate of completion (`SIGN-005`).
+**Requirement.** Where the firm turns delegation on for a proposal or template, a signer who is not the right person delegates from their own link to a named person with email (and a mobile number when that signer's check is SMS). The delegate must pass the identity check set for that signer (`SIGN-006`) before seeing the agreement; the delegator's link is revoked; the sender is notified and can undo the delegation before the delegate signs. Delegation never changes the offer, revision, approvals or signing order, is refused once the delegator has signed or when delegation is off, and is recorded in the certificate of completion (`SIGN-005`). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-009).
 
 **Acceptance.**
 1. With delegation off, try to delegate from the CEO's link (refused); turn it on and delegate to the COO: the CEO's link is refused and the sender is notified; the COO verifies and signs, and the certificate shows the CEO delegated to the COO with the time; on another proposal sign as the CEO and then try to delegate (409).
@@ -1146,9 +1251,9 @@ Core · target · **missing**
 
 #### SIGN-010 — In-person signing on the firm's device
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** A sender hosts a signing session on their own signed-in phone, tablet or computer for clients who are present, as incumbents offer for walk-in clients. The sender starts the session from the proposal and hands the device over; each signer in signing order (`SIGN-004`) confirms their name, reads the electronic records disclosure and consents (`SIGN-003`), fills the fields assigned to them (`SIGN-007`) and signs. Between signers the device returns to a hand-back screen, and the sender's own pages stay locked until the sender signs in again. The firm can require a code sent to each signer's mobile or mailbox in the session (`SIGN-006`). The certificate of completion (`SIGN-005`) records each signature as "in person, hosted by" the sender, with time and device, and each signer gets the completed copy by email.
+**Requirement.** A sender hosts a signing session on their own signed-in phone, tablet or computer for clients who are present, as incumbents offer for walk-in clients. The sender starts the session from the proposal and hands the device over; each signer in signing order (`SIGN-004`) confirms their name, reads the electronic records disclosure and consents (`SIGN-003`), fills the fields assigned to them (`SIGN-007`) and signs. Between signers the device returns to a hand-back screen, and the sender's own pages stay locked until the sender signs in again. The firm can require a code sent to each signer's mobile or mailbox in the session (`SIGN-006`). The certificate of completion (`SIGN-005`) records each signature as "in person, hosted by" the sender, with time and device, and each signer gets the completed copy by email. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-010).
 
 **Acceptance.**
 1. As a sales member at 390 pixels, host an in-person session for two client signers in order: each reads the disclosure, consents and signs; the screen returns to the hand-back screen between them and the sender's queue cannot be opened without signing in again; the certificate names the in-person method and the host; both signers receive the completed copy in the mail fake; the remote link for the same signer then shows the proposal as already signed.
@@ -1159,21 +1264,31 @@ Core · target · **missing**
 
 #### SIGN-011 — Template recipient roles, field assignment and signing order
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** A template (`EDIT-002`) holds recipient roles, each with a name the firm chooses (such as Client, Client CFO or Countersigner) and a kind: signer, client-side approver, viewer or CC (`SEND-003`), or firm countersigner (`SIGN-004`). Every signature, initials, date and form field (`SIGN-003`, `SIGN-007`) and every signature block (`EDIT-001`) is assigned to exactly one role, and a template with a signature, initials, date or required field assigned to no role cannot be published (400). The template sets the signing order, including parallel groups (`SIGN-004`), and the identity check for each role (`SIGN-006`). A role can be pre-assigned to a member, such as the owner as countersigner, or to a fixed contact, who is then added to every proposal created from the template. Every proposal created from a template shows each role as a slot, whether a member starts it (`EDIT-002`), duplicates it (`EDIT-012`), creates it in bulk (`RENEW-001`), a visitor submits a public link (`SEND-009`) or it is drafted (`AI-001`). The member fills each slot from the client's contacts or the linked CRM deal's contacts (`EDIT-004`, `CRM-001` to `CRM-004`), with a deal contact whose CRM role or label matches the role name offered first, and the role's fields and place in the order arrive assigned to whoever fills the slot. Sending is refused (409), naming the role, while any signer, approver or countersigner role is unfilled. The proposal copies the template's roles, fields and order when it is created, so a later change to the template never alters a proposal already created; on one proposal the member may add or remove roles and change the order before sending. Template roles read from PandaDoc's API at move-in become these roles with their order, field assignments and pre-assigned recipients (`MIG-001`).
-
-Before shipping, extend EDIT-012 duplication assertions to preserve all role slots and only template-preassigned members, clearing all other recipients.
+**Requirement.** Templates define named signer, client approver, viewer, CC and firm-countersigner roles, each with assigned fields, order/parallel group and identity check. Every signature, initials, date and required form field has exactly one role; missing assignment prevents publication. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-011).
 
 **Acceptance.**
-1. Build a template with three roles: Client signer (signature, date and a required PO number field), Client CFO (approver) and Firm countersigner pre-assigned to the owner (signature), ordered signer, then CFO, then countersigner; publishing it with one more signature field assigned to no role is refused (400).
-2. Create a proposal from it: exactly three role slots appear, the countersigner already filled by the owner.
-3. Link a HubSpot deal fake with three contacts, one of them labeled Client CFO in HubSpot: the Client CFO slot offers that contact first, ahead of the other two.
-4. Fill the signer from one of the deal's contacts and leave the CFO empty: send is refused (409) naming Client CFO.
-5. Fill the CFO and send: the signer's page shows exactly the signature, date and PO number fields; the CFO's approval is refused before the signer signs; the owner's countersignature is refused until the CFO approves, and the agreement completes on it.
-6. Change the template's order to CFO first: the proposal already created keeps signer, CFO, countersigner, and a new proposal from the template gets the new order.
-7. Duplicate the sent proposal (`EDIT-012`): the copy has the three slots with only the owner filled.
-8. With a PandaDoc API fake returning a template with two roles, Client and Sender, each with assigned fields and an order, the imported template carries the same two roles, field assignments and order (`MIG-001`).
+1. Create Client signer, Client CFO approver and owner-preassigned countersigner, with signature/date/PO fields. An unassigned extra signature prevents publication.
+2. Start a proposal: exactly three slots exist and the owner’s slot is filled.
+3. The HubSpot contact labelled Client CFO is offered first for that slot; an unfilled required role prevents sending and names the role.
+4. Filled recipient fields and signing order match their template role; the CFO cannot act before the signer and the owner cannot countersign before the CFO.
+5. A completed countersignature completes the agreement.
+
+**Evidence.** None.
+**Gap.** No templates, recipient roles or field assignments; one client recipient per proposal.
+
+#### SIGN-012 — Recipient-role snapshots across creation
+
+Core · target · **missing** · From SIGN-011 · Rules D-1
+
+**Requirement.** Every template start, duplicate, bulk proposal, public submission and AI draft copies its role/field/order snapshot. A person can edit its roles and order before sending without changing the template or earlier proposals.
+
+**Acceptance.**
+1. Change the template to CFO-first: the existing proposal keeps signer/CFO/countersigner and the next start uses CFO-first.
+2. Duplicate the sent proposal: all three slots remain with only the template-preassigned owner filled.
+3. Each other creation door keeps the same role-slot assignment behavior.
+4. A PandaDoc API template with Client/Sender roles imports the same fields, order and preassigned recipients.
 
 **Evidence.** None.
 **Gap.** No templates, recipient roles or field assignments; one client recipient per proposal.
@@ -1182,38 +1297,36 @@ Before shipping, extend EDIT-012 duplication assertions to preserve all role slo
 
 #### PAY-001 — Stripe card and ACH collection in the proposal
 
-Core · target · **partial**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** The owner or an admin (`TEAM-001`) connects the firm's own Stripe account. The client pays inside the proposal by card, Apple Pay, Google Pay or ACH bank debit, with bank verification through Stripe Financial Connections or micro-deposits. The ACH debit authorization text is shown and stored with the agreement. Card and bank numbers never touch Platter. The methods a proposal offers are copied when it is created from its template (`EDIT-002`), or from the workspace's default methods when the template sets none, and the sender changes them per proposal before sending; the owner or an admin sets the workspace defaults and whether to pass through a fee where allowed.
-
-SEND-010 withdrawal voids all unpaid payment links; extend its named refused-payment-link assertions before shipping.
+**Requirement.** The owner or an admin (`TEAM-001`) connects the firm's own Stripe account. The client pays inside the proposal by card, Apple Pay, Google Pay or ACH bank debit, with bank verification through Stripe Financial Connections or micro-deposits. The ACH debit authorization text is shown and stored with the agreement. Card and bank numbers never touch Platter. The methods a proposal offers are copied when it is created from its template (`EDIT-002`), or from the workspace's default methods when the template sets none, and the sender changes them per proposal before sending; the owner or an admin sets the workspace defaults and whether to pass through a fee where allowed. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#pay-001).
 
 **Acceptance.**
 1. In Stripe test mode, connect an account, accept and pay a deposit by test card, by Apple Pay and Google Pay test wallets, and by test ACH; see the authorization text retained; inspect the database and logs for card or bank numbers (none).
 2. Turn on a 3% card fee after confirming it is allowed: the card total shows the fee as its own line, ACH shows none, and a client whose billing state the firm marked as not allowing surcharges sees no fee.
 3. With workspace default methods of card, wallets and ACH, a template offering card and ACH only starts a proposal whose client page offers card and ACH and no wallets, and a blank proposal offers all three; turning ACH off on that one proposal leaves the template unchanged.
 
-**Evidence.** `tests/stripe-sandbox.mjs` — native public collection (held-key US test-mode run, 26 October 2026: USD account connection, card decline and success, test ACH succeeded, retained one-time authorization and mandate reference, no instrument numbers in retained agreement, authorization or mail; ACH micro-deposit verification held as requires action, descriptor code verified and the debit moved forward with the authorization text and mandate reference retained). `tests/collection-browser.mjs` — real Payment Element journey with held US test keys, three consecutive clean runs on 26 October 2026 at 1440 and 390 pixels (card decline then success, due decline, separate card fee, completed 3-D Secure, whole-database inspection of every table through `tests/instrument-scan.mjs` and runtime-log inspection: no card or bank numbers; every test charge refunded). `tests/platter.test.mjs` — “card fees require admin confirmation, remain separate and exempt ACH and prohibited billing states” proves fee authority, consent, the separate 3% card line and both exemptions; “proposal methods copy template overrides or workspace defaults and remain independent” proves all methods, template overrides and independent per-proposal changes; “SEND-010 / FOLLOW-002 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval” refuses every current collection, refresh and consent door after unsigned withdrawal. `tests/site.test.mjs` — “deposit collection settings, retained signatures, required and due completion at desktop and phone widths” proves native screens at 1440 and 390.
+**Evidence.** `tests/stripe-sandbox.mjs`, `tests/collection-browser.mjs`, `tests/instrument-scan.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`
 **Gap.** USD collection uses Stripe Payment Element only after explicit preparation consent and a verified current signature. Exact one-time amount authorization is audited before confirmation; the provider account, accepted revision, deposit, currency, method and billing-state quote stay bound. Card and bank details stay in Stripe frames. Unknown and prohibited billing states and ACH have no card fee. Collection starts only after signing, so unsigned withdrawal releases no Stripe client secret. Gap: Apple Pay and Google Pay test-wallet payments (Stripe reports no available wallet in the headless test browser; they need a device with a configured wallet) and a browser Financial Connections instant-verification journey remain unproved. Bank verification is proved only by the micro-deposit path driven through Stripe’s test API. PAY-003, PAY-005 and PAY-008 inherit exact account, amount, revision and explicit authorization binding; this one-time authorization grants no future charge.
 
 #### PAY-002 — Deposit or partial payment at acceptance
 
-Core · target · **done**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** Accept and pay is one flow: after signing, the client pays the deposit or first payment in the same session. The firm chooses whether acceptance completes only once the payment succeeds or whether signing completes the agreement with the payment due. Agreement and payment states stay separate, so a failed payment never undoes a signature.
+**Requirement.** Accept and pay is one flow: after signing, the client pays the deposit or first payment in the same session. The firm chooses whether acceptance completes only once the payment succeeds or whether signing completes the agreement with the payment due. Agreement and payment states stay separate, so a failed payment never undoes a signature. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#pay-002).
 
 **Acceptance.**
 1. With payment required, sign and decline the test card: the agreement waits for payment; pay and see it complete.
 2. With payment due, sign, fail the payment and see the agreement accepted with the deposit due.
 
-**Evidence.** `tests/collection-browser.mjs` — real held-key US Stripe test run, three consecutive clean runs on 26 October 2026 at 1440 and 390 pixels (required decline then success completes the agreement; due decline stays accepted with the deposit due; completed 3-D Secure; every test charge refunded); `tests/stripe-sandbox.mjs` — native required and due public-route collection (26 October 2026); `tests/platter.test.mjs` — “deposit signatures survive declines, required acceptance waits for Stripe success and due acceptance stays complete”; `tests/site.test.mjs` — “deposit collection settings, retained signatures, required and due completion at desktop and phone widths”.
-**Gap.** PAY-003, PAY-008 and PAY-009 inherit this same-session flow and must extend the named real-browser journey before shipping.
+**Evidence.** `tests/collection-browser.mjs`, `tests/stripe-sandbox.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Due-deposit amount remains outstanding after the declined payment. The cited browser assertion checks accepted state; a separate exact due-money readback is needed.
 
 #### PAY-003 — Milestone and recurring payment schedules
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** The accepted schedule (`PRICE-007`) is executed: milestones are charged or invoiced on their date or when the owner marks the event done, each amount's invoice being created on that issue day and never earlier (`ACCT-007`), and recurring fees are charged on their interval against the payment method the client authorized, or sent as net-terms invoices with a pay link and overdue tracking (`PAY-008`). The client can update the payment method from a link.
+**Requirement.** The accepted schedule (`PRICE-007`) is executed: milestones are charged or invoiced on their date or when the owner marks the event done, each amount's invoice being created on that issue day and never earlier (`ACCT-007`), and recurring fees are charged on their interval against the payment method the client authorized, or sent as net-terms invoices with a pay link and overdue tracking (`PAY-008`). The client can update the payment method from a link. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#pay-003).
 
 **Acceptance.**
 1. Accept a deposit, a charged milestone, a net-30 milestone and a monthly retainer; mark milestone one done and see it charged; mark the net-30 milestone done and see an invoice issued, not a charge, followed by the `PAY-008` journey; advance the clock a month and see the retainer charged; update the payment method from the client link.
@@ -1223,11 +1336,9 @@ Core · target · **missing**
 
 #### PAY-004 — Paid, pending, failed, refunded and disputed states
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** Each payment shows scheduled, processing, succeeded, failed, refunded, partially refunded or disputed from signed Stripe webhooks, processed once per event ID. ACH payments stay processing until Stripe reports success, typically up to four business days. A payment is paid only on provider evidence, and the owner sees amounts due, paid and overdue per agreement.
-
-Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with paid, including filters, sorting, counts and totals under its visibility rules.
+**Requirement.** Each payment shows scheduled, processing, succeeded, failed, refunded, partially refunded or disputed from signed Stripe webhooks, processed once per event ID. ACH payments stay processing until Stripe reports success, typically up to four business days. A payment is paid only on provider evidence, and the owner sees amounts due, paid and overdue per agreement. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#pay-004).
 
 **Acceptance.**
 1. Replay Stripe test events out of order and twice: the state ends correct with one record per event; an ACH payment stays processing until the success event; the agreement shows due, paid and overdue totals.
@@ -1237,11 +1348,9 @@ Before this capability ships, it extends the `REPORT-001` dashboard and its name
 
 #### PAY-005 — Failed-payment retries and notices
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** When a payment fails, the client and firm are told with the reason; Platter retries on an owner-set schedule only where the client's authorization allows it, and stops a retry once the amount is paid by any route. Each attempt is on the timeline.
-
-Before shipping, extend FOLLOW-002 with failed-payment reasons, prescribed reason precedence and client-payment closure in its named queue journey.
+**Requirement.** When a payment fails, the client and firm are told with the reason; Platter retries on an owner-set schedule only where the client's authorization allows it, and stops a retry once the amount is paid by any route. Each attempt is on the timeline. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#pay-005).
 
 **Acceptance.**
 1. Fail a milestone charge; both parties are notified; a retry runs after the set delay; pay by check (`PAY-007`) before the next retry and see it canceled.
@@ -1251,15 +1360,13 @@ Before shipping, extend FOLLOW-002 with failed-payment reasons, prescribed reaso
 
 #### PAY-006 — Refunds and disputes
 
-Core · target · **partial**
+Core · target · **partial** · Cites BASE-AGENT-006, BASE-AGENT-007, BASE-OPS-003 · Rules D-1
 
-**Requirement.** The owner, an admin or a billing user (`TEAM-001`) refunds a payment in full or in part with a reason, and the refund syncs to accounting. When a client disputes a card payment, Platter shows the dispute, its deadline and an evidence pack (signed agreement, certificate, views and payment authorization) that the owner, an admin or a billing user submits to Stripe.
-
-A dispute response has four separately recorded steps, and Platter never reports a later step from an earlier one. Preparation: Platter builds the packet only from its own retained records for the verified deposit: the exact accepted snapshot and the acceptance as recorded (mailbox-code verified under `SIGN-001` and `SIGN-002`, or an owner-attested upload under `SIGN-008`, stated as such), the verified charge and amount, and the person's response note. The packet itself names every target artifact Platter does not yet hold (the `SIGN-005` certificate, `TRACK-001` views, `PAY-001` and `PAY-002` payment authorization) and every retained file it does not include; nothing is inferred, upgraded or fabricated. Authorization: the owner, an admin or a billing user reviews that exact packet and explicitly authorizes sending it; the authorization names the dispute, its amount and provider deadline and the packet's SHA-256, and is in the audit log (`TEAM-004`); agent keys and other roles are refused (403) with no provider call. Submission: only an authorized packet is sent, byte for byte and once; the request is claimed before any provider call, uses provider idempotency and is never repeated after an uncertain outcome (`MAIL-001`); nothing is submitted automatically, every provider evidence update states whether it submits, and a passed deadline or changed disputed amount refuses it. Receipt: Submitted is shown only when Stripe confirms it holds the response (the dispute is under review); an uncertain outcome stays held for reconciliation against Stripe; won or lost comes only from Stripe's dispute state (`PAY-004`). Submitted bytes and hash stay unchanged and travel in archives without credentials (`PORT-002`).
+**Requirement.** The owner, an admin or a billing user (`TEAM-001`) refunds a payment in full or in part with a reason, and the refund syncs to accounting. When a client disputes a card payment, Platter shows the dispute, its deadline and an evidence pack (signed agreement, certificate, views and payment authorization) that the owner, an admin or a billing user submits to Stripe. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#pay-006).
 
 **Acceptance.**
 1. As a billing user refund half of a deposit and see the credit in the QuickBooks Online fake; a sales member's refund is refused (403); open a test dispute and submit the evidence pack to the Stripe fake before its deadline.
-2. A billing user previews the exact packet with their note and its SHA-256, authorizes that hash, and the Stripe fake receives exactly those bytes once with an explicit submit; a submission naming another hash, after the deadline, after the disputed amount changed, or without authorization is refused with no provider call, and manager, sales, content editor, viewer and agent-key attempts are refused (403) with no provider call.
+2. A billing user previews the exact packet with their note and its SHA-256, authorizes that hash, and the Stripe fake receives exactly those bytes once with an explicit submit; a submission naming another hash, after the deadline, after the disputed amount changed, or without authorization is refused with no provider call, and manager, sales, content editor and viewer attempts are refused without a provider call; under the held company policy an agent submission carrying external and commitment waits for its named approver.
 3. A dispute on an agreement accepted by attested upload yields a packet that states the attested upload and makes no mailbox-verification claim.
 4. Every packet names the target evidence it does not include.
 5. A provider timeout leaves the submission held for reconciliation; repeating the request makes no provider call; Submitted appears only after Stripe reports the dispute under review.
@@ -1269,9 +1376,9 @@ A dispute response has four separately recorded steps, and Platter never reports
 
 #### PAY-007 — Check, wire and ACH credit payments
 
-Core · target · **partial**
+Core · target · **partial** · Rules D-1
 
-**Requirement.** US clients often pay by check, wire or ACH credit. Invoices show remittance details, and the owner, an admin or a billing user (`TEAM-001`) records an offline payment with method, reference and date. It reconciles against the schedule and accounting like any other payment.
+**Requirement.** US clients often pay by check, wire or ACH credit. Invoices show remittance details, and the owner, an admin or a billing user (`TEAM-001`) records an offline payment with method, reference and date. It reconciles against the schedule and accounting like any other payment. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#pay-007).
 
 **Acceptance.**
 1. As a billing user record a check with its number against a milestone and see it paid, synced to QuickBooks Online, and removed from the overdue list.
@@ -1281,11 +1388,9 @@ Core · target · **partial**
 
 #### PAY-008 — Net-terms invoices with a pay link and overdue tracking
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** When a scheduled amount is on net terms (net 15, net 30 or a custom number of days), Platter issues an invoice when its date arrives or its milestone is marked done, with its due date counted from that issue day and never created earlier (`ACCT-007`): an email to the billing contact (`SIGN-007`) with the invoice number, amount, due date, a PDF invoice and a pay link, using the invoice template of `SEND-006`. The pay link opens a page where the client pays by card or ACH (`PAY-001`, `PAY-009`) or reads remittance details for check and wire (`PAY-007`). An unpaid invoice is due through its due date and turns overdue the next day in the firm's time zone: it counts in the agreement's overdue total (`PAY-004`), opens a follow-up in the owner's queue (`FOLLOW-002`) and sends overdue reminders on the owner's schedule. A payment from the link is processing until the provider reports success and paid only on that evidence. When the accounting system is the invoice authority (`ACCT-004`), the invoice sent is the one in QuickBooks Online, Xero or Pantry, never a second one.
-
-Before shipping, extend FOLLOW-002 with overdue-payment reasons, prescribed reason precedence and paid-event closure in its named queue journey.
+**Requirement.** When a scheduled amount is on net terms (net 15, net 30 or a custom number of days), Platter issues an invoice when its date arrives or its milestone is marked done, with its due date counted from that issue day and never created earlier (`ACCT-007`): an email to the billing contact (`SIGN-007`) with the invoice number, amount, due date, a PDF invoice and a pay link, using the invoice template of `SEND-006`. The pay link opens a page where the client pays by card or ACH (`PAY-001`, `PAY-009`) or reads remittance details for check and wire (`PAY-007`). An unpaid invoice is due through its due date and turns overdue the next day in the firm's time zone: it counts in the agreement's overdue total (`PAY-004`), opens a follow-up in the owner's queue (`FOLLOW-002`) and sends overdue reminders on the owner's schedule. A payment from the link is processing until the provider reports success and paid only on that evidence. When the accounting system is the invoice authority (`ACCT-004`), the invoice sent is the one in QuickBooks Online, Xero or Pantry, never a second one. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#pay-008).
 
 **Acceptance.**
 1. Accept a proposal with a $6,000.00 milestone on net 30 and mark it done on 1 March: the mail fake holds one invoice email with amount $6,000.00, due date 31 March, a PDF and a pay link.
@@ -1298,9 +1403,9 @@ Before shipping, extend FOLLOW-002 with overdue-payment reasons, prescribed reas
 
 #### PAY-009 — PayPal, Square and Authorize.net collection
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** A firm that does not take payment through Stripe connects its own PayPal, Square or Authorize.net account instead, and the client pays the deposit, milestones and net-terms invoices inside the proposal by card, or by PayPal or Venmo where PayPal is connected. Payment states, retries, refunds and accounting sync work as for Stripe (`PAY-002` to `PAY-008`, `ACCT-001` to `ACCT-006`), with each processor's signed webhooks or notifications processed once per event. Where a processor cannot charge a stored method for a schedule, Platter sends a pay link for each scheduled amount and says so when the firm connects it. Card numbers never touch Platter.
+**Requirement.** A firm that does not take payment through Stripe connects its own PayPal, Square or Authorize.net account instead, and the client pays the deposit, milestones and net-terms invoices inside the proposal by card, or by PayPal or Venmo where PayPal is connected. Payment states, retries, refunds and accounting sync work as for Stripe (`PAY-002` to `PAY-008`, `ACCT-001` to `ACCT-006`), with each processor's signed webhooks or notifications processed once per event. Where a processor cannot charge a stored method for a schedule, Platter sends a pay link for each scheduled amount and says so when the firm connects it. Card numbers never touch Platter. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#pay-009).
 
 **Acceptance.**
 1. With PayPal, Square and Authorize.net sandbox fakes: connect each in turn, accept and pay a deposit, refund half of it, replay each webhook twice, and see the same payment states and QuickBooks Online fake records as the Stripe journey with one record per event; inspect the database and logs for card numbers (none).
@@ -1312,9 +1417,9 @@ Core · target · **missing**
 
 #### ACCT-001 — QuickBooks Online invoices and payments
 
-Core · target · **missing**
+Core · target · **missing** · Register R-2
 
-**Requirement.** The owner or an admin connects QuickBooks Online. On acceptance, Platter creates or matches the customer and creates the deposit invoice; each milestone and recurring invoice is created on its issue day under `ACCT-007`, never at acceptance. Every invoice carries items, tax codes and the income accounts set in the catalog, and Platter records Stripe and offline payments, refunds and fees against them, with Stripe payouts and fees posted through a clearing account (`ACCT-006`). Invoices paid in QuickBooks Online, including through QuickBooks Payments, are read back as paid.
+**Requirement.** The owner or an admin connects QuickBooks Online. On acceptance, Platter creates or matches the customer and creates the deposit invoice; each milestone and recurring invoice is created on its issue day under `ACCT-007`, never at acceptance. Every invoice carries items, tax codes and the income accounts set in the catalog, and Platter records Stripe and offline payments, refunds and fees against them, with Stripe payouts and fees posted through a clearing account (`ACCT-006`). Invoices paid in QuickBooks Online, including through QuickBooks Payments, are read back as paid. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#acct-001).
 
 **Acceptance.**
 1. With a QuickBooks Online sandbox fake: accept a proposal with a deposit and a net-30 milestone and see one customer and only the deposit invoice, with the right tax code; pay the deposit by Stripe and see the payment applied in full with its fee posted as in `ACCT-006`; mark the milestone done and see its invoice appear dated that day; pay that invoice in QuickBooks and see it paid in Platter.
@@ -1324,9 +1429,9 @@ Core · target · **missing**
 
 #### ACCT-002 — Xero invoices and payments
 
-Core · target · **partial**
+Core · target · **partial** · Register R-2
 
-**Requirement.** The owner or an admin connects a USD Xero organization. Platter creates or matches the contact, raises the deposit invoice at acceptance and each milestone and recurring invoice on its issue day (`ACCT-007`), with items, tax rates and accounts, and records payments and refunds, with paid status read back from Xero.
+**Requirement.** The owner or an admin connects a USD Xero organization. Platter creates or matches the contact, raises the deposit invoice at acceptance and each milestone and recurring invoice on its issue day (`ACCT-007`), with items, tax rates and accounts, and records payments and refunds, with paid status read back from Xero. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#acct-002).
 
 **Acceptance.**
 1. With a Xero API fake: accept a proposal with a deposit and a net-30 milestone, and see the contact and only the deposit invoice; pay by Stripe and see the payment applied; mark the milestone done and see its invoice appear dated that day; pay it in Xero and see it paid in Platter.
@@ -1338,7 +1443,7 @@ Core · target · **partial**
 
 Core · target · **missing**
 
-**Requirement.** For firms on [Pantry](https://github.com/just-every/run-pantry), Platter posts customers, invoices and payments the same way as `ACCT-001`, each invoice on its `ACCT-007` issue day, and reads back paid status.
+**Requirement.** For firms on [Pantry](https://github.com/just-every/run-pantry), Platter posts customers, invoices and payments the same way as `ACCT-001`, each invoice on its `ACCT-007` issue day, and reads back paid status. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#acct-003).
 
 **Acceptance.**
 1. Run the `ACCT-001` journey against a Pantry instance and see the same customer, invoices and payments, with only the deposit invoice present until the milestone is marked done.
@@ -1350,7 +1455,7 @@ Core · target · **missing**
 
 Core · target · **partial**
 
-**Requirement.** The owner chooses one invoice authority per installation: Platter with Stripe invoices, QuickBooks Online, Xero or Pantry. Each scheduled amount maps to exactly one invoice and one external ID, created on its issue day under `ACCT-007`, so retries, reconnects and replays never create a second and none is created early. A reconciliation view lists each scheduled amount with its invoice, payments, provider events and accounting status, and flags mismatches.
+**Requirement.** The owner chooses one invoice authority per installation: Platter with Stripe invoices, QuickBooks Online, Xero or Pantry. Each scheduled amount maps to exactly one invoice and one external ID, created on its issue day under `ACCT-007`, so retries, reconnects and replays never create a second and none is created early. A reconciliation view lists each scheduled amount with its invoice, payments, provider events and accounting status, and flags mismatches. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#acct-004).
 
 **Acceptance.**
 1. Accept, disconnect and reconnect QuickBooks, replay the sync twice and see one invoice per amount; edit the amount in the fake and see a mismatch flagged in reconciliation.
@@ -1362,7 +1467,7 @@ Core · target · **partial**
 
 Core · target · **partial**
 
-**Requirement.** Without a live connection, the owner exports invoices, payments and schedules as QuickBooks Online and Xero import files in USD, retained once per invoice as in `INV-001`.
+**Requirement.** Without a live connection, the owner exports invoices, payments and schedules as QuickBooks Online and Xero import files in USD, retained once per invoice as in `INV-001`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#acct-005).
 
 **Acceptance.**
 1. Export the deposit and two milestones in QuickBooks and Xero formats and import them into each sandbox without errors; exporting again returns the same retained files.
@@ -1374,7 +1479,7 @@ Core · target · **partial**
 
 Core · target · **missing**
 
-**Requirement.** Stripe pays out net of fees, so a firm's bank deposit never equals its invoices. Platter posts each Stripe payment gross against its invoice into a clearing account the owner picks (such as "Stripe clearing" in QuickBooks Online or Xero), posts Stripe's processing fees to the owner's fee expense account, and records each payout as one transfer from clearing to the bank account for the payout's net amount, so the bank feed matches one deposit per payout and the clearing account returns to zero. Refunds, dispute amounts and dispute fees post through the same clearing account. The same posting applies to the processors of `PAY-009`.
+**Requirement.** Stripe pays out net of fees, so a firm's bank deposit never equals its invoices. Platter posts each Stripe payment gross against its invoice into a clearing account the owner picks (such as "Stripe clearing" in QuickBooks Online or Xero), posts Stripe's processing fees to the owner's fee expense account, and records each payout as one transfer from clearing to the bank account for the payout's net amount, so the bank feed matches one deposit per payout and the clearing account returns to zero. Refunds, dispute amounts and dispute fees post through the same clearing account. The same posting applies to the processors of `PAY-009`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#acct-006).
 
 **Acceptance.**
 1. In a QuickBooks Online fake and a Xero fake: take card payments of $1,000.00 and $500.00 with fees of $29.30 and $14.80 and one payout of $1,455.90; see both invoices paid in full, $44.10 in the fee expense account, one $1,455.90 transfer to the bank account and the clearing account at $0.00; refund $100.00 and see clearing and the bank match the next payout.
@@ -1386,7 +1491,7 @@ Core · target · **missing**
 
 Core · target · **missing**
 
-**Requirement.** One timing rule holds for every invoice authority (`ACCT-004`: Platter with Stripe invoices, QuickBooks Online, Xero or Pantry). The deposit invoice is created at acceptance. A milestone invoice is created on its issue day: its date for a dated milestone, or the day it is marked done for an event milestone. Each recurring amount's invoice is created on its billing date, one per period. A net-terms invoice's due date is counted from its issue day (`PAY-008`), and a charged amount's invoice is created when the charge is made and marked paid only on the provider's success evidence (`PAY-003`). No invoice is created ahead of its issue day, so the accounting system's open invoices and A/R aging hold only amounts already issued, and a milestone that slips moves its issue day with nothing to void. Future amounts show in the agreement's schedule (`PAY-004`) as scheduled, not invoiced. The invoice emailed to the client under `PAY-008` is the authority's own invoice, never a second one. `ACCT-001`, `ACCT-002`, `ACCT-003` and `PAY-003` follow this rule.
+**Requirement.** One timing rule holds for every invoice authority (`ACCT-004`: Platter with Stripe invoices, QuickBooks Online, Xero or Pantry). The deposit invoice is created at acceptance. A milestone invoice is created on its issue day: its date for a dated milestone, or the day it is marked done for an event milestone. Each recurring amount's invoice is created on its billing date, one per period. A net-terms invoice's due date is counted from its issue day (`PAY-008`), and a charged amount's invoice is created when the charge is made and marked paid only on the provider's success evidence (`PAY-003`). No invoice is created ahead of its issue day, so the accounting system's open invoices and A/R aging hold only amounts already issued, and a milestone that slips moves its issue day with nothing to void. Future amounts show in the agreement's schedule (`PAY-004`) as scheduled, not invoiced. The invoice emailed to the client under `PAY-008` is the authority's own invoice, never a second one. `ACCT-001`, `ACCT-002`, `ACCT-003` and `PAY-003` follow this rule. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#acct-007).
 
 **Acceptance.**
 1. With QuickBooks Online as the invoice authority, accept a proposal with a $2,000.00 deposit, a $6,000.00 net-30 event milestone and a $1,500.00 monthly retainer starting 1 April: the QuickBooks Online fake holds only the deposit invoice.
@@ -1401,9 +1506,9 @@ Core · target · **missing**
 
 #### CRM-001 — HubSpot two-way deal sync
 
-Core · target · **missing**
+Core · target · **missing** · Register R-2
 
-**Requirement.** The owner or an admin connects HubSpot. A member starts a proposal from a deal (or from a HubSpot CRM card), with company, contacts, deal fields and line items pulled in. Platter writes back status, amount, line items, the proposal link and timeline events (sent, viewed, signed, paid), and moves the deal stage according to rules the admin sets.
+**Requirement.** The owner or an admin connects HubSpot. A member starts a proposal from a deal (or from a HubSpot CRM card), with company, contacts, deal fields and line items pulled in. Platter writes back status, amount, line items, the proposal link and timeline events (sent, viewed, signed, paid), and moves the deal stage according to rules the admin sets. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#crm-001).
 
 **Acceptance.**
 1. With a HubSpot API fake: create a proposal from a deal with two line items, send, view and sign; see the deal's line items, amount, stage Closed won and four timeline events.
@@ -1414,9 +1519,9 @@ Core · target · **missing**
 
 #### CRM-002 — Salesforce two-way opportunity sync
 
-Core · target · **missing**
+Core · target · **missing** · Register R-2
 
-**Requirement.** The owner or an admin connects Salesforce. Proposals start from an opportunity with account, contacts and price-book products, and Platter writes back opportunity line items, amount, stage, the proposal link and activity, under the same rules as `CRM-001`.
+**Requirement.** The owner or an admin connects Salesforce. Proposals start from an opportunity with account, contacts and price-book products, and Platter writes back opportunity line items, amount, stage, the proposal link and activity, under the same rules as `CRM-001`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#crm-002).
 
 **Acceptance.**
 1. With a Salesforce API fake: create from an opportunity with price-book products, accept, and see opportunity products, amount and stage updated and the activity logged.
@@ -1428,7 +1533,7 @@ Core · target · **missing**
 
 Core · target · **missing**
 
-**Requirement.** For firms on [Orbit](https://github.com/just-every/run-orbit), Platter syncs deals, contacts and line items both ways as in `CRM-001`.
+**Requirement.** For firms on [Orbit](https://github.com/just-every/run-orbit), Platter syncs deals, contacts and line items both ways as in `CRM-001`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#crm-003).
 
 **Acceptance.**
 1. Run the `CRM-001` journey against an Orbit instance.
@@ -1440,7 +1545,7 @@ Core · target · **missing**
 
 Core · target · **missing**
 
-**Requirement.** Platter syncs deals, persons and products with Pipedrive and Zoho CRM as in `CRM-001`.
+**Requirement.** Platter syncs deals, persons and products with Pipedrive and Zoho CRM as in `CRM-001`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#crm-004).
 
 **Acceptance.**
 1. Run the `CRM-001` journey against Pipedrive and Zoho CRM fakes.
@@ -1454,7 +1559,7 @@ Core · target · **missing**
 
 Core · target · **missing**
 
-**Requirement.** Admins set rules on proposal events (sent, viewed, commented, signed, paid, declined, expired): update the CRM, archive documents, create invoices, notify a channel, create a delivery project or start a follow-up. Each run is logged with its outcome and can be retried by hand; a failed step is visible and never silently dropped.
+**Requirement.** Admins set rules on proposal events (sent, viewed, commented, signed, paid, declined, expired): update the CRM, archive documents, create invoices, notify a channel, create a delivery project or start a follow-up. Each run is logged with its outcome and can be retried by hand; a failed step is visible and never silently dropped. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#auto-001).
 
 **Acceptance.**
 1. Set a rule on signed that archives the PDF, posts to Slack and creates an Asana project; sign; see three logged successes; break the Slack fake and see a failed step with a manual retry.
@@ -1464,9 +1569,9 @@ Core · target · **missing**
 
 #### AUTO-002 — Completed documents archived to file storage
 
-Core · target · **missing**
+Core · target · **missing** · Register R-2
 
-**Requirement.** Signed PDFs, certificates and attachments are filed to Google Drive, Microsoft OneDrive or SharePoint, Box or [Chest](https://github.com/just-every/run-chest) in a folder per client, named by a pattern the admin sets.
+**Requirement.** Signed PDFs, certificates and attachments are filed to Google Drive, Microsoft OneDrive or SharePoint, Box or [Chest](https://github.com/just-every/run-chest) in a folder per client, named by a pattern the admin sets. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#auto-002).
 
 **Acceptance.**
 1. Connect a Google Drive fake, complete an agreement and see the PDF and certificate in the client's folder with the configured name.
@@ -1476,36 +1581,34 @@ Core · target · **missing**
 
 #### AUTO-003 — Team chat notifications
 
-Core · target · **partial**
+Core · target · **partial** · Register R-2
 
-**Requirement.** Proposal events, approvals and follow-ups post to Slack, Microsoft Teams or [Nook](https://github.com/just-every/run-nook) channels and direct messages, with links back and approval actions where `APPROVE-002` allows.
+**Requirement.** Proposal events, approvals and follow-ups post to Slack, Microsoft Teams or [Nook](https://github.com/just-every/run-nook) channels and direct messages, with links back and approval actions where `APPROVE-002` allows. The ct-approved notification boundary requires owner/admin-verified destination consent, generic channel text with protected links, private detail only to eligible direct approvers, current session/revision/plan decisions, uncertain delivery held and restored routes inactive (RL-20). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#auto-003).
 
 **Acceptance.**
 1. Route signed events to a Slack channel and approvals to a Teams direct message; sign and request approval; see both with working links.
 
-**Evidence.** `tests/mail.test.mjs` — “AUTO-003 signed events reach Slack channels and approval requests reach verified Teams direct chats with session protected links” proves a real client acceptance posts once to a consented Slack channel, a pending approval posts to the verified Teams direct chat, a scheduled follow-up posts without its private action text, and event links require the existing member session. Approval request delivery and stale-plan refusals use the named APPROVE-002 tests. The named notification CLI test preserves route metadata while excluding credentials, pending messages and activation authority.
-**Gap.** Nook, broader proposal events, channel settings screens and chat-native approval interactions remain. Conservative default adopted pending ct approval: only owner and admins authorize destinations; channel events contain generic event text and a session-protected link, never proposal content; approval details use a verified direct recipient. Restored routes require explicit reconnection and new consent. Future Nook and COLLAB-002 event sources inherit these obligations.
+**Evidence.** `tests/mail.test.mjs`
+**Gap.** Nook, broader proposal events, channel settings screens and chat-native approval interactions remain. Conservative default adopted  Restored routes require explicit reconnection and new consent. Future Nook and COLLAB-002 event sources inherit these obligations.
 
 #### AUTO-004 — Public REST API and webhooks
 
-Core · target · **partial**
+Core · target · **partial** · Cites BASE-ROLE-001, BASE-OPS-003
 
-**Requirement.** *Cites:* PORT-002, PRICE-006, SEC-001.
-
-A documented REST API creates proposals from templates, fills variables, reads status, analytics and payments, and lists agreements, under scoped API keys. Its documentation is an OpenAPI description served at a public route and rendered as a reference page, listing every public route with its scopes and every webhook event with its payload schema and an example. Signed webhooks deliver every lifecycle event, with retries and a delivery log.
+**Requirement.** *Cites:* PORT-002, PRICE-006, SEC-001. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#auto-004).
 
 **Acceptance.**
 1. Create a proposal from a template through the API with a scoped key, send it, receive signed webhooks for sent and signed, verify their signatures, and see a key without write scope refused.
 2. Fetch the published OpenAPI description and reference page: the route table the server registers and the documented routes match both ways (no undocumented public route, no documented route the server lacks), each documented route names its scope, and every webhook event type Platter emits is documented with an example that validates against its schema.
 
-**Evidence.** `src/platter/api/index.ts`, `src/platter/api/webhooks.ts`, `tests/platter.test.mjs` — “AUTO-004 scoped REST drafting, immutable owner keys and human-only authority” proves template creation, variable filling, selected reads, human send and missing-scope refusal; “AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation” proves sent and signed signatures, retries, delivery outcomes and cost-free payloads; “AUTO-004 published route reference matches live methods and webhook schemas both ways” proves registered routes, scopes and all ten emitted types against schemas. “scoped status and analytics distinguish withdrawn and expired offers from live offers” proves both states, independent counts and reopening; “receiver gets revised and approved events for each negotiated revision before it is sent” proves the upgraded negotiation path; “receiver obtains all ten lifecycle types including every terminal outcome” proves actual delivery; “each published method and route declares its independently expected scope” proves all documented scopes. `tests/site-lifecycle.mjs` — “AUTO-004 compiled public API reference exposes scoped operations and signed event examples” proves the compiled reference at 1440 and 390. `tests/archive.test.mjs` — “public CLI preserves business records and import custody, excludes credentials, and enforces restore fences” retains routes and delivery history while excluding keys and signing secrets.
+**Evidence.** `src/platter/api/index.ts`, `src/platter/api/webhooks.ts`, `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
 **Gap.** The ct demotion remains in force pending fresh acceptance of the corrected public status and analytics, negotiated revision events, all ten receiver deliveries and independently expected documented scopes. Exact-candidate Verify and guarded landing receipts remain pending; AUTO-004 must remain partial until ct accepts.
 
 #### AUTO-005 — Zapier, Make and Crank apps
 
 Core · target · **missing**
 
-**Requirement.** Published Zapier and Make apps and a [Crank](https://github.com/just-every/run-crank) connector expose Platter's triggers (proposal sent, viewed, signed, paid) and actions (create proposal from template, add client).
+**Requirement.** Published Zapier and Make apps and a [Crank](https://github.com/just-every/run-crank) connector expose Platter's triggers (proposal sent, viewed, signed, paid) and actions (create proposal from template, add client). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#auto-005).
 
 **Acceptance.**
 1. Run a Zap in Zapier's test environment that creates a proposal from a form submission and fires on signed; run a Make scenario in Make's test environment that fires on paid and adds a client; run the same trigger and action against a Crank instance; each trigger fires once per event.
@@ -1517,7 +1620,7 @@ Core · target · **missing**
 
 Core · target · **missing**
 
-**Requirement.** On acceptance, Platter creates a project in Asana, Trello, monday.com, ClickUp, Jira or [Vector](https://github.com/just-every/run-vector) from the accepted scope: one task or section per accepted line item, with dates from the schedule and the agreement linked. The handoff records the external project ID and never runs twice.
+**Requirement.** On acceptance, Platter creates a project in Asana, Trello, monday.com, ClickUp, Jira or [Vector](https://github.com/just-every/run-vector) from the accepted scope: one task or section per accepted line item, with dates from the schedule and the agreement linked. The handoff records the external project ID and never runs twice. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#hand-001).
 
 **Acceptance.**
 1. Accept a proposal with four line items and an Asana fake connected; see one project with four tasks and the agreement link; replay the event and see no second project.
@@ -1529,7 +1632,7 @@ Core · target · **missing**
 
 Core · target · **missing**
 
-**Requirement.** For firms on [Gauge](https://github.com/just-every/run-gauge) or Harvest with Forecast, the accepted scope becomes a project with budget, roles, rates, milestones and billing schedule, so delivery tracks against what was sold. Gauge's actuals return to Platter for `AGENT-002` and `AGENT-006`.
+**Requirement.** For firms on [Gauge](https://github.com/just-every/run-gauge) or Harvest with Forecast, the accepted scope becomes a project with budget, roles, rates, milestones and billing schedule, so delivery tracks against what was sold. Gauge's actuals return to Platter for `AGENT-002` and `AGENT-006`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#hand-002).
 
 **Acceptance.**
 1. Accept a proposal and see a Gauge project with budget hours, rates and milestones matching the agreement.
@@ -1543,7 +1646,7 @@ Core · target · **missing**
 
 Core · target · **missing**
 
-**Requirement.** A member creates proposals for a list of clients (a CSV, a CRM list or every client with an agreement ending this quarter) from one template, with per-client variables and prices and the template's role slots (`SIGN-011`) filled per client from CSV columns or CRM contacts; a client whose signer role stays unfilled is held as an exception like a missing variable. Each proposal takes the template's reminder schedule and expiry period, or the workspace defaults where the template sets none (`FOLLOW-006`). The owner reviews a sample and the list of exceptions, approves the batch, and Platter sends at a set pace with one result per client.
+**Requirement.** A member creates proposals for a list of clients (a CSV, a CRM list or every client with an agreement ending this quarter) from one template, with per-client variables and prices and the template's role slots (`SIGN-011`) filled per client from CSV columns or CRM contacts; a client whose signer role stays unfilled is held as an exception like a missing variable. Each proposal takes the template's reminder schedule and expiry period, or the workspace defaults where the template sets none (`FOLLOW-006`). The owner reviews a sample and the list of exceptions, approves the batch, and Platter sends at a set pace with one result per client. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#renew-001).
 
 **Acceptance.**
 1. Create 40 proposals from a template with a Client signer role and a pre-assigned countersigner, using a CSV in which three rows miss a variable and two have no signer contact; the five are held as exceptions naming the variable or role; approve the batch and see 35 sent at the set pace, each with its own link and timeline, its signer filled from the CSV and the owner as countersigner.
@@ -1555,7 +1658,7 @@ Core · target · **missing**
 
 Core · target · **missing**
 
-**Requirement.** Before an agreement's term ends, Platter prepares a renewal from it with the same scope, an optional price increase the owner sets (percentage or amount), and the notice period stated in the agreement. It follows the `APPROVE-003` approval policy as any revision does. Evergreen agreements show their renewal and cancellation terms to the client before signing.
+**Requirement.** Before an agreement's term ends, Platter prepares a renewal from it with the same scope, an optional price increase the owner sets (percentage or amount), and the notice period stated in the agreement. It follows the `APPROVE-003` approval policy as any revision does. Evergreen agreements show their renewal and cancellation terms to the client before signing. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#renew-002).
 
 **Acceptance.**
 1. Accept a 12-month retainer; 45 days before term end a renewal draft with a 5% increase is waiting for approval; approve, send and accept it, and see a new schedule start when the old one ends.
@@ -1567,21 +1670,23 @@ Core · target · **missing**
 
 #### REPORT-001 — Proposal pipeline dashboard
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-ROLE-001
 
-**Requirement.** A dashboard shows proposals by status (draft, awaiting approval, sent, viewed, accepted, paid, declined, expired) with value, owner, client, age and next action, filterable and sortable by each. This obligation covers every current workflow state (draft, approved, sent, accepted and withdrawn); `APPROVE-001` and `APPROVE-003` inherit awaiting approval, `TRACK-001` viewed, `PAY-004` paid, `FOLLOW-005` declined and `SEND-004` expired before those capabilities ship, with the same named fixture proof. The pipeline now uses TEAM-001 proposal visibility: owner/admin all, manager and viewer team scope, sales own/collaborator scope; content editor and billing pipeline access is refused until their content and revenue reports exist. A new proposal records its preparing person as its stable sales owner; an agent draft records the key owner. Later revisions never transfer ownership. Legacy rows whose sales owner was not recorded stay labelled "Not recorded", with no inference from a preparer string. Value is the highest offered option before acceptance and the exact selected total afterwards, in integer cents; currencies are totalled separately and value sorting groups by currency before amount, with no conversion. Age is the number of completed 24-hour days since creation. Next actions are approve revision, send approved offer, await client decision, export deposit invoice, deposit invoice exported, or prepare a new revision for a withdrawn offer, according to the current recorded state; `FOLLOW-002` inherits due follow-ups. Numeric filters include both bounds; equal sort keys use title then proposal id. Every filter applies before counts and totals.
+**Requirement.** The pipeline lists draft, awaiting approval, sent, viewed, accepted, paid, declined and expired proposals, including withdrawn, by value, sales owner, client, age and next action, filterable and sortable by each. Counts and separate currency totals follow the visible filtered rows. Legacy missing owners remain “Not recorded”. Valuation, age and tie rules are in [pipeline behavior](docs/contract-behavior.md#report-001).
 
 **Acceptance.**
-1. Seed 30 proposals across statuses and owners, filter by owner and status, sort by value, and see the totals match a fixture.
+1. Seed thirty proposals across statuses and owners; each field’s filters/sorts and the totals equal the hand-computed fixture.
+2. Owner/admin see all, managers/viewers their teams and sales owned/shared proposals; content and revenue specialists use only their report rights.
+3. Edits keep the original sales owner, including the sponsor of an agent-prepared proposal.
 
 **Evidence.** `src/platter/pipeline.ts`, `src/platter/ui/pipeline.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every role’s full visible report set. The matrix includes unimplemented content/revenue specialist reports.
 
 #### REPORT-002 — Win rate and sales performance
 
 Core · target · **missing**
 
-**Requirement.** Reports show win rate, time to sign, time to pay, average deal value and lost reasons by owner, template, service, client segment and period.
+**Requirement.** Reports show win rate, time to sign, time to pay, average deal value and lost reasons by owner, template, service, client segment and period. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#report-002).
 
 **Acceptance.**
 1. From a fixture of 100 decided proposals, see win rate, median time to sign, median time to pay, average deal value and lost-reason counts by owner, template, service, client segment and quarter, each matching the fixture's hand-computed values.
@@ -1593,7 +1698,7 @@ Core · target · **missing**
 
 Core · target · **missing**
 
-**Requirement.** Reports show which templates, library items, packages and optional items appear in won and lost proposals, how long clients read them (`TRACK-002`), and which packages clients choose.
+**Requirement.** Reports show which templates, library items, packages and optional items appear in won and lost proposals, how long clients read them (`TRACK-002`), and which packages clients choose. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#report-003).
 
 **Acceptance.**
 1. In the `REPORT-002` fixture of 100 decided proposals, template Agency retainer is used on 40 proposals of which 18 are won; package Growth is offered on 30 and chosen on 12; optional item Rush delivery is offered on 25 and chosen on 6; and library item Acme case study appears in 20 proposals, 12 won and 8 lost, with `TRACK-002` reading times whose median is 95 seconds.
@@ -1606,7 +1711,7 @@ Core · target · **missing**
 
 Core · target · **partial**
 
-**Requirement.** Reports show signed value, one-off and recurring (MRR and first-year value), invoiced, collected and overdue amounts by period and owner, reconciled with payments and accounting (`ACCT-004`).
+**Requirement.** Reports show signed value, one-off and recurring (MRR and first-year value), invoiced, collected and overdue amounts by period and owner, reconciled with payments and accounting (`ACCT-004`). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#report-004).
 
 **Acceptance.**
 1. Accept and pay a fixture of agreements and see booked, invoiced, collected and overdue totals match payments and the QuickBooks Online fake.
@@ -1616,26 +1721,38 @@ Core · target · **partial**
 
 #### REPORT-005 — Report export and scheduled delivery
 
-Core · target · **done**
+Core · target · **partial**
 
-**Requirement.** Any report exports to CSV and can be emailed on a schedule to named people.
-
-Done when every report that exists today conforms: the `REPORT-001` pipeline, including its current `REPORT-004` recorded-revenue view. `REPORT-002`, `REPORT-003` and `REPORT-004` each add CSV export and scheduled email of their report, under the same rules, before they ship. The CSV holds the rows exactly as filtered and sorted on screen (title, client, owner, status, next action, currency, value as a decimal of the integer cents, age in completed days), then one total row per currency. Until `TEAM-001` adds the admin role, only the owner exports a report or creates and stops a schedule. A schedule saves the screen's filters and sort and runs daily, or weekly on a chosen weekday, at a whole hour in the installation's time zone (an IANA name the owner sets; UTC until set); the run follows daylight saving changes, takes the first occurrence of a repeated hour and the first instant after a skipped hour, and is checked every 15 minutes, so it runs at the first check at or after its time. It goes to one to ten named people who are active people of this installation, never an outside address; naming a member is the owner's explicit share of those figures, and anyone no longer active at run time is skipped and the run says so. Each run is claimed once, so overlapping checks never send it twice, and a run missed while the Worker was down runs once at the next check. The email repeats the screen's count, per-currency totals and rows in the screen's money format, as of the run time, followed by the CSV. Its outcome is labelled honestly per recipient: captured locally (no email sent), queued, accepted by provider, or provider result uncertain and not resent; Platter never claims delivery of report email. Schedules archive with the business records; report email stays local like proposal mail.
+**Requirement.** Every report exports its currently filtered and sorted rows and per-currency totals to CSV. Column and money encoding details are in [report behavior](docs/contract-behavior.md#report-005).
 
 **Acceptance.**
-1. Schedule the weekly win-rate report to two people and export the pipeline to CSV; the email arrives with the same figures as the screen.
-2. Until `REPORT-002` ships the win-rate report, the journey schedules the weekly `REPORT-001` pipeline report, in a set installation time zone across a daylight saving change.
+1. Export the pipeline: every screen row, count and per-currency total matches CSV in the same order.
 
 **Evidence.** `src/platter/reports/schedules.ts`, `src/platter/reports/pipeline-csv.ts`, `src/platter/reports/zone.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every visible screen row. A partial field or amount match is insufficient to establish the complete row reconciliation. count. A partial field or amount match is insufficient to establish the complete row reconciliation. currency total equals exported CSV. A partial field or amount match is insufficient to establish the complete row reconciliation.
+
+#### REPORT-006 — Scheduled report delivery
+
+Core · target · **partial** · From REPORT-005 · Cites BASE-MAIL-001, BASE-ROLE-001
+
+**Requirement.** Authorized people schedule reports daily or weekly to one to ten named active people, preserving filters and sort. The installation’s IANA zone and daylight-saving rules govern runs; [report behavior](docs/contract-behavior.md#report-005) defines time and recipient handling.
+
+**Acceptance.**
+1. Schedule weekly win rate to two people: both messages contain the same screen figures and CSV.
+2. Run the pipeline schedule across a daylight-saving transition with exact run-time data.
+3. Repeated checks and downtime recovery produce one run; inactive recipients are visibly skipped and uncertain transport is not resent.
+4. Schedules survive archive without email transport.
+
+**Evidence.** `src/platter/reports/schedules.ts`, `src/platter/reports/pipeline-csv.ts`, `src/platter/reports/zone.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Weekly win-rate report reaches two people with exact screen rows/figures and CSV. REPORT-002 win-rate does not exist; pipeline fallback does not assert it. Pipeline scheduled exact data across DST. Each boundary and every row/total must be read, not just dispatch status. Once-only run. Every independent branch needs its own assertion. inactive recipients. Every independent branch needs its own assertion. uncertain delivery across downtime. Every independent branch needs its own assertion. Schedules restore without transport. This part’s old Evidence set omits the archive assertion file.
 
 ### Team administration
 
 #### TEAM-001 — Roles and permissions
 
-Core · target · **partial**
+Core · target · **partial** · Cites BASE-ROLE-001, BASE-ACCESS-004
 
-**Requirement.** Every member has one role: owner, admin, manager, sales, content editor, viewer or billing. Members belong to one or more teams, and a manager manages the teams they are in. In the table, "Team" means proposals whose sales owner is in one of the person's teams, plus proposals whose sales owner they are; "Own" means proposals whose sales owner they are, plus proposals shared with them as a collaborator; "All" means every proposal in the workspace. Sharing grants one proposal, never role authority. A share also places that proposal in a manager's or viewer's View scope and in a manager's Edit scope when its sales owner is outside their teams, so every collaborator can open it and comment on it (`COLLAB-002`) and a collaborator whose role edits proposals can edit it. A share never changes a No cell and never widens any other row: managers send, share, approve (`APPROVE-003`) and unlock (`EDIT-015`) only their teams' proposals; sales members send and share proposals shared with them because their Own cells include them; content editors, viewers and billing users never send. Removing a share, or changing the person's role or teams, ends the access it gave at once, including for a write already under way. The rights are exactly these, and every one is enforced on the server: an action outside them is refused (403) with no write, and a list or search omits what the person may not view. Every door that lists, searches, reports, previews, downloads or opens proposals applies this same View scope; a scheduled report reaches only the active people the owner or an admin names (`REPORT-005`).
+**Requirement.** Members hold owner, admin, manager, sales, content editor, viewer or billing roles and belong to teams. The matrix defines proposal jobs: All is workspace-wide, Team follows the sales owner’s teams plus own, and Own includes owned and explicitly shared proposals. A collaborator share grants one proposal’s View and permitted Edit rights, without changing a No cell or widening other rights. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#team-001).
 
 | Right | Owner | Admin | Manager | Sales | Content editor | Viewer | Billing |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -1657,41 +1774,110 @@ Core · target · **partial**
 | Connect their own mailbox (`SEND-001`) | Yes | Yes | Yes | Yes | No | No | Yes |
 | Invite members and change roles | Any role | Any role except owner and admin | Sales, content editor and viewer, into their own teams | No | No | No | No |
 | Change the approval policy, approval rules and workspace settings, including the default reminder schedule, expiry period and payment methods (`APPROVE-001`, `APPROVE-003`, `FOLLOW-006`, `PAY-001`) | Yes | Yes | No | No | No | No | No |
-| Issue and revoke agent keys (`ACCESS-001`) | Yes | No | No | No | No | No | No |
+| Issue and revoke agent grants (`ACCESS-001`) | Yes | No | No | No | No | No | No |
 | Transfer ownership and delete the workspace | Yes | No | No | No | No | No | No |
 | View reports (`REPORT-001` to `REPORT-005`) | All | All | Team | Own | Content reports only (`REPORT-003`) | Team | Revenue reports only (`REPORT-004`) |
 | View and export the audit log (`TEAM-004`) | Yes | Yes | No | No | No | No | No |
 
-Template and library folders can also be limited to teams (`EDIT-002`, `EDIT-003`): such a folder is listed and used only by members of those teams, admins and the owner. On upgrade, the first release's owner stays the owner and its members become sales members in no team, so each sees only their own proposals until the owner places them in teams. Agent keys are not a role and keep the draft-only rights of `ACCESS-001`.
+**Acceptance.**
+1. Run every matrix cell through its public door: allowed jobs succeed; disallowed jobs change no record or provider state; lists/searches equal the permitted proposal set.
+2. Sales can open/edit/send a collaborator proposal; managers can edit a shared out-of-team proposal but cannot send, share onward, approve or unlock it; viewers can read but cannot edit.
+3. Removing a share removes it from lists and refuses the next read/edit.
+4. The upgrade retains the owner and places legacy members in sales with no teams and only their own proposals.
+5. Cost/margin visibility and refund/provider/default-setting rights match each matrix role.
 
-Invitations follow the "Invite members and change roles" row. An invitation is one pending grant of one role and the listed teams (a manager lists one or more of their own teams) to one email address, and grants nothing until the person proves control of that address by native mailbox verification. Acceptance applies exactly that role and those teams in one transaction, and only while the issuer could still issue the same grant: the issuer is active, still holds a role that allows it and, for a manager, still belongs to every listed team; and the grant is the address's current one, not revoked and not past the expiry recorded when it was issued. Otherwise acceptance is refused (403) and gives no session, role, team or proposal access, and the person is told to ask for a fresh invitation. A change to the issuer that leaves that authority intact, such as their time zone, does not invalidate the grant. Reissuing, by anyone who could issue the new grant now, replaces the grant and refuses every earlier link for that address, used or not; revoking a pending invitation does the same. Native invitation routes cannot bypass a grant's role and team selection. An invitation never grants collaborator access to a proposal or changes any folder's audience.
+**Evidence.** `src/platter/permissions.ts`, `src/platter/approvals.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`, `tests/mail.test.mjs`
+**Gap.** Product roles, teams, collaborator sharing and personal time zones now ship. Native members default to sales in no team; state, revision history, direct reads, previews, attachments, edits and sends enforce proposal scopes, including transaction-time membership and sharing checks. Current personal-template, pipeline, audit, workspace-default, shared text-library editing and internal-pricing read/edit rights are enforced; scopes and exact no-write refusals are proved by tests/platter.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP”, scoped awaiting-approval counts/sorting/totals by tests/platter.test.mjs — “FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership”, screens at 1440/390 by tests/site.test.mjs — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths”, and custody by tests/archive.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items”. Gap: the full rights matrix remains unproved and unimplemented for SSO provider connections, workspace deletion and full content/revenue report capabilities. Base’s native issuer-version check still rejects a pending invitation after a native role promotion even when the issuer retains grant authority (a public /auth/operator/role then /auth/confirm probe returns 400, no session); product time-zone/team additions are preserved, but native-version preservation needs a supported Base change or explicit review of credential rebinding. The native security guard is retained. CT ruling (22 October 2026, eaf743e) implemented: a share grants one proposal, never role authority. Cell (8) is proved by tests/platter.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP”; the named role browser journey covers the out-of-team manager without Send, Approve or Unlock controls at 1440/390. Catalog edit/insertion and manual dispute responses now ship, with their named CAT-001 and PAY-006 public-door proofs.  Shared templates/team folders, library folders, native-section template locks and delegated invitations now ship. Their public-door proofs are tests/platter.test.mjs — “TEAM-001 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content”, “TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval”, and “TEAM-001 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses”, plus the named role browser and CLI journeys. CT ruling (22 October 2026, eaf743e) implemented: current grant authority, exact native invitation binding, cancellation and expiry, and explicit consent for wider folder/item audiences. Cell (9) is proved by tests/platter.test.mjs — “TEAM-001 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses”; cell (10) by tests/platter.test.mjs — “TEAM-001 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content” and the named role browser journey at 1440/390. Verified Stripe, QuickBooks, HubSpot, Salesforce, Google Drive, Slack and own Google/Microsoft mailbox connections now ship; the QuickBooks admin/sales boundary is proved by tests/platter.test.mjs — “TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens”. Credentials are encrypted and excluded from archives; restored metadata requires reconnection. Mailbox connections follow SEND-001's ct-approved provider-verified one-member binding: OAuth mailboxes may differ from sign-in, refresh before sending, and attribute the selected sender. Its legacy access-token door remains identity-only. Billing refund and received-payment authority are proved by tests/platter.test.mjs — “TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund”. Workspace reminder/expiry/payment-default authority and snapshots now ship; reminder execution remains FOLLOW-001/FOLLOW-006 work. Native ownership handoff is proved with fresh email-link authority, denied non-owner writes, revoked old-owner sessions/agent keys and retained proposals in tests/platter.test.mjs — “TEAM-001 / APPROVE-003 native admins remain eligible named approvers and settings audit records identify the actual person or workspace”. tests/platter.test.mjs — “TEAM-001 upgrading a pre-role database keeps former members as sales without inferring historical ownership” proves the actual additive migration and scoped old-member reads. The recorded-revenue pipeline view now enforces all current revenue-report role cells, with hand-computed payment/refund totals and matching CSV/scheduled mail. Full content reports and remaining revenue features remain foundations in this seed, not account blockers. Current reminder policy and execution rights are additionally proved by tests/mail.test.mjs — “FOLLOW-001 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap” and “SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh”: only owner/admin change quiet hours, sending follows live proposal/team scope, and role or invitation changes during provider I/O refuse the reminder without a provider send or fallback. The existing delegated-invitation journey now reproduces the native issuer-version blocker through /auth/operator/role and /auth/confirm: an authorized manager promoted to native admin still yields 400 and no session, product role or team on the old invitation. This needs a supported Base change; credential versions are never rebound here.
 
-A team-limited folder's audience is judged at each read and write. Widening who can list or use a folder or an item — adding or clearing a folder's teams, moving a template or library item into a folder with a wider audience or out of a team-limited folder into the workspace, or first sharing a personal template — needs the editor's explicit consent to the resulting audience, shown before saving, and is recorded in the audit log (`TEAM-004`). Joining or leaving a team changes what that member sees under these same rules and is governed by the membership and invitation rights above, not by folder consent.
+#### TEAM-006 — Scoped membership invitations
 
-Before this capability ships, it extends the `REPORT-001` dashboard and its named public-door fixture with the report rights matrix, including filters, sorting, counts and totals under its visibility rules.
+Core · target · **partial** · From TEAM-001 · Cites BASE-ROLE-001, BASE-ACCESS-004, BASE-SIGNIN-001
 
-Before shipping, extend FOLLOW-002 with personal time zones, sales-owner queues and manager access only to people in one of their teams, in its named journey.
+**Requirement.** An invitation offers one email address a role and teams within the issuer’s current authority. It gives no account, session, team or proposal authority before native mailbox verification. The exact grant is accepted atomically only while current, unexpired, unrevoked and still issuable by its active issuer.
+
+| Right | Owner | Admin | Manager | Sales | Content editor | Viewer | Billing |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| View proposals and agreements | All | All | Team | Own | Own | Team | All |
+| Edit proposals | All | All | Team | Own | Own | No | No |
+| Send, send a fresh invitation, send a revision, replace a signer or withdraw (`APPROVE-003`, `SEND-010`) | All | All | Team | Own | No | No | No |
+| Share a proposal with another member as a collaborator | All | All | Team | Own | No | No | No |
+| Approve a step whose rule names them or their role (`APPROVE-001`, `APPROVE-003`) | All | All | Team | No | No | No | Only steps naming them personally |
+| Create and edit shared templates and template folders (`EDIT-002`) | Yes | Yes | Yes | No | Yes | No | No |
+| Save a proposal as a personal template | Yes | Yes | Yes | Yes | Yes | No | No |
+| Create and edit library items (`EDIT-003`) | Yes | Yes | Yes | No | Yes | No | No |
+| Lock and unlock sections in a template (`EDIT-015`) | Yes | Yes | Yes | No | Yes | No | No |
+| Unlock a locked section in one proposal (`EDIT-015`) | All | All | Team | No | No | No | No |
+| Create and edit catalog items and prices (`CAT-001`) | Yes | Yes | Yes | No | No | No | No |
+| See internal cost and margin (`PRICE-006`) | Yes | Yes | Yes | No | No | No | Yes |
+| Record check, wire and ACH credit payments (`PAY-007`) | Yes | Yes | No | No | No | No | Yes |
+| Refund and respond to disputes (`PAY-006`) | Yes | Yes | No | No | No | No | Yes |
+| Connect and disconnect payment, accounting, CRM, file storage, chat and SSO providers (`SEC-001`) | Yes | Yes | No | No | No | No | No |
+| Connect their own mailbox (`SEND-001`) | Yes | Yes | Yes | Yes | No | No | Yes |
+| Invite members and change roles | Any role | Any role except owner and admin | Sales, content editor and viewer, into their own teams | No | No | No | No |
+| Change the approval policy, approval rules and workspace settings, including the default reminder schedule, expiry period and payment methods (`APPROVE-001`, `APPROVE-003`, `FOLLOW-006`, `PAY-001`) | Yes | Yes | No | No | No | No | No |
+| Issue and revoke agent grants (`ACCESS-001`) | Yes | No | No | No | No | No | No |
+| Transfer ownership and delete the workspace | Yes | No | No | No | No | No | No |
+| View reports (`REPORT-001` to `REPORT-005`) | All | All | Team | Own | Content reports only (`REPORT-003`) | Team | Revenue reports only (`REPORT-004`) |
+| View and export the audit log (`TEAM-004`) | Yes | Yes | No | No | No | No | No |
 
 **Acceptance.**
-1. The matrix journey runs the `TEAM-001` rights table cell by cell: for each right and each role it calls the action's public route (HTTP, and the browser where the right is a screen) and expects success with the write, or 403 with no write, and list and search routes return exactly the proposals the View row allows.
-2. These cells are also pinned by name. (1) A sales member lists and opens another sales member's proposal: it is absent from the list and opening it is refused (403); once the other member shares it with them as a collaborator it lists, opens and edits, and they send it. (2) A manager opens a proposal whose sales owner is outside their teams (403) and one whose sales owner is in their team (200). (3) A sales member's view of a pricing table in the editor, the team API and the PDF export carries no cost or margin field, while a manager's does (`PRICE-006`). (4) A content editor edits a library item (200) and sends a proposal (403). (5) A billing user refunds part of a deposit (200, and the refund reaches the Stripe fake), and a sales member's refund is refused (403, no Stripe call). (6) A sales member disconnects QuickBooks Online (403, the connection unchanged), and an admin disconnects it (200). (7) A sales member and a manager change the workspace reminder and expiry defaults (403, the defaults unchanged), and an admin changes them (200).
-3. After an upgrade from a first-release database, the former member holds the sales role and sees only their own proposals. (8) A sales member shares their proposal with a manager and a viewer whose teams do not include its sales owner: both see it in lists and search and open it (200); the manager edits it (200); the manager's send, onward share, approval and section unlock, and the viewer's edit, are refused (403, no write).
-4. After the share is removed it leaves both lists, opening it is refused (403), and the manager's next edit is refused (403, no write). (9) A manager invites a sales member into their own team; after mailbox verification the person joins with exactly that role and team.
-5. A reissue with another permitted role or team refuses the first, never-used link (no session, role or team) and the new link joins with the reissued grant.
-6. A link is likewise refused after its recorded expiry, after the owner or an admin revokes the invitation, and after the issuer loses the authority to issue it, while an issuer's time-zone change leaves it acceptable; a later native invitation of a revoked address does not apply the revoked grant.
-7. A manager's raw native invitation is refused (403, no account). (10) Moving a team-limited library item or shared template to the workspace or another team's folder, or clearing a folder's teams, without audience consent is refused with no write; with consent it succeeds, appears in the audit log, and the item is visible to exactly the new audience.
+1. A manager invites a sales member into their own team; mailbox verification applies exactly that role and team.
+2. Reissue with another permitted role/team invalidates all prior links, used or unused; the new link applies only the new grant.
+3. Expiry, revocation or loss of issuer authority refuse acceptance without session, role or team changes; a later native invitation cannot apply a revoked grant.
+4. Changing the issuer’s time zone alone leaves a still-authorized grant usable.
+5. A manager’s raw native invitation cannot bypass selected role/team bounds and creates no account.
+6. An invitation grants neither collaborator access nor a wider folder audience.
+
+**Evidence.** `src/platter/permissions.ts`, `src/platter/approvals.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`, `tests/mail.test.mjs`
+**Gap.** Product roles, teams, collaborator sharing and personal time zones now ship. Native members default to sales in no team; state, revision history, direct reads, previews, attachments, edits and sends enforce proposal scopes, including transaction-time membership and sharing checks. Current personal-template, pipeline, audit, workspace-default, shared text-library editing and internal-pricing read/edit rights are enforced; scopes and exact no-write refusals are proved by tests/platter.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP”, scoped awaiting-approval counts/sorting/totals by tests/platter.test.mjs — “FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership”, screens at 1440/390 by tests/site.test.mjs — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths”, and custody by tests/archive.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items”. Gap: the full rights matrix remains unproved and unimplemented for SSO provider connections, workspace deletion and full content/revenue report capabilities. Base’s native issuer-version check still rejects a pending invitation after a native role promotion even when the issuer retains grant authority (a public /auth/operator/role then /auth/confirm probe returns 400, no session); product time-zone/team additions are preserved, but native-version preservation needs a supported Base change or explicit review of credential rebinding. The native security guard is retained. CT ruling (22 October 2026, eaf743e) implemented: a share grants one proposal, never role authority. Cell (8) is proved by tests/platter.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP”; the named role browser journey covers the out-of-team manager without Send, Approve or Unlock controls at 1440/390. Catalog edit/insertion and manual dispute responses now ship, with their named CAT-001 and PAY-006 public-door proofs.  Shared templates/team folders, library folders, native-section template locks and delegated invitations now ship. Their public-door proofs are tests/platter.test.mjs — “TEAM-001 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content”, “TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval”, and “TEAM-001 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses”, plus the named role browser and CLI journeys. CT ruling (22 October 2026, eaf743e) implemented: current grant authority, exact native invitation binding, cancellation and expiry, and explicit consent for wider folder/item audiences. Cell (9) is proved by tests/platter.test.mjs — “TEAM-001 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses”; cell (10) by tests/platter.test.mjs — “TEAM-001 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content” and the named role browser journey at 1440/390. Verified Stripe, QuickBooks, HubSpot, Salesforce, Google Drive, Slack and own Google/Microsoft mailbox connections now ship; the QuickBooks admin/sales boundary is proved by tests/platter.test.mjs — “TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens”. Credentials are encrypted and excluded from archives; restored metadata requires reconnection. Mailbox connections follow SEND-001's ct-approved provider-verified one-member binding: OAuth mailboxes may differ from sign-in, refresh before sending, and attribute the selected sender. Its legacy access-token door remains identity-only. Billing refund and received-payment authority are proved by tests/platter.test.mjs — “TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund”. Workspace reminder/expiry/payment-default authority and snapshots now ship; reminder execution remains FOLLOW-001/FOLLOW-006 work. Native ownership handoff is proved with fresh email-link authority, denied non-owner writes, revoked old-owner sessions/agent keys and retained proposals in tests/platter.test.mjs — “TEAM-001 / APPROVE-003 native admins remain eligible named approvers and settings audit records identify the actual person or workspace”. tests/platter.test.mjs — “TEAM-001 upgrading a pre-role database keeps former members as sales without inferring historical ownership” proves the actual additive migration and scoped old-member reads. The recorded-revenue pipeline view now enforces all current revenue-report role cells, with hand-computed payment/refund totals and matching CSV/scheduled mail. Full content reports and remaining revenue features remain foundations in this seed, not account blockers. Current reminder policy and execution rights are additionally proved by tests/mail.test.mjs — “FOLLOW-001 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap” and “SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh”: only owner/admin change quiet hours, sending follows live proposal/team scope, and role or invitation changes during provider I/O refuse the reminder without a provider send or fallback. The existing delegated-invitation journey now reproduces the native issuer-version blocker through /auth/operator/role and /auth/confirm: an authorized manager promoted to native admin still yields 400 and no session, product role or team on the old invitation. This needs a supported Base change; credential versions are never rebound here.
+
+#### TEAM-007 — Team folder audiences
+
+Core · target · **partial** · From TEAM-001 · Cites BASE-ROLE-001, BASE-ACCESS-004, BASE-AGENT-007
+
+**Requirement.** Team-limited template and library folders are visible and usable only to their teams, owner and admins. An audience expansion is shown before saving and requires the editor’s explicit audience decision; the company policy decides an agent’s access-class call, with direction and affected people.
+
+| Right | Owner | Admin | Manager | Sales | Content editor | Viewer | Billing |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| View proposals and agreements | All | All | Team | Own | Own | Team | All |
+| Edit proposals | All | All | Team | Own | Own | No | No |
+| Send, send a fresh invitation, send a revision, replace a signer or withdraw (`APPROVE-003`, `SEND-010`) | All | All | Team | Own | No | No | No |
+| Share a proposal with another member as a collaborator | All | All | Team | Own | No | No | No |
+| Approve a step whose rule names them or their role (`APPROVE-001`, `APPROVE-003`) | All | All | Team | No | No | No | Only steps naming them personally |
+| Create and edit shared templates and template folders (`EDIT-002`) | Yes | Yes | Yes | No | Yes | No | No |
+| Save a proposal as a personal template | Yes | Yes | Yes | Yes | Yes | No | No |
+| Create and edit library items (`EDIT-003`) | Yes | Yes | Yes | No | Yes | No | No |
+| Lock and unlock sections in a template (`EDIT-015`) | Yes | Yes | Yes | No | Yes | No | No |
+| Unlock a locked section in one proposal (`EDIT-015`) | All | All | Team | No | No | No | No |
+| Create and edit catalog items and prices (`CAT-001`) | Yes | Yes | Yes | No | No | No | No |
+| See internal cost and margin (`PRICE-006`) | Yes | Yes | Yes | No | No | No | Yes |
+| Record check, wire and ACH credit payments (`PAY-007`) | Yes | Yes | No | No | No | No | Yes |
+| Refund and respond to disputes (`PAY-006`) | Yes | Yes | No | No | No | No | Yes |
+| Connect and disconnect payment, accounting, CRM, file storage, chat and SSO providers (`SEC-001`) | Yes | Yes | No | No | No | No | No |
+| Connect their own mailbox (`SEND-001`) | Yes | Yes | Yes | Yes | No | No | Yes |
+| Invite members and change roles | Any role | Any role except owner and admin | Sales, content editor and viewer, into their own teams | No | No | No | No |
+| Change the approval policy, approval rules and workspace settings, including the default reminder schedule, expiry period and payment methods (`APPROVE-001`, `APPROVE-003`, `FOLLOW-006`, `PAY-001`) | Yes | Yes | No | No | No | No | No |
+| Issue and revoke agent grants (`ACCESS-001`) | Yes | No | No | No | No | No | No |
+| Transfer ownership and delete the workspace | Yes | No | No | No | No | No | No |
+| View reports (`REPORT-001` to `REPORT-005`) | All | All | Team | Own | Content reports only (`REPORT-003`) | Team | Revenue reports only (`REPORT-004`) |
+| View and export the audit log (`TEAM-004`) | Yes | Yes | No | No | No | No | No |
+
+**Acceptance.**
+1. Moving a team-limited library item or template to a wider folder or workspace, clearing folder teams or first sharing a personal template without the required audience decision is refused with no write.
+2. After that decision, the move and audience are recorded in audit, and the item is visible to exactly its new audience.
+3. Joining or leaving a team follows TEAM-006 membership authority and changes visibility, without using folder consent to grant membership.
 
 **Evidence.** `src/platter/permissions.ts`, `src/platter/approvals.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`, `tests/mail.test.mjs`
 **Gap.** Product roles, teams, collaborator sharing and personal time zones now ship. Native members default to sales in no team; state, revision history, direct reads, previews, attachments, edits and sends enforce proposal scopes, including transaction-time membership and sharing checks. Current personal-template, pipeline, audit, workspace-default, shared text-library editing and internal-pricing read/edit rights are enforced; scopes and exact no-write refusals are proved by tests/platter.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP”, scoped awaiting-approval counts/sorting/totals by tests/platter.test.mjs — “FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership”, screens at 1440/390 by tests/site.test.mjs — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths”, and custody by tests/archive.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items”. Gap: the full rights matrix remains unproved and unimplemented for SSO provider connections, workspace deletion and full content/revenue report capabilities. Base’s native issuer-version check still rejects a pending invitation after a native role promotion even when the issuer retains grant authority (a public /auth/operator/role then /auth/confirm probe returns 400, no session); product time-zone/team additions are preserved, but native-version preservation needs a supported Base change or explicit review of credential rebinding. The native security guard is retained. CT ruling (22 October 2026, eaf743e) implemented: a share grants one proposal, never role authority. Cell (8) is proved by tests/platter.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP”; the named role browser journey covers the out-of-team manager without Send, Approve or Unlock controls at 1440/390. Catalog edit/insertion and manual dispute responses now ship, with their named CAT-001 and PAY-006 public-door proofs.  Shared templates/team folders, library folders, native-section template locks and delegated invitations now ship. Their public-door proofs are tests/platter.test.mjs — “TEAM-001 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content”, “TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval”, and “TEAM-001 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses”, plus the named role browser and CLI journeys. CT ruling (22 October 2026, eaf743e) implemented: current grant authority, exact native invitation binding, cancellation and expiry, and explicit consent for wider folder/item audiences. Cell (9) is proved by tests/platter.test.mjs — “TEAM-001 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses”; cell (10) by tests/platter.test.mjs — “TEAM-001 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content” and the named role browser journey at 1440/390. Verified Stripe, QuickBooks, HubSpot, Salesforce, Google Drive, Slack and own Google/Microsoft mailbox connections now ship; the QuickBooks admin/sales boundary is proved by tests/platter.test.mjs — “TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens”. Credentials are encrypted and excluded from archives; restored metadata requires reconnection. Mailbox connections follow SEND-001's ct-approved provider-verified one-member binding: OAuth mailboxes may differ from sign-in, refresh before sending, and attribute the selected sender. Its legacy access-token door remains identity-only. Billing refund and received-payment authority are proved by tests/platter.test.mjs — “TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund”. Workspace reminder/expiry/payment-default authority and snapshots now ship; reminder execution remains FOLLOW-001/FOLLOW-006 work. Native ownership handoff is proved with fresh email-link authority, denied non-owner writes, revoked old-owner sessions/agent keys and retained proposals in tests/platter.test.mjs — “TEAM-001 / APPROVE-003 native admins remain eligible named approvers and settings audit records identify the actual person or workspace”. tests/platter.test.mjs — “TEAM-001 upgrading a pre-role database keeps former members as sales without inferring historical ownership” proves the actual additive migration and scoped old-member reads. The recorded-revenue pipeline view now enforces all current revenue-report role cells, with hand-computed payment/refund totals and matching CSV/scheduled mail. Full content reports and remaining revenue features remain foundations in this seed, not account blockers. Current reminder policy and execution rights are additionally proved by tests/mail.test.mjs — “FOLLOW-001 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap” and “SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh”: only owner/admin change quiet hours, sending follows live proposal/team scope, and role or invitation changes during provider I/O refuse the reminder without a provider send or fallback. The existing delegated-invitation journey now reproduces the native issuer-version blocker through /auth/operator/role and /auth/confirm: an authorized manager promoted to native admin still yields 400 and no session, product role or team on the old invitation. This needs a supported Base change; credential versions are never rebound here.
 
 #### TEAM-002 — Single sign-on and SCIM provisioning
 
-Core · target · **missing**
+Core · target · **missing** · Cites BASE-SIGNIN-001, BASE-ROLE-001 · Register R-8
 
-**Requirement.** Members sign in through SAML or OIDC from [Auth](https://github.com/just-every/run-auth), Okta, Microsoft Entra ID or Google Workspace, and are created, updated and removed through SCIM with role mapping. Removing a member ends their sessions and keeps their proposals with a new owner.
+**Requirement.** Sign-in through Auth, Okta, Entra or Google Workspace maps provider roles to the proposal matrix. Deprovisioned members’ proposals are assigned a new sales owner. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#team-002).
 
 **Acceptance.**
-1. Sign in through an Okta fake with SAML, provision and deprovision through SCIM, and see sessions ended and proposals reassigned.
+1. With run-auth’s standards fixture, admit a SAML member, provision/update/deprovision through SCIM and observe proposal reassignment under the mapped role.
 
 **Evidence.** None.
 **Gap.** No SSO or SCIM.
@@ -1700,7 +1886,7 @@ Core · target · **missing**
 
 Core · target · **missing**
 
-**Requirement.** A firm runs several brands or business units, each with its own brand kit, domain, templates, library, catalog, Stripe account and accounting connection, with members in one or more.
+**Requirement.** A firm runs several brands or business units, each with its own brand kit, domain, templates, library, catalog, Stripe account and accounting connection, with members in one or more. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#team-003).
 
 **Acceptance.**
 1. Create two brands with separate Stripe and QuickBooks fakes; a proposal from brand B uses B's brand, domain and Stripe account, and B's members cannot see A's library.
@@ -1710,30 +1896,27 @@ Core · target · **missing**
 
 #### TEAM-004 — Audit log
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-AUDIT-001, BASE-AGENT-009, BASE-OPS-005
 
-**Requirement.** Every action by people, agents and integrations (edits, approvals, sends, views, signatures, payments, refunds, setting and permission changes) is logged with actor, time and subject, searchable by admins and exportable to CSV. This applies to every capability that exists today: successful client and proposal commands, revision restore and negotiation, tracked text suggestions and review, vendor-document settings and proposal file upload/refresh/download, agent-key management, client invitation views and verification/acceptance, client-import preview/apply/journal/undo, invoice export/download, and native Base authentication, setup, settings and permission actions. The owner and product admins search and export CSV; other roles are refused (403), as proved by the TEAM-001 role journey as well as the original audit journey. Rows retain an opaque actor record id and role (agent key id for agents), action, subject record id and server epoch-millisecond time. Unverified invitation views identify an unknown person, never the named client; verified client actions identify the client record. Credentials, codes, command payloads, IP addresses, devices and invitation tokens are never copied into the log. Exact actor/action/subject filters combine with case-insensitive literal search and inclusive epoch-millisecond time bounds; CSV returns the same ordered filtered rows. Audit rows travel in the business archive. Logging starts on upgrade; earlier history is not invented. Refused actions write nothing, preserving `HTTP-001`.
-
-Every future capability must extend this audit journey before shipping: document and pricing actions (`EDIT-001`–`EDIT-018`, `CAT-001`, `PRICE-001`–`PRICE-007`), approval and team settings (`APPROVE-001`–`APPROVE-003`, `TEAM-001`–`TEAM-003`), recipient/notification/follow-up and tracking actions (`SEND-001`–`SEND-010`, `FOLLOW-001`–`FOLLOW-006`, `TRACK-001`–`TRACK-004`), signature/payment actions (`SIGN-003`–`SIGN-011`, `PAY-001`–`PAY-009`), integration actions (`CRM-001`–`CRM-004`, `ACCT-001`–`ACCT-007`, `AUTO-001`–`AUTO-005`, `HAND-001`–`HAND-002`), renewals, report delivery, migration, privacy and agent actions (`RENEW-001`–`RENEW-002`, `REPORT-002`–`REPORT-005`, `MIG-001`–`MIG-007`, `PRIV-001`, `AI-001`–`AI-004`, `AGENT-001`–`AGENT-009`).
+**Requirement.** Platter audit subjects include proposal revisions, approvals, sends, client invitations, signatures, payments, refunds, provider settings and membership. Unknown invitation viewers remain unknown; verified client actions identify the client record. Proposal-specific fields and filters are in [audit behavior](docs/contract-behavior.md#team-004).
 
 **Acceptance.**
-1. Perform every currently supported kind of action through HTTP and see each in the log with its actor, subject and server time; exact filters, literal search and inclusive bounds return the matching rows, and CSV exports those same rows.
-2. Exercise person, agent, unidentified invitation and verified client actors; confirm refused actions write nothing and secrets/payloads are absent.
-3. Search and download in the real app at 1440 and 390 pixels; member and signed-out audit access is refused.
-4. Export and restore through the public CLI and see audit rows preserved exactly.
-5. Each future capability named above inherits the same assertion before shipping.
+1. Perform every proposal job through its public door: actor, subject and server time are retained; exact filters, literal search and inclusive bounds return matching rows and the CSV contains those same ordered rows.
+2. Person, agent, unknown invitation and verified client records remain distinct; command payloads, credentials and invitation secrets are absent.
+3. Owner/admin can search and download at 1440 and 390; other roles and signed-out readers cannot.
+4. Archive and restore preserve the proposal audit exactly.
 
 **Evidence.** `src/platter/audit.ts`, `src/platter/auth-audit.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Compiled admin/owner audit. The old browser Evidence file imports the assertion helpers rather than containing them. unauthorized readers at 1440/390. The old browser Evidence file imports the assertion helpers rather than containing them.
 
 #### TEAM-005 — Security review pack for procurement
 
-Core · target · **missing**
+Core · target · **missing** · Register R-7
 
-**Requirement.** A buyer's procurement or IT team gets what they ask an incumbent for. A security page states each control Platter implements (encryption and credential custody `SEC-001`, access control `TEAM-001` and `TEAM-002`, audit `TEAM-004`, erasure `PRIV-001`, archives and restore `PORT-001`), each linked to the clause and test that prove it. The pack also holds a subprocessor list, a data processing addendum, and completed standard questionnaires (CAIQ Lite and SIG Lite). For Run Edit Run's hosted service it includes the current SOC 2 Type II report, delivered under NDA on request. For a self-hosted installation, the pack states which controls the installer's own Cloudflare account carries.
+**Requirement.** A buyer's procurement or IT team gets what they ask an incumbent for. A security page states each control Platter implements (encryption and credential custody `SEC-001`, access control `TEAM-001` and `TEAM-002`, audit `TEAM-004`, erasure `PRIV-001`, archives and restore `PORT-001`), each linked to the clause and test that prove it. The pack also holds a subprocessor list, a data processing addendum, and completed standard questionnaires (CAIQ Lite and SIG Lite). The hosted report is field proof R-7. For a self-hosted installation, the pack states which controls the installer's own Cloudflare account carries. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#team-005).
 
 **Acceptance.**
-1. Open the security page: every control statement links to a clause whose status is done, and none links to a partial or missing clause; download the subprocessor list and DPA; request the SOC 2 report, accept the NDA and receive the report for the current period; a questionnaire answer naming a control links to the same clause as the page.
+1. Open the security page: every control statement links to a clause whose status is done, and none links to a partial or missing clause; download the subprocessor list and DPA; a questionnaire answer naming a control links to the same clause as the page.
 
 **Evidence.** None.
 **Gap.** No security page, questionnaire answers, DPA, subprocessor list or audit report.
@@ -1742,9 +1925,9 @@ Core · target · **missing**
 
 #### MIG-001 — PandaDoc move-in
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** A PandaDoc customer on any plan moves in without API access, because PandaDoc gives Business and Starter accounts only its Sandbox API and keeps the Production API for approved Enterprise accounts. Through the self-serve route of `MIG-007`, the buyer uploads PandaDoc's bulk download zips (PDFs in the account's folder tree, with the eSignature certificate pages on completed documents, exported in batches of 200 to 300 and without attachments) and PandaDoc's catalog CSV (Name, SKU, Type, SKUs_in_bundle, Category, Price, Cost, Currency, Description, Images, Billing_frequency and custom-field columns). The mapping: completed documents with a certificate become retained, read-only agreements keeping the original PDF and certificate byte-identical with their SHA-256 recorded; open documents (draft, sent or viewed) become fixed-page drafts from their PDF (`EDIT-005`), or editable drafts where the buyer also uploads the document's Word download, and either can be reissued under `MIG-005`; the folder tree becomes Platter folders (`EDIT-016`); catalog rows become catalog items (`CAT-001`) with each URL in the Images column fetched as the item's image, bundles become packages, and non-USD rows are listed rather than converted; each template's body comes from its Word download (in PandaDoc, open the template and choose File, then Download, then Microsoft Word, offered on Starter, Business and Enterprise plans once the account owner allows Word downloads), converted to editable blocks with PandaDoc tokens such as `[Client.Company]` and `[Sender.FirstName]` mapped to variables (`EDIT-004`) and each quote or pricing table turned into a `PRICE-001` pricing table whose rows are matched to the imported catalog by SKU or name, with unmatched rows listed (`EDIT-005`); content library items, which PandaDoc does not let customers download, come across by inserting them into one PandaDoc document, downloading that document as Word and importing it as library items split at each Heading 1 (`EDIT-005`); a template the buyer has only as a PDF arrives as fixed pages listed as "Word download needed for editing"; contacts come from the connected CRM (`CRM-001` to `CRM-004`) or a contacts CSV, including the file PandaDoc support provides on request (`MIG-006`), because PandaDoc has no self-serve contact export. Where the buyer has the Production API, Platter also reads document statuses, recipients, template roles, fields, tokens, pricing-table items and folder metadata to enrich what the files carry; each template role becomes a `SIGN-011` role with its signing order, its field assignments and any pre-assigned recipient. PandaDoc's template details response holds no body text, so a template found through the API is listed as "convert from Word download" with its roles and tokens kept, and its body arrives only from its Word file. Without the Production API, the import report states what arrived (signed agreements with certificates, open documents as drafts, folders, catalog, converted template and library bodies, and contacts from the CRM or CSV) and lists as unmapped what the files cannot carry: attachments, template roles, pricing-table formulas, images PandaDoc leaves out of quote tables in Word downloads, comments, view analytics and audit events beyond the certificate. Everything runs under `IMPORT-001`'s preview, journal and undo.
+**Requirement.** A PandaDoc customer on any plan moves in without API access, because PandaDoc gives Business and Starter accounts only its Sandbox API and keeps the Production API for approved Enterprise accounts. The full mapping and custody rules in [proposal behavior](docs/contract-behavior.md#mig-001) apply to every import and resulting record.
 
 **Acceptance.**
 1. With fixtures in PandaDoc's real export shapes, namely two bulk zips (250 and 40 PDFs) with a three-level folder tree, completed documents carrying certificate pages and open documents without, a catalog CSV with the export columns, a bundle row and a custom-field column, and a template details JSON response with roles and tokens and no body: preview and apply with no API key, and see completed documents as retained agreements whose PDFs and certificates are byte-identical with matching SHA-256, open documents as drafts, folders matching the tree, catalog items and the bundle package matching the CSV with each row's Images URL fetched from a file-host fake as the item's image, and a report listing what arrived and each unmapped kind.
@@ -1759,9 +1942,9 @@ Core · target · **missing**
 
 #### MIG-002 — Proposify move-in
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** Platter imports Proposify templates, content library sections, fee tables, clients and proposals through the Proposify API where the buyer has it (Proposify offers its API on the Business plan, enabled by its Customer Success team), with signed proposals as read-only agreements and open ones as drafts. Without API access, the buyer uses the `MIG-007` route: proposal PDFs downloaded from Proposify, with signed ones kept as retained agreements with their signature page byte-identical and open ones as drafts for reissue; Proposify's documents report exported as CSV for status, value, client and dates, matched to each PDF; clients and catalog items by CSV (`MIG-006`) or from the CRM; and templates and library sections, which Proposify offers no Word download for, arriving as fixed pages from the PDF of a proposal made from each one (`EDIT-005`) and listed in the report as "rebuild in the editor", never converted. A template or section that the API returns without its content is treated the same way. Either way the import report states what arrived and lists what did not map, under `IMPORT-001`'s preview, journal and undo.
+**Requirement.** Platter imports Proposify templates, content library sections, fee tables, clients and proposals through the Proposify API where the buyer has it (Proposify offers its API on the Business plan, enabled by its Customer Success team), with signed proposals as read-only agreements and open ones as drafts. Without API access, the buyer uses the `MIG-007` route: proposal PDFs downloaded from Proposify, with signed ones kept as retained agreements with their signature page byte-identical and open ones as drafts for reissue; Proposify's documents report exported as CSV for status, value, client and dates, matched to each PDF; clients and catalog items by CSV (`MIG-006`) or from the CRM; and templates and library sections, which Proposify offers no Word download for, arriving as fixed pages from the PDF of a proposal made from each one (`EDIT-005`) and listed in the report as "rebuild in the editor", never converted. A template or section that the API returns without its content is treated the same way. Either way the import report states what arrived and lists what did not map, under `IMPORT-001`'s preview, journal and undo. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#mig-002).
 
 **Acceptance.**
 1. Run the `MIG-001` journey against a Proposify API fake; then, with no API, import 30 Proposify PDFs and a documents report CSV and see each PDF matched to its report row with status, value and client, signed ones retained byte-identical, open ones as drafts, and the unmapped list stated; a template supplied as a Proposify PDF arrives as fixed pages listed as "rebuild in the editor", with no Word conversion offered.
@@ -1771,9 +1954,9 @@ Core · target · **missing**
 
 #### MIG-003 — Better Proposals move-in
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** Platter imports Better Proposals templates, content, contacts and proposals through its API where the buyer's plan includes API access, and otherwise through the `MIG-007` route from downloaded proposal PDFs and CSV files, under the same preview, journal and undo and with the same report of what did not map.
+**Requirement.** Platter imports Better Proposals templates, content, contacts and proposals through its API where the buyer's plan includes API access, and otherwise through the `MIG-007` route from downloaded proposal PDFs and CSV files, under the same preview, journal and undo and with the same report of what did not map. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#mig-003).
 
 **Acceptance.**
 1. Run the `MIG-001` journey against a Better Proposals API fake, then run the no-API journey of `MIG-002` with Better Proposals PDFs and a contacts CSV.
@@ -1783,9 +1966,9 @@ Core · target · **missing**
 
 #### MIG-004 — Qwilr and Ignition move-in
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** Platter imports Qwilr pages, templates and quotes through its API where the buyer's plan has it enabled, and otherwise from Qwilr PDF exports through `MIG-007`; it imports Ignition clients, services, proposals and billing schedules from Ignition's exports. Both run under the same preview, journal and undo.
+**Requirement.** Platter imports Qwilr pages, templates and quotes through its API where the buyer's plan has it enabled, and otherwise from Qwilr PDF exports through `MIG-007`; it imports Ignition clients, services, proposals and billing schedules from Ignition's exports. Both run under the same preview, journal and undo. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#mig-004).
 
 **Acceptance.**
 1. Run the `MIG-001` journey against a Qwilr API fake and against Qwilr PDF exports with no API, and against an Ignition export fixture including one active billing schedule.
@@ -1795,9 +1978,9 @@ Core · target · **missing**
 
 #### MIG-005 — Open proposals and payment schedules continue
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** At move-in, proposals sent but not signed in the old tool can be reissued from Platter with a new link, and signed agreements with active Stripe schedules or subscriptions are adopted by their Stripe IDs, so no client is charged twice and no scheduled payment is missed. A reissued proposal links to the imported original and is listed for the buyer to void in the old tool. An open document that arrived only as a PDF is reissued as fixed pages (`EDIT-005`): the original pages unchanged, with signature, initials and date fields placed where the PDF's signature block was detected or where the member puts them, and with no interactive pricing, optional items or payment collection unless the member appends a pricing table and sets a payment schedule before approval. The import report and the reissue screen say this and offer the Word route: an open document whose Word download was also uploaded is reissued as an editable proposal with live pricing tables (`PRICE-001`).
+**Requirement.** At move-in, proposals sent but not signed in the old tool can be reissued from Platter with a new link, and signed agreements with active Stripe schedules or subscriptions are adopted by their Stripe IDs, so no client is charged twice and no scheduled payment is missed. A reissued proposal links to the imported original and is listed for the buyer to void in the old tool. An open document that arrived only as a PDF is reissued as fixed pages (`EDIT-005`): the original pages unchanged, with signature, initials and date fields placed where the PDF's signature block was detected or where the member puts them, and with no interactive pricing, optional items or payment collection unless the member appends a pricing table and sets a payment schedule before approval. The import report and the reissue screen say this and offer the Word route: an open document whose Word download was also uploaded is reissued as an editable proposal with live pricing tables (`PRICE-001`). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#mig-005).
 
 **Acceptance.**
 1. Import an Ignition agreement with an active Stripe subscription fake, adopt it, advance a month and see exactly one charge recorded against the imported agreement.
@@ -1808,13 +1991,9 @@ Core · target · **missing**
 
 #### MIG-006 — Clients, contacts and catalog CSV move-in
 
-Core · target · **partial**
+Core · target · **partial** · Cites BASE-DATA-001, BASE-INPUT-003 · Rules D-1
 
-**Requirement.** The CSV kit imports companies, contacts with titles and phone numbers, billing and service addresses, tax-exempt status and catalog items, with the preview, fingerprint, journal and undo of `IMPORT-001`. It reads the incumbents' own contact and catalog CSV layouts (including PandaDoc's catalog CSV and the contact file PandaDoc support provides) as well as Platter's.
-
-Current owner-only imports use published layout presets and a reviewed delimiter/column mapper for differing or undocumented exports, leaving original files unchanged. Company associations use explicit source IDs or reviewed exact label-to-ID associations, never inferred merges. Existing IDs and exact email conflicts are held with diagnostics; exports lacking IDs get identities scoped to the exact file and row. The fingerprint binds CSV bytes, mappings, associations, acquired image bytes and any explicit omission confirmation. Original files, every source column, journals, native records and undo custody survive `PORT-002` archives. Unchanged legacy client imports and their journals remain available.
-
-Catalog metadata preserves decimal strings (PandaDoc price/cost through five decimal places), currency, price type/range, recurrence, category paths, resolved SKU/quantity bundles, images and arbitrary custom fields. Unmapped columns and non-USD rows are reported, never discarded or converted. Imported metadata neither calculates charges nor certifies tax exemptions; `CAT-001`, `PRICE-001`, `PRICE-003` and `MIG-001`..`MIG-004` inherit its lossless custody when they consume these records. Image acquisition uses credential-free HTTPS, validated public A/AAAA answers, connection to the validated literal IP without another DNS resolution, hostname-verified TLS, no redirects, PNG/JPEG/GIF/WebP byte-type checks and 5 MiB per-image / 20 MiB per-import limits. Unfetched URLs are listed as metadata and block apply unless the owner explicitly confirms importing that file without them; this decision is fingerprint-bound and the records say `not-fetched`. A runtime without hostname verification never bypasses TLS or claims image acquisition; such an installation remains partial for image fetching.
+**Requirement.** The CSV kit imports companies, contacts with titles and phone numbers, billing and service addresses, tax-exempt status and catalog items, with the preview, fingerprint, journal and undo of `IMPORT-001`. It reads the incumbents' own contact and catalog CSV layouts (including PandaDoc's catalog CSV and the contact file PandaDoc support provides) as well as Platter's. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#mig-006).
 
 **Acceptance.**
 1. Import a CSV of 200 contacts across 60 companies with addresses and exemptions, and 50 catalog items, preview, apply and undo; import PandaDoc's catalog CSV layout unchanged and see the same items as `MIG-001`.
@@ -1827,9 +2006,9 @@ Catalog metadata preserves decimal strings (PandaDoc price/cost through five dec
 
 #### MIG-007 — Move-in from exported files without API access
 
-Core · target · **missing**
+Core · target · **missing** · Rules D-1
 
-**Requirement.** For every incumbent, a buyer without API access moves in from the files the incumbent lets any customer export: document PDFs (one at a time or in bulk zips, across several uploads into one import), catalog and contact CSVs, and report CSVs. Platter detects signed documents by their signature certificate or signature page and keeps them as retained, read-only agreements with the original file byte-identical and its SHA-256 recorded; matches each PDF to report rows by title, client and date and holds ambiguous matches for the buyer to review; converts template and library files to editable blocks (`EDIT-005`); and resumes an interrupted upload without duplicating anything. Every import ends with a report of what arrived, what is held for review and what did not map, under `IMPORT-001`'s preview, journal and undo.
+**Requirement.** For every incumbent, a buyer without API access moves in from the files the incumbent lets any customer export: document PDFs (one at a time or in bulk zips, across several uploads into one import), catalog and contact CSVs, and report CSVs. Platter detects signed documents by their signature certificate or signature page and keeps them as retained, read-only agreements with the original file byte-identical and its SHA-256 recorded; matches each PDF to report rows by title, client and date and holds ambiguous matches for the buyer to review; converts template and library files to editable blocks (`EDIT-005`); and resumes an interrupted upload without duplicating anything. Every import ends with a report of what arrived, what is held for review and what did not map, under `IMPORT-001`'s preview, journal and undo. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#mig-007).
 
 **Acceptance.**
 1. Import three zips in two sessions with an interrupted upload between them and one PDF present in two zips: there is one agreement per document and nothing is duplicated; an ambiguous report row is held for review until the buyer picks its PDF; the report's counts of arrived, held and unmapped items match the fixture; undo removes everything the import wrote.
@@ -1841,21 +2020,21 @@ Core · target · **missing**
 
 #### MOB-001 — Team app on a phone
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-ACCESSIBILITY-001 · Register R-4, R-5
 
-**Requirement.** On a phone browser, a sales member creates a proposal from a template, sends it, answers a client question and checks the follow-up queue, and an approver role approves a request under the `APPROVE-003` policy.
+**Requirement.** On a phone browser, a sales member creates a proposal from a template, sends it, answers a client question and checks the follow-up queue, and an approver role approves a request under the `APPROVE-003` policy. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#mob-001).
 
 **Acceptance.**
 1. A browser journey at 390 pixels completes each of those actions, the sends and answers as a sales member and the approval as a manager; the same approval attempted by the sales member is refused (403).
 
-**Evidence.** `tests/site.test.mjs` — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” (sales templates/send/answer/follow-up/reuse, manager approval and sales 403, at 390/1440)
-**Gap.** tests/site.test.mjs — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” completes template creation, sales sending, a verified client question and sales answer, sales follow-up management, personal-template reuse, manager approval and the sales approval refusal (403), at both 390 and 1440 pixels. All acceptance actions are proven through the compiled production routes.
+**Evidence.** `tests/site.test.mjs`
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Sales template/send/answer/queue. All browser asserting lines are outside the sole old cited wrapper. manager approval. All browser asserting lines are outside the sole old cited wrapper. sales refusal at 390. All browser asserting lines are outside the sole old cited wrapper.
 
 #### MOB-002 — iOS and Android apps with push notifications
 
-Core · target · **missing**
+Core · target · **missing** · Cites BASE-ACCESSIBILITY-001 · Register R-4, R-5, R-6
 
-**Requirement.** Native iOS and Android apps give members the follow-up queue, proposal status, client questions, approvals and payments, with push notifications for views, questions, signatures, payments and approval requests.
+**Requirement.** Native iOS and Android apps give members the follow-up queue, proposal status, client questions, approvals and payments, with push notifications for views, questions, signatures, payments and approval requests. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#mob-002).
 
 **Acceptance.**
 1. On iOS and Android test devices, sign in, receive a push when the client views and signs, approve a request, and answer a question.
@@ -1867,55 +2046,56 @@ Core · target · **missing**
 
 #### AI-001 — Drafts from meeting notes, transcripts and email
 
-Core · target · **partial**
+Core · target · **partial** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** A member pastes notes, uploads a transcript or picks an email thread or a recorded Zoom, Google Meet or Microsoft Teams call, and Platter drafts a proposal from the firm's templates, library and catalog, starting from the template's role slots (`SIGN-011`) with the people named in the source offered for each slot, and with the template's reminder schedule and expiry period (`FOLLOW-006`). Each drafted section cites the source line it came from. The draft is sent only by a person who may send it, under the `APPROVE-003` policy like any proposal; a draft an agent key prepared always needs a person's approval (`PROP-001`).
+**Requirement.** A person selects notes, transcripts, email or Zoom/Meet/Teams recordings. Platter drafts from the firm’s template, library and catalog, with recipient-role suggestions and delivery settings; every section cites its source. Drafting carries standard and external sending with binding offer terms carries external and commitment, decided by company policy. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#ai-001).
 
 **Acceptance.**
-1. Draft from a fixture transcript; every section cites a transcript line; prices come only from catalog items; under the default policy the draft needs approval before sending, and the same draft prepared through an agent key is refused at send (409) until a manager or the owner approves it even with "approval required for every proposal" off.
+1. From the transcript fixture, every section cites a line, all prices are catalog items, source people are suggested for role slots and template delivery settings are retained.
+2. Under the held company policy, sending waits for the named approver; under all-autonomous policy, permitted sending runs.
 
 **Evidence.** `src/platter/http.ts`, `tests/platter.test.mjs`
-**Gap.** External agents can post structured drafts; there is no ingestion of notes, transcripts or email and no in-product drafting.
+**Gap.** Legacy preparation exists only in part. Complete sourced proposal work and seed-wide risk classification/company-policy execution are not proved; the old implementation boundary is recorded in CHANGELOG.
 
 #### AI-002 — Writing assistant in the editor
 
-Core · target · **missing**
+Core · target · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** In the editor a member asks to rewrite, shorten, adjust tone, summarize or translate a block; the suggestion appears as a change to accept or reject, and never edits pricing.
+**Requirement.** The editor offers rewrite, shorten, tone, summary and translation of text blocks, without modifying pricing. Applying an agent’s text edit carries standard; the company policy decides it. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#ai-002).
 
 **Acceptance.**
-1. Ask to shorten a section, see a suggested change, accept it, and see a request to change a price refused.
+1. Ask to shorten a block: its suggested change is visible.
+2. Under the held company policy, the person accepts the text change; a price-edit request through this text-only action is refused.
 
 **Evidence.** None.
 **Gap.** No writing assistant.
 
 #### AI-003 — MCP server for AI assistants
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-AGENT-001, BASE-AGENT-002, BASE-AGENT-005, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-012 · Register R-9
 
-**Requirement.** An MCP server lets Claude, ChatGPT and other assistants search proposals, read status and engagement, draft from templates and request sending, under scoped, revocable keys. Assistants can request but never approve, send, sign or refund. Every capability available today conforms: the stateless Streamable HTTP endpoint `/api/platter/agent/mcp` uses existing owner-bound, draft-only agent keys (`ACCESS-001`), with their current expiry, immediate revocation and account-version binding. Tools search proposals and existing clients, read current offer/status and recorded delivery/acceptance, prepare or version-guard a structured draft, and queue an exact draft/approved revision for the owner. View and reading analytics are honestly unavailable, and provider acceptance is never claimed as delivery or reading. `EDIT-002` inherits drafting from templates and `TRACK-001`/`TRACK-002` inherit engagement tools and their same named MCP journey before shipping. `TEAM-001` inherits its visibility rules before shipping. No template, tracking or role capability is simulated.
-
-An owner send request is a retained request, never authorization: it changes no offer, approval or mail. Repeating an active request for the same key, proposal and revision returns the same row. A later revision makes it visibly stale. The owner opens Agent access, reviews the proposal, explicitly approves and sends it under the standing policy, and may mark a request fulfilled only after that exact revision is sent or accepted; the owner may dismiss a request without sending. Other roles cannot read or resolve the queue. Requests and their opaque key provenance travel in archives; keys do not. MCP tool actions extend `TEAM-004`'s audit journey.
+**Requirement.** MCP offers proposal search, status/engagement, template drafting, revision and sending requests to assistants. Preparation carries standard; sending carries external and commitment; signing/approval carries commitment; refunds carry money. Company policy decides calls instead of a tool-name filter. Retained send requests and stale-revision behavior remain proposal features, with the legacy implementation described in [MCP behavior](docs/contract-behavior.md#ai-003).
 
 **Acceptance.**
-1. Connect an MCP client with an existing scoped key; initialize and list schemas; search existing clients/proposals, prepare and revise a draft, read status and the honestly labeled engagement fields, request sending and see one retained owner request on replay, with no approval, offer or mail change.
-2. Approve/send/sign/refund tool calls are refused, as are revoked keys and foreign origins.
-3. Edit a requested revision and see the stale request; the owner dismisses it, approves and explicitly sends the current revision, then marks only that revision's request fulfilled.
-4. A premature fulfillment is refused (409), members cannot read/resolve the queue (403), and invitation credentials are absent from tool responses.
-5. Exercise the real queue at 1440 and 390 pixels; export and restore requests and resolutions through the public CLI with credentials excluded.
-6. `EDIT-002`, `TRACK-001`, `TRACK-002` and `TEAM-001` extend this journey before shipping.
+1. Connect, list schemas, search clients/proposals, prepare/revise a draft, and read status and honestly labelled engagement.
+2. Replay a send request for the same grant/proposal/revision: one request is retained and no offer, approval or mail changes before the company policy permits execution.
+3. Under the held policy, sending and binding decisions wait for the named person; under all-autonomous policy, permitted calls run. Revoked credentials and foreign origins are refused.
+4. Edit a requested revision: its request becomes stale; dismissal and fulfillment retain their exact revision.
+5. Premature fulfillment and an unauthorized person’s queue decision are refused; tool results exclude invitation credentials.
+6. Use the queue at desktop/phone widths and archive requests and resolutions without credentials.
 
 **Evidence.** `src/platter/mcp.ts`, `src/platter/send-requests.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: MCP search. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. schema. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. draft/revision/status. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. engagement. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. One retained send request with unchanged business state before execution. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Held. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. all-autonomous company-policy execution. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. revoked/foreign-origin refusal. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Stale revision. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. dismissal. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. exact fulfillment. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Premature/unauthorized queue refusal. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. absence of credentials. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. Compiled queue at both widths. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. exact credential-free CLI restore. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target.
 
 #### AI-004 — Explainable price suggestions
 
-Core · target · **missing**
+Core · target · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** For each line item, Platter suggests a price range from the firm's own accepted and lost proposals for the same catalog item and client segment, with the sample size and examples shown. The member decides; suggestions are never applied silently.
+**Requirement.** Price suggestions use the firm’s accepted/lost proposals for the same catalog item and client segment, with sample size and examples. Applying an agent’s price change carries standard and later binding the offer carries commitment; company policy decides. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#ai-004).
 
 **Acceptance.**
-1. From a fixture history, see a suggested range with sample size and three linked examples, and see the price unchanged until the member applies it.
+1. From fixture history, the suggested range shows its sample size and three linked examples.
+2. Under the held policy the price remains unchanged until its reviewer applies the suggestion.
 
 **Evidence.** None.
 **Gap.** No price suggestions.
@@ -1924,36 +2104,39 @@ Core · target · **missing**
 
 #### PRIV-001 — Erasure across contacts, tracking and synced systems
 
-Core · target · **partial**
+Core · target · **partial** · Cites BASE-DATA-003, BASE-DATA-006
 
-**Requirement.** An owner handles a US privacy request (CCPA/CPRA or similar): erase a contact's personal data, viewing data and comments from proposals that are not retained agreements, and record which retained agreements keep it as business records. Synced CRMs and file stores are listed with what to erase there.
+**Requirement.** A US privacy request covers contact details, engagement and draft discussions, while retained agreements identify their business-record exception. The receipt names affected CRM and file-store records the operator must erase there. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#priv-001).
 
 **Acceptance.**
-1. Erase a contact who viewed two drafts and signed one agreement; their views and draft data are gone, the agreement remains with a retention note, and the receipt lists the HubSpot fake record to erase.
+1. Erase a contact with two draft views and one signed agreement: draft data and views are gone, the agreement has a retention note, and the receipt lists the HubSpot fixture’s record.
 
 **Evidence.** `src/platter/commands.ts`, `tests/platter.test.mjs`
 **Gap.** Only unused client records can be erased; no contacts, tracking data or notice to synced systems.
 
 #### PORT-002 — Complete product archive
 
-Core · target · **done**
+Core · target · **partial** · Cites BASE-DATA-001, BASE-SECRET-001
 
-**Requirement.** Archives and restore cover everything in the product: templates, library, catalog, media, signed PDFs and certificates, payment and invoice records, reports' source data and integration mappings, under `PORT-001`'s rules. Provider credentials never travel. Every record kind supported today must round-trip, including clients, draft/sent/accepted proposals, revisions, approval history, immutable acceptances, retained invoice files and client-import originals, journal and provenance. `EDIT-002`, `EDIT-003`, `CAT-001`, `EDIT-006`, `EDIT-010`, `SIGN-005`, `PAY-001` to `PAY-009`, `REPORT-001` to `REPORT-005`, `CRM-001` to `CRM-004`, `AUTO-001` to `AUTO-004` and `SEC-001` inherit archive/restore coverage of their new record kinds and credential exclusion before shipping. Provider connection metadata now round-trips while encrypted credentials stay local; agent keys, native sessions, client invitations, verification state and mail stay local under `PORT-001`.
+**Requirement.** The archive includes every Platter record kind: templates, library, catalog, media, signed PDFs/certificates, payment/invoice records, report source data and integration mappings. Connection metadata travels; connection credentials and public invitation authority stay local. Each added record kind joins the same archive obligation. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#port-002).
 
 **Acceptance.**
-1. Export an installation with every record kind, restore into an empty one, and re-export identical parts; no provider token appears in the archive.
+1. Export an installation containing every record kind, restore into an empty installation and re-export identical parts.
+2. Inspect that populated archive: no provider token, agent key, native session, invitation, verification state or mail is carried.
 
 **Evidence.** `tests/archive.test.mjs`, `src/platter/archive-policy.mjs`
-**Gap.** None.
+**Gap.** Carried evidence asserts only the outcomes marked asserted in DONE-AUDIT. Unasserted: Every product record/attachment part is identical on re-export. Named subset comparisons do not establish a complete part inventory equality. Every provider/agent/native/verification/mail credential kind is absent from the populated archive. Every named exclusion requires a mechanism assertion; one empty table is insufficient.
 
 #### SEC-001 — Provider credential custody
 
-Core · target · **partial**
+Core · target · **partial** · Cites BASE-SECRET-001, BASE-ROLE-001, BASE-DATA-001
 
-**Requirement.** OAuth tokens and API keys for Stripe, CRMs, accounting, mail and storage are encrypted at rest, scoped to the least access each connection needs, never shown again after setup, excluded from archives and logs, and revocable from settings, with a visible state when a connection breaks. Only the owner and admins connect or disconnect the workspace's payment, accounting, CRM, file storage, chat and SSO providers; each member who sends connects only their own mailbox (`SEND-001`), as `TEAM-001` sets.
+**Requirement.** Platter provider connections cover payments, CRM, accounting, mail, file storage, chat and SSO. Owner/admin manage workspace connections; senders manage only their own mailbox. Broken connections show an actionable state. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sec-001).
 
 **Acceptance.**
-1. Connect each provider fake, inspect the database and logs for tokens in clear (none), revoke one connection and see its state change and its jobs stop; a sales member's attempt to disconnect QuickBooks Online is refused (403).
+1. Connect every provider fake and inspect storage/logs: no clear token is present.
+2. Revoke one connection: its state changes and its jobs stop.
+3. Sales cannot disconnect QuickBooks; owner/admin can.
 
 **Evidence.** `src/platter/connections.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
 **Gap.** Stripe, QuickBooks, HubSpot, Salesforce, Drive, Slack, Google and Microsoft tokens are sealed with purpose-separated AES-GCM, omitted from API/UI/log fields and excluded from archives. tests/platter.test.mjs — “TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens” proves connection authority, plaintext absence and disconnect; tests/archive.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” proves metadata restoration requires reconnection. Gap: SSO provider credentials, per-provider least-scope verification, OAuth refresh, visible breakage state and job-stop assertions for future synchronization jobs.
@@ -1962,115 +2145,191 @@ Core · target · **partial**
 
 #### AGENT-001 — Discovery call to priced draft
 
-Core · push-further · **partial**
+Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** The agent reads discovery call transcripts (Zoom, Google Meet, Microsoft Teams or an uploaded recording), the email thread, CRM deal notes and the firm's past winning proposals, and drafts the scope with two or three priced packages from the catalog. Every requirement, assumption and exclusion cites its source. The agent flags what the client asked that the firm does not offer. A member edits, and because an agent prepared it the draft always needs a person's approval from an approver role before it is sent (`PROP-001`, `APPROVE-003`).
+**Requirement.** The proposal specialist reads discovery transcripts from Zoom, Meet, Teams or uploaded recordings, email, CRM notes and prior winning proposals. It drafts catalog-priced packages, sourcing each requirement, assumption and exclusion and flagging unsupported requests. Preparation carries standard and sending carries external and commitment, decided by company policy.
 
 **Acceptance.**
-1. From a fixture call and email thread, the draft's every scope line cites a source, every price is a catalog item, an unmatched request is flagged, and sending is refused until approval.
+1. The call/email fixture yields two or three packages whose scope lines cite sources and whose prices are catalog items.
+2. An unmatched request is flagged; under the held policy sending waits for the named approver.
 
 **Evidence.** `src/platter/http.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs`
-**Gap.** Agents can submit drafts that the owner must approve; there is no transcript ingestion, catalog matching or citations.
+**Gap.** Legacy preparation exists only in part. Complete sourced proposal work and seed-wide risk classification/company-policy execution are not proved; the old implementation boundary is recorded in CHANGELOG.
 
 #### AGENT-002 — Scope and price tested against delivery reality
 
-Core · push-further · **missing**
+Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** Before approval, the agent tests the draft against the firm's actual delivery data: hours and costs on similar past projects from Gauge, Harvest or QuickBooks Online job costing, team capacity in the proposed dates from Gauge or Forecast, and past win rates and margins for similar proposals. It shows an assumptions table (hours per line, blended cost, utilization, contingency), the expected margin range and the capacity conflict, if any. It suggests changes but never changes a price or date itself; the owner accepts or rejects each.
+**Requirement.** The specialist compares a draft with similar projects’ hours/costs from Gauge, Harvest or QuickBooks job costing, Gauge/Forecast capacity, win rates and margins. Its assumptions table states hours, blended cost, utilization and contingency. Price/date edits carry standard; company policy decides application.
 
 **Acceptance.**
-1. With Gauge and QuickBooks fixtures where similar projects overran by 30%, the agent shows the margin falling below the firm's floor, cites the projects, flags a capacity conflict in week 3, and the price stays unchanged until the owner applies a suggestion.
+1. With projects that overran by 30%, show the expected margin range below the firm’s floor, cite those projects and flag week-three capacity conflict.
+2. Under the held policy prices and dates remain unchanged until the owner applies the suggestion.
 
 **Evidence.** None.
 **Gap.** No delivery cost, capacity or outcome data is read.
 
 #### AGENT-003 — Client questions chased to resolution
 
-Core · push-further · **missing**
+Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** The agent watches client questions, comments and email replies, drafts precise answers that cite the proposal, library and agreement terms, and prepares a revision when an answer changes scope or price (`NEG-001`). Each question stays open until answered and acknowledged or until the proposal is decided. The proposal's sales owner approves every message, and the revision is sent only after approval under `APPROVE-003`; contact frequency and stop rules are the owner's.
+**Requirement.** The specialist watches proposal questions, comments and replies, drafts answers citing proposal/library/terms, and prepares revisions for price or scope changes. Answers stay open until answered and acknowledged or the proposal is decided. Outbound answers carry external and a revised binding offer adds commitment; company policy decides frequency, stops and execution.
 
 **Acceptance.**
-1. Ask three questions as the client, one of which needs a price change; the agent drafts two answers and a revision; no answer reaches the client until the proposal's sales owner approves it, and the revision is refused at send (409) until a manager or the owner approves it; the queue shows each question until it is acknowledged.
+1. For three questions, one changing price, draft two sourced answers and one revision.
+2. Under the held company policy, the sales owner approves the answers and the named approver the revised offer before sending.
+3. Each question remains visible until acknowledgement.
 
 **Evidence.** None.
 **Gap.** No question tracking or agent.
 
 #### AGENT-004 — Engagement-driven follow-up
 
-Core · push-further · **missing**
+Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** The agent decides the next action for each open proposal from views, section reading, questions and CRM activity, and drafts a follow-up that refers to what the client actually read ("you spent time on the retainer option"). The sales owner sends, edits or skips each, or pre-approves templated nudges within a cap; nothing is sent outside the owner's limits.
+**Requirement.** The specialist chooses next actions from recorded views, section reading, questions and CRM activity and drafts follow-ups referring to sections actually read. Outbound nudges carry external, with recipient counts; company policy sets execution and contact limits.
 
 **Acceptance.**
-1. Two clients read different sections; the agent drafts two different follow-ups that name those sections; with a cap of two nudges, a third is refused.
+1. Two clients reading different sections produce different sourced follow-ups.
+2. Under the company policy with a two-nudge cap, the third nudge is refused.
 
 **Evidence.** None.
 **Gap.** No engagement data or follow-up agent.
 
 #### AGENT-005 — Payment exceptions closed without duplicate invoices
 
-Core · push-further · **partial**
+Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** The agent compares accepted schedules, Stripe events and accounting invoices, and finds failed, duplicate, partial, unmatched or disputed amounts. For each it explains the cause, drafts the client follow-up or the accounting correction, and proposes refunds or write-offs. The owner approves every refund, write-off and message; a payment is settled only on provider evidence, and the agent verifies reconciliation after each fix.
+**Requirement.** The specialist reconciles accepted schedules, Stripe events and accounting invoices to identify failed, duplicate, partial, unmatched and disputed amounts. It explains causes and prepares corrections. Refunds/write-offs carry money and outbound contact carries external; company policy decides execution. Settlement relies on provider evidence and each fix is reconciled.
 
 **Acceptance.**
-1. Seed a duplicate invoice, a failed ACH debit and an unmatched check; the agent opens three exceptions with causes; after the owner approves the fixes, reconciliation shows no mismatch and no second invoice exists.
+1. A duplicate invoice, failed ACH and unmatched check produce three exceptions with causes.
+2. Under the held policy, after the owner approves the fixes, reconciliation shows no mismatch and no second invoice exists.
 
 **Evidence.** `src/platter/invoices.ts`, `tests/platter.test.mjs`
-**Gap.** Duplicate local exports are prevented; there is no provider event matching, exception queue or agent.
+**Gap.** Legacy preparation exists only in part. Complete sourced proposal work and seed-wide risk classification/company-policy execution are not proved; the old implementation boundary is recorded in CHANGELOG.
 
 #### AGENT-006 — Out-of-scope delivery turned into a change order
 
-Core · push-further · **missing**
+Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** The agent reads delivery actuals and change requests from Gauge, Asana, Jira, Vector or email, compares them with the accepted inclusions and exclusions, and prepares a separately priced change order linked to the original agreement. The delivery lead confirms the scope difference, an approver role approves the price under `APPROVE-003` (an agent-prepared change order always needs approval), and the client accepts and pays the change order on its own. The original agreement and its history never change.
+**Requirement.** The specialist compares Gauge, Asana, Jira, Vector or email delivery actuals and change requests with accepted inclusions/exclusions. It prepares a separately priced change order linked to the agreement. Scope sign-off and binding offer carry commitment; sending adds external, payment adds money. Company policy decides agent execution; the client decides the separate agreement.
 
 **Acceptance.**
-1. With a Gauge fixture showing 40 hours on a feature listed as excluded, the agent prepares a change order citing the exclusion and hours; after confirmation and approval the client accepts and pays it; the original agreement is byte-identical.
+1. For forty excluded feature hours in the Gauge fixture, the change order cites the exclusion and hours.
+2. Under the held policy, the delivery lead confirms scope and the named approver decides the offer; the client accepts and pays it.
+3. The original agreement and history stay byte-identical.
 
 **Evidence.** None.
 **Gap.** No delivery signals or change orders.
 
 #### AGENT-007 — Win and loss learning for templates and pricing
 
-Core · push-further · **missing**
+Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** After proposals are decided, the agent finds which sections, packages, prices, discounts and timings go with wins and losses, with sample sizes, and proposes edits to templates, the library or catalog prices as suggestions. An admin accepts or rejects each; nothing in the library changes silently.
+**Requirement.** From decided proposals, the specialist relates sections, packages, prices, discounts and timing to wins/losses with sample sizes. Applying template/library/catalog edits carries standard; company policy decides.
 
 **Acceptance.**
-1. From a fixture of 200 decided proposals where a three-package layout wins more often, the agent proposes the template change with the sample size, and the template is unchanged until an admin accepts it.
+1. From 200 decided proposals where three packages win more often, show the proposed template change and its sample size.
+2. Under the held policy the template stays unchanged until the admin accepts it.
 
 **Evidence.** None.
 **Gap.** No outcome analysis.
 
 #### AGENT-008 — Renewal preparation from delivered results
 
-Core · push-further · **missing**
+Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
 
-**Requirement.** Ahead of a renewal (`RENEW-002`), the agent assembles what was delivered (from Gauge or the delivery tool), usage and outcomes, suggests a scope and price for the renewal with the reasoning, and drafts the renewal proposal for approval.
+**Requirement.** Before renewal, the specialist assembles Gauge or delivery-tool actuals, usage and outcomes, then drafts a reasoned renewal scope and price. Drafting carries standard and the binding renewal carries commitment; company policy decides.
 
 **Acceptance.**
-1. For a retainer that used 20% more hours than sold, the agent drafts a renewal with a larger package, cites the hours, and waits for approval.
+1. A retainer using 20% more hours yields a sourced larger renewal package.
+2. Under the held company policy the renewal waits for its named approver.
 
 **Evidence.** None.
 **Gap.** No renewal agent.
 
 #### AGENT-009 — Agent authority ledger and limits
 
-Core · push-further · **partial**
+Core · push-further · **partial** · Cites BASE-AGENT-009, BASE-AGENT-011
 
-**Requirement.** Every agent action is logged with the data it read, what it produced, the model used and who approved it. Agents can draft, analyze and request, and can never approve prices, send, sign, refund or write off. The owner sets a monthly model budget and can pause any agent at once.
+**Requirement.** The proposal ledger adds source records, outputs and model identity to the Base agent audit. Provider spend and its monthly cap are company policy, with Pause inherited from Base.
 
 **Acceptance.**
-1. Run each agent once; the ledger lists inputs, outputs and approvals for each; an agent's attempt to send or refund is refused; pausing an agent stops its next run; exceeding the budget stops runs with a notice.
+1. Run each proposal agent: its ledger shows inputs, outputs, model and any policy-required approval.
+2. Under the held company policy, sending and refund calls follow external/commitment and money decisions; Pause stops the next run.
+3. Exceed the company’s chosen model budget: the run stops with a visible notice.
 
 **Evidence.** `src/platter/http.ts`, `src/platter/credentials.ts`, `tests/platter.test.mjs`
-**Gap.** Agent keys are limited to drafting and are revocable; there is no per-action ledger, source citations, budget or pause control.
+**Gap.** Legacy preparation exists only in part. Complete sourced proposal work and seed-wide risk classification/company-policy execution are not proved; the old implementation boundary is recorded in CHANGELOG.
 
 ## Agent surface
 
-None.
+### Agent surface
+
+#### SURFACE-001 — Proposal registry and role parity
+
+Agent surface · target · **missing** · From new · Cites BASE-AGENT-002, BASE-AGENT-003, BASE-AGENT-013
+
+**Requirement.** The proposal registry covers exactly the Core jobs and non-tool reasons in this area.
+
+**Acceptance.**
+1. Every tool’s Core-clause mapping equals this table, including underlying phone jobs.
+2. Each tool returns the native action’s proposal state, error and event type.
+3. The registry documents every listed record URI, event and specialist prompt.
+
+**Evidence.** None.
+**Gap.** The seed-specific MCP registry, computed-class proof and Base policy-matrix conformance are not implemented.
+
+#### SURFACE-002 — Proposal classes from business facts
+
+Agent surface · target · **missing** · From new · Cites BASE-AGENT-006, BASE-AGENT-007
+
+**Requirement.** Proposal classifiers use the saved revision, recipient, provider and affected records to apply the class computations above.
+
+**Acceptance.**
+1. Drafts, text, internal pricing and follow-up edits compute standard with item counts.
+2. Outside mail, SMS, public links, exposed attachments, CRM/accounting sync and handoffs compute external with recipient count and known/new/public counterparty.
+3. Collection, refunds and write-offs compute money with exact amount, currency and payee.
+4. Binding offers, scope sign-offs, approval and signatures compute commitment with value and counterparty.
+5. New provider accounts compute accounts; the same provider’s hosted personal consent/card/identity step computes gated with provider and step.
+6. Role, team, grant and audience changes compute access with people and direction; credential and protective-setting changes compute security.
+7. Irreversible erasure/restore replacement computes destructive with item count; W-9/identity/bank/card records add sensitive with record count and kind.
+8. Running automation/connector changes compute live with service identity; an argument or record-text claim cannot change any computed class.
+
+**Evidence.** None.
+**Gap.** The seed-specific MCP registry, computed-class proof and Base policy-matrix conformance are not implemented.
+
+#### SURFACE-003 — Exact proposal decisions and custody
+
+Agent surface · target · **missing** · From new · Cites BASE-AGENT-007, BASE-AGENT-008, BASE-AGENT-012
+
+**Requirement.** The company-policy journey uses Platter’s exact revision and immutable-agreement semantics.
+
+**Acceptance.**
+1. A changed draft invalidates the saved pending proposal decision; the same revision executes once after the company-policy decision permits it.
+2. Under the held policy, the named person’s proposal approval is shown separately from the agent’s preparation.
+3. Under all-autonomous policy a permitted agent offer/signature decision carries its own commitment attribution.
+4. A restored proposal or schedule gains no earlier recipient, provider or execution authority.
+
+**Evidence.** None.
+**Gap.** The seed-specific MCP registry, computed-class proof and Base policy-matrix conformance are not implemented.
+
+#### SURFACE-004 — A seeded service-firm week through MCP
+
+Agent surface · target · **missing** · From new · Cites BASE-AGENT-005, BASE-AGENT-007, BASE-AGENT-008, BASE-AGENT-009, BASE-AGENT-013
+
+**Requirement.** A stranger specialist given only the installation URL runs the proposal coordinator’s week through MCP under two complete company policies.
+
+**Acceptance.**
+1. Under all-autonomous policy, draft from a discovery call, prepare sourced packages, send the binding proposal, resolve a client question, record the client’s signing/payment outcome, hand accepted scope to Gauge and reconcile the invoice; no call waits for a person or is refused by policy.
+2. Run the same week under the held policy: standard calls enter review and each other declared class waits for the named approver, then completes once granted.
+3. Counts, amounts, saved revisions, messages, signed agreement and accounting records equal the week’s hand-computed fixture.
+4. Before the company policy is complete, the first call changes no proposal and returns the setup question; an all-class answer covers every declared class.
+5. Every run preserves truthful preparer/decider attribution and the same role scope as the sponsoring person.
+
+**Evidence.** None.
+**Gap.** The seed-specific MCP registry, computed-class proof and Base policy-matrix conformance are not implemented.
 
 ## Later
 
@@ -2078,4 +2337,15 @@ None.
 
 ## Field proof register
 
-No field proof is recorded yet.
+| ID | Proof | Clauses | State | Date | Receipt |
+| --- | --- | --- | --- | --- | --- |
+| R-1 | Real Google Workspace and Microsoft 365 mailbox qualification | SEND-001 | not run | | |
+| R-2 | Real CRM, accounting, file-store and chat tenant qualification | CRM-001, CRM-002, ACCT-001, ACCT-002, AUTO-002, AUTO-003 | not run | | |
+| R-3 | Carrier acceptance, A2P 10DLC or toll-free verification and SMS legal review | SEND-008, SIGN-006 | not run | | |
+| R-4 | Human screen-reader review | EDIT-007, MOB-001, MOB-002 | not run | | |
+| R-5 | Accessibility VPAT | EDIT-007, MOB-001, MOB-002 | not run | | |
+| R-6 | iOS and Android store approvals | MOB-002 | not run | | |
+| R-7 | Hosted SOC 2 Type II report for the current period | TEAM-005 | not run | | |
+| R-8 | Real Okta, Entra and Google Workspace tenant qualification | TEAM-002 | not run | | |
+| R-9 | Claude, ChatGPT, Codex and Copilot client interoperability receipts | AI-003 | not run | | |
+| R-10 | Real custom-domain and sending-domain DNS acceptance | EDIT-008 | not run | | |

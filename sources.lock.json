@@ -2654,7 +2654,7 @@
       "executable": false
     },
     "src/platter/archive-policy.mjs": {
-      "sha256": "3f4c7d9bb39d6e95f8c1e083d731fe66ad1b3421596d4b5ac315f393b18ce6e8",
+      "sha256": "91f3eb267f95dd8ebaea1f1321e5cf9384299f2f80e96c5e0df3cf721260a3db",
       "executable": false
     },
     "src/platter/attachment-commands.ts": {

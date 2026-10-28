@@ -1,3 +1,4 @@
+import { clientLocale } from './locales'
 import { copyCosts } from './internal-pricing'
 import { documentOf, fieldSlot } from './documents/blocks'
 import type { Bindings } from '../auth.server'
@@ -106,7 +107,7 @@ export async function recipientInvitations(env:Bindings,a:Actor,input:Record<str
  ]
  for(const r of links){
   const url=env.AUTH_ORIGIN+'/p/'+r.token
-  writes.push(env.DB.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient,slot_id,signing_position) VALUES(?,?,?,?,?,?)').bind(row.id,row.revision,r.token,r.email,r.id,r.group),...invitationMail(env,a,input,row,r.email!,url,at))
+  writes.push(env.DB.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient,slot_id,signing_position) VALUES(?,?,?,?,?,?)').bind(row.id,row.revision,r.token,r.email,r.id,r.group),...invitationMail(env,a,input,{...row,client_locale:(await env.DB.prepare('SELECT locale FROM p_recipient_locales WHERE proposal_id=? AND slot_id=?').bind(row.id,r.id).first<{locale:string}>())?.locale??row.client_locale},r.email!,url,at))
  }
  return {writes,links:links.map(({token,...r})=>({...r,shareUrl:env.AUTH_ORIGIN+'/p/'+token}))}
 }

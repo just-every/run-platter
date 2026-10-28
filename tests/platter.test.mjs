@@ -26,7 +26,7 @@ test('EDIT-017 Spanish mailbox journey preserves authority, verification limits,
  const member=await h.signIn(memberEmail)
  await h.cmd('proposal.locale',{id:p.id,version:1,locale:'es'},member,403)
  await h.cmd('proposal.locale',{id:p.id,version:0,locale:'es'},h.owner,409)
- await h.cmd('proposal.locale',{id:p.id,version:1,locale:'fr'},h.owner,400)
+ await h.cmd('proposal.locale',{id:p.id,version:1,locale:'it'},h.owner,400)
  assert.deepEqual((await h.state()).proposals.find(row=>row.id===p.id),before)
  await h.cmd('proposal.locale',{id:p.id,version:1,locale:'es'})
  await h.cmd('proposal.approve',{id:p.id,version:2,revision:1})
@@ -93,6 +93,57 @@ test('EDIT-017 Spanish mailbox journey preserves authority, verification limits,
  const freshVerification=await h.send(fresh+'/action?name=code.verify',{code:freshCode});assert.equal(freshVerification.status,200)
  r=await h.send(fresh+'/action?name=decline',{revision:1,reason:'No se necesita',consent:true},freshVerification.cookie);assert.equal(r.status,410);assert.match(r.text,/Propuesta retirada/);assert.ok(!r.text.includes(offer.scope))
  r=await h.send(fresh,undefined,freshVerification.cookie);assert.equal(r.status,410);assert.match(r.text,/<html lang="es">/);assert.ok(!r.text.includes(offer.scope))
+
+ for(const [locale,expected,heading] of [
+  ['en','Your Platter verification code','Verify your email'],
+  ['fr','Votre code de vérification Platter','Vérifiez votre adresse e-mail'],
+  ['de','Ihr Platter-Bestätigungscode','Bestätigen Sie Ihre E-Mail-Adresse'],
+  ['pt','Seu código de verificação do Platter','Verifique seu e-mail'],
+  ['auto','Ihr Platter-Bestätigungscode','Bestätigen Sie Ihre E-Mail-Adresse'],
+ ]){
+  const created=await h.cmd('proposal.prepare',{...offer,clientId:client.id})
+  await h.cmd('proposal.locale',{id:created.id,version:1,locale})
+  await h.cmd('proposal.approve',{id:created.id,version:2,revision:1})
+  const sent=await h.cmd('proposal.send',{id:created.id,version:3}),url=new URL(sent.shareUrl).pathname
+  const language=locale==='auto'?'de':locale
+  const page=await h.send(url,undefined,'',{'accept-language':'it-IT, de-CH;q=0.9, fr;q=0.8'})
+  assert.match(page.text,new RegExp('<html lang="'+language+'">'));assert.ok(page.text.includes(heading));assert.ok(page.text.includes(offer.scope))
+  assert.equal((await h.send(url+'/action?name=code.request',{},'',{'accept-language':'pt'})).status,200)
+  const mail=await h.db.prepare('SELECT subject,body FROM p_mail WHERE proposal_id=? AND subject=?').bind(created.id,expected).first()
+  assert.ok(mail,'code transport uses the same language as the page, even when a later header differs')
+  const code=mail.body.match(/\b\d{6}\b/)[0]
+  const verification=await h.send(url+'/action?name=code.verify',{code});assert.equal(verification.status,200,verification.text)
+  assert.equal((await h.send(url+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true})).status,401)
+  assert.equal((await h.send(url+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},verification.cookie)).status,200)
+  const result=await h.send(url+'/certificate.json',undefined,verification.cookie);assert.equal(result.status,200,result.text)
+  assert.equal(result.value.language,language);assert.equal(result.value.signers[0].language,language)
+  assert.equal((await h.db.prepare('SELECT body FROM p_mail WHERE proposal_id=? AND subject=?').bind(created.id,expected).first()).body,'Verification code consumed')
+ }
+ const multi=await h.cmd('proposal.prepare',{...offer,clientId:client.id})
+ const people=[{id:'first',name:'First signer',email:'synthetic-platter-9781'+String.fromCharCode(64)+'example.test',role:'signer',group:1},{id:'second',name:'Second signer',email:'synthetic-platter-9782'+String.fromCharCode(64)+'example.test',role:'signer',group:2}]
+ await h.cmd('recipient.save',{id:multi.id,version:1,recipients:people})
+ await h.cmd('proposal.locale',{id:multi.id,version:2,recipientId:'first',locale:'es'})
+ await h.cmd('proposal.locale',{id:multi.id,version:3,recipientId:'second',locale:'fr'})
+ await h.cmd('proposal.approve',{id:multi.id,version:4,revision:2})
+ const invited=await h.cmd('proposal.send',{id:multi.id,version:5}),paths=Object.fromEntries(invited.recipients.map(r=>[r.id,new URL(r.shareUrl).pathname])),cookies={}
+ for(const [id,language,subject] of [['first','es','Su código de verificación de Platter'],['second','fr','Votre code de vérification Platter']]){
+  const unverified=await h.send(paths[id]);assert.match(unverified.text,new RegExp('<html lang="'+language+'">'));assert.ok(!unverified.text.includes(offer.scope))
+  assert.equal((await h.send(paths[id]+'/action?name=code.request',{})).status,200)
+  const message=await h.db.prepare('SELECT body FROM p_mail WHERE proposal_id=? AND recipient=? AND subject=?').bind(multi.id,people.find(p=>p.id===id).email,subject).first()
+  const verification=await h.send(paths[id]+'/action?name=code.verify',{code:message.body.match(/\b\d{6}\b/)[0]});assert.equal(verification.status,200,verification.text);cookies[id]=verification.cookie
+ }
+ const decide=(id,cookie=cookies[id])=>h.send(paths[id]+'/action?name=accept',{name:'Synthetic '+id,optionId:'one',consent:true},cookie)
+ assert.equal((await decide('second')).status,409)
+ assert.equal((await decide('first',cookies.second)).status,401)
+ assert.equal((await h.db.prepare('SELECT count(*) n FROM p_recipient_signatures WHERE proposal_id=?').bind(multi.id).first()).n,0)
+ assert.equal((await decide('first')).status,200)
+ const waiting=await h.send(paths.second,undefined,cookies.second);assert.ok(waiting.text.includes('Votre rôle de destinataire'));assert.ok(!waiting.text.includes('Your recipient role'))
+ assert.equal((await decide('second')).status,200)
+ const complete=await h.send(paths.first+'/certificate.json',undefined,cookies.first);assert.equal(complete.status,200,complete.text)
+ assert.deepEqual(complete.value.signers.map(r=>r.language),['es','fr'])
+ const previousSignatures=(await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(multi.id).all()).results
+ assert.equal((await decide('second')).status,200)
+ assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(multi.id).all()).results,previousSignatures)
  }finally{await h.close()}
 })
 test('native auth, CSRF, roles and revocable agent boundary',()=>run(async h=>{

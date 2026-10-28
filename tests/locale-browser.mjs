@@ -25,10 +25,10 @@ async function englishClientCopy() {
  return [...words]
 }
 
-export async function localeBrowser(width=1440) {
+export async function localeBrowser(width=1440, appOptions={}) {
  let app,browser,context
  try {
-  app=await installedApp()
+  app=await installedApp(appOptions)
   browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   context=await browser.newContext({viewport:{width,height:900},locale:'fr-FR'})
   const page=await context.newPage(),request=context.request,headers={origin:app.origin}
@@ -124,6 +124,40 @@ export async function localeBrowser(width=1440) {
    const completed=await request.get(new URL(invitation.shareUrl).origin+new URL(invitation.shareUrl).pathname+'/certificate.json')
    assert.equal(completed.status(),200)
    const receipt=await completed.json();assert.equal(receipt.language,'es');assert.equal(receipt.signers[0].consent,actualConsent)
+  }
+
+  for(const [locale,language,heading,requestLabel,codeLabel,verifyLabel,nameLabel,acceptLabel,acceptedHeading,subject] of [
+   ['fr','fr','Vérifiez votre adresse e-mail','Envoyer le code de vérification','Code de vérification par e-mail','Vérifier l’adresse e-mail','Votre nom complet','Accepter la proposition','Proposition acceptée','Votre code de vérification Platter'],
+   ['de','de','Bestätigen Sie Ihre E-Mail-Adresse','Bestätigungscode senden','E-Mail-Bestätigungscode','E-Mail-Adresse bestätigen','Ihr vollständiger Name','Angebot annehmen','Angebot angenommen','Ihr Platter-Bestätigungscode'],
+   ['pt','pt','Verifique seu e-mail','Enviar código de verificação','Código de verificação por e-mail','Verificar e-mail','Seu nome completo','Aceitar proposta','Proposta aceita','Seu código de verificação do Platter'],
+   ['auto','fr','Vérifiez votre adresse e-mail','Envoyer le code de vérification','Code de vérification par e-mail','Vérifier l’adresse e-mail','Votre nom complet','Accepter la proposition','Proposition acceptée','Votre code de vérification Platter'],
+  ]){
+   const next=await cmd('proposal.prepare',{...authored,clientId:client.id,priceOne:'2400',priceTwo:'4200',depositPercent:'25'})
+   await cmd('proposal.locale',{id:next.id,version:1,locale})
+   await cmd('proposal.approve',{id:next.id,version:2,revision:1})
+   const invitation=await cmd('proposal.send',{id:next.id,version:3}),url=new URL(invitation.shareUrl)
+   const untranslated=async()=>{
+    assert.equal(await page.locator('html').getAttribute('lang'),language)
+    let text=await page.locator('body').innerText()
+    for(const value of Object.values(authored))text=text.replaceAll(value,'')
+    for(const key of catalog)assert.ok(!text.includes(key),'untranslated '+language+' system text: '+key)
+    assert.ok((await page.locator('main').innerText()).includes(authored.scope))
+   }
+   await page.goto(invitation.shareUrl);assert.equal(await page.getByRole('heading',{name:heading,exact:true}).count(),1)
+   await untranslated();await capture(locale+'-invitation')
+   await page.getByRole('button',{name:requestLabel,exact:true}).click()
+   const messages=(await (await request.get(app.origin+'/api/platter/state')).json()).outbox
+   const code=messages.find(m=>m.proposal_id===next.id&&m.subject===subject).body.match(/\b\d{6}\b/)[0]
+   await page.getByLabel(codeLabel,{exact:true}).fill(code);await page.getByRole('button',{name:verifyLabel,exact:true}).click()
+   await untranslated();await capture(locale+'-consent')
+   await page.getByRole('radio',{name:/Full campaign/}).check();await page.getByLabel(nameLabel,{exact:true}).fill('Synthetic signer')
+   const checkbox=page.locator('input[name="consent"]');await checkbox.check()
+   const shownConsent=(await checkbox.locator('..').innerText()).trim()
+   await page.getByRole('button',{name:acceptLabel,exact:true}).click()
+   assert.equal(await page.getByRole('heading',{name:acceptedHeading,exact:true}).count(),1)
+   await untranslated();await capture(locale+'-accepted')
+   const certificate=await request.get(url.origin+url.pathname+'/certificate.json');assert.equal(certificate.status(),200)
+   const facts=await certificate.json();assert.equal(facts.language,language);assert.equal(facts.signers[0].language,language);assert.equal(facts.signers[0].consent,shownConsent)
   }
  } finally {await context?.close();await browser?.close();await app?.close()}
 }

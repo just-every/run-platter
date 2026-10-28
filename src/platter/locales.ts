@@ -1,8 +1,32 @@
+import french from './locale-fr'
+import german from './locale-de'
+import portuguese from './locale-pt'
 import { commit, exact, need, type Actor } from './model'
 import { permitted } from './permissions'
 
-export type ClientLocale = 'en' | 'es'
-export const clientLocale = (row: any): ClientLocale => row.client_locale === 'es' ? 'es' : 'en'
+export const clientLocales = ['en','es','fr','de','pt'] as const
+export type ClientLocale = typeof clientLocales[number]
+export type LocaleChoice = ClientLocale | 'auto'
+export const localeNames: Record<ClientLocale,string> = {en:'English',es:'Spanish',fr:'French',de:'German',pt:'Portuguese'}
+export const clientLocale = (row: any): ClientLocale => clientLocales.includes(row.client_locale) ? row.client_locale : 'en'
+export function browserLocale(header: string | null): ClientLocale {
+ const preferences=(header??'').split(',').map((part,index)=>{
+  const [tag,...parameters]=part.trim().toLowerCase().split(';')
+  const quality=parameters.find(p=>p.trim().startsWith('q='))?.trim().slice(2)
+  return {locale:tag.split('-')[0],quality:quality===undefined?1:Number(quality),index}
+ }).filter(p=>Number.isFinite(p.quality)&&p.quality>0&&p.quality<=1).sort((a,b)=>b.quality-a.quality||a.index-b.index)
+ return preferences.find(p=>clientLocales.includes(p.locale as ClientLocale))?.locale as ClientLocale ?? 'en'
+}
+// Resolve once per invitation. Later requests cannot change the language retained
+// with an acceptance merely by submitting a different request header.
+export async function invitationLocale(db:D1Database,row:any,share:any,request:Request):Promise<ClientLocale> {
+ const override=share.slot_id?await db.prepare('SELECT locale FROM p_recipient_locales WHERE proposal_id=? AND slot_id=?').bind(row.id,share.slot_id).first<{locale:string}>():null
+ const choice=override?.locale??row.client_locale??'en'
+ if(choice!=='auto')return clientLocale({client_locale:choice})
+ const picked=browserLocale(request.headers.get('accept-language'))
+ await db.prepare('INSERT INTO p_invitation_languages(token,locale) VALUES(?,?) ON CONFLICT DO NOTHING').bind(share.token,picked).run()
+ return (await db.prepare('SELECT locale FROM p_invitation_languages WHERE token=?').bind(share.token).first<{locale:ClientLocale}>())!.locale
+}
 let rendering: ClientLocale = 'en'
 export const renderingLocale = () => rendering
 export function inClientLocale<T>(locale: ClientLocale, render: () => T): T {
@@ -265,32 +289,192 @@ export const spanish: Record<string, string> = {
  'An accepted agreement cannot be declined': 'No se puede rechazar un acuerdo ya aceptado',
  'The change could not be completed. Reload and try again.': 'No se pudo completar el cambio. Vuelva a cargar e inténtelo de nuevo.',
 }
-const exactOnly = new Set(['email',' role','state','county','city','district','service','billing','week','month','quarter','year','Deposit','Acceptance','Monthly retainer','One-off balance','Yes','No'])
+export const catalogs: Record<Exclude<ClientLocale,'en'>,Record<string,string>> = {es:spanish,fr:french,de:german,pt:portuguese}
+const extras:Record<string,string[]> = {
+ "Viewing as ": [
+  "Vista como ",
+  "Vous consultez en tant que ",
+  "Ansicht als ",
+  "Visualizando como "
+ ],
+ "This invitation is for viewing only. It grants no signing or payment authority.": [
+  "Esta invitación es solo para consulta. No otorga permiso para firmar ni pagar.",
+  "Cette invitation permet uniquement la consultation. Elle n’accorde aucun droit de signature ni de paiement.",
+  "Diese Einladung dient nur zur Ansicht. Sie gewährt keine Unterschrifts- oder Zahlungsbefugnis.",
+  "Este convite permite apenas a visualização. Não concede autorização para assinar nem pagar."
+ ],
+ "Your decision is retained. Waiting for the remaining recipients.": [
+  "Su decisión está guardada. Se espera a los demás destinatarios.",
+  "Votre décision est conservée. En attente des autres destinataires.",
+  "Ihre Entscheidung ist gespeichert. Die übrigen Empfänger stehen noch aus.",
+  "Sua decisão foi guardada. Aguardando os demais destinatários."
+ ],
+ "Waiting for the preceding signing group. You can review this proposal now.": [
+  "Se espera al grupo de firma anterior. Ya puede revisar esta propuesta.",
+  "En attente du groupe de signature précédent. Vous pouvez consulter cette proposition.",
+  "Die vorherige Unterzeichnungsgruppe steht noch aus. Sie können dieses Angebot bereits prüfen.",
+  "Aguardando o grupo de assinatura anterior. Você já pode revisar esta proposta."
+ ],
+ "I approve this exact proposal revision and selected package.": [
+  "Apruebo esta revisión exacta de la propuesta y el paquete seleccionado.",
+  "J’approuve cette version exacte de la proposition et le forfait sélectionné.",
+  "Ich genehmige diese genaue Angebotsfassung und das ausgewählte Paket.",
+  "Aprovo esta versão exata da proposta e o pacote selecionado."
+ ],
+ "Approve client revision": [
+  "Aprobar revisión del cliente",
+  "Approuver la version client",
+  "Kundenfassung genehmigen",
+  "Aprovar versão do cliente"
+ ],
+ "Your recipient role": [
+  "Su rol de destinatario",
+  "Votre rôle de destinataire",
+  "Ihre Empfängerrolle",
+  "Sua função de destinatário"
+ ],
+ "Mailbox verified. Review your recipient role below.": [
+  "Correo electrónico verificado. Revise su rol a continuación.",
+  "Adresse e-mail vérifiée. Consultez votre rôle ci-dessous.",
+  "E-Mail-Adresse bestätigt. Prüfen Sie unten Ihre Empfängerrolle.",
+  "E-mail verificado. Revise sua função abaixo."
+ ],
+ "Verify your own mailbox before signing": [
+  "Verifique su propio correo electrónico antes de firmar",
+  "Vérifiez votre propre adresse e-mail avant de signer",
+  "Bestätigen Sie vor der Unterschrift Ihre eigene E-Mail-Adresse",
+  "Verifique seu próprio e-mail antes de assinar"
+ ],
+ "Wait for the preceding signing group to finish": [
+  "Espere a que termine el grupo de firma anterior",
+  "Attendez la fin du groupe de signature précédent",
+  "Warten Sie, bis die vorherige Unterzeichnungsgruppe fertig ist",
+  "Aguarde o término do grupo de assinatura anterior"
+ ],
+ "Confirm your decision": [
+  "Confirme su decisión",
+  "Confirmez votre décision",
+  "Bestätigen Sie Ihre Entscheidung",
+  "Confirme sua decisão"
+ ],
+ "Your decision is already retained.": [
+  "Su decisión ya está guardada.",
+  "Votre décision est déjà conservée.",
+  "Ihre Entscheidung ist bereits gespeichert.",
+  "Sua decisão já foi guardada."
+ ],
+ "This agreement is already complete": [
+  "Este acuerdo ya está completo",
+  "Cet accord est déjà terminé",
+  "Dieser Vertrag ist bereits abgeschlossen",
+  "Este acordo já está concluído"
+ ],
+ "All recipients must sign the same package and quantities": [
+  "Todos los destinatarios deben firmar el mismo paquete y las mismas cantidades",
+  "Tous les destinataires doivent signer le même forfait et les mêmes quantités",
+  "Alle Empfänger müssen dasselbe Paket und dieselben Mengen unterzeichnen",
+  "Todos os destinatários devem assinar o mesmo pacote e as mesmas quantidades"
+ ],
+ "Proposal accepted. Every required signature is retained.": [
+  "Propuesta aceptada. Se han guardado todas las firmas requeridas.",
+  "Proposition acceptée. Toutes les signatures requises sont conservées.",
+  "Angebot angenommen. Alle erforderlichen Unterschriften sind gespeichert.",
+  "Proposta aceita. Todas as assinaturas obrigatórias foram guardadas."
+ ],
+ "Your approval is retained. Waiting for the remaining recipients.": [
+  "Su aprobación está guardada. Se espera a los demás destinatarios.",
+  "Votre approbation est conservée. En attente des autres destinataires.",
+  "Ihre Genehmigung ist gespeichert. Die übrigen Empfänger stehen noch aus.",
+  "Sua aprovação foi guardada. Aguardando os demais destinatários."
+ ],
+ "Your signature is retained. Waiting for the remaining recipients.": [
+  "Su firma está guardada. Se espera a los demás destinatarios.",
+  "Votre signature est conservée. En attente des autres destinataires.",
+  "Ihre Unterschrift ist gespeichert. Die übrigen Empfänger stehen noch aus.",
+  "Sua assinatura foi guardada. Aguardando os demais destinatários."
+ ],
+ "Open proposal in a new tab": [
+  "Abrir propuesta en otra pestaña",
+  "Ouvrir la proposition dans un nouvel onglet",
+  "Angebot in einem neuen Tab öffnen",
+  "Abrir proposta em outra aba"
+ ],
+ " if your browser blocks embedded verification.": [
+  " si su navegador bloquea la verificación integrada.",
+  " si votre navigateur bloque la vérification intégrée.",
+  ", wenn Ihr Browser die eingebettete Bestätigung blockiert.",
+  " se seu navegador bloquear a verificação incorporada."
+ ],
+ "Your request to reopen this proposal has been saved for the firm.": [
+  "Se ha guardado su solicitud de reapertura para la empresa.",
+  "Votre demande de réouverture a été enregistrée pour l’entreprise.",
+  "Ihre Bitte um Wiederöffnung wurde für das Unternehmen gespeichert.",
+  "Seu pedido de reabertura foi salvo para a empresa."
+ ],
+ "signer": [
+  "firmante",
+  "signataire",
+  "Unterzeichner",
+  "signatário"
+ ],
+ "countersigner": [
+  "contrafirmante",
+  "contresignataire",
+  "Gegenzeichner",
+  "contrassignatário"
+ ],
+ "approver": [
+  "aprobador",
+  "approbateur",
+  "Genehmiger",
+  "aprovador"
+ ],
+ "viewer": [
+  "lector",
+  "lecteur",
+  "Betrachter",
+  "visualizador"
+ ],
+ "cc": [
+  "copia",
+  "copie",
+  "Kopie",
+  "cópia"
+ ]
+}
+for(const [key,values] of Object.entries(extras))for(const [i,locale] of (['es','fr','de','pt'] as const).entries())catalogs[locale][key]=values[i]
+const exactOnly = new Set(['email',' role','state','county','city','district','service','billing','week','month','quarter','year','Deposit','Acceptance','Monthly retainer','One-off balance','Yes','No','signer','countersigner','approver','viewer','cc'])
 const keys = Object.keys(spanish).filter(key => !exactOnly.has(key)).sort((a,b) => b.length-a.length)
 const matcher = new RegExp(keys.map(key => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g')
 export function clientText(text: string, locale: ClientLocale): string {
- if(locale !== 'es')return text
- if(spanish[text])return spanish[text]
+ if(locale === 'en')return text
+ const catalog=catalogs[locale]
+ if(catalog[text])return catalog[text]
  // These errors contain a firm-authored field title. Preserve the captured title.
- for(const [prefix,translated] of [
-  ['Complete required field: ','Complete el campo obligatorio: '],
-  ['Enter text for ','Introduzca texto para '],
-  ['Use up to 1000 characters for ','Utilice hasta 1000 caracteres para '],
-  ['Enter a valid calendar date for ','Introduzca una fecha válida para '],
- ] as const)if(text.startsWith(prefix))return translated+text.slice(prefix.length)
+ const prefixes:Record<string,string[]>={
+  'Complete required field: ':['Complete el campo obligatorio: ','Remplissez le champ obligatoire : ','Füllen Sie das Pflichtfeld aus: ','Preencha o campo obrigatório: '],
+  'Enter text for ':['Introduzca texto para ','Saisissez le texte pour ','Geben Sie Text ein für ','Digite o texto para '],
+  'Use up to 1000 characters for ':['Utilice hasta 1000 caracteres para ','Utilisez au plus 1 000 caractères pour ','Verwenden Sie bis zu 1000 Zeichen für ','Use até 1.000 caracteres para '],
+  'Enter a valid calendar date for ':['Introduzca una fecha válida para ','Saisissez une date valide pour ','Geben Sie ein gültiges Datum ein für ','Digite uma data válida para '],
+ }
+ const index=['es','fr','de','pt'].indexOf(locale)
+ for(const [prefix,translations] of Object.entries(prefixes))if(text.startsWith(prefix))return translations[index]+text.slice(prefix.length)
  const adopted=text.match(/^Adopt the same full name in (.*) as your acceptance name$/)
- if(adopted)return 'Adopte el mismo nombre completo en '+adopted[1]+' que como nombre de aceptación'
+ if(adopted){const around=[['Adopte el mismo nombre completo en ',' que como nombre de aceptación'],['Utilisez le même nom complet dans ',' que pour votre acceptation'],['Übernehmen Sie denselben vollständigen Namen in ',' wie bei Ihrer Annahme'],['Adote o mesmo nome completo em ',' usado na aceitação']][index];return around[0]+adopted[1]+around[1]}
  return text
 }
 export function clientEnum(value:string):string {
- if(rendering !== 'es')return value
- return ({scope:'Alcance',pricing:'Precios',terms:'Condiciones',open:'Abierta',closed:'Cerrada',answered:'Respondida',accepted:'Aceptada',rejected:'Rechazada',weekly:'semanal',monthly:'mensual',quarterly:'trimestral',annual:'anual'} as Record<string,string>)[value]??value
+ const names:Record<string,string>={scope:'Scope',pricing:'Pricing',terms:'Terms',weekly:'week',monthly:'month',quarterly:'quarter',annual:'year'}
+ const states:Record<string,Record<string,string>>={es:{open:'Abierta',closed:'Cerrada',answered:'Respondida',accepted:'Aceptada',rejected:'Rechazada'},fr:{open:'Ouverte',closed:'Fermée',answered:'Répondue',accepted:'Acceptée',rejected:'Refusée'},de:{open:'Offen',closed:'Geschlossen',answered:'Beantwortet',accepted:'Angenommen',rejected:'Abgelehnt'},pt:{open:'Aberta',closed:'Fechada',answered:'Respondida',accepted:'Aceita',rejected:'Recusada'}}
+ if(rendering==='en')return value
+ return states[rendering]?.[value]??clientText(names[value]??value,rendering)
 }
 export function ui(text: string | TemplateStringsArray, ...values: unknown[]): string {
  const translate = (part: string) => {
-  if(rendering !== 'es')return part
-  if(spanish[part])return spanish[part]
-  const words = (value:string) => value.replace(matcher, match => spanish[match])
+  if(rendering === 'en')return part
+  const catalog=catalogs[rendering]
+  if(catalog[part])return catalog[part]
+  const words = (value:string) => value.replace(matcher, match => catalog[match])
   // Translate text and accessible labels, keeping element names and structural
   // attributes intact. Interpolations are opaque until translation is complete.
   return part.split(/(<[^>]*(?:>|$))/g).map(piece => piece.startsWith('<')
@@ -306,11 +490,13 @@ export async function saveClientLocale(db: D1Database, actor: Actor, input: Reco
  const row = await permitted(db, actor, input.id, 'edit')
  exact(row, input)
  need(['draft','approved'].includes(row.status), 'Choose the client language before sending', 409)
- need(input.locale === 'en' || input.locale === 'es', 'Choose English or Spanish')
- if(input.locale === 'es') {
-  need(!row.recipient_plan || row.recipient_plan === '[]', 'Spanish currently requires a single client mailbox', 409)
-  need(!await db.prepare('SELECT 1 FROM p_collection_policy WHERE proposal_id=?').bind(row.id).first(), 'Turn off collection before choosing Spanish', 409)
+ need(clientLocales.includes(input.locale as ClientLocale)||input.locale==='auto', 'Choose a supported client language')
+ if(input.locale !== 'en') {
+  need(!await db.prepare('SELECT 1 FROM p_collection_policy WHERE proposal_id=?').bind(row.id).first(), 'Turn off collection before choosing a translated client language', 409)
  }
- await commit(db, actor, [db.prepare('INSERT INTO p_client_locales(proposal_id,locale) VALUES(?,?) ON CONFLICT(proposal_id) DO UPDATE SET locale=excluded.locale').bind(row.id,input.locale),db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id)], false, {sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))", values:[row.id,row.version]})
+ const slot=input.recipientId?String(input.recipientId):null
+ if(slot)need((typeof row.recipient_plan==='string'?JSON.parse(row.recipient_plan):row.recipient_plan??[]).some((r:any)=>r.id===slot),'Choose a current recipient',404)
+ const localeWrite=slot?db.prepare('INSERT INTO p_recipient_locales(proposal_id,slot_id,locale) VALUES(?,?,?) ON CONFLICT(proposal_id,slot_id) DO UPDATE SET locale=excluded.locale').bind(row.id,slot,input.locale):db.prepare('INSERT INTO p_client_locales(proposal_id,locale) VALUES(?,?) ON CONFLICT(proposal_id) DO UPDATE SET locale=excluded.locale').bind(row.id,input.locale)
+ await commit(db, actor, [localeWrite,db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id)], false, {sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))", values:[row.id,row.version]})
  return {id:row.id}
 }

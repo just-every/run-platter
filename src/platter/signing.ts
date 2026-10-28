@@ -1,5 +1,5 @@
 import { archiveCompletion } from './archiving/jobs'
-import { clientLocale, clientText, type ClientLocale } from './locales'
+import { clientLocale, clientText, invitationLocale, clientLocales, type ClientLocale } from './locales'
 import { paymentTerms } from './payment-terms'
 import { recipientContent, recipientPlan, recipientProgress, recipientSignatures, requiredRecipient, completionMail } from './recipients'
 import { trackingSettings } from './tracking'
@@ -29,6 +29,7 @@ const cookieName='platter_client'
 export function sixDigitCode(){const limit=4294000000,v=new Uint32Array(1);do crypto.getRandomValues(v);while(v[0]>=limit);return String(v[0]%1000000).padStart(6,'0')}
 export async function clientContext(env:Bindings,token:string,request:Request){need(/^[a-f0-9]{64}$/.test(token),'Proposal invitation not found',404);const share=await env.DB.prepare('SELECT * FROM p_shares WHERE token=?').bind(token).first<any>();need(share,'Proposal invitation not found',404);const row=await env.DB.prepare('SELECT p.*,lang.locale AS client_locale,c.name AS clientName,c.email AS clientEmail FROM p_proposals p JOIN p_clients c ON c.id=p.client_id LEFT JOIN p_client_locales lang ON lang.proposal_id=p.id WHERE p.id=?').bind(share.proposal_id).first<any>();need(row&&share.revision===row.revision&&['sent','accepted'].includes(row.status),'This proposal has been replaced',409)
  if(share.recipient)row.clientEmail=share.recipient
+ row.client_locale=await invitationLocale(env.DB,row,share,request)
  const progress=await recipientProgress(env.DB,row,share.slot_id);need(!recipientPlan(row).length||progress,'This recipient invitation is no longer current',410)
  const cookie=request.headers.get('cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith(cookieName+'='))?.slice(cookieName.length+1),verified=Boolean(cookie&&share.session_hash&&share.session_expires>await currentTime(env.DB)&&await hash(cookie)===share.session_hash)
  const params=Object.fromEntries(new URL(request.url).searchParams);const embedded=params.embed==='1';need(!embedded||share.embed_origin,'Embedding is not authorized for this invitation',403);const options=JSON.parse(row.options),optionId=progress?.choice?.optionId??params.optionId??options[0].id,selection=offerSelection(options,row.deposit_bps,optionId,progress?.choice?.items??reviewItems(params),row);return{embedded,progress,share,row,verified,token,optionId,selection,expiry:await expiryFor(env.DB,row)}
@@ -75,14 +76,14 @@ export async function clientCommand(env:Bindings,c:Awaited<ReturnType<typeof cli
  if(name==='code.verify'){
   const code=text(p.code,'the six-digit code',6);need(/^\d{6}$/.test(code),'Enter the six-digit code');need(share.code_hash&&share.code_expires>at&&share.code_attempts<5,'Code expired, was used, or reached its attempt limit. Request another code.',401)
   const correct=await hash(`${env.SESSION_SECRET}:${share.token}:${share.code_generation}:${code}`)===share.code_hash,session=secret()
-  await atomic(env,c,correct?[db.prepare('UPDATE p_shares SET code_hash=NULL,session_hash=?,session_expires=?,session_method=?,session_verified_at=? WHERE token=?').bind(await hash(session),at+86400000,share.code_method,at,c.token),db.prepare("UPDATE p_mail SET body='Verification code consumed' WHERE proposal_id=? AND recipient=? AND subject IN (?,?)").bind(row.id,row.clientEmail,...['en','es'].map(locale=>codeMail('', '', locale as ClientLocale)[0]))]:[db.prepare('UPDATE p_shares SET code_attempts=code_attempts+1 WHERE token=?').bind(c.token)],'s.code_hash=? AND s.code_attempts=? AND s.code_attempts<5 AND s.code_expires>?',[share.code_hash,share.code_attempts,at],true);need(correct,'Incorrect verification code',401)
+  await atomic(env,c,correct?[db.prepare('UPDATE p_shares SET code_hash=NULL,session_hash=?,session_expires=?,session_method=?,session_verified_at=? WHERE token=?').bind(await hash(session),at+86400000,share.code_method,at,c.token),db.prepare("UPDATE p_mail SET body='Verification code consumed' WHERE proposal_id=? AND recipient=? AND subject IN (?,?,?,?,?)").bind(row.id,row.clientEmail,...clientLocales.map(locale=>codeMail('', '', locale)[0]))]:[db.prepare('UPDATE p_shares SET code_attempts=code_attempts+1 WHERE token=?').bind(c.token)],'s.code_hash=? AND s.code_attempts=? AND s.code_attempts<5 AND s.code_expires>?',[share.code_hash,share.code_attempts,at],true);need(correct,'Incorrect verification code',401)
   return{message:c.progress?'Mailbox verified. Review your recipient role below.':share.code_method==='SMS code'?'Text code verified. Choose your option and accept.':'Email verified. Choose your option and accept.',cookie:`${cookieName}=${session}; Path=/p/${c.token}; HttpOnly; SameSite=${c.embedded&&env.AUTH_ORIGIN.startsWith('https:')?'None':'Strict'}; Max-Age=86400${env.AUTH_ORIGIN.startsWith('https:')?'; Secure':''}`}
  }
  if(name==='accept'){
   if(c.progress)return multiRecipientAccept(env,c,p,at)
   need(c.verified,'Verify your email before accepting',401);const a=await db.prepare('SELECT a.*,f.method AS verification_method FROM p_acceptances a LEFT JOIN p_signature_facts f ON f.proposal_id=a.proposal_id WHERE a.proposal_id=?').bind(row.id).first<any>();if(a)return{acceptance:acceptanceView(a)}
   need(!c.expiry.expired,'This proposal has expired. Ask the firm to reopen it.',409)
-  need(p.consent===true||['on','yes'].includes(String(p.consent)),'Confirm that you accept this proposal');const signer=text(p.name,'your full name',200),{option,deposit,frozen,consent}=acceptanceTerms(row,p.optionId,p,at),fieldValues=acceptanceFields(frozen.document,p,signer);const language=clientLocale(row);Object.assign(frozen,{language});const shownConsent=language==='es'?clientText('I accept the scope of work, chosen option, total price, and deposit',language)+(paymentTerms(row)?clientText(' and payment schedule',language):'')+clientText(' shown above.',language):consent;const policy=await collectionPolicy(db,row.id);if(policy.enabled)Object.assign(frozen,{collectionPolicy:policy});if(fieldValues)Object.assign(frozen,{fieldValues})
+  need(p.consent===true||['on','yes'].includes(String(p.consent)),'Confirm that you accept this proposal');const signer=text(p.name,'your full name',200),{option,deposit,frozen,consent}=acceptanceTerms(row,p.optionId,p,at),fieldValues=acceptanceFields(frozen.document,p,signer);const language=clientLocale(row);Object.assign(frozen,{language});const shownConsent=language!=='en'?clientText('I accept the scope of work, chosen option, total price, and deposit',language)+(paymentTerms(row)?clientText(' and payment schedule',language):'')+clientText(' shown above.',language):consent;const policy=await collectionPolicy(db,row.id);if(policy.enabled)Object.assign(frozen,{collectionPolicy:policy});if(fieldValues)Object.assign(frozen,{fieldValues})
   await atomic(env,c,[db.prepare('INSERT INTO p_acceptances(proposal_id,revision,snapshot,name,email,option_id,total_cents,deposit_cents,accepted_at,consent,currency) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(row.id,row.revision,JSON.stringify(frozen),signer,row.clientEmail,option.id,option.cents,deposit,at,shownConsent,frozen.currency),db.prepare('INSERT INTO p_signature_facts(proposal_id,revision,method,verified_at,language) VALUES(?,?,?,?,?)').bind(row.id,row.revision,share.session_method,share.session_verified_at??null,language),db.prepare("UPDATE p_proposals SET status='accepted',version=version+1 WHERE id=?").bind(row.id),db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),...archiveCompletion(db,row.id)],`s.session_hash=? AND s.session_expires>? AND ${expiryOpenSql('p')} AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))`,[share.session_hash,at,at,discountDeadline([option]),at]);return{message:policy.enabled&&policy.completion==='required'&&deposit>0?'Your signature is retained. Complete the deposit payment below.':'Proposal accepted. Your agreed version is frozen.'}
  }
  fail('Unknown client action',404)
@@ -103,7 +104,8 @@ async function multiRecipientAccept(env:Bindings,c:Awaited<ReturnType<typeof cli
  need(row.status==='sent','This agreement is already complete',409)
  need(progress.ready,'Wait for the preceding signing group to finish',409)
  need(p.consent===true||['on','yes'].includes(String(p.consent)),'Confirm your decision')
- const signer=text(p.name,'your full name',200),{option,deposit,frozen,consent}=acceptanceTerms(row,p.optionId,p,at)
+ const signer=text(p.name,'your full name',200),{option,deposit,frozen}=acceptanceTerms(row,p.optionId,p,at)
+ const language=clientLocale(row),consent=recipient.role==='approver'?clientText('I approve this exact proposal revision and selected package.',language):clientText('I accept the scope of work, chosen option, total price, and deposit',language)+(paymentTerms(row)?clientText(' and payment schedule',language):'')+clientText(' shown above.',language)
  const fieldValues=acceptanceFields(frozen.document,p,signer,recipient.id,progress.clientSlot)
  if(fieldValues)Object.assign(frozen,{fieldValues})
  const choice={optionId:option.id,totalCents:option.cents,depositCents:deposit,items:(frozen as any).selection?.items??[]}
@@ -111,19 +113,19 @@ async function multiRecipientAccept(env:Bindings,c:Awaited<ReturnType<typeof cli
  need(!previous||JSON.stringify(previous.choice)===JSON.stringify(choice),'All recipients must sign the same package and quantities',409)
  const content=previous?.content??frozen,plan=recipientPlan(row)
  const complete=plan.filter(requiredRecipient).every(r=>r.id===recipient.id||prior.some(s=>s.slot_id===r.id))
- const evidence={content:{...content,...(fieldValues?{fieldValues}:{fieldValues:{}})},choice}
+ const evidence={language,content:{...content,...(fieldValues?{fieldValues}:{fieldValues:{}})},choice}
  const writes=[
-  db.prepare('INSERT INTO p_recipient_signatures(proposal_id,revision,slot_id,role,name,email,signed_at,method,verified_at,consent,snapshot) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(row.id,row.revision,recipient.id,recipient.role,signer,row.clientEmail,at,share.session_method,share.session_verified_at,recipient.role==='approver'?'I approve this exact proposal revision.':consent,JSON.stringify(evidence)),
+  db.prepare('INSERT INTO p_recipient_signatures(proposal_id,revision,slot_id,role,name,email,signed_at,method,verified_at,consent,snapshot) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(row.id,row.revision,recipient.id,recipient.role,signer,row.clientEmail,at,share.session_method,share.session_verified_at,consent,JSON.stringify(evidence)),
   db.prepare("UPDATE p_proposals SET version=version+1"+(complete?",status='accepted'":"")+" WHERE id=?").bind(row.id),
  ]
  if(complete){
   const first=prior.find(s=>s.role==='signer')??{name:signer,email:row.clientEmail,method:share.session_method,verified_at:share.session_verified_at,consent}
-  const signatures=[...prior.map(s=>({name:s.name,email:s.email,role:s.role,slotId:s.slot_id,signedAt:s.signed_at,method:s.method,verifiedAt:s.verified_at,consent:s.consent})),{name:signer,email:row.clientEmail,role:recipient.role,slotId:recipient.id,signedAt:at,method:share.session_method,verifiedAt:share.session_verified_at,consent}]
+  const signatures=[...prior.map(s=>({...JSON.parse(s.snapshot).language?{language:JSON.parse(s.snapshot).language}:{},name:s.name,email:s.email,role:s.role,slotId:s.slot_id,signedAt:s.signed_at,method:s.method,verifiedAt:s.verified_at,consent:s.consent})),{language,name:signer,email:row.clientEmail,role:recipient.role,slotId:recipient.id,signedAt:at,method:share.session_method,verifiedAt:share.session_verified_at,consent}]
   const policy=await collectionPolicy(db,row.id)
   const combinedFields=Object.assign({},...prior.map(s=>JSON.parse(s.snapshot).content.fieldValues??{}),fieldValues??{})
   const final={...content,...(Object.keys(combinedFields).length?{fieldValues:combinedFields}:{}),signatures,...(policy.enabled?{collectionPolicy:policy}:{})}
   writes.push(db.prepare('INSERT INTO p_acceptances(proposal_id,revision,snapshot,name,email,option_id,total_cents,deposit_cents,accepted_at,consent,currency) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(row.id,row.revision,JSON.stringify(final),first.name,first.email,choice.optionId,choice.totalCents,choice.depositCents,at,first.consent,content.currency),
-   db.prepare('INSERT INTO p_signature_facts(proposal_id,revision,method,verified_at) VALUES(?,?,?,?)').bind(row.id,row.revision,first.method,first.verified_at),
+   db.prepare('INSERT INTO p_signature_facts(proposal_id,revision,method,verified_at,language) VALUES(?,?,?,?,?)').bind(row.id,row.revision,first.method,first.verified_at,signatures.find(s=>s.role==='signer')?.language??null),
    db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),...completionMail(env,row,plan,at))
  }
  const ownerGuard=recipient.role==='countersigner'?" AND EXISTS(SELECT 1 FROM oa_operators WHERE lower(email)=? AND role='owner' AND status='active')":''

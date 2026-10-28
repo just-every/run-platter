@@ -1,3 +1,4 @@
+import { localeNames, type ClientLocale } from '../locales'
 import { collectionView } from '../collection'
 import type { Bindings } from '../../auth.server'
 import { commit, need, type Actor } from '../model'
@@ -29,7 +30,7 @@ export async function agreementArtifact(env:Bindings,id:string,kind:string,autho
   const facts={...(a.language?{language:a.language}:{}),replacements,schemaVersion:1,proposalId:id,revision:a.revision,documentSha256:digest,signers,location:'not recorded',userAgent:'not recorded',attachments:frozen.attachments??[]}
   const pdf=await PdfText.create(a.revision,fonts,'Certificate of completion')
   pdf.heading('Certificate of completion');pdf.text('Proposal: '+frozen.title);pdf.text('Revision: '+a.revision);pdf.text('Document SHA-256: '+digest);pdf.text('Signer: '+a.name);pdf.text('Recipient: '+a.email);pdf.text('Verification method: '+a.method);pdf.text('Verified at: '+(a.verified_at?new Date(a.verified_at).toISOString():'not recorded'));pdf.text('Accepted at: '+new Date(a.accepted_at).toISOString());pdf.text('Consent: '+a.consent);pdf.text('Location and user agent: not recorded')
-  if(a.language)pdf.text('Language shown: '+(a.language==='es'?'Spanish (es)':'English (en)'))
+  if(a.language)pdf.text('Language shown: '+(localeNames[a.language as ClientLocale]+' ('+a.language+')'))
   if(frozen.signatures)for(const s of signers){pdf.heading(s.role==='approver'?'Client approval':'Required signature');pdf.text('Signer: '+s.name);pdf.text('Recipient: '+s.email);pdf.text('Role: '+s.role);pdf.text('Verification method: '+s.method);pdf.text('Verified at: '+(s.verifiedAt?new Date(s.verifiedAt).toISOString():'not recorded'));pdf.text('Signed at: '+new Date(s.acceptedAt).toISOString());pdf.text('Consent: '+s.consent)}
   for(const r of replacements){pdf.heading('Signer replacement');pdf.text('Previous recipient: '+r.old_recipient);pdf.text('Replacement recipient: '+r.new_recipient);pdf.text('Replaced by: '+r.actor_email);pdf.text('Replaced at: '+new Date(r.replaced_at).toISOString());pdf.text('Reason: '+r.reason);pdf.text('Signing position: '+r.signing_position);pdf.text('Required verification: '+r.required_method)}
   const certificate=await pdf.document.save()

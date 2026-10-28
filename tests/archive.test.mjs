@@ -585,7 +585,22 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const signatures=(await h.db.prepare('SELECT * FROM p_recipient_signatures ORDER BY proposal_id,revision,slot_id').all()).results
   const voids=(await h.db.prepare('SELECT * FROM p_void_signatures ORDER BY proposal_id,revision').all()).results
   assert.equal(signatures.length,4);assert.equal(voids.length,1)
-  const allInvitationHistory=[...retained,...(await h.state()).proposals.find(r=>r.id===multi.id).invitationMessages,...(await h.state()).proposals.find(r=>r.id===voided.id).invitationMessages];assert.equal(allInvitationHistory.length,8)
+  const otherLanguages=[]
+  for(const [locale,language] of [['fr','fr'],['de','de'],['pt','pt'],['auto','de']]){
+   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Language custody '+locale,scope:'Firm authored content stays exact.',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+   await h.cmd('proposal.locale',{id:p.id,version:1,locale})
+   await h.cmd('proposal.approve',{id:p.id,version:2,revision:1})
+   const invitation=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(invitation.shareUrl).pathname
+   assert.equal((await h.send(path,undefined,'',{'accept-language':'de-CH'})).status,200)
+   assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+   const mail=await h.db.prepare('SELECT body FROM p_mail WHERE proposal_id=? ORDER BY rowid DESC LIMIT 1').bind(p.id).first()
+   const verified=await h.send(path+'/action?name=code.verify',{code:mail.body.match(/\b\d{6}\b/)[0]});assert.equal(verified.status,200)
+   assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},verified.cookie)).status,200)
+   const artifact=await h.send(path+'/certificate.json',undefined,verified.cookie);assert.equal(artifact.status,200)
+   assert.equal(artifact.value.language,language)
+   otherLanguages.push({id:p.id,locale,language,path,certificate:artifact.text,invitationMessages:(await h.state()).proposals.find(r=>r.id===p.id).invitationMessages})
+  }
+  const allInvitationHistory=[...otherLanguages.flatMap(r=>r.invitationMessages),...retained,...(await h.state()).proposals.find(r=>r.id===multi.id).invitationMessages,...(await h.state()).proposals.find(r=>r.id===voided.id).invitationMessages];assert.equal(allInvitationHistory.length,12)
 
   await h.close();h=null
   const archive=join(temporary,'source.rer')
@@ -597,6 +612,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.ok(!bytes.includes(replacementPath))
   for(const path of [...Object.values(multi.links),...Object.values(voided.links),new URL(shared.shareUrl).pathname])assert.ok(!bytes.includes(path),'archive contains no recipient capability')
   assert.equal(records.filter(item=>item.table==='p_shares').length,0)
+  assert.equal(records.filter(item=>item.table==='p_invitation_languages').length,0)
   assert.deepEqual(records.filter(item=>item.table==='p_recipient_signatures').map(item=>item.row).sort((a,b)=>a.proposal_id.localeCompare(b.proposal_id)||a.revision-b.revision||a.slot_id.localeCompare(b.slot_id)),signatures)
   assert.deepEqual(records.filter(item=>item.table==='p_void_signatures').map(item=>item.row),voids)
   assert.equal(records.filter(item=>item.table==='p_replaced_links').length,0)
@@ -611,6 +627,13 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
   assert.deepEqual(after.proposals.find(row=>row.id===p.id),proposal)
   assert.deepEqual(after.proposals.find(row=>row.id===real.id).invitationMessages,retained)
+  for(const retained of otherLanguages){
+   assert.equal(after.proposals.find(row=>row.id===retained.id).client_locale,retained.locale)
+   assert.equal(after.proposals.find(row=>row.id===retained.id).acceptance.language,retained.language)
+   assert.equal((await h.send('/api/platter/certificate.json?id='+retained.id,undefined,owner)).text,retained.certificate)
+   assert.equal((await h.send(retained.path)).status,404)
+  }
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_invitation_languages').first()).n,0)
   assert.equal(after.proposals.find(row=>row.id===real.id).client_locale,'es')
   assert.deepEqual(after.proposals.find(row=>row.id===real.id).acceptance,acceptedLanguage)
   assert.deepEqual(await h.db.prepare('SELECT language FROM p_signature_facts WHERE proposal_id=?').bind(real.id).first(),languageFacts)

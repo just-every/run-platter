@@ -194,7 +194,7 @@ Evidence: `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.m
 
 Status: **partial**.
 
-Gap: Owner-selected Spanish and English defaults now cover the single-client mailbox journey with collection off, retaining authored text and actual new acceptance and certificate language without historical inference. Gap: French, German and Portuguese, browser-language fallback, full SIGN-003 consumer disclosures, other email events, payment and provider identity screens and configured multi-recipient flows remain. SEND-003 and SIGN-004 retain their own authority-policy Gaps.
+Gap: Owner-selected English, Spanish, French, German and Portuguese plus explicit browser preference now cover the mailbox journey with collection off, retaining authored text and actual new acceptance and certificate language without historical inference. Per-recipient language choices preserve signing order and authority. Gap: full SIGN-003 consumer disclosures, other email events, payment and provider identity screens, and complete language-catalog proof of every configured multi-recipient screen remain. SEND-003 and SIGN-004 retain their own authority-policy Gaps.
 
 Evidence: `tests/mail.test.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 

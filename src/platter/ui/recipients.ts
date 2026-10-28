@@ -1,3 +1,4 @@
+import { ui } from '../locales'
 import { recipientPlan } from '../recipients'
 import { date, escape, field, form, hidden, panel, proposalPath } from './shared'
 
@@ -26,11 +27,11 @@ export function recipientClientPanel(view:any,publicForm:(name:string,body:strin
  const progress=view.recipientProgress
  if(!progress)return ''
  const r=progress.recipient
- let body='<p>Viewing as '+escape(r.name)+' · '+escape(r.role)+' · Group '+r.group+'</p>'
- if(!['signer','countersigner','approver'].includes(r.role))body+='<p>This invitation is for viewing only. It grants no signing or payment authority.</p>'
- else if(progress.signed)body+='<p>Your decision is retained. Waiting for the remaining recipients.</p>'
- else if(!progress.ready)body+='<p>Waiting for the preceding signing group. You can review this proposal now.</p>'
- else if(r.role==='approver'&&view.verified&&!view.expiry?.expired)body+=publicForm('recipient.approve',hidden('optionId',view.selectedOptionId)+field('Your full name','name','','required maxlength="200"')+'<label class="choice"><input type="checkbox" name="consent" value="yes" required> I approve this exact proposal revision and selected package.</label><button>Approve client revision</button>')
- const history=progress.signatures.length?'<ol>'+progress.signatures.map((s:any)=>'<li>'+escape(s.name)+' · '+escape(s.role)+' · '+date(s.signedAt)+'</li>').join('')+'</ol>':''
- return panel('Your recipient role',body+history)
+ let body=ui('<p>Viewing as ')+escape(r.name)+' · '+escape(ui(r.role))+' · '+ui('Group')+' '+r.group+'</p>'
+ if(!['signer','countersigner','approver'].includes(r.role))body+=ui('<p>This invitation is for viewing only. It grants no signing or payment authority.</p>')
+ else if(progress.signed)body+=ui('<p>Your decision is retained. Waiting for the remaining recipients.</p>')
+ else if(!progress.ready)body+=ui('<p>Waiting for the preceding signing group. You can review this proposal now.</p>')
+ else if(r.role==='approver'&&view.verified&&!view.expiry?.expired)body+=publicForm('recipient.approve',hidden('optionId',view.selectedOptionId)+field(ui('Your full name'),'name','','required maxlength="200"')+ui('<label class="choice"><input type="checkbox" name="consent" value="yes" required> I approve this exact proposal revision and selected package.</label><button>Approve client revision</button>'))
+ const history=progress.signatures.length?'<ol>'+progress.signatures.map((s:any)=>'<li>'+escape(s.name)+' · '+escape(ui(s.role))+' · '+date(s.signedAt)+'</li>').join('')+'</ol>':''
+ return panel(ui('Your recipient role'),body+history)
 }

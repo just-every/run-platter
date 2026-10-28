@@ -2,7 +2,28 @@ import assert from 'node:assert/strict'
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
+import ts from 'typescript'
 import { installedApp } from './site-harness.mjs'
+import { recurringFixture } from './recurring-journey.mjs'
+import { configureTaxes, taxPackages, taxRequest, taxTables } from './taxes-fixture.mjs'
+
+async function englishClientCopy() {
+ const words=new Set()
+ for(const file of ['client','shell','shared','expiry','questions','attachments','paper','suggestions','packages','pricing','payment-terms','blocks']) {
+  const source=ts.createSourceFile(file,await readFile('./src/platter/ui/'+file+'.ts','utf8'),ts.ScriptTarget.Latest,true)
+  const collect=node=>{
+   if(ts.isStringLiteral(node)||ts.isNoSubstitutionTemplateLiteral(node)||ts.isTemplateHead(node)||ts.isTemplateMiddle(node)||ts.isTemplateTail(node)) {
+    for(const part of node.text.replace(/<[^>]*(?:>|$)/g,'\0').split('\0')) {
+     const text=part.replace(/^[\s"'<>/=]+|[\s"'<>/=]+$/g,'').trim()
+     if(text.length>=4&&!['Platter','Total'].includes(text)&&(/[A-Z][a-z]{3}/.test(text)||/[a-z]{3} [a-z]{3}/.test(text)))words.add(text)
+    }
+   }
+   ts.forEachChild(node,collect)
+  }
+  collect(source)
+ }
+ return [...words]
+}
 
 export async function localeBrowser(width=1440) {
  let app,browser,context
@@ -37,7 +58,9 @@ export async function localeBrowser(width=1440) {
   const sent=await (await request.get(app.origin+'/api/platter/state')).json(),row=sent.proposals.find(r=>r.id===p.id)
   const path='/p/'+row.shareToken
   // A catalog check applies only to system text: authored interpolations remain exact.
-  const catalog=[...(await readFile('src/platter/locales.ts','utf8')).matchAll(/^ '([^']+)': '([^']+)',?$/gm)].filter(([,en,es])=>en!==es).map(([,en])=>en.trim()).filter(key=>key.length>6)
+  // Read the English reference at its rendering sites, independently of the
+  // translation catalog, so a missing translation cannot remove its own check.
+  const catalog=await englishClientCopy()
   const spanishScreen=async()=>{
    assert.equal(await page.locator('html').getAttribute('lang'),'es')
    let text=await page.locator('body').innerText()
@@ -68,5 +91,22 @@ export async function localeBrowser(width=1440) {
   await spanishScreen();await capture('accepted')
   const certificate=await request.get(app.origin+path+'/certificate.json');assert.equal(certificate.status(),200)
   const facts=await certificate.json();assert.equal(facts.language,'es');assert.equal(facts.signers[0].language,'es');assert.equal(facts.signers[0].consent,shownConsent)
+  for(const kind of ['recurring','tax']) {
+   if(kind==='tax')await configureTaxes(cmd)
+   const input=kind==='recurring'?recurringFixture():{packages:taxPackages(),pricingTables:taxTables(),tax:taxRequest()}
+   const next=await cmd('proposal.prepare',{...authored,...input,clientId:client.id,depositPercent:'25'})
+   await cmd('proposal.locale',{id:next.id,version:1,locale:'es'})
+   await cmd('proposal.approve',{id:next.id,version:2,revision:1})
+   const invitation=await cmd('proposal.send',{id:next.id,version:3})
+   await page.goto(invitation.shareUrl+(kind==='recurring'?'?optionId=two':''))
+   assert.equal(await page.locator('html').getAttribute('lang'),'es')
+   const text=await page.locator('main').innerText()
+   assert.match(text,kind==='recurring'?/Total de pago único: USD 2,500.00/:/Impuesto sobre las ventas: USD 82.50/)
+   if(kind==='recurring'){assert.match(text,/USD 1,200.00 por mes/);assert.match(text,/Valor del primer año: USD 16,900.00/)}
+   else {assert.match(text,/Dirección fiscal \(servicio\)/);assert.match(text,/Austin ciudad/)}
+   const controls=await page.locator('h2,h3,button,label').allTextContents()
+   for(const control of controls)for(const key of catalog)assert.ok(!control.includes(key),'untranslated summary control: '+key)
+   await capture(kind+'-summary')
+  }
  } finally {await context?.close();await browser?.close();await app?.close()}
 }

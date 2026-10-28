@@ -545,6 +545,10 @@
       "sha256": "ef776bb7c8d626f88778b6122f6c97c7d7c2f7cd344f83a3c213844464630a40",
       "executable": false
     },
+    "migrations/core/0087_archive_dispatch_lock.sql": {
+      "sha256": "b1e6db4178f2ca9bf8013b5c9c9642286c82844501bb8af7a4b8cfcc487bbb45",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false

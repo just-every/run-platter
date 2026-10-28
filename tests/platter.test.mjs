@@ -2761,7 +2761,10 @@ test('TRACK-003 forwarded viewers verify their own mailbox before owner conversi
  assert.equal((await h.send(path+'/stakeholder',{challengeId,code})).status,401,'code is single use')
  const data=(await h.send('/api/platter/engagement?id='+p.id,undefined,h.owner)).value,person=data.stakeholders[0]
  assert.equal(person.name,'Riley Procurement');assert.equal(person.email,'riley@synthetic-platter.example');assert.equal(person.role,'stakeholder')
+ const beforeConversion=(await h.state()).outbox,invitationCount=(await h.db.prepare('SELECT count(*) n FROM p_shares WHERE proposal_id=?').bind(p.id).first()).n
  await h.cmd('tracking.recipient',{id:p.id,stakeholderId:person.id,consent:'yes'})
+ assert.deepEqual((await h.state()).outbox,beforeConversion,'stakeholder conversion sends no automatic invitation')
+ assert.equal((await h.db.prepare('SELECT count(*) n FROM p_shares WHERE proposal_id=?').bind(p.id).first()).n,invitationCount,'stakeholder conversion creates no invitation authority')
  assert.equal((await h.send('/api/platter/engagement?id='+p.id,undefined,h.owner)).value.stakeholders[0].role,'approver')
  assert.equal((await h.send(path+'/action?name=accept',{name:'Riley Procurement',optionId:'one',consent:true})).status,401)
  assert.equal((await h.state()).proposals.find(row=>row.id===p.id).acceptance,undefined)

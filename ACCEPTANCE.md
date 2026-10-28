@@ -13,7 +13,7 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 | Later | 0 | 0 | 0 | 0 |
 | Full target | 13 | 92 | 58 | 163 |
 
-Judged from the code and tests at commit `83c5300be4eee707af37fecfe7b53016a3fe3e05` (28 October 2026). PRICE-003 retains main’s assertion repairs and judgment. AUTO-004 remains partial under the ct demotion of 27 October 2026 at 23:04Z; the corrected behavior and new assertions require fresh judgment. No ct acceptance or landing receipt is claimed. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `b2551363bd49d431add363e7ee97bed57938c394` (28 October 2026). Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -760,13 +760,13 @@ Core · target · **partial** · From SEND-002 · Cites BASE-MAIL-001, BASE-OPS-
 
 Core · target · **partial** · Cites BASE-ROLE-001, BASE-PUBLIC-002 · Rules D-1
 
-**Requirement.** A proposal has any number of recipients with a role: signer, client-side approver, viewer or CC. A proposal created from a template starts with the template's role slots, fields and order (`SIGN-011`), and sending is refused (409) while a signer, approver or countersigner slot is unfilled. Each recipient has their own link and verification. Before sending, the sender previews the client page as each recipient (`EDIT-018`). The firm can also share by link (with verification) or embed the proposal on its site. Removing a recipient revokes their link, and withdrawing the proposal revokes every link at once (`SEND-010`). Replacing a signer on a sent proposal is `SEND-007`, and a signer delegating is `SIGN-009`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#send-003).
+**Requirement.** A proposal has any number of recipients with a role: signer, client-side approver, viewer or CC. A proposal created from a template starts with the template's role slots, fields and order (`SIGN-011`), and sending is refused (409) while a signer, approver or countersigner slot is unfilled. Each recipient has their own link and verification. Before sending, the sender previews the client page as each recipient (`EDIT-018`). The firm can also share by link (with verification) or embed the proposal on its site. Removing a recipient revokes their link, and withdrawing the proposal revokes every link at once (`SEND-010`). Replacing a signer on a sent proposal is `SEND-007`, and a signer delegating is `SIGN-009`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#send-003). The current native owner alone manages recipient roles, explicitly sends invitations or creates additional mailbox-bound viewing links, and authorizes an exact framing origin. Stakeholder conversion, copies and restores grant no invitation authority and never invite automatically. This native-owner authority floor is RL-21; full template-role management remains SIGN-011 and provider-specific recipient checks remain SIGN-006.
 
 **Acceptance.**
 1. Add a signer, a CFO approver and a viewer; each opens their own link; the viewer cannot sign; remove the viewer and see their link refused.
 
 **Evidence.** `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Policy default adopted under the standing scope rule, policy not yet ruled where noted in RULINGS: the current owner alone manages recipient roles, explicitly sends invitations or creates additional mailbox-bound viewing links, and authorizes an exact framing origin. Stakeholder conversion, copies and restores never invite anyone automatically or restore invitation authority. Scoped delegation and provider boundaries remain unapproved; the full template-role management duties remain with SIGN-011. SEND-003 stays PARTIAL policy not yet ruled where noted in RULINGS of this default.
+**Gap.** Current main judged SEND-003 done under RL-21. Its role/link/removal assertions are in tests/recipients-http.mjs and its compiled browser assertions in tests/recipients-browser.mjs, neither named in the old Evidence set. The wrapper test titles alone do not prove those outcomes; stakeholder conversion’s no-mail/no-authority assertions are retained.
 
 #### SEND-004 — Expiry and reopening
 

@@ -88,3 +88,13 @@ Explicit owner/admin verified destination consent; generic channel text and prot
 **Sources:**
 - [Document owners/admins configure inherited reminders; authorized Slack notices reach individual users.](https://www.pandadoc.com/recipes/automated-document-reminders/)
 - [Workspace/template reminder settings inherit into documents and can be reviewed at send.](https://support.pandadoc.com/en/articles/9714663-auto-reminders)
+
+### RL-21 — Native owner recipient authority
+
+- Date: 2026-10-28
+- Ruler: ct
+- Governs: SEND-003
+
+Ct approved this authority floor on 28 October 2026 at 08:10 UTC: the native owner holds the authority; no delegated or agent authority is added. The current native owner alone manages recipient roles, explicitly sends invitations or creates additional mailbox-bound viewing links, and authorizes an exact framing origin. Stakeholder conversion, copies and restores never invite anyone automatically or restore invitation authority. No split or deferral applies. Full template-role management remains with SIGN-011, and provider-specific recipient checks remain with SIGN-006.
+
+This records the approved authority clarification without adding acceptance points or granting delegated authority.

@@ -663,7 +663,7 @@ A buyer replacing an incumbent needs the whole job, so the target is the whole j
 
 *Tier:* Core · *Cites:* BASE-ROLE-001, BASE-PUBLIC-002 · *Rules:* D-1
 
-**Requirement.** A proposal has any number of recipients with a role: signer, client-side approver, viewer or CC. A proposal created from a template starts with the template's role slots, fields and order (`SIGN-011`), and sending is refused (409) while a signer, approver or countersigner slot is unfilled. Each recipient has their own link and verification. Before sending, the sender previews the client page as each recipient (`EDIT-018`). The firm can also share by link (with verification) or embed the proposal on its site. Removing a recipient revokes their link, and withdrawing the proposal revokes every link at once (`SEND-010`). Replacing a signer on a sent proposal is `SEND-007`, and a signer delegating is `SIGN-009`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#send-003).
+**Requirement.** A proposal has any number of recipients with a role: signer, client-side approver, viewer or CC. A proposal created from a template starts with the template's role slots, fields and order (`SIGN-011`), and sending is refused (409) while a signer, approver or countersigner slot is unfilled. Each recipient has their own link and verification. Before sending, the sender previews the client page as each recipient (`EDIT-018`). The firm can also share by link (with verification) or embed the proposal on its site. Removing a recipient revokes their link, and withdrawing the proposal revokes every link at once (`SEND-010`). Replacing a signer on a sent proposal is `SEND-007`, and a signer delegating is `SIGN-009`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#send-003). The current native owner alone manages recipient roles, explicitly sends invitations or creates additional mailbox-bound viewing links, and authorizes an exact framing origin. Stakeholder conversion, copies and restores grant no invitation authority and never invite automatically. This native-owner authority floor is RL-21; full template-role management remains SIGN-011 and provider-specific recipient checks remain SIGN-006.
 
 **Acceptance.**
 1. Add a signer, a CFO approver and a viewer; each opens their own link; the viewer cannot sign; remove the viewer and see their link refused.
@@ -1784,19 +1784,19 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 | `platter.approvals.decide` | Approval binds the exact revision | PROP-001, APPROVE-003, APPROVE-004 | commitment | legacy action; MCP parity unproved |
 | `platter.proposals.send` | Sending freezes the offer | PROP-002 | external or commitment | legacy action; MCP parity unproved |
 | `platter.signing.verify` | Verified-mailbox acceptance | SIGN-001 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
-| `platter.signing.accept` | Immutable acceptance with an integer-cent deposit | SIGN-002 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
+| `platter.signing.manage_accept` | Immutable acceptance with an integer-cent deposit | SIGN-002 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
 | `platter.invoices.export` | One retained deposit invoice per acceptance | INV-001 | standard | legacy action; MCP parity unproved |
 | `platter.imports.apply` | Reviewed client CSV move-in with undo | IMPORT-001 | standard | legacy action; MCP parity unproved |
-| `platter.clients.erase` | Bounded client erasure | ERASE-001 | destructive or sensitive | legacy action; MCP parity unproved |
+| `platter.clients.manage_erase` | Bounded client erasure | ERASE-001 | destructive or sensitive | legacy action; MCP parity unproved |
 | `platter.archives.restore` | Validated archives and restore | PORT-001 | destructive or sensitive | legacy action; MCP parity unproved |
 | `platter.mail.read` | Durable proposal mail with honest outcomes | MAIL-001 | standard | legacy action; MCP parity unproved |
 | `platter.documents.update` | Branded drag-and-drop proposal editor | EDIT-001 | standard | legacy action; MCP parity unproved |
 | `platter.templates.start` | Proposal templates | EDIT-002 | standard | legacy prepare_from_template |
 | `platter.library.insert` | Reusable content library | EDIT-003 | standard | legacy action; MCP parity unproved |
 | `platter.variables.fill` | Variables from client, deal and CRM records | EDIT-004 | standard | legacy action; MCP parity unproved |
-| `platter.imports.word` | Word and PDF import and export | EDIT-005 | standard | legacy action; MCP parity unproved |
+| `platter.imports.manage_word` | Word and PDF import and export | EDIT-005 | standard | legacy action; MCP parity unproved |
 | `platter.documents.export` | Word and PDF exports | EDIT-020 | standard | legacy action; MCP parity unproved |
-| `platter.imports.pdf` | Fixed PDF pages with signing fields | EDIT-019 | standard | legacy action; MCP parity unproved |
+| `platter.imports.manage_pdf` | Fixed PDF pages with signing fields | EDIT-019 | standard | legacy action; MCP parity unproved |
 | `platter.media.insert` | Embedded rich media | EDIT-006 | standard | legacy action; MCP parity unproved |
 | `platter.domains.configure` | Custom domain and branded client experience | EDIT-008 | accounts or gated or security | legacy action; MCP parity unproved |
 | `platter.conditions.update` | Conditional content by package | EDIT-009 | standard | legacy action; MCP parity unproved |
@@ -1809,20 +1809,20 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 | `platter.proposals.search` | Proposal search and folders | EDIT-016 | standard | legacy search_proposals |
 | `platter.language.set` | Client page in the client's language | EDIT-017 | standard | legacy action; MCP parity unproved |
 | `platter.previews.read` | Client-page preview before sending | EDIT-018, EDIT-022 | standard | legacy action; MCP parity unproved |
-| `platter.cat.service_and_product_catalog` | Service and product catalog | CAT-001 | standard | legacy action; MCP parity unproved |
-| `platter.price.usd_pricing_tables_with_line_items` | USD pricing tables with line items | PRICE-001 | standard | legacy action; MCP parity unproved |
-| `platter.price.packages_and_optional_items_the_client_chooses` | Packages and optional items the client chooses | PRICE-002 | standard | legacy action; MCP parity unproved |
-| `platter.price.one_off_and_recurring_fees` | One-off and recurring fees | PRICE-003 | standard | legacy action; MCP parity unproved |
-| `platter.price.discounts` | Discounts | PRICE-004 | standard | legacy action; MCP parity unproved |
-| `platter.price.us_sales_tax` | US sales tax | PRICE-005 | standard | legacy action; MCP parity unproved |
-| `platter.price.internal_cost_and_margin` | Internal cost and margin | PRICE-006 | standard | legacy action; MCP parity unproved |
-| `platter.price.payment_terms_and_schedules_on_the_proposal` | Payment terms and schedules on the proposal | PRICE-007 | standard | legacy action; MCP parity unproved |
-| `platter.price.first_release_aud_agreements_stay_exact` | First-release AUD agreements stay exact | PRICE-008 | standard | legacy action; MCP parity unproved |
-| `platter.collab.real_time_team_editing` | Real-time team editing | COLLAB-001 | standard | legacy action; MCP parity unproved |
-| `platter.collab.internal_comments_mentions_and_assignments` | Internal comments, mentions and assignments | COLLAB-002 | standard | legacy action; MCP parity unproved |
-| `platter.collab.version_history_with_compare_and_restore` | Version history with compare and restore | COLLAB-003 | standard | legacy action; MCP parity unproved |
+| `platter.cat.manage_service_and_product_catalog` | Service and product catalog | CAT-001 | standard | legacy action; MCP parity unproved |
+| `platter.price.manage_usd_pricing_tables_with_line_items` | USD pricing tables with line items | PRICE-001 | standard | legacy action; MCP parity unproved |
+| `platter.price.manage_packages_and_optional_items_the_client_chooses` | Packages and optional items the client chooses | PRICE-002 | standard | legacy action; MCP parity unproved |
+| `platter.price.manage_one_off_and_recurring_fees` | One-off and recurring fees | PRICE-003 | standard | legacy action; MCP parity unproved |
+| `platter.price.manage_discounts` | Discounts | PRICE-004 | standard | legacy action; MCP parity unproved |
+| `platter.price.manage_us_sales_tax` | US sales tax | PRICE-005 | standard | legacy action; MCP parity unproved |
+| `platter.price.manage_internal_cost_and_margin` | Internal cost and margin | PRICE-006 | standard | legacy action; MCP parity unproved |
+| `platter.price.manage_payment_terms_and_schedules_on_the_proposal` | Payment terms and schedules on the proposal | PRICE-007 | standard | legacy action; MCP parity unproved |
+| `platter.price.manage_first_release_aud_agreements_stay_exact` | First-release AUD agreements stay exact | PRICE-008 | standard | legacy action; MCP parity unproved |
+| `platter.collab.manage_real_time_team_editing` | Real-time team editing | COLLAB-001 | standard | legacy action; MCP parity unproved |
+| `platter.collab.manage_internal_comments_mentions_and_assignments` | Internal comments, mentions and assignments | COLLAB-002 | standard | legacy action; MCP parity unproved |
+| `platter.collab.manage_version_history_with_compare_and_restore` | Version history with compare and restore | COLLAB-003 | standard | legacy action; MCP parity unproved |
 | `platter.rules.update` | Approval rules and routing | APPROVE-001 | standard | legacy action; MCP parity unproved |
-| `platter.approve.approval_requests_that_reach_the_approver` | Approval requests that reach the approver | APPROVE-002 | standard | legacy action; MCP parity unproved |
+| `platter.approve.manage_approval_requests_that_reach_the_approver` | Approval requests that reach the approver | APPROVE-002 | standard | legacy action; MCP parity unproved |
 | `platter.mailboxes.connect` | Send from the firm's own mailbox | SEND-001 | accounts or gated or security | legacy action; MCP parity unproved |
 | `platter.replies.read` | Inbound client reply custody | SEND-011 | external or commitment | legacy action; MCP parity unproved |
 | `platter.delivery.read` | Delivery status and bounce handling | SEND-002 | external or commitment | legacy action; MCP parity unproved |
@@ -1832,72 +1832,72 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 | `platter.warnings.run` | Unsigned-recipient expiry warnings | SEND-013 | external or commitment | legacy action; MCP parity unproved |
 | `platter.notifications.configure` | Completion and activity notifications | SEND-005 | external or commitment | legacy action; MCP parity unproved |
 | `platter.messages.update` | Editable subject, message and shared email templates | SEND-006 | external or commitment | legacy action; MCP parity unproved |
-| `platter.mail.rehearse` | Private rehearsal email | SEND-014 | external or commitment | legacy action; MCP parity unproved |
-| `platter.signers.replace` | Replace an unsigned signer on a sent proposal | SEND-007 | external or commitment | legacy action; MCP parity unproved |
+| `platter.mail.manage_rehearse` | Private rehearsal email | SEND-014 | external or commitment | legacy action; MCP parity unproved |
+| `platter.signers.manage_replace` | Replace an unsigned signer on a sent proposal | SEND-007 | external or commitment | legacy action; MCP parity unproved |
 | `platter.sms.send` | Sending and reminders by text message | SEND-008 | external or commitment | legacy action; MCP parity unproved |
 | `platter.publiclinks.publish` | Reusable public signing link | SEND-009 | external or commitment | legacy action; MCP parity unproved |
-| `platter.proposals.withdraw` | Withdraw a sent proposal | SEND-010 | external or commitment | legacy action; MCP parity unproved |
+| `platter.proposals.manage_withdraw` | Withdraw a sent proposal | SEND-010 | external or commitment | legacy action; MCP parity unproved |
 | `platter.proposals.reissue` | Withdrawal receipt and approved reissue | SEND-015 | external or commitment | legacy action; MCP parity unproved |
-| `platter.track.view_tracking_and_live_open_alerts` | View tracking and live open alerts | TRACK-001 | standard | legacy action; MCP parity unproved |
-| `platter.track.section_level_reading_analytics` | Section-level reading analytics | TRACK-002 | standard | legacy action; MCP parity unproved |
-| `platter.track.forwarded_stakeholder_identification` | Forwarded stakeholder identification | TRACK-003 | standard | legacy action; MCP parity unproved |
-| `platter.track.tracking_disclosure_and_privacy_limits` | Tracking disclosure and privacy limits | TRACK-004 | standard | legacy action; MCP parity unproved |
+| `platter.track.manage_view_tracking_and_live_open_alerts` | View tracking and live open alerts | TRACK-001 | standard | legacy action; MCP parity unproved |
+| `platter.track.manage_section_level_reading_analytics` | Section-level reading analytics | TRACK-002 | standard | legacy action; MCP parity unproved |
+| `platter.track.manage_forwarded_stakeholder_identification` | Forwarded stakeholder identification | TRACK-003 | standard | legacy action; MCP parity unproved |
+| `platter.track.manage_tracking_disclosure_and_privacy_limits` | Tracking disclosure and privacy limits | TRACK-004 | standard | legacy action; MCP parity unproved |
 | `platter.reminders.schedule` | Scheduled reminders to unsigned recipients | FOLLOW-001 | standard or external | legacy action; MCP parity unproved |
 | `platter.reminders.send` | Manual unsigned-recipient reminders | FOLLOW-008 | standard or external | legacy action; MCP parity unproved |
 | `platter.followups.list` | Next-action follow-up queue by sales owner | FOLLOW-002 | standard | legacy action; MCP parity unproved |
-| `platter.followups.report` | Follow-up reporting and team visibility | FOLLOW-010 | standard | legacy action; MCP parity unproved |
+| `platter.followups.manage_report` | Follow-up reporting and team visibility | FOLLOW-010 | standard | legacy action; MCP parity unproved |
 | `platter.followups.resolve` | Follow-up lifecycle and action history | FOLLOW-009 | standard | legacy action; MCP parity unproved |
 | `platter.notices.configure` | Expiry and renewal notifications | FOLLOW-003 | standard or external | legacy action; MCP parity unproved |
 | `platter.questions.answer` | Client questions and comments | FOLLOW-004 | standard or external | legacy action; MCP parity unproved |
 | `platter.outcomes.record` | Decline reasons and won or lost outcomes | FOLLOW-005 | standard or external | legacy action; MCP parity unproved |
 | `platter.deliverydefaults.update` | Default reminder schedule and expiry from the workspace and templates | FOLLOW-006, FOLLOW-011 | standard | legacy action; MCP parity unproved |
-| `platter.crm.sync` | Unattended CRM synchronization with a scoped grant | FOLLOW-007 | standard or external | legacy action; MCP parity unproved |
-| `platter.neg.negotiated_revisions_after_sending` | Negotiated revisions after sending | NEG-001 | standard | legacy action; MCP parity unproved |
-| `platter.neg.client_suggested_text_edits` | Client-suggested text edits | NEG-002 | standard | legacy action; MCP parity unproved |
-| `platter.sign.esign_and_ueta_electronic_signature` | ESIGN and UETA electronic signature | SIGN-003 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
-| `platter.sign.multiple_signers_signing_order_and_countersignature` | Multiple signers, signing order and countersignature | SIGN-004 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
-| `platter.sign.signed_agreement_pdf_and_certificate_of_completion` | Signed agreement PDF and certificate of completion | SIGN-005 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
-| `platter.sign.signer_identity_options` | Signer identity options | SIGN-006 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
-| `platter.sign.fields_collected_at_acceptance` | Fields collected at acceptance | SIGN-007 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
-| `platter.sign.acceptance_on_the_client_s_own_paper` | Acceptance on the client's own paper | SIGN-008 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
-| `platter.sign.recipient_delegation_of_signing` | Recipient delegation of signing | SIGN-009 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
-| `platter.sign.in_person_signing_on_the_firm_s_device` | In-person signing on the firm's device | SIGN-010 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
-| `platter.sign.template_recipient_roles_field_assignment_and_signing_order` | Template recipient roles, field assignment and signing order | SIGN-011 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
-| `platter.sign.recipient_role_snapshots_across_creation` | Recipient-role snapshots across creation | SIGN-012 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
-| `platter.pay.stripe_card_and_ach_collection_in_the_proposal` | Stripe card and ACH collection in the proposal | PAY-001 | external or money | legacy action; MCP parity unproved |
-| `platter.pay.deposit_or_partial_payment_at_acceptance` | Deposit or partial payment at acceptance | PAY-002 | external or money | legacy action; MCP parity unproved |
-| `platter.pay.milestone_and_recurring_payment_schedules` | Milestone and recurring payment schedules | PAY-003 | external or money | legacy action; MCP parity unproved |
-| `platter.pay.paid_pending_failed_refunded_and_disputed_states` | Paid, pending, failed, refunded and disputed states | PAY-004 | external or money | legacy action; MCP parity unproved |
-| `platter.pay.failed_payment_retries_and_notices` | Failed-payment retries and notices | PAY-005 | external or money | legacy action; MCP parity unproved |
-| `platter.pay.refunds_and_disputes` | Refunds and disputes | PAY-006 | external or money | legacy action; MCP parity unproved |
-| `platter.pay.check_wire_and_ach_credit_payments` | Check, wire and ACH credit payments | PAY-007 | external or money | legacy action; MCP parity unproved |
-| `platter.pay.net_terms_invoices_with_a_pay_link_and_overdue_tracking` | Net-terms invoices with a pay link and overdue tracking | PAY-008 | external or money | legacy action; MCP parity unproved |
-| `platter.pay.paypal_square_and_authorize_net_collection` | PayPal, Square and Authorize.net collection | PAY-009 | external or money | legacy action; MCP parity unproved |
-| `platter.acct.quickbooks_online_invoices_and_payments` | QuickBooks Online invoices and payments | ACCT-001 | standard or external | legacy action; MCP parity unproved |
-| `platter.acct.xero_invoices_and_payments` | Xero invoices and payments | ACCT-002 | standard or external | legacy action; MCP parity unproved |
-| `platter.acct.pantry_invoices_and_payments` | Pantry invoices and payments | ACCT-003 | standard or external | legacy action; MCP parity unproved |
-| `platter.acct.one_invoice_authority_and_reconciliation` | One invoice authority and reconciliation | ACCT-004 | standard or external | legacy action; MCP parity unproved |
-| `platter.acct.invoice_and_payment_export_files` | Invoice and payment export files | ACCT-005 | standard or external | legacy action; MCP parity unproved |
-| `platter.acct.stripe_payouts_fees_and_clearing_in_accounting` | Stripe payouts, fees and clearing in accounting | ACCT-006 | standard or external | legacy action; MCP parity unproved |
-| `platter.acct.invoices_created_on_their_issue_day_never_ahead` | Invoices created on their issue day, never ahead | ACCT-007 | standard or external | legacy action; MCP parity unproved |
-| `platter.crm.hubspot_two_way_deal_sync` | HubSpot two-way deal sync | CRM-001 | standard or external | legacy action; MCP parity unproved |
-| `platter.crm.salesforce_two_way_opportunity_sync` | Salesforce two-way opportunity sync | CRM-002 | standard or external | legacy action; MCP parity unproved |
-| `platter.crm.orbit_two_way_deal_sync` | Orbit two-way deal sync | CRM-003 | standard or external | legacy action; MCP parity unproved |
-| `platter.crm.pipedrive_and_zoho_crm_sync` | Pipedrive and Zoho CRM sync | CRM-004 | standard or external | legacy action; MCP parity unproved |
-| `platter.auto.status_driven_automations` | Status-driven automations | AUTO-001 | external or live | legacy action; MCP parity unproved |
-| `platter.auto.completed_documents_archived_to_file_storage` | Completed documents archived to file storage | AUTO-002 | standard or external | legacy action; MCP parity unproved |
-| `platter.auto.team_chat_notifications` | Team chat notifications | AUTO-003 | standard or external | legacy action; MCP parity unproved |
-| `platter.auto.public_rest_api_and_webhooks` | Public REST API and webhooks | AUTO-004 | standard or external | legacy action; MCP parity unproved |
-| `platter.auto.zapier_make_and_crank_apps` | Zapier, Make and Crank apps | AUTO-005 | external or live | legacy action; MCP parity unproved |
-| `platter.hand.accepted_scope_handoff_to_delivery_tools` | Accepted-scope handoff to delivery tools | HAND-001 | standard or external | legacy action; MCP parity unproved |
-| `platter.hand.handoff_to_gauge_with_budget_and_rates` | Handoff to Gauge with budget and rates | HAND-002 | standard or external | legacy action; MCP parity unproved |
-| `platter.renew.bulk_proposal_creation_and_sending` | Bulk proposal creation and sending | RENEW-001 | standard | legacy action; MCP parity unproved |
-| `platter.renew.renewal_proposals_from_accepted_agreements` | Renewal proposals from accepted agreements | RENEW-002 | standard | legacy action; MCP parity unproved |
-| `platter.report.proposal_pipeline_dashboard` | Proposal pipeline dashboard | REPORT-001 | standard | legacy action; MCP parity unproved |
-| `platter.report.win_rate_and_sales_performance` | Win rate and sales performance | REPORT-002 | standard | legacy action; MCP parity unproved |
-| `platter.report.content_and_pricing_performance` | Content and pricing performance | REPORT-003 | standard | legacy action; MCP parity unproved |
-| `platter.report.booked_billed_and_collected_revenue` | Booked, billed and collected revenue | REPORT-004 | standard | legacy action; MCP parity unproved |
-| `platter.report.report_export_and_scheduled_delivery` | Report export and scheduled delivery | REPORT-005 | standard | legacy action; MCP parity unproved |
+| `platter.crm.manage_sync` | Unattended CRM synchronization with a scoped grant | FOLLOW-007 | standard or external | legacy action; MCP parity unproved |
+| `platter.neg.manage_negotiated_revisions_after_sending` | Negotiated revisions after sending | NEG-001 | standard | legacy action; MCP parity unproved |
+| `platter.neg.manage_client_suggested_text_edits` | Client-suggested text edits | NEG-002 | standard | legacy action; MCP parity unproved |
+| `platter.sign.manage_esign_and_ueta_electronic_signature` | ESIGN and UETA electronic signature | SIGN-003 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
+| `platter.sign.manage_multiple_signers_signing_order_and_countersignature` | Multiple signers, signing order and countersignature | SIGN-004 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
+| `platter.sign.manage_signed_agreement_pdf_and_certificate_of_completion` | Signed agreement PDF and certificate of completion | SIGN-005 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
+| `platter.sign.manage_signer_identity_options` | Signer identity options | SIGN-006 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
+| `platter.sign.manage_fields_collected_at_acceptance` | Fields collected at acceptance | SIGN-007 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
+| `platter.sign.manage_acceptance_on_the_client_s_own_paper` | Acceptance on the client's own paper | SIGN-008 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
+| `platter.sign.manage_recipient_delegation_of_signing` | Recipient delegation of signing | SIGN-009 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
+| `platter.sign.manage_in_person_signing_on_the_firm_s_device` | In-person signing on the firm's device | SIGN-010 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
+| `platter.sign.manage_template_recipient_roles_field_assignment_and_signing_order` | Template recipient roles, field assignment and signing order | SIGN-011 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
+| `platter.sign.manage_recipient_role_snapshots_across_creation` | Recipient-role snapshots across creation | SIGN-012 | external or commitment or gated or sensitive | legacy action; MCP parity unproved |
+| `platter.pay.manage_stripe_card_and_ach_collection_in_the_proposal` | Stripe card and ACH collection in the proposal | PAY-001 | external or money | legacy action; MCP parity unproved |
+| `platter.pay.manage_deposit_or_partial_payment_at_acceptance` | Deposit or partial payment at acceptance | PAY-002 | external or money | legacy action; MCP parity unproved |
+| `platter.pay.manage_milestone_and_recurring_payment_schedules` | Milestone and recurring payment schedules | PAY-003 | external or money | legacy action; MCP parity unproved |
+| `platter.pay.manage_paid_pending_failed_refunded_and_disputed_states` | Paid, pending, failed, refunded and disputed states | PAY-004 | external or money | legacy action; MCP parity unproved |
+| `platter.pay.manage_failed_payment_retries_and_notices` | Failed-payment retries and notices | PAY-005 | external or money | legacy action; MCP parity unproved |
+| `platter.pay.manage_refunds_and_disputes` | Refunds and disputes | PAY-006 | external or money | legacy action; MCP parity unproved |
+| `platter.pay.manage_check_wire_and_ach_credit_payments` | Check, wire and ACH credit payments | PAY-007 | external or money | legacy action; MCP parity unproved |
+| `platter.pay.manage_net_terms_invoices_with_a_pay_link_and_overdue_tracking` | Net-terms invoices with a pay link and overdue tracking | PAY-008 | external or money | legacy action; MCP parity unproved |
+| `platter.pay.manage_paypal_square_and_authorize_net_collection` | PayPal, Square and Authorize.net collection | PAY-009 | external or money | legacy action; MCP parity unproved |
+| `platter.acct.manage_quickbooks_online_invoices_and_payments` | QuickBooks Online invoices and payments | ACCT-001 | standard or external | legacy action; MCP parity unproved |
+| `platter.acct.manage_xero_invoices_and_payments` | Xero invoices and payments | ACCT-002 | standard or external | legacy action; MCP parity unproved |
+| `platter.acct.manage_pantry_invoices_and_payments` | Pantry invoices and payments | ACCT-003 | standard or external | legacy action; MCP parity unproved |
+| `platter.acct.manage_one_invoice_authority_and_reconciliation` | One invoice authority and reconciliation | ACCT-004 | standard or external | legacy action; MCP parity unproved |
+| `platter.acct.manage_invoice_and_payment_export_files` | Invoice and payment export files | ACCT-005 | standard or external | legacy action; MCP parity unproved |
+| `platter.acct.manage_stripe_payouts_fees_and_clearing_in_accounting` | Stripe payouts, fees and clearing in accounting | ACCT-006 | standard or external | legacy action; MCP parity unproved |
+| `platter.acct.manage_invoices_created_on_their_issue_day_never_ahead` | Invoices created on their issue day, never ahead | ACCT-007 | standard or external | legacy action; MCP parity unproved |
+| `platter.crm.manage_hubspot_two_way_deal_sync` | HubSpot two-way deal sync | CRM-001 | standard or external | legacy action; MCP parity unproved |
+| `platter.crm.manage_salesforce_two_way_opportunity_sync` | Salesforce two-way opportunity sync | CRM-002 | standard or external | legacy action; MCP parity unproved |
+| `platter.crm.manage_orbit_two_way_deal_sync` | Orbit two-way deal sync | CRM-003 | standard or external | legacy action; MCP parity unproved |
+| `platter.crm.manage_pipedrive_and_zoho_crm_sync` | Pipedrive and Zoho CRM sync | CRM-004 | standard or external | legacy action; MCP parity unproved |
+| `platter.auto.manage_status_driven_automations` | Status-driven automations | AUTO-001 | external or live | legacy action; MCP parity unproved |
+| `platter.auto.manage_completed_documents_archived_to_file_storage` | Completed documents archived to file storage | AUTO-002 | standard or external | legacy action; MCP parity unproved |
+| `platter.auto.manage_team_chat_notifications` | Team chat notifications | AUTO-003 | standard or external | legacy action; MCP parity unproved |
+| `platter.auto.manage_public_rest_api_and_webhooks` | Public REST API and webhooks | AUTO-004 | standard or external | legacy action; MCP parity unproved |
+| `platter.auto.manage_zapier_make_and_crank_apps` | Zapier, Make and Crank apps | AUTO-005 | external or live | legacy action; MCP parity unproved |
+| `platter.hand.manage_accepted_scope_handoff_to_delivery_tools` | Accepted-scope handoff to delivery tools | HAND-001 | standard or external | legacy action; MCP parity unproved |
+| `platter.hand.manage_handoff_to_gauge_with_budget_and_rates` | Handoff to Gauge with budget and rates | HAND-002 | standard or external | legacy action; MCP parity unproved |
+| `platter.renew.manage_bulk_proposal_creation_and_sending` | Bulk proposal creation and sending | RENEW-001 | standard | legacy action; MCP parity unproved |
+| `platter.renew.manage_renewal_proposals_from_accepted_agreements` | Renewal proposals from accepted agreements | RENEW-002 | standard | legacy action; MCP parity unproved |
+| `platter.report.manage_proposal_pipeline_dashboard` | Proposal pipeline dashboard | REPORT-001 | standard | legacy action; MCP parity unproved |
+| `platter.report.manage_win_rate_and_sales_performance` | Win rate and sales performance | REPORT-002 | standard | legacy action; MCP parity unproved |
+| `platter.report.manage_content_and_pricing_performance` | Content and pricing performance | REPORT-003 | standard | legacy action; MCP parity unproved |
+| `platter.report.manage_booked_billed_and_collected_revenue` | Booked, billed and collected revenue | REPORT-004 | standard | legacy action; MCP parity unproved |
+| `platter.report.manage_report_export_and_scheduled_delivery` | Report export and scheduled delivery | REPORT-005 | standard | legacy action; MCP parity unproved |
 | `platter.report.scheduled_report_delivery` | Scheduled report delivery | REPORT-006 | standard | legacy action; MCP parity unproved |
 | `platter.members.update` | Roles and permissions | TEAM-001 | access | legacy action; MCP parity unproved |
 | `platter.audiences.update` | Team folder audiences | TEAM-007 | access | legacy action; MCP parity unproved |
@@ -1906,28 +1906,28 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 | `platter.brands.update` | Multiple brands and workspaces | TEAM-003 | standard | legacy action; MCP parity unproved |
 | `platter.audit.search` | Audit log | TEAM-004 | standard | legacy action; MCP parity unproved |
 | `platter.securitypack.read` | Security review pack for procurement | TEAM-005 | standard | legacy action; MCP parity unproved |
-| `platter.mig.pandadoc_move_in` | PandaDoc move-in | MIG-001 | standard | legacy action; MCP parity unproved |
-| `platter.mig.proposify_move_in` | Proposify move-in | MIG-002 | standard | legacy action; MCP parity unproved |
-| `platter.mig.better_proposals_move_in` | Better Proposals move-in | MIG-003 | standard | legacy action; MCP parity unproved |
-| `platter.mig.qwilr_and_ignition_move_in` | Qwilr and Ignition move-in | MIG-004 | standard | legacy action; MCP parity unproved |
-| `platter.mig.open_proposals_and_payment_schedules_continue` | Open proposals and payment schedules continue | MIG-005 | standard | legacy action; MCP parity unproved |
-| `platter.mig.clients_contacts_and_catalog_csv_move_in` | Clients, contacts and catalog CSV move-in | MIG-006 | standard | legacy action; MCP parity unproved |
-| `platter.mig.move_in_from_exported_files_without_api_access` | Move-in from exported files without API access | MIG-007 | standard | legacy action; MCP parity unproved |
+| `platter.mig.manage_pandadoc_move_in` | PandaDoc move-in | MIG-001 | standard | legacy action; MCP parity unproved |
+| `platter.mig.manage_proposify_move_in` | Proposify move-in | MIG-002 | standard | legacy action; MCP parity unproved |
+| `platter.mig.manage_better_proposals_move_in` | Better Proposals move-in | MIG-003 | standard | legacy action; MCP parity unproved |
+| `platter.mig.manage_qwilr_and_ignition_move_in` | Qwilr and Ignition move-in | MIG-004 | standard | legacy action; MCP parity unproved |
+| `platter.mig.manage_open_proposals_and_payment_schedules_continue` | Open proposals and payment schedules continue | MIG-005 | standard | legacy action; MCP parity unproved |
+| `platter.mig.manage_clients_contacts_and_catalog_csv_move_in` | Clients, contacts and catalog CSV move-in | MIG-006 | standard | legacy action; MCP parity unproved |
+| `platter.mig.manage_move_in_from_exported_files_without_api_access` | Move-in from exported files without API access | MIG-007 | standard | legacy action; MCP parity unproved |
 | `platter.drafts.prepare` | Drafts from meeting notes, transcripts and email | AI-001 | standard or sensitive | legacy prepare_proposal |
 | `platter.text.rewrite` | Writing assistant in the editor | AI-002 | standard | legacy action; MCP parity unproved |
 | `platter.prices.suggest` | Explainable price suggestions | AI-004 | standard | legacy action; MCP parity unproved |
-| `platter.priv.erasure_across_contacts_tracking_and_synced_systems` | Erasure across contacts, tracking and synced systems | PRIV-001 | standard | legacy action; MCP parity unproved |
+| `platter.priv.manage_erasure_across_contacts_tracking_and_synced_systems` | Erasure across contacts, tracking and synced systems | PRIV-001 | standard | legacy action; MCP parity unproved |
 | `platter.archives.export` | Complete product archive | PORT-002 | standard or sensitive | legacy action; MCP parity unproved |
 | `platter.connections.update` | Provider credential custody | SEC-001 | accounts or gated or security | legacy action; MCP parity unproved |
-| `platter.agent.discovery_call_to_priced_draft` | Discovery call to priced draft | AGENT-001 | standard or external or commitment | legacy action; MCP parity unproved |
-| `platter.agent.scope_and_price_tested_against_delivery_reality` | Scope and price tested against delivery reality | AGENT-002 | standard | legacy action; MCP parity unproved |
-| `platter.agent.client_questions_chased_to_resolution` | Client questions chased to resolution | AGENT-003 | external or commitment | legacy action; MCP parity unproved |
-| `platter.agent.engagement_driven_follow_up` | Engagement-driven follow-up | AGENT-004 | external | legacy action; MCP parity unproved |
-| `platter.agent.payment_exceptions_closed_without_duplicate_invoices` | Payment exceptions closed without duplicate invoices | AGENT-005 | external or money | legacy action; MCP parity unproved |
-| `platter.agent.out_of_scope_delivery_turned_into_a_change_order` | Out-of-scope delivery turned into a change order | AGENT-006 | external or money or commitment | legacy action; MCP parity unproved |
-| `platter.agent.win_and_loss_learning_for_templates_and_pricing` | Win and loss learning for templates and pricing | AGENT-007 | standard | legacy action; MCP parity unproved |
-| `platter.agent.renewal_preparation_from_delivered_results` | Renewal preparation from delivered results | AGENT-008 | standard or commitment | legacy action; MCP parity unproved |
-| `platter.agent.agent_authority_ledger_and_limits` | Agent authority ledger and limits | AGENT-009 | standard | legacy action; MCP parity unproved |
+| `platter.agent.manage_discovery_call_to_priced_draft` | Discovery call to priced draft | AGENT-001 | standard or external or commitment | legacy action; MCP parity unproved |
+| `platter.agent.manage_scope_and_price_tested_against_delivery_reality` | Scope and price tested against delivery reality | AGENT-002 | standard | legacy action; MCP parity unproved |
+| `platter.agent.manage_client_questions_chased_to_resolution` | Client questions chased to resolution | AGENT-003 | external or commitment | legacy action; MCP parity unproved |
+| `platter.agent.manage_engagement_driven_follow_up` | Engagement-driven follow-up | AGENT-004 | external | legacy action; MCP parity unproved |
+| `platter.agent.manage_payment_exceptions_closed_without_duplicate_invoices` | Payment exceptions closed without duplicate invoices | AGENT-005 | external or money | legacy action; MCP parity unproved |
+| `platter.agent.manage_out_of_scope_delivery_turned_into_a_change_order` | Out-of-scope delivery turned into a change order | AGENT-006 | external or money or commitment | legacy action; MCP parity unproved |
+| `platter.agent.manage_win_and_loss_learning_for_templates_and_pricing` | Win and loss learning for templates and pricing | AGENT-007 | standard | legacy action; MCP parity unproved |
+| `platter.agent.manage_renewal_preparation_from_delivered_results` | Renewal preparation from delivered results | AGENT-008 | standard or commitment | legacy action; MCP parity unproved |
+| `platter.agent.manage_agent_authority_ledger_and_limits` | Agent authority ledger and limits | AGENT-009 | standard | legacy action; MCP parity unproved |
 **Resources.** Proposal, revision, template, library item, catalog item, client, agreement, invoice, payment, follow-up, report, audit and import-job URI templates identify their native records.
 **Events.** proposal.changed, approval.decided, proposal.sent, question.changed, signature.recorded, payment.changed, followup.changed, import.completed and policy.adopted.
 **Prompts.** Discovery-to-proposal (AI-001, AGENT-001), delivery-fit review (AGENT-002), question resolution (AGENT-003), collection reconciliation (AGENT-005), change order (AGENT-006) and renewal (AGENT-008).
@@ -2177,7 +2177,7 @@ Platter is one product. Where the market sells a neighboring product separately,
 
 ## Status
 
-Judged from the code and tests at commit `83c5300be4eee707af37fecfe7b53016a3fe3e05` (28 October 2026). PRICE-003 retains main’s assertion repairs and judgment. AUTO-004 remains partial under the ct demotion of 27 October 2026 at 23:04Z; the corrected behavior and new assertions require fresh judgment. No ct acceptance or landing receipt is claimed.
+Judged from the code and tests at commit `b2551363bd49d431add363e7ee97bed57938c394` (28 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
@@ -2241,7 +2241,7 @@ Judged from the code and tests at commit `83c5300be4eee707af37fecfe7b53016a3fe3e
 | `SEND-011` | Inbound client reply custody | target | partial | `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | All listed acceptance outcomes are traced in DONE-AUDIT. The published conservative demotion is retained pending a fresh ct judgment; this rewrite makes no status promotion. |
 | `SEND-002` | Delivery status and bounce handling | target | partial | `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Delivered. The complete listed branch set needs asserting lines, rather than a provider callback status alone. deferred-then-delivered. The complete listed branch set needs asserting lines, rather than a provider callback status alone. hard bounce each display their state. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Both signed-provider correlations. The complete listed branch set needs asserting lines, rather than a provider callback status alone. replay. The complete listed branch set needs asserting lines, rather than a provider callback status alone. terminal regression cases. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Queued/complained/uncertain remain distinct. The complete listed branch set needs asserting lines, rather than a provider callback status alone. Compiled delivery history at 1440 and 390. Browser assertions are outside the cited wrapper file. |
 | `SEND-012` | Bounce correction follow-up | target | partial | `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Hard bounce creates both sender notice. The complete combination is not established by a cited asserting line for each listed effect. separate follow-up. The complete combination is not established by a cited asserting line for each listed effect. Current sender correction rotates link/session. The complete combination is not established by a cited asserting line for each listed effect. preserves offer/client. The complete combination is not established by a cited asserting line for each listed effect. routes verification to corrected address. The complete combination is not established by a cited asserting line for each listed effect. Provider acceptance closes correction while uncertainty leaves it open. The complete combination is not established by a cited asserting line for each listed effect. Dismissal retains the entered reason. The complete combination is not established by a cited asserting line for each listed effect. Both desktop/phone correction. The complete combination is not established by a cited asserting line for each listed effect. exact open/resolved CLI restore. The complete combination is not established by a cited asserting line for each listed effect. |
-| `SEND-003` | Recipients, roles and sharing | target | partial | `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Policy default adopted under the standing scope rule, policy not yet ruled where noted in RULINGS: the current owner alone manages recipient roles, explicitly sends invitations or creates additional mailbox-bound viewing links, and authorizes an exact framing origin. Stakeholder conversion, copies and restores never invite anyone automatically or restore invitation authority. Scoped delegation and provider boundaries remain unapproved; the full template-role management duties remain with SIGN-011. SEND-003 stays PARTIAL policy not yet ruled where noted in RULINGS of this default. |
+| `SEND-003` | Recipients, roles and sharing | target | partial | `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Current main judged SEND-003 done under RL-21. Its role/link/removal assertions are in tests/recipients-http.mjs and its compiled browser assertions in tests/recipients-browser.mjs, neither named in the old Evidence set. The wrapper test titles alone do not prove those outcomes; stakeholder conversion’s no-mail/no-authority assertions are retained. |
 | `SEND-004` | Expiry and reopening | target | partial | `src/platter/expiry.ts`, `src/platter/expiry-time.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Accepted never expires. Every independent clock branch must have a readback assertion. reinvite keeps clock. Every independent clock branch must have a readback assertion. negotiation restarts period. Every independent clock branch must have a readback assertion. Expiry settings. The complete outcome is not isolated in the cited archive assertions. reopen requests survive restore without transport authority. The complete outcome is not isolated in the cited archive assertions. |
 | `SEND-013` | Unsigned-recipient expiry warnings | target | partial | `src/platter/expiry.ts`, `src/platter/expiry-time.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Every unsigned signer receives one warning. The additional recipient assertions live in tests/recipients-http.mjs, outside the old Evidence set. every signed signer receives none. The additional recipient assertions live in tests/recipients-http.mjs, outside the old Evidence set. Extension moves the warning date without stale delivery. No asserting line in the old cited evidence. Repeated processing gives one warning. No asserting line in the old cited evidence. uncertain transport stays held. No asserting line in the old cited evidence. All warning facts/settings restore without sending authority. No asserting line in the old cited evidence. |
 | `SEND-005` | Completion and activity notifications | target | partial | `tests/mail.test.mjs`, `tests/archive.test.mjs` | Decline and failed-payment events, personal Teams, Nook and push carriers, and settings controls with desktop and phone proof remain. Only explicitly consenting current scoped people receive generic events and protected links; view alerts additionally require current owner opt-in for that revision; preferences bind the exact proposal revision, direct Slack destinations must be verified for that person, and restoration does not activate sending. Existing APPROVE-002 and AUTO-003 consent and custody obligations remain. |

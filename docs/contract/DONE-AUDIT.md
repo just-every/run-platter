@@ -1,4 +1,4 @@
-Old reference: `b9f84d99d60dce690c63cc1ec156ab06c2e77372`.
+Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | Clause | Point | Outcome | Asserting test | Result |
 | --- | --- | --- | --- | --- |
 | HTTP-001 | 1 | Signed-out private read is refused. | `tests/platter.test.mjs:303` | asserted |
@@ -389,3 +389,8 @@ Old reference: `b9f84d99d60dce690c63cc1ec156ab06c2e77372`.
 | REPORT-006 | 2 | Scheduled count and currency total match the screen. | `tests/platter.test.mjs:618` | asserted |
 | EDIT-009 | 1 | Accepted Standard omits the timeline while Premium includes it in the immutable snapshot. | `tests/platter.test.mjs:934` | asserted |
 | EDIT-009 | 2 | Variable-dependent visibility on every carrier is unproved; package-condition assertions do not establish this outcome. | none | none |
+| SEND-003 | 1 | Each signer, CFO approver and viewer opens a separate link. The assertions are in tests/recipients-http.mjs, which the old Status Evidence does not cite. | none | none |
+| SEND-003 | 1 | The viewer’s signing attempt is refused. The assertions are in tests/recipients-http.mjs, which the old Status Evidence does not cite. | none | none |
+| SEND-003 | 1 | Removing the viewer revokes their link. The assertions are in tests/recipients-http.mjs, which the old Status Evidence does not cite. | none | none |
+| SEND-003 | 1 | Stakeholder conversion sends no automatic invitation. | `tests/platter.test.mjs:2766` | asserted |
+| SEND-003 | 1 | Stakeholder conversion creates no invitation authority. | `tests/platter.test.mjs:2767` | asserted |

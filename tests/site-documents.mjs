@@ -1,3 +1,4 @@
+import { acceptRevenue } from './revenue-fixture.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
 import { documentJourney } from './document-journey.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
@@ -693,4 +694,48 @@ test('PRICE-003 and PRICE-002 recurring line editing, preview, client selection 
 
 test('EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads', {timeout:120000},async()=>{
  const {documentImportBrowser}=await import('./document-import-browser.mjs');await documentImportBrowser()
+})
+
+
+test('REPORT-004 booked snapshots and independent receipt periods export and schedule the visible report', {timeout:120000}, async()=>{
+ const {harness}=await import('./harness.mjs')
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ let browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   const h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',unclaimed:true})
+   const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const bootstrap=await context.request.post(h.origin+'/auth/bootstrap',{headers:{origin:h.origin},data:{token:h.auth.SETUP_TOKEN,displayName:'Synthetic owner'},maxRedirects:0})
+    assert.equal(bootstrap.status(),303)
+    const owner=bootstrap.headers()['set-cookie'].split(';')[0],page=await context.newPage()
+    await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const app={...h,owner,cmd:(name,input,cookie=owner)=>h.cmd(name,input,cookie),state:(cookie=owner)=>h.state(cookie)}
+    const client=await app.cmd('client.save',{name:'Reporting client',email:h.auth.OWNER_EMAIL})
+    const first=await acceptRevenue(app,{clientId:client.id}),later=await acceptRevenue(app,{clientId:client.id,term:24,date:'2099-04-01',title:'Two-year care'})
+    for(const [id,amount,receivedOn] of [[first.id,'2500','2099-03-31'],[first.id,'1200','2099-04-01'],[later.id,'2400','2099-06-30']])await app.cmd('payment.record',{id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4500',consent:true})
+    await page.goto(h.origin+'/app?view=recorded-revenue')
+    const ownerId=(await app.state()).actor.id
+    await page.getByLabel('Currency',{exact:true}).selectOption('USD');await page.getByLabel('Owner',{exact:true}).selectOption(ownerId)
+    for(const [label,value] of [['Booked from (UTC)','2099-01-15'],['Booked through (UTC)','2099-03-31'],['Received from','2099-04-01'],['Received through','2099-06-30']])await page.getByLabel(label,{exact:true}).fill(value)
+    await page.getByRole('button',{name:'Filter pipeline',exact:true}).click()
+    const report=page.locator('section').filter({has:page.getByRole('heading',{name:'Recorded revenue',exact:true})})
+    if(width===1440){
+     assert.equal(await report.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'2')
+     const totals=report.locator('.line-totals');assert.match(await totals.innerText(),/Booked one-off value\s+\$2,500\.00 USD/);assert.match(await totals.innerText(),/Booked first-year value\s+\$16,900\.00 USD/);assert.match(await totals.innerText(),/Received payments\s+\$3,600\.00 USD/)
+     assert.equal(await page.getByLabel('Booked through (UTC)',{exact:true}).inputValue(),'2099-03-31');assert.equal(await page.getByLabel('Received from',{exact:true}).inputValue(),'2099-04-01')
+    }
+    await page.evaluate(()=>document.fonts.ready)
+    if(screenshots){await report.screenshot({path:join(screenshots,'REPORT-004-periods-'+width+'.png')});await page.screenshot({path:join(screenshots,'REPORT-004-screen-'+width+'.png'),fullPage:true})}
+    const exports=page.locator('section').filter({has:page.getByRole('heading',{name:'Report export and email',exact:true})})
+    const csv=await context.request.get(h.origin+await exports.getByRole('link',{name:'Download recorded revenue CSV',exact:true}).getAttribute('href'))
+    if(width===1440){assert.equal(csv.status(),200);assert.match(await csv.text(),/Total \(2 proposals\),,,,,USD,16900\.00,,,,2500\.00,16900\.00,3600\.00/)}
+    await exports.getByRole('checkbox').first().check();await exports.getByRole('button',{name:'Schedule report email',exact:true}).click()
+    if(width===1440){assert.equal(await page.getByRole('alert').count(),0);const saved=(await app.state()).reportSchedules[0],filters=new URLSearchParams(saved.filters);assert.equal(filters.get('receivedFrom'),'2099-04-01');assert.equal(filters.get('bookedTo'),'2099-03-31');assert.equal(filters.get('owner'),ownerId);assert.equal(filters.get('currency'),'USD');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))}
+    await page.getByRole('button',{name:'Stop this schedule',exact:true}).click()
+   }finally{await context.close();await h.close()}
+  }
+ }finally{await browser?.close()}
 })

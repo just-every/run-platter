@@ -1,3 +1,4 @@
+import { acceptRevenue } from './revenue-fixture.mjs'
 import { collectionLifecycle, collectionFees, collectionMethodInheritance } from './collection-journey.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { richLibraryPropagation, richLibrarySource } from './library-fixture.mjs'
@@ -1743,7 +1744,7 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   await h.cmd('proposal.approve',{id:second.id,version:1,revision:1});const secondSend=await h.cmd('proposal.send',{id:second.id,version:2},people.sales),secondPath=new URL(secondSend.shareUrl).pathname,secondCookie=await verified(h,secondPath)
   assert.equal((await h.send(secondPath+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},secondCookie)).status,200)
   await h.cmd('payment.record',{id:second.id,amount:'7',receivedOn:'2026-10-21',method:'check',reference:'synthetic-platter-4200',consent:true},people.billing);await h.cmd('invoice.export',{id:p.id})
-  const query='view=recorded-revenue&sort=value&direction=desc',totals={currency:'USD',count:2,valueCents:480000,receivedCents:61000,refundedCents:40000,netReceivedCents:21000,uncertainRefundCents:5000,exportedDepositCents:60000}
+  const query='view=recorded-revenue&sort=value&direction=desc',totals={currency:'USD',count:2,valueCents:480000,oneOffCents:480000,firstYearCents:480000,receivedCents:61000,refundedCents:40000,netReceivedCents:21000,uncertainRefundCents:5000,exportedDepositCents:60000}
   for(const [role,cookie] of Object.entries({owner:h.owner,...people})){
    const report=await h.send('/api/platter/pipeline?'+query,undefined,cookie)
    if(role==='content_editor'){assert.equal(report.status,403);assert.equal((await h.send('/app?'+query,undefined,cookie)).status,403);assert.ok((await h.state(cookie)).proposals.every(p=>!Object.hasOwn(p,'recordedRevenue')));continue}
@@ -1751,9 +1752,48 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
    if(['owner','admin','billing'].includes(role))assert.deepEqual(report.value.totals,[totals]);else{assert.deepEqual(report.value.rows.map(r=>r.id),[second.id]);assert.equal(report.value.totals[0].netReceivedCents,700)}
    assert.doesNotMatch(report.text,/provider_charge|reference|recorded_by|internalPricing|synthetic-platter-2401/)
   }
-  const csv=await h.send('/api/platter/pipeline.csv?'+query,undefined,h.owner);assert.equal(csv.status,200);assert.match(csv.text,/Received payments,Confirmed refunds,Net received,Unconfirmed refunds,Exported deposit CSV value/);assert.match(csv.text,/Total \(2 proposals\),,,,,USD,4800\.00,,?,610\.00,400\.00,210\.00,50\.00,600\.00/)
+  const csv=await h.send('/api/platter/pipeline.csv?'+query,undefined,h.owner);assert.equal(csv.status,200);assert.match(csv.text,/Received payments,Confirmed refunds,Net received,Unconfirmed refunds,Exported deposit CSV value/);assert.match(csv.text,/Total \(2 proposals\),,,,,USD,4800\.00,,,,4800\.00,4800\.00,610\.00,400\.00,210\.00,50\.00,600\.00/)
   const scheduled=await h.cmd('report.schedule',{filters:query,cadence:'daily',hour:8,recipients:[h.auth.OWNER_EMAIL]});const due=(await h.state()).reportSchedules.find(r=>r.id===scheduled.id).nextRunAt,worker=await h.mf.getWorker();await worker.scheduled({scheduledTime:new Date(due),cron:'*/15 * * * *'});await worker.scheduled({scheduledTime:new Date(due),cron:'*/15 * * * *'})
   const email=(await h.state()).reportOutbox;assert.equal(email.length,1);assert.match(email[0].subject,/recorded revenue/);const asOfRun=await h.send('/api/platter/pipeline.csv?'+query,undefined,h.owner);assert.equal(asOfRun.status,200);assert.ok(email[0].body.includes(asOfRun.text),'scheduled CSV equals the same filtered rows as of the run time');assert.match(email[0].body,/Net received: \$210\.00 USD/);assert.match(email[0].body,/Unconfirmed refunds: \$50\.00 USD/)
+
+  const undated=new URLSearchParams({view:'recorded-revenue',q:offer.title,bookedFrom:'2099-01-01',bookedTo:'2099-12-31',receivedFrom:'2000-01-01',receivedTo:'2100-12-31'})
+  const datedOnly=await h.send('/api/platter/pipeline?'+undated,undefined,h.owner);assert.equal(datedOnly.status,200);assert.equal(datedOnly.value.totals[0].receivedCents,300,'A linked Stripe receipt has no recorded receipt date and cannot be placed in a collection period');assert.equal(datedOnly.value.totals[0].refundedCents,0)
+  const ownerId=(await h.state()).actor.id
+  const first=await acceptRevenue(h,{clientId:client.id}),later=await acceptRevenue(h,{clientId:client.id,term:24,date:'2099-04-01',title:'Two-year care'})
+  const other=await acceptRevenue(h,{clientId:client.id,cookie:people.sales,title:'Sales care'}),aud=await acceptRevenue(h,{clientId:client.id,currency:'AUD',title:'Historical AUD care'})
+  for(const [id,amount,receivedOn] of [[first.id,'2500','2099-03-31'],[first.id,'1200','2099-04-01'],[later.id,'2400','2099-06-30'],[other.id,'900','2099-04-01'],[aud.id,'700','2099-04-01']])await h.cmd('payment.record',{id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4300',consent:true},people.billing)
+  const filters=new URLSearchParams({view:'recorded-revenue',currency:'USD',owner:ownerId,bookedFrom:'2099-01-15',bookedTo:'2099-03-31',receivedFrom:'2099-04-01',receivedTo:'2099-06-30',sort:'value',direction:'desc'}).toString()
+  const read=async query=>{const r=await h.send('/api/platter/pipeline?'+query,undefined,h.owner);assert.equal(r.status,200,r.text);return r.value}
+  const native=await read(filters)
+  assert.deepEqual(native.rows.map(r=>r.id),[first.id,later.id])
+  assert.deepEqual(native.totals,[{currency:'USD',count:2,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:360000,refundedCents:0,netReceivedCents:360000,uncertainRefundCents:0,exportedDepositCents:0}])
+  assert.equal(native.rows[0].bookedOn,'2099-01-15')
+  assert.deepEqual(native.rows.map(r=>[r.recordedRevenue.oneOffCents,r.recordedRevenue.firstYearCents,r.recordedRevenue.receivedCents]),[[250000,1690000,120000],[0,0,240000]])
+  const reverse=new URLSearchParams(filters);reverse.set('bookedFrom','2099-04-01');reverse.set('bookedTo','2099-06-30');reverse.set('receivedFrom','2099-01-01');reverse.set('receivedTo','2099-03-31')
+  const secondQuarter=await read(reverse)
+  assert.deepEqual(secondQuarter.totals,[{currency:'USD',count:2,valueCents:3130000,oneOffCents:250000,firstYearCents:1690000,receivedCents:250000,refundedCents:0,netReceivedCents:250000,uncertainRefundCents:0,exportedDepositCents:0}])
+  const sameDay=new URLSearchParams(filters);sameDay.set('bookedTo','2099-01-15');sameDay.set('receivedFrom','2099-03-31');sameDay.set('receivedTo','2099-03-31')
+  assert.deepEqual((await read(sameDay)).rows.map(r=>[r.id,r.recordedRevenue.receivedCents]),[[first.id,250000]],'Both date endpoints are inclusive')
+  const foreign=new URLSearchParams(filters);foreign.set('currency','AUD');assert.deepEqual((await read(foreign)).totals,[{currency:'AUD',count:1,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:70000,refundedCents:0,netReceivedCents:70000,uncertainRefundCents:0,exportedDepositCents:0}])
+  for(const cookie of [people.sales,people.manager,people.viewer])assert.equal((await h.send('/api/platter/pipeline?'+filters,undefined,cookie)).value.count,0,'Owner filter cannot widen live revenue scope')
+  const frozen=(await h.state()).proposals.find(p=>p.id===first.id).acceptance
+  await h.cmd('proposal.revise',{...first.input,id:first.id,version:4},h.owner,409)
+  assert.equal((await h.send(first.path+'/action?name=accept',{name:'Changed',optionId:'two',consent:true},first.cookie)).status,200)
+  assert.deepEqual((await h.state()).proposals.find(p=>p.id===first.id).acceptance,frozen)
+  assert.deepEqual((await read(filters)).totals,native.totals,'Retries and refused repricing cannot change booked snapshots')
+  for(const bad of ['bookedFrom=2099-02-30','bookedFrom=2099-04-01&bookedTo=2099-01-01','receivedFrom=2099-07-01&receivedTo=2099-04-01','currency=usd']){
+   assert.equal((await h.send('/api/platter/pipeline?view=recorded-revenue&'+bad,undefined,h.owner)).status,400)
+   const before=(await h.state()).reportSchedules;await h.cmd('report.schedule',{filters:'view=recorded-revenue&'+bad,cadence:'daily',hour:8,recipients:[h.auth.OWNER_EMAIL]},h.owner,400);assert.deepEqual((await h.state()).reportSchedules,before)
+  }
+  const filteredCsv=await h.send('/api/platter/pipeline.csv?'+filters,undefined,h.owner)
+  assert.equal(filteredCsv.status,200);assert.match(filteredCsv.text,/Accepted on \(UTC\),Booked one-off value,Booked first-year value/)
+  assert.match(filteredCsv.text,/Total \(2 proposals\),,,,,USD,16900\.00,,,,2500\.00,16900\.00,3600\.00,0\.00,3600\.00/)
+  const scheduledNative=await h.cmd('report.schedule',{filters,cadence:'daily',hour:8,recipients:[h.auth.OWNER_EMAIL]})
+  const saved=(await h.state()).reportSchedules.find(r=>r.id===scheduledNative.id);assert.deepEqual(Object.fromEntries(new URLSearchParams(saved.filters)),Object.fromEntries(new URLSearchParams(filters)))
+  await worker.scheduled({scheduledTime:new Date(saved.nextRunAt),cron:'*/15 * * * *'});await worker.scheduled({scheduledTime:new Date(saved.nextRunAt),cron:'*/15 * * * *'})
+  const nativeMail=(await h.state()).reportOutbox.filter(m=>m.body.includes('Booked first-year value: $16,900.00 USD'))
+  assert.equal(nativeMail.length,1);assert.ok(nativeMail[0].body.includes((await h.send('/api/platter/pipeline.csv?'+filters,undefined,h.owner)).text));assert.match(nativeMail[0].body,/Received payments: \$3,600\.00 USD/)
+
 
  }finally{await h.close()}
 })

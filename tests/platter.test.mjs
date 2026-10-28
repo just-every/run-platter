@@ -2998,7 +2998,7 @@ describe('AUTO-004 independently documented authority',()=>{
 
 test('SIGN-004 sequential and parallel recipient groups complete only after every signature',async()=>{
  const h=await harness({assetsDirectory:'public'})
- try{const {signingOrderHttp}=await import('./recipients-http.mjs');await signingOrderHttp(h)}finally{await h.close()}
+ try{const {signingOrderHttp,ownershipHandoffHttp}=await import('./recipients-http.mjs');await signingOrderHttp(h);await ownershipHandoffHttp(h)}finally{await h.close()}
 })
 test('SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP',()=>run(async h=>{const {recipientRolesHttp}=await import('./recipients-http.mjs');await recipientRolesHttp(h)}))
 
@@ -3027,7 +3027,7 @@ test('EDIT-004 linked deal variables refuse missing values, freeze the sent revi
   const native=await h.cmd('proposal.prepare',{...offer,clientId:b.id,title:'{{Client.Company}} native roles',scope:'{{Contact.Name}} {{Contact.Title}} {{Client.Address}} {{Custom.Region}} {{Sender.FirstName}}',variableValues:{},recipientPlan:[{id:'synthetic-platter-client',name:'{{Contact.Name}}',email:'{{Client.Email}}',role:'signer',group:1}]})
   const nativeRow=await get(native.id);assert.equal(nativeRow.scope,'Casey Lane Buyer 20 Synthetic Street West Jordan');assert.deepEqual(JSON.parse(nativeRow.recipient_plan).map(r=>[r.name,r.email]),[['Casey Lane',['synthetic-platter-202','example.test'].join('@')]])
   const template=await h.cmd('template.save',{id:native.id,version:1,name:'Synthetic variable roles'}),fromTemplate=await h.cmd('template.start',{id:template.id,version:1,clientId:b.id}),templateRow=await get(fromTemplate.id)
-  assert.equal(templateRow.scope,nativeRow.scope);assert.deepEqual(JSON.parse(templateRow.recipient_plan).map(r=>[r.name,r.email]),[['Casey Lane',['synthetic-platter-202','example.test'].join('@')]])
+  assert.deepEqual((await h.state()).templates.find(t=>t.id===template.id).snapshot.document.merge.values,{},'templates retain bindings without source contact or deal values');assert.equal(templateRow.scope,nativeRow.scope);assert.deepEqual(JSON.parse(templateRow.recipient_plan).map(r=>[r.name,r.email]),[['Casey Lane',['synthetic-platter-202','example.test'].join('@')]])
   await h.cmd('provider.connect',{provider:'salesforce',version:0,token:'synthetic-platter-208',consent:true})
   const sf=await h.cmd('proposal.prepare',{...offer,clientId:b.id,title:'{{Deal.Name}} for {{Client.Company}}',scope:'{{Contact.Name}} {{Contact.Title}} {{Client.Address}}',priceOne:'{{Deal.Amount}}',variableDeal:{provider:'salesforce',id:'synthetic-platter-209'}}),sfRow=await get(sf.id)
   assert.equal(sfRow.title,'Synthetic Salesforce opportunity for Synthetic Salesforce client');assert.equal(sfRow.scope,'Taylor Lane CFO 41 Synthetic Street');assert.equal(sfRow.options[0].cents,410000)

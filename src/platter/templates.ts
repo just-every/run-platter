@@ -55,7 +55,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   if(existing?.shared===1)await requireAudienceConsent(db,existing.folder_id,folderId,input.shareConsent)
   const templateName = text(input.name, 'a template name')
   const { id: _id, client_id: _client, revision: _revision, ...content } = snapshot(displayed)
-  if(content.document)content.document=bindDocument(content.document)
+  if(content.document){content.document=bindDocument(content.document);if(content.document.merge)content.document.merge={patterns:content.document.merge.patterns,values:{}}}
   if(content.recipient_plan)content.recipient_plan=content.recipient_plan.map((r:any)=>({...r,email:null}))
   if(existing)await assertTemplateLocks(db,existing,content)
   const [pdf, savedExpiry, sections] = await Promise.all([

@@ -2,7 +2,7 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | Clause | Point | Outcome | Asserting test | Result |
 | --- | --- | --- | --- | --- |
 | HTTP-001 | 1 | Signed-out private read is refused. | `tests/platter.test.mjs:303` | asserted |
-| HTTP-001 | 2 | Foreign-origin domain call is refused. | `tests/platter.test.mjs:2785` | asserted |
+| HTTP-001 | 2 | Foreign-origin domain call is refused. | `tests/platter.test.mjs:2788` | asserted |
 | HTTP-001 | 3 | Revoked key cannot read context. | `tests/platter.test.mjs:23` | asserted |
 | HTTP-001 | 4 | Owner-only invoice/import attempts are refused without record changes. Expected statuses are checked by tests/harness.mjs, outside this clause’s cited evidence; the complete no-write outcome is not asserted here. | none | none |
 | ACCESS-001 | 1 | A labelled key prepares a draft. | `tests/platter.test.mjs:22` | asserted |

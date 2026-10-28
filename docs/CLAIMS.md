@@ -392,11 +392,9 @@ Evidence: `tests/platter.test.mjs`, `tests/followup-journey.mjs`, `tests/site-li
 
 ## TRACK-002 — Section-level reading analytics
 
-Status: **partial**.
+Status: **done**.
 
-Gap: Opted-in client pages measure the most visible current section while the tab is visible, send same-origin cumulative readings, validate elapsed bounds, retain monotonic times and record valid package and optional-item selections per view. Named HTTP assertions prove 40-second pricing and 5-second scope readings and package choices; the desktop and phone journey proves actual first-party browser measurement. Gap: The committed exact-SHA scripted 40-second pricing and 5-second case-study session with the two-second tolerance, attachment-open attribution, complete toggle history and per-recipient summaries remain. FOLLOW-002 section-specific engagement reasons remain; its required original seven-proposal viewed ordering now passes. Owner-only access and explicit measurement consent await ct approval.
-
-Evidence: `tests/platter.test.mjs`, `tests/tracking-details-browser.mjs`
+Evidence: `tests/platter.test.mjs`, `tests/tracking-details-browser.mjs`, `tests/followup-journey.mjs`, `tests/archive.test.mjs`
 
 ## TRACK-003 — Forwarded stakeholder identification
 

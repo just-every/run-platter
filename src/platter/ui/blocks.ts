@@ -20,7 +20,7 @@ export function documentBlocks(view:any,mediaBase='',suffix=''){
    if(view.recipientProgress&&view.status!=='accepted'&&fieldSlot(b,view.recipientProgress.clientSlot)!==view.recipientProgress.recipient.id)return ''
    const value=view.acceptance?.fieldValues?.[b.id]??view.recipientProgress?.ownFields?.[b.id],disabled=view.preview||!view.verified||view.status==='accepted'||view.recipientProgress?.signed||view.recipientProgress&&!view.recipientProgress.ready,name=(b.type==='signature'?'signature:':'field:')+b.id
    body+='<p class="muted">'+(b.recipientRole==='slot'?ui('Assigned to ')+escape(recipientPlan(view).find(r=>r.id===b.recipientId)?.name??'this recipient')+ui(' recipient role.'):ui('Assigned to the Client recipient')+(b.recipientId?'':ui(' role'))+'.')+'</p>'
-   if(view.status==='accepted'||view.recipientProgress?.signed)body+='<p>'+escape(value===undefined?ui('Not collected'):value===true?'Yes':value===false?'No':value)+'</p>'
+   if(view.status==='accepted'||view.recipientProgress?.signed)body+='<p>'+escape(value===undefined?ui('Not collected'):value===true?ui('Yes'):value===false?ui('No'):value)+'</p>'
    else {const kind=b.type==='signature'?'text':b.fieldKind,required=b.type==='signature'||b.required;body+='<label>'+escape(b.type==='signature'?ui('Type your full name for ')+b.title:b.title)+'<input form="platter-acceptance" name="'+escape(name)+'" type="'+escape(kind)+'"'+(kind==='checkbox'?' value="yes"':' maxlength="1000"')+(required?' required':'')+(disabled?' disabled':'')+'></label>'+(b.type==='signature'?ui('<p>By accepting below, you adopt this typed name as your signature for this block. It must match your acceptance name.</p>'):'')}
    if(b.text)body+=richText(b.text)
   }

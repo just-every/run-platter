@@ -1,3 +1,4 @@
+import { archiveCommand } from './archiving/jobs'
 import { hasTaxable, taxRequest, optionTax, resolveTax, saveTaxRate, validateTaxOptions, type TaxSnapshot } from './taxes'
 import { resolveVariables, editableVariableFields, missingMerge, clientVariableFields } from './variables'
 import { recipientCommand, recipientInvitations, recipientInput } from './recipients'
@@ -125,6 +126,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='payment.surcharge')return surchargeCommand(db,a,p)
  if(name==='payment.collection')return collectionPolicyCommand(env,a,name,p)
  if(name.startsWith('payment.'))return paymentCommand(env,a,name,p)
+ if(name.startsWith('archive.'))return archiveCommand(env,a,name,p)
  if(name.startsWith('provider.'))return connectionCommand(env,a,name,p)
  if(name==='workspace.defaults')return workspaceCommand(db,a,p)
  if(name==='pricing.cost')return saveCost(env,a,p,(fields,patch)=>command(env,a,'proposal.revise',fields,undefined,patch))

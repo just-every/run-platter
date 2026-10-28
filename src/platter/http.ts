@@ -1,3 +1,4 @@
+import { archiveState } from './archiving/jobs'
 import { fixedPagePreview, importDocument, exportDocument } from './documents/import-export'
 import { publicApi } from './api'
 import { stakeholderResponse } from './tracking/stakeholders'
@@ -104,6 +105,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    const media=path.match(/^\/api\/platter\/document-media\/([\w-]+)\/([\w-]+)$/);if(media){const row=await permitted(env.DB,actor,media[1]);return await documentMedia(env.DB,negotiatedView(row,await pendingNegotiation(env.DB,row.id)),media[2])}
    const dispute=path.match(/^\/api\/platter\/disputes\/([^/]+)\/evidence\.pdf$/);if(dispute){const response=await disputePdf(env,actor,decodeURIComponent(dispute[1]),url.searchParams.get('submission'),url.searchParams.get('packet'));await recordAudit(env.DB,actor,'dispute.evidence',decodeURIComponent(dispute[1]));return response}
    if(path==='/api/platter/agreement.pdf'||path==='/api/platter/certificate.pdf'||path==='/api/platter/certificate.json')return await agreementArtifact(env,String(url.searchParams.get('id')),path.split('/').at(-1)!,{actor})
+   if(path==='/api/platter/archives'){need(administrators.includes(actor.role),'Only owner and admins read archive history',403);return json(await archiveState(env,actor))}
    if(path==='/api/platter/engagement')return json(await engagement(env,actor,String(url.searchParams.get('id')??'')))
    if(path==='/api/platter/tracking-alerts'){need(senders.includes(actor.role),'Only current proposal senders read open notices',403);return json({alerts:await senderAlerts(env.DB,actor)})}
    if(path==='/api/platter/watch')return json({watcher:await watcherState(env,actor,url.searchParams.get('id'))})

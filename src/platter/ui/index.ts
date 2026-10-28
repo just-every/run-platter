@@ -1,3 +1,4 @@
+import { archivePanel } from './archiving'
 import { trackingPanel, trackingNotices } from './tracking'
 import { collaborationSettings } from './collaboration'
 import { documentBrandCss } from './blocks'
@@ -37,7 +38,7 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
       case '/app/library': title='Content library'; content=libraryPage(state,url.searchParams); break
       case '/app/team': title='Team'; content=teamPage(state)+foldersPanel(state)+connectionsPanel(state,true); break
       case '/app/approvals': title='Approvals'; content=approvalsPage(state); break
-      case '/app/settings': title = 'Vendor documents'; above = eyebrow('Settings · defaults for new proposals'); content = trackingPanel(state)+vendorSettings(state)+workspacePanel(state)+connectionsPanel(state,false)+collaborationSettings(state); break
+      case '/app/settings': title = 'Vendor documents'; above = eyebrow('Settings · defaults for new proposals'); content = trackingPanel(state)+vendorSettings(state)+workspacePanel(state)+connectionsPanel(state,false)+archivePanel(state)+collaborationSettings(state); break
       case '/app': title = 'Proposals'; above = eyebrow(`Pipeline · ${count((state.proposals ?? []).length, 'proposal')} · ${count((state.clients ?? []).length, 'client')}`); layout = 'proposals-page'; content = proposalsPage(state, url.searchParams, composerRefusal); break
       case '/app/proposal': {
         const id = url.searchParams.get('id') ?? ''

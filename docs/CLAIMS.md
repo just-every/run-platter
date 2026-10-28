@@ -716,11 +716,11 @@ Evidence: None recorded.
 
 ## AUTO-002 — Completed documents archived to file storage
 
-Status: **missing**.
+Status: **partial**.
 
-Gap: No document archiving.
+Gap: OneDrive, SharePoint, Box, Chest, full agreement attachments, payment-gated completion, configured multi-recipient completion and live-provider qualification remain. Browser and restored-history proof are pending. Conservative owner and admin authorization default: explicit verified account, destination folder and naming pattern; configuration, connection and authorizing role versions checked before each request; uncertain writes held without automatic replay. Restores confer no credentials or execution authority. SEND-003 and SIGN-004 retain their recorded authority holds.
 
-Evidence: None recorded.
+Evidence: `tests/platter.test.mjs`
 
 ## AUTO-003 — Team chat notifications
 

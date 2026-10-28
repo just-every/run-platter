@@ -1317,7 +1317,7 @@ A buyer replacing an incumbent needs the whole job, so the target is the whole j
 
 *Tier:* Core · *Cites:* BASE-ROLE-001, BASE-OPS-003
 
-**Requirement.** *Cites:* PORT-002, PRICE-006, SEC-001. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#auto-004).
+**Requirement.** A documented, scoped API creates proposals from templates, fills their variables, reads proposal status, analytics and payments, and lists agreements. Signed lifecycle webhooks retry failed delivery and expose a delivery log. The published API reference describes every public route’s scope and each webhook event’s payload schema and example. Archive custody, private cost exclusion and connection security follow PORT-002, PRICE-006 and SEC-001. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#auto-004).
 
 **Acceptance.**
 1. Create a proposal from a template through the API with a scoped key, send it, receive signed webhooks for sent and signed, verify their signatures, and see a key without write scope refused.

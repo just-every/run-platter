@@ -4796,16 +4796,26 @@
     {
       "file": "CONTRACT.md",
       "line": 946,
-      "text": "A documented REST API creates proposals from templates, fills variables, reads status, analytics and payments, and lists agreements, under scoped API keys. Its documentation is an OpenAPI description served at a public route and rendered as a reference page, listing every public route with its scopes and every webhook event with its payload schema and an example. Signed webhooks deliver every lifecycle event, with retries and a delivery log.",
+      "text": "A documented REST API creates proposals from templates, fills variables, reads status, analytics and payments, and lists agreements, under scoped API keys.",
       "to": "clause",
       "ids": [
         "AUTO-004"
-      ],
-      "also": [
-        {
-          "to": "docs",
-          "path": "docs/contract-behavior.md"
-        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 946,
+      "text": "Its documentation is an OpenAPI description served at a public route and rendered as a reference page, listing every public route with its scopes and every webhook event with its payload schema and an example.",
+      "to": "docs",
+      "path": "docs/contract-behavior.md"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 946,
+      "text": "Signed webhooks deliver every lifecycle event, with retries and a delivery log.",
+      "to": "clause",
+      "ids": [
+        "AUTO-004"
       ]
     },
     {

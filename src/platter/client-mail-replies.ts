@@ -9,7 +9,7 @@ import { authenticatedReply } from './question-replies'
 export async function prepareClientReply(env:Bindings,a:Actor,row:any){
  if(!row.reply_consent||row.reply_to)return row.reply_to
  need(resendReplyAvailable(env),'Email replies are unavailable',409)
- const share=await env.DB.prepare('SELECT token FROM p_shares WHERE proposal_id=? AND revision=?').bind(row.proposal_id,row.proposal_revision).first<any>()
+ const share=await env.DB.prepare('SELECT token FROM p_shares WHERE proposal_id=? AND revision=? AND (recipient=? OR recipient IS NULL)').bind(row.proposal_id,row.proposal_revision,row.recipient).first<any>()
  need(share,'The invitation changed before sending',409)
  const token=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join(''),sealed=await sealReplyAddress(env,token+'@'+replyDomain(env)!)
  await commit(env.DB,a,[

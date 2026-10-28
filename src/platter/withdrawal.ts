@@ -1,3 +1,4 @@
+import { voidSignatureStatement } from './recipients'
 import { firmOutcomeReason, synchronizeOutcome } from './outcomes'
 import type { Bindings } from '../auth.server'
 import { commit, exact, need, proposal, text, type Actor } from './model'
@@ -13,6 +14,7 @@ export async function withdrawalStatements(env:Bindings,row:any,actor:{id:string
  const db=env.DB,eventId=crypto.randomUUID()
  const shares=(await db.prepare('SELECT s.*,COALESCE(s.recipient,c.email) AS email FROM p_shares s JOIN p_clients c ON c.id=? WHERE s.proposal_id=?').bind(row.client_id,row.id).all<any>()).results
  const writes=[
+  voidSignatureStatement(db,row.id,row.revision,at,reason),
   db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE proposal_id=? AND status='queued'").bind(row.id),
   db.prepare('DELETE FROM p_sms_authority WHERE proposal_id=?').bind(row.id),
   db.prepare('INSERT INTO p_withdrawals(id,proposal_id,revision,actor_id,actor_email,withdrawn_at,reason,notice) VALUES(?,?,?,?,?,?,?,?)').bind(eventId,row.id,row.revision,actor.id,actor.email,at,reason,notice?1:0),

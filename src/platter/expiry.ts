@@ -97,12 +97,17 @@ export async function runExpiry(env: Bindings, at: number) {
  const db = env.DB
  await db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET observed_at=MAX(observed_at,excluded.observed_at)').bind(at).run()
  const now = await currentTime(db)
- const due = (await db.prepare(`SELECT e.*,p.title,p.revision,s.token,COALESCE(s.recipient,c.email) AS recipient
+ const due = (await db.prepare(`SELECT e.*,p.title,p.revision,p.version,s.slot_id,s.token,COALESCE(s.recipient,c.email) AS recipient
  FROM p_expiry e JOIN p_proposals p ON p.id=e.proposal_id JOIN p_clients c ON c.id=p.client_id
  JOIN p_shares s ON s.proposal_id=p.id AND s.revision=p.revision
  WHERE p.status='sent' AND e.warning_days IS NOT NULL AND e.warning_sent_at IS NULL AND e.deadline_at>?
- AND NOT EXISTS(SELECT 1 FROM p_acceptances WHERE proposal_id=p.id)`).bind(now).all<any>()).results
+ AND NOT EXISTS(SELECT 1 FROM p_acceptances WHERE proposal_id=p.id)
+ AND (p.recipient_plan='[]' OR EXISTS(SELECT 1 FROM json_each(p.recipient_plan) r WHERE json_extract(r.value,'$.id')=s.slot_id AND json_extract(r.value,'$.role') IN ('signer','countersigner')))
+ AND NOT EXISTS(SELECT 1 FROM p_recipient_signatures sig WHERE sig.proposal_id=p.id AND sig.revision=p.revision AND sig.slot_id=s.slot_id)`).bind(now).all<any>()).results
+ const handled=new Set<string>()
  for (const e of due) {
+  if(handled.has(e.proposal_id))continue
+  handled.add(e.proposal_id)
   if (startOfDate(addDays(e.expires_on, -e.warning_days), e.time_zone) > now) continue
   const owner = await actorById(db,e.owner_id)
   if(owner){try{await permitted(db,owner,e.proposal_id,'send')}catch{continue}}
@@ -112,12 +117,12 @@ export async function runExpiry(env: Bindings, at: number) {
   try {
    await commit(db, owner, [
     db.prepare('UPDATE p_expiry SET warning_sent_at=? WHERE proposal_id=?').bind(now, e.proposal_id),
-    queueMail(env, e.proposal_id, e.recipient, subject, body),
+    ...due.filter(r=>r.proposal_id===e.proposal_id).map(r=>queueMail(env,r.proposal_id,r.recipient,subject,body.replace('/p/'+e.token,'/p/'+r.token))),
     db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(), 'scheduler', 'owner', 'expiry.warning', e.proposal_id, now),
    ], true, { sql: `EXISTS(SELECT 1 FROM p_expiry e JOIN p_proposals p ON p.id=e.proposal_id JOIN p_shares s ON s.proposal_id=p.id
-    WHERE p.id=? AND p.status='sent' AND p.revision=? AND s.revision=p.revision AND s.token=?
+    WHERE p.id=? AND p.version=? AND p.status='sent' AND p.revision=? AND s.revision=p.revision AND s.token=?
     AND e.owner_id=? AND e.deadline_at=? AND e.warning_days=? AND e.warning_sent_at IS NULL AND ${expiryOpenSql('p')}
-    AND NOT EXISTS(SELECT 1 FROM p_acceptances WHERE proposal_id=p.id))`, values: [e.proposal_id, e.revision, e.token, owner.id, e.deadline_at, e.warning_days, now] })
+    AND NOT EXISTS(SELECT 1 FROM p_acceptances WHERE proposal_id=p.id))`, values: [e.proposal_id, e.version, e.revision, e.token, owner.id, e.deadline_at, e.warning_days, now] })
   } catch (error) { if ((error as any).status === 409) continue; throw error }
   await dispatchMail(env, e.proposal_id)
  }

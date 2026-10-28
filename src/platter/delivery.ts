@@ -57,6 +57,7 @@ export async function deliveryCommand(env: Bindings, actor: Actor, name: string,
  }
  need(name==='delivery.correct','Unknown delivery action',404)
  const recipient=email(input.email), old=await proposal(db,notice.proposal_id)
+ need(old.recipient_plan==='[]','Use signer replacement for a configured recipient',409)
  need(old.status==='sent','Only an unsigned sent offer can have its invitation corrected',409)
  const approval=await approvalPlan(db,old,actor);need(approval.complete,'Approve this revision under the current policy before correcting its invitation',409)
  const token=secret(), shareUrl=env.AUTH_ORIGIN+'/p/'+token

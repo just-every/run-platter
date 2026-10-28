@@ -1,4 +1,4 @@
-import { renderingLocale, ui } from '../locales'
+import { renderingLocale, ui, clientScriptCopy } from '../locales'
 import { embedFrameSources } from '../documents/embeds'
 import { createHash } from 'node:crypto'
 import { fontHead } from '../../base/font-head'
@@ -30,7 +30,7 @@ export function document(title: string, contents: string, options: FrameOptions 
   const styleHash=options.styles?createHash('sha256').update(options.styles).digest('base64'):''
   const style=options.styles?`<style>${options.styles}</style>`:''
   const responsePolicy=options.collection?policy.replace("script-src 'self'","script-src 'self' https://js.stripe.com https://*.js.stripe.com").replace("connect-src 'self'","connect-src 'self' https://api.stripe.com").replace("frame-src 'self'","frame-src 'self' https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com"):policy
-  const html = `<!doctype html><html lang="${renderingLocale()}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} · Platter</title>${icons}${fontHead}<link rel="stylesheet" href="/rer-theme.css">${parts}${style}<script src="/platter.js" defer></script></head>`
+  const html = `<!doctype html><html lang="${renderingLocale()}"${client?' data-client-copy="'+escape(JSON.stringify(clientScriptCopy(renderingLocale())))+'"':''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} · Platter</title>${icons}${fontHead}<link rel="stylesheet" href="/rer-theme.css">${parts}${style}<script src="/platter.js" defer></script></head>`
     + ui`<body${actor ? ` data-draft-scope="${escape(actor.id)}"` : ''}${!feedback?.error && (feedback?.message || feedback?.result) ? ' data-action-success="true"' : ''}><a class="skip" href="#main">Skip to content</a>`
     + `<header class="topbar"><a class="brand" href="${client ? '#' : '/app'}"><img src="/brand/mark-32.svg" width="40" height="40" alt=""><span data-rer-name>Platter</span></a>${actor ? `<nav aria-label="Main navigation">${links}</nav>` : ''}${person}</header>`
     + `<main id="main" class="${client ? 'client-page' : 'app-page'}${options.layout ? ' ' + escape(options.layout) : ''}"${client ? ' tabindex="-1"' : ''}>${options.beforeTitle ?? ''}${options.eyebrow ?? ''}<h1>${escape(title)}</h1>${options.inlineNotices ? '' : notices(feedback, client)}${contents}</main></body></html>`

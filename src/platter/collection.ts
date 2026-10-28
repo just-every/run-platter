@@ -1,3 +1,4 @@
+import { clientLocale, clientText } from './locales'
 import { currentTime } from './expiry-time'
 import { collectionQuote } from './collection-fees'
 import type { Bindings } from '../auth.server'
@@ -42,7 +43,7 @@ export async function clientCollection(env:Bindings,c:any,input:Record<string,un
   need(secret.publishableKey,'The firm must reconnect Stripe with its publishable key',409)
   need(accepted.currency==='USD','Online deposit collection currently requires USD',409)
   const quote=await collectionQuote(db,accepted.deposit_cents,method,input.billingState)
-  const id=crypto.randomUUID(),at=await currentTime(db),authorization=`I authorize a one-time ${method==='ach'?'ACH bank debit':'payment'} of ${(quote.cents/100).toFixed(2)} ${accepted.currency} for the deposit on “${JSON.parse(accepted.snapshot).title}”, revision ${accepted.revision}. No future charges are authorized.${method==='ach'?' Stripe verifies the bank account and records the ACH debit mandate.':' Stripe collects payment details securely.'}`
+  const id=crypto.randomUUID(),at=await currentTime(db),language=clientLocale(c.row),authorization=clientText('I authorize a one-time ',language)+clientText(method==='ach'?'ACH bank debit':'payment',language)+clientText(' of ',language)+(quote.cents/100).toFixed(2)+' '+accepted.currency+clientText(' for the deposit on “',language)+JSON.parse(accepted.snapshot).title+clientText('”, revision ',language)+accepted.revision+clientText('. No future charges are authorized.',language)+clientText(method==='ach'?' Stripe verifies the bank account and records the ACH debit mandate.':' Stripe collects payment details securely.',language)
   try{await db.batch([
    db.prepare('INSERT INTO p_guard(ok) VALUES(EXISTS(SELECT 1 FROM p_shares WHERE token=? AND session_hash=? AND session_expires>?))').bind(c.token,c.share.session_hash,at),
    db.prepare("INSERT INTO p_collection_intents(id,proposal_id,revision,account_id,cents,deposit_cents,fee_cents,billing_state,currency,method,status,authorization,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,'reserved',?,?,?)").bind(id,accepted.proposal_id,accepted.revision,secret.accountId,quote.cents,quote.depositCents,quote.feeCents,quote.billingState,accepted.currency,method,authorization,at,at),db.prepare('DELETE FROM p_guard')

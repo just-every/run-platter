@@ -9,13 +9,12 @@ import { configureTaxes, taxPackages, taxRequest, taxTables } from './taxes-fixt
 
 async function englishClientCopy() {
  const words=new Set()
- for(const file of ['client','shell','shared','expiry','questions','attachments','paper','suggestions','packages','pricing','payment-terms','blocks','recipients']) {
+ for(const file of ['client','shell','shared','expiry','questions','attachments','paper','suggestions','packages','pricing','payment-terms','blocks','recipients','electronic-records','../electronic-records-text']) {
   const source=ts.createSourceFile(file,await readFile('./src/platter/ui/'+file+'.ts','utf8'),ts.ScriptTarget.Latest,true)
   const collect=node=>{
    if(ts.isStringLiteral(node)||ts.isNoSubstitutionTemplateLiteral(node)||ts.isTemplateHead(node)||ts.isTemplateMiddle(node)||ts.isTemplateTail(node)) {
     for(const part of node.text.replace(/<[^>]*(?:>|$)/g,'\0').split('\0')) {
      const text=part.replace(/^[\s"'<>/=]+|[\s"'<>/=]+$/g,'').trim()
-     if(file==='recipients'&&['signer','countersigner','approver','viewer'].includes(text))words.add(text)
      if(text.length>=4&&!['Platter','Total'].includes(text)&&(/[A-Z][a-z]{3}/.test(text)||/[a-z]{3} [a-z]{3}/.test(text)))words.add(text)
     }
    }
@@ -84,6 +83,16 @@ export async function localeBrowser(width=1440) {
   assert.match(await page.getByRole('alert').innerText(),/Código de verificación incorrecto/);await spanishScreen();await capture('wrong-code')
   await page.getByLabel('Código de verificación por correo electrónico').fill(code);await page.getByRole('button',{name:'Verificar correo electrónico',exact:true}).click()
   await spanishScreen();await capture('verified')
+  await page.getByRole('button',{name:'Retirar consentimiento electrónico',exact:true}).click()
+  assert.equal(await page.getByRole('button',{name:'Aceptar propuesta',exact:true}).count(),0)
+  await spanishScreen();await capture('electronic-consent-withdrawn')
+  await page.getByRole('button',{name:'Solicitar copia en papel',exact:true}).click()
+  const notices=(await (await request.get(app.origin+'/api/platter/state')).json()).electronicRequests
+  assert.equal(notices[0].kind,'paper');assert.equal(notices[0].proposal_id,p.id)
+  await spanishScreen();await capture('paper-requested')
+  await page.getByRole('button',{name:'Volver a consentir electrónicamente',exact:true}).click()
+  assert.equal(await page.getByRole('button',{name:'Aceptar propuesta',exact:true}).count(),1)
+
   await page.getByLabel('Su pregunta',{exact:true}).fill('Una pregunta de la persona invitada.')
   await page.getByRole('button',{name:'Enviar pregunta al propietario',exact:true}).click()
   assert.match(await page.getByRole('status').first().innerText(),/Pregunta enviada al propietario/)

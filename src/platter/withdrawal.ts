@@ -1,4 +1,4 @@
-import { clientLocale } from './locales'
+import { clientLocale, clientText } from './locales'
 import { voidSignatureStatement } from './recipients'
 import { firmOutcomeReason, synchronizeOutcome } from './outcomes'
 import type { Bindings } from '../auth.server'
@@ -29,7 +29,7 @@ export async function withdrawalStatements(env:Bindings,row:any,actor:{id:string
   db.prepare("UPDATE p_bounce_notices SET closed_at=?,action='Proposal withdrawn' WHERE proposal_id=? AND closed_at IS NULL").bind(at,row.id),
   db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(eventId,actor.id,actor.role,action,row.id,at),
  ]
- if(notice)for(const s of shares)writes.push(queueMail(env,row.id,s.email,'Proposal withdrawn: '+row.title,`The firm has withdrawn this proposal.\nReason: ${reason}\nContact: ${contact}`,actor.id))
+ if(notice)for(const s of shares)writes.push(queueMail(env,row.id,s.email,clientText('Proposal withdrawn: ',clientLocale(s))+row.title,clientText('The firm has withdrawn this proposal.\nReason: ',clientLocale(s))+reason+clientText('\nContact: ',clientLocale(s))+contact,actor.id))
  return writes
 }
 

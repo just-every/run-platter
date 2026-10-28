@@ -1,3 +1,4 @@
+import { clientText, recipientMailLocale } from './locales'
 import { recipientPlan } from './recipients'
 import { reminderMessageSnapshot } from './reminder-message-defaults'
 import { reminderCopy, scheduledReminderCopy } from './reminder-messages'
@@ -74,7 +75,8 @@ async function queueReminder(env:Bindings,a:Actor,row:any,input:{subject:string;
   scheduled+=" AND EXISTS(SELECT 1 FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version WHERE s.proposal_id=? AND s.revision=? AND s.sender_id=? AND s.recipient=? AND s.enabled=1 AND s.version=?) AND (SELECT count(*) FROM p_reminder_runs WHERE proposal_id=? AND revision=? AND recipient=? AND kind='scheduled')<?"
   values.push(row.id,row.revision,a.id,recipient,input.settingsVersion,row.id,row.revision,recipient,input.cap)
  }
- try{await commit(db,a,[db.prepare('INSERT INTO p_reminder_runs(id,proposal_id,revision,recipient,kind,slot,local_date,time_zone,actor_id,subject,message,queued_at,request_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,recipient,kind,slot,localDate(at,input.zone),input.zone,a.id,input.subject,input.message,at,input.requestId),db.prepare('INSERT INTO p_reminder_transport(mail_id,run_id,share_hash,settings_version) VALUES(?,?,?,?)').bind(mailId,id,shareHash,input.settingsVersion??null),queueMail(env,row.id,recipient,input.subject,input.message+'\n\n'+env.AUTH_ORIGIN+'/p/'+share.token+'\n\nTo stop reminders, verify your mailbox on the proposal and opt out.',a.id,null,mailId),audit(db,a,'reminder.'+kind,row.id,at)],true,{sql:sql+scheduled,values})}catch(error){
+ const language=await recipientMailLocale(db,row.id,share.slot_id,recipient)
+ try{await commit(db,a,[db.prepare('INSERT INTO p_reminder_runs(id,proposal_id,revision,recipient,kind,slot,local_date,time_zone,actor_id,subject,message,queued_at,request_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,recipient,kind,slot,localDate(at,input.zone),input.zone,a.id,input.subject,input.message,at,input.requestId),db.prepare('INSERT INTO p_reminder_transport(mail_id,run_id,share_hash,settings_version) VALUES(?,?,?,?)').bind(mailId,id,shareHash,input.settingsVersion??null),queueMail(env,row.id,recipient,input.subject,input.message+'\n\n'+env.AUTH_ORIGIN+'/p/'+share.token+'\n\n'+clientText('To stop reminders, verify your mailbox on the proposal and opt out.',language),a.id,null,mailId),audit(db,a,'reminder.'+kind,row.id,at)],true,{sql:sql+scheduled,values})}catch(error){
   if(kind==='manual'&&(error as any).status===409&&await db.prepare("SELECT 1 FROM p_reminder_runs WHERE proposal_id=? AND recipient=? AND kind='manual' AND local_date=?").bind(row.id,recipient,slot).first())need(false,'One manual reminder per recipient calendar day is allowed',429)
   throw error
  }

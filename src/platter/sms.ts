@@ -1,3 +1,4 @@
+import { clientText, type ClientLocale } from './locales'
 import { recipientPlan } from './recipients'
 import { demoEffect } from '@runeditrun/rer/internal/modules/demo/index.mjs'
 import type { Bindings } from '../auth.server'
@@ -125,9 +126,9 @@ export async function smsCodeContext(env:Bindings,id:string,quiet=true){
  if(quiet)need(afterQuietHours(ctx.at,ctx.c.time_zone,await reminderPolicy(env.DB))===ctx.at,'Text verification waits until recipient quiet hours end',429)
  return ctx
 }
-export async function deliverSmsCode(env:Bindings,id:string,code:string){
+export async function deliverSmsCode(env:Bindings,id:string,code:string,locale:ClientLocale='en'){
  const ctx=await smsCodeContext(env,id)
- const body=new URLSearchParams({To:ctx.c.phone,From:env.TWILIO_FROM!,Body:'Your Platter verification code is '+code+'. It expires in 10 minutes. Reply STOP to stop. HELP for help.'})
+ const body=new URLSearchParams({To:ctx.c.phone,From:env.TWILIO_FROM!,Body:clientText('Your Platter verification code is ',locale)+code+clientText('. It expires in 10 minutes. Reply STOP to stop. HELP for help.',locale)})
  const response=await demoEffect(()=>fetch('https://api.twilio.com/2010-04-01/Accounts/'+encodeURIComponent(env.TWILIO_ACCOUNT_SID!)+'/Messages.json',{method:'POST',headers:{authorization:'Basic '+btoa(env.TWILIO_ACCOUNT_SID+':'+env.TWILIO_AUTH_TOKEN),'content-type':'application/x-www-form-urlencoded'},body,redirect:'manual',signal:AbortSignal.timeout(15000)}),()=>Response.json({sid:'synthetic-platter-demo'}))
  need(response.ok,'The text code outcome is uncertain. Wait before requesting a new code.',409)
 }

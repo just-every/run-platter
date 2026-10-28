@@ -1,4 +1,4 @@
-import { clientLocale } from './locales'
+import { clientLocale, clientText, recipientMailLocale, retireInvitations } from './locales'
 import { copyCosts } from './internal-pricing'
 import { documentOf, fieldSlot } from './documents/blocks'
 import type { Bindings } from '../auth.server'
@@ -61,7 +61,7 @@ export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record
   const next=plan.filter(r=>r.id!==id)
   if(row.status!=='sent')return recipientCommand(env,a,'recipient.save',{...p,recipients:next})
   await commit(db,a,[
-   db.prepare('INSERT INTO p_replaced_links(token,proposal_id,revision) SELECT token,proposal_id,revision FROM p_shares WHERE proposal_id=? AND slot_id=? ON CONFLICT DO NOTHING').bind(row.id,id),
+   retireInvitations(db,row.id,id),
    db.prepare('DELETE FROM p_shares WHERE proposal_id=? AND slot_id=?').bind(row.id,id),
    db.prepare("UPDATE p_mail SET status='uncertain',held_reason='recipient_removed' WHERE proposal_id=? AND recipient=? AND status='pending'").bind(row.id,removed.email),
    db.prepare('DELETE FROM p_mail_reply_keys WHERE proposal_id=? AND recipient=?').bind(row.id,removed.email),
@@ -102,7 +102,7 @@ export async function recipientInvitations(env:Bindings,a:Actor,input:Record<str
  need(!signatures.some(s=>!s.voided_at),'Withdraw this partly signed revision before issuing fresh invitations',409)
  const links=plan.filter(r=>r.email).map(r=>({...r,token:secret()}))
  const writes:D1PreparedStatement[]=[
-  env.DB.prepare('INSERT INTO p_replaced_links(token,proposal_id,revision) SELECT token,proposal_id,revision FROM p_shares WHERE proposal_id=? ON CONFLICT DO NOTHING').bind(row.id),
+  retireInvitations(env.DB,row.id),
   env.DB.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(row.id),
  ]
  for(const r of links){
@@ -121,8 +121,8 @@ export async function recipientProgress(db:D1Database,row:any,slotId:string){
 export function voidSignatureStatement(db:D1Database,id:string,revision:number,at:number,reason:string){
  return db.prepare('INSERT INTO p_void_signatures(proposal_id,revision,voided_at,reason) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM p_recipient_signatures WHERE proposal_id=? AND revision=?) ON CONFLICT DO NOTHING').bind(id,revision,at,reason,id,revision)
 }
-export function completionMail(env:Bindings,row:any,plan:Recipient[],at:number){
- return plan.filter(r=>r.email).map(r=>queueMail(env,row.id,r.email!,'Agreement complete: '+row.title,'All required recipients have completed revision '+row.revision+'. Open your personal invitation to review the completed agreement.'))
+export async function completionMail(env:Bindings,row:any,plan:Recipient[],at:number){
+ return Promise.all(plan.filter(r=>r.email).map(async r=>{const locale=await recipientMailLocale(env.DB,row.id,r.id,r.email!);return queueMail(env,row.id,r.email!,clientText('Agreement complete: ',locale)+row.title,clientText('All required recipients have completed revision ',locale)+row.revision+clientText('. Open your personal invitation to review the completed agreement.',locale))}))
 }
 
 export function recipientContent(view:any,progress:any){

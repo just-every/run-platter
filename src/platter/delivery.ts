@@ -1,3 +1,4 @@
+import { clientLocale } from './locales'
 import { scope, senders, permitted } from './permissions'
 import { approvalPlan } from './approvals'
 import type { Bindings } from '../auth.server'
@@ -61,7 +62,7 @@ export async function deliveryCommand(env: Bindings, actor: Actor, name: string,
  need(old.status==='sent','Only an unsigned sent offer can have its invitation corrected',409)
  const approval=await approvalPlan(db,old,actor);need(approval.complete,'Approve this revision under the current policy before correcting its invitation',409)
  const token=secret(), shareUrl=env.AUTH_ORIGIN+'/p/'+token
- const statement=queueMail(env,old.id,recipient,...proposalMail(old.title,shareUrl),actor.id,null,crypto.randomUUID(),true)
+ const statement=queueMail(env,old.id,recipient,...proposalMail(old.title,shareUrl,clientLocale(old)),actor.id,null,crypto.randomUUID(),true)
  await commit(db,actor,[
   db.prepare("UPDATE p_proposals SET version=version+1 WHERE id=?").bind(old.id),
   db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(old.id),

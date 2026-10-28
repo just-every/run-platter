@@ -1,3 +1,4 @@
+import { clientText, recipientMailLocale } from './locales'
 import { deliveryChange } from './delivery-settings'
 import { actorById } from './credentials'
 import { permitted, senders } from './permissions'
@@ -117,7 +118,7 @@ export async function runExpiry(env: Bindings, at: number) {
   try {
    await commit(db, owner, [
     db.prepare('UPDATE p_expiry SET warning_sent_at=? WHERE proposal_id=?').bind(now, e.proposal_id),
-    ...due.filter(r=>r.proposal_id===e.proposal_id).map(r=>queueMail(env,r.proposal_id,r.recipient,subject,body.replace('/p/'+e.token,'/p/'+r.token))),
+    ...await Promise.all(due.filter(r=>r.proposal_id===e.proposal_id).map(async r=>{const locale=await recipientMailLocale(db,r.proposal_id,r.slot_id,r.recipient);return queueMail(env,r.proposal_id,r.recipient,clientText('Expiry warning: ',locale)+e.title,clientText('This proposal expires at the start of ',locale)+e.expires_on+' ('+e.time_zone+clientText('). Verify your email to review and accept before that date.',locale)+'\n'+env.AUTH_ORIGIN+'/p/'+r.token+'\n\n'+clientText('This is a fixed automatic expiry warning. Shared editable email templates are not available.',locale))})),
     db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(), 'scheduler', 'owner', 'expiry.warning', e.proposal_id, now),
    ], true, { sql: `EXISTS(SELECT 1 FROM p_expiry e JOIN p_proposals p ON p.id=e.proposal_id JOIN p_shares s ON s.proposal_id=p.id
     WHERE p.id=? AND p.version=? AND p.status='sent' AND p.revision=? AND s.revision=p.revision AND s.token=?

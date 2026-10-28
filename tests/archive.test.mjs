@@ -568,6 +568,8 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.equal((await h.send(replacementPath+'/action?name=code.request',{})).status,200)
   const code=(await h.state()).outbox.find(m=>m.proposal_id===real.id&&m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0]
   const verified=await h.send(replacementPath+'/action?name=code.verify',{code});assert.equal(verified.status,200)
+  for(const kind of ['withdraw','paper','resume'])assert.equal((await h.send(replacementPath+'/action?name=records.request',{kind},verified.cookie)).status,200)
+  const electronicRequests=(await h.db.prepare('SELECT * FROM p_electronic_requests ORDER BY sequence').all()).results;assert.equal(electronicRequests.length,3)
   assert.equal((await h.send(replacementPath+'/action?name=accept',{name:'Northstar COO',optionId:'two',consent:true},verified.cookie)).status,200)
   const certificate=await h.send(replacementPath+'/certificate.json',undefined,verified.cookie);assert.equal(certificate.status,200,certificate.text)
   assert.equal(certificate.value.language,'es');assert.equal(certificate.value.signers[0].language,'es')
@@ -617,6 +619,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.ok(!bytes.includes(new URL(invitation.shareUrl).pathname))
   assert.ok(!bytes.includes(replacementPath))
   for(const path of [...Object.values(multi.links),...Object.values(voided.links),new URL(shared.shareUrl).pathname])assert.ok(!bytes.includes(path),'archive contains no recipient capability')
+  assert.deepEqual(records.filter(item=>item.table==='p_electronic_requests').map(item=>item.row).sort((a,b)=>a.sequence-b.sequence),electronicRequests)
   assert.equal(records.filter(item=>item.table==='p_shares').length,0)
   assert.equal(records.filter(item=>item.table==='p_invitation_languages').length,0)
   assert.deepEqual(records.filter(item=>item.table==='p_recipient_signatures').map(item=>item.row).sort((a,b)=>a.proposal_id.localeCompare(b.proposal_id)||a.revision-b.revision||a.slot_id.localeCompare(b.slot_id)),signatures)
@@ -631,6 +634,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   await command(restored,['import','--input',archive,'--yes'])
   h=await harness({root:restored,unclaimed:true,assetsDirectory:'public'})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_electronic_requests ORDER BY sequence').all()).results,electronicRequests)
   assert.deepEqual(after.proposals.find(row=>row.id===p.id),proposal)
   assert.deepEqual(after.proposals.find(row=>row.id===real.id).invitationMessages,retained)
   for(const retained of otherLanguages){

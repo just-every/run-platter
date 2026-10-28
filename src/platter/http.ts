@@ -1,5 +1,5 @@
 import { archiveState } from './archiving/jobs'
-import { clientLocale } from './locales'
+import { clientLocale, clientText } from './locales'
 import { fixedPagePreview, importDocument, exportDocument } from './documents/import-export'
 import { publicApi } from './api'
 import { stakeholderResponse } from './tracking/stakeholders'
@@ -70,7 +70,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   if(path==='/api/platter/question-replies')return await questionReplyResponse(request,env)
   if(path==='/api/platter/mail/events')return await deliveryWebhook(request,env)
   if(request.method==='POST'&&!isAgent)need(request.headers.get('origin')===env.AUTH_ORIGIN&&request.headers.get('sec-fetch-site')!=='cross-site','Cross-site request refused',403)
-  if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/stakeholder|\/engagement|\/action|\/agreement\.pdf|\/certificate\.json|\/certificate\.pdf|\/payment\.json|\/payment-consent\.json|\/payment-status\.json|\/download\.pdf|\/data\.json|\/attachments\/([\w-]+)|\/media\/([\w-]+))?$/);need(match,'Invitation not found',404);const withdrawn=await env.DB.prepare('SELECT contact_email,client_locale FROM p_withdrawn_links WHERE token=?').bind(match[1]).first<{contact_email:string;client_locale:string}>();if(withdrawn)return path.endsWith('.json')?json({error:'Proposal withdrawn',contact:withdrawn.contact_email},410):withdrawnPage(withdrawn.contact_email,clientLocale(withdrawn));const replaced=await env.DB.prepare('SELECT lang.locale AS client_locale FROM p_replaced_links l JOIN p_proposals p ON p.id=l.proposal_id LEFT JOIN p_client_locales lang ON lang.proposal_id=p.id WHERE l.token=?').bind(match[1]).first();if(replaced)return path.endsWith('.json')?json({error:'This signer invitation was replaced'},410):replacedInvitationPage(clientLocale(replaced));context=await clientContext(env,match[1],request)
+  if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/stakeholder|\/engagement|\/action|\/agreement\.pdf|\/certificate\.json|\/certificate\.pdf|\/payment\.json|\/payment-consent\.json|\/payment-status\.json|\/download\.pdf|\/data\.json|\/attachments\/([\w-]+)|\/media\/([\w-]+))?$/);need(match,'Invitation not found',404);const withdrawn=await env.DB.prepare('SELECT contact_email,client_locale FROM p_withdrawn_links WHERE token=?').bind(match[1]).first<{contact_email:string;client_locale:string}>();if(withdrawn)return path.endsWith('.json')?json({error:'Proposal withdrawn',contact:withdrawn.contact_email},410):withdrawnPage(withdrawn.contact_email,clientLocale(withdrawn));const replaced=await env.DB.prepare('SELECT COALESCE(l.client_locale,lang.locale) AS client_locale FROM p_replaced_links l JOIN p_proposals p ON p.id=l.proposal_id LEFT JOIN p_client_locales lang ON lang.proposal_id=p.id WHERE l.token=?').bind(match[1]).first();if(replaced)return path.endsWith('.json')?json({error:'This signer invitation was replaced'},410):replacedInvitationPage(clientLocale(replaced));context=await clientContext(env,match[1],request)
    if(match[2]==='/stakeholder'){need(request.method==='POST','Use stakeholder identification',405);return await stakeholderResponse(env,context,await body(request))}
    if(match[2]==='/engagement'){need(request.method==='POST','Use a tracking event',405);return json(await readingEvent(env,context,await body(request)))}
    if(['/agreement.pdf','/certificate.json','/certificate.pdf'].includes(match[2])){need(request.method==='GET','Use an agreement download',405);return await agreementArtifact(env,context.row.id,match[2].slice(1),{client:context})}
@@ -137,7 +137,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   }
   return path.startsWith('/app')?renderMissing():json({error:'Not found'},404)
  }catch(error){const status=Number((error as any)?.status)||500;const message=status<500?(error as Error).message:'The change could not be completed. Reload and try again.';if(status>=500)console.error(error)
-  if(isClient&&path.endsWith('.json'))return json({error:message},status)
+  if(isClient&&path.endsWith('.json'))return json({error:context?clientText(message,clientLocale(context.row)):message},status)
   if(isClient&&context&&status!==403){const r=renderClient(await clientView(env,context),context.token,{error:message});return new Response(r.body,{status,headers:r.headers})}
   if((path==='/app/attachment'||path==='/app/document-media'||path==='/app/paper-acceptance')&&actor){const response=renderApp(await state(env,actor),back,{error:message});return new Response(response.body,{status,headers:response.headers})}
   if(path==='/app/action'&&actor)return renderApp(await state(env,actor),back,{error:message,status,field:(error as any)?.field,command:url.searchParams.get('name')??undefined,input:submitted})

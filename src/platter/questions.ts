@@ -1,3 +1,4 @@
+import { clientLocale, clientText } from './locales'
 import { selectedDocument } from './documents/blocks'
 import { permitted, scope, senders } from './permissions'
 import { currentTime } from './expiry-time'
@@ -79,7 +80,7 @@ export async function createQuestion(env:Bindings,c:ClientContext,input:Record<s
  const ownerChecks=owners.map(()=>"EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND email=? AND version=? AND role='owner' AND status='active')").join(' AND ')
  try { await db.batch([
   db.prepare(`INSERT INTO p_guard(ok) VALUES((${guard}) AND (${ownerChecks}) AND ${budget.sql})`).bind(c.token,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,c.share.session_hash,at,...owners.flatMap(o=>[o.id,o.email,o.version]),...budget.values),
-  db.prepare('INSERT INTO p_questions(id,proposal_id,revision,client_id,client_email,section,text,created_at,block_id,block_title) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,section,body,at,block?.id??null,block?.title||block?.type||null),
+  db.prepare('INSERT INTO p_questions(id,proposal_id,revision,client_id,client_email,section,text,created_at,block_id,block_title,language) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id,c.row.id,c.row.revision,c.row.client_id,c.row.clientEmail,section,body,at,block?.id??null,block?.title||block?.type||null,clientLocale(c.row)),
   ...(await Promise.all(owners.map(owner=>prepareReplyNotice(env,owner,{id,proposal_id:c.row.id,revision:c.row.revision,section:block?.title||block?.type||section,text:body,title:c.row.title})))).flat(),
   audit(db,c.row.client_id,'client','question.create',id,at),
   db.prepare('DELETE FROM p_guard')
@@ -113,11 +114,12 @@ export async function recordAnswer(env:Bindings,a:Actor,input:AnswerInput,hook?:
  if(hook){guard.sql+=' AND ('+hook.guard.sql+')';guard.values.push(...hook.guard.values)}
  const prior=await db.prepare('SELECT id,question_id,text,owner_id FROM p_question_answers WHERE source_key=?').bind(sourceKey).first<any>()
  if(prior){need(source!=='email','This reply has already been recorded',409);need(prior.question_id===questionId&&prior.owner_id===a.id&&prior.text===body,'This message identity has already been used',409);await commit(db,a,[],true,guard);return {id,questionId,answerId:prior.id,replayed:true}}
+ const language=clientLocale({client_locale:question.language})
  try { await commit(db,a,[
   ...(hook?.writes??[]),
   db.prepare('UPDATE p_question_reply_keys SET used_at=? WHERE question_id=? AND used_at IS NULL').bind(at,questionId),
   db.prepare('INSERT INTO p_question_answers(id,question_id,text,owner_id,owner_email,source,source_key,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(answerId,questionId,body,a.id,a.email,source,sourceKey,at),
-  queueMail(env,id,question.client_email,'Answer to your question: '+question.title,`The firm answered your ${question.section} question on revision ${question.revision}.\n\nYour question:\n${question.text}\n\nAnswer:\n${body}`,a.id),
+  queueMail(env,id,question.client_email,clientText('Answer to your question: ',language)+question.title,clientText('The firm answered your ',language)+(language==='en'?question.section:clientText(({scope:'Scope',pricing:'Pricing',terms:'Terms'} as Record<string,string>)[question.section]??question.section,language))+clientText(' question on revision ',language)+question.revision+clientText('.\n\nYour question:\n',language)+question.text+clientText('\n\nAnswer:\n',language)+body,a.id),
   audit(db,a.id,a.role,'question.answer',questionId,at)
  ],true,guard) }catch(error){
   // A concurrent delivery may have committed the same authenticated message first.

@@ -1,3 +1,4 @@
+import { electronicRequestNotices } from './electronic-records'
 import { archivePanel } from './archiving'
 import { trackingPanel, trackingNotices } from './tracking'
 import { collaborationSettings } from './collaboration'
@@ -52,6 +53,7 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
       default: return renderMissing()
     }
     if (content === null) return renderMissing()
+    content=electronicRequestNotices(state)+content
     if (state.actor?.role === 'owner' && url.pathname === '/app/proposal' && state.outbox?.length) {
       content += panel('Local development mail', `<p>Messages captured locally for this installation.</p><ul class="records">${state.outbox.map((message: any) => `<li><article><h3>${escape(message.subject)}</h3><p>To: ${escape(message.recipient)} · ${escape(message.status)}</p><p class="preserve">${escape(message.body)}</p></article></li>`).join('')}</ul>`)
     }

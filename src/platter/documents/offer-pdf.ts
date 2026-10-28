@@ -1,3 +1,4 @@
+import { fixedPagesPdf } from './import-export'
 import { feeLines } from '../recurring'
 import { depositCents, paymentTerms, scheduleLines } from '../payment-terms'
 import { displayOptions } from '../discounts'
@@ -30,7 +31,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   need(Number.isSafeInteger(cents) && cents >= 0 && Number.isSafeInteger(cents * depositBps), 'Invalid offer price')
   return view.payment_terms ? depositCents(cents,depositBps,view) : Math.round(cents * depositBps / 10000)
  }
- const pdf = await PdfText.create(revision, fontBytes,signer?`Signed agreement, revision ${revision}`:undefined,documentOf(view).brand)
+ const pdf = await PdfText.create(revision, fontBytes,signer?`Signed agreement, revision ${revision}`:undefined,documentOf(view).brand,view.paperSize)
  pdf.document.setTitle(String(view.title ?? ''))
  pdf.document.setSubject(`${signer?'Signed agreement':'Not signed'}, revision ${revision}`)
  pdf.document.setCreator('Platter')
@@ -101,5 +102,6 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   pdf.gap(6)
  }
  if(signer){pdf.heading('Signature');pdf.text('Signed by: '+signer.name);pdf.text('Recipient: '+signer.email);pdf.text('Verification method: '+signer.method);pdf.text('Accepted at: '+new Date(signer.acceptedAt).toISOString());pdf.text('Consent: '+signer.consent)}
- return pdf.document.save()
+ const generated=await pdf.document.save();if(doc.fixedPdf){need(media,'Fixed PDF is unavailable',503);return fixedPagesPdf(await media(doc.fixedPdf.fileId),generated,view)}
+ return generated
 }

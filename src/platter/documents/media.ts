@@ -4,13 +4,14 @@ import { commit, exact, need, snapshot, type Actor } from '../model'
 import { permitted } from '../permissions'
 import { negotiatedView, pendingNegotiation } from '../negotiation'
 import { documentOf, type ProposalDocument } from './blocks'
-export const documentMediaIds=(document:ProposalDocument)=>[...new Set([document.brand?.logoId,...document.blocks.flatMap(b=>[b.assetId,b.posterId,...(b.images??[]).map(i=>i.assetId)])].filter((v):v is string=>Boolean(v)))]
+export const documentMediaIds=(document:ProposalDocument)=>[...new Set([document.fixedPdf?.fileId,document.brand?.logoId,...document.blocks.flatMap(b=>[b.assetId,b.posterId,...(b.images??[]).map(i=>i.assetId)])].filter((v):v is string=>Boolean(v)))]
 export const copyDocumentMedia=(db:D1Database,source:string,destination:string,document:ProposalDocument)=>{const ids=documentMediaIds(document);return db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_document_media WHERE proposal_id=? AND file_id IN ('+(ids.map(()=>'?').join(',')||'NULL')+')').bind(destination,source,...ids)}
 export async function mediaFiles(db:D1Database,id:string){return (await db.prepare('SELECT f.id,f.filename,f.media_type AS mediaType,f.size,f.sha256 FROM p_attachment_files f JOIN p_document_media m ON m.file_id=f.id WHERE m.proposal_id=? ORDER BY f.created_at,f.id').bind(id).all<AttachmentRef>()).results}
 export async function validateDocumentMedia(db:D1Database,document:ProposalDocument,id?:string){
  const files=id?await mediaFiles(db,id):[]
  const image=(file?:AttachmentRef)=>Boolean(file&&['image/png','image/jpeg'].includes(file.mediaType))
  for(const block of document.blocks){if(block.type==='gallery')for(const item of block.images??[])need(image(files.find(f=>f.id===item.assetId)),'Choose gallery images uploaded to this proposal');if(block.type==='embed')need(image(files.find(f=>f.id===block.posterId)),'Choose an embed poster uploaded to this proposal');if(block.type==='image')need(image(files.find(f=>f.id===block.assetId)),'Choose an uploaded PNG or JPEG from this proposal');if(block.type==='video'){need(files.some(f=>f.id===block.assetId&&['video/mp4','video/webm'].includes(f.mediaType)),'Choose an uploaded MP4 or WebM from this proposal');need(image(files.find(f=>f.id===block.posterId)),'Choose an uploaded video poster from this proposal')}}
+ if(document.fixedPdf){const f=files.find(f=>f.id===document.fixedPdf!.fileId);need(f?.mediaType==='application/pdf','Choose a PDF uploaded to this proposal');const response=await downloadAttachment(db,f!);const pdf=await PDFDocument.load(await response.arrayBuffer());need(pdf.getPageCount()===document.fixedPdf.pages,'Fixed PDF page count changed')}
  if(document.brand?.logoId)need(image(files.find(f=>f.id===document.brand?.logoId)),'Choose a logo uploaded to this proposal')
 }
 /** Explicitly consented display media has a separate namespace. Attachments remain download-only. */

@@ -3026,3 +3026,54 @@ test('EDIT-004 linked deal variables refuse missing values, freeze the sent revi
   await h.cmd('provider.disconnect',{provider:'hubspot',version:1});await h.cmd('proposal.duplicate',{id:p.id,version:5,clientId:b.id,deal:{provider:'hubspot',id:'synthetic-platter-205'}},h.owner,409)
  }finally{await h.close()}
 })
+
+test('EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections',async()=>{
+ const {wordFixture,uploadDocument}=await import('./document-import-fixture.mjs'),{applyBusiness}=await import('./business-import-fixture.mjs'),h=await harness()
+ try{
+  const {p}=await draft(h),csv='id,sku,name,description,price,currency,unit\n'+Array.from({length:5},(_,i)=>'synthetic-platter-'+(300+i)+',SKU'+(i+1)+',Synthetic product '+(i+1)+',,99,USD,each').join('\n')
+  await applyBusiness(h,{kind:'catalog',format:'platter',csv})
+  const imported=await uploadDocument(h,p.id,1,await wordFixture(),'synthetic-platter-301.docx',{mode:'template',templateName:'Synthetic imported template'}),s=await h.state(),current=s.proposals.find(r=>r.id===p.id),doc=current.document
+  assert.equal(current.revision,2);assert.equal(doc.blocks.filter(b=>b.type==='heading').length,3);assert.equal(doc.blocks.filter(b=>b.type==='image').length,1)
+  assert.match(doc.blocks.find(b=>b.type==='text').text,/\{\{Client.Company\}\} \{\{Sender.FirstName\}\} \{\{Custom.Unmapped_Case\}\}/)
+  assert.deepEqual(imported.report.unknown,['Custom.Unmapped_Case']);assert.deepEqual(imported.report.unmatched,['Synthetic product 6']);assert.match(imported.report.missing.join(' '),/images absent/)
+  const lines=current.options[0].tables[0].lines;assert.equal(lines.length,6);assert.deepEqual(lines.map(l=>l.catalogId??null),['synthetic-platter-300','synthetic-platter-301','synthetic-platter-302','synthetic-platter-303','synthetic-platter-304',null]);assert.deepEqual(lines.map(l=>[l.name,l.quantity,l.unitPrice,l.lineTotalCents]),Array.from({length:6},(_,i)=>['Synthetic product '+(i+1),String(i+1),(10+i)+'.00',(i+1)*(10+i)*100]));assert.equal(current.options[0].cents,28000)
+  assert.equal(s.templates.find(t=>t.name==='Synthetic imported template').snapshot.document.blocks.length,doc.blocks.length)
+  const bytes=await h.send('/api/platter/document-media/'+p.id+'/'+doc.blocks.find(b=>b.type==='image').assetId,undefined,h.owner);assert.equal(bytes.status,200)
+  await h.cmd('proposal.document',{id:p.id,version:2,document:{...doc,blocks:doc.blocks.map(b=>b.type==='heading'?{...b,title:b.title+' edited'}:b)}})
+  assert.equal((await h.state()).proposals.find(r=>r.id===p.id).document.blocks[0].title,'Synthetic section 1 edited')
+  const library=await uploadDocument(h,p.id,3,await wordFixture({headings:10,rows:0,images:0,tokens:false}),'synthetic-platter-302.docx',{mode:'library'})
+  assert.equal(library.libraryItems,10);assert.deepEqual((await h.state()).libraryItems.map(i=>i.title).sort(),Array.from({length:10},(_,i)=>'Synthetic section '+(i+1)).sort());assert.equal((await h.state()).libraryItems.find(i=>i.title==='Synthetic section 10').content,'Synthetic section 10\n\nParagraph 10')
+  await uploadDocument(h,p.id,1,await wordFixture(),'synthetic-platter-303.docx',{},409)
+ }finally{await h.close()}
+})
+
+test('EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing',async()=>{
+ const {uploadDocument}=await import('./document-import-fixture.mjs'),h=await harness({assetsDirectory:'public'})
+ try{
+  const {p}=await draft(h),source=await PDFDocument.create(),font=await source.embedFont(StandardFonts.Helvetica);for(let i=1;i<=3;i++)source.addPage([612,792]).drawText('Synthetic original page '+i,{x:48,y:700,font});const bytes=await source.save()
+  await uploadDocument(h,p.id,1,bytes,'synthetic-platter-310.pdf')
+  let current=(await h.state()).proposals.find(r=>r.id===p.id);assert.equal(current.document.fixedPdf.pages,3);assert.equal(current.document.blocks.length,0)
+  const original=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+p.id+'/'+current.document.fixedPdf.fileId,{headers:{cookie:h.owner}});assert.deepEqual(new Uint8Array(await original.arrayBuffer()),bytes)
+  await h.cmd('proposal.variables',{id:p.id,version:2,fields:{pricingTables:[{optionId:'one',name:'Synthetic appended quote',lines:[{name:'Synthetic line A',unit:'each',quantity:'2',unitPrice:'120'},{name:'Synthetic line B',unit:'each',quantity:'1',unitPrice:'60'}]}],document:{...current.document,blocks:[{id:'synthetic-platter-sign',type:'signature',title:'Page three signature',text:'',recipientRole:'client',page:3,x:70,y:120},{id:'synthetic-platter-prices',type:'pricing',title:'',text:'',optionId:'one',tableIndex:0}]}}})
+  current=(await h.state()).proposals.find(r=>r.id===p.id);assert.equal(current.options[0].cents,30000)
+  await h.cmd('proposal.approve',{id:p.id,version:3,revision:3});const sent=await h.cmd('proposal.send',{id:p.id,version:4}),path=new URL(sent.shareUrl).pathname,cookie=await verified(h,path)
+  const download=await h.mf.dispatchFetch(h.origin+path+'/download.pdf?optionId=one',{headers:{cookie}});assert.equal(download.status,200);const pages=await pdfPages(new Uint8Array(await download.arrayBuffer()))
+  assert.ok(pages.length>=4);for(let i=0;i<3;i++)assert.match(pages[i],new RegExp('Synthetic original page '+(i+1)));assert.match(pages[2],/Page three signature/);for(const page of pages)assert.match(page,/Not signed, revision 3/)
+  assert.match(pages.slice(3).join(' '),/Synthetic appended quote/);assert.match(pages.slice(3).join(' '),/USD 300.00/)
+  const untouched=await h.mf.dispatchFetch(h.origin+path+'/media/'+current.document.fixedPdf.fileId,{headers:{cookie}});assert.deepEqual(new Uint8Array(await untouched.arrayBuffer()),bytes)
+  await h.cmd('pdf.downloads',{id:p.id,version:5,enabled:false});assert.equal((await h.send(path+'/download.pdf?optionId=one',undefined,cookie)).status,403)
+ }finally{await h.close()}
+})
+
+test('EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order',async()=>{
+ const {wordFixture,uploadDocument}=await import('./document-import-fixture.mjs'),{unzipSync,strFromU8}=await import('fflate'),h=await harness({assetsDirectory:'public'})
+ try{
+  const {p}=await draft(h);await uploadDocument(h,p.id,1,await wordFixture({rows:4,images:2,tokens:false}),'synthetic-platter-320.docx')
+  const word=await h.mf.dispatchFetch(h.origin+'/api/platter/document-export?id='+p.id+'&format=docx',{headers:{cookie:h.owner}});assert.equal(word.status,200);const files=unzipSync(new Uint8Array(await word.arrayBuffer())),xml=strFromU8(files['word/document.xml'])
+  assert.equal((xml.match(/w:pStyle w:val="Heading1"/g)??[]).length,3);assert.equal(Object.keys(files).filter(k=>k.startsWith('word/media/')).length,2)
+  for(let i=1;i<=4;i++){assert.match(xml,new RegExp('Synthetic product '+i));assert.match(xml,new RegExp('>'+i+'<'));assert.match(xml,new RegExp('>'+(9+i)+'\\.00<'));assert.match(xml,new RegExp('>'+i*(9+i)+'\\.00<'))}
+  const pdf=await h.mf.dispatchFetch(h.origin+'/api/platter/document-export?id='+p.id+'&format=pdf&size=a4',{headers:{cookie:h.owner}});assert.equal(pdf.status,200);const pages=await pdfPages(new Uint8Array(await pdf.arrayBuffer()),true),text=pages.map(p=>p.text).join(' ')
+  assert.ok(text.indexOf('Synthetic section 1')<text.indexOf('Synthetic section 2'));assert.ok(text.indexOf('Synthetic section 3')<text.indexOf('Synthetic product 1'));assert.ok(pages.reduce((n,p)=>n+p.imageCount,0)>=2);assert.ok(pages.every(p=>Math.abs(p.width-595.28)<.01&&Math.abs(p.height-841.89)<.01));for(const page of pages)assert.match(page.text,/Not signed, revision 2/)
+  assert.equal((await h.send('/api/platter/document-export?id='+p.id+'&format=docx')).status,401)
+ }finally{await h.close()}
+})

@@ -22,23 +22,26 @@ export class PdfText {
  private ink=ink
  private accent=accent
  private paper=rgb(1,1,1)
+ private size:[number,number]=letter
  private readonly coverage: Set<number>[]
  private readonly choices = new Map<string, PDFFont>()
  private readonly segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
- private constructor(readonly document: PDFDocument, private fonts: PDFFont[], private revision: number, private footer?: string,brand?:ProposalDocument['brand']) {
+ private constructor(readonly document: PDFDocument, private fonts: PDFFont[], private revision: number, private footer?: string,brand?:ProposalDocument['brand'],paperSize?:string) {
+  if(paperSize==='a4')this.size=[595.28,841.89]
+  this.textWidth=this.size[0]-margin*2
   const color=(hex:string)=>rgb(...[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255) as [number,number,number]);if(brand){this.ink=color(brand.ink);this.accent=color(brand.accent);this.paper=color(brand.paper)}
   this.coverage = fonts.map(font => new Set(font.getCharacterSet()))
   this.newPage()
  }
 
- static async create(revision: number, fontBytes: (Uint8Array | ArrayBuffer)[] = [], footer?: string,brand?:ProposalDocument['brand']) {
+ static async create(revision: number, fontBytes: (Uint8Array | ArrayBuffer)[] = [], footer?: string,brand?:ProposalDocument['brand'],paperSize?:string) {
   need(fontBytes.length > 0, 'PDF fonts are unavailable.', 503)
   const document = await PDFDocument.create()
   document.registerFontkit(fontkit)
   const fonts: PDFFont[] = []
   for (const bytes of fontBytes) fonts.push(await document.embedFont(bytes, { subset: true }))
-  return new PdfText(document, fonts, revision, footer,brand)
+  return new PdfText(document, fonts, revision, footer,brand,paperSize)
  }
 
  private runs(text: string): Run[] {
@@ -75,13 +78,13 @@ export class PdfText {
  private newPage() {
   this.pageIndex++
   const existing=this.document.getPages()[this.pageIndex]
-  if(existing){this.page=existing;this.y=letter[1]-margin;return}
-  this.page = this.document.addPage(letter)
-  this.page.drawRectangle({x:0,y:0,width:letter[0],height:letter[1],color:this.paper})
-  this.page.drawLine({ start: { x: margin, y: 48 }, end: { x: letter[0] - margin, y: 48 }, thickness: 0.6, color: rgb(0.8, 0.83, 0.81) })
+  if(existing){this.page=existing;this.y=this.size[1]-margin;return}
+  this.page = this.document.addPage(this.size)
+  this.page.drawRectangle({x:0,y:0,width:this.size[0],height:this.size[1],color:this.paper})
+  this.page.drawLine({ start: { x: margin, y: 48 }, end: { x: this.size[0] - margin, y: 48 }, thickness: 0.6, color: rgb(0.8, 0.83, 0.81) })
   this.draw(this.footer??`Not signed, revision ${this.revision}`, margin, 32, 9, this.ink)
-  this.draw(`Page ${this.document.getPageCount()}`, letter[0] - margin - 48, 32, 9, this.ink)
-  this.y = letter[1] - margin
+  this.draw(`Page ${this.document.getPageCount()}`, this.size[0] - margin - 48, 32, 9, this.ink)
+  this.y = this.size[1] - margin
  }
 
  private room(height: number) {
@@ -92,18 +95,18 @@ export class PdfText {
   this.y = Math.max(bottom, this.y - height)
  }
 
- async image(bytes:Uint8Array,maxHeight=320){const image=bytes[0]===137?await this.document.embedPng(bytes):await this.document.embedJpg(bytes);const scale=Math.min((letter[0]-margin*2)/image.width,maxHeight/image.height,1),width=image.width*scale,height=image.height*scale;this.room(height+12);this.y-=height;this.page.drawImage(image,{x:margin,y:this.y,width,height});this.gap(12)}
+ async image(bytes:Uint8Array,maxHeight=320){const image=bytes[0]===137?await this.document.embedPng(bytes):await this.document.embedJpg(bytes);const scale=Math.min((this.size[0]-margin*2)/image.width,maxHeight/image.height,1),width=image.width*scale,height=image.height*scale;this.room(height+12);this.y-=height;this.page.drawImage(image,{x:margin,y:this.y,width,height});this.gap(12)}
 
  columns(left:string,right:string){
   const start=this.pageIndex,startY=this.y
-  this.textWidth=(letter[0]-margin*2-24)/2
+  this.textWidth=(this.size[0]-margin*2-24)/2
   this.text(left)
   const leftEnd=this.pageIndex,leftY=this.y
   this.pageIndex=start;this.page=this.document.getPages()[start];this.y=startY;this.textX=margin+this.textWidth+24
   this.text(right)
   const rightEnd=this.pageIndex,rightY=this.y,end=Math.max(leftEnd,rightEnd)
   this.pageIndex=end;this.page=this.document.getPages()[end];this.y=leftEnd===rightEnd?Math.min(leftY,rightY):end===leftEnd?leftY:rightY
-  this.textX=margin;this.textWidth=letter[0]-margin*2;this.gap()
+  this.textX=margin;this.textWidth=this.size[0]-margin*2;this.gap()
  }
 
  link(url:string){this.linkTarget=url;try{this.text(url)}finally{this.linkTarget=undefined}}

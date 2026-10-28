@@ -11,18 +11,18 @@ export function mergeFields(value:any):MergeFields|undefined{
  if(!value)return undefined
  need(value&&typeof value==='object'&&!Array.isArray(value)&&value.patterns&&value.values,'Invalid variable bindings')
  const patterns:Record<string,string>={},values:Record<string,string>={}
- for(const [key,v]of Object.entries(value.patterns)){need(/^\/(title|scope|terms|optionOne|optionTwo|priceOne|priceTwo|packages|pricingTables|document|recipientPlan)(?:\/[A-Za-z0-9_-]+)*$/.test(key)&&typeof v==='string'&&v.length<=10000&&variableNames(v).length,'Invalid variable field');patterns[key]=v}
+ for(const [key,v]of Object.entries(value.patterns)){need(!key.split('/').some(k=>['__proto__','constructor','prototype'].includes(k))&&/^\/(title|scope|terms|optionOne|optionTwo|priceOne|priceTwo|packages|pricingTables|document|recipientPlan)(?:\/[A-Za-z0-9_-]+)*$/.test(key)&&typeof v==='string'&&v.length<=10000&&variableNames(v).length,'Invalid variable field');patterns[key]=v}
  for(const [key,v]of Object.entries(value.values)){need(/^[A-Za-z][A-Za-z0-9_.]{0,99}$/.test(key)&&typeof v==='string'&&v.length<=10000&&!variableNames(v).length,'Use plain text variable values');values[key]=v}
  need(Object.keys(patterns).length<=500,'Use at most 500 variable fields')
  const deal=value.deal;if(deal)need(['hubspot','salesforce','orbit'].includes(deal.provider)&&typeof deal.id==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(deal.id),'Choose a valid linked deal')
  return {patterns,values,...(deal?{deal:{provider:deal.provider,id:deal.id}}:{})}
 }
 const replace=(text:string,values:Record<string,string>)=>text.replace(variableToken,(original,key)=>Object.hasOwn(values,key)?values[key]:original)
-export function editableVariableFields(row:any){return {clientId:row.client_id,title:row.title,scope:row.scope,terms:row.terms??'',depositPercent:row.deposit_bps/100,packages:editablePackages(typeof row.options==='string'?JSON.parse(row.options):row.options),pricingTables:pricingInput(typeof row.options==='string'?JSON.parse(row.options):row.options),sectionConditions:row.section_conditions??{},document:typeof row.document==='string'?JSON.parse(row.document):row.document,paymentTerms:editableTerms(row)}}
+export function editableVariableFields(row:any){return {clientId:row.client_id,title:row.title,scope:row.scope,terms:row.terms??'',depositPercent:row.deposit_bps/100,packages:editablePackages(typeof row.options==='string'?JSON.parse(row.options):row.options),pricingTables:pricingInput(typeof row.options==='string'?JSON.parse(row.options):row.options),recipientPlan:typeof row.recipient_plan==='string'?JSON.parse(row.recipient_plan):row.recipient_plan??[],sectionConditions:row.section_conditions??{},document:typeof row.document==='string'?JSON.parse(row.document):row.document,paymentTerms:editableTerms(row)}}
 async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFields['deal']){
  const c=await env.DB.prepare('SELECT * FROM p_clients WHERE id=?').bind(clientId).first<any>();need(c,'Client not found',404)
  const profile=JSON.parse(c.variable_fields??'{}'),sender=await env.DB.prepare('SELECT display_name FROM oa_operators WHERE id=?').bind(a.id).first<any>(),name=sender?.display_name??''
- const values:Record<string,string>={'Client.Company':c.name,'Client.Name':profile.contactName??'','Client.FirstName':profile.firstName??profile.contactName?.split(' ')[0]??'','Client.Title':profile.title??'','Contact.Name':profile.contactName??'','Contact.Title':profile.title??'','Client.Address':profile.address??'','Sender.Name':name,'Sender.FirstName':name.split(' ')[0],'Sender.Email':a.email,...Object.fromEntries(Object.entries(profile.custom??{}).map(([k,v])=>['Custom.'+k,String(v)]))}
+ const values:Record<string,string>={'Client.Company':c.name,'Client.Email':c.email,'Client.LastName':profile.lastName??profile.contactName?.split(' ').slice(1).join(' ')??'','Client.Name':profile.contactName??'','Client.FirstName':profile.firstName??profile.contactName?.split(' ')[0]??'','Client.Title':profile.title??'','Contact.Name':profile.contactName??'','Contact.Title':profile.title??'','Client.Address':profile.address??'','Sender.Name':name,'Sender.LastName':name.split(' ').slice(1).join(' '),'Date.Today':new Date(await (await import('./expiry-time')).currentTime(env.DB)).toISOString().slice(0,10),'Sender.FirstName':name.split(' ')[0],'Sender.Email':a.email,...Object.fromEntries(Object.entries(profile.custom??{}).map(([k,v])=>['Custom.'+k,String(v)]))}
  for(const key of Object.keys(values))if(!values[key])delete values[key]
  if(deal){
   need(['owner','admin'].includes(a.role),'Only owner and admins read connected deals',403)
@@ -46,6 +46,7 @@ export async function resolveVariables(env:Bindings,a:Actor,input:Record<string,
  if(!old&&!p.variableValues&&!p.variableDeal)return {fields:p,merge:undefined}
  const values={...await recordValues(env,a,String(p.clientId),deal),...(!rebind?previous:{}),...(p.variableValues??{})}
  for(const [key,value]of Object.entries(values))need(typeof value==='string'&&value.length<=10000&&!variableNames(value).length,'Use plain text variable values')
+ if(rebind&&old)for(const [path,pattern]of Object.entries(old.patterns)){const keys=path.slice(1).split('/');let parent=p;for(const key of keys.slice(0,-1)){if(parent[key]===undefined)break;parent=parent[key]}if(parent&&typeof parent==='object')parent[keys.at(-1)!]=pattern}
  p=walk(p,(v,path)=>{if(path.startsWith('/variable'))return v;const original=old?.patterns[path],pattern=original&&(rebind||replace(original,previous)===v)?original:variableNames(v).length?v:undefined;if(!pattern)return v;patterns[path]=pattern;const filled=replace(pattern,values);return variableNames(filled).length&&/(?:price|unitPrice|quantity)$/i.test(path)?'0.01':filled})
  if(!Object.keys(patterns).length)return {fields:p,merge:undefined}
  const used=variableNames(Object.values(patterns)),merge=mergeFields({patterns,values:Object.fromEntries(Object.entries(values).filter(([k])=>used.includes(k))),...(deal?{deal}:{})})!
@@ -55,7 +56,7 @@ export async function resolveVariables(env:Bindings,a:Actor,input:Record<string,
 export function clientVariableFields(value:any){
  need(value&&typeof value==='object'&&!Array.isArray(value),'Use client variable fields')
  const result:Record<string,any>={}
- for(const key of ['contactName','firstName','title','address'])if(value[key]!==undefined){need(typeof value[key]==='string'&&value[key].length<=1000,'Use plain text client fields');result[key]=value[key]}
+ for(const key of ['contactName','firstName','lastName','title','address'])if(value[key]!==undefined){need(typeof value[key]==='string'&&value[key].length<=1000,'Use plain text client fields');result[key]=value[key]}
  const custom=value.custom??{};need(custom&&typeof custom==='object'&&!Array.isArray(custom)&&Object.keys(custom).length<=50,'Use at most 50 custom fields');result.custom={}
  for(const [key,v]of Object.entries(custom)){need(/^[A-Za-z][A-Za-z0-9_]{0,50}$/.test(key)&&typeof v==='string'&&v.length<=1000,'Use named plain text custom fields');result.custom[key]=v}
  return result

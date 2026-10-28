@@ -1,0 +1,10 @@
+import { documentOf } from '../documents/blocks'
+import { escape, hidden, panel } from './shared'
+export function documentImportPanel(p:any){
+ const doc=documentOf(p),report=doc.importReport,base='/api/platter/document-export?id='+encodeURIComponent(p.id)
+ const downloads='<p><a href="'+base+'&amp;format=docx">Export Word document</a> · <a href="'+base+'&amp;format=pdf">Export US Letter PDF</a> · <a href="'+base+'&amp;format=pdf&amp;size=a4">Export A4 PDF</a></p>'
+ const fixed=doc.fixedPdf?'<p>'+doc.fixedPdf.pages+' fixed PDF pages. These pages stay uneditable; blocks follow them.</p><a href="/api/platter/document-media/'+escape(p.id)+'/'+escape(doc.fixedPdf.fileId)+'">Download original PDF</a>':''
+ const results=report?'<dl><dt>Custom variables</dt><dd>'+escape(report.unknown.join(', ')||'None')+'</dd><dt>Unmatched quote rows</dt><dd>'+escape(report.unmatched.join(', ')||'None')+'</dd><dt>Missing source images</dt><dd>'+escape(report.missing.join(' ')||'None reported')+'</dd></dl>':''
+ const upload=p.canEdit&&['draft','approved'].includes(p.status)?'<details><summary>Import Word or PDF</summary><p>Word becomes editable blocks and matched quote rows. PDF pages remain fixed. Library imports split text at Heading 1; import rich sections into a proposal first. <a href="/docs/document-import.html">Token mapping and file support</a></p><form method="post" enctype="multipart/form-data" action="/app/document-import">'+hidden('id',p.id)+hidden('version',p.version)+'<label>Source document<input type="file" name="file" accept=".docx,.pdf" required></label><label>Import as<select name="mode"><option value="proposal">Proposal blocks</option><option value="template">Personal template</option><option value="library">Library sections</option></select></label><label>Template name (optional)<input name="templateName" maxlength="200"></label><label class="choice"><input type="checkbox" name="consent" value="yes" required>I authorize displaying this content to the proposal recipients or the selected library audience.</label><button>Import document</button></form></details>':''
+ return panel('Document files',downloads+fixed+results+upload)
+}

@@ -2,10 +2,10 @@ import { mergeFields, type MergeFields } from '../variables'
 import { embedUrl } from './embeds'
 import { need } from '../model'
 
-export const blockTypes = ['cover','heading','text','image','video','gallery','embed','columns','pricing','quote','bio','case_study','terms','field','signature','page_break'] as const
+export const blockTypes = ['cover','heading','text','image','video','gallery','embed','columns','pricing','quote','bio','case_study','terms','field','signature','page_break','table'] as const
 export type BlockType = typeof blockTypes[number]
-export interface ProposalBlock { id:string; type:BlockType; title:string; text:string; second?:string; optionId?:string; tableIndex?:number; condition?:string; assetId?:string; posterId?:string; alt?:string; images?:{assetId:string;alt:string}[]; url?:string; consent?:boolean; fieldKind?:'text'|'date'|'checkbox'; required?:boolean; recipientRole?:'client'|'slot'; recipientId?:string }
-export interface ProposalDocument { version:1; blocks:ProposalBlock[]; merge?:MergeFields; brand?:{name:string; accent:string; ink:string; paper:string; font:'sans'|'serif'; cover:string;logoId?:string} }
+export interface ProposalBlock { id:string; type:BlockType; headingLevel?:number;page?:number;x?:number;y?:number; title:string; text:string; second?:string; optionId?:string; tableIndex?:number; condition?:string; assetId?:string; posterId?:string; alt?:string; images?:{assetId:string;alt:string}[]; url?:string; consent?:boolean; fieldKind?:'text'|'date'|'checkbox'; required?:boolean; recipientRole?:'client'|'slot'; recipientId?:string }
+export interface ProposalDocument { version:1; blocks:ProposalBlock[]; merge?:MergeFields;fixedPdf?:{fileId:string;pages:number};importReport?:{unknown:string[];unmatched:string[];missing:string[]}; brand?:{name:string; accent:string; ink:string; paper:string; font:'sans'|'serif'; cover:string;logoId?:string} }
 const string=(value:unknown,max:number,label:string)=>{need(typeof value==='string'&&value.length<=max&& !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value),'Enter '+label+' (up to '+max+' characters)');return value}
 const color=(value:unknown)=>{need(typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value),'Use six-digit brand colors');return value.toLowerCase()}
 const luminance=(hex:string)=>{const parts=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4);return parts[0]*0.2126+parts[1]*0.7152+parts[2]*0.0722}
@@ -33,6 +33,8 @@ export function proposalDocument(value:unknown,options?:any[],clientId?:string):
    block.posterId=string(b.posterId??'',80,'an embed poster id');need(/^[a-zA-Z0-9_-]+$/.test(block.posterId),'Choose an uploaded embed poster')
    block.alt=string(b.alt??'',1000,'an embed description');need(block.alt.trim(),'Describe the external content')
   }
+  if(b.headingLevel!==undefined){need(b.type==='heading'&&Number.isInteger(b.headingLevel)&&b.headingLevel>=1&&b.headingLevel<=6,'Choose a Word heading level');block.headingLevel=b.headingLevel}
+  if(b.page!==undefined){need(['signature','field'].includes(b.type)&&Number.isInteger(b.page)&&b.page>=1&&b.page<=(parsed.fixedPdf?.pages??0),'Choose a fixed page for the field');block.page=b.page;for(const axis of ['x','y'] as const){need(Number.isFinite(b[axis])&&b[axis]>=0&&b[axis]<=1000,'Choose a valid field position');block[axis]=b[axis]}}
   if(b.type==='columns')block.second=string(b.second??'',10000,'the second column')
   if(b.type==='pricing'){
    need(typeof b.optionId==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(b.optionId)&&Number.isInteger(b.tableIndex)&&b.tableIndex>=0,'Choose a pricing table')
@@ -44,13 +46,15 @@ export function proposalDocument(value:unknown,options?:any[],clientId?:string):
  })
  let brand:ProposalDocument['brand']
  if(parsed.brand){const b=parsed.brand;need(b&&typeof b==='object'&&!Array.isArray(b),'Invalid brand kit');const accent=color(b.accent),ink=color(b.ink),paper=color(b.paper);need(contrast(ink,paper)>=4.5&&contrast(accent,paper)>=4.5,'Brand text and accent must have at least 4.5:1 contrast against the paper');need(['sans','serif'].includes(b.font),'Choose a supported brand font');brand={name:string(b.name??'',200,'a brand name'),accent,ink,paper,font:b.font,cover:string(b.cover??'',200,'a default cover heading'),...(b.logoId?{logoId:string(b.logoId,80,'a logo file id')}:{})}}
+ let fixedPdf:ProposalDocument['fixedPdf'];if(parsed.fixedPdf){const f=parsed.fixedPdf;need(typeof f.fileId==='string'&&/^[A-Za-z0-9_-]+$/.test(f.fileId)&&Number.isInteger(f.pages)&&f.pages>0&&f.pages<=100,'Choose a retained PDF');fixedPdf={fileId:f.fileId,pages:f.pages}}
+ let importReport:ProposalDocument['importReport'];if(parsed.importReport){importReport={unknown:[],unmatched:[],missing:[]};for(const k of ['unknown','unmatched','missing'] as const){const values=parsed.importReport[k];need(Array.isArray(values)&&values.length<=500&&values.every(v=>typeof v==='string'&&v.length<=1000),'Invalid import report');importReport[k]=values}}
  const merge=mergeFields(parsed.merge)
- const document:ProposalDocument={version:1,blocks,...(brand?{brand}:{}),...(merge?{merge}:{})}
+ const document:ProposalDocument={version:1,blocks,...(brand?{brand}:{}),...(merge?{merge}:{}),...(fixedPdf?{fixedPdf}:{}),...(importReport?{importReport}:{})}
  need(new TextEncoder().encode(JSON.stringify(document)).length<=100000,'Document exceeds the 100 KB content limit')
  return document
 }
 export function documentOf(row:any){return proposalDocument(row.document)}
-export function documentFields(row:any){const doc=documentOf(row);return doc.blocks.length||doc.brand||doc.merge?{document:doc}:{}}
+export function documentFields(row:any){const doc=documentOf(row);return doc.blocks.length||doc.brand||doc.merge||doc.fixedPdf?{document:doc}:{}}
 export function selectedDocument(value:unknown,optionId:string,items:{id:string}[]=[]){const doc=proposalDocument(value);return {...doc,blocks:doc.blocks.filter(b=>!b.condition||(b.condition.startsWith('item:')?items.some(i=>'item:'+i.id===b.condition):b.condition===optionId))}}
 export function documentText(value:unknown){const doc=proposalDocument(value);return doc.blocks.map(b=>[b.type,b.title,b.text,b.second??'',b.alt??'',...(b.images??[]).map(image=>image.alt)].filter(Boolean).join('\n')).join('\n\n')}
 

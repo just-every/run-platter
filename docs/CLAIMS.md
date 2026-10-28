@@ -106,11 +106,11 @@ Evidence: `tests/platter.test.mjs`
 
 ## EDIT-005 — Word and PDF import and export
 
-Status: **missing**.
+Status: **partial**.
 
-Gap: No import or export of documents.
+Gap: Word uploads create editable headings, text, lists, text tables and embedded images; merge tokens and quote rows map with unmatched and missing-image reports. Heading 1 text sections import as library items. Fixed PDF originals retain exact bytes, support positioned fields and appended pricing. Word and US Letter or A4 PDF exports retain editable blocks, pricing and images. Remaining: rich library section imports, complete fixed-page Word export, inherited archive and conditional-carrier proof, and browser proof.
 
-Evidence: None recorded.
+Evidence: `tests/platter.test.mjs`
 
 ## EDIT-006 — Embedded rich media
 

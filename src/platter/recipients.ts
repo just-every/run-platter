@@ -13,6 +13,22 @@ export const requiredRecipient=(r:Recipient)=>['signer','approver','countersigne
 export async function recipientSignatures(db:D1Database,id:string,revision:number){
  return (await db.prepare('SELECT s.*,v.voided_at,v.reason AS void_reason FROM p_recipient_signatures s LEFT JOIN p_void_signatures v ON v.proposal_id=s.proposal_id AND v.revision=s.revision WHERE s.proposal_id=? AND s.revision=? ORDER BY s.signed_at,s.slot_id').bind(id,revision).all<any>()).results
 }
+export function recipientInput(input:any,a:Actor):Recipient[]{
+ need(Array.isArray(input)&&input.length>0,'Add at least one signer')
+ const next:Recipient[]=input.map((r:any)=>{
+  need(r&&typeof r==='object','Enter a recipient')
+  const id=text(r.id??crypto.randomUUID(),'a recipient id',100)
+  need(/^[a-zA-Z0-9_-]+$/.test(id),'Use a simple recipient id')
+  need(['signer','approver','viewer','cc','countersigner'].includes(r.role),'Choose a recipient role')
+  const group=Number(r.group??1);need(Number.isSafeInteger(group)&&group>=1&&group<=10000,'Choose a signing group from 1 to 10000')
+  return {id,name:text(r.name,'a recipient name',200),email:r.email?email(r.email):null,role:r.role,group}
+ })
+ need(new Set(next.map(r=>r.id)).size===next.length,'Recipient ids must be distinct')
+ need(new Set(next.filter(r=>r.email).map(r=>r.email)).size===next.filter(r=>r.email).length,'Each recipient needs their own mailbox')
+ need(next.some(r=>r.role==='signer'),'Include a client signer')
+ for(const r of next.filter(r=>r.role==='countersigner'&&r.email))need(r.email===a.email.toLowerCase(),'The countersigner must be the current owner',403)
+ return next
+}
 export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  need(a.role==='owner','Only the current owner manages proposal recipients',403)
  const db=env.DB,row=await permitted(db,a,p.id,'send');exact(row,p)
@@ -62,19 +78,7 @@ export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record
   const id=p.recipientId?text(p.recipientId,'a recipient id',100):crypto.randomUUID()
   input=[...plan.filter(r=>r.id!==id),{id,name:p.recipientName,email:p.recipientEmail,role:p.recipientRole,group:p.recipientGroup}]
  }
- need(Array.isArray(input)&&input.length>0,'Add at least one signer')
- const next:Recipient[]=input.map((r:any)=>{
-  need(r&&typeof r==='object','Enter a recipient')
-  const id=text(r.id??crypto.randomUUID(),'a recipient id',100)
-  need(/^[a-zA-Z0-9_-]+$/.test(id),'Use a simple recipient id')
-  need(['signer','approver','viewer','cc','countersigner'].includes(r.role),'Choose a recipient role')
-  const group=Number(r.group??1);need(Number.isSafeInteger(group)&&group>=1&&group<=10000,'Choose a signing group from 1 to 10000')
-  return {id,name:text(r.name,'a recipient name',200),email:r.email?email(r.email):null,role:r.role,group}
- })
- need(new Set(next.map(r=>r.id)).size===next.length,'Recipient ids must be distinct')
- need(new Set(next.filter(r=>r.email).map(r=>r.email)).size===next.filter(r=>r.email).length,'Each recipient needs their own mailbox')
- need(next.some(r=>r.role==='signer'),'Include a client signer')
- for(const r of next.filter(r=>r.role==='countersigner'&&r.email))need(r.email===a.email.toLowerCase(),'The countersigner must be the current owner',403)
+ const next=recipientInput(input,a)
  const revision=row.revision+1,updated={...row,recipient_plan:JSON.stringify(next),revision}
  await commit(db,a,[
   db.prepare("UPDATE p_proposals SET recipient_plan=?,revision=?,version=version+1,status='draft',approved_by=NULL,approved_at=NULL WHERE id=?").bind(JSON.stringify(next),revision,row.id),

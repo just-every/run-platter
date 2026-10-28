@@ -42,6 +42,7 @@ import { expiryCommand, expirySendStatements, currentTime } from './expiry'
 import { pdfCommand } from './documents/client-pdf'
 import { businessCommand } from './business-records'
 import { deliveryCommand } from './delivery'
+import { refreshRevenueInvoice } from './reports/accounting'
 import { reportCommand } from './reports/schedules'
 import { vendorDocuments } from './attachments'
 import { refreshVendorDocuments } from './attachment-commands'
@@ -68,6 +69,7 @@ export function proposalFields(p:Record<string,unknown>){
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
+ if(name==='revenue.invoice.refresh')return refreshRevenueInvoice(env,a,p)
  if(name.startsWith('recipient.'))return recipientCommand(env,a,name,p)
  if(name==='tracking.recipient')return stakeholderRecipient(env,a,p)
  if(name.startsWith('tracking.'))return trackingCommand(env,a,name,p)

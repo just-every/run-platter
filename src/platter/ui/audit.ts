@@ -35,7 +35,7 @@ const verbs: Record<string, string> = {
  'report.time-zone': 'set the installation time zone', 'report.schedule': 'scheduled a pipeline report email', 'report.unschedule': 'stopped a pipeline report email', 'report.export': 'exported the pipeline report',
  'native.auth.bootstrap': 'claimed this installation', 'native.setup': 'finished first-run setup', 'native.auth.invite': 'invited',
  'native.auth.magic-link': 'asked for a sign-in link', 'native.auth.confirm': 'signed in', 'native.auth.signout': 'signed out',
- 'native.auth.operator.role': 'changed the role of', 'native.auth.operator.status': 'changed the access of', 'native.auth.settings.identity': 'changed the sign-in settings',
+ 'revenue.invoice.refresh': 'refreshed an existing accounting invoice for', 'native.auth.operator.role': 'changed the role of', 'native.auth.operator.status': 'changed the access of', 'native.auth.settings.identity': 'changed the sign-in settings',
 }
 const spoken = (action: string) => verbs[action] ?? (action.startsWith('mcp.') ? `used ${action.slice(4).replaceAll('_', ' ')} through the agent connection on` : action.replace(/^native\./, '').replace(/[._-]+/g, ' '))
 

@@ -11,7 +11,7 @@ export function pipelineCsv(report: Report & {view?:string}) {
  const lines = [['Title', 'Client', 'Owner', 'Status', 'Next action', 'Currency', 'Value', 'Age in days','Follow-up due']]
  for (const r of report.rows) lines.push([r.title, r.client, r.owner, r.status, nextActions[r.nextAction as keyof typeof nextActions], r.currency, decimal(r.valueCents), String(r.age),r.dueDate??''])
  for (const t of report.totals) lines.push([`Total (${t.count} proposals)`, '', '', '', '', t.currency, decimal(t.valueCents), '', ''])
- if(report.view==='recorded-revenue'){lines[0][6]='Booked signed value';lines[0].push('Accepted on (UTC)',...revenueLabels);for(const [i,row] of report.rows.entries())lines[i+1].push(row.bookedOn,...revenueKeys.map(k=>decimal(row.recordedRevenue?.[k]??0)));for(const [i,total] of report.totals.entries())lines[report.rows.length+i+1].push('',...revenueKeys.map(k=>decimal((total as any)[k]??0)))}
+ if(report.view==='recorded-revenue'){lines[0][6]='Booked signed value';lines[0].push('Accepted on (UTC)',...revenueLabels,'Accounting reconciliation','Linked invoices','Oldest refresh (UTC)');for(const [i,row] of report.rows.entries())lines[i+1].push(row.bookedOn,...revenueKeys.map(k=>decimal(row.recordedRevenue?.[k]??0)),row.accounting.status,String(row.accounting.invoiceCount),row.accounting.refreshedAt?new Date(row.accounting.refreshedAt).toISOString():'');for(const [i,total] of report.totals.entries())lines[report.rows.length+i+1].push('',...revenueKeys.map(k=>decimal((total as any)[k]??0)),'','','')}
  return lines.map(line => line.map(cell).join(',')).join('\r\n') + '\r\n'
 }
 
@@ -21,7 +21,7 @@ export function pipelineMail(report: Report & {view?:string}, filters: string): 
  const financial=(row:any)=>report.view==='recorded-revenue'?' · '+revenueKeys.map((key,i)=>revenueLabels[i]+': '+shown(row[key]??0,row.currency)).join(' · '):''
  const body = [`Platter ${report.view==='recorded-revenue'?'recorded revenue':'pipeline'} report generated ${at}.`, `Filters: ${filters || 'all proposals'}.`, `${report.count} proposals match.`,
   ...report.totals.map(t => `${t.currency} total · ${t.count} proposals: ${shown(t.valueCents, t.currency)}${financial(t)}`), '',
-  ...report.rows.map(r => `${r.title} · ${r.status} · ${shown(r.valueCents, r.currency)} · ${r.owner} · ${r.client} · ${r.age} days · ${nextActions[r.nextAction as keyof typeof nextActions]}${financial({...r.recordedRevenue,currency:r.currency})}`),
+  ...report.rows.map(r => `${r.title} · ${r.status} · ${shown(r.valueCents, r.currency)} · ${r.owner} · ${r.client} · ${r.age} days · ${nextActions[r.nextAction as keyof typeof nextActions]}${financial({...r.recordedRevenue,currency:r.currency})+(report.view==='recorded-revenue'?' · Accounting reconciliation: '+r.accounting.status:'')}`),
   '', 'CSV:', pipelineCsv(report)].join('\n')
  return [`Platter ${report.view==='recorded-revenue'?'recorded revenue':'pipeline'} report · ${at}`, body]
 }

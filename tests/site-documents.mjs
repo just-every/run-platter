@@ -702,10 +702,18 @@ test('REPORT-004 booked snapshots and independent receipt periods export and sch
  const screenshots=process.env.PLATTER_SCREENSHOTS
  let browser
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
-   const h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',unclaimed:true})
+   const accountingInvoices=new Map([
+    ['synthetic-platter-4702',{Id:'synthetic-platter-4702',SyncToken:'0',CurrencyRef:{value:'USD'},TxnDate:'2099-01-15',DueDate:'2099-02-14',TotalAmt:2500,Balance:0}],
+    ['synthetic-platter-4703',{Id:'synthetic-platter-4703',SyncToken:'0',CurrencyRef:{value:'USD'},TxnDate:'2099-04-01',DueDate:'2099-05-01',TotalAmt:7500,Balance:6300}],
+    ['synthetic-platter-4704',{Id:'synthetic-platter-4704',SyncToken:'0',CurrencyRef:{value:'USD'},TxnDate:'2099-04-01',DueDate:'2099-07-01',TotalAmt:6000,Balance:3600}],
+   ])
+   const h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',unclaimed:true,outboundService:async request=>{
+    const url=new URL(request.url);assert.equal(url.hostname,'quickbooks.api.intuit.com');assert.equal(request.method,'GET')
+    return Response.json(url.pathname.includes('/companyinfo/')?{CompanyInfo:{CompanyName:'Synthetic accounting'}}:{Invoice:accountingInvoices.get(url.pathname.split('/').at(-1))})
+   }})
    const context=await browser.newContext({viewport:{width,height:900}})
    try{
     const bootstrap=await context.request.post(h.origin+'/auth/bootstrap',{headers:{origin:h.origin},data:{token:h.auth.SETUP_TOKEN,displayName:'Synthetic owner'},maxRedirects:0})
@@ -716,15 +724,29 @@ test('REPORT-004 booked snapshots and independent receipt periods export and sch
     const client=await app.cmd('client.save',{name:'Reporting client',email:h.auth.OWNER_EMAIL})
     const first=await acceptRevenue(app,{clientId:client.id}),later=await acceptRevenue(app,{clientId:client.id,term:24,date:'2099-04-01',title:'Two-year care'})
     for(const [id,amount,receivedOn] of [[first.id,'2500','2099-03-31'],[first.id,'1200','2099-04-01'],[later.id,'2400','2099-06-30']])await app.cmd('payment.record',{id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4500',consent:true})
+    await app.cmd('provider.connect',{provider:'quickbooks',version:0,realmId:'synthetic-platter-4700',token:'synthetic-platter-4701',consent:true})
+    await page.goto(h.origin+'/app/settings')
+    for(const [id,invoiceId] of [[first.id,'synthetic-platter-4702'],[first.id,'synthetic-platter-4703'],[later.id,'synthetic-platter-4704']]){
+     const link=page.locator('form').filter({has:page.getByRole('button',{name:'Link accounting invoice',exact:true})})
+     await link.getByLabel('Accepted agreement',{exact:true}).selectOption(id)
+     await link.getByLabel('Existing QuickBooks invoice id',{exact:true}).fill(invoiceId)
+     await link.getByRole('checkbox').check()
+     await link.getByRole('button',{name:'Link accounting invoice',exact:true}).click()
+    }
+    const refresh=page.locator('form').filter({has:page.getByRole('button',{name:'Refresh invoice snapshot',exact:true})}).first()
+    await refresh.getByRole('checkbox').check();await refresh.getByRole('button',{name:'Refresh invoice snapshot',exact:true}).click()
+    if(width===1440){assert.equal(await page.getByRole('alert').count(),0);assert.equal((await app.state()).accountingInvoices.length,3)}
+    if(screenshots)await page.screenshot({path:join(screenshots,'REPORT-004-settings-'+width+'.png'),fullPage:true})
     await page.goto(h.origin+'/app?view=recorded-revenue')
     const ownerId=(await app.state()).actor.id
     await page.getByLabel('Currency',{exact:true}).selectOption('USD');await page.getByLabel('Owner',{exact:true}).selectOption(ownerId)
-    for(const [label,value] of [['Booked from (UTC)','2099-01-15'],['Booked through (UTC)','2099-03-31'],['Received from','2099-04-01'],['Received through','2099-06-30']])await page.getByLabel(label,{exact:true}).fill(value)
+    for(const [label,value] of [['Booked from (UTC)','2099-01-15'],['Booked through (UTC)','2099-03-31'],['Received from','2099-04-01'],['Received through','2099-06-30'],['Invoiced from','2099-04-01'],['Invoiced through','2099-06-30'],['Overdue as of (UTC)','2099-07-01']])await page.getByLabel(label,{exact:true}).fill(value)
     await page.getByRole('button',{name:'Filter pipeline',exact:true}).click()
     const report=page.locator('section').filter({has:page.getByRole('heading',{name:'Recorded revenue',exact:true})})
     if(width===1440){
      assert.equal(await report.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'2')
      const totals=report.locator('.line-totals');assert.match(await totals.innerText(),/Booked one-off value\s+\$2,500\.00 USD/);assert.match(await totals.innerText(),/Booked first-year value\s+\$16,900\.00 USD/);assert.match(await totals.innerText(),/Received payments\s+\$3,600\.00 USD/)
+     assert.match(await totals.innerText(),/Booked MRR\s+\$1,200\.00 USD/);assert.match(await totals.innerText(),/Accounting invoiced\s+\$13,500\.00 USD/);assert.match(await totals.innerText(),/Accounting outstanding\s+\$9,900\.00 USD/);assert.match(await totals.innerText(),/Accounting overdue\s+\$6,300\.00 USD/);assert.match(await report.innerText(),/Matched · 2 linked invoices/)
      assert.equal(await page.getByLabel('Booked through (UTC)',{exact:true}).inputValue(),'2099-03-31');assert.equal(await page.getByLabel('Received from',{exact:true}).inputValue(),'2099-04-01')
     }
     await page.evaluate(()=>document.fonts.ready)
@@ -733,7 +755,7 @@ test('REPORT-004 booked snapshots and independent receipt periods export and sch
     const csv=await context.request.get(h.origin+await exports.getByRole('link',{name:'Download recorded revenue CSV',exact:true}).getAttribute('href'))
     if(width===1440){assert.equal(csv.status(),200);assert.match(await csv.text(),/Total \(2 proposals\),,,,,USD,16900\.00,,,,2500\.00,16900\.00,3600\.00/)}
     await exports.getByRole('checkbox').first().check();await exports.getByRole('button',{name:'Schedule report email',exact:true}).click()
-    if(width===1440){assert.equal(await page.getByRole('alert').count(),0);const saved=(await app.state()).reportSchedules[0],filters=new URLSearchParams(saved.filters);assert.equal(filters.get('receivedFrom'),'2099-04-01');assert.equal(filters.get('bookedTo'),'2099-03-31');assert.equal(filters.get('owner'),ownerId);assert.equal(filters.get('currency'),'USD');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))}
+    if(width===1440){assert.equal(await page.getByRole('alert').count(),0);const saved=(await app.state()).reportSchedules[0],filters=new URLSearchParams(saved.filters);assert.equal(filters.get('receivedFrom'),'2099-04-01');assert.equal(filters.get('bookedTo'),'2099-03-31');assert.equal(filters.get('owner'),ownerId);assert.equal(filters.get('currency'),'USD');assert.equal(filters.get('invoicedFrom'),'2099-04-01');assert.equal(filters.get('asOf'),'2099-07-01');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))}
     await page.getByRole('button',{name:'Stop this schedule',exact:true}).click()
    }finally{await context.close();await h.close()}
   }

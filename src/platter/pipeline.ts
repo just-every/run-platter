@@ -28,9 +28,9 @@ export function pipeline(proposals: any[], params = new URLSearchParams(), now =
  const minValue = bound(params, 'minValue', true), maxValue = bound(params, 'maxValue', true), minAge = bound(params, 'minAge'), maxAge = bound(params, 'maxAge')
  need(minValue === undefined || maxValue === undefined || minValue <= maxValue, 'Minimum value exceeds maximum')
  need(minAge === undefined || maxAge === undefined || minAge <= maxAge, 'Minimum age exceeds maximum')
- const financial=new Map(proposals.filter(p=>revenue).map(p=>[p.id,periodRevenue(p,periods!)]))
+ const financial=new Map(proposals.filter(p=>revenue).map(p=>[p.id,periodRevenue(p,periods!,now)]))
  let rows = proposals.filter(p=>!revenue||financial.get(p.id)!.included).map(p => ({
-  ...(revenue?{recordedRevenue:financial.get(p.id)!.recordedRevenue,bookedOn:financial.get(p.id)!.bookedOn}:{}),folderId:p.folderId??null,id: String(p.id), title: String(p.title), status: String(p.pipelineStatus ?? p.status), currency: String(revenue?p.acceptance.currency:p.currency),
+  ...(revenue?{recordedRevenue:financial.get(p.id)!.recordedRevenue,accounting:financial.get(p.id)!.accounting,bookedOn:financial.get(p.id)!.bookedOn}:{}),folderId:p.folderId??null,id: String(p.id), title: String(p.title), status: String(p.pipelineStatus ?? p.status), currency: String(revenue?p.acceptance.currency:p.currency),
   valueCents: Number(revenue?financial.get(p.id)!.valueCents:p.acceptance ? p.acceptance.totalCents : Math.max(...p.options.map((o: any) => o.cents))),
   ownerId: p.sales_owner_id as string | null, owner: p.sales_owner_name || 'Not recorded',
   clientId: String(p.client_id), client: String(p.clientName), age: Math.max(0, Math.floor((now - p.created_at) / 86400000)),

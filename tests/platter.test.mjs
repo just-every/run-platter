@@ -1718,8 +1718,9 @@ test('TEAM-001 provider connections verify accounts, seal credentials, enforce a
 })
 
 test('TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund',async()=>{
+ const invoices=new Map();let duringInvoice
  const calls=[];let accepted,refunded=0,uncertain=false
- const h=await harness({outboundService:async request=>{const url=new URL(request.url);assert.equal(url.hostname,'api.stripe.com');calls.push({path:url.pathname,method:request.method});if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2400'});if(url.pathname==='/v1/charges/synthetic-platter-2401')return Response.json({id:'synthetic-platter-2401',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:refunded,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}});assert.equal(url.pathname,'/v1/refunds');assert.equal(request.method,'POST');assert.match(request.headers.get('idempotency-key'),/^platter-refund-/);const body=new URLSearchParams(await request.text());assert.equal(body.get('charge'),'synthetic-platter-2401');if(uncertain)return new Response(null,{status:503});const amount=Number(body.get('amount'));refunded+=amount;assert.ok(refunded<=accepted.deposit_cents);return Response.json({id:'synthetic-platter-'+(2500+calls.length),charge:'synthetic-platter-2401',amount,status:'succeeded'})}})
+ const h=await harness({outboundService:async request=>{const url=new URL(request.url);if(url.hostname==='quickbooks.api.intuit.com'){assert.equal(request.method,'GET');if(url.pathname.includes('/companyinfo/'))return Response.json({CompanyInfo:{CompanyName:'Synthetic accounting'}});if(duringInvoice)await duringInvoice();return Response.json({Invoice:invoices.get(url.pathname.split('/').at(-1))})}assert.equal(url.hostname,'api.stripe.com');calls.push({path:url.pathname,method:request.method});if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2400'});if(url.pathname==='/v1/charges/synthetic-platter-2401')return Response.json({id:'synthetic-platter-2401',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:refunded,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}});assert.equal(url.pathname,'/v1/refunds');assert.equal(request.method,'POST');assert.match(request.headers.get('idempotency-key'),/^platter-refund-/);const body=new URLSearchParams(await request.text());assert.equal(body.get('charge'),'synthetic-platter-2401');if(uncertain)return new Response(null,{status:503});const amount=Number(body.get('amount'));refunded+=amount;assert.ok(refunded<=accepted.deposit_cents);return Response.json({id:'synthetic-platter-'+(2500+calls.length),charge:'synthetic-platter-2401',amount,status:'succeeded'})}})
  try{
   const people={};for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[]});people[role]=cookie}
   const {p,path}=await sent(h),cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},cookie)).status,200);accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
@@ -1744,7 +1745,7 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   await h.cmd('proposal.approve',{id:second.id,version:1,revision:1});const secondSend=await h.cmd('proposal.send',{id:second.id,version:2},people.sales),secondPath=new URL(secondSend.shareUrl).pathname,secondCookie=await verified(h,secondPath)
   assert.equal((await h.send(secondPath+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},secondCookie)).status,200)
   await h.cmd('payment.record',{id:second.id,amount:'7',receivedOn:'2026-10-21',method:'check',reference:'synthetic-platter-4200',consent:true},people.billing);await h.cmd('invoice.export',{id:p.id})
-  const query='view=recorded-revenue&sort=value&direction=desc',totals={currency:'USD',count:2,valueCents:480000,oneOffCents:480000,firstYearCents:480000,receivedCents:61000,refundedCents:40000,netReceivedCents:21000,uncertainRefundCents:5000,exportedDepositCents:60000}
+  const query='view=recorded-revenue&sort=value&direction=desc',totals={currency:'USD',count:2,valueCents:480000,oneOffCents:480000,firstYearCents:480000,receivedCents:61000,refundedCents:40000,netReceivedCents:21000,uncertainRefundCents:5000,exportedDepositCents:60000,mrrCents:0,invoicedCents:0,outstandingCents:0,overdueCents:0,accountingPaidCents:0,accountingDifferenceCents:0}
   for(const [role,cookie] of Object.entries({owner:h.owner,...people})){
    const report=await h.send('/api/platter/pipeline?'+query,undefined,cookie)
    if(role==='content_editor'){assert.equal(report.status,403);assert.equal((await h.send('/app?'+query,undefined,cookie)).status,403);assert.ok((await h.state(cookie)).proposals.every(p=>!Object.hasOwn(p,'recordedRevenue')));continue}
@@ -1766,15 +1767,15 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   const read=async query=>{const r=await h.send('/api/platter/pipeline?'+query,undefined,h.owner);assert.equal(r.status,200,r.text);return r.value}
   const native=await read(filters)
   assert.deepEqual(native.rows.map(r=>r.id),[first.id,later.id])
-  assert.deepEqual(native.totals,[{currency:'USD',count:2,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:360000,refundedCents:0,netReceivedCents:360000,uncertainRefundCents:0,exportedDepositCents:0}])
+  assert.deepEqual(native.totals,[{currency:'USD',count:2,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:360000,refundedCents:0,netReceivedCents:360000,uncertainRefundCents:0,exportedDepositCents:0,mrrCents:120000,invoicedCents:0,outstandingCents:0,overdueCents:0,accountingPaidCents:0,accountingDifferenceCents:0}])
   assert.equal(native.rows[0].bookedOn,'2099-01-15')
   assert.deepEqual(native.rows.map(r=>[r.recordedRevenue.oneOffCents,r.recordedRevenue.firstYearCents,r.recordedRevenue.receivedCents]),[[250000,1690000,120000],[0,0,240000]])
   const reverse=new URLSearchParams(filters);reverse.set('bookedFrom','2099-04-01');reverse.set('bookedTo','2099-06-30');reverse.set('receivedFrom','2099-01-01');reverse.set('receivedTo','2099-03-31')
   const secondQuarter=await read(reverse)
-  assert.deepEqual(secondQuarter.totals,[{currency:'USD',count:2,valueCents:3130000,oneOffCents:250000,firstYearCents:1690000,receivedCents:250000,refundedCents:0,netReceivedCents:250000,uncertainRefundCents:0,exportedDepositCents:0}])
+  assert.deepEqual(secondQuarter.totals,[{currency:'USD',count:2,valueCents:3130000,oneOffCents:250000,firstYearCents:1690000,receivedCents:250000,refundedCents:0,netReceivedCents:250000,uncertainRefundCents:0,exportedDepositCents:0,mrrCents:120000,invoicedCents:0,outstandingCents:0,overdueCents:0,accountingPaidCents:0,accountingDifferenceCents:0}])
   const sameDay=new URLSearchParams(filters);sameDay.set('bookedTo','2099-01-15');sameDay.set('receivedFrom','2099-03-31');sameDay.set('receivedTo','2099-03-31')
   assert.deepEqual((await read(sameDay)).rows.map(r=>[r.id,r.recordedRevenue.receivedCents]),[[first.id,250000]],'Both date endpoints are inclusive')
-  const foreign=new URLSearchParams(filters);foreign.set('currency','AUD');assert.deepEqual((await read(foreign)).totals,[{currency:'AUD',count:1,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:70000,refundedCents:0,netReceivedCents:70000,uncertainRefundCents:0,exportedDepositCents:0}])
+  const foreign=new URLSearchParams(filters);foreign.set('currency','AUD');assert.deepEqual((await read(foreign)).totals,[{currency:'AUD',count:1,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:70000,refundedCents:0,netReceivedCents:70000,uncertainRefundCents:0,exportedDepositCents:0,mrrCents:120000,invoicedCents:0,outstandingCents:0,overdueCents:0,accountingPaidCents:0,accountingDifferenceCents:0}])
   for(const cookie of [people.sales,people.manager,people.viewer])assert.equal((await h.send('/api/platter/pipeline?'+filters,undefined,cookie)).value.count,0,'Owner filter cannot widen live revenue scope')
   const frozen=(await h.state()).proposals.find(p=>p.id===first.id).acceptance
   await h.cmd('proposal.revise',{...first.input,id:first.id,version:4},h.owner,409)
@@ -1793,6 +1794,62 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   await worker.scheduled({scheduledTime:new Date(saved.nextRunAt),cron:'*/15 * * * *'});await worker.scheduled({scheduledTime:new Date(saved.nextRunAt),cron:'*/15 * * * *'})
   const nativeMail=(await h.state()).reportOutbox.filter(m=>m.body.includes('Booked first-year value: $16,900.00 USD'))
   assert.equal(nativeMail.length,1);assert.ok(nativeMail[0].body.includes((await h.send('/api/platter/pipeline.csv?'+filters,undefined,h.owner)).text));assert.match(nativeMail[0].body,/Received payments: \$3,600\.00 USD/)
+
+  // Existing accounting invoices are read through the provider edge; no financial POST is made.
+  await h.cmd('provider.connect',{provider:'quickbooks',version:0,realmId:'synthetic-platter-4600',token:'synthetic-platter-4601',consent:true})
+  const a='synthetic-platter-4602',b='synthetic-platter-4603',c='synthetic-platter-4604'
+  invoices.set(a,{Id:a,SyncToken:'0',CurrencyRef:{value:'USD'},TxnDate:'2099-01-15',DueDate:'2099-02-14',TotalAmt:2500,Balance:0})
+  invoices.set(b,{Id:b,SyncToken:'0',CurrencyRef:{value:'USD'},TxnDate:'2099-04-01',DueDate:'2099-05-01',TotalAmt:7500,Balance:6300})
+  invoices.set(c,{Id:c,SyncToken:'0',CurrencyRef:{value:'USD'},TxnDate:'2099-04-01',DueDate:'2099-07-01',TotalAmt:6000,Balance:3600})
+  const link=(id,invoiceId,version=0)=>({id,invoiceId,version,consent:true})
+  for(const cookie of [people.billing,people.sales,people.manager,people.viewer,people.content_editor]){
+   await h.cmd('revenue.invoice.refresh',link(first.id,a),cookie,403)
+   assert.deepEqual((await h.state(cookie)).accountingInvoices,[])
+  }
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_revenue_invoices').first()).n,0)
+  await h.cmd('revenue.invoice.refresh',{...link(first.id,a),consent:false},h.owner,400)
+  await h.cmd('revenue.invoice.refresh',link(first.id,a))
+  await h.cmd('revenue.invoice.refresh',link(first.id,b),people.admin)
+  await h.cmd('revenue.invoice.refresh',link(later.id,c))
+  const snapshots=async()=>JSON.stringify((await h.db.prepare('SELECT * FROM p_revenue_invoices ORDER BY invoice_id').all()).results)
+  let unchanged=await snapshots()
+  await h.cmd('revenue.invoice.refresh',link(first.id,a),h.owner,409)
+  await h.cmd('revenue.invoice.refresh',link(later.id,a,1),h.owner,409)
+  invoices.get(a).CurrencyRef.value='AUD'
+  await h.cmd('revenue.invoice.refresh',link(first.id,a,1),h.owner,409)
+  invoices.get(a).CurrencyRef.value='USD'
+  assert.equal(await snapshots(),unchanged,'Stale, conflicting and wrong-currency links change no accounting facts')
+  await h.cmd('revenue.invoice.refresh',link(first.id,a,1))
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_revenue_invoices').first()).n,3,'A replay refresh never duplicates an invoice')
+  const accountingFilters=new URLSearchParams(filters);accountingFilters.set('invoicedFrom','2099-04-01');accountingFilters.set('invoicedTo','2099-06-30');accountingFilters.set('asOf','2099-07-01')
+  const accounting=await read(accountingFilters)
+  assert.deepEqual(accounting.totals,[{currency:'USD',count:2,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:360000,refundedCents:0,netReceivedCents:360000,uncertainRefundCents:0,exportedDepositCents:0,mrrCents:120000,invoicedCents:1350000,outstandingCents:990000,overdueCents:630000,accountingPaidCents:610000,accountingDifferenceCents:0}])
+  assert.deepEqual(accounting.rows.map(r=>r.accounting.status),['Matched','Matched'])
+  assert.equal((await read(new URLSearchParams({...Object.fromEntries(accountingFilters),asOf:'2099-07-02'}))).totals[0].overdueCents,990000,'An invoice due today becomes overdue tomorrow')
+  assert.equal((await read(new URLSearchParams({...Object.fromEntries(accountingFilters),invoicedFrom:'2099-01-15',invoicedTo:'2099-01-15'}))).totals[0].invoicedCents,250000,'Invoice endpoints are inclusive and independent of booking and receipt periods')
+  for(const cookie of [people.sales,people.manager,people.viewer])assert.equal((await h.send('/api/platter/pipeline?'+accountingFilters,undefined,cookie)).value.count,0)
+  const setupRevenue=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setupRevenue.status,303)
+  const shown=await h.send('/app?'+accountingFilters,undefined,h.owner);assert.match(shown.text,/Accounting reconciliation/);assert.match(shown.text,/Matched/)
+  const accountingCsv=await h.send('/api/platter/pipeline.csv?'+accountingFilters,undefined,h.owner)
+  assert.match(accountingCsv.text,/Booked MRR,Accounting invoiced,Accounting outstanding,Accounting overdue/);assert.match(accountingCsv.text,/1200\.00,13500\.00,9900\.00,6300\.00,6100\.00,0\.00/)
+  const accountingSchedule=await h.cmd('report.schedule',{filters:accountingFilters.toString(),cadence:'daily',hour:8,recipients:[h.auth.OWNER_EMAIL]})
+  const accountingDue=(await h.state()).reportSchedules.find(r=>r.id===accountingSchedule.id).nextRunAt
+  await worker.scheduled({scheduledTime:new Date(accountingDue),cron:'*/15 * * * *'})
+  const accountingMail=(await h.state()).reportOutbox.find(m=>m.body.includes('Accounting invoiced: $13,500.00 USD'))
+  assert.ok(accountingMail.body.includes(accountingCsv.text));assert.match(accountingMail.body,/Accounting reconciliation: Matched/)
+
+  // A changed accounting amount is an explicit mismatch, never a changed accepted price or invented receipt.
+  invoices.get(b).TotalAmt=7600;invoices.get(b).SyncToken='1'
+  await h.cmd('revenue.invoice.refresh',link(first.id,b,1))
+  const mismatch=await read(accountingFilters),firstRow=mismatch.rows.find(r=>r.id===first.id)
+  assert.equal(firstRow.accounting.status,'Mismatch');assert.equal(firstRow.recordedRevenue.accountingDifferenceCents,-10000);assert.equal(firstRow.recordedRevenue.receivedCents,120000);assert.deepEqual((await h.state()).proposals.find(p=>p.id===first.id).acceptance,frozen)
+  unchanged=await snapshots()
+  duringInvoice=async()=>{duringInvoice=undefined;await h.db.prepare("UPDATE p_connections SET status='disconnected',version=version+1 WHERE id='workspace:quickbooks'").run()}
+  await h.cmd('revenue.invoice.refresh',link(first.id,b,2),h.owner,409)
+  assert.equal(await snapshots(),unchanged,'Revoking the connection during provider I/O prevents a write')
+  await h.cmd('revenue.invoice.refresh',link(first.id,b,2),h.owner,409)
+  assert.equal(await snapshots(),unchanged,'A disconnected credential cannot refresh historical snapshots')
+
 
 
  }finally{await h.close()}

@@ -367,7 +367,28 @@
     {
       "file": "CONTRACT.md",
       "line": 72,
-      "text": "**PROP-002 \u2014 Sending freezes the offer.** Sending freezes the approved revision: its scope, options and prices can no longer be edited in place. Anyone who may send the proposal under `APPROVE-003` (the owner, under the default policy) can send a fresh invitation, which rotates the client link and clears any verification session without changing the offer, so it needs no new approval. A change after sending is a new revision under `NEG-001`, never an edit to what the client already holds. **Acceptance evidence:** Send an approved proposal, try to revise it (409), send a fresh invitation and confirm the old link is refused and the offer unchanged.",
+      "text": "**PROP-002 \u2014 Sending freezes the offer.** Sending freezes the approved revision: its scope, options and prices can no longer be edited in place. Anyone who may send the proposal under `APPROVE-003`",
+      "to": "clause",
+      "ids": [
+        "PROP-002"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 72,
+      "text": "(the owner, under the default policy)",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 72,
+      "text": "can send a fresh invitation, which rotates the client link and clears any verification session without changing the offer, so it needs no new approval. A change after sending is a new revision under `NEG-001`, never an edit to what the client already holds. **Acceptance evidence:** Send an approved proposal, try to revise it (409), send a fresh invitation and confirm the old link is refused and the offer unchanged.",
       "to": "clause",
       "ids": [
         "PROP-002"

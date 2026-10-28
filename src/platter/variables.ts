@@ -59,7 +59,16 @@ export async function resolveVariables(env:Bindings,a:Actor,input:Record<string,
  const values=rebind?{...context,...(p.variableValues??{})}:p.variableDeal!==undefined?{...previous,...context,...(p.variableValues??{})}:{...context,...previous,...(p.variableValues??{})}
  for(const [key,value]of Object.entries(values))need(typeof value==='string'&&value.length<=10000&&!variableNames(value).length,'Use plain text variable values')
  if(rebind&&old)for(const [path,pattern]of Object.entries(old.patterns)){const keys=path.slice(1).split('/');let parent=p;for(const key of keys.slice(0,-1)){if(parent[key]===undefined)break;parent=parent[key]}if(parent&&typeof parent==='object')parent[keys.at(-1)!]=pattern}
- p=walk(p,(v,path)=>{if(path.startsWith('/variable'))return v;const original=old?.patterns[path],pattern=original&&(rebind||replace(original,previous)===v)?original:variableNames(v).length?v:undefined;if(!pattern)return v;patterns[path]=pattern;const filled=replace(pattern,values);return variableNames(filled).length&&/(?:price|unitPrice|quantity)$/i.test(path)?'0.01':filled})
+ p=walk(p,(v,path)=>{
+  if(path.startsWith('/variable'))return v
+  const original=old?.patterns[path],rendered=original?replace(original,previous):'',numeric=/(?:price|priceOne|priceTwo|unitPrice|quantity)$/i.test(path)
+  const sameNumber=numeric&&/^-?\d+(?:\.\d+)?$/.test(rendered)&&/^-?\d+(?:\.\d+)?$/.test(v)&&Number(rendered)===Number(v)
+  const retained=original&&(rebind||rendered===v||sameNumber||numeric&&variableNames(rendered).length>0)
+  const pattern=retained?original:variableNames(v).length?v:undefined
+  if(!pattern)return v
+  patterns[path]=pattern;const filled=replace(pattern,values)
+  return variableNames(filled).length&&numeric?'0.01':filled
+ })
  if(!Object.keys(patterns).length&&!conditionNames.size)return {fields:p,merge:undefined}
  const used=[...new Set([...variableNames(Object.values(patterns)),...conditionNames])],merge=mergeFields({patterns,conditions:[...conditionNames],values:Object.fromEntries(Object.entries(values).filter(([k])=>used.includes(k))),...(deal?{deal}:{})})!
  p.document={...(p.document??{version:1,blocks:[]}),merge}

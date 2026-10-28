@@ -769,3 +769,45 @@ test('CAT-001 reviewed CSV promotion and explicit recurring insertion preserve i
   await catalogBrowser({origin:h.origin,owner,sales,op,page,review,command,state,capture:async()=>{},client,width:1440})
  }finally{await owner?.close();await sales?.close();await browser?.close();await edge.close();await h.close()}
 })
+
+test('AUTO-002 Settings authorizes Drive archiving and shows completed and held jobs with safe reconciliation', {timeout:120000},async()=>{
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{driveFixture,driveToken,driveRoot,completeDriveAgreement}=await import('./drive-fixture.mjs')
+ const fake=driveFixture(),edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,outboundService:fake.outboundService});edge.attach(h)
+ let browser,context
+ try{
+  browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  context=await browser.newContext({viewport:{width:1440,height:1000},ignoreHTTPSErrors:true})
+  const [name,value]=h.owner.split('=');await context.addCookies([{name,value,url:h.origin}])
+  const page=await context.newPage();await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  await page.goto(h.origin+'/app/settings')
+  const connection=page.locator('article').filter({has:page.getByRole('heading',{name:'Google Drive',exact:true})})
+  await connection.getByLabel('Google Drive access token').fill(driveToken);await connection.getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect Google Drive',exact:true}).click()
+  const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Completed document archiving',exact:true})})
+  await panel.getByLabel('Drive destination folder id').fill(driveRoot);await panel.getByLabel('Archive naming pattern').fill('{client} - {title} - r{revision}');await panel.getByRole('checkbox').check();await panel.getByRole('button',{name:'Authorize Drive archiving',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0);assert.match(await panel.innerText(),/Archiving is authorized/)
+  const signed=await completeDriveAgreement(h),fire=async()=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  await page.reload();await panel.getByRole('button',{name:'Process queued archives',exact:true}).click()
+  assert.match(await panel.getByRole('list',{name:'Document archive history'}).innerText(),/Synthetic archive agreement[\s\S]*complete/)
+  fake.setUncertain(true);await completeDriveAgreement(h,'Uncertain archive agreement',signed.client.id);await fire();await page.reload()
+  assert.match(await panel.innerText(),/held/);assert.equal(await panel.getByRole('button',{name:'Reconcile archive',exact:true}).count(),1)
+  assert.equal(await panel.getByLabel('Archive naming pattern').inputValue(),'{client} - {title} - r{revision}')
+  const posts=fake.calls.filter(c=>c.method==='POST').length
+  await panel.getByRole('button',{name:'Reconcile archive',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0);assert.equal(await panel.getByRole('button',{name:'Reconcile archive',exact:true}).count(),0)
+  assert.equal(fake.calls.filter(c=>c.method==='POST').length,posts)
+  assert.equal(await panel.getByRole('listitem').count(),2)
+  assert.ok(await panel.locator('button,input').evaluateAll(nodes=>nodes.every(node=>parseFloat(getComputedStyle(node).fontSize)>=13)))
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+  const screenshots=process.env.PLATTER_SCREENSHOTS
+  if(screenshots){
+   await mkdir(screenshots,{recursive:true});await documentFonts(page)
+   await panel.screenshot({path:join(screenshots,'AUTO-002-settings-1440.png')})
+   await page.setViewportSize({width:390,height:900});await documentFonts(page)
+   await panel.screenshot({path:join(screenshots,'AUTO-002-settings-390.png')})
+  }
+  await page.setViewportSize({width:1440,height:1000})
+  await panel.getByRole('button',{name:'Revoke archiving authorization',exact:true}).click()
+  assert.match(await panel.innerText(),/Archiving is inactive/)
+ }finally{await context?.close();await browser?.close();await edge.close();await h.close()}
+})
+async function documentFonts(page){await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))})}

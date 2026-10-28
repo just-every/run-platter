@@ -9,26 +9,27 @@ import { configureTaxes, taxPackages, taxRequest, taxTables } from './taxes-fixt
 
 async function englishClientCopy() {
  const words=new Set()
- for(const file of ['client','shell','shared','expiry','questions','attachments','paper','suggestions','packages','pricing','payment-terms','blocks']) {
+ for(const file of ['client','shell','shared','expiry','questions','attachments','paper','suggestions','packages','pricing','payment-terms','blocks','recipients']) {
   const source=ts.createSourceFile(file,await readFile('./src/platter/ui/'+file+'.ts','utf8'),ts.ScriptTarget.Latest,true)
   const collect=node=>{
    if(ts.isStringLiteral(node)||ts.isNoSubstitutionTemplateLiteral(node)||ts.isTemplateHead(node)||ts.isTemplateMiddle(node)||ts.isTemplateTail(node)) {
     for(const part of node.text.replace(/<[^>]*(?:>|$)/g,'\0').split('\0')) {
      const text=part.replace(/^[\s"'<>/=]+|[\s"'<>/=]+$/g,'').trim()
+     if(file==='recipients'&&['signer','countersigner','approver','viewer'].includes(text))words.add(text)
      if(text.length>=4&&!['Platter','Total'].includes(text)&&(/[A-Z][a-z]{3}/.test(text)||/[a-z]{3} [a-z]{3}/.test(text)))words.add(text)
     }
    }
    ts.forEachChild(node,collect)
   }
-  collect(source)
+  if(file==='recipients'){for(const statement of source.statements)if(ts.isFunctionDeclaration(statement)&&statement.name?.text==='recipientClientPanel')collect(statement)}else collect(source)
  }
  return [...words]
 }
 
-export async function localeBrowser(width=1440, appOptions={}) {
+export async function localeBrowser(width=1440) {
  let app,browser,context
  try {
-  app=await installedApp(appOptions)
+  app=await installedApp()
   browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   context=await browser.newContext({viewport:{width,height:900},locale:'fr-FR'})
   const page=await context.newPage(),request=context.request,headers={origin:app.origin}
@@ -139,7 +140,7 @@ export async function localeBrowser(width=1440, appOptions={}) {
    const untranslated=async()=>{
     assert.equal(await page.locator('html').getAttribute('lang'),language)
     let text=await page.locator('body').innerText()
-    for(const value of Object.values(authored))text=text.replaceAll(value,'')
+    for(const value of [...Object.values(authored),'Synthetic signer'])text=text.replaceAll(value,'')
     for(const key of catalog)assert.ok(!text.includes(key),'untranslated '+language+' system text: '+key)
     assert.ok((await page.locator('main').innerText()).includes(authored.scope))
    }
@@ -159,5 +160,57 @@ export async function localeBrowser(width=1440, appOptions={}) {
    const certificate=await request.get(url.origin+url.pathname+'/certificate.json');assert.equal(certificate.status(),200)
    const facts=await certificate.json();assert.equal(facts.language,language);assert.equal(facts.signers[0].language,language);assert.equal(facts.signers[0].consent,shownConsent)
   }
+
+  const multi=await cmd('proposal.prepare',{...authored,clientId:client.id,priceOne:'2400',priceTwo:'4200',depositPercent:'25'})
+  const email=n=>'synthetic-platter-'+n+String.fromCharCode(64)+'example.test'
+  const recipients=[{id:'ceo',name:'Synthetic CEO',email:email(9791),role:'signer',group:1},{id:'cfo',name:'Synthetic CFO',email:email(9792),role:'signer',group:2},{id:'approver',name:'Synthetic approver',email:email(9793),role:'approver',group:2},{id:'owner',name:'Synthetic owner',email:'owner'+String.fromCharCode(64)+'northstar.example',role:'countersigner',group:3},{id:'viewer',name:'Synthetic viewer',email:email(9794),role:'viewer',group:1}]
+  await cmd('recipient.save',{id:multi.id,version:1,recipients})
+  for(const [index,[id,locale]] of [['ceo','es'],['cfo','fr'],['approver','pt'],['viewer','de']].entries())await cmd('proposal.locale',{id:multi.id,version:index+2,recipientId:id,locale})
+  await cmd('proposal.approve',{id:multi.id,version:6,revision:2})
+  await page.goto(app.origin+'/app/proposal?id='+multi.id)
+  await page.getByRole('button',{name:'Send recipient-language defaults',exact:true}).click()
+  const stateAfterSend=await (await request.get(app.origin+'/api/platter/state')).json(),issued=stateAfterSend.proposals.find(r=>r.id===multi.id)
+  assert.equal(issued.status,'sent')
+  const links=Object.fromEntries(issued.recipientLinks.map(r=>[r.slot_id,app.origin+'/p/'+r.token]))
+  for(const [id,prefix] of [['ceo','Su propuesta: '],['cfo','Votre proposition : '],['approver','Sua proposta: '],['viewer','Ihr Angebot: '],['owner','Your proposal: ']]){
+   const mail=stateAfterSend.outbox.find(m=>m.proposal_id===multi.id&&m.recipient===recipients.find(r=>r.id===id).email)
+   assert.equal(mail.subject,prefix+authored.title)
+  }
+  const recipientSettings=[
+   ['viewer','de','Bestätigungscode senden','E-Mail-Bestätigungscode','E-Mail-Adresse bestätigen','Ihre Empfängerrolle'],
+   ['cfo','fr','Envoyer le code de vérification','Code de vérification par e-mail','Vérifier l’adresse e-mail','Votre rôle de destinataire'],
+   ['approver','pt','Enviar código de verificação','Código de verificação por e-mail','Verificar e-mail','Sua função de destinatário'],
+   ['ceo','es','Enviar código de verificación','Código de verificación por correo electrónico','Verificar correo electrónico','Su rol de destinatario'],
+   ['owner','en','Send verification code','Email verification code','Verify email','Your recipient role'],
+  ]
+  for(const [id,locale,sendCode,codeLabel,verifyCode,roleHeading] of recipientSettings){
+   await page.goto(links[id]);assert.equal(await page.locator('html').getAttribute('lang'),locale)
+   assert.ok(!(await page.locator('body').innerText()).includes(authored.scope),'personal invitations reveal no offer before verification')
+   await page.getByRole('button',{name:sendCode,exact:true}).click()
+   const messages=(await (await request.get(app.origin+'/api/platter/state')).json()).outbox
+   const mail=messages.find(m=>m.proposal_id===multi.id&&m.recipient===recipients.find(r=>r.id===id).email&&/\b\d{6}\b/.test(m.body))
+   await page.getByLabel(codeLabel,{exact:true}).fill(mail.body.match(/\b\d{6}\b/)[0]);await page.getByRole('button',{name:verifyCode,exact:true}).click()
+   assert.equal(await page.getByRole('heading',{name:roleHeading,exact:true}).count(),1)
+   if(locale!=='en'){
+    let text=await page.locator('body').innerText()
+    for(const value of [...Object.values(authored),...recipients.map(r=>r.name)])text=text.replaceAll(value,'')
+    for(const english of catalog){const escaped=english.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');assert.ok(!new RegExp('(^|[^\\p{L}])'+escaped+'(?=$|[^\\p{L}])','u').test(text),'recipient interface translated: '+english)}
+   }
+   if(id==='viewer'){
+    assert.equal(await page.locator('form#platter-acceptance').count(),0)
+    const refused=await request.post(links[id]+'/action?name=accept',{headers,data:{name:'Synthetic viewer',optionId:'one',consent:true}});assert.equal(refused.status(),403)
+   }
+   if(id==='cfo')assert.equal(await page.locator('form#platter-acceptance').count(),0,'later signer has no signing form')
+   await capture('recipient-'+id)
+  }
+  for(const [id,nameLabel,button] of [['ceo','Su nombre completo','Aceptar propuesta'],['cfo','Votre nom complet','Accepter la proposition'],['approver','Seu nome completo','Aprovar versão do cliente'],['owner','Your full name','Accept proposal']]){
+   await page.goto(links[id]);await page.getByLabel(nameLabel,{exact:true}).fill('Synthetic '+id)
+   if(id!=='approver')await page.getByRole('radio',{name:/Studio essentials/}).check()
+   await page.locator('form#platter-acceptance input[name="consent"]').check()
+   await page.getByRole('button',{name:button,exact:true}).click()
+  }
+  const multiCertificate=await request.get(links.owner+'/certificate.json');assert.equal(multiCertificate.status(),200)
+  const multiFacts=await multiCertificate.json();assert.deepEqual(multiFacts.signers.map(s=>s.language),['es','fr','pt','en'])
+  await capture('recipient-completion')
  } finally {await context?.close();await browser?.close();await app?.close()}
 }

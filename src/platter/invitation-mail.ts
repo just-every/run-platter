@@ -11,7 +11,7 @@ export function invitationMail(
  recipient: string, shareUrl: string, at: number,
 ): D1PreparedStatement[] {
  let subject: string, message: string, body: string
- if (input.mailSubject === undefined && input.mailMessage === undefined) {
+ if (input.localizedDefaults === 'yes' || input.mailSubject === undefined && input.mailMessage === undefined) {
   const defaults = proposalMail(offer.title, shareUrl, clientLocale(offer))
   subject = defaults[0]
   body = defaults[1]

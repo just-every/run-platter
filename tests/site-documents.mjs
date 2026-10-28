@@ -12,7 +12,7 @@ import { chromium } from '@playwright/test'
 import { pdfPages } from './pdf-document.mjs'
 import { builtSite, installedApp } from './site-harness.mjs'
 
-test('EDIT-017 owner-selected Spanish invitation, verification, consent and completion preserve authored English through the compiled client', {timeout:120000},()=>localeBrowser())
+test('EDIT-017 owner-selected mailbox languages and ordered recipients preserve authored content through the compiled client', {timeout:120000},()=>localeBrowser())
 
 test('COLLAB-003 desktop and phone compare revisions and restore an earlier draft requiring fresh approval', { timeout: 120000 }, async () => {
  let app, browser

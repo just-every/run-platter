@@ -79,6 +79,6 @@ function recipientVerification(view:any,token:string,feedback?:Feedback){
  const body=ui('<p>Verify the mailbox assigned to this personal invitation before viewing the proposal: ')+escape(view.clientEmail)+'.</p>'+
   '<form method="post" action="'+endpoint+ui('code.request"><button>Send verification code</button></form>')+
   '<form method="post" action="'+endpoint+'code.verify">'+field(ui('Email verification code'),'code','','required autocomplete="one-time-code" inputmode="numeric"')+ui('<button>Verify email</button></form>')+
-  (view.embedded?'<p><a href="/p/'+encodeURIComponent(token)+'" target="_blank" rel="noopener noreferrer">Open proposal in a new tab</a> if your browser blocks embedded verification.</p>':'')
+  (view.embedded?ui`<p><a href="/p/${encodeURIComponent(token)}" target="_blank" rel="noopener noreferrer">Open proposal in a new tab</a> if your browser blocks embedded verification.</p>`:'')
  return document(ui('Verify your email'),panel(ui('Personal invitation'),body),{client:true,feedback})
 }

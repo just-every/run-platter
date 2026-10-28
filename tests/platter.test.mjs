@@ -16,7 +16,7 @@ async function audited(h,action,actor,role,subject){const query=new URLSearchPar
 async function draft(h){const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'});const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id});return{client,p}}
 async function sent(h){const{client,p}=await draft(h);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:p.id,version:2});return{client,p,path:new URL(share.shareUrl).pathname}}
 async function verified(h,path){let r=await h.send(path+'/action?name=code.request',{});assert.equal(r.status,200,r.text);const mail=(await h.state()).outbox.find(x=>x.subject.includes('verification code'));const code=mail.body.match(/\b\d{6}\b/)[0];r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,200,r.text);assert.ok(r.cookie);return r.cookie}
-test('EDIT-017 Spanish mailbox journey preserves authority, verification limits, authored content and actual certificate language',async()=>{const h=await harness({assetsDirectory:'public'});try{
+test('EDIT-017 mailbox languages preserve authority, verification limits, authored content and actual certificate language',async()=>{const h=await harness({assetsDirectory:'public'});try{
  const {client,p}=await draft(h)
  const at=Date.parse('2030-06-01T15:00:00Z'),tick=async time=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(time),cron:'*/15 * * * *'})
  await tick(at)

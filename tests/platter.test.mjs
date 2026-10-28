@@ -2912,7 +2912,8 @@ describe('AUTO-004 negotiated lifecycle delivery',()=>{
  test('receiver gets revised and approved events for each negotiated revision before it is sent',async()=>{
   const received=[],h=await harness({migrateThrough:'0078_public_api.sql',outboundService:async request=>{received.push(await request.json());return new Response(null,{status:204})}})
   try{
-   await h.db.batch(unstable_splitSqlQuery(await readFile('migrations/core/0079_negotiated_webhooks.sql','utf8')).map(sql=>h.db.prepare(sql)))
+   const upgrades=(await readdir('migrations/core')).filter(file=>file.endsWith('.sql')&&file>'0078_public_api.sql').sort()
+   for(const file of upgrades)await h.db.batch(unstable_splitSqlQuery(await readFile('migrations/core/'+file,'utf8')).map(sql=>h.db.prepare(sql)))
    assert.equal((await h.send('/api/platter/v1/webhooks',{url:'https://hooks.example.com/negotiated',consent:true},h.owner)).status,200)
    const {p,client,path}=await sent(h)
    await h.cmd('proposal.negotiate',{...offer,id:p.id,clientId:client.id,version:3,scope:'Synthetic negotiated scope'})

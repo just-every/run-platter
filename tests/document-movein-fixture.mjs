@@ -63,6 +63,9 @@ export async function applyNativeMovein(h,cookie=h.owner) {
  const {id}=await h.cmd('document-import.create',{label:'Synthetic native move-in'},cookie)
  for(const file of fixture.zips)await uploadMovein(h,id,file,cookie)
  const unresolved=await h.cmd('document-import.preview',{id},cookie),ambiguous=unresolved.report.rows.find(r=>r.candidates.length===2),choices={[ambiguous.id]:hash(fixture.originals[2])}
+ const libraryHash=hash(fixture.library),libraryCount=(await h.state(cookie)).libraryItems.length
+ await h.cmd('document-import.preview',{id,choices,mapping:{...fixture.mapping,[libraryHash]:{kind:'library',shareConsent:false}}},cookie,409)
+ assert.equal((await h.state(cookie)).libraryItems.length,libraryCount,'refusing unapproved library sharing creates no resources')
  const reviewed=await h.cmd('document-import.preview',{id,choices,mapping:fixture.mapping},cookie)
  assert.equal(reviewed.canApply,true,JSON.stringify(reviewed.diagnostics))
  let result=await h.cmd('document-import.apply',{id,choices,mapping:fixture.mapping,fingerprint:reviewed.fingerprint},cookie)
@@ -84,9 +87,9 @@ export async function assertNativeMovein(h,move,cookie=h.owner){
  assert.equal(template.snapshot.document.blocks.filter(b=>b.type==='image').length,1)
  assert.match(JSON.stringify(template.snapshot.document.merge.patterns),/Client.Company/)
  assert.equal(state.libraryItems.filter(i=>resources.some(r=>r.kind==='library'&&r.id===i.id)).length,10)
- const folders=state.resourceFolders.filter(f=>f.name==='Open'||f.name==='Open/2026'||f.name==='Open/2026/January')
- assert.equal(folders.length,3);assert.equal(move.reviewed.report.arrivedFolders,5);assert.equal(state.importedDocuments.find(d=>d.id===hash(move.fixture.originals[0])).folders[0].name,'Completed');assert.equal(folders.find(f=>f.name==='Open/2026/January').parent_id,folders.find(f=>f.name==='Open/2026').id)
- assert.equal(draft.folderId,folders.find(f=>f.name==='Open/2026/January').id)
+ const folders=state.resourceFolders.filter(f=>f.name==='Open'||f.name===['Open','2026'].join('/')||f.name===['Open','2026','January'].join('/'))
+ assert.equal(folders.length,3);assert.equal(move.reviewed.report.arrivedFolders,5);assert.equal(state.importedDocuments.find(d=>d.id===hash(move.fixture.originals[0])).folders[0].name,'Completed');assert.equal(folders.find(f=>f.name===['Open','2026','January'].join('/')).parent_id,folders.find(f=>f.name===['Open','2026'].join('/')).id)
+ assert.equal(draft.folderId,folders.find(f=>f.name===['Open','2026','January'].join('/')).id)
  assert.equal(state.businessRecords.contacts.filter(c=>c.email===['synthetic-platter-9','example.invalid'].join('@')).length,1)
  assert.equal(state.businessRecords.catalog.filter(c=>/^SKU[1-5]$/.test(c.sku)).length,5)
  const journal=await h.cmd('document-import.journal',{id:move.id},cookie)

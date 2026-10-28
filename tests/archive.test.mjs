@@ -524,22 +524,26 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Email rehearsal',scope:'A photography session',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
   await h.cmd('proposal.test-mail',{id:p.id,version:1,subject:'Archive rehearsal only',message:'Test-only message never in the agreement package'})
   const real=await h.cmd('proposal.prepare',{clientId:client.id,title:'Retained invitation',scope:'A second photography session',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
-  await h.cmd('proposal.approve',{id:real.id,version:1,revision:1})
-  const invitation=await h.cmd('proposal.send',{id:real.id,version:2,mailSubject:'Your photography agreement',mailMessage:'Hi Avery, please review the agreed session.'})
+  await h.cmd('proposal.locale',{id:real.id,version:1,locale:'es'})
+  await h.cmd('proposal.approve',{id:real.id,version:2,revision:1})
+  const invitation=await h.cmd('proposal.send',{id:real.id,version:3,mailSubject:'Your photography agreement',mailMessage:'Hi Avery, please review the agreed session.'})
   const before=await h.state(),proposal=before.proposals.find(row=>row.id===p.id)
   let retained=before.proposals.find(row=>row.id===real.id).invitationMessages
   assert.equal(retained.length,1)
   assert.equal(proposal.testMail.length,1);assert.equal(before.outbox.length,2)
-  const replacement=await h.cmd('signer.replace',{id:real.id,version:3,recipient:'coo@northstar.example',reason:'COO signs this agreement',mailSubject:'COO invitation',mailMessage:'Please sign the unchanged offer.'})
+  const replacement=await h.cmd('signer.replace',{id:real.id,version:4,recipient:'coo@northstar.example',reason:'COO signs this agreement',mailSubject:'COO invitation',mailMessage:'Please sign the unchanged offer.'})
   const replacementPath=new URL(replacement.shareUrl).pathname
   retained=(await h.state()).proposals.find(row=>row.id===real.id).invitationMessages
   const replacements=(await h.state()).proposals.find(row=>row.id===real.id).signerReplacements
   assert.equal(replacements.length,1);assert.equal(replacements[0].signing_position,1)
   assert.equal((await h.send(replacementPath+'/action?name=code.request',{})).status,200)
-  const code=(await h.state()).outbox.find(m=>m.proposal_id===real.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+  const code=(await h.state()).outbox.find(m=>m.proposal_id===real.id&&m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0]
   const verified=await h.send(replacementPath+'/action?name=code.verify',{code});assert.equal(verified.status,200)
   assert.equal((await h.send(replacementPath+'/action?name=accept',{name:'Northstar COO',optionId:'two',consent:true},verified.cookie)).status,200)
   const certificate=await h.send(replacementPath+'/certificate.json',undefined,verified.cookie);assert.equal(certificate.status,200,certificate.text)
+  assert.equal(certificate.value.language,'es');assert.equal(certificate.value.signers[0].language,'es')
+  const languageFacts=await h.db.prepare('SELECT language FROM p_signature_facts WHERE proposal_id=?').bind(real.id).first()
+  const acceptedLanguage=(await h.state()).proposals.find(row=>row.id===real.id).acceptance
   const artifacts=(await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(real.id).all()).results
 
   const {recipientFixture,roles,verifyRecipient,decision}=await import('./recipients-http.mjs')
@@ -584,6 +588,9 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
   assert.deepEqual(after.proposals.find(row=>row.id===p.id),proposal)
   assert.deepEqual(after.proposals.find(row=>row.id===real.id).invitationMessages,retained)
+  assert.equal(after.proposals.find(row=>row.id===real.id).client_locale,'es')
+  assert.deepEqual(after.proposals.find(row=>row.id===real.id).acceptance,acceptedLanguage)
+  assert.deepEqual(await h.db.prepare('SELECT language FROM p_signature_facts WHERE proposal_id=?').bind(real.id).first(),languageFacts)
   assert.equal((await h.send(new URL(invitation.shareUrl).pathname)).status,404)
   assert.equal((await h.send(replacementPath)).status,404)
   assert.deepEqual(after.proposals.find(row=>row.id===real.id).signerReplacements,replacements)

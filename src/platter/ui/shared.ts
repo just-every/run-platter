@@ -1,3 +1,4 @@
+import { ui, renderingLocale } from '../locales'
 import { depositCents } from '../payment-terms'
 export type Feedback = { message?: string; error?: string; result?: any; status?: number; field?: string; command?: string; input?: Record<string, unknown> }
 export const escape = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!)
@@ -12,7 +13,7 @@ export function inZone<T>(name: string | undefined, render: () => T): T {
 export const date = (value: unknown): string => {
   if (!value) return '—'
   const parsed = new Date(typeof value==='number'?value:String(value))
-  return Number.isNaN(parsed.getTime()) ? escape(value) : escape(parsed.toLocaleString('en-US', { timeZone: zone, weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }))
+  return Number.isNaN(parsed.getTime()) ? escape(value) : escape(parsed.toLocaleString(renderingLocale()==='es'?'es-ES':'en-US', { timeZone: zone, weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }))
 }
 export const hidden = (name: string, value: unknown): string => `<input type="hidden" name="${escape(name)}" value="${escape(value)}">`
 export const field = (label: string, name: string, value: unknown = '', extra = ''): string => `<label>${escape(label)}<input name="${escape(name)}" value="${escape(value)}" ${extra}></label>`
@@ -31,15 +32,15 @@ export function notices(feedback?: Feedback, focus = false): string {
   if (!feedback) return ''
   const focusTarget = focus ? ' tabindex="-1" autofocus' : ''
   const result = feedback.result
-  let html = feedback.error ? `<div class="notice error" role="alert"${focusTarget}><strong>Could not complete this action</strong><p>${escape(feedback.error)}</p></div>` : ''
-  if (feedback.message) html += `<p class="notice" role="status"${feedback.error ? '' : focusTarget}>${escape(feedback.message)}</p>`
+  let html = feedback.error ? ui`<div class="notice error" role="alert"${focusTarget}><strong>Could not complete this action</strong><p>${escape(feedback.error)}</p></div>` : ''
+  if (feedback.message) html += ui`<p class="notice" role="status"${feedback.error ? '' : focusTarget}>${escape(feedback.message)}</p>`
   for (const key of ['shareUrl', 'inviteUrl']) {
     const link = result && safeLink(result[key])
-    if (link) html += `<div class="notice"><p>${key === 'shareUrl' ? 'Client proposal link' : 'Invitation link'}</p><a class="wrap" href="${escape(link)}">${escape(link)}</a></div>`
+    if (link) html += `<div class="notice"><p>${key === 'shareUrl' ? ui('Client proposal link') : 'Invitation link'}</p><a class="wrap" href="${escape(link)}">${escape(link)}</a></div>`
   }
   const token = result && (result.token || result.apiKey || result.key)
-  if (typeof token === 'string') html += `<div class="notice" role="status"><strong>Copy your agent key now</strong><p>This key is shown once. Store it securely.</p><code class="wrap">${escape(token)}</code></div>`
+  if (typeof token === 'string') html += ui`<div class="notice" role="status"><strong>Copy your agent key now</strong><p>This key is shown once. Store it securely.</p><code class="wrap">${escape(token)}</code></div>`
   return html
 }
 export const statusPill = (value: unknown): string => `<span class="status status-${escape(String(value).toLowerCase().replace(/[^a-z]+/g, '-'))}">${escape(value)}</span>`
-export const optionPair = (options: any[], depositBps: number, chosen?: string, currency?: string,terms?:any): string => `<div class="option-pair">${options.map(option => `<div class="offer-option${option.id === chosen ? ' chosen' : ''}"><strong>${escape(option.label)}</strong><span class="option-price">${money(option.cents,currency)}</span><span class="muted">Deposit ${money(depositCents(option.cents,depositBps,terms),currency)}</span></div>`).join('')}</div>`
+export const optionPair = (options: any[], depositBps: number, chosen?: string, currency?: string,terms?:any): string => `<div class="option-pair">${options.map(option => ui`<div class="offer-option${option.id === chosen ? ' chosen' : ''}"><strong>${escape(option.label)}</strong><span class="option-price">${money(option.cents,currency)}</span><span class="muted">Deposit ${money(depositCents(option.cents,depositBps,terms),currency)}</span></div>`).join('')}</div>`

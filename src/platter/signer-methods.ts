@@ -9,6 +9,7 @@ export async function signerMethodCommand(env:Bindings,a:Actor,p:Record<string,u
  const db=env.DB,row=await permitted(db,a,p.id,'send');exact(row,p);need(row.recipient_plan==='[]','Configured recipients verify their own mailbox',409)
  need(row.status==='sent','Choose the method on the current sent invitation',409)
  need(p.method==='mailbox code'||p.method==='SMS code','Choose mailbox code or SMS code')
+ if(p.method==='SMS code')need(row.client_locale!=='es','Spanish currently requires mailbox verification',409)
  if(p.method==='SMS code')await smsCodeContext(env,row.id,false)
  const share=await db.prepare('SELECT * FROM p_shares WHERE proposal_id=?').bind(row.id).first<any>()
  need(share&&share.revision===row.revision&&share.code_generation===0&&!share.session_hash,'Reissue the invitation before changing an identity method already used',409)

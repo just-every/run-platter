@@ -1,3 +1,4 @@
+import { clientLocale } from './locales'
 import { voidSignatureStatement } from './recipients'
 import { firmOutcomeReason, synchronizeOutcome } from './outcomes'
 import type { Bindings } from '../auth.server'
@@ -18,8 +19,8 @@ export async function withdrawalStatements(env:Bindings,row:any,actor:{id:string
   db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE proposal_id=? AND status='queued'").bind(row.id),
   db.prepare('DELETE FROM p_sms_authority WHERE proposal_id=?').bind(row.id),
   db.prepare('INSERT INTO p_withdrawals(id,proposal_id,revision,actor_id,actor_email,withdrawn_at,reason,notice) VALUES(?,?,?,?,?,?,?,?)').bind(eventId,row.id,row.revision,actor.id,actor.email,at,reason,notice?1:0),
-  db.prepare('INSERT INTO p_withdrawn_links(token,contact_email) SELECT token,? FROM p_replaced_links WHERE proposal_id=? ON CONFLICT DO NOTHING').bind(contact,row.id),
-  ...shares.map(s=>db.prepare('INSERT INTO p_withdrawn_links(token,contact_email) VALUES(?,?)').bind(s.token,contact)),
+  db.prepare('INSERT INTO p_withdrawn_links(token,contact_email,client_locale) SELECT token,?,? FROM p_replaced_links WHERE proposal_id=? ON CONFLICT DO NOTHING').bind(contact,clientLocale(row),row.id),
+  ...shares.map(s=>db.prepare('INSERT INTO p_withdrawn_links(token,contact_email,client_locale) VALUES(?,?,?)').bind(s.token,contact,clientLocale(row))),
   db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(row.id),
   db.prepare("UPDATE p_followups SET closed_at=?,resolution='Proposal withdrawn',updated_at=? WHERE proposal_id=? AND closed_at IS NULL").bind(at,at,row.id),
   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),

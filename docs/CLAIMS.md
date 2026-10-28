@@ -192,11 +192,11 @@ Evidence: `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.m
 
 ## EDIT-017 — Client page in the client's language
 
-Status: **missing**.
+Status: **partial**.
 
-Gap: The client page and mail are English only.
+Gap: Owner-selected Spanish and English defaults now cover the single-client mailbox journey with collection off, retaining authored text and actual new acceptance and certificate language without historical inference. Gap: French, German and Portuguese, browser-language fallback, full SIGN-003 consumer disclosures, other email events, payment and provider identity screens and configured multi-recipient flows remain. SEND-003 and SIGN-004 retain their own authority-policy Gaps.
 
-Evidence: None recorded.
+Evidence: `tests/mail.test.mjs`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 
 ## EDIT-018 — Client-page preview before sending
 

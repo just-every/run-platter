@@ -2890,7 +2890,7 @@
       "executable": false
     },
     "src/platter/signer-methods.ts": {
-      "sha256": "05bd57bdeffad4e6fed3b5f013627c24e1cbbaf8e0f3070a832157ea7c69fa7d",
+      "sha256": "e76bb93d7043db5301a9af5d7f52455b99fc437815ac4edd8d2f1fe78b79929f",
       "executable": false
     },
     "src/platter/signer-replacement.ts": {

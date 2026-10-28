@@ -1,3 +1,4 @@
+import { taxFields } from './taxes'
 import { recurrenceEditor } from './recurring'
 import { displayOptions } from '../discounts'
 import { escape, hidden, money } from './shared'
@@ -11,7 +12,7 @@ function lineEditor(line: any = {}): string {
     ${textInput('Quantity', 'quantity', line.quantity ?? '1', 'required inputmode="decimal" pattern="(?=.*[1-9])[0-9]+([.][0-9]{1,3})?" title="Enter a positive quantity with up to three decimal places, at most 1000000."')}
     ${textInput('Unit', 'unit', line.unit, 'required maxlength="40" placeholder="e.g. hours, guests, items"')}
     ${textInput('Unit price in USD', 'unitPrice', line.unitPrice, 'required inputmode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" title="Enter a USD amount with up to two decimal places, at most 10000000."')}
-    ${recurrenceEditor(line,'pricing')}
+    ${recurrenceEditor(line,'pricing')}${taxFields(line,'pricing')}
     ${textInput('Group (optional)', 'group', line.group, 'maxlength="200"')}
     ${textInput('Line discount (%)', 'discountPercent', (line.discountBps??0)/100, 'inputmode="decimal"')}
     ${textInput('Line discount in USD', 'discountAmount', ((line.discountFixedCents??0)/100).toFixed(2), 'inputmode="decimal"')}

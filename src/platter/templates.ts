@@ -1,3 +1,4 @@
+import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields } from './variables'
 import { proposalFields } from './commands'
 import { documentMediaIds } from './documents/media'
@@ -66,6 +67,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   const expiry = savedExpiry ? { ...savedExpiry, expires_on: savedExpiry.mode === 'date' ? savedExpiry.expires_on : null }
    : { mode: 'never', period_days: null, expires_on: null, time_zone: await installationZone(db), warning_days: null }
   const id = existing?.id ?? crypto.randomUUID(), version = (existing?.version ?? 0) + 1
+  content.options=withoutTaxAddresses(content.options)
   const values = [templateName, JSON.stringify(content), pdf?.enabled === 0 ? 0 : 1, JSON.stringify(expiry), JSON.stringify(sections.results.map(s => s.section))]
   const writes = existing
    ? [db.prepare('UPDATE p_personal_templates SET name=?,snapshot=?,pdf_enabled=?,expiry=?,suggestion_sections=?,version=version+1,updated_at=? WHERE id=? AND version=?').bind(...values, at, id, existing.version)]
@@ -100,7 +102,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  const templateLocks=starter?[]:(await db.prepare('SELECT section FROM p_template_locks WHERE template_id=? UNION ALL SELECT section FROM p_template_block_locks WHERE template_id=?').bind(template.id,template.id).all<any>()).results.map(l=>l.section)
  need(!templateLocks.includes('title')||title===content.title,'The template title is locked',403)
  const attachments = copyAttachments(content.attachments ?? [])
- const row = { ...content, document:bindDocument(content.document,clientId), id, client_id: clientId, title, revision: 1, attachments }
+ const row = { ...content, options:withoutTaxAddresses(content.options), document:bindDocument(content.document,clientId), id, client_id: clientId, title, revision: 1, attachments }
  const preparer = a.role === 'agent' ? `agent:${a.keyId}` : a.email
  await commit(db, a, [
   db.prepare(`INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,

@@ -1,3 +1,5 @@
+import { taxFields } from './taxes'
+import { taxLines } from '../taxes'
 import { feeLines } from '../recurring'
 import { recurrenceEditor } from './recurring'
 import { editablePackages } from '../pricing'
@@ -7,7 +9,7 @@ export function optionalEditor(item: any = {}): string {
  return `<fieldset data-optional-item data-item-id="${escape(item.id??'')}"><legend>Optional item</legend>
  ${field('Item name','',item.label,'data-item-field="label" required maxlength="200"')}
  ${field('Unit price in USD','',item.unitPrice,'data-item-field="unitPrice" required inputmode="decimal"')}
- ${recurrenceEditor(item,'item')}
+ ${recurrenceEditor(item,'item')}${taxFields(item,'item')}
  ${field('Minimum quantity','',item.min??1,'data-item-field="min" required type="number" min="1" max="1000000"')}
  ${field('Maximum quantity','',item.max??10,'data-item-field="max" required type="number" min="1" max="1000000"')}
  ${field('Default quantity','',item.quantity??1,'data-item-field="quantity" required type="number" min="1" max="1000000"')}
@@ -19,7 +21,7 @@ function packageEditor(option: any): string {
  return `<fieldset data-package-id="${escape(option.id)}"><legend>Package</legend>
  ${field('Option label',suffix?'option'+suffix:'',option.label,'data-package-field="label" required maxlength="200"')}
  ${field('Price in USD',suffix?'price'+suffix:'',option.price,'data-package-field="price" required inputmode="decimal"')}
- ${field('Package discount (%)','',option.discountPercent??'0','data-package-field="discountPercent" inputmode="decimal"')}
+ ${taxFields(option)}${field('Package discount (%)','',option.discountPercent??'0','data-package-field="discountPercent" inputmode="decimal"')}
  ${field('Package discount in USD','',option.discountAmount??'0','data-package-field="discountAmount" inputmode="decimal"')}
 <label>Show discounts to client<select data-package-field="showDiscount"><option value="yes"${option?.showDiscount!=='no'?' selected':''}>Show discounts</option><option value="no"${option?.showDiscount==='no'?' selected':''}>Show net prices only</option></select></label><label>Discount expiry date (UTC)<input type="date" data-package-field="discountExpiresOn" value="${escape(option?.discountExpiresOn??'')}"></label> <div data-optional-items>${(option.optionalItems??[]).map(optionalEditor).join('')}</div>
  <div class="actions"><button type="button" class="secondary" data-package-action="add-item">Add optional item</button>
@@ -37,7 +39,7 @@ export function packagesEditor(options: any[]): string {
  <script src="/packages.js" defer></script></div>`
 }
 
-export const hasExpandedSelection = (options: any[]) => options.length!==2 || options.some((o:any,i:number)=>o.id!==['one','two'][i] || o.optionalItems?.length || o.tables?.some((t:any)=>t.lines.some((l:any)=>l.recurrence)))
+export const hasExpandedSelection = (options: any[]) => options.length!==2 || options.some((o:any,i:number)=>o.id!==['one','two'][i] || o.tax || o.optionalItems?.length || o.tables?.some((t:any)=>t.lines.some((l:any)=>l.recurrence)))
 export const selectionChoices = (selection:any) => (selection?.items??[]).map((x:any)=>({id:x.id,quantity:x.quantity}))
 export function itemChoices(option:any, selection:any): string {
  return (option.optionalItems??[]).map((item:any)=>{
@@ -53,7 +55,7 @@ export function selectedSummary(selection:any,currency:string,reviewLabel?:strin
  const total=selection.totalCents??selection.option?.cents,deposit=selection.depositCents??selection.deposit
  const conceal=selection.concealDiscount||selection.option?.concealDiscount
  const discount=conceal?0:selection.discountCents??selection.option?.discount?.cents,bps=selection.discountBps??selection.option?.discount?.bps
- const contents=`${feeLines(selection.fees,currency).map(line=>'<p>'+escape(line)+'</p>').join('')}${review?`<p>Package: ${escape(reviewLabel)}</p>`:''}<ul>${(selection.items??[]).map((x:any)=>`<li>${escape(x.label)} · ${x.quantity} × ${money(x.unitCents,currency)}${x.recurrence?` × ${x.recurrence.term} installments`:""} = ${money(x.totalCents,currency)}</li>`).join('')}</ul>${discount?`<p>Package discount: ${escape(bps/100)}% · −${money(discount,currency)}</p>`:''}<p>Total: <output aria-label="Selected total">${money(total,currency)}</output></p><p>Deposit due: <output aria-label="Selected deposit">${money(deposit,currency)}</output></p>`
+ const contents=`${taxLines(selection.tax,currency).map(line=>'<p>'+escape(line)+'</p>').join('')}${feeLines(selection.fees,currency).map(line=>'<p>'+escape(line)+'</p>').join('')}${review?`<p>Package: ${escape(reviewLabel)}</p>`:''}<ul>${(selection.items??[]).map((x:any)=>`<li>${escape(x.label)} · ${x.quantity} × ${money(x.unitCents,currency)}${x.recurrence?` × ${x.recurrence.term} installments`:""} = ${money(x.totalCents,currency)}</li>`).join('')}</ul>${discount?`<p>Package discount: ${escape(bps/100)}% · −${money(discount,currency)}</p>`:''}<p>Total: <output aria-label="Selected total">${money(total,currency)}</output></p><p>Deposit due: <output aria-label="Selected deposit">${money(deposit,currency)}</output></p>`
  // A native fragment target restores reading/focus after the GET review, even
  // without JavaScript. Other summary surfaces retain their existing markup.
  return review?`<section class="panel" id="selection-review" tabindex="-1" aria-labelledby="selection-heading"><h2 id="selection-heading">Your selection</h2>${contents}</section>`:panel('Your selection',contents)

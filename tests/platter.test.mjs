@@ -3162,3 +3162,55 @@ test('EDIT-005 Word and PDF exports retain heading styles, four exact table line
   assert.equal((await h.send('/api/platter/document-export?id='+p.id+'&format=docx')).status,401)
  }finally{await h.close()}
 })
+
+test('PRICE-005 owner tax follows selected quantities and discounts, freezes rates and refuses unsafe writes',async()=>{const h=await harness({assetsDirectory:'public'});try{
+ assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
+ const {configureTaxes,taxRequest,taxPackages,taxTables}=await import('./taxes-fixture.mjs')
+ let rateVersion=await configureTaxes(h.cmd)
+ const {client}=await draft(h),input={clientId:client.id,title:'Taxed services',scope:'One-off services',depositPercent:50,packages:taxPackages(),pricingTables:taxTables(),tax:taxRequest()}
+ const p=await h.cmd('proposal.prepare',input),portland=await h.cmd('proposal.prepare',{...input,tax:taxRequest('Portland','OR')})
+ const preview=async(id,option='one',items=[])=>h.send('/app/preview/client?'+new URLSearchParams({id,revision:1,optionId:option,items:JSON.stringify(items)}),undefined,h.owner)
+ let response=await preview(p.id);assert.equal(response.status,200,response.text);assert.match(response.text,/Sales tax: USD 82\.50/);assert.match(response.text,/1,582\.50/);assert.match(response.text,/791\.25/)
+ response=await preview(portland.id);assert.match(response.text,/Sales tax: USD 0\.00/);assert.match(response.text,/1,500\.00/)
+ const selected=[{id:'extra',quantity:4}]
+ // $1,600 less 10% and $50 = $1,390. Allocated taxable base $955.62;
+ // each jurisdiction rounds separately: $59.73 + $9.56 + $9.56 = $78.85.
+ response=await preview(p.id,'two',selected);for(const value of ['Sales tax: USD 78.85','1,468.85','734.43'])assert.ok(response.text.includes(value),value)
+ const noWrites=async action=>{const before=await h.state();await action();assert.deepEqual(await h.state(),before)}
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,tax:{...taxRequest(),method:'stripe'}},h.owner,409))
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,tax:{...taxRequest(),method:'avatax'}},h.owner,409))
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,tax:{...taxRequest(),serviceAddress:{...taxRequest().serviceAddress,region:'WA'}}},h.owner,409))
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,pricingTables:taxTables().map(t=>({...t,lines:t.lines.map(l=>({...l,recurrence:{interval:'monthly',term:12,startsOn:'2030-01-01'}}))}))},h.owner,409))
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,paymentTerms:{netDays:15,milestones:[],retainer:{percent:10,startsOn:'2030-01-01',months:2}}},h.owner,409))
+ await noWrites(()=>h.cmd('proposal.revise',{...input,id:p.id,version:0},h.owner,409))
+ await noWrites(()=>h.cmd('tax.rate',{level:'city',region:'TX',jurisdiction:'Austin',percent:'2',startsOn:'2099-01-01',version:0},h.owner,409))
+ const key=await h.cmd('agent.create',{label:'Synthetic tax refusal'})
+ const agent=(name,input)=>h.send('/api/platter/agent/command',{name,input},'',{authorization:'Bearer '+key.token})
+ await noWrites(async()=>{assert.equal((await agent('tax.rate',{level:'state',region:'TX',percent:'99',startsOn:'2020-01-01',version:rateVersion})).status,403);assert.equal((await agent('proposal.prepare',input)).status,403)})
+ await h.cmd('agent.revoke',{id:key.id});assert.equal((await agent('proposal.prepare',input)).status,401)
+ await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:p.id,version:2}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+ const sentOptions=(await h.state()).proposals.find(x=>x.id===p.id).options
+ await h.cmd('tax.rate',{level:'city',region:'TX',jurisdiction:'Austin',percent:'2',startsOn:'2099-01-01',version:rateVersion++})
+ // A later effective rate also cannot recalculate an already sent revision.
+ await h.cmd('tax.rate',{level:'city',region:'TX',jurisdiction:'Austin',percent:'3',startsOn:'2021-01-01',version:rateVersion++})
+ assert.deepEqual((await h.state()).proposals.find(x=>x.id===p.id).options,sentOptions)
+ const newer=await h.cmd('proposal.prepare',{...input,title:'New dated rates'});response=await preview(newer.id);assert.match(response.text,/Sales tax: USD 102\.50/)
+ const query='?optionId=two&items='+encodeURIComponent(JSON.stringify(selected));response=await h.send(path+query,undefined,cookie)
+ for(const value of ['Sales tax: USD 78.85','1,468.85','734.43'])assert.ok(response.text.includes(value),value)
+ const data=(await h.send(path+'/data.json'+query,undefined,cookie)).value;assert.equal(data.selection.tax.taxableCents,95562);assert.equal(data.selection.tax.taxCents,7885);assert.deepEqual(data.selection.tax.lines.map(l=>l.netCents),[86875,43438,8687]);assert.equal(data.selection.tax.lines[0].taxCode,'synthetic-platter-service')
+ const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf'+query,{headers:{host:new URL(h.origin).host,cookie}});assert.equal(pdf.status,200);const pdfText=(await pdfPages(new Uint8Array(await pdf.arrayBuffer()))).join(' ')
+ for(const value of ['Sales tax: USD 78.85','Selected option total: USD 1,468.85','Deposit due: USD 734.43','Austin city tax (1%): USD 9.56'])assert.ok(pdfText.includes(value),value)
+ await noWrites(async()=>{assert.equal((await h.send(path+'/action?name=accept',{optionId:'two',items:[{id:'extra',quantity:11}],consent:true,name:'Synthetic signer'},cookie)).status,400)})
+ assert.equal((await h.send(path+'/action?name=accept',{optionId:'two',items:selected,consent:true,name:'Synthetic signer'},cookie)).status,200)
+ let agreement=(await h.state()).proposals.find(x=>x.id===p.id).acceptance
+ assert.equal(agreement.totalCents,146885);assert.equal(agreement.depositCents,73443);assert.equal(agreement.selection.tax.taxCents,7885);assert.deepEqual(agreement.selection.tax.components.map(c=>c.taxCents),[5973,0,956,956])
+ response=await h.send(path+'/data.json',undefined,cookie);assert.deepEqual(response.value.selection.tax,agreement.selection.tax)
+ const agreementPdf=await h.mf.dispatchFetch(h.origin+path+'/agreement.pdf',{headers:{host:new URL(h.origin).host,cookie}});assert.equal(agreementPdf.status,200);assert.match((await pdfPages(new Uint8Array(await agreementPdf.arrayBuffer()))).join(' '),/Sales tax: USD 78\.85/)
+ await noWrites(()=>h.cmd('invoice.export',{id:p.id},h.owner,409))
+ const frozen=await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
+ assert.equal((await h.send(path+'/action?name=accept',{optionId:'one',consent:true,name:'Replay'},cookie)).status,200)
+ assert.equal((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot,frozen.snapshot)
+ // New client drafts cannot silently inherit another client's address, or send taxable lines without one.
+ const destination=await h.cmd('client.save',{name:'Synthetic destination',email:h.auth.OWNER_EMAIL}),copy=await h.cmd('proposal.duplicate',{id:p.id,version:4,clientId:destination.id})
+ assert.ok((await h.state()).proposals.find(x=>x.id===copy.id).options.every(o=>!o.tax));await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1});await h.cmd('proposal.send',{id:copy.id,version:2},h.owner,409)
+}finally{await h.close()}})

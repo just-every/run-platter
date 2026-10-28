@@ -242,11 +242,11 @@ Evidence: `tests/platter.test.mjs`, `tests/pricing-journey.mjs`, `tests/archive.
 
 ## PRICE-005 — US sales tax
 
-Status: **missing**.
+Status: **partial**.
 
-Gap: No tax handling beyond a fixed GST-free export.
+Gap: Stripe Tax and AvaTax adapters, AvaTax commit on invoice issuance, recurring tax, exemption-certificate custody and accounting tax-code propagation remain unimplemented. Owner-only configuration is the conservative interim authority floor; scoped delegation is not claimed. Browser and public CLI restore proof are being completed for the native one-off path.
 
-Evidence: None recorded.
+Evidence: `src/platter/taxes.ts`, `src/platter/selection.ts`, `tests/platter.test.mjs`
 
 ## PRICE-006 — Internal cost and margin
 

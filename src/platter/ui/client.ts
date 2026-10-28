@@ -31,7 +31,7 @@ function clientDocument(view: any, token: string, feedback?: Feedback): Response
   const options = view.options ?? []
   const currency = view.currency ?? 'AUD'
   const expanded=hasExpandedSelection(options),conditional=Boolean(paymentTerms(view))||Boolean(view.documentConditional)||expanded||Object.keys(sectionConditions(view.section_conditions)).length>0
-  const pricing = currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'
+  const pricing = currency === 'AUD' ? 'All prices are GST-free in AUD.' : options.some((o:any)=>o.tax)?'All prices are in USD. Package prices exclude tax; your selection includes sales tax.':'All prices are in USD. Sales tax is not calculated.'
   let html = view.preview ? previewBanner(view) : ''
   html+=panel('View privacy',view.tracking?.enabled?'<p>Views of this page are measured. The firm records the invitation recipient, time, device class and approximate city, region and country. A link view is unverified until mailbox verification. No full IP address is stored. Engagement is retained for '+escape(view.tracking.retention_days)+' days, unless held, and the firm can erase it.</p>':'<p>View measurement is off for this proposal. No third-party trackers are used.</p>')
   html += documentBlocks(view,view.preview?'/app/preview/client/media/':`/p/${encodeURIComponent(token)}/media/`,view.preview?'?'+view.preview.query:(view.selectedOptionId?'?optionId='+encodeURIComponent(view.selectedOptionId)+(items.length?'&items='+encodeURIComponent(JSON.stringify(items)):''):''))

@@ -1,3 +1,4 @@
+import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields } from './variables'
 import { proposalFields } from './commands'
 import { recipientPlan } from './recipients'
@@ -28,7 +29,8 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
  need(!titleLocked||title===displayed.title,'The proposal title is locked',403)
  const id = crypto.randomUUID(), at = await currentTime(db)
  const attachments = copyAttachments(typeof displayed.attachments === 'string' ? JSON.parse(displayed.attachments) : displayed.attachments)
- const options = typeof displayed.options === 'string' ? JSON.parse(displayed.options) : displayed.options
+ const sourceOptions = typeof displayed.options === 'string' ? JSON.parse(displayed.options) : displayed.options
+ const options=clientId===displayed.client_id?sourceOptions:withoutTaxAddresses(sourceOptions)
  const copiedDocument=bindDocument(displayed.document,clientId)
  if(input.title===undefined&&!titleLocked&&copiedDocument.merge?.patterns['/title'])copiedDocument.merge.patterns['/title']+=' (copy)'
  const row = { recipient_plan:recipientPlan(displayed).map((r,i)=>({...r,email:documentOf(displayed).merge?.patterns['/recipientPlan/'+i+'/email']?r.email:null})), document:copiedDocument, id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '', section_conditions: displayed.section_conditions??{},

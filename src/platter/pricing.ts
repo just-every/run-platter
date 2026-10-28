@@ -1,10 +1,11 @@
+import { taxFlags } from './taxes'
 import { allocateNet, fixedDiscount, scopedNet, percentBps } from './discounts'
 import { recurrenceInput, type Recurrence } from './recurring'
 import { calendarDate } from './expiry-time'
 import { dollars, need, text } from './model'
 
 export interface PriceLine {
- catalogId?:string; recurrence?:Recurrence; name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number; grossCents?:number; discountBps?:number; discountFixedCents?:number; groupDiscountBps?:number; groupDiscountFixedCents?:number
+ taxable?:boolean; taxCode?:string; catalogId?:string; recurrence?:Recurrence; name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number; grossCents?:number; discountBps?:number; discountFixedCents?:number; groupDiscountBps?:number; groupDiscountFixedCents?:number
 }
 export interface PriceTable {
  name: string; lines: PriceLine[]; groups: { name: string; subtotalCents: number }[]; subtotalCents: number; thresholdBps?:number
@@ -47,7 +48,7 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
    const name = text(line.name, 'a line name'), unit = text(line.unit, 'a unit', 40)
    groups.set(group.trim(), boundedTotal(BigInt(groups.get(group.trim()) ?? 0) + BigInt(lineTotalCents)))
    const catalogId=line.catalogId===undefined||line.catalogId===''?undefined:text(line.catalogId,'a catalog reference',200)
-   return { ...(catalogId?{catalogId}:{}),...recurring,name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{grossCents,discountBps,discountFixedCents,groupDiscountBps,groupDiscountFixedCents}:{}) }
+   return { ...taxFlags(line),...(catalogId?{catalogId}:{}),...recurring,name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{grossCents,discountBps,discountFixedCents,groupDiscountBps,groupDiscountFixedCents}:{}) }
   })
   let thresholdBps=Math.max(0,...lines.map(l=>l.grossCents?Math.ceil((l.grossCents-l.lineTotalCents)*10000/l.grossCents):0))
   for(const group of groups.keys()){
@@ -73,7 +74,7 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
 export function pricingInput(options: any[]) {
  return options.flatMap(option => (option.tables ?? []).map((table: PriceTable) => ({
   optionId: option.id, name: table.name,
-  lines: table.lines.map(({ catalogId,recurrence,name, description, quantity, unit, unitPrice, group, discountBps, discountFixedCents, groupDiscountBps, groupDiscountFixedCents }) => ({ ...(catalogId?{catalogId}:{}),...(recurrence?{recurrence}:{}),name, description, quantity, unit, unitPrice, group,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{discountPercent:(discountBps??0)/100,discountAmount:((discountFixedCents??0)/100).toFixed(2),groupDiscountPercent:(groupDiscountBps??0)/100,groupDiscountAmount:((groupDiscountFixedCents??0)/100).toFixed(2)}:{}) })),
+  lines: table.lines.map(({ taxable,taxCode,catalogId,recurrence,name, description, quantity, unit, unitPrice, group, discountBps, discountFixedCents, groupDiscountBps, groupDiscountFixedCents }) => ({ ...taxFlags({taxable,taxCode}),...(catalogId?{catalogId}:{}),...(recurrence?{recurrence}:{}),name, description, quantity, unit, unitPrice, group,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{discountPercent:(discountBps??0)/100,discountAmount:((discountFixedCents??0)/100).toFixed(2),groupDiscountPercent:(groupDiscountBps??0)/100,groupDiscountAmount:((groupDiscountFixedCents??0)/100).toFixed(2)}:{}) })),
  })))
 }
 
@@ -100,14 +101,14 @@ export function packageInputs(input: unknown, tables: any[]) {
    const min = integer(extra.min), max = integer(extra.max), quantity = integer(extra.quantity)
    need(min <= quantity && quantity <= max, 'Default quantity must be within its minimum and maximum')
    need(typeof extra.editable === 'boolean', 'Choose whether quantity is client-editable')
-   return { ...recurrenceInput(extra),id, label: text(extra.label, 'an optional-item name'), unitCents: dollars(extra.unitPrice), min, max, quantity, editable: extra.editable }
+   return { ...taxFlags(extra),...recurrenceInput(extra),id, label: text(extra.label, 'an optional-item name'), unitCents: dollars(extra.unitPrice), min, max, quantity, editable: extra.editable }
   })
   const discountBps=percentBps(item.discountPercent,'a package discount',9999)
   const discountFixedCents=fixedDiscount(item.discountAmount)
   need(item.showDiscount===undefined||[true,false,'yes','no'].includes(item.showDiscount),'Choose whether to show discounts')
   const concealDiscount=item.showDiscount===false||item.showDiscount==='no',discountExpiresOn=item.discountExpiresOn?calendarDate(item.discountExpiresOn):undefined
-  return { ...(concealDiscount?{concealDiscount:true}:{}),...(discountExpiresOn?{discountExpiresOn}:{}),...(discountBps?{discountBps}:{}),...(discountFixedCents?{discountFixedCents}:{}),id, label: text(item.label, 'a package name'), cents: tables.some(t => t?.optionId === id) ? 1 : dollars(item.price, 'package:' + id), ...(optionalItems.length ? { optionalItems } : {}) }
+  return { ...taxFlags(item),...(concealDiscount?{concealDiscount:true}:{}),...(discountExpiresOn?{discountExpiresOn}:{}),...(discountBps?{discountBps}:{}),...(discountFixedCents?{discountFixedCents}:{}),id, label: text(item.label, 'a package name'), cents: tables.some(t => t?.optionId === id) ? 1 : dollars(item.price, 'package:' + id), ...(optionalItems.length ? { optionalItems } : {}) }
  })
 }
 
-export const editablePackages = (options: any[]) => options.map(option => ({ id: option.id, label: option.label,showDiscount:option.concealDiscount?'no':'yes',discountExpiresOn:option.discountExpiresOn??'', price: ((option.discount?.grossCents??option.cents) / 100).toFixed(2),discountPercent:((option.discount?.bps??0)/100).toString(),discountAmount:((option.discount?.fixedCents??0)/100).toFixed(2), optionalItems: (option.optionalItems ?? []).map((item: any) => ({ ...item, unitPrice: (item.unitCents / 100).toFixed(2) })) }))
+export const editablePackages = (options: any[]) => options.map(option => ({ ...taxFlags(option),id: option.id, label: option.label,showDiscount:option.concealDiscount?'no':'yes',discountExpiresOn:option.discountExpiresOn??'', price: ((option.discount?.grossCents??option.cents) / 100).toFixed(2),discountPercent:((option.discount?.bps??0)/100).toString(),discountAmount:((option.discount?.fixedCents??0)/100).toFixed(2), optionalItems: (option.optionalItems ?? []).map((item: any) => ({ ...item, unitPrice: (item.unitCents / 100).toFixed(2) })) }))

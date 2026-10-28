@@ -2770,7 +2770,7 @@
       "executable": false
     },
     "src/platter/preview.ts": {
-      "sha256": "e40a84bf15a870afe92e62ead6b782947ced4ef4bce52bd38073496b64188acf",
+      "sha256": "99430719133cb353cb77a30ef3c67e5e04d7e9b6e8ba90df2f1eabdd82cee7c1",
       "executable": false
     },
     "src/platter/pricing.ts": {
@@ -2946,7 +2946,7 @@
       "executable": false
     },
     "src/platter/ui/client.ts": {
-      "sha256": "f09acf93dafd8b4241eb745f12fe3bd6d5252252bc5e4179abab752800bef655",
+      "sha256": "1657d09d027ac1ea229f27ee29b47d77e9864b8caeb60b5a65241eaee4eafc0e",
       "executable": false
     },
     "src/platter/ui/clients.ts": {
@@ -3354,7 +3354,7 @@
       "executable": false
     },
     "tests/locale-browser.mjs": {
-      "sha256": "3dbc54d8d0b87605cde98d4a2b964383eba1b5a70910e9b2ecb73cefd01e2002",
+      "sha256": "10ce36450fb4a900f53e60f3122abc72b1b74f2b25205cf783ddd9f7aa415a59",
       "executable": false
     },
     "tests/mail.test.mjs": {

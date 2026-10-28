@@ -93,7 +93,7 @@ export async function localeBrowser(width=1440) {
   const facts=await certificate.json();assert.equal(facts.language,'es');assert.equal(facts.signers[0].language,'es');assert.equal(facts.signers[0].consent,shownConsent)
   for(const kind of ['recurring','tax']) {
    if(kind==='tax')await configureTaxes(cmd)
-   const input=kind==='recurring'?recurringFixture():{packages:taxPackages(),pricingTables:taxTables(),tax:taxRequest()}
+   const input=kind==='recurring'?recurringFixture():{packages:taxPackages(),pricingTables:taxTables(),tax:taxRequest(),paymentTerms:{netDays:15,milestones:[{label:'Entrega aprobada',event:'Firm event',percent:100}]}}
    const next=await cmd('proposal.prepare',{...authored,...input,clientId:client.id,depositPercent:'25'})
    await cmd('proposal.locale',{id:next.id,version:1,locale:'es'})
    await cmd('proposal.approve',{id:next.id,version:2,revision:1})
@@ -107,6 +107,18 @@ export async function localeBrowser(width=1440) {
    const controls=await page.locator('h2,h3,button,label').allTextContents()
    for(const control of controls)for(const key of catalog)assert.ok(!control.includes(key),'untranslated summary control: '+key)
    await capture(kind+'-summary')
+   await page.getByRole('button',{name:'Enviar código de verificación',exact:true}).click()
+   const messages=(await (await request.get(app.origin+'/api/platter/state')).json()).outbox
+   const code=messages.find(m=>m.proposal_id===next.id&&m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0]
+   await page.getByLabel('Código de verificación por correo electrónico').fill(code);await page.getByRole('button',{name:'Verificar correo electrónico',exact:true}).click()
+   await page.getByLabel('Su nombre completo',{exact:true}).fill('Avery Chen')
+   const checkbox=page.getByRole('checkbox',{name:/Acepto el alcance del trabajo/})
+   await checkbox.check();const actualConsent=(await checkbox.locator('..').innerText()).trim()
+   await page.getByRole('button',{name:'Aceptar propuesta',exact:true}).click()
+   assert.equal(await page.getByRole('heading',{name:'Propuesta aceptada',exact:true}).count(),1)
+   const completed=await request.get(new URL(invitation.shareUrl).origin+new URL(invitation.shareUrl).pathname+'/certificate.json')
+   assert.equal(completed.status(),200)
+   const receipt=await completed.json();assert.equal(receipt.language,'es');assert.equal(receipt.signers[0].consent,actualConsent)
   }
  } finally {await context?.close();await browser?.close();await app?.close()}
 }

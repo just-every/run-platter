@@ -42,7 +42,7 @@ p{margin:6px 0 14px;text-wrap:pretty}
 }
 @media(max-width:600px){
  main{padding:18px 16px 56px}
- .eyebrow{font-size:12px;letter-spacing:.13em}
+ .eyebrow{font-size:13px;letter-spacing:.13em}
  h1{font-size:38px;letter-spacing:-.03em;margin-bottom:12px}
  h2{font-size:21px}
 }

@@ -70,16 +70,16 @@ export async function recipientsBrowser(width=1440){
   await capture('sent-roles')
   row=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals.find(r=>r.id===p.id)
   const links=Object.fromEntries(row.recipientLinks.map(r=>[r.slot_id,'/p/'+r.token]))
-  const verify=async r=>{
+  const verify=async(r,proposalId=p.id,paths=links)=>{
    const ctx=await browser.newContext({viewport:{width,height:1000}});clients.push(ctx)
    const clientPage=await ctx.newPage()
-   await clientPage.goto(app.origin+links[r.id])
+   await clientPage.goto(app.origin+paths[r.id])
    assert.equal(await clientPage.getByRole('heading',{name:offer.title,exact:true}).count(),0)
    await clientPage.getByRole('button',{name:'Send verification code',exact:true}).click()
-   const code=(await app.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND recipient=? AND subject='Your Platter verification code' ORDER BY rowid DESC LIMIT 1").bind(p.id,r.email).first()).body.match(/\b\d{6}\b/)[0]
+   const code=(await app.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND recipient=? AND subject='Your Platter verification code' ORDER BY rowid DESC LIMIT 1").bind(proposalId,r.email).first()).body.match(/\b\d{6}\b/)[0]
    await clientPage.getByLabel('Email verification code',{exact:true}).fill(code)
    await clientPage.getByRole('button',{name:'Verify email',exact:true}).click()
-   assert.equal(await clientPage.getByRole('heading',{name:offer.title,exact:true}).count(),1)
+   assert.equal(await clientPage.getByRole('heading',{name:proposalId===p.id?offer.title:'Revocable viewing agreement',exact:true}).count(),1)
    return clientPage
   }
   const pages={}
@@ -88,7 +88,7 @@ export async function recipientsBrowser(width=1440){
   assert.equal(await viewer.getByRole('button',{name:'Accept proposal',exact:true}).count(),0)
   assert.equal(await viewer.getByRole('button',{name:'Approve client revision',exact:true}).count(),0)
   assert.equal(await pages.CFO.getByRole('button',{name:'Accept proposal',exact:true}).count(),0)
-  await pages.CFO.screenshot(screenshots?{path:join(screenshots,'recipients-waiting-'+width+'.png'),fullPage:true}:{})
+  if(screenshots)await pages.CFO.screenshot({path:join(screenshots,'recipients-waiting-'+width+'.png'),fullPage:true})
   const sign=async(name,button='Accept proposal')=>{
    const active=pages[name];await active.reload()
    await active.getByLabel('Your full name',{exact:true}).fill(name)
@@ -112,16 +112,54 @@ export async function recipientsBrowser(width=1440){
   await page.goto(app.origin+'/app/proposal?id='+p.id);await capture('complete-owner')
   // The same owner form revokes a viewer before any agreement completion.
   const second=await cmd('proposal.prepare',{...offer,title:'Revocable viewing agreement'})
-  const configured=await cmd('recipient.save',{id:second.id,version:1,recipients:[{id:'signer',name:'Client signer',email:address(1007),role:'signer',group:1},{id:'viewer',name:'Revocable viewer',email:address(1008),role:'viewer',group:1}]})
+  const configured=await cmd('recipient.save',{id:second.id,version:1,recipients:[{id:'signer',name:'Client signer',email:address(1007),role:'signer',group:1},{id:'viewer',name:'Revocable viewer',email:address(1008),role:'viewer',group:1},{id:'counter',name:'Owner countersigner',email:owner,role:'countersigner',group:2}]})
   await cmd('proposal.approve',{id:second.id,version:configured.version,revision:configured.revision})
   const sent=await cmd('proposal.send',{id:second.id,version:configured.version+1})
   const oldViewer=new URL(sent.recipients.find(r=>r.id==='viewer').shareUrl).pathname
+  const secondLinks=Object.fromEntries(sent.recipients.map(r=>[r.id,new URL(r.shareUrl).pathname]))
+  await page.goto(app.origin+'/app/proposal?id='+second.id)
+  await panel.locator('summary').getByText('Share a verified viewing link',{exact:true}).click()
+  const shareForm=panel.locator('form[action*="name=recipient.share"]')
+  await shareForm.getByLabel('Shared viewer name',{exact:true}).fill('Embedded viewer')
+  await shareForm.getByLabel('Shared viewer email',{exact:true}).fill(address(1009))
+  await shareForm.getByLabel('Embed site origin (optional)',{exact:true}).fill(app.origin)
+  await shareForm.getByRole('checkbox').check();await shareForm.getByRole('button',{name:'Create viewing link',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0)
+  const embedCode=await panel.getByLabel('Embed code',{exact:true}).inputValue()
+  const embedUrl=embedCode.match(/src="([^"]+)"/)[1]
+  const hostContext=await browser.newContext({viewport:{width,height:1000}});clients.push(hostContext)
+  const host=await hostContext.newPage();await host.goto(app.origin+'/signin')
+  await host.setContent('<iframe src="'+embedUrl+'" title="Verified proposal" width="100%" height="900" frameborder="0"></iframe>')
+  const embedded=host.frameLocator('iframe[title="Verified proposal"]')
+  assert.equal(await embedded.getByRole('heading',{name:'Revocable viewing agreement',exact:true}).count(),0)
+  await embedded.getByRole('button',{name:'Send verification code',exact:true}).click()
+  const embedMail=(await app.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND recipient=? AND subject='Your Platter verification code' ORDER BY rowid DESC LIMIT 1").bind(second.id,address(1009)).first()).body.match(/\b\d{6}\b/)[0]
+  await embedded.getByLabel('Email verification code',{exact:true}).fill(embedMail);await embedded.getByRole('button',{name:'Verify email',exact:true}).click()
+  await embedded.getByRole('heading',{name:'Revocable viewing agreement',exact:true}).waitFor()
+  assert.equal(await embedded.getByRole('button',{name:'Accept proposal',exact:true}).count(),0)
+  if(screenshots)await host.screenshot({path:join(screenshots,'recipients-embedded-viewer-'+width+'.png'),fullPage:true})
+  await capture('shared-viewer-owner')
+  const secondSigner=await verify({id:'signer',email:address(1007)},second.id,secondLinks)
+  await secondSigner.getByLabel('Your full name',{exact:true}).fill('Client signer')
+  const signing=secondSigner.locator('#platter-acceptance');await signing.getByRole('radio').first().check();await signing.getByRole('checkbox').check();await signing.getByRole('button',{name:'Accept proposal',exact:true}).click()
+  assert.equal(await secondSigner.getByText('Your signature is retained. Waiting for the remaining recipients.',{exact:true}).count(),1)
   await page.goto(app.origin+'/app/proposal?id='+second.id)
   await page.getByRole('button',{name:'Remove Revocable viewer',exact:true}).click()
   assert.equal((await page.goto(app.origin+oldViewer)).status(),410)
   assert.equal(await page.getByRole('heading',{name:'Signer invitation replaced',exact:true}).count(),1)
   assert.ok(!(await page.locator('main').innerText()).includes('Revocable viewing agreement'))
   await capture('removed-viewer')
+  await page.goto(app.origin+'/app/proposal?id='+second.id)
+  const withdrawal=page.locator('form[action*="name=proposal.withdraw"]')
+  await withdrawal.getByLabel('Withdrawal reason',{exact:true}).fill('Partly signed offer cancelled')
+  await withdrawal.getByRole('button',{name:'Withdraw proposal',exact:true}).click()
+  assert.match(await panel.getByLabel('Signature history').innerText(),/Void: Partly signed offer cancelled/)
+  await capture('void-signature-owner')
+  await host.reload()
+  assert.ok(!(await host.locator('body').innerText()).includes('Revocable viewing agreement'))
+  assert.equal((await secondSigner.goto(app.origin+secondLinks.signer)).status(),410)
+  assert.equal(await secondSigner.getByRole('heading',{name:'Proposal withdrawn',exact:true}).count(),1)
+
  }finally{
   for(const ctx of clients)await ctx.close()
   await context.close();await browser.close();await app.close()

@@ -124,7 +124,7 @@ async function multiRecipientAccept(env:Bindings,c:Awaited<ReturnType<typeof cli
    db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),...completionMail(env,row,plan,at))
  }
  const ownerGuard=recipient.role==='countersigner'?" AND EXISTS(SELECT 1 FROM oa_operators WHERE lower(email)=? AND role='owner' AND status='active')":''
- await atomic(env,c,writes,'p.version=? AND s.slot_id=? AND s.session_hash=? AND s.session_expires>? AND '+expiryOpenSql('p')+ownerGuard,[row.version,recipient.id,share.session_hash,at,at,...(ownerGuard?[row.clientEmail.toLowerCase()]:[])])
+ await atomic(env,c,writes,'p.version=? AND s.slot_id=? AND s.session_hash=? AND s.session_expires>? AND '+expiryOpenSql('p')+' AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))'+ownerGuard,[row.version,recipient.id,share.session_hash,at,at,discountDeadline([option]),at,...(ownerGuard?[row.clientEmail.toLowerCase()]:[])])
  if(complete)await dispatchMail(env,row.id)
  return {message:complete?'Proposal accepted. Every required signature is retained.':recipient.role==='approver'?'Your approval is retained. Waiting for the remaining recipients.':'Your signature is retained. Waiting for the remaining recipients.'}
 }

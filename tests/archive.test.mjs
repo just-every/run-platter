@@ -557,6 +557,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const signatures=(await h.db.prepare('SELECT * FROM p_recipient_signatures ORDER BY proposal_id,revision,slot_id').all()).results
   const voids=(await h.db.prepare('SELECT * FROM p_void_signatures ORDER BY proposal_id,revision').all()).results
   assert.equal(signatures.length,4);assert.equal(voids.length,1)
+  const allInvitationHistory=[...retained,...(await h.state()).proposals.find(r=>r.id===multi.id).invitationMessages,...(await h.state()).proposals.find(r=>r.id===voided.id).invitationMessages];assert.equal(allInvitationHistory.length,8)
 
   await h.close();h=null
   const archive=join(temporary,'source.rer')
@@ -572,7 +573,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.deepEqual(records.filter(item=>item.table==='p_void_signatures').map(item=>item.row),voids)
   assert.equal(records.filter(item=>item.table==='p_replaced_links').length,0)
   assert.deepEqual(records.filter(item=>item.table==='p_signer_replacements').map(item=>item.row),replacements)
-  assert.deepEqual(records.filter(item=>item.table==='p_invitation_messages').map(item=>item.row).sort((a,b)=>a.id.localeCompare(b.id)),[...retained].sort((a,b)=>a.id.localeCompare(b.id)))
+  assert.deepEqual(records.filter(item=>item.table==='p_invitation_messages').map(item=>item.row).sort((a,b)=>a.id.localeCompare(b.id)),[...allInvitationHistory].sort((a,b)=>a.id.localeCompare(b.id)))
   assert.equal(records.filter(item=>item.table==='p_mail').length,0)
   const tests=records.filter(item=>item.table==='p_audit'&&item.row.action==='proposal.test-mail')
   assert.equal(tests.length,1)

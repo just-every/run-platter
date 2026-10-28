@@ -2762,7 +2762,7 @@
       "executable": false
     },
     "src/platter/signing.ts": {
-      "sha256": "a142122fd965f39d7b418161f5cfd7faa491c3e18dce3420f75576adf291e426",
+      "sha256": "4cbf39ba125b1312a7a2d11afef991f8a33f4f2f8c1557237ceddbe7a574c2ff",
       "executable": false
     },
     "src/platter/sms.ts": {
@@ -3130,7 +3130,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "d4fdf313c212b7031943e0ad24a449b559695313aa078559b8f4b7f18f2f45fe",
+      "sha256": "7fc6740a2bd8b3de896493668c8f7a025c8746bb7fb3de79c866d7047c577b67",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3234,7 +3234,7 @@
       "executable": false
     },
     "tests/recipients-browser.mjs": {
-      "sha256": "96b9091a6ecbedd8fd7f53a9c8c0e3cc8003ad541e688143529aea8e56d6ceb7",
+      "sha256": "8f811471f1e88eb85fd9d8c5f7975d7340026ed1e5ccf179c8769dd02870a31c",
       "executable": false
     },
     "tests/recipients-http.mjs": {

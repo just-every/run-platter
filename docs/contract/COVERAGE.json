@@ -322,7 +322,112 @@
     {
       "file": "CONTRACT.md",
       "line": 66,
-      "text": "Browser mutations require the configured Origin and Host and refuse cross-site requests. Which role may take which action is `TEAM-001`, with approving and sending set by `APPROVE-003`; every refusal is a 403 with no write. Signed-out readers of `/app` are sent to sign-in, and unknown routes return real 404s. **Acceptance evidence:** Through HTTP: read state signed out (401), post a mutation from a foreign Origin (403), call a domain command with a revoked agent key (401) and as a member for an owner-only action (403).",
+      "text": "Browser mutations require the configured Origin and Host and refuse cross-site requests.",
+      "to": "base",
+      "ids": [
+        "BASE-PUBLIC-002"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 66,
+      "text": "Which role may take which action is `TEAM-001`, with approving and sending set by `APPROVE-003`; every refusal is a 403 with no write.",
+      "to": "clause",
+      "ids": [
+        "HTTP-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 66,
+      "text": "Signed-out readers of `/app` are sent to sign-in, and unknown routes return real 404s.",
+      "to": "base",
+      "ids": [
+        "BASE-ACCESS-002"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 66,
+      "text": "**Acceptance evidence:** Through HTTP:",
+      "to": "clause",
+      "ids": [
+        "HTTP-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 66,
+      "text": "read state signed out (401)",
+      "to": "base",
+      "ids": [
+        "BASE-ACCESS-002"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 66,
+      "text": ",",
+      "to": "clause",
+      "ids": [
+        "HTTP-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 66,
+      "text": "post a mutation from a foreign Origin (403)",
+      "to": "base",
+      "ids": [
+        "BASE-PUBLIC-002"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 66,
+      "text": ",",
+      "to": "clause",
+      "ids": [
+        "HTTP-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 66,
+      "text": "call a domain command with a revoked agent key (401)",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-005"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 66,
+      "text": "and as a member for an owner-only action (403).",
       "to": "clause",
       "ids": [
         "HTTP-001"
@@ -478,7 +583,31 @@
     {
       "file": "CONTRACT.md",
       "line": 81,
-      "text": "**PORT-001 \u2014 Validated archives and restore.** RER archives preserve clients, proposals, revisions, approvals, immutable acceptances and deposit invoices. Credentials, sessions, client invitation links, verification state and mail do not travel. Restore requires an empty destination and valid integrity, and refuses an older archive without a newer erasure journal. Sent offers need fresh invitations after restore. **Acceptance evidence:** Through the public CLI: export, import into an empty checkout and re-export identical parts, refuse a populated destination (4), refuse a damaged archive (1), and refuse an older archive after an erasure (4).",
+      "text": "**PORT-001 \u2014 Validated archives and restore.** RER archives preserve clients, proposals, revisions, approvals, immutable acceptances and deposit invoices. Credentials, sessions, client invitation links, verification state and mail do not travel. Restore requires an empty destination and valid integrity, and refuses an older archive without a newer erasure journal. Sent offers need fresh invitations after restore. **Acceptance evidence:** Through the public CLI:",
+      "to": "clause",
+      "ids": [
+        "PORT-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 81,
+      "text": "export, import into an empty checkout and re-export identical parts",
+      "to": "base",
+      "ids": [
+        "BASE-DATA-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 81,
+      "text": ", refuse a populated destination (4), refuse a damaged archive (1), and refuse an older archive after an erasure (4).",
       "to": "clause",
       "ids": [
         "PORT-001"
@@ -6523,7 +6652,31 @@
     {
       "file": "CONTRACT.md",
       "line": 1249,
-      "text": "*Acceptance:* Export an installation with every record kind, restore into an empty one, and re-export identical parts; no provider token appears in the archive.",
+      "text": "*Acceptance:*",
+      "to": "clause",
+      "ids": [
+        "PORT-002"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1249,
+      "text": "Export an installation with every record kind, restore into an empty one, and re-export identical parts",
+      "to": "base",
+      "ids": [
+        "BASE-DATA-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1249,
+      "text": "; no provider token appears in the archive.",
       "to": "clause",
       "ids": [
         "PORT-002"
@@ -6883,7 +7036,31 @@
     {
       "file": "CONTRACT.md",
       "line": 1331,
-      "text": "with the data it read, what it produced, the model used and who approved it. Agents can draft, analyze and request, and can never approve prices, send, sign, refund or write off. The owner sets a monthly model budget and can pause any agent at once.",
+      "text": "with the data it read, what it produced, the model used and who approved it. Agents can draft, analyze and request, and can never approve prices, send, sign, refund or write off.",
+      "to": "clause",
+      "ids": [
+        "AGENT-009"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-behavior.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1331,
+      "text": "The owner sets a monthly model budget and can pause any agent at once.",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-011"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 1333,
+      "text": "*Acceptance:* Run each agent once; the ledger lists inputs, outputs and approvals for each; an agent's attempt to send or refund is refused;",
       "to": "clause",
       "ids": [
         "AGENT-009"
@@ -6898,16 +7075,10 @@
     {
       "file": "CONTRACT.md",
       "line": 1333,
-      "text": "*Acceptance:* Run each agent once; the ledger lists inputs, outputs and approvals for each; an agent's attempt to send or refund is refused; pausing an agent stops its next run; exceeding the budget stops runs with a notice.",
-      "to": "clause",
+      "text": "pausing an agent stops its next run; exceeding the budget stops runs with a notice.",
+      "to": "base",
       "ids": [
-        "AGENT-009"
-      ],
-      "also": [
-        {
-          "to": "docs",
-          "path": "docs/contract-behavior.md"
-        }
+        "BASE-AGENT-011"
       ]
     },
     {

@@ -58,7 +58,7 @@ A buyer replacing an incumbent needs the whole job, so the target is the whole j
 | BASE-DATA-004 | Outbound flows | none | not run |
 | BASE-DATA-005 | Independence | none | not run |
 | BASE-PUBLIC-001 | Privacy | SITE-001, EDIT-006, SEND-009, TRACK-001, TRACK-004 | not run |
-| BASE-PUBLIC-002 | Origins | EDIT-008, SEND-003, SEND-009 | not run |
+| BASE-PUBLIC-002 | Origins | HTTP-001, EDIT-008, SEND-003, SEND-009 | not run |
 | BASE-PUBLIC-003 | Accessibility | none | not run |
 | BASE-OPS-001 | Health | none | not run |
 | BASE-OPS-002 | Migrations | none | not run |
@@ -79,7 +79,7 @@ A buyer replacing an incumbent needs the whole job, so the target is the whole j
 | BASE-AGENT-002 | The seed's jobs are tools, through the UI's own actions | AI-001, AI-002, AI-003, AI-004, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, SURFACE-001 | not run |
 | BASE-AGENT-003 | Records are resources | SURFACE-001 | not run |
 | BASE-AGENT-004 | Business identity and short-lived, audience-bound tokens | ACCESS-001 | not run |
-| BASE-AGENT-005 | An agent acts as a person in a role, never more | ACCESS-001, FOLLOW-007, AI-003, SURFACE-004 | not run |
+| BASE-AGENT-005 | An agent acts as a person in a role, never more | HTTP-001, ACCESS-001, FOLLOW-007, AI-003, SURFACE-004 | not run |
 | BASE-AGENT-006 | Every action declares its risk class | FOLLOW-007, NEG-002, PAY-006, AI-001, AI-002, AI-003, AI-004, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, SURFACE-002 | not run |
 | BASE-AGENT-007 | The company's policy decides, at one chokepoint | ACCESS-001, PROP-001, APPROVE-003, APPROVE-004, FOLLOW-004, FOLLOW-007, NEG-002, SIGN-008, PAY-006, TEAM-007, AI-001, AI-002, AI-003, AI-004, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, SURFACE-002, SURFACE-003, SURFACE-004 | not run |
 | BASE-AGENT-008 | Truthful attribution | ACCESS-001, PROP-001, APPROVE-003, AI-001, AI-002, AI-004, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, SURFACE-003, SURFACE-004 | not run |
@@ -91,7 +91,7 @@ A buyer replacing an incumbent needs the whole job, so the target is the whole j
 
 ## Published clauses
 
-- `HTTP-001`: *Tier:* Core · *Cites:* BASE-ACCESS-002, BASE-ACCESS-004, BASE-ROLE-001
+- `HTTP-001`: *Tier:* Core · *Cites:* BASE-ACCESS-002, BASE-ACCESS-004, BASE-PUBLIC-002, BASE-ROLE-001, BASE-AGENT-005
 - `ACCESS-001`: *Tier:* Core · *Cites:* BASE-AGENT-004, BASE-AGENT-005, BASE-AGENT-007, BASE-AGENT-008
 - `PROP-001`: *Tier:* Core · *Cites:* BASE-AGENT-007, BASE-AGENT-008
 - `PROP-002`: *Tier:* Core · *Cites:* BASE-ROLE-001
@@ -108,13 +108,10 @@ A buyer replacing an incumbent needs the whole job, so the target is the whole j
 
 #### HTTP-001 — Authorized domain dispatch
 
-**Requirement.** The proposal, client, import and invoice doors use TEAM-001 rights and APPROVE-003 proposal authority. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#http-001).
+**Requirement.** The proposal, client, import and invoice doors use TEAM-001 rights and APPROVE-003 proposal authority. Session, origin and agent-authority guarantees belong to the cited Base duties; their conformance journey state is recorded in Shared duties. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#http-001).
 
 **Acceptance.**
-1. Read proposal state while signed out: no private record is returned.
-2. Attempt a client mutation from a foreign origin: no client is written.
-3. Revoke a proposal key and attempt another domain command: no command runs.
-4. A member attempts an owner-only invoice export and import: neither changes records.
+1. A member attempts an owner-only invoice export and import: neither changes records.
 
 #### ACCESS-001 — Proposal preparation grants
 
@@ -190,10 +187,10 @@ A buyer replacing an incumbent needs the whole job, so the target is the whole j
 
 #### PORT-001 — Validated archives and restore
 
-**Requirement.** The Platter archive carries clients, proposals, revisions, approvals, immutable acceptances and deposit invoices. It carries no credentials, sessions, invitation links, verification authority or mail. Sent offers require fresh invitations after restore. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#port-001).
+**Requirement.** The Platter archive carries clients, proposals, revisions, approvals, immutable acceptances and deposit invoices. It carries no credentials, sessions, invitation links, verification authority or mail. Sent offers require fresh invitations after restore. The generic archive conformance journey belongs to BASE-DATA-001 in Shared duties. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#port-001).
 
 **Acceptance.**
-1. Export, restore to an empty installation and re-export: the record and attachment parts are identical.
+1. Inspect a populated archive: it retains clients, proposal revisions, approvals, immutable acceptances, deposit-invoice records and their original attachment bytes.
 2. A populated destination and a damaged archive are refused.
 3. An older archive after erasure is refused without the newer erasure journal.
 
@@ -1741,10 +1738,10 @@ A buyer replacing an incumbent needs the whole job, so the target is the whole j
 
 *Tier:* Core · *Cites:* BASE-DATA-001, BASE-SECRET-001
 
-**Requirement.** The archive includes every Platter record kind: templates, library, catalog, media, signed PDFs/certificates, payment/invoice records, report source data and integration mappings. Connection metadata travels; connection credentials and public invitation authority stay local. Each added record kind joins the same archive obligation. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#port-002).
+**Requirement.** The archive includes every Platter record kind: templates, library, catalog, media, signed PDFs/certificates, payment/invoice records, report source data and integration mappings. Connection metadata travels; connection credentials and public invitation authority stay local. Each added record kind joins the same archive obligation. BASE-DATA-001 owns the shared archive conformance journey, whose state is recorded in Shared duties. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#port-002).
 
 **Acceptance.**
-1. Export an installation containing every record kind, restore into an empty installation and re-export identical parts.
+1. Inspect a populated product archive: it includes templates, library items, catalog, media, signed PDFs and certificates, payment/invoice records, report source data and integration mappings with their retained bytes.
 2. Inspect that populated archive: no provider token, agent key, native session, invitation, verification state or mail is carried.
 
 #### SEC-001 — Provider credential custody
@@ -2077,12 +2074,10 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 *Tier:* Core · *Cites:* BASE-AGENT-009, BASE-AGENT-011
 
-**Requirement.** The proposal ledger adds source records, outputs and model identity to the Base agent audit. Provider spend and its monthly cap are company policy, with Pause inherited from Base.
+**Requirement.** The proposal ledger adds source records, outputs and model identity to the Base agent audit. BASE-AGENT-011 owns Pause and provider-budget enforcement; its conformance journey state is recorded in Shared duties.
 
 **Acceptance.**
-1. Run each proposal agent: its ledger shows inputs, outputs, model and any policy-required approval.
-2. Under the held company policy, sending and refund calls follow external/commitment and money decisions; Pause stops the next run.
-3. Exceed the company’s chosen model budget: the run stops with a visible notice.
+1. Run each proposal agent: its ledger identifies the proposal source records it read, its outputs and the model used.
 
 ## Field proof register
 

@@ -21,15 +21,12 @@ Judged from the code and tests at commit `56c6fb72f04a58cdc5d169af6fd59b0996a374
 
 #### HTTP-001 — Authorized domain dispatch
 
-Core · published · **partial** · Cites BASE-ACCESS-002, BASE-ACCESS-004, BASE-ROLE-001
+Core · published · **partial** · Cites BASE-ACCESS-002, BASE-ACCESS-004, BASE-PUBLIC-002, BASE-ROLE-001, BASE-AGENT-005
 
-**Requirement.** The proposal, client, import and invoice doors use TEAM-001 rights and APPROVE-003 proposal authority. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#http-001).
+**Requirement.** The proposal, client, import and invoice doors use TEAM-001 rights and APPROVE-003 proposal authority. Session, origin and agent-authority guarantees belong to the cited Base duties; their conformance journey state is recorded in Shared duties. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#http-001).
 
 **Acceptance.**
-1. Read proposal state while signed out: no private record is returned.
-2. Attempt a client mutation from a foreign origin: no client is written.
-3. Revoke a proposal key and attempt another domain command: no command runs.
-4. A member attempts an owner-only invoice export and import: neither changes records.
+1. A member attempts an owner-only invoice export and import: neither changes records.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/http.ts`
 **Gap.** Carried evidence asserts the outcomes marked asserted in DONE-AUDIT. Unasserted: Owner-only invoice/import attempts are refused without record changes. Expected statuses are checked by tests/harness.mjs, outside this clause’s cited evidence; the complete no-write outcome is not asserted here.
@@ -150,10 +147,10 @@ Core · published · **partial** · Cites BASE-DATA-003, BASE-DATA-006, BASE-DAT
 
 Core · published · **partial** · Cites BASE-DATA-001, BASE-BACKUP-001
 
-**Requirement.** The Platter archive carries clients, proposals, revisions, approvals, immutable acceptances and deposit invoices. It carries no credentials, sessions, invitation links, verification authority or mail. Sent offers require fresh invitations after restore. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#port-001).
+**Requirement.** The Platter archive carries clients, proposals, revisions, approvals, immutable acceptances and deposit invoices. It carries no credentials, sessions, invitation links, verification authority or mail. Sent offers require fresh invitations after restore. The generic archive conformance journey belongs to BASE-DATA-001 in Shared duties. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#port-001).
 
 **Acceptance.**
-1. Export, restore to an empty installation and re-export: the record and attachment parts are identical.
+1. Inspect a populated archive: it retains clients, proposal revisions, approvals, immutable acceptances, deposit-invoice records and their original attachment bytes.
 2. A populated destination and a damaged archive are refused.
 3. An older archive after erasure is refused without the newer erasure journal.
 
@@ -2120,10 +2117,10 @@ Core · target · **partial** · Cites BASE-DATA-003, BASE-DATA-006
 
 Core · target · **partial** · Cites BASE-DATA-001, BASE-SECRET-001
 
-**Requirement.** The archive includes every Platter record kind: templates, library, catalog, media, signed PDFs/certificates, payment/invoice records, report source data and integration mappings. Connection metadata travels; connection credentials and public invitation authority stay local. Each added record kind joins the same archive obligation. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#port-002).
+**Requirement.** The archive includes every Platter record kind: templates, library, catalog, media, signed PDFs/certificates, payment/invoice records, report source data and integration mappings. Connection metadata travels; connection credentials and public invitation authority stay local. Each added record kind joins the same archive obligation. BASE-DATA-001 owns the shared archive conformance journey, whose state is recorded in Shared duties. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#port-002).
 
 **Acceptance.**
-1. Export an installation containing every record kind, restore into an empty installation and re-export identical parts.
+1. Inspect a populated product archive: it includes templates, library items, catalog, media, signed PDFs and certificates, payment/invoice records, report source data and integration mappings with their retained bytes.
 2. Inspect that populated archive: no provider token, agent key, native session, invitation, verification state or mail is carried.
 
 **Evidence.** `tests/archive.test.mjs`, `src/platter/archive-policy.mjs`
@@ -2255,12 +2252,10 @@ Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 
 Core · push-further · **partial** · Cites BASE-AGENT-009, BASE-AGENT-011
 
-**Requirement.** The proposal ledger adds source records, outputs and model identity to the Base agent audit. Provider spend and its monthly cap are company policy, with Pause inherited from Base.
+**Requirement.** The proposal ledger adds source records, outputs and model identity to the Base agent audit. BASE-AGENT-011 owns Pause and provider-budget enforcement; its conformance journey state is recorded in Shared duties.
 
 **Acceptance.**
-1. Run each proposal agent: its ledger shows inputs, outputs, model and any policy-required approval.
-2. Under the held company policy, sending and refund calls follow external/commitment and money decisions; Pause stops the next run.
-3. Exceed the company’s chosen model budget: the run stops with a visible notice.
+1. Run each proposal agent: its ledger identifies the proposal source records it read, its outputs and the model used.
 
 **Evidence.** `src/platter/http.ts`, `src/platter/credentials.ts`, `tests/platter.test.mjs`
 **Gap.** Legacy preparation exists only in part. Complete sourced proposal work and seed-wide risk classification/company-policy execution are not proved; the old implementation boundary is recorded in CHANGELOG.

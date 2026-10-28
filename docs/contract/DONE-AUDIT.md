@@ -1,10 +1,7 @@
 Old reference: `26bc99232f1d8c8a5ac7bbc2508c90c801f53d13`.
 | Clause | Point | Outcome | Asserting test | Result |
 | --- | --- | --- | --- | --- |
-| HTTP-001 | 1 | Signed-out private read is refused. | `tests/platter.test.mjs:303` | asserted |
-| HTTP-001 | 2 | Foreign-origin domain call is refused. | `tests/platter.test.mjs:2788` | asserted |
-| HTTP-001 | 3 | Revoked key cannot read context. | `tests/platter.test.mjs:23` | asserted |
-| HTTP-001 | 4 | Owner-only invoice/import attempts are refused without record changes. Expected statuses are checked by tests/harness.mjs, outside this clause’s cited evidence; the complete no-write outcome is not asserted here. | none | none |
+| HTTP-001 | 1 | Owner-only invoice/import attempts are refused without record changes. Expected statuses are checked by tests/harness.mjs, outside this clause’s cited evidence; the complete no-write outcome is not asserted here. | none | none |
 | ACCESS-001 | 1 | A labelled key prepares a draft. | `tests/platter.test.mjs:22` | asserted |
 | ACCESS-001 | 1 | Prepared proposal identifies its key. | `tests/platter.test.mjs:320` | asserted |
 | ACCESS-001 | 2 | Company-policy decisions under held. No asserting line in the old cited evidence. | none | none |
@@ -154,8 +151,8 @@ Old reference: `26bc99232f1d8c8a5ac7bbc2508c90c801f53d13`.
 | EDIT-022 | 5 | Refusals add no audit row. | `tests/platter.test.mjs:886` | asserted |
 | EDIT-022 | 5 | Exact preview audit survives public CLI restore. Archive assertions compare broader data. | none | none |
 | EDIT-022 | 5 | this point’s specific preview outcome is not isolated in the old Evidence set. | none | none |
-| PORT-001 | 1 | All record. The archive journey asserts many records but never compares the complete re-exported part manifest. | none | none |
-| PORT-001 | 1 | attachment parts are identical after export/import/re-export. The archive journey asserts many records but never compares the complete re-exported part manifest. | none | none |
+| PORT-001 | 1 | All record. The archive journey asserts many records but never compares the complete re-exported part manifest. | Shared conformance in BASE-DATA-001; Platter contents are retained. | moved |
+| PORT-001 | 1 | attachment parts are identical after export/import/re-export. The archive journey asserts many records but never compares the complete re-exported part manifest. | Shared conformance in BASE-DATA-001; Platter contents are retained. | moved |
 | EDIT-021 | 5 | Copied content, files and delivery settings survive restore exactly. | `tests/archive.test.mjs:284` | asserted |
 | MAIL-001 | 3 | The timed-out mail is contacted only once after later dispatches. | `tests/mail.test.mjs:385` | asserted |
 | PRICE-001 | 1 | Two tables retain their cent-exact subtotals. | `tests/platter.test.mjs:956` | asserted |
@@ -365,8 +362,8 @@ Old reference: `26bc99232f1d8c8a5ac7bbc2508c90c801f53d13`.
 | AI-003 | 5 | absence of credentials. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. | none | none |
 | AI-003 | 6 | Compiled queue at both widths. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. | none | none |
 | AI-003 | 6 | exact credential-free CLI restore. The legacy implementation proves portions but not the new company-policy class decision; its hard-coded name refusals do not establish this target. | none | none |
-| PORT-002 | 1 | Displayed document and brand survive restore. | `tests/archive.test.mjs:265` | asserted |
-| PORT-002 | 1 | Every product record/attachment part is identical on re-export. Named subset comparisons do not establish a complete part inventory equality. | none | none |
+| PORT-002 | 1 | Displayed document and brand survive restore. | Shared conformance in BASE-DATA-001; Platter contents are retained. | moved |
+| PORT-002 | 1 | Every product record/attachment part is identical on re-export. Named subset comparisons do not establish a complete part inventory equality. | Shared conformance in BASE-DATA-001; Platter contents are retained. | moved |
 | PORT-002 | 2 | Invitation credentials do not appear as archive rows. | `tests/archive.test.mjs:571` | asserted |
 | PORT-002 | 2 | Every provider/agent/native/verification/mail credential kind is absent from the populated archive. Every named exclusion requires a mechanism assertion; one empty table is insufficient. | none | none |
 | FOLLOW-002 | 1 | The complete seven-proposal target order is A,C,D,F,E,B,G. | `tests/followup-journey.mjs:48` | asserted |

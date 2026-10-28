@@ -1,3 +1,5 @@
+import { resolveVariables, editableVariableFields } from './variables'
+import { proposalFields } from './commands'
 import { recipientPlan } from './recipients'
 import { paymentTerms } from './payment-terms'
 import { copyDocumentMedia } from './documents/media'
@@ -15,9 +17,10 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
  need(['owner','admin','manager','sales','content_editor'].includes(a.role), 'Only an owner or member duplicates proposals', 403)
  const db = env.DB, source = await proposal(db, input.id)
  exact(source, input)
- const displayed = negotiatedView(source, await pendingNegotiation(db, source.id))
+ let displayed = negotiatedView(source, await pendingNegotiation(db, source.id))
  const clientId = input.clientId === undefined ? displayed.client_id : text(input.clientId, 'a client')
  need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(clientId).first(), 'Client not found', 404)
+ if(documentOf(displayed).merge){const resolved=await resolveVariables(env,a,{...editableVariableFields(displayed),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);displayed={...displayed,...proposalFields(resolved.fields),recipient_plan:resolved.fields.recipientPlan}}
  const titleLocked=await db.prepare("SELECT 1 FROM p_proposal_locks WHERE proposal_id=? AND section='title'").bind(source.id).first()
  const title = input.title === undefined
   ? titleLocked?displayed.title:text(displayed.title.slice(0,193)+' (copy)','a title')
@@ -26,7 +29,9 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
  const id = crypto.randomUUID(), at = await currentTime(db)
  const attachments = copyAttachments(typeof displayed.attachments === 'string' ? JSON.parse(displayed.attachments) : displayed.attachments)
  const options = typeof displayed.options === 'string' ? JSON.parse(displayed.options) : displayed.options
- const row = { recipient_plan:recipientPlan(displayed).map(r=>({...r,email:null})), document:bindDocument(displayed.document,clientId), id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '', section_conditions: displayed.section_conditions??{},
+ const copiedDocument=bindDocument(displayed.document,clientId)
+ if(input.title===undefined&&!titleLocked&&copiedDocument.merge?.patterns['/title'])copiedDocument.merge.patterns['/title']+=' (copy)'
+ const row = { recipient_plan:recipientPlan(displayed).map((r,i)=>({...r,email:documentOf(displayed).merge?.patterns['/recipientPlan/'+i+'/email']?r.email:null})), document:copiedDocument, id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '', section_conditions: displayed.section_conditions??{},
   payment_terms:paymentTerms(displayed), revision: 1, deposit_bps: displayed.deposit_bps, options, currency: displayed.currency, attachments }
  await commit(db, a, [
   db.prepare(`INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,

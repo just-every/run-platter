@@ -19,7 +19,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 11 | Proposal agents use the company’s class policy for drafting and sending | `ACCESS-001` partial; `PROP-001` partial | partial |
 | 12 | Lines from the catalog; items not in it left out | `CAT-001` partial; `PRICE-001` partial | partial |
 | 13 | Checked against Gauge: margin against the floor | `AGENT-002` missing; `PRICE-006` partial; `HAND-002` missing | partial |
-| 14 | Template, content library, brand kit, fields, locked sections | `EDIT-001` partial; `EDIT-002` partial; `EDIT-003` partial; `EDIT-004` missing; `EDIT-015` partial | partial |
+| 14 | Template, content library, brand kit, fields, locked sections | `EDIT-001` partial; `EDIT-002` partial; `EDIT-003` partial; `EDIT-004` partial; `EDIT-015` partial | partial |
 | 15 | The client sets the guest count; options they can add | `PRICE-002` partial; `PRICE-001` partial | partial |
 | 16 | Delaware sales tax $0.00 | `PRICE-005` missing | missing |
 | 17 | Reminders, cancelled once signed; expiry | `FOLLOW-001` partial; `FOLLOW-008` partial; `FOLLOW-006` partial; `FOLLOW-011` partial; `SEND-004` partial; `SEND-013` partial | partial |
@@ -44,7 +44,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 36 | Out-of-scope request priced as its own change order; the original agreement unchanged | `AGENT-006` missing; `PROP-002` partial | partial |
 | 37 | Asana project made at signing, one task per accepted line | `HAND-001` missing | missing |
 | 38 | Paid by card that afternoon | `PAY-001` partial | partial |
-| 39 | PandaDoc Word templates become editable pages; tokens become fields; rows matched to the catalog | `MIG-001` missing; `MIG-007` missing; `EDIT-005` missing; `EDIT-020` missing; `EDIT-019` missing; `EDIT-004` missing; `CAT-001` partial | partial |
+| 39 | PandaDoc Word templates become editable pages; tokens become fields; rows matched to the catalog | `MIG-001` missing; `MIG-007` missing; `EDIT-005` done; `EDIT-020` done; `EDIT-019` done; `EDIT-004` partial; `CAT-001` partial | partial |
 | 40 | Catalog CSV with bundles as packages; bulk PDFs kept with their certificates | `MIG-001` missing; `CAT-001` partial | partial |
 | 41 | Planned move-in support for Proposify, Better Proposals, Qwilr and Ignition | `MIG-002` missing; `MIG-003` missing; `MIG-004` missing | missing |
 

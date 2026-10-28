@@ -5,14 +5,14 @@ import { documentOf } from '../documents/blocks'
 import { embedProvider } from '../documents/embeds'
 import { escape, form, hidden, proposalPath } from './shared'
 import { pricingTables } from './pricing'
-export const blockNames:Record<string,string>={cover:'Cover page',heading:'Heading',text:'Text',image:'Image',video:'Video',gallery:'Image gallery',embed:'External embed',columns:'Columns',pricing:'Pricing table',quote:'Quote or testimonial',bio:'Team bio',case_study:'Case study',terms:'Terms',field:'Form field',signature:'Signature block',page_break:'Page break'}
+export const blockNames:Record<string,string>={table:'Text table',cover:'Cover page',heading:'Heading',text:'Text',image:'Image',video:'Video',gallery:'Image gallery',embed:'External embed',columns:'Columns',pricing:'Pricing table',quote:'Quote or testimonial',bio:'Team bio',case_study:'Case study',terms:'Terms',field:'Form field',signature:'Signature block',page_break:'Page break'}
 /** Escaped text with a small, explicit formatting vocabulary; never accepts HTML. */
 export function richText(value:string){return value.split('\n').map(line=>{const escaped=escape(line);return '<p>'+escaped.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/_([^_]+)_/g,'<em>$1</em>').replace(/^- /,'• ')+'</p>'}).join('')}
 export function documentBlocks(view:any,mediaBase='',suffix=''){
  const doc=documentOf(view)
- if(!doc.blocks.length)return ''
+ if(!doc.blocks.length&&!doc.fixedPdf)return ''
  const media=(id:string)=>escape(mediaBase+encodeURIComponent(id)+suffix)
- return '<article class="proposal-document" aria-label="Proposal document">'+(doc.brand?.logoId?'<img class="document-logo" src="'+media(doc.brand.logoId)+'" alt="'+escape(doc.brand.name||'Firm logo')+'" width="200" height="100">':'')+(doc.brand?.name?'<p class="document-brand">'+escape(doc.brand.name)+'</p>':'')+doc.blocks.map(b=>{
+ return '<article class="proposal-document" aria-label="Proposal document">'+(doc.brand?.logoId?'<img class="document-logo" src="'+media(doc.brand.logoId)+'" alt="'+escape(doc.brand.name||'Firm logo')+'" width="200" height="100">':'')+(doc.fixedPdf?'<section aria-label="Fixed PDF pages"><h2>Fixed PDF pages</h2><p>'+doc.fixedPdf.pages+' original pages, followed by the appended blocks.</p><a href="'+media(doc.fixedPdf.fileId)+'">Open original PDF</a><div data-fixed-pages data-source="'+media(doc.fixedPdf.fileId)+'"><p role="status">Loading original PDF pages…</p></div><script type="module" src="/fixed-pages.js"></script></section>':'')+(doc.brand?.name?'<p class="document-brand">'+escape(doc.brand.name)+'</p>':'')+doc.blocks.map(b=>{
   let body=b.title?'<h2>'+escape(b.title)+'</h2>':''
   if(b.type==='page_break')return '<hr class="document-page-break" aria-label="Page break" data-document-block="'+escape(b.id)+'">'
   if(b.type==='field'||b.type==='signature'){
@@ -23,6 +23,7 @@ export function documentBlocks(view:any,mediaBase='',suffix=''){
    else {const kind=b.type==='signature'?'text':b.fieldKind,required=b.type==='signature'||b.required;body+='<label>'+escape(b.type==='signature'?'Type your full name for '+b.title:b.title)+'<input form="platter-acceptance" name="'+escape(name)+'" type="'+escape(kind)+'"'+(kind==='checkbox'?' value="yes"':' maxlength="1000"')+(required?' required':'')+(disabled?' disabled':'')+'></label>'+(b.type==='signature'?'<p>By accepting below, you adopt this typed name as your signature for this block. It must match your acceptance name.</p>':'')}
    if(b.text)body+=richText(b.text)
   }
+  else if(b.type==='table')body+='<div class="pricing-table-wrap"><table>'+b.text.split('\n').map(row=>'<tr>'+row.split('\t').map(cell=>'<td>'+escape(cell)+'</td>').join('')+'</tr>').join('')+'</table></div>'
   else if(b.type==='image')body+='<figure><img src="'+media(b.assetId!)+'" alt="'+escape(b.alt)+'" loading="lazy" decoding="async" width="1280" height="720">'+(b.text?'<figcaption>'+escape(b.text)+'</figcaption>':'')+'</figure>'
   else if(b.type==='video')body+='<video controls preload="none" poster="'+media(b.posterId!)+'" aria-label="'+escape(b.alt)+'" width="1280" height="720"><source src="'+media(b.assetId!)+'"><a href="'+media(b.assetId!)+'">Download video</a></video>'+richText(b.text)
   else if(b.type==='gallery')body+='<div class="document-gallery-grid">'+(b.images??[]).map(image=>'<figure><img src="'+media(image.assetId)+'" alt="'+escape(image.alt)+'" loading="lazy" decoding="async" width="1280" height="720"></figure>').join('')+'</div>'+richText(b.text)

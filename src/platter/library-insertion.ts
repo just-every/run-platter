@@ -44,10 +44,17 @@ export async function insertLibrary(db:D1Database,a:Actor,p:Record<string,unknow
   const tables=pricingInput(options),saved=JSON.parse(item.content).table
   tables.push({optionId,...saved});nextOptions=pricedOptions(packageInputs(editablePackages(options),tables),tables)
  }
- doc.blocks.push(libraryBlock(item,blockId,optionId,option?.tables?.length??0))
+ const additions:any[]=[]
+ const imported=await db.prepare('SELECT * FROM p_imported_library WHERE item_id=?').bind(item.id).first<any>()
+ if(imported){
+  const saved=proposalDocument(JSON.parse(imported.document)),savedTables=JSON.parse(imported.options),tables=pricingInput(options)
+  for(const block of saved.blocks){const copy={...block,id:crypto.randomUUID()};if(copy.type==='pricing'){const source=savedTables.filter((t:any)=>t.optionId===copy.optionId)[copy.tableIndex!];need(source&&option,'Choose a package for imported pricing');copy.optionId=optionId;copy.tableIndex=tables.filter((t:any)=>t.optionId===optionId).length;tables.push({...source,optionId})}doc.blocks.push(copy);additions.push(copy)}
+  if(tables.length)nextOptions=pricedOptions(packageInputs(editablePackages(options),tables),tables)
+ }else doc.blocks.push(libraryBlock(item,blockId,optionId,option?.tables?.length??0))
  const change=await documentWrites(db,a,row,doc,Date.now(),nextOptions)
  change.writes.push(db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_library_media WHERE item_id=? ON CONFLICT DO NOTHING').bind(row.id,item.id))
- await commit(db,a,[...change.writes,db.prepare('INSERT INTO p_library_uses(proposal_id,block_id,item_id,linked,item_version,title,content,kind) VALUES(?,?,?,?,?,?,?,?)').bind(row.id,blockId,item.id,p.mode==='linked'?1:0,item.version,item.title,item.content,item.kind)],false,{sql:access.sql+' AND EXISTS(SELECT 1 FROM p_library_items WHERE id=? AND version=? AND folder_id IS ?)',values:[...access.values,item.id,item.version,item.folder_id]})
+ const uses=imported?additions.map(block=>db.prepare('INSERT INTO p_library_uses(proposal_id,block_id,item_id,linked,item_version,title,content,kind) VALUES(?,?,?,?,?,?,?,?)').bind(row.id,block.id,item.id,p.mode==='linked'?1:0,item.version,item.title,JSON.stringify({block,...(block.type==='pricing'?{table:(nextOptions??options).find((o:any)=>o.id===block.optionId).tables[block.tableIndex]}:{})}),'imported')):[]
+ await commit(db,a,[...change.writes,...uses,...(imported?[]:[db.prepare('INSERT INTO p_library_uses(proposal_id,block_id,item_id,linked,item_version,title,content,kind) VALUES(?,?,?,?,?,?,?,?)').bind(row.id,blockId,item.id,p.mode==='linked'?1:0,item.version,item.title,item.content,item.kind)])],false,{sql:access.sql+' AND EXISTS(SELECT 1 FROM p_library_items WHERE id=? AND version=? AND folder_id IS ?)',values:[...access.values,item.id,item.version,item.folder_id]})
  return {id:row.id,version:row.version+1,revision:change.revision,blockId}
 }
 
@@ -69,6 +76,7 @@ export async function propagateLibrary(db:D1Database,a:Actor,old:any,next:any,at
   if(row.status==='accepted'||(!['draft','approved'].includes(row.status)&&!pending))continue
   const current=negotiatedView(row,pending),doc=documentOf(current),options=snapshot(current).options;let changed=false,prices=false
   for(const use of group){const block=doc.blocks.find(b=>b.id===use.block_id);if(!block||!matches(block,use,options))continue
+   if(use.kind==='imported'){const captured=JSON.parse(use.content);if(captured.block.type==='heading'&&captured.block.title===old.title){captured.block.title=next.title;block.title=next.title}writes.push(db.prepare('UPDATE p_library_uses SET item_version=?,title=?,content=? WHERE proposal_id=? AND block_id=?').bind(old.version+1,next.title,JSON.stringify(captured),id,use.block_id));changed=true;continue}
    need(use.kind===next.kind||![use.kind,next.kind].some(k=>['image','video','pricing'].includes(k)),'Keep the media or table type of an item with linked draft copies',409)
    if(next.kind==='pricing'){const option=options.find((o:any)=>o.id===block.optionId);option.tables[block.tableIndex!]=JSON.parse(next.content).table;prices=true}
    Object.assign(block,libraryBlock(next,use.block_id,block.optionId,block.tableIndex));changed=true

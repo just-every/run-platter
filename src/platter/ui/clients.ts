@@ -31,6 +31,6 @@ function card(state: any, client: any): string {
 export function clientsPage(state: any): string {
   if (state.actor?.role !== 'owner') return ownerOnly()
   const clients = state.clients ?? []
-  const add = panel('Add a client', form('client.save', '/app/clients', field('Client name', 'name', '', 'required autocomplete="organization"') + field('Client email', 'email', '', 'type="email" required autocomplete="email"') + '<button>Add client</button>', 'client-new'), 'slim-form')
+  const add = panel('Add a client', form('client.save', '/app/clients', field('Client name', 'name', '', 'required autocomplete="organization"') + field('Client email', 'email', '', 'type="email" required autocomplete="email"') + field('Contact name (optional)','contactName','')+field('Contact title (optional)','title','')+field('Postal address (optional)','address','')+ '<button>Add client</button>', 'client-new'), 'slim-form')
   return add + (clients.length ? `<div class="client-grid">${clients.map((client: any) => card(state, client)).join('')}</div>` : empty('No clients have been added.'))
 }

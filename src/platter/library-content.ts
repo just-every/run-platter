@@ -8,6 +8,7 @@ export const libraryKind=(item:any)=>item.rich_kind??item.kind
 export const libraryBlockType=(kind:string)=>({section:'text',testimonial:'quote'}[kind]??kind)
 export function libraryBlock(item:any,id:string,optionId?:string,tableIndex?:number):ProposalBlock {
  const kind=libraryKind(item)
+ if(kind==='imported')return {...JSON.parse(item.content).block,id}
  const extra=richLibraryKinds.includes(kind)?JSON.parse(item.content).block:{}
  return {...extra,id,type:libraryBlockType(kind),title:item.title,text:richLibraryKinds.includes(kind)?extra.text:item.content,...(kind==='pricing'?{optionId,tableIndex}:{})}
 }
@@ -15,6 +16,7 @@ export function libraryMatches(block:any,use:any,options:any[]=[]){
  if(!block)return false
  const expected=libraryBlock({...use,title:use.source_title??use.title},block.id,block.optionId,block.tableIndex)
  if(Object.keys(block).length!==Object.keys(expected).length||Object.keys(block).some(key=>block[key]!==expected[key as keyof ProposalBlock]))return false
+ if(use.kind==='imported'){const saved=JSON.parse(use.content);return !saved.table||JSON.stringify(options.find(o=>o.id===block.optionId)?.tables?.[block.tableIndex])===JSON.stringify(saved.table)}
  return use.kind!=='pricing'||JSON.stringify(options.find(o=>o.id===block.optionId)?.tables?.[block.tableIndex])===JSON.stringify(JSON.parse(use.content).table)
 }
 export async function captureLibraryContent(db:D1Database,a:Actor,p:Record<string,unknown>,old:any,kind:string){

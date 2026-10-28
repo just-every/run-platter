@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 9 | 96 | 54 | 159 |
+| Core | 12 | 97 | 50 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 9 | 96 | 58 | 163 |
+| Full target | 12 | 97 | 54 | 163 |
 
-Judged from the code and tests at commit `b2551363bd49d431add363e7ee97bed57938c394` (28 October 2026). Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `56c6fb72f04a58cdc5d169af6fd59b0996a3745c` (28 October 2026). Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -235,19 +235,19 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-003 · Rules D-
 
 #### EDIT-004 — Variables from client, deal and CRM records
 
-Core · target · **missing** · Rules D-1
+Core · target · **partial** · Rules D-1
 
 **Requirement.** Text and pricing can use variables: client company, contact name and title, address, deal name and amount, sender details, dates and custom fields, filled from Platter records or from the linked HubSpot, Salesforce or Orbit deal (`CRM-001` to `CRM-003`). Template role slots (`SIGN-012`) are filled the same way, from the client's contacts or the deal's contacts. A variable with no value is flagged in the editor, and sending is refused until each one is filled or deliberately cleared. The sent revision freezes the filled values. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-004).
 
 **Acceptance.**
 1. Create a proposal from a HubSpot deal fake with a missing contact title, see the send refused naming that variable, fill it, send, change the deal in the fake, and see the sent proposal unchanged.
 
-**Evidence.** None.
-**Gap.** No variables or merge fields.
+**Evidence.** `tests/platter.test.mjs` — “EDIT-004 linked deal variables refuse missing values, freeze the sent revision and refill destination copies”; `tests/site-documents.mjs` — “EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads”; `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority”
+**Gap.** Orbit refill requires its scoped contact-read API and a reference instance; the current Orbit public API exposes deal fields but no contact-read door. Connected-deal reads use the conservative owner or admin floor under the standing scope rule; scoped delegation and the Orbit provider boundary remain unproved. No full CRM qualification is claimed.
 
 #### EDIT-005 — Word and PDF import and export
 
-Core · target · **missing** · Rules D-1
+Core · target · **done** · Rules D-1
 
 **Requirement.** Word imports become editable proposal blocks with headings, paragraphs, lists, tables and images. Published token mappings create variables; unmapped tokens become listed custom variables. Quote tables match catalog items by SKU then name, retaining quantity and price; unmatched rows and missing images are listed. Word library imports split at each Heading 1. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-005).
 
@@ -256,12 +256,12 @@ Core · target · **missing** · Rules D-1
 2. Unmapped tokens become named custom variables; missing source images are reported rather than invented.
 3. Import ten Heading 1 sections as library content: ten items carry those headings.
 
-**Evidence.** None.
-**Gap.** No import or export of documents.
+**Evidence.** `tests/platter.test.mjs` — “EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections” (editable content, mapped and custom variables, catalog links, unmatched and missing images, library names, independent copies and revoked scope); “EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing” (source bytes, positioned fields, schedules, every-page revision marks, paper sizes and frozen signed custody); “EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order” (native Word structures, exact prices and media, PDF order); `tests/site-documents.mjs` — “EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads” (compiled editor, client pages, local fixed-page rendering and Word download); `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority” (exact media, fixed originals, variables and library custody without restored links)
+**Gap.** None.
 
 #### EDIT-019 — Fixed PDF pages with signing fields
 
-Core · target · **missing** · From EDIT-005 · Rules D-1
+Core · target · **done** · From EDIT-005 · Rules D-1
 
 **Requirement.** An imported PDF keeps its original pages, with signing, initials, date and form fields. Editor blocks and a pricing table can follow the fixed pages, and the document can collect its scheduled payment.
 
@@ -270,12 +270,12 @@ Core · target · **missing** · From EDIT-005 · Rules D-1
 2. Place a signature field on page 3; append pricing after the last page and verify its added lines total correctly.
 3. Fixed pages and added blocks retain the exact-revision unsigned-download behavior of EDIT-014.
 
-**Evidence.** None.
-**Gap.** No import or export of documents.
+**Evidence.** `tests/platter.test.mjs` — “EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections” (editable content, mapped and custom variables, catalog links, unmatched and missing images, library names, independent copies and revoked scope); “EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing” (source bytes, positioned fields, schedules, every-page revision marks, paper sizes and frozen signed custody); “EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order” (native Word structures, exact prices and media, PDF order); `tests/site-documents.mjs` — “EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads” (compiled editor, client pages, local fixed-page rendering and Word download); `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority” (exact media, fixed originals, variables and library custody without restored links)
+**Gap.** None.
 
 #### EDIT-020 — Word and PDF exports
 
-Core · target · **missing** · From EDIT-005 · Rules D-1
+Core · target · **done** · From EDIT-005 · Rules D-1
 
 **Requirement.** Proposals export to US Letter or A4 PDF and Word. The signed agreement PDF remains SIGN-005.
 
@@ -283,8 +283,8 @@ Core · target · **missing** · From EDIT-005 · Rules D-1
 1. Export three headings, a four-line pricing table and two images to Word: headings use Word heading styles, the table carries every name, quantity, unit price and total, and both images are embedded.
 2. The PDF contains the same blocks in the same order.
 
-**Evidence.** None.
-**Gap.** No import or export of documents.
+**Evidence.** `tests/platter.test.mjs` — “EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections” (editable content, mapped and custom variables, catalog links, unmatched and missing images, library names, independent copies and revoked scope); “EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing” (source bytes, positioned fields, schedules, every-page revision marks, paper sizes and frozen signed custody); “EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order” (native Word structures, exact prices and media, PDF order); `tests/site-documents.mjs` — “EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads” (compiled editor, client pages, local fixed-page rendering and Word download); `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority” (exact media, fixed originals, variables and library custody without restored links)
+**Gap.** None.
 
 #### EDIT-006 — Embedded rich media
 

@@ -8,7 +8,7 @@ export async function pdfPages(bytes,layout=false) {
   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber++) {
    const page = await document.getPage(pageNumber)
    const items=(await page.getTextContent()).items,text=items.map(item=>item.str).join(' ')
-   if(layout){const viewport=page.getViewport({scale:1}),operators=await page.getOperatorList(),images=operators.fnArray.flatMap((fn,i)=>fn===OPS.paintImageXObject||fn===OPS.paintInlineImageXObject?[operators.argsArray[i]]:[]);pages.push({text,width:viewport.width,height:viewport.height,imageCount:images.length,items:items.map(item=>({text:item.str,x:item.transform[4],y:item.transform[5]}))})}else pages.push(text)
+   if(layout){const viewport=page.getViewport({scale:1}),operators=await page.getOperatorList(),images=operators.fnArray.flatMap((fn,i)=>fn===OPS.paintImageXObject||fn===OPS.paintInlineImageXObject?[operators.argsArray[i]]:[]);pages.push({text,width:viewport.width,height:viewport.height,imageCount:images.length,readingOrder:operators.fnArray.flatMap((fn,i)=>fn===OPS.paintImageXObject||fn===OPS.paintInlineImageXObject?['IMAGE']:fn===OPS.showText?[(operators.argsArray[i]?.[0]??[]).map(g=>typeof g==='object'?g.unicode??'':'').join('')]:[]),items:items.map(item=>({text:item.str,x:item.transform[4],y:item.transform[5]}))})}else pages.push(text)
   }
   return pages
  } finally { await document.destroy() }

@@ -71,7 +71,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [runtime, browser_documents, business, archive_custody, archive_restore, archive_media]
+        shard: [runtime, browser_documents, business_authoring, business_lifecycle, archive_custody, archive_restore, archive_media]
     env:
       CI: 'true'
       PLATTER_VERIFY_SHARD: ${{ matrix.shard }}

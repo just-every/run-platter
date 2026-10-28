@@ -87,7 +87,15 @@ export async function documentJourney(){
     await blocks.nth(1).getByRole('button',{name:'Move down',exact:true}).press('Enter')
     const beforeDrag=await blocks.evaluateAll(nodes=>nodes.map(n=>n.dataset.blockId)),keyboardOrder=[...originalOrder];[keyboardOrder[1],keyboardOrder[2]]=[keyboardOrder[2],keyboardOrder[1]];assert.deepEqual(beforeDrag,keyboardOrder,'keyboard moves the selected block down one position')
     const handle=blocks.nth(2).getByRole('button',{name:'Drag block',exact:true})
-    await handle.dragTo(blocks.nth(1).locator('.document-block-bar'))
+    // Start the native drag before scrolling the destination into view. Otherwise
+    // scrolling can put another block under the pressed pointer before dragstart.
+    await handle.hover()
+    const source=await handle.boundingBox()
+    await page.mouse.down();await page.mouse.move(source.x+source.width/2+8,source.y+source.height/2,{steps:3})
+    const destination=blocks.nth(1).locator('.document-block-bar')
+    await destination.scrollIntoViewIfNeeded()
+    const target=await destination.boundingBox()
+    await page.mouse.move(target.x+24,target.y+target.height/2,{steps:8});await page.mouse.up()
     await page.waitForFunction(expected=>Array.from(document.querySelectorAll('[data-block-id]'),n=>n.dataset.blockId).join(',')!==expected,beforeDrag.join(','))
     const reordered=await blocks.evaluateAll(nodes=>nodes.map(n=>n.dataset.blockId)),expected=[...beforeDrag];expected.splice(1,0,...expected.splice(2,1));assert.deepEqual(reordered,expected,'drag places the moved block before its target')
     const count=await blocks.count();await blocks.nth(1).getByRole('button',{name:'Duplicate block',exact:true}).click();assert.equal(await blocks.count(),count+1)
@@ -132,7 +140,9 @@ export async function documentJourney(){
     if(screenshots){await client.locator('.document-embed').first().scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-006-consent-${width}.png`)})}
     assert.deepEqual(providerRequests,[],'no provider request occurs before viewer consent');assert.deepEqual(await clientContext.cookies(providerHosts.map(host=>'https://'+host)),[]);assert.equal(await client.evaluate(()=>localStorage.length+sessionStorage.length),0);consented=true
     for(const embed of await client.locator('.document-embed').all()){
-     await embed.getByRole('button',{name:'Load external content',exact:true}).click();await embed.frameLocator('iframe').getByText('Recorded provider edge').waitFor()
+     // Native keyboard consent stays on the chosen control while each loaded
+     // frame changes the long document's layout and scroll position.
+     await embed.getByRole('button',{name:'Load external content',exact:true}).press('Enter');await embed.frameLocator('iframe').getByText('Recorded provider edge').waitFor()
      assert.ok(providerHosts.map(host=>'https://'+host).includes(new URL(await embed.locator('iframe').getAttribute('src')).origin),'frames use exact allowlisted origins');assert.equal(await embed.locator('iframe').getAttribute('sandbox'),'allow-scripts allow-same-origin allow-forms allow-presentation');assert.equal(await embed.locator('iframe').getAttribute('referrerpolicy'),'no-referrer')
     }
     assert.equal(providerRequests.length,3);assert.ok(providerRequests.every(r=>r.consented));console.log('EDIT-006 recorded provider requests at width '+width+': '+JSON.stringify({beforeConsent:providerRequests.filter(r=>!r.consented),afterConsent:providerRequests.filter(r=>r.consented)}));if(screenshots)await writeFile(join(screenshots,`EDIT-006-requests-${width}.json`),JSON.stringify({beforeConsent:[],afterConsent:providerRequests},null,2))

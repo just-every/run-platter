@@ -58,7 +58,7 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
  need(name==='provider.connect','Unknown provider action',404)
  need(p.consent===true||p.consent==='yes','Confirm permission to connect this account')
  const token=text(p.token,'a provider token',8192);need(!/[\r\n\0]/.test(token),'Use a single-line provider token')
- let accountId:string,mailboxEmail:string|null=null,webhookSecret:string|undefined
+ let accountId:string,mailboxEmail:string|null=null,webhookSecret:string|undefined,instanceOrigin:string|undefined
  if(provider==='stripe'){
   webhookSecret=p.webhookSecret?text(p.webhookSecret,'the Stripe webhook signing secret',8192):undefined
   if(p.publishableKey!==undefined&&p.publishableKey!=='')need(typeof p.publishableKey==='string'&&p.publishableKey.length>0&&p.publishableKey.length<=8192&&!/[\r\n\0]/.test(p.publishableKey),'Use the Stripe publishable key')
@@ -71,6 +71,7 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
   need((typeof value==='string'&&value.length>0)||(typeof value==='number'&&Number.isSafeInteger(value)&&value>0),'HubSpot did not confirm the portal');accountId=text(String(value),'the verified HubSpot portal',200)
  }else if(provider==='salesforce'){
   const result=await providerJson('https://login.salesforce.com/services/oauth2/userinfo',token);accountId=text(result.organization_id,'the verified Salesforce organization',200);need(typeof result.user_id==='string'&&result.user_id.length>0,'Salesforce did not confirm the authorized user')
+  if(result.urls?.rest){const url=new URL(result.urls.rest);need(url.protocol==='https:'&&/\.(?:salesforce|force)\.com$/.test(url.hostname)&&!url.username&&!url.password,'Salesforce returned an invalid instance');instanceOrigin=url.origin}
  }else if(provider==='google_drive'){
   const result=await providerJson('https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress,permissionId)',token);accountId=text(result.user?.permissionId,'the verified Drive account',200);need(typeof result.user?.emailAddress==='string','Drive did not confirm the account')
  }else if(provider==='teams'){
@@ -89,7 +90,7 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
   need(await db.prepare('SELECT 1 WHERE '+sql).bind(...values).first(),'This mailbox is already bound to another member',403)
   guard.sql+=' AND '+sql;guard.values.push(...values)
  }
- const sealed=await sealCredential(env,id,{provider,token,accountId,...(webhookSecret?{webhookSecret}:{}),...(provider==='stripe'&&p.publishableKey?{publishableKey:p.publishableKey}:{})}),at=Date.now()
+ const sealed=await sealCredential(env,id,{provider,token,accountId,...(instanceOrigin?{instanceOrigin}:{}),...(webhookSecret?{webhookSecret}:{}),...(provider==='stripe'&&p.publishableKey?{publishableKey:p.publishableKey}:{})}),at=Date.now()
  await commit(db,a,[db.prepare("INSERT INTO p_connections(id,provider,operator_id,account_id,mailbox_email,status,connected_by,connected_at) VALUES(?,?,?,?,?,'connected',?,?) ON CONFLICT(id) DO UPDATE SET account_id=excluded.account_id,mailbox_email=excluded.mailbox_email,status='connected',broken_at=NULL,version=p_connections.version+1,connected_by=excluded.connected_by,connected_at=excluded.connected_at").bind(id,provider,isMailbox(provider)?a.id:null,accountId,mailboxEmail,a.id,at),db.prepare('INSERT INTO p_connection_secrets(connection_id,sealed) VALUES(?,?) ON CONFLICT(connection_id) DO UPDATE SET sealed=excluded.sealed').bind(id,sealed)],false,guard)
  return {id,status:'connected'}
 }

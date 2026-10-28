@@ -690,3 +690,7 @@ test('PRICE-003 and PRICE-002 recurring line editing, preview, client selection 
  const {recurringBrowserJourney}=await import('./recurring-browser.mjs')
  await recurringBrowserJourney()
 })
+
+test('EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads', {timeout:120000},async()=>{
+ const {documentImportBrowser}=await import('./document-import-browser.mjs');await documentImportBrowser()
+})

@@ -1,6 +1,6 @@
 // Small native-control editor. Server owns validation, scope, locks and revisions.
 (() => {
- const names={cover:'Cover page',heading:'Heading',text:'Text',columns:'Columns',pricing:'Pricing table',quote:'Quote or testimonial',bio:'Team bio',case_study:'Case study',image:'Image',video:'Video',gallery:'Image gallery',embed:'External embed',terms:'Terms',field:'Form field',signature:'Signature block',page_break:'Page break'};
+ const names={table:'Text table',cover:'Cover page',heading:'Heading',text:'Text',columns:'Columns',pricing:'Pricing table',quote:'Quote or testimonial',bio:'Team bio',case_study:'Case study',image:'Image',video:'Video',gallery:'Image gallery',embed:'External embed',terms:'Terms',field:'Form field',signature:'Signature block',page_break:'Page break'};
  for(const form of document.querySelectorAll('[data-document-editor]')){
   const payload=form.elements.document,container=form.querySelector('[data-document-blocks]'),status=form.querySelector('[data-document-status]'),error=form.querySelector('[data-document-error]'),undo=form.querySelector('[data-block-undo]');
   const showError=message=>{error.textContent=message;error.hidden=!message;};
@@ -43,6 +43,7 @@
       select.addEventListener('change',()=>{checkpoint();if(select.value==='client'){block.recipientRole='client';delete block.recipientId;}else{block.recipientRole='slot';block.recipientId=select.value.slice(5);}schedule();});
       label.append(select);card.append(label);
       if(block.type==='field'){const wrap=element('label',{},'Field type'),kind=element('select',{'aria-label':'Field type'});for(const [id,name] of [['text','Text'],['date','Date'],['checkbox','Checkbox']]){const option=element('option',{value:id},name);option.selected=block.fieldKind===id;kind.append(option);}kind.addEventListener('change',()=>{checkpoint();block.fieldKind=kind.value;schedule();});wrap.append(kind);card.append(wrap);const required=element('label',{class:'choice'},'Required field'),check=element('input',{type:'checkbox','aria-label':'Required field'});check.checked=block.required;check.addEventListener('change',()=>{checkpoint();block.required=check.checked;schedule();});required.prepend(check);card.append(required);}
+      if(doc.fixedPdf){card.append(control('Fixed PDF page (blank for appended field)','page',block.page??'',v=>{if(v)block.page=Number(v);else delete block.page;}),control('Position from left in PDF points','x',block.x??48,v=>block.x=Number(v)),control('Position from bottom in PDF points','y',block.y??100,v=>block.y=Number(v)));block.x??=48;block.y??=100;}
       card.append(control('Instructions','text',block.text,v=>block.text=v,'textarea'));
      }else if(['image','video'].includes(block.type)){
       const choice=(label,key,files)=>{const wrap=element('label',{},label),select=element('select',{'aria-label':label});for(const file of files){const option=element('option',{value:file.id},file.filename);option.selected=block[key]===file.id;select.append(option);}select.addEventListener('change',()=>{checkpoint();block[key]=select.value;schedule();});wrap.append(select);return wrap;};
@@ -67,6 +68,7 @@
      const conditions=new Map();for(const o of options){conditions.set(o.id,'Only '+o.label);for(const i of o.optionalItems??[])conditions.set('item:'+i.id,'Only with '+i.label);}
      for(const [id,label] of conditions){const opt=element('option',{value:id},label);opt.selected=block.condition===id;select.append(opt);}select.addEventListener('change',()=>{checkpoint();if(select.value)block.condition=select.value;else delete block.condition;schedule();});wrap.append(select);card.append(wrap);
     }
+    if(!['field','signature'].includes(block.type)){const match=/^variable:([^=]+)=(.*)$/.exec(block.condition??'');let variable=match?.[1]??'',expected=match?.[2]??'';const update=()=>{if(variable)block.condition='variable:'+variable+'='+expected;else delete block.condition;};card.append(control('Visibility variable (optional)','visibilityVariable',variable,v=>{variable=v;update();}),control('Required variable value','visibilityValue',expected,v=>{expected=v;update();}));}
     if(locked){card.append(element('p',{class:'muted'},block.type==='embed'?'Only the owner or an admin changes external content.':'This section is locked. You can move this section; ask an owner, admin or team manager to unlock it before changing its content.'));for(const node of card.querySelectorAll('input,textarea,select'))node.disabled=true;}
     container.append(card);
    }

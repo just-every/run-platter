@@ -1,4 +1,4 @@
-Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
+Old reference: `26bc99232f1d8c8a5ac7bbc2508c90c801f53d13`.
 | Clause | Point | Outcome | Asserting test | Result |
 | --- | --- | --- | --- | --- |
 | HTTP-001 | 1 | Signed-out private read is refused. | `tests/platter.test.mjs:303` | asserted |
@@ -428,3 +428,11 @@ Old reference: `1b994afccb0c422820b435fce66fcc527fcf651b`.
 | TRACK-001 | 1 | The rendered proposal timeline shows region for both recipient views. API record assertions do not assert that rendered field; the cited browser file only imports tests/tracking-browser.mjs. | none | none |
 | TRACK-001 | 1 | The rendered proposal timeline shows country for both recipient views. API record assertions do not assert that rendered field; the cited browser file only imports tests/tracking-browser.mjs. | none | none |
 | TRACK-001 | 1 | The rendered proposal timeline shows device class for both recipient views. API record assertions do not assert that rendered field; the cited browser file only imports tests/tracking-browser.mjs. | none | none |
+| EDIT-005 | 1 | Main’s document import/export journey covers this carried part. | `tests/platter.test.mjs:3060` | asserted |
+| EDIT-005 | 2 | Main’s document import/export journey covers this carried part. | `tests/platter.test.mjs:3062` | asserted |
+| EDIT-005 | 3 | Main’s document import/export journey covers this carried part. | `tests/platter.test.mjs:3070` | asserted |
+| EDIT-019 | 1 | Main’s document import/export journey covers this carried part. | `tests/platter.test.mjs:3092` | asserted |
+| EDIT-019 | 2 | Main’s document import/export journey covers this carried part. | `tests/platter.test.mjs:3098` | asserted |
+| EDIT-019 | 3 | Main’s document import/export journey covers this carried part. | `tests/platter.test.mjs:3100` | asserted |
+| EDIT-020 | 1 | Main’s document import/export journey covers this carried part. | `tests/platter.test.mjs:3118` | asserted |
+| EDIT-020 | 2 | Main’s document import/export journey covers this carried part. | `tests/platter.test.mjs:3121` | asserted |

@@ -2892,8 +2892,10 @@ test('AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocati
   assert.deepEqual((await current()).internalPricing,row.internalPricing,'a refused sales edit changes no private amounts')
   await h.cmd('proposal.approve',{id:p.id,version:row.version,revision:row.revision})
   row=await current();const path=new URL((await h.cmd('proposal.send',{id:p.id,version:row.version})).shareUrl).pathname
+  const unsigned=await current()
   const unverified=await h.send(path+'/action?name=accept',{name:'Synthetic Signer',optionId:'main',items:[{id:'rush',quantity:3}],consent:true})
-  assert.equal(unverified.status,401);assert.equal((await current()).acceptance,undefined)
+  assert.equal(unverified.status,401);const refused=await current();assert.equal(refused.acceptance,undefined)
+  assert.deepEqual([refused.version,refused.revision,refused.status,refused.internalPricing],[unsigned.version,unsigned.revision,unsigned.status,unsigned.internalPricing],'unverified acceptance leaves the sent revision and private amounts unchanged')
   const cookie=await verified(h,path),query='?optionId=main&add.rush=yes&qty.rush=3'
   const data=await h.send(path+'/data.json'+query,undefined,cookie);assert.equal(data.status,200,data.text);assert.equal(data.value.selection.totalCents,1800000);costFree(data.text)
   const page=await h.send(path+query,undefined,cookie);assert.equal(page.status,200);costFree(page.text)

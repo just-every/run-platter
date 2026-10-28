@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 import { unzipSync } from 'fflate'
 import { PDFDocument } from 'pdf-lib'
 import { canonicalJson, sha256, type Json, type SourceArtifact, type SourceBundle } from '../../modules/import-kit/src/d1/index.ts'
-import { pdfSearchText } from '../documents/pdf-search'
+import { extractText, getDocumentProxy } from 'unpdf'
 import { parseBusinessCsv } from './business-csv'
 import { fail } from './errors'
 
@@ -12,7 +12,7 @@ const normalized = (text: string) => text.trim().replace(/\s+/g, ' ').toLowerCas
 type Pdf = { id: string; sha256: string; filename: string; title: string; client: string; date: string; pages: number;
  signatureEvidence: { kind: string; page: number; text: string }[]; sources: string[]; base64: string }
 type ReportRow = { id: string; source: string; line: number; title: string; client: string; date: string; fields: Record<string,string>; candidates: string[]; selected: string | null }
-export async function documentSource(uploads: UploadedDocument[], choices: Record<string,string>) {
+export async function documentSource(uploads: UploadedDocument[], choices: Record<string,string>, moveinId: string) {
  const artifacts: SourceArtifact[] = [], pdfs = new Map<string,Pdf>(), rows: ReportRow[] = [], seenReports = new Set<string>(), unmapped: string[] = []
  let expanded = 0, duplicateDocuments = 0
  const artifact = (name: string, bytes: Uint8Array) => {
@@ -25,20 +25,20 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
    let pdf
    try { pdf = await PDFDocument.load(bytes) } catch { fail('invalid_pdf',400,'Upload a readable, unencrypted PDF: '+filename) }
    if (!pdf.getPageCount() || pdf.getPageCount()>100) fail('invalid_pdf',400,'PDFs may contain up to 100 pages')
-   const text = await pdfSearchText(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer)
    // Source evidence only. No certificate is represented as cryptographically validated.
-   const { extractText, getDocumentProxy } = await import('unpdf')
    const signatureEvidence: Pdf['signatureEvidence'] = []
-   const proxy = await getDocumentProxy(bytes.slice())
+   let text = ''
+   const proxy = await getDocumentProxy(new Uint8Array(bytes))
    try {
     const pages = await extractText(proxy,{mergePages:false})
+    text = pages.text.join('\n')
     for (const [i,page] of pages.text.entries()) {
      const match = page.match(/certificate of completion|signature certificate|e.?signature certificate|signature page/i)
      if (match) signatureEvidence.push({kind:/certificate/i.test(match[0])?'certificate':'signature-page',page:i+1,text:match[0]})
     }
-   } finally { await proxy.destroy() }
+   } catch { fail('invalid_pdf',400,'The PDF text could not be read: '+filename) } finally { await proxy.destroy() }
    const title = pdf.getTitle()?.trim() || filename.split('/').at(-1)!.replace(/\.pdf$/i,'')
-   const client = text.match(/Client:\s*([^\r\n]+)/i)?.[1]?.trim() || pdf.getSubject()?.trim() || ''
+   const client = text.match(/Client:\s*([^\r\n]+?)(?=\s+(?:Date|Status|Title|Document):|[\r\n]|$)/i)?.[1]?.trim() || pdf.getSubject()?.trim() || ''
    const date = text.match(/Date:\s*(\d{4}-\d{2}-\d{2})/)?.[1] || pdf.getCreationDate()?.toISOString().slice(0,10) || ''
    pdfs.set(hash,{id:hash,sha256:hash,filename,title,client,date,pages:pdf.getPageCount(),signatureEvidence,sources:[source],base64:Buffer.from(bytes).toString('base64')})
    artifact('documents/'+hash+'.pdf',bytes)
@@ -72,7 +72,7 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
  const documents=[...pdfs.values()].sort((a,b)=>a.id.localeCompare(b.id))
  for (const row of rows) {
   row.candidates=documents.filter(p=>normalized(p.title)===normalized(row.title)&&(!p.client||normalized(p.client)===normalized(row.client))&&(!p.date||p.date===row.date)).map(p=>p.id)
-  if (choices[row.id] && choices[row.id]!=='unmapped' && !row.candidates.includes(choices[row.id])) fail('invalid_report_choice',409,'Choose a PDF offered for this report row')
+  if (Object.hasOwn(choices,row.id) && choices[row.id]!=='unmapped' && !row.candidates.includes(choices[row.id])) fail('invalid_report_choice',409,'Choose a PDF offered for this report row')
   row.selected=choices[row.id]==='unmapped'?null:choices[row.id] || (row.candidates.length===1?row.candidates[0]:null)
  }
  if (Object.keys(choices).some(key=>!rows.some(row=>row.id===key))) fail('invalid_report_choice',409,'Preview the current report rows again')
@@ -88,8 +88,8 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
  const source: SourceBundle={artifacts,diagnostics:conflicts.map(r=>({severity:'error',code:'ambiguous_report',message:'Choose a PDF for report row '+r.line,location:{artifact:r.source,row:r.line}})),
   records:documents.map(p=>{
    const {base64,...metadata}=p
-   const value={...metadata,disposition:p.signatureEvidence.length?'retained-agreement':'held-open-document',report:rows.find(r=>r.selected===p.id)?.fields??null}
-   const payload={value,base64}
+   const value={...metadata,moveinId,disposition:p.signatureEvidence.length?'retained-agreement':'held-open-document',report:rows.find(r=>r.selected===p.id)?.fields??null}
+   const payload={value}
    return {namespace:documentNamespace,kind:'documents',sourceId:p.id,payload:payload as unknown as Json,payloadHash:sha256(canonicalJson(payload)),artifactHash:p.sha256,location:{artifact:'documents/'+p.sha256+'.pdf'}}
   })}
  return {source,documents:documents.map(({base64,...p})=>p),report,canApply:conflicts.length===0}

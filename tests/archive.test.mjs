@@ -500,7 +500,8 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   const movein=await applyMovein(h,documentFixture)
   const documentJournal=await h.cmd('document-import.journal',{id:movein.id}),beforeDocuments=(await h.state()).importedDocuments
   const nativeClient=await h.cmd('client.save',{name:'Synthetic retained dependency',email:h.auth.OWNER_EMAIL})
-  const dependency=await h.cmd('proposal.prepare',{clientId:nativeClient.id,title:'Synthetic retained dependency',scope:'Synthetic retained dependency',optionOne:'One',priceOne:'100',optionTwo:'Two',priceTwo:'200',depositPercent:'0'})
+  const dependency=await h.cmd('proposal.prepare',{clientId:nativeClient.id,title:'Synthetic retained dependency',scope:'Synthetic retained dependency',optionOne:'One',priceOne:'100',optionTwo:'Two',priceTwo:'200',depositPercent:'25'})
+  await h.db.prepare('INSERT INTO p_imported_document_links(document_id,proposal_id) VALUES(?,?)').bind(hash(documentFixture.originals[0]),dependency.id).run()
   const before=(await h.state()).businessRecords,journal=await h.cmd('business-import.journal',{id:catalog.job.id})
   const identity={auth:h.auth,owner:h.owner};await h.close();h=null
   const file=join(temporary,'business.rer');await command(source,['export','--output',file,'--no-queue']);await command(restored,['import','--input',file,'--yes','--no-queue'])
@@ -517,7 +518,7 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
    assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)
   }
   const originalId=hash(documentFixture.originals[0])
-  await h.db.prepare('INSERT INTO p_imported_document_links(document_id,proposal_id) VALUES(?,?)').bind(originalId,dependency.id).run()
+  assert.deepEqual(await h.db.prepare('SELECT document_id,proposal_id FROM p_imported_document_links WHERE document_id=?').bind(originalId).first(),{document_id:originalId,proposal_id:dependency.id})
   await h.cmd('document-import.undo',{id:movein.id},cookie,409)
   assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments)
   await h.db.prepare('DELETE FROM p_imported_document_links WHERE document_id=?').bind(originalId).run()

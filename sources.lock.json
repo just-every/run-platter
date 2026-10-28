@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "cfaf8343a0c6a70df70bbe1740cd46a392afbb2ab8e8e88efff3996da81623b8",
+      "sha256": "359804447ce569d2ca99a2be5bb722a92df058f5013a017c3f56856b16111fa9",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "86f53d30ec0ef6c62d18eb13ac7730b6a58852bf90c812538c754bd7a0beb491",
+      "sha256": "69ffabcd94ac86a02b67117d7cf37587646953c390df35e1ec2256a74dc6f006",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "2dc3e6e5accebe3c1da10c3d3aab6a51954412f858fa03b6606fe36a5829bf5d",
+      "sha256": "5ebceef7dce9f461fb07490a7d0ea1301a26a003fc734a89543942a292923b22",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -130,7 +130,7 @@
       "executable": false
     },
     "docs/MOVE-IN.md": {
-      "sha256": "083ca9792ff37d46eff1dc5b6fd40a75b05aeec95e6b80ad6a3e9cb8b247dd71",
+      "sha256": "e2f031f40463bf1b88918d1df1e22f6efab602a9ca348dd9fa11656c056b091c",
       "executable": false
     },
     "docs/notifications.md": {
@@ -550,7 +550,7 @@
       "executable": false
     },
     "migrations/core/0088_document_movein.sql": {
-      "sha256": "98dd353557c4b345be75d1bcb89805c36485a05c22032fe45fb98b0af9b3178c",
+      "sha256": "1ada2f9fead70090f5b1a548f0924571d40180fef13db033f5e2845be9ae9f03",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -658,7 +658,7 @@
       "executable": false
     },
     "public/document-movein.js": {
-      "sha256": "bcd0feecd18b4fed607f5800ea09d72dee4d83e882f07311a181dde8cabc564f",
+      "sha256": "fc15c63e0166af74f7100387170d79f47d8fab65e9277b8c41f9baba00408246",
       "executable": false
     },
     "public/favicon.ico": {
@@ -2574,7 +2574,7 @@
       "executable": false
     },
     "src/platter/http.ts": {
-      "sha256": "069de5acea7e96727aea35b90e0e02be6e7863ee71e929dcfd7a8fedac1476ff",
+      "sha256": "1a2b68ff0b33279443e76db7be96653f5406f59e69b926cbcdeb7d68833fcde7",
       "executable": false
     },
     "src/platter/internal-pricing.ts": {
@@ -2674,15 +2674,15 @@
       "executable": false
     },
     "src/platter/movein/document-import.ts": {
-      "sha256": "052f460629daeba2b9fdb27a9b0a7c88bb1136b5a000c2a39a98e364431dc4a1",
+      "sha256": "7fcb05015709bc5c56b4ab548c0ae6c35eeec2dc58ab6e8a2430a365a7e333fd",
       "executable": false
     },
     "src/platter/movein/document-source.ts": {
-      "sha256": "ae3dfb00d06b16c863b25586fd462c9c1a518046af416a9cd7e8203967a02ab4",
+      "sha256": "c5cb22bd1e1bb34217b8af59b803c07877f299d0bd4e0f5794baa33959190ac7",
       "executable": false
     },
     "src/platter/movein/document-targets.ts": {
-      "sha256": "37ba0c35969d8823227379dae64065b604ae4488b179ae9dc7ae00338af93624",
+      "sha256": "56a15532c98e95fbdc6274106bfb55754395a55a9cae942779983eae3f32d78b",
       "executable": false
     },
     "src/platter/movein/errors.ts": {
@@ -3242,7 +3242,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "1746db99959e8e003119bb8ca945cb0c2a9239884bc595f6884c7e88c9e9f064",
+      "sha256": "462c8b73675cb050cd1159ded757a360bd381451648c18d2d781614c14daa4e7",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3358,7 +3358,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "60f00e85f31c5ba9b53450d0fdec10aaa6c7713a69a66443b88b73c9df032b30",
+      "sha256": "470f6c9e2bd98528aea1aee8bd2cdeef7d1fe251ea6d60c63399894973781b35",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

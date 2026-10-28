@@ -18,7 +18,7 @@ const context=(db:D1Database,actor:Actor):D1ImportContext=>d1RequestContext({
 })
 const mapping:ImportMapping={version:'exported-documents-v1',map(record){
  const payload=record.payload as any
- return {effects:[{targetKind:'documents',targetId:record.sourceId,value:payload.value,attachment:{base64:payload.base64,sha256:record.sourceId,mediaType:'application/pdf'}}]}
+ return {effects:[{targetKind:'documents',targetId:record.sourceId,value:payload.value}]}
 }}
 async function session(db:D1Database,actor:Actor,id:unknown) {
  await documentOwner(db,actor)
@@ -99,12 +99,16 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
     if(name==='document-import.preview'||input.fingerprint!==movein.fingerprint||canonicalJson(selected)!==movein.choices_json)fail('review_fingerprint_mismatch',409,'Continue the exact reviewed import from its history')
     if(movein.job_id)return {id,job:await applyD1ImportBatches(movein.job_id,kit),report:JSON.parse(movein.report_json)}
    }
-   const prepared=await documentSource(await uploaded(db,id),selected)
+   const prepared=await documentSource(await uploaded(db,id),selected,id)
    const plan=await planD1Import(prepared.source,mapping,kit)
    // A second import never replaces an already retained original or its attribution.
    const prior=await db.prepare('SELECT id FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?').bind(documentDestination,actor.id,id).first<any>()
-   const existing=[]
+   const existing:string[]=[]
    if(!prior)for(const p of prepared.documents)if(await db.prepare('SELECT 1 FROM p_imported_documents WHERE id=?').bind(p.id).first())existing.push(p.id)
+   if(existing.length) {
+    prepared.report.held+=existing.length
+    prepared.report.arrived-=prepared.documents.filter(p=>existing.includes(p.id)&&p.signatureEvidence.length).length
+   }
    const canApply=prepared.canApply&&existing.length===0
    if(name==='document-import.preview')return {id,kind:'Document move-in',fingerprint:plan.fingerprint,...prepared,source:undefined,canApply,choices:selected,existing}
    if(input.fingerprint!==plan.fingerprint)fail('review_fingerprint_mismatch',409,'Preview the exact uploaded bytes and report choices again')
@@ -137,16 +141,21 @@ export async function documentMoveinState(db:D1Database,actor:Actor) {
  await documentOwner(db,actor)
  const moves=(await db.prepare('SELECT m.*,j.state,j.checkpoint,j.total FROM p_document_moveins m LEFT JOIN ik_jobs j ON j.id=m.job_id WHERE owner_id=? ORDER BY m.rowid DESC').bind(actor.id).all<any>()).results
  for(const move of moves)move.uploads=(await db.prepare('SELECT sha256,filename,size,received,complete FROM p_document_uploads WHERE movein_id=? ORDER BY rowid').bind(move.id).all()).results
- const documents=(await db.prepare('SELECT data_json FROM p_imported_documents ORDER BY id').all<{data_json:string}>()).results.map(r=>JSON.parse(r.data_json))
+ const documents=(await db.prepare("SELECT d.data_json FROM p_imported_documents d JOIN p_document_moveins m ON m.id=json_extract(d.data_json,'$.moveinId') WHERE m.owner_id=? ORDER BY d.id").bind(actor.id).all<{data_json:string}>()).results.map(r=>JSON.parse(r.data_json))
  return {documentMoveins:moves,importedDocuments:documents}
 }
 export async function importedOriginal(db:D1Database,actor:Actor,query:URLSearchParams) {
  await documentOwner(db,actor)
  let bytes:Buffer,filename='import-original'
  if(query.has('document')){
-  const row=await db.prepare('SELECT data_json,original_base64 FROM p_imported_documents WHERE id=?').bind(query.get('document')).first<any>()
+  const row=await db.prepare('SELECT data_json FROM p_imported_documents WHERE id=?').bind(query.get('document')).first<any>()
   if(!row)fail('original_not_found',404)
-  const data=JSON.parse(row.data_json);bytes=Buffer.from(row.original_base64,'base64')
+  const data=JSON.parse(row.data_json)
+  // Original bytes live once in the import kit's chunked, integrity-checked custody.
+  const journal=await documentImportCommand(db,actor,'document-import.journal',{id:data.moveinId}) as any
+  const file=journal.originals.find((o:any)=>o.name==='documents/'+data.sha256+'.pdf')
+  if(file?.original.status!=='retained')fail('original_not_found',404)
+  bytes=Buffer.from(file.original.base64,'base64')
   if(sha256(bytes)!==data.sha256)fail('original_integrity',409,'Original file integrity check failed')
   filename='retained-document.pdf'
  }else{

@@ -210,7 +210,7 @@ for(const button of document.querySelectorAll('[data-embed-url]'))button.addEven
  function tick(){const now=performance.now();if(visible&&active)totals.set(active,(totals.get(active)||0)+now-previous);previous=now;active=current();}
  function selection(){
   const select=document.querySelector('select[name="optionId"]'),optionId=select?.value||document.querySelector('input[name="optionId"]:checked')?.value||view.dataset.engagementOption;
-  const controls=[...document.querySelectorAll('input[name^="add."]')],items=controls.length?controls.filter(input=>input.checked).map(input=>({id:input.name.slice(4),quantity:Number([...document.querySelectorAll('input[name^="qty."]')].find(q=>q.name==='qty.'+input.name.slice(4))?.value||1)})):JSON.parse(view.dataset.engagementItems);
+  const controls=[...document.querySelectorAll('input[name^="add."]')],renderedOption=select?.form?.querySelector('input[name="itemsOptionId"]')?.value,items=select&&optionId!==renderedOption?[]:controls.length?controls.filter(input=>input.checked).map(input=>({id:input.name.slice(4),quantity:Number([...document.querySelectorAll('input[name^="qty."]')].find(q=>q.name==='qty.'+input.name.slice(4))?.value||1)})):JSON.parse(view.dataset.engagementItems);
   return {optionId,items:items.sort((a,b)=>a.id.localeCompare(b.id))};
  }
  function flush(){

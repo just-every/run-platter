@@ -27,6 +27,32 @@ async function finishSetup(h) {
 
 const mailRows = async h => (await h.db.prepare('SELECT * FROM p_mail ORDER BY created_at, id').all()).results
 
+test('EDIT-017 Spanish invitation and mailbox code retain authored mail and consume localized code transport', async()=>{
+ const sent=[]
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9701'},outboundService:async request=>{sent.push(await request.json());return Response.json({id:'synthetic-platter-'+(9702+sent.length)})}})
+ try{
+  const id=await approved(h)
+  await h.cmd('proposal.locale',{id,version:2,locale:'es'})
+  const invitation=await h.cmd('proposal.send',{id,version:3}),path=new URL(invitation.shareUrl).pathname
+  assert.equal(sent[0].subject,'Su propuesta: '+offer.title)
+  assert.equal(sent[0].text,'Revise su propuesta y verifique su correo electrónico antes de aceptarla:\n'+invitation.shareUrl)
+  assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+  assert.equal(sent[1].subject,'Su código de verificación de Platter')
+  const code=sent[1].text.match(/\b\d{6}\b/)[0]
+  assert.equal(sent[1].text,'Su código de verificación es '+code+'. Caduca en 10 minutos.\nPropuesta: '+offer.title)
+  const verification=await h.send(path+'/action?name=code.verify',{code});assert.equal(verification.status,200,verification.text)
+  assert.equal((await h.db.prepare('SELECT body FROM p_mail WHERE proposal_id=? AND subject=?').bind(id,sent[1].subject).first()).body,'Verification code consumed')
+  assert.equal((await h.send(path+'/action?name=code.verify',{code})).status,401)
+  const second=await approved(h)
+  await h.cmd('proposal.locale',{id:second,version:2,locale:'es'})
+  const subject='Your proposal: escrito por la empresa',message='Review your proposal and verify your email before accepting:\nTexto propio sin traducción.'
+  await h.cmd('proposal.send',{id:second,version:3,mailSubject:subject,mailMessage:message})
+  assert.equal(sent.at(-1).subject,subject);assert.ok(sent.at(-1).text.startsWith(message+'\n\n'))
+  const history=(await h.state()).proposals.find(p=>p.id===second).invitationMessages[0]
+  assert.equal(history.subject,subject);assert.equal(history.message,message)
+ }finally{await h.close()}
+})
+
 test('SEND-006 invitation, fresh link and negotiated send deliver edited text and retain exact link-free history atomically', async()=>{
  const sent=[]
  const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'fake-invitation-edge-key'},outboundService:async request=>{

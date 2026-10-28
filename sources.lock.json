@@ -90,7 +90,7 @@
       "executable": false
     },
     "CHANGELOG.md": {
-      "sha256": "275de80c55ac23644c536f56da01d84cb449611f8eecb356b2fb17699c080885",
+      "sha256": "d81d7a2e145ba47410f411e710be00ae0ef25df508cbc5df4f71da6a3096432e",
       "executable": false
     },
     "composition.lock.json": {
@@ -126,7 +126,7 @@
       "executable": false
     },
     "docs/contract-behavior.md": {
-      "sha256": "89a1e644d2f73ff3fed458cfa3df7137af42991c5ebf4ff341b98438881a4ab6",
+      "sha256": "13183c07bf8dcead483e7934994c6fd36a8f08037c1f01be3bf85ed68d2a3ec5",
       "executable": false
     },
     "docs/contract/COVERAGE.json": {

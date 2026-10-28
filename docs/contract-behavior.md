@@ -354,7 +354,7 @@ Before shipping, extend EDIT-012 duplication assertions to copy every source pay
 
 ## FOLLOW-007
 
-Unattended outcome synchronization under a standing grant is separate from FOLLOW-005's explicit consent to one exact revision, destination and stage field map. The 25 October 2026, 18:40 UTC ct ruling requires this missing row; the current slice grants no standing authority.
+Outcome synchronization beyond FOLLOW-005’s one exact revision, destination and stage field map uses server-computed classes and the company’s policy within the sponsor’s current role and grant. External synchronization carries external; a binding outcome also carries commitment.
 
 ## NEG-001
 

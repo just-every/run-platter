@@ -4039,3 +4039,7 @@ Every agent action is logged with the data it read, what it produced, the model 
 Evidence: `src/platter/http.ts`, `src/platter/credentials.ts`, `tests/platter.test.mjs`
 
 Gap: Agent keys are limited to drafting and are revocable; there is no per-action ledger, source citations, budget or pause control.
+
+## 2026-10-28 — Historical outcome-synchronization wording
+
+Superseded behavior-reference wording before the company-policy rewrite: Unattended outcome synchronization under a standing grant is separate from FOLLOW-005's explicit consent to one exact revision, destination and stage field map. The 25 October 2026, 18:40 UTC ct ruling requires this missing row; the current slice grants no standing authority.

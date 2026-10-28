@@ -42,7 +42,7 @@ Core · published · **partial** · Cites BASE-AGENT-004, BASE-AGENT-005, BASE-A
 
 **Acceptance.**
 1. Create a labelled grant and prepare a proposal attributed to it.
-2. Under a held company policy, price approval waits for the named person and client creation follows its standard rule; under the all-autonomous company policy, each permitted call runs.
+2. Under a held company policy, a commitment-class price approval waits for the named person and client creation follows its standard rule; under the all-autonomous company policy, each permitted call runs.
 3. Revoke the grant and read context again: access is refused.
 
 **Evidence.** `tests/platter.test.mjs`, `src/platter/credentials.ts`
@@ -2054,7 +2054,7 @@ Core · target · **partial** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGEN
 
 **Acceptance.**
 1. From the transcript fixture, every section cites a line, all prices are catalog items, source people are suggested for role slots and template delivery settings are retained.
-2. Under the held company policy, sending waits for the named approver; under all-autonomous policy, permitted sending runs.
+2. Under the held company policy, external and commitment sending waits for the named approver; under all-autonomous policy, permitted sending runs.
 
 **Evidence.** `src/platter/http.ts`, `tests/platter.test.mjs`
 **Gap.** Legacy preparation exists only in part. Complete sourced proposal work and seed-wide risk classification/company-policy execution are not proved; the old implementation boundary is recorded in CHANGELOG.
@@ -2067,7 +2067,7 @@ Core · target · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGEN
 
 **Acceptance.**
 1. Ask to shorten a block: its suggested change is visible.
-2. Under the held company policy, the person accepts the text change; a price-edit request through this text-only action is refused.
+2. Under the held company policy, the person accepts the standard-class text change; a price-edit request through this text-only action is refused.
 
 **Evidence.** None.
 **Gap.** No writing assistant.
@@ -2081,7 +2081,7 @@ Core · target · **partial** · Cites BASE-AGENT-001, BASE-AGENT-002, BASE-AGEN
 **Acceptance.**
 1. Connect, list schemas, search clients/proposals, prepare/revise a draft, and read status and honestly labelled engagement.
 2. Replay a send request for the same grant/proposal/revision: one request is retained and no offer, approval or mail changes before the company policy permits execution.
-3. Under the held policy, sending and binding decisions wait for the named person; under all-autonomous policy, permitted calls run. Revoked credentials and foreign origins are refused.
+3. Under the held policy, external sending and commitment decisions wait for the named person; under all-autonomous policy, permitted calls run. Revoked credentials and foreign origins are refused.
 4. Edit a requested revision: its request becomes stale; dismissal and fulfillment retain their exact revision.
 5. Premature fulfillment and an unauthorized person’s queue decision are refused; tool results exclude invitation credentials.
 6. Use the queue at desktop/phone widths and archive requests and resolutions without credentials.
@@ -2097,7 +2097,7 @@ Core · target · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGEN
 
 **Acceptance.**
 1. From fixture history, the suggested range shows its sample size and three linked examples.
-2. Under the held policy the price remains unchanged until its reviewer applies the suggestion.
+2. Under the held policy, the standard-class price edit remains unchanged until its reviewer applies the suggestion.
 
 **Evidence.** None.
 **Gap.** No price suggestions.
@@ -2153,7 +2153,7 @@ Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 
 **Acceptance.**
 1. The call/email fixture yields two or three packages whose scope lines cite sources and whose prices are catalog items.
-2. An unmatched request is flagged; under the held policy sending waits for the named approver.
+2. An unmatched request is flagged; under the held policy, external and commitment sending waits for the named approver.
 
 **Evidence.** `src/platter/http.ts`, `src/platter/commands.ts`, `tests/platter.test.mjs`
 **Gap.** Legacy preparation exists only in part. Complete sourced proposal work and seed-wide risk classification/company-policy execution are not proved; the old implementation boundary is recorded in CHANGELOG.
@@ -2166,7 +2166,7 @@ Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 
 **Acceptance.**
 1. With projects that overran by 30%, show the expected margin range below the firm’s floor, cite those projects and flag week-three capacity conflict.
-2. Under the held policy prices and dates remain unchanged until the owner applies the suggestion.
+2. Under the held policy, standard-class price and date edits remain unchanged until the owner applies the suggestion.
 
 **Evidence.** None.
 **Gap.** No delivery cost, capacity or outcome data is read.
@@ -2179,7 +2179,7 @@ Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 
 **Acceptance.**
 1. For three questions, one changing price, draft two sourced answers and one revision.
-2. Under the held company policy, the sales owner approves the answers and the named approver the revised offer before sending.
+2. Under the held company policy, the sales owner approves external answers and the named approver decides the external and commitment revised offer before sending.
 3. Each question remains visible until acknowledgement.
 
 **Evidence.** None.
@@ -2193,7 +2193,7 @@ Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 
 **Acceptance.**
 1. Two clients reading different sections produce different sourced follow-ups.
-2. Under the company policy with a two-nudge cap, the third nudge is refused.
+2. Under the company policy with a two-recipient external-nudge cap, the third nudge is refused.
 
 **Evidence.** None.
 **Gap.** No engagement data or follow-up agent.
@@ -2206,7 +2206,7 @@ Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 
 **Acceptance.**
 1. A duplicate invoice, failed ACH and unmatched check produce three exceptions with causes.
-2. Under the held policy, after the owner approves the fixes, reconciliation shows no mismatch and no second invoice exists.
+2. Under the held policy, after the owner approves the money and external fixes, reconciliation shows no mismatch and no second invoice exists.
 
 **Evidence.** `src/platter/invoices.ts`, `tests/platter.test.mjs`
 **Gap.** Legacy preparation exists only in part. Complete sourced proposal work and seed-wide risk classification/company-policy execution are not proved; the old implementation boundary is recorded in CHANGELOG.
@@ -2219,7 +2219,7 @@ Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 
 **Acceptance.**
 1. For forty excluded feature hours in the Gauge fixture, the change order cites the exclusion and hours.
-2. Under the held policy, the delivery lead confirms scope and the named approver decides the offer; the client accepts and pays it.
+2. Under the held policy, the delivery lead confirms the commitment-class scope and the named approver decides the external and commitment offer; the client accepts and pays it.
 3. The original agreement and history stay byte-identical.
 
 **Evidence.** None.
@@ -2233,7 +2233,7 @@ Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 
 **Acceptance.**
 1. From 200 decided proposals where three packages win more often, show the proposed template change and its sample size.
-2. Under the held policy the template stays unchanged until the admin accepts it.
+2. Under the held policy, the standard-class template change waits until the admin accepts it.
 
 **Evidence.** None.
 **Gap.** No outcome analysis.
@@ -2246,7 +2246,7 @@ Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 
 **Acceptance.**
 1. A retainer using 20% more hours yields a sourced larger renewal package.
-2. Under the held company policy the renewal waits for its named approver.
+2. Under the held company policy, the commitment-class renewal waits for its named approver.
 
 **Evidence.** None.
 **Gap.** No renewal agent.

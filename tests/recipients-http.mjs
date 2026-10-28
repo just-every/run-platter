@@ -20,6 +20,7 @@ export async function verifyRecipient(h,path){
  const share=await h.db.prepare('SELECT proposal_id,recipient FROM p_shares WHERE token=?').bind(path.split('/').at(-1)).first()
  const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND recipient=? AND subject='Your Platter verification code' ORDER BY rowid DESC LIMIT 1").bind(share.proposal_id,share.recipient).first()).body.match(/\b\d{6}\b/)[0]
  const r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,200,r.text)
+ assert.equal((await h.send(path+'/action?name=code.verify',{code})).status,401,'a consumed mailbox code cannot create another session')
  return r.cookie
 }
 export const decision=(h,path,cookie,optionId='one',name='accept',fields={})=>h.send(path+'/action?name='+name,{name:'Synthetic signer',optionId,consent:true,...fields},cookie)
@@ -110,6 +111,11 @@ export async function recipientRolesHttp(h){
   assert.equal((await h.send(path+'/data.json')).status,401)
   sessions[id]=await verifyRecipient(h,path)
   assert.equal((await h.send(path+'/data.json',undefined,sessions[id])).status,200)
+ }
+ for(const [id,path] of Object.entries(p.links))for(const other of Object.keys(p.links).filter(other=>other!==id)){
+  const refused=await h.send(path+'/data.json',undefined,sessions[other])
+  assert.equal(refused.status,401,other+' cannot read '+id+' with a different recipient session')
+  assert.ok(!refused.text.includes(p.offer.title))
  }
  const shareRow=(await h.state()).proposals.find(r=>r.id===p.id),mailBefore=(await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n
  await h.cmd('recipient.share',{id:p.id,version:shareRow.version,recipientName:'Shared viewer',recipientEmail:address(1006),embedOrigin:h.origin},h.owner,400)
@@ -211,24 +217,46 @@ export async function recipientRolesHttp(h){
  assert.deepEqual(agreement.acceptance.fieldValues,{'ceo-detail':'synthetic-platter-2001','cfo-detail':'synthetic-platter-2002'})
 }
 export async function recipientWithdrawalHttp(h){
- const p=await recipientFixture(h,'Partly signed withdrawal',[...roles(h.auth.OWNER_EMAIL),{id:'viewer',name:'Viewer',email:address(1004),role:'viewer',group:1}])
+ const p=await recipientFixture(h,'Partly signed withdrawal',[...roles(h.auth.OWNER_EMAIL),
+  {id:'finance',name:'CFO approver',email:address(1003),role:'approver',group:1},
+  {id:'viewer',name:'Viewer',email:address(1004),role:'viewer',group:1},
+  {id:'cc',name:'CC',email:address(1005),role:'cc',group:1},
+ ])
  const sharingRow=(await h.state()).proposals.find(r=>r.id===p.id)
  const shared=await h.cmd('recipient.share',{id:p.id,version:sharingRow.version,recipientName:'Shared viewer',recipientEmail:address(1006),embedOrigin:h.origin,shareConsent:true})
  p.links.shared=new URL(shared.shareUrl).pathname
- const cookie=await verifyRecipient(h,p.links.ceo)
+ const sessions={}
+ for(const [id,path] of Object.entries(p.links))sessions[id]=await verifyRecipient(h,path)
+ const cookie=sessions.ceo
  assert.equal((await decision(h,p.links.ceo,cookie)).status,200)
  const before=(await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(p.id).all()).results
  const row=(await h.state()).proposals.find(r=>r.id===p.id)
  await h.cmd('proposal.withdraw',{id:p.id,version:row.version,reason:'Offer withdrawn',notice:true})
  const mail=(await h.db.prepare("SELECT recipient FROM p_mail WHERE proposal_id=? AND subject LIKE 'Proposal withdrawn:%'").bind(p.id).all()).results
- assert.deepEqual(mail.map(r=>r.recipient).sort(),[...roles(h.auth.OWNER_EMAIL).map(r=>r.email),address(1004),address(1006)].sort())
+ assert.deepEqual(mail.map(r=>r.recipient).sort(),[address(1001),address(1002),h.auth.OWNER_EMAIL,address(1003),address(1004),address(1005),address(1006)].sort())
  assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(p.id).all()).results,before)
  assert.ok((await h.db.prepare('SELECT voided_at FROM p_void_signatures WHERE proposal_id=? AND revision=?').bind(p.id,p.revision).first()).voided_at)
- for(const path of Object.values(p.links))for(const door of ['', '/data.json','/download.pdf?optionId=one','/agreement.pdf','/certificate.json','/certificate.pdf','/payment.json','/payment-status.json','/payment-consent.json','/action?name=accept','/action?name=code.request','/action?name=code.verify','/attachments/synthetic-platter-1','/media/synthetic-platter-1']){
-  const r=await h.send(path+door,door.includes('/action')||door.includes('/payment')?{code:'123456',consent:true,optionId:'one',name:'Signer'}:undefined,cookie)
-  assert.equal(r.status,410,door);for(const content of [p.offer.title,p.offer.scope,p.offer.optionOne,'2500'])assert.ok(!r.text.includes(content),door+' leaks no proposal')
+ for(const [id,path] of Object.entries(p.links))for(const door of ['', '/data.json','/download.pdf?optionId=one','/agreement.pdf','/certificate.json','/certificate.pdf','/payment.json','/payment-status.json','/payment-consent.json','/action?name=accept','/action?name=recipient.approve','/action?name=code.request','/action?name=code.verify','/attachments/synthetic-platter-1','/media/synthetic-platter-1']){
+  const r=await h.send(path+door,door.includes('/action')||door.includes('/payment')?{code:'123456',consent:true,optionId:'one',name:'Signer'}:undefined,sessions[id])
+  assert.equal(r.status,410,id+' '+door);for(const content of [p.offer.title,p.offer.scope,p.offer.optionOne,'2500'])assert.ok(!r.text.includes(content),door+' leaks no proposal')
  }
  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).n,0)
+ const withdrawn=(await h.state()).proposals.find(r=>r.id===p.id)
+ const revised=await h.cmd('proposal.negotiate',{...p.offer,id:p.id,version:withdrawn.version,scope:'Corrected leadership agreement.'})
+ await h.cmd('proposal.send',{id:p.id,version:revised.version},h.owner,409)
+ await h.cmd('proposal.approve',{id:p.id,version:revised.version,revision:revised.revision})
+ const reissued=await h.cmd('proposal.send',{id:p.id,version:revised.version+1})
+ assert.deepEqual(reissued.recipients.map(r=>r.id).sort(),Object.keys(p.links).filter(id=>id!=='shared').concat(shared.recipientId).sort())
+ for(const invitation of reissued.recipients){
+  const path=new URL(invitation.shareUrl).pathname
+  assert.ok(!Object.values(p.links).includes(path),'reissue creates a fresh link for every recipient')
+  const oldId=invitation.id===shared.recipientId?'shared':invitation.id
+  assert.equal((await h.send(path+'/data.json',undefined,sessions[oldId])).status,401,'old recipient sessions confer no reissued authority')
+  const fresh=await verifyRecipient(h,path)
+  assert.equal((await h.send(path+'/data.json',undefined,fresh)).value.scope,'Corrected leadership agreement.')
+  assert.equal((await h.send(p.links[oldId]+'/data.json',undefined,sessions[oldId])).status,410,'reissue never revives a withdrawn link')
+ }
+ assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(p.id).all()).results,before,'reissue retains the earlier void signature')
 }
 export async function recipientExpiryHttp(h){
  const worker=await h.mf.getWorker(),fire=async at=>worker.scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})

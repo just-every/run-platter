@@ -1,4 +1,5 @@
 import { fillVariables } from './variables'
+import { currentTime } from '../expiry-time'
 import type { Bindings } from '../../auth.server'
 import { principal } from '../credentials'
 import { commit,hash,need,secret,text,type Actor } from '../model'
@@ -19,7 +20,12 @@ async function keys(env:Bindings,a:Actor,p:Record<string,unknown>){
  await commit(env.DB,a,[env.DB.prepare("INSERT INTO p_agent_keys(id,owner_id,owner_version,label,token_hash,created_at,expires_at) SELECT ?,id,version,?,?,?,? FROM oa_operators WHERE id=? AND role='owner' AND status='active'").bind(id,text(p.label,'a key label',80),await hash(token),at,expiresAt,a.id),env.DB.prepare('INSERT INTO p_rest_keys VALUES(?,?)').bind(id,JSON.stringify(p.scopes))],true)
  await recordAudit(env.DB,a,'api-key.create',id);return {id,token,scopes:p.scopes,expiresAt}
 }
-const proposals=async(env:Bindings)=> (await env.DB.prepare('SELECT id,title,revision,version,status,currency FROM p_proposals ORDER BY created_at,id').all()).results
+// Withdrawal and expiry are retained separately from the frozen offer.
+const proposalQuery=`SELECT p.id,p.title,p.revision,p.version,
+ CASE WHEN EXISTS(SELECT 1 FROM p_withdrawals w WHERE w.proposal_id=p.id AND w.revision=p.revision) THEN 'withdrawn'
+ WHEN p.status='sent' AND EXISTS(SELECT 1 FROM p_expiry ex WHERE ex.proposal_id=p.id AND ex.deadline_at<=?) THEN 'expired'
+ ELSE p.status END AS status,p.currency FROM p_proposals p`
+const proposals=async(env:Bindings)=> (await env.DB.prepare(proposalQuery+' ORDER BY p.created_at,p.id').bind(await currentTime(env.DB)).all()).results
 export const routes:Route[]=[
  {method:'GET',path:'/openapi.json',scope:'public',summary:'OpenAPI description',handle:async()=>description()},
  {method:'GET',path:'/reference',scope:'public',summary:'API reference',handle:async()=>null},
@@ -30,7 +36,7 @@ export const routes:Route[]=[
  {method:'POST',path:'/proposals',scope:'proposals.write',summary:'Create a draft from a template; a person approves and sends',handle:async c=>{need(c.p.templateId!==undefined,'Choose a template');const result=await command(c.env,c.actor,'proposal.prepare',c.p);await recordAudit(c.env.DB,c.actor,'api.proposal.prepare',result.id);return result}},
  {method:'POST',path:'/proposals/{id}/variables',scope:'proposals.write',summary:'Fill draft template variables in a new revision',handle:async c=>{const result=await fillVariables(c.env,c.actor,c.id,c.p);await recordAudit(c.env.DB,c.actor,'api.proposal.variables',c.id);return result}},
  {method:'GET',path:'/proposals',scope:'proposals.read',summary:'Read proposal status',handle:async c=>proposals(c.env)},
- {method:'GET',path:'/analytics',scope:'analytics.read',summary:'Read counts by proposal status',handle:async c=>(await c.env.DB.prepare('SELECT status,count(*) AS count FROM p_proposals GROUP BY status ORDER BY status').all()).results},
+ {method:'GET',path:'/analytics',scope:'analytics.read',summary:'Read counts by proposal status',handle:async c=>(await c.env.DB.prepare('SELECT status,count(*) AS count FROM ('+proposalQuery+') GROUP BY status ORDER BY status').bind(await currentTime(c.env.DB)).all()).results},
  {method:'GET',path:'/payments',scope:'payments.read',summary:'Read recorded payment status',handle:async c=>(await c.env.DB.prepare('SELECT id,proposal_id AS proposalId,cents AS amountCents,currency,method,received_on AS receivedOn FROM p_payment_records ORDER BY id').all()).results},
  {method:'GET',path:'/agreements',scope:'agreements.read',summary:'List retained agreements',handle:async c=>(await c.env.DB.prepare('SELECT proposal_id AS id,revision,total_cents AS totalCents,currency,accepted_at AS acceptedAt FROM p_acceptances ORDER BY accepted_at,proposal_id').all()).results},
  {method:'POST',path:'/webhooks',scope:'session:owner',summary:'Authorize a destination and receive its signing secret once',handle:async c=>webhookCreate(c.env,c.actor,c.p)},

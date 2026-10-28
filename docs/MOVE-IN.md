@@ -3,6 +3,46 @@
 Bring an existing client list into Platter with a reviewed CSV import. Open
 **Import** in your installed app as the owner.
 
+## Exported documents and report CSVs (`MIG-007`)
+
+Use **Move in exported documents** on Import. Name a move-in, then add PDF files,
+bulk ZIP downloads and report CSVs to it. You can return after signing in again:
+select an interrupted file and **Upload or resume files** continues from its
+saved byte offset. Repeated uploads of the same bytes are reused. Files are
+limited to 5 MiB each and 20 MiB per move-in; ZIPs retain their original paths as
+source evidence and allow up to 600 entries with 20 MiB expanded in total.
+
+Report CSVs use **Title, Client, Date** columns, with dates in YYYY-MM-DD form.
+The equivalent Document name, Client name and Created date headers are accepted.
+All additional columns, such as status and value, remain source metadata.
+PDF titles use their recorded title or filename. Recorded client and date
+metadata narrow matches when present. Ambiguous rows need an explicit PDF choice
+or **Leave this row unmapped**, followed by **Review report matches**.
+
+The preview reports arrived agreements, items held for review, unmapped items
+and duplicate PDFs. Certificate and signature-page text is recorded with its
+source page; this recognition does not validate a signature. Completed files
+are retained as read-only agreements. PDFs without that evidence remain
+read-only open documents held for review. Every original download is
+byte-identical, with its SHA-256 available under source evidence.
+
+**Apply reviewed document move-in** binds all uploaded bytes and report choices.
+Adding a file or changing a choice needs a fresh preview. After apply, the
+move-in is frozen; use another move-in for more files. A later import holds
+already retained documents rather than replacing them. The journal retains
+original ZIPs, PDFs, report files, reviewed choices and each native change.
+**Undo document move-in** removes unchanged imported documents and refuses while
+a dependent proposal uses an original. Completed imports, exact originals,
+reports, journals and working undo survive RER archives; staged upload transport
+is local and is not restored.
+
+This slice creates no client invitations, editable templates, native folders,
+catalog items, contacts, payments or provider actions. Open-document reissue,
+combined template and library conversion, catalog and contact integration,
+provider enrichment and qualification of every incumbent's exports remain
+unfinished. CSV image handling keeps the existing explicit failure and owner
+choice to apply without images.
+
 ## Companies, contacts and catalog (`MIG-006`)
 
 Use **Move in companies, contacts and catalog** on Import. Choose the record

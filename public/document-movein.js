@@ -11,6 +11,7 @@ for (const form of document.querySelectorAll('[data-document-upload]')) {
   button.disabled=true
   try {
    for(const file of form.elements.files.files) {
+    if(!file.size||file.size>5*1024*1024)throw Error('Choose files up to 5 MiB each.')
     const bytes=new Uint8Array(await file.arrayBuffer())
     const sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('')
     const upload=await command('upload-start',{filename:file.name,size:bytes.length,sha256})

@@ -15,7 +15,7 @@ CREATE TABLE p_document_upload_chunks (
  FOREIGN KEY(movein_id,sha256) REFERENCES p_document_uploads(movein_id,sha256)
 );
 CREATE TABLE p_imported_documents (
- id TEXT PRIMARY KEY, data_json TEXT NOT NULL, original_base64 TEXT NOT NULL,
+ id TEXT PRIMARY KEY, data_json TEXT NOT NULL,
  revision TEXT NOT NULL
 );
 -- A later reissue keeps its original alive until that dependency is removed.

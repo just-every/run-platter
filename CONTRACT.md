@@ -1176,7 +1176,7 @@ For every incumbent, a buyer without API access moves in from the files the incu
 
 *Acceptance:* Import three zips in two sessions with an interrupted upload between them and one PDF present in two zips: there is one agreement per document and nothing is duplicated; an ambiguous report row is held for review until the buyer picks its PDF; the report's counts of arrived, held and unmapped items match the fixture; undo removes everything the import wrote.
 
-*Status:* missing. No document import; only the client CSV kit exists.
+*Status:* partial. Owner-only exported document move-in retains exact PDFs and source evidence, resumes uploads, reviews report matches, and journals reversible imports. The complete incumbent move-in remains unfinished.
 
 ### Mobile
 
@@ -1419,8 +1419,8 @@ Judged from the code and tests at commit `56c6fb72f04a58cdc5d169af6fd59b0996a374
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 41 | 40 | 48 | 129 |
-| All | 53 | 40 | 48 | 141 |
+| Target and push further | 41 | 41 | 47 | 129 |
+| All | 53 | 41 | 47 | 141 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1546,7 +1546,7 @@ Judged from the code and tests at commit `56c6fb72f04a58cdc5d169af6fd59b0996a374
 | `MIG-004` | Qwilr and Ignition move-in | target | missing |  | No Qwilr or Ignition import. |
 | `MIG-005` | Open proposals and payment schedules continue | target | missing |  | No in-flight migration. |
 | `MIG-006` | Clients, contacts and catalog CSV move-in | target | partial | `src/platter/movein/business-import.ts`, `src/platter/business-records.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs` | image URLs fetched through Base's egress relay |
-| `MIG-007` | Move-in from exported files without API access | target | missing |  | No document import; only the client CSV kit exists. |
+| `MIG-007` | Move-in from exported files without API access | target | partial | `tests/platter.test.mjs` — “MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo” (three ZIPs across two sign-ins, interrupted upload, content hashes, certificate and signature-page source evidence, exact original downloads, report matching, changed-byte and choice refusals, duplicate conflicts, current owner authority and dependent undo); `tests/site.test.mjs` loads `tests/site-documents.mjs` — “MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in” (compiled upload, review, journal and undo at 1440, browser proof at 1440 and 390); `tests/archive.test.mjs` — “MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody” (restored exact originals, SHA-256, report, provenance and dependency-safe undo). | The document and report-CSV slice uses the conservative current-owner-only authority floor under the standing scope policy; scoped delegation and provider boundaries remain unqualified. Signature certificates and pages are recognized only as supplied source evidence, not cryptographically validated signatures. Open documents are held read-only: open-document reissue, editable template and library conversion in this combined move-in, native folder creation, catalog and contact integration, provider enrichment and complete qualification for every incumbent export remain. Existing documents are held rather than replaced by a later import. Image acquisition still requires the qualified Base image-GET egress door with validated public address pinning, original-host TLS, no redirects and the required 5-MiB image and 20-MiB batch bounds; the recorded POST-only 64-KiB relay does not qualify. Explicit image failure and apply without images remain in MIG-006. EDIT-013 prerequisites remain unchanged. No live-provider, full migration or DONE claim. |
 | `MOB-001` | Team app on a phone | target | done | `tests/site.test.mjs` — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” (sales templates/send/answer/follow-up/reuse, manager approval and sales 403, at 390/1440) | tests/site.test.mjs — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” completes template creation, sales sending, a verified client question and sales answer, sales follow-up management, personal-template reuse, manager approval and the sales approval refusal (403), at both 390 and 1440 pixels. All acceptance actions are proven through the compiled production routes. |
 | `MOB-002` | iOS and Android apps with push notifications | target | missing |  | No native apps or push. |
 | `AI-001` | Drafts from meeting notes, transcripts and email | target | partial | `src/platter/http.ts`, `tests/platter.test.mjs` | External agents can post structured drafts; there is no ingestion of notes, transcripts or email and no in-product drafting. |

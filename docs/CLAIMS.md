@@ -100,17 +100,15 @@ Evidence: `tests/platter.test.mjs`, `tests/platter.test.mjs`, `tests/site.test.m
 
 Status: **partial**.
 
-Gap: Native client fields, custom values and explicitly chosen HubSpot or Salesforce deals fill text and prices; missing values refuse send and sent values stay frozen. Destination copies and template recipient roles refill independently. Variable-conditioned blocks exclude private source patterns from client JSON. Remaining: Orbit contact refill requires its scoped contact API, which the current Orbit public API does not expose; inherited PDF and archive proof and phone browser proof remain. Connected deal reads use the conservative owner or admin authority floor.
+Gap: Orbit refill requires its scoped contact-read API and a reference instance; the current Orbit public API exposes deal fields but no contact-read door. Connected-deal reads use the conservative owner or admin floor under the standing scope rule; scoped delegation and the Orbit provider boundary remain unproved. No full CRM qualification is claimed.
 
-Evidence: `tests/platter.test.mjs`
+Evidence: `tests/platter.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 
 ## EDIT-005 — Word and PDF import and export
 
-Status: **partial**.
+Status: **done**.
 
-Gap: Word uploads create editable headings, text, lists, text tables and embedded images; merge tokens and quote rows map with unmatched and missing-image reports. Heading 1 sections import as library items, with rich sections retaining media and pricing for independent detached insertion. Fixed PDF originals retain exact bytes, support positioned signature, initials, date and text fields, appended pricing and frozen payment schedules. Word and US Letter or A4 PDF exports retain editable blocks, pricing and images. Remaining: complete fixed-page Word export, inherited archive and conditional-carrier proof and phone browser proof. Imported rich library sections currently insert only as detached copies.
-
-Evidence: `tests/platter.test.mjs`
+Evidence: `tests/platter.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 
 ## EDIT-006 — Embedded rich media
 

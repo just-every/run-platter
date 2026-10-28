@@ -332,11 +332,9 @@ Evidence: `src/platter/delivery.ts`, `src/platter/ui/delivery.ts`, `tests/mail.t
 
 ## SEND-003 — Recipients, roles and sharing
 
-Status: **partial**.
+Status: **done**.
 
-Gap: Policy default adopted under the standing scope rule, pending ct approval: the current owner alone manages recipient roles, explicitly sends invitations or creates additional mailbox-bound viewing links, and authorizes an exact framing origin. Stakeholder conversion, copies and restores never invite anyone automatically or restore invitation authority. Scoped delegation and provider boundaries remain unapproved; the full template-role management duties remain with SIGN-011. SEND-003 stays PARTIAL pending ct approval of this default.
-
-Evidence: `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+Evidence: `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`, `tests/platter.test.mjs`
 
 ## SEND-004 — Expiry and reopening
 

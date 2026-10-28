@@ -2761,7 +2761,10 @@ test('TRACK-003 forwarded viewers verify their own mailbox before owner conversi
  assert.equal((await h.send(path+'/stakeholder',{challengeId,code})).status,401,'code is single use')
  const data=(await h.send('/api/platter/engagement?id='+p.id,undefined,h.owner)).value,person=data.stakeholders[0]
  assert.equal(person.name,'Riley Procurement');assert.equal(person.email,'riley@synthetic-platter.example');assert.equal(person.role,'stakeholder')
+ const beforeConversion=(await h.state()).outbox,invitationCount=(await h.db.prepare('SELECT count(*) n FROM p_shares WHERE proposal_id=?').bind(p.id).first()).n
  await h.cmd('tracking.recipient',{id:p.id,stakeholderId:person.id,consent:'yes'})
+ assert.deepEqual((await h.state()).outbox,beforeConversion,'stakeholder conversion sends no automatic invitation')
+ assert.equal((await h.db.prepare('SELECT count(*) n FROM p_shares WHERE proposal_id=?').bind(p.id).first()).n,invitationCount,'stakeholder conversion creates no invitation authority')
  assert.equal((await h.send('/api/platter/engagement?id='+p.id,undefined,h.owner)).value.stakeholders[0].role,'approver')
  assert.equal((await h.send(path+'/action?name=accept',{name:'Riley Procurement',optionId:'one',consent:true})).status,401)
  assert.equal((await h.state()).proposals.find(row=>row.id===p.id).acceptance,undefined)
@@ -2998,6 +3001,6 @@ describe('AUTO-004 independently documented authority',()=>{
 
 test('SIGN-004 sequential and parallel recipient groups complete only after every signature',async()=>{
  const h=await harness({assetsDirectory:'public'})
- try{const {signingOrderHttp}=await import('./recipients-http.mjs');await signingOrderHttp(h)}finally{await h.close()}
+ try{const {signingOrderHttp,ownershipHandoffHttp}=await import('./recipients-http.mjs');await signingOrderHttp(h);await ownershipHandoffHttp(h)}finally{await h.close()}
 })
 test('SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP',()=>run(async h=>{const {recipientRolesHttp}=await import('./recipients-http.mjs');await recipientRolesHttp(h)}))

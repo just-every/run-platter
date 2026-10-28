@@ -97,6 +97,41 @@ export async function signingOrderHttp(h){
  assert.deepEqual(completion.map(r=>r.recipient).sort(),[address(1001),address(1011),h.auth.OWNER_EMAIL].sort())
 
 }
+
+export async function ownershipHandoffHttp(h){
+ // A verified countersignature link does not retain the former owner's authority.
+ const handoff=await recipientFixture(h,'Ownership changes before countersignature',roles(h.auth.OWNER_EMAIL)),handoffSessions={}
+ for(const [id,path] of Object.entries(handoff.links))handoffSessions[id]=await verifyRecipient(h,path)
+ assert.equal((await decision(h,handoff.links.ceo,handoffSessions.ceo)).status,200)
+ assert.equal((await decision(h,handoff.links.cfo,handoffSessions.cfo)).status,200)
+ const oldOwner=(await h.state()).actor,successorEmail=address(1020)
+ assert.equal((await h.send('/auth/invite',{email:successorEmail,displayName:'Successor owner',role:'admin',returnTo:'/app'},h.owner)).status,202)
+ const successorAdmin=await h.signIn(successorEmail),successorId=(await h.state(successorAdmin)).actor.id
+ const freshOwner=await h.signIn(oldOwner.email)
+ assert.equal((await h.send('/auth/operator/role',{operatorId:successorId,role:'owner'},freshOwner)).status,200)
+ const successor=await h.signIn(successorEmail)
+ assert.equal((await h.send('/auth/operator/role',{operatorId:oldOwner.id,role:'admin'},successor)).status,200)
+ const beforeHandoff=await h.state(successor)
+ const retained=(await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=? ORDER BY slot_id').bind(handoff.id).all()).results
+ const denied=await decision(h,handoff.links.owner,handoffSessions.owner)
+ assert.equal(denied.status,403,denied.text)
+ assert.match(denied.text,/Only the current owner countersigns/)
+ assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=? ORDER BY slot_id').bind(handoff.id).all()).results,retained)
+ assert.equal((await h.db.prepare('SELECT count(*) n FROM p_acceptances WHERE proposal_id=?').bind(handoff.id).first()).n,0,'former owner cannot finish the agreement')
+ const awaiting=beforeHandoff.proposals.find(r=>r.id===handoff.id)
+ assert.equal(awaiting.status,'sent')
+ const replacementOwner=await h.cmd('signer.replace',{id:handoff.id,version:awaiting.version,recipientId:'owner',recipient:successorEmail,reason:'Ownership handoff'},successor)
+ const currentOwnerPath=new URL(replacementOwner.shareUrl).pathname
+ assert.equal((await h.send(handoff.links.owner+'/data.json',undefined,handoffSessions.owner)).status,410)
+ assert.equal((await decision(h,currentOwnerPath,handoffSessions.owner)).status,401,'former owner verification cannot authorize the successor')
+ const currentOwnerSession=await verifyRecipient(h,currentOwnerPath)
+ assert.equal((await decision(h,currentOwnerPath,currentOwnerSession)).status,200)
+ assert.equal((await h.state(successor)).proposals.find(r=>r.id===handoff.id).status,'accepted')
+ assert.deepEqual((await h.db.prepare('SELECT slot_id,email FROM p_recipient_signatures WHERE proposal_id=? ORDER BY slot_id').bind(handoff.id).all()).results,[{slot_id:'ceo',email:address(1001)},{slot_id:'cfo',email:address(1002)},{slot_id:'owner',email:successorEmail}])
+ const handoffMail=(await h.db.prepare("SELECT recipient FROM p_mail WHERE proposal_id=? AND subject LIKE 'Agreement complete:%'").bind(handoff.id).all()).results
+ assert.deepEqual(handoffMail.map(r=>r.recipient).sort(),[address(1001),address(1002),successorEmail].sort())
+
+}
 export async function recipientRolesHttp(h){
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
 
@@ -119,10 +154,15 @@ export async function recipientRolesHttp(h){
  }
  const shareRow=(await h.state()).proposals.find(r=>r.id===p.id),mailBefore=(await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n
  await h.cmd('recipient.share',{id:p.id,version:shareRow.version,recipientName:'Shared viewer',recipientEmail:address(1006),embedOrigin:h.origin},h.owner,400)
+ for(const embedOrigin of ['https://synthetic-platter.example/path','https://*.synthetic-platter.example']){
+  const before=await h.state()
+  await h.cmd('recipient.share',{id:p.id,version:shareRow.version,recipientName:'Refused framing',recipientEmail:address(4004),embedOrigin,shareConsent:true},h.owner,400)
+  assert.deepEqual(await h.state(),before,'an inexact framing origin creates no viewing authority')
+ }
  const shared=await h.cmd('recipient.share',{id:p.id,version:shareRow.version,recipientName:'Shared viewer',recipientEmail:address(1006),embedOrigin:h.origin,shareConsent:true})
  const sharedPath=new URL(shared.shareUrl).pathname
  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n,mailBefore,'sharing does not send an automatic invitation')
- const embedded=await h.send(sharedPath+'?embed=1');assert.equal(embedded.status,200);assert.ok(embedded.headers.get('content-security-policy').includes('frame-ancestors '+h.origin));assert.ok(!embedded.text.includes(p.offer.title))
+ const embedded=await h.send(sharedPath+'?embed=1');assert.equal(embedded.status,200);assert.equal(embedded.headers.get('content-security-policy').split(';').map(directive=>directive.trim()).find(directive=>directive.startsWith('frame-ancestors ')),'frame-ancestors '+h.origin);assert.ok(!embedded.text.includes(p.offer.title))
  for(const suffix of ['/data.json','/attachments/synthetic-platter-1','/media/synthetic-platter-1'])assert.equal((await h.send(sharedPath+suffix)).status,401)
  const sharedCookie=await verifyRecipient(h,sharedPath)
  assert.ok((await h.send(sharedPath+'?embed=1',undefined,sharedCookie)).text.includes(p.offer.title))
@@ -198,6 +238,14 @@ export async function recipientRolesHttp(h){
  assert.equal((await h.send(viewerInvitation+'/data.json',undefined,authorityViewer)).status,200,'refused revocation leaves the owner invitation intact')
  await h.cmd('recipient.remove',{id:authority.id,version:sentAuthority.version,recipientId:'viewer'})
  assert.equal((await h.send(viewerInvitation+'/data.json',undefined,authorityViewer)).status,410,'the owner revokes the same invitation')
+ const original=(await h.state()).proposals.find(row=>row.id===authority.id)
+ const duplicate=await h.cmd('proposal.duplicate',{id:authority.id,version:original.version,clientId:p.offer.clientId})
+ const copiedAuthority=(await h.state()).proposals.find(row=>row.id===duplicate.id)
+ assert.deepEqual(JSON.parse(copiedAuthority.recipient_plan),[{...plan[0],email:null}],'a duplicate copies the role without mailbox authority')
+ assert.equal((await h.db.prepare('SELECT count(*) n FROM p_shares WHERE proposal_id=?').bind(duplicate.id).first()).n,0)
+ assert.equal((await h.db.prepare('SELECT count(*) n FROM p_mail WHERE proposal_id=?').bind(duplicate.id).first()).n,0)
+ await h.cmd('proposal.approve',{id:duplicate.id,version:copiedAuthority.version,revision:copiedAuthority.revision})
+ await h.cmd('proposal.send',{id:duplicate.id,version:copiedAuthority.version+1},h.owner,409)
  for(const missingRole of ['signer','approver','countersigner']){
   const blank=await h.cmd('proposal.prepare',{...p.offer,title:'Unfilled '+missingRole})
   const plan=[...roles(h.auth.OWNER_EMAIL),{id:'finance',name:'Finance approval',email:address(1003),role:'approver',group:1}].map(r=>r.role===missingRole?{...r,email:null}:r)

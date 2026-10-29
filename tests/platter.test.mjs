@@ -3715,7 +3715,7 @@ test('AGENT-009 consented receipts, human records and pause protect every existi
   assert.equal((await restBudgetInFlight).status,409);assert.deepEqual((await h.state()).proposals,unchangedBudget)
   await h.cmd('agent.budget',{id:budgetKey.id,version:5,budget:''})
   arm()
-  const mcpBudgetInFlight=h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'prepare_proposal',arguments:{...offer,depositPercent:25,clientId:client.id}}},'',{...budgetAuth,'x-test-agent-commit':'hold'})
+  const mcpBudgetInFlight=h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:2,method:'tools'+'/call',params:{name:'prepare_proposal',arguments:{...offer,depositPercent:25,clientId:client.id}}},'',{...budgetAuth,'x-test-agent-commit':'hold'})
   await barrier;await h.cmd('agent.budget',{id:budgetKey.id,version:6,budget:'25',consent:true});release()
   const mcpBudgetRefused=await mcpBudgetInFlight;assert.equal(mcpBudgetRefused.value.result.isError,true);assert.match(mcpBudgetRefused.value.result.content[0].text,/409/)
   assert.deepEqual((await h.state()).proposals,unchangedBudget)

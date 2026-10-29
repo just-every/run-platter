@@ -294,6 +294,10 @@ test('AI-003 desktop and phone owners review MCP requests, approve and send expl
      assert.equal(budgetRefusal.status(),409);assert.match(await budgetRefusal.text(),/not independently recorded/)
     }
     await capture('agent-model-budget')
+    await page.goto(app.origin+'/app/access')
+    if(width===1440)assert.match(await page.locator('section').filter({has:page.getByRole('heading',{name:'Agent keys',exact:true})}).innerText(),/Budget held/i)
+    await capture('agent-budget-held-key')
+    await page.goto(app.origin+'/app/settings#agent-controls')
     await controls().getByLabel('Monthly model budget (USD)',{exact:true}).fill('')
     await controls().getByRole('button',{name:'Save model budget',exact:true}).click()
     await rpc('ping')

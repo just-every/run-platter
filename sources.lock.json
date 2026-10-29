@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "12b444b660085e040eed0ae1124c8796f36a1af60f331ea23fd58fa065670688",
+      "sha256": "ecacc9b36deb8e477865bc86ef67232f5f82004e3ef00d4737757873fd4dce74",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "8b5b443fb8fb4b822ad3ae43bf7cf7cb43f31d1d59aaf16ff0afa22b4f6662a2",
+      "sha256": "e2eceeb825a2e2858eb42f4a200503887ee5259ee6dce5f0d312c3f9f2c3edaa",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "72eb260718d012dfe17323415231615cd756f84fb154298838ccaf76292803f1",
+      "sha256": "3dbdb7d1ffb8a42476db33d8c36455e54e68d28190a037016dcb93c1bfcb3ba6",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -559,6 +559,10 @@
     },
     "migrations/core/0090_client_locale.sql": {
       "sha256": "7153ad1bf73010e227a4da19168994294a241805f8d104fc7255a5e6dc93feca",
+      "executable": false
+    },
+    "migrations/core/0091_completion_mail.sql": {
+      "sha256": "64e865f9388060737b05b9bcc81198e0b722288282e927556a751f6302c84cd1",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -2453,6 +2457,10 @@
       "sha256": "61f2d198c5521ca0fb0296ee9c106ada423650af03cab214e8cbbf2b09171ad2",
       "executable": false
     },
+    "src/platter/completion-mail.ts": {
+      "sha256": "926bb20e75d91a71df95d7e657633037f869d15d88a43088c635ddc60b0e1cd2",
+      "executable": false
+    },
     "src/platter/conditional.ts": {
       "sha256": "2440141facf97de0228ca22ac0be5fcbbcde8335d50ab7b9b732a3676fd6a5ae",
       "executable": false
@@ -2622,7 +2630,7 @@
       "executable": false
     },
     "src/platter/mail.ts": {
-      "sha256": "36c1c61ebf943f75b2504ee81eb06c8867c8a3e446aa6f55e58e9954faad63fa",
+      "sha256": "11dee8ec35da844f8e3f550dfb0b49970410cecb5c114272546b8f9d9302240e",
       "executable": false
     },
     "src/platter/mailboxes.ts": {
@@ -3258,7 +3266,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "efad14513a43cbaa2259877b8b6cf76e481944cd7fe26ba02a96d8fd54358d4c",
+      "sha256": "5c040451c7e3fba43ac9d62a112898b748c1deeae736942ace98f4fa2b5a7ab2",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3358,7 +3366,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "d3b4fac8215070e863aa57809d50b199744d6b541a5e738c8d8a1924b63793a2",
+      "sha256": "3a8cc0e6a4f7cf56435d9efc1af89d05ca01f540388537e7dd79ff975884dc21",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {
@@ -3438,7 +3446,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "55d7dac675c04282429ffe75fb21d6bd429447a4ff123ec45dda5de45450dae7",
+      "sha256": "3469fea37d40cb9ac8e9e40ff68a340f27445286f7237b9ce7e41a759b6a939f",
       "executable": false
     },
     "tests/site.test.mjs": {

@@ -12,7 +12,7 @@ export const proposalMail=(title:string,shareUrl:string,locale:ClientLocale='en'
 export function queueMail(env:Bindings,proposalId:string,to:string,subject:string,body:string,senderId:string|null=null,replyTo:SealedReplyAddress|null=null,mailId=crypto.randomUUID(),requiresApproval=false,replyConsent=false){return env.DB.prepare('INSERT INTO p_mail(id,proposal_id,recipient,subject,body,status,created_at,sender_id,provider,reply_to,requires_approval,reply_consent,proposal_revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,(SELECT revision FROM p_proposals WHERE id=?))').bind(mailId,proposalId,to,subject,body,capturesMail(env)?'local':'pending',Date.now(),senderId,env.MAIL_PROVIDER??null,replyTo,requiresApproval?1:0,replyConsent?1:0,proposalId)}
 // Claim before contacting the provider; an uncertain attempt is never resent blindly.
 export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string){if(capturesMail(env)){
- // Captured messages retain the same artifact references without external I/O.
+ // Captured messages retain the same artifact references without external provider contact.
  if(env.ASSETS){const rows=(await env.DB.prepare("SELECT m.* FROM p_mail m JOIN p_completion_mail c ON c.mail_id=m.id WHERE m.proposal_id=? AND m.status='local'").bind(proposalId).all<any>()).results;for(const row of rows)await completionAttachments(env,row)}
  return
  }
@@ -49,7 +49,7 @@ export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string
    const outcome=(error as any)?.status===403?'withheld':'uncertain'
    await env.DB.prepare('UPDATE p_mail SET status=?,provider=?,held_reason=? WHERE id=?').bind('uncertain',route==='installation'?env.MAIL_PROVIDER??null:route,outcome==='withheld'?'sender_not_authorized':null,row.id).run()
    await recordSender(env,row,route,address,outcome,fallback)
-   if(outcome==='withheld')throw error
+   if(outcome==='withheld'&&!await env.DB.prepare('SELECT 1 FROM p_completion_mail WHERE mail_id=?').bind(row.id).first())throw error
   }
  }
 }

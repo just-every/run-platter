@@ -683,12 +683,12 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
   if(process.env.PLATTER_SCREENSHOTS)await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true})
   for(const width of [1440,390]){
    let h,edge,context
-   const texts=[]
+   const texts=[],mail=[]
    try{
     edge=await browserEdge()
     h=await harness({entry:'dist/server/index.js',origin:edge.origin,assetsDirectory:'dist/client',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9400',TWILIO_ACCOUNT_SID:'synthetic-platter-9401',TWILIO_AUTH_TOKEN:'synthetic-platter-9402',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
      if(new URL(request.url).hostname==='api.twilio.com'){texts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-9403'},{status:201})}
-     return Response.json({id:'synthetic-platter-9404'})
+     mail.push(await request.json());return Response.json({id:'synthetic-platter-'+(9404+mail.length)})
     }})
     edge.attach(h)
     const finish=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(finish.status,303)
@@ -721,6 +721,26 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
     if(process.env.PLATTER_SCREENSHOTS)await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-006-complete-${width}.png`),fullPage:true})
     const ownerContext=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
     try{await ownerContext.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}]);const ownerPage=await ownerContext.newPage();await ownerPage.goto(h.origin+'/app/proposal?id='+p.id);assert.ok((await ownerPage.locator('main').innerText()).includes('Platter e-signature after text-code verification'));assert.equal(await ownerPage.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);if(process.env.PLATTER_SCREENSHOTS)await ownerPage.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-006-owner-${width}.png`),fullPage:true})}finally{await ownerContext.close()}
+    const completed=await h.cmd('proposal.prepare',{clientId:client.id,title:'Mailbox completion attachments',scope:'Exact retained scope',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+    await h.cmd('proposal.approve',{id:completed.id,version:1,revision:1})
+    const completionShare=await h.cmd('proposal.send',{id:completed.id,version:2})
+    await page.goto(completionShare.shareUrl)
+    await page.getByRole('button',{name:'Send verification code',exact:true}).click()
+    await page.getByLabel('Email verification code',{exact:true}).fill(mail.at(-1).text.match(/\b\d{6}\b/)[0])
+    await page.getByRole('button',{name:'Verify email',exact:true}).click()
+    await page.getByRole('heading',{name:'Accept this proposal',exact:true}).waitFor()
+    await page.locator('input[name="optionId"][value="one"]').check()
+    await page.getByLabel('Your full name',{exact:true}).fill('Synthetic signer')
+    await page.locator('input[name="consent"]').check()
+    await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
+    await page.getByRole('heading',{name:'Agreement downloads',exact:true}).waitFor()
+    const completionMail=mail.filter(m=>m.subject==='Agreement complete: Mailbox completion attachments')
+    const attachmentDownload=async label=>{const waiting=page.waitForEvent('download');await page.getByRole('link',{name:label,exact:true}).click();return readFile(await (await waiting).path())}
+    const agreement=await attachmentDownload('Signed agreement PDF'),certificate=await attachmentDownload('Certificate of completion')
+    if(width===1440){assert.equal(completionMail.length,2);assert.deepEqual(completionMail.map(m=>m.to[0]).sort(),[['client','synthetic-platter.example'].join('@'),h.auth.OWNER_EMAIL].sort());for(const m of completionMail){assert.deepEqual(m.attachments.map(a=>a.filename),['agreement.pdf','certificate.pdf']);assert.deepEqual(Buffer.from(m.attachments[0].content,'base64'),agreement);assert.deepEqual(Buffer.from(m.attachments[1].content,'base64'),certificate)}}
+    if(process.env.PLATTER_SCREENSHOTS)await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-005-completion-${width}.png`),fullPage:true})
+    const firmContext=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
+    try{await firmContext.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}]);const firm=await firmContext.newPage();await firm.goto(h.origin+'/app/proposal?id='+completed.id);if(width===1440){const pdf=await firmContext.request.get(h.origin+'/api/platter/agreement.pdf?id='+completed.id);assert.equal(pdf.status(),200);assert.deepEqual(await pdf.body(),agreement);const proof=await firmContext.request.get(h.origin+'/api/platter/certificate.pdf?id='+completed.id);assert.equal(proof.status(),200);assert.deepEqual(await proof.body(),certificate)};if(process.env.PLATTER_SCREENSHOTS)await firm.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-005-firm-${width}.png`),fullPage:true})}finally{await firmContext.close()}
    }finally{await context?.close();await h?.close();await edge?.close()}
   }
  }finally{await browser?.close()}

@@ -1448,11 +1448,11 @@ test('COLLAB-002 scoped colleagues comment, receive consented generic email and 
 test('SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports', {timeout:240000}, async()=>{
  const {createHash}=await import('node:crypto')
  for(const provider of ['resend','sendgrid','cloudflare','gmail','microsoft','local']){
-  const sent=[];let fail=false,stall=false,release,entered
+  const sent=[];let fail=false,stall=false,revokeDuringRefresh=false,release,entered
   let arrived=new Promise(resolve=>{entered=resolve}),waiting=new Promise(resolve=>{release=resolve})
   const h=await harness({assetsDirectory:'public',...(provider==='local'?{}:{origin:'https://platter.example'}),auth:{AUTH_LOCAL:provider==='local'?'true':'false',MAIL_PROVIDER:['gmail','microsoft'].includes(provider)?'resend':provider==='local'?'development':provider,MAIL_ACCOUNT_ID:'0'.repeat(32),MAIL_API_KEY:'synthetic-platter-9801',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-9802',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-9803',MICROSOFT_MAIL_CLIENT_ID:'synthetic-platter-9804',MICROSOFT_MAIL_CLIENT_SECRET:'synthetic-platter-9805'},outboundService:async request=>{
    const url=new URL(request.url)
-   if(['oauth2.googleapis.com','login.microsoftonline.com'].includes(url.hostname))return Response.json({access_token:'synthetic-platter-9806',refresh_token:'synthetic-platter-9807',scope:provider==='gmail'?'openid email https://www.googleapis.com/auth/gmail.send':'User.Read Mail.Send'})
+   if(['oauth2.googleapis.com','login.microsoftonline.com'].includes(url.hostname)){if(revokeDuringRefresh){revokeDuringRefresh=false;await h.db.prepare("UPDATE oa_operators SET version=version+1 WHERE role='owner'").run()}return Response.json({access_token:'synthetic-platter-9806',refresh_token:'synthetic-platter-9807',scope:provider==='gmail'?'openid email https://www.googleapis.com/auth/gmail.send':'User.Read Mail.Send'})}
    if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-9808',email:h.auth.OWNER_EMAIL,email_verified:true})
    if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-9809',mail:h.auth.OWNER_EMAIL})
    const payload=await request.json();let message
@@ -1463,9 +1463,9 @@ test('SIGN-005 completion mail attaches the retained PDFs to both parties once, 
     else message.text=Buffer.from(raw.split('\r\n\r\n')[1],'base64').toString()
    }else if(provider==='microsoft')message={to:payload.message.toRecipients.map(r=>r.emailAddress.address),subject:payload.message.subject,text:payload.message.body.content,attachments:(payload.message.attachments??[]).map(a=>{assert.equal(a['@odata.type'],'#microsoft.graph.fileAttachment');assert.equal(a.contentType,'application/pdf');return {filename:a.name,bytes:Buffer.from(a.contentBytes,'base64')}})}
    else message={to:provider==='sendgrid'?payload.personalizations[0].to.map(r=>r.email):payload.to,subject:payload.subject,text:payload.text??payload.content?.find(c=>c.type==='text/plain')?.value,attachments:(payload.attachments??[]).map(a=>{assert.equal(a.content_type??a.type,'application/pdf');return {filename:a.filename,bytes:Buffer.from(a.content,'base64')}})}
-   sent.push(message)
+   sent.push(message);const providerMessageId='synthetic-platter-'+(9900+sent.length)
    if(message.subject.startsWith('Agreement complete:')){if(stall&&message.to.includes(recipient)){entered();await waiting}if(fail)throw Error('Synthetic uncertain completion response')}
-   return provider==='sendgrid'?new Response(null,{status:202}):provider==='microsoft'?new Response(null,{status:202}):provider==='cloudflare'?Response.json({success:true,result:{message_id:'synthetic-platter-'+(9900+sent.length)}}):Response.json({id:'synthetic-platter-'+(9900+sent.length)})
+   return provider==='sendgrid'?new Response(null,{status:202}):provider==='microsoft'?new Response(null,{status:202}):provider==='cloudflare'?Response.json({success:true,errors:[],result:{message_id:providerMessageId,queued:message.to,delivered:[],permanent_bounces:[]}}):Response.json({id:providerMessageId})
   }})
   try{
    if(['gmail','microsoft'].includes(provider)){
@@ -1494,6 +1494,7 @@ test('SIGN-005 completion mail attaches the retained PDFs to both parties once, 
    if(provider==='local'){
     const captured=(await mailRows(h)).filter(m=>references.some(r=>r.mail_id===m.id));assert.equal(captured.length,2);assert.ok(captured.every(m=>m.status==='local'));assert.equal(sent.length,0)
    }else{
+    const outcomes=(await h.db.prepare('SELECT m.status FROM p_mail m JOIN p_completion_mail c ON c.mail_id=m.id WHERE c.proposal_id=?').bind(id).all()).results;assert.ok(outcomes.every(m=>m.status==='accepted'),provider+' completion has provider acceptance')
     assert.equal(completion.length,2,provider);assert.deepEqual(completion.map(m=>m.to[0]).sort(),[recipient,h.auth.OWNER_EMAIL].sort())
     for(const message of completion){assert.deepEqual(message.attachments.map(a=>a.filename),['agreement.pdf','certificate.pdf']);assert.deepEqual(message.attachments[0].bytes,pdf);assert.deepEqual(message.attachments[1].bytes,certificate)}
    }
@@ -1512,6 +1513,14 @@ test('SIGN-005 completion mail attaches the retained PDFs to both parties once, 
     await h.cmd('proposal.send',{id:stale,version:row.version})
     const unchanged=sent.length;assert.equal((await h.send(oldPath+'/action?name=accept',accept,v.cookie)).status,404);assert.equal(sent.length,unchanged)
     assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_completion_mail WHERE proposal_id=?').bind(stale).first()).n,0)
+   }
+   if(provider==='gmail'){
+    const revoked=await approved(h),share=await h.cmd('proposal.send',{id:revoked,version:2}),revokedPath=new URL(share.shareUrl).pathname
+    await h.send(revokedPath+'/action?name=code.request',{});const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(revoked).first()).body.match(/\b\d{6}\b/)[0],v=await h.send(revokedPath+'/action?name=code.verify',{code})
+    const before=sent.length;revokeDuringRefresh=true
+    assert.equal((await h.send(revokedPath+'/action?name=accept',accept,v.cookie)).status,200)
+    await cron();assert.equal(sent.length,before,'owner credential revocation during refresh withholds both attachments without a provider send')
+    assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_mail m JOIN p_completion_mail c ON c.mail_id=m.id WHERE c.proposal_id=? AND m.held_reason='sender_not_authorized'").bind(revoked).first()).n,2)
    }
   }finally{release();await h.close()}
  }

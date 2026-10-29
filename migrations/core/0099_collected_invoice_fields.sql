@@ -1,0 +1,5 @@
+-- Retain reviewed accounting history without restoring execution grants.
+CREATE TABLE p_invoice_authority (singleton INTEGER PRIMARY KEY CHECK(singleton=1), provider TEXT NOT NULL, selected_at INTEGER NOT NULL);
+CREATE TABLE p_invoice_authority_grants (singleton INTEGER PRIMARY KEY CHECK(singleton=1), actor_id TEXT NOT NULL, account_id TEXT NOT NULL, connection_version INTEGER NOT NULL);
+CREATE TABLE p_qbo_invoice_reviews (id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL, revision INTEGER NOT NULL, proposal_version INTEGER NOT NULL, actor_id TEXT NOT NULL, actor_version INTEGER NOT NULL, connection_version INTEGER NOT NULL, account_id TEXT NOT NULL, mapping TEXT NOT NULL, payload TEXT NOT NULL, source TEXT NOT NULL, digest TEXT NOT NULL, created_at INTEGER NOT NULL, consumed_at INTEGER);
+CREATE TABLE p_qbo_invoices (proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id), revision INTEGER NOT NULL, account_id TEXT NOT NULL, customer_id TEXT NOT NULL, payload TEXT NOT NULL, digest TEXT NOT NULL, authorized_by TEXT NOT NULL, authorized_at INTEGER NOT NULL, status TEXT NOT NULL CHECK(status IN ('sending','confirmed','uncertain')), provider_id TEXT);

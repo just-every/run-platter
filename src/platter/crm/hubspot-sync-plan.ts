@@ -76,7 +76,22 @@ export async function buildSyncPlan(env: Bindings, actor: Actor, input: Record<s
  need(lines.every((line: any) => !line.recurrence && !line.discountBps && !line.discountFixedCents && !line.groupDiscountBps && !line.groupDiscountFixedCents), 'Recurring or discounted rows need separate CRM preparation', 409)
  need(option.cents === option.tables[0].subtotalCents && (!facts.accepted || facts.accepted.total_cents === option.cents), 'The CRM amount must equal the exact copied rows', 409)
  const link = env.AUTH_ORIGIN + '/app/proposal?id=' + encodeURIComponent(row.id)
- const properties: Record<string, string> = { amount: (option.cents / 100).toFixed(2), [statusProperty]: facts.status, [linkProperty]: link }
+ const acceptedFields=input.acceptedFields===undefined?[]:input.acceptedFields
+ need(Array.isArray(acceptedFields)&&acceptedFields.length<=20,'Choose at most twenty accepted field mappings')
+ const fieldMapping=acceptedFields.map((entry:any)=>({fieldId:text(entry?.fieldId,'an accepted field id'),property:identifier(entry?.property)}))
+ need(new Set(fieldMapping.map(entry=>entry.property)).size===fieldMapping.length&&fieldMapping.every(entry=>![statusProperty,linkProperty,'amount','pipeline','dealstage','dealname'].includes(entry.property)),'Choose distinct custom properties for collected values')
+ need(!fieldMapping.length||facts.accepted,'Only accepted values may be sent to the CRM',409)
+ const fieldMetadata=[],fieldProperties:Record<string,string>={}
+ for(const entry of fieldMapping){
+  const value=content.fieldValues?.[entry.fieldId]
+  need(typeof value==='string'||typeof value==='boolean','This accepted field has no retained value',409)
+  const meta=await providerJson(base+'/properties/deals/'+entry.property,secret.token)
+  need(meta.name===entry.property&&meta.hubspotDefined===false&&!meta.archived&&meta.type==='string'&&!meta.modificationMetadata?.readOnlyValue&&!meta.calculated,'Choose a writable custom text property for collected values',409)
+  fieldMetadata.push(meta);fieldProperties[entry.property]=String(value)
+ }
+ const fieldDestination=fieldMapping.length?await providerJson(base+'/objects/deals/'+source.deal_id+'?properties='+fieldMapping.map(entry=>entry.property).join(','),secret.token):undefined
+ need(!fieldDestination||fieldDestination.id===source.deal_id&&!fieldDestination.archived,'The collected-field destination changed',409)
+ const properties: Record<string, string> = { ...fieldProperties,amount: (option.cents / 100).toFixed(2), [statusProperty]: facts.status, [linkProperty]: link }
  if (facts.status === 'signed' || facts.status === 'paid' || facts.status === 'won') properties.dealstage = wonStage
  if (facts.status === 'declined' || facts.status === 'lost' || facts.status === 'withdrawn') properties.dealstage = lostStage
  const operations: SyncOperation[] = []
@@ -88,6 +103,6 @@ export async function buildSyncPlan(env: Bindings, actor: Actor, input: Record<s
  operations.push({ key: '', method: 'PATCH', path: '/objects/deals/' + source.deal_id, label: 'Deal amount, status, protected link and stage', body: { properties } })
  for (const event of facts.events) operations.push({ key: 'event:' + row.id + ':' + row.revision + ':' + event.kind, method: 'POST', path: '/objects/notes', label: event.kind + ' timeline note', body: { properties: { hs_timestamp: new Date(event.at).toISOString(), hs_note_body: 'Platter proposal ' + row.id + ', revision ' + row.revision + ': ' + event.kind + '. ' + link }, associations: [{ to: { id: source.deal_id }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 214 }] }] } })
  for (const op of operations) if (!op.key) op.key = 'write:' + row.id + ':' + row.revision + ':' + await hash(canonical({ method: op.method, path: op.path, body: op.body }))
- const remote = canonical({ source: read.source, deal, statusMeta, linkMeta, pipelines })
- return { row, source, connection, remote, plan: { proposalId: row.id, revision: row.revision, version: row.version, accountId: connection.account_id, dealId: source.deal_id, mapping: { statusProperty, linkProperty, pipelineId, wonStage, lostStage, lineIds }, status: facts.status, totalCents: option.cents, operations } }
+ const remote = canonical({ source: read.source, deal, statusMeta, linkMeta, pipelines,...(fieldMapping.length?{fieldMetadata,fieldDestination}:{}) })
+ return { row, source, connection, remote, plan: { proposalId: row.id, revision: row.revision, version: row.version, accountId: connection.account_id, dealId: source.deal_id, mapping: { statusProperty, linkProperty, pipelineId, wonStage, lostStage, lineIds,...(fieldMapping.length?{acceptedFields:fieldMapping}:{}) }, status: facts.status, totalCents: option.cents, operations } }
 }

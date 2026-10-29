@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { clientFileBlocks, clientPdfBytes, uploadClientOriginal } from './client-files-fixture.mjs'
+import { clientFileBlocks, clientPdfBytes, uploadClientOriginal, configuredClientOriginals } from './client-files-fixture.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { collectionLifecycle, collectionFees, collectionMethodInheritance } from './collection-journey.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
@@ -2621,20 +2621,17 @@ test('EDIT-001 Client-assigned required fields and typed signature blocks valida
  const freshCookie=await verified(h,freshPath)
  assert.equal((await h.send(freshPath+'/action?name=accept',{...copyInput,'field:purchase-file':staleFile.id},freshCookie)).status,409)
  assert.equal(await count(),countBeforeRevocation);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_acceptances WHERE proposal_id=?').bind(started.id).first()).n,0)
- const mailbox=(await h.state()).clients.find(v=>v.id===client.id).email
- const configured=await h.cmd('proposal.prepare',{...offer,clientId:client.id,recipientPlan:[{id:'synthetic-platter-file-client',name:'Assigned Client',email:mailbox,role:'signer',group:1}]})
- await h.cmd('proposal.document',{id:configured.id,version:1,document:{version:1,blocks:clientFileBlocks()}})
- await h.cmd('proposal.approve',{id:configured.id,version:2,revision:2})
- const configuredPath=new URL((await h.cmd('proposal.send',{id:configured.id,version:3})).shareUrl).pathname,configuredCookie=await verified(h,configuredPath),configuredBefore=await count()
- assert.equal((await uploadClientOriginal(h,configuredPath,configuredCookie,{bytes:original})).status,409)
- assert.equal((await h.send(configuredPath+'/action?name=accept',input,configuredCookie)).status,409)
- assert.equal(await count(),configuredBefore);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_recipient_signatures WHERE proposal_id=?').bind(configured.id).first()).n,0)
+ await configuredClientOriginals(h,client,offer,original)
  const expected={billing:'50 Synthetic Street',po:'synthetic-platter-4',start:'2026-11-01',confirm:true,signature:'Synthetic Platter signer'}
  const frozen=JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot);assert.deepEqual(frozen.clientFiles,[file,image]);assert.equal(frozen.fieldValues.billing,'50 Synthetic Street')
  const originalResponse=await h.mf.dispatchFetch(h.origin+path+'/client-files/'+file.id,{headers:{cookie}});assert.equal(originalResponse.status,200);assert.deepEqual(new Uint8Array(await originalResponse.arrayBuffer()),original);assert.match(originalResponse.headers.get('content-disposition'),/^attachment/);assert.equal(originalResponse.headers.get('x-content-type-options'),'nosniff')
  assert.equal((await h.send(path+'/client-files/'+file.id)).status,401)
  const ownerDownload=await h.mf.dispatchFetch(h.origin+'/api/platter/client-files/'+p.id+'/'+file.id,{headers:{cookie:h.owner}});assert.deepEqual(new Uint8Array(await ownerDownload.arrayBuffer()),original)
  const certificate=(await h.send(path+'/certificate.json',undefined,cookie)).value;assert.deepEqual(certificate.clientFiles,[file,image]);const certificatePdf=await h.mf.dispatchFetch(h.origin+path+'/certificate.pdf',{headers:{cookie}}),certificateText=(await pdfPages(await certificatePdf.arrayBuffer())).join(' ');assert.ok(certificateText.includes(file.filename));assert.ok(certificateText.replace(/\s/g,'').includes(digest))
+ const packageResponse=await h.mf.dispatchFetch(h.origin+path+'/agreement.zip',{headers:{cookie}});assert.equal(packageResponse.status,200)
+ const {unzipSync}=await import('fflate'),bundle=unzipSync(new Uint8Array(await packageResponse.arrayBuffer()))
+ assert.deepEqual(bundle['originals/'+file.id+'/'+file.filename],original);assert.deepEqual(bundle['originals/'+image.id+'/'+image.filename],new Uint8Array(imageBytes));assert.deepEqual(JSON.parse(new TextDecoder().decode(bundle['manifest.json'])).clientFiles,[file,image])
+ assert.equal((await h.send(path+'/agreement.zip')).status,401)
  const signedPdf=await h.mf.dispatchFetch(h.origin+path+'/agreement.pdf',{headers:{cookie}}),signedText=(await pdfPages(await signedPdf.arrayBuffer())).join(' ');assert.ok(signedText.includes('50 Synthetic Street'));assert.ok(signedText.includes('synthetic-platter-4'))
  assert.equal((await uploadClientOriginal(h,path,cookie,{bytes:original})).status,409)
  const data=(await h.send(path+'/data.json',undefined,cookie)).value;assert.deepEqual(data.acceptance.fieldValues,expected)
@@ -2642,6 +2639,7 @@ test('EDIT-001 Client-assigned required fields and typed signature blocks valida
  const agreement=(await h.send(path,undefined,cookie)).text;assert.match(agreement,/synthetic-platter-4/);assert.match(agreement,/2026-11-01/)
  await h.send(path+'/action?name=accept',{...input,'field:po':'Changed'},cookie)
  assert.deepEqual((await h.send(path+'/data.json',undefined,cookie)).value.acceptance.fieldValues,expected,'replay cannot rewrite accepted fields')
+await (await import('./collected-fields-propagation.mjs')).collectedFieldsPropagation()
 }finally{await h.close()}})
 
 test('EDIT-001 new sections inherit verified questions and opt-in tracked edits without changing the sent document or bypassing review',()=>run(async h=>{

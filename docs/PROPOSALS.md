@@ -173,3 +173,13 @@ when those execution capabilities ship.
 
 The follow-up queue ranks package values using one-off value plus the first
 year of recurring fees, retaining separate currency totals.
+
+## Collect fields and originals
+
+In the document editor, add required text fields for the PO number and billing address and a required **File upload** field. Assign each field to the client or a configured recipient slot. English mailbox-verified recipients on collection-off offers upload PDF, PNG or JPEG files of up to 25 MB each. A recipient can fill only their assigned fields; required values and files prevent acceptance until complete. Uploading preserves text already entered. Accepted values and originals stay frozen.
+
+The signed page offers original downloads and **Download agreement package**. The ZIP contains the retained signed PDF, certificate, a manifest and the exact original files. The certificate lists each collected filename and SHA-256. Historical artifacts remain unchanged. These are private downloads; original bytes are never forwarded to accounting or CRM providers.
+
+The owner can explicitly select QuickBooks through the `invoice.authority` command with provider `quickbooks` and consent. This is refused if another local invoice export already exists. Use `invoice.qbo.review` with the accepted proposal id and version, verified `customerId` and `itemId`, and the `poField` and `billingField` block ids. Inspect the returned payload and account before calling `invoice.qbo.apply` with that review id, digest and explicit consent. `invoice.qbo.status` retains the provider id and result. A reconnect requires fresh authority; uncertain writes require reconciliation and never replay automatically. This limited door exports only the accepted deposit, and holds taxes, schedules and payment collection for accounting preparation.
+
+For an accepted proposal started from HubSpot, the existing `crm.sync.review` command optionally accepts `acceptedFields`, an array of objects naming `fieldId` and the destination custom text `property`. The provider must confirm those properties are writable; the exact values, properties, account and deal join the reviewed snapshot. The existing explicit apply step authorizes it. Unsupported or missing values are held, and file references and original bytes are excluded. These conservative owner and reviewed-provider authority defaults remain pending ct approval; no provider qualification is claimed.

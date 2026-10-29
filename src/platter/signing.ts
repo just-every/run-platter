@@ -115,7 +115,7 @@ async function multiRecipientAccept(env:Bindings,c:Awaited<ReturnType<typeof cli
  need(progress.ready,'Wait for the preceding signing group to finish',409)
  need(p.consent===true||['on','yes'].includes(String(p.consent)),'Confirm your decision')
  const signer=text(p.name,'your full name',200),{option,deposit,frozen,consent}=acceptanceTerms(row,p.optionId,p,at)
- await acceptedClientFiles(env,c,frozen.document,p)
+ const files=await acceptedClientFiles(env,c,frozen.document,p)
  const fieldValues=acceptanceFields(frozen.document,p,signer,recipient.id,progress.clientSlot)
  if(fieldValues)Object.assign(frozen,{fieldValues})
  const choice={optionId:option.id,totalCents:option.cents,depositCents:deposit,items:(frozen as any).selection?.items??[]}
@@ -123,7 +123,7 @@ async function multiRecipientAccept(env:Bindings,c:Awaited<ReturnType<typeof cli
  need(!previous||JSON.stringify(previous.choice)===JSON.stringify(choice),'All recipients must sign the same package and quantities',409)
  const content=previous?.content??frozen,plan=recipientPlan(row)
  const complete=plan.filter(requiredRecipient).every(r=>r.id===recipient.id||prior.some(s=>s.slot_id===r.id))
- const evidence={context:c.signingContext,content:{...content,...(fieldValues?{fieldValues}:{fieldValues:{}})},choice}
+ const evidence={context:c.signingContext,content:{...content,clientFiles:files,...(fieldValues?{fieldValues}:{fieldValues:{}})},choice}
  const writes=[
   db.prepare('INSERT INTO p_recipient_signatures(proposal_id,revision,slot_id,role,name,email,signed_at,method,verified_at,consent,snapshot) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(row.id,row.revision,recipient.id,recipient.role,signer,row.clientEmail,at,share.session_method,share.session_verified_at,recipient.role==='approver'?'I approve this exact proposal revision.':consent,JSON.stringify(evidence)),
   db.prepare("UPDATE p_proposals SET version=version+1"+(complete?",status='accepted'":"")+" WHERE id=?").bind(row.id),
@@ -133,7 +133,8 @@ async function multiRecipientAccept(env:Bindings,c:Awaited<ReturnType<typeof cli
   const signatures=[...prior.map(s=>({name:s.name,email:s.email,role:s.role,slotId:s.slot_id,signedAt:s.signed_at,method:s.method,verifiedAt:s.verified_at,consent:s.consent,...JSON.parse(s.snapshot).context})),{name:signer,email:row.clientEmail,role:recipient.role,slotId:recipient.id,signedAt:at,method:share.session_method,verifiedAt:share.session_verified_at,consent,...c.signingContext}]
   const policy=await collectionPolicy(db,row.id)
   const combinedFields=Object.assign({},...prior.map(s=>JSON.parse(s.snapshot).content.fieldValues??{}),fieldValues??{})
-  const final={...content,recipient_plan:plan,...(Object.keys(combinedFields).length?{fieldValues:combinedFields}:{}),signatures,...(policy.enabled?{collectionPolicy:policy}:{})}
+  const combinedFiles=[...prior.flatMap(s=>JSON.parse(s.snapshot).content.clientFiles??[]),...files]
+  const final={...content,...(combinedFiles.length?{clientFiles:combinedFiles}:{}),recipient_plan:plan,...(Object.keys(combinedFields).length?{fieldValues:combinedFields}:{}),signatures,...(policy.enabled?{collectionPolicy:policy}:{})}
   writes.push(db.prepare('INSERT INTO p_acceptances(proposal_id,revision,snapshot,name,email,option_id,total_cents,deposit_cents,accepted_at,consent,currency) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(row.id,row.revision,JSON.stringify(final),first.name,first.email,choice.optionId,choice.totalCents,choice.depositCents,at,first.consent,content.currency),
    db.prepare('INSERT INTO p_signature_facts(proposal_id,revision,method,verified_at,context) VALUES(?,?,?,?,?)').bind(row.id,row.revision,first.method,first.verified_at,JSON.stringify(JSON.parse(first.snapshot).context??null)),
    db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),...completionMailStatements(env,row.id))

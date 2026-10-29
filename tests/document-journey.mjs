@@ -12,7 +12,7 @@ export async function documentJourney(){
  let app,browser
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
    app=await installedApp()
@@ -194,6 +194,8 @@ export async function documentJourney(){
     await client.getByRole('link',{name:'Download synthetic-platter-9801.pdf',exact:true}).scrollIntoViewIfNeeded()
     const [browserDownload]=await Promise.all([client.waitForEvent('download'),client.getByRole('link',{name:'Download synthetic-platter-9801.pdf',exact:true}).click()])
     if(width===1440){assert.equal(browserDownload.suggestedFilename(),'synthetic-platter-9801.pdf');assert.deepEqual(new Uint8Array(await readFile(await browserDownload.path())),original)}
+    const [packageDownload]=await Promise.all([client.waitForEvent('download'),client.getByRole('link',{name:'Download agreement package',exact:true}).click()])
+    if(width===1440){const {unzipSync}=await import('fflate'),bundle=unzipSync(new Uint8Array(await readFile(await packageDownload.path())));assert.deepEqual(bundle['originals/'+file.id+'/'+file.filename],original);assert.deepEqual(JSON.parse(new TextDecoder().decode(bundle['manifest.json'])).clientFiles,[file])}
     if(screenshots)await client.screenshot({path:join(screenshots,`SIGN-007-complete-${width}.png`)})
     assert.deepEqual(errors,[])
    }finally{await clientContext?.close();await context.close();await app.close();app=undefined}

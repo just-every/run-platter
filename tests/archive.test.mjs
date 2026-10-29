@@ -41,7 +41,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
   let h
   try {
     for (const path of [source,restored,erased]) await checkout(path)
-    await exec(process.execPath, [resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'], { cwd:source, env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'}, maxBuffer:2e6 })
+    await exec(process.execPath, [resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'], { cwd:source, env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'}, maxBuffer:8e6 })
     h=await harness({root:source,assetsDirectory:'public',outboundService:()=>new Response(null,{status:204})})
     const p=await h.cmd('client.save',{name:'Temporary joiner',email:'temporary@studio.example'})
     const key=await h.cmd('agent.create',{label:'Excluded secret'})
@@ -351,7 +351,7 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
  const temporary=await mkdtemp(join(tmpdir(),'platter-erasure-')),source=join(temporary,'source'),erased=join(temporary,'erased');let h
  try{
   for(const path of [source,erased])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source})
   const p=await h.cmd('client.save',{name:'Temporary joiner',email:'synthetic-platter-8200@example.com'}),client=await h.cmd('client.save',{name:'Retained client',email:'synthetic-platter-8201@example.com'})
   const proposal=await h.cmd('proposal.prepare',{clientId:client.id,title:'Retained agreement',scope:'Retained business record',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
@@ -464,7 +464,7 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   const events=resendEvents();let submitted=0
   h=await harness({root:source,origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'network-edge-key',MAIL_WEBHOOK_KEY:events.key},outboundService:()=>Response.json({id:'archive-provider-'+(++submitted)})})
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
@@ -498,7 +498,7 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   const options={alias:{'cloudflare:sockets':'./tests/catalog-socket-edge.ts'},outboundService:r=>fileHost(r)}
   h=await harness({root:source,...options})
   const contacts=await applyBusiness(h,{kind:'contacts',format:'platter',csv:await businessCsv('platter-contacts.csv')})
@@ -548,7 +548,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,assetsDirectory:'public'})
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Email rehearsal',scope:'A photography session',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
@@ -668,7 +668,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,origin:'https://platter.example',assetsDirectory:'public',auth:{...inbound.settings,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5600',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5601',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5602'},outboundService:async request=>{const url=new URL(request.url);if(url.hostname==='oauth2.googleapis.com')return Response.json({access_token:'synthetic-platter-5603',refresh_token:'synthetic-platter-5604',scope:'openid email https://www.googleapis.com/auth/gmail.send'});if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-5605',email:'archive-mailbox@synthetic-platter.example',email_verified:true});if(url.hostname==='gmail.googleapis.com'){mailboxWires.push(Buffer.from((await request.json()).raw,'base64url').toString('utf8'));return Response.json({id:'synthetic-platter-'+(8000+mailboxWires.length)})}if(url.hostname==='api.resend.com'&&request.method==='GET')return Response.json(inbound.messages.get(url.pathname.split('/').at(-1)));if(url.hostname==='api.resend.com')return Response.json({id:'synthetic-platter-5607'});if(url.hostname==='files.stripe.com'){const upload=await request.formData();assert.equal(upload.get('purpose'),'dispute_evidence');return Response.json({id:'synthetic-platter-3700'})}if(url.hostname==='api.hubapi.com'){if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-4120'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9961',stages:[{id:'synthetic-platter-9962',metadata:{isClosed:'true',probability:'1'}},{id:'synthetic-platter-9963',metadata:{isClosed:'true',probability:'0'}}]}]});const id=url.pathname.split('/').at(-1);return Response.json({id,properties:request.method==='PATCH'?(await request.json()).properties:{pipeline:'synthetic-platter-9961'}})};if(url.hostname==='quickbooks.api.intuit.com')return Response.json({CompanyInfo:{CompanyName:'Synthetic company'}});assert.equal(url.hostname,'api.stripe.com');if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2800'});if(url.pathname.includes('/disputes/')){const id=url.pathname.split('/').at(-1);if(request.method==='POST')return Response.json({id,status:'under_review'});const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id,charge:'synthetic-platter-2801',amount:accepted.deposit_cents,currency:accepted.currency.toLowerCase(),status:'needs_response',evidence_details:{due_by:disputeDeadline}})}if(request.method==='GET'){const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id:'synthetic-platter-2801',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:0,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}})}const amount=Number(new URLSearchParams(await request.text()).get('amount'));return Response.json({id:'synthetic-platter-2802',charge:'synthetic-platter-2801',amount,status:'succeeded'})}})
   const people={}
   for(const role of ['sales','manager','other']){
@@ -808,7 +808,7 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
  try{
   for(const path of [source,restored])await checkout(path)
   // Prepare both independent empty schemas together; import still runs through the public CLI.
-  await Promise.all([source,restored].map(cwd=>exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})))
+  await Promise.all([source,restored].map(cwd=>exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})))
   h=await harness({root:source,assetsDirectory:'public',auth:{AUTH_LOCAL:'true',TWILIO_ACCOUNT_SID:'synthetic-platter-7110',TWILIO_AUTH_TOKEN:'synthetic-platter-7111',TWILIO_FROM:'+15005550006'},outboundService:sourceEdge})
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(fixed),cron:'*/15 * * * *'})
   const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
@@ -908,9 +908,9 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
  const temporary=await mkdtemp(join(tmpdir(),'platter-doc-archive-')),source=join(temporary,'source'),target=join(temporary,'target');let h
  try{
   await checkout(source);await checkout(target)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  const {hubspotSyncFixture}=await import('./hubspot-sync-fixture.mjs'),crm=hubspotSyncFixture()
-  h=await harness({root:source,assetsDirectory:'public',outboundService:crm.request})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
+  const {collectedFieldsEdge}=await import('./collected-fields-propagation.mjs'),providerEdge=collectedFieldsEdge(),crm=providerEdge.crm
+  h=await harness({root:source,assetsDirectory:'public',outboundService:providerEdge.request})
   await h.cmd('provider.connect',{provider:'hubspot',version:0,token:'synthetic-platter-4607',consent:true})
   const crmReview=await h.cmd('crm.deal.review',crm.selected),crmDraft=await h.cmd('crm.deal.apply',{id:crmReview.id,digest:crmReview.digest,consent:true}),unusedCrmReview=await h.cmd('crm.deal.review',crm.selected)
   const crmSourceBefore=(await h.send('/api/platter/crm/source?id='+crmDraft.id,undefined,h.owner)).value,crmDraftBefore=(await h.state()).proposals.find(p=>p.id===crmDraft.id)
@@ -933,6 +933,7 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
   assert.equal((await h.send(path+'/action?name=suggestion.create',{revision:2,section:'block:story:text',original:'clear',replacement:'weekly'},verified.cookie)).status,200)
   const clientOriginal=await clientPdfBytes(),clientUpload=await uploadClientOriginal(h,path,verified.cookie,{bytes:clientOriginal});assert.equal(clientUpload.status,200,await clientUpload.clone().text());const clientFile=await clientUpload.json()
   assert.equal((await h.send(path+'/action?name=accept',{optionId:'two',name:'Synthetic signer',consent:true,'field:billing':'50 Synthetic Street','field:purchase-file':clientFile.id,'field:po':'synthetic-platter-2','signature:signature':'Synthetic signer'},verified.cookie)).status,200)
+  const packageBefore=await h.mf.dispatchFetch(h.origin+path+'/agreement.zip',{headers:{cookie:verified.cookie}}),packageBytes=new Uint8Array(await packageBefore.arrayBuffer())
   const certificateBefore=await h.mf.dispatchFetch(h.origin+path+'/certificate.pdf',{headers:{cookie:verified.cookie}}),certificateBytes=new Uint8Array(await certificateBefore.arrayBuffer()),factsBefore=(await h.send(path+'/certificate.json',undefined,verified.cookie)).value
   assert.deepEqual(factsBefore.clientFiles,[clientFile])
   let before=(await h.state()).proposals.find(p=>p.id===created.id)
@@ -952,9 +953,22 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
   await uploadDocument(h,fixedDraft.id,1,fixedBytes,'synthetic-platter-8502.pdf')
   const wordDraft=await h.cmd('proposal.prepare',{...fields,title:'Synthetic Word custody'});await uploadDocument(h,wordDraft.id,1,await wordFixture({headings:1,rows:2,images:1,tokens:false}),'synthetic-platter-8503.docx');await uploadDocument(h,wordDraft.id,2,await wordFixture({headings:1,rows:2,images:1,tokens:false,prefix:'Archived rich section'}),'synthetic-platter-8504.docx',{mode:'library'})
   const extraBefore=(await h.state()).proposals.filter(p=>[mergeDraft.id,fixedDraft.id,wordDraft.id].includes(p.id)).map(p=>({id:p.id,document:p.document,options:p.options})),profileBefore=(await h.state()).clients.find(c=>c.id===mergeClient.id).variable_fields,richArchiveItem=(await h.state()).libraryItems.find(i=>i.title==='Archived rich section 1'),libraryBefore=(await h.state()).libraryItems
+  providerEdge.setCustomerEmail(fields.clientId?(await h.state()).clients.find(c=>c.id===fields.clientId).email:'')
+  await h.cmd('provider.connect',{provider:'quickbooks',version:0,realmId:'synthetic-platter-9814',token:'synthetic-platter-9810',consent:true})
+  await h.cmd('invoice.authority',{provider:'quickbooks',consent:true})
+  const invoiceMapping={id:created.id,version:before.version,customerId:'synthetic-platter-9811',itemId:'synthetic-platter-9812',poField:'po',billingField:'billing'}
+  const unusedInvoiceReview=await h.cmd('invoice.qbo.review',invoiceMapping),invoiceReview=await h.cmd('invoice.qbo.review',invoiceMapping)
+  const invoiceBefore=await h.cmd('invoice.qbo.apply',{id:invoiceReview.id,digest:invoiceReview.digest,consent:true});assert.equal(invoiceBefore.status,'confirmed');assert.equal(providerEdge.invoices.length,1)
+  const invoiceAuthorityBefore=await h.db.prepare('SELECT * FROM p_invoice_authority').first()
   const identity={auth:h.auth,owner:h.owner};await h.close();h=undefined
   const archive=join(temporary,'document.rer');await command(source,['export','--output',archive,'--no-queue']);await command(target,['import','--input',archive,'--yes','--no-queue'])
   h=await harness({root:target,...identity,assetsDirectory:'public'});const owner=await h.signIn(h.auth.OWNER_EMAIL),after=(await h.state(owner)).proposals.find(p=>p.id===created.id)
+  assert.deepEqual(await h.cmd('invoice.qbo.status',{id:created.id},owner),invoiceBefore)
+  assert.deepEqual(await h.db.prepare('SELECT * FROM p_invoice_authority').first(),invoiceAuthorityBefore)
+  for(const table of ['p_invoice_authority_grants','p_qbo_invoice_reviews'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  await h.cmd('invoice.qbo.apply',{id:unusedInvoiceReview.id,digest:unusedInvoiceReview.digest,consent:true},owner,409)
+  await h.cmd('invoice.qbo.review',invoiceMapping,owner,409)
+  const restoredPackage=await h.mf.dispatchFetch(h.origin+'/api/platter/agreement.zip?id='+created.id,{headers:{cookie:owner}});assert.equal(restoredPackage.status,200);const {unzipSync}=await import('fflate');assert.deepEqual(unzipSync(new Uint8Array(await restoredPackage.arrayBuffer())),unzipSync(packageBytes))
   const restoredOriginal=await h.mf.dispatchFetch(h.origin+'/api/platter/client-files/'+created.id+'/'+clientFile.id,{headers:{cookie:owner}});assert.equal(restoredOriginal.status,200);assert.deepEqual(new Uint8Array(await restoredOriginal.arrayBuffer()),clientOriginal)
   const restoredCertificate=await h.mf.dispatchFetch(h.origin+'/api/platter/certificate.pdf?id='+created.id,{headers:{cookie:owner}});assert.equal(restoredCertificate.status,200);assert.deepEqual(new Uint8Array(await restoredCertificate.arrayBuffer()),certificateBytes);assert.deepEqual((await h.send('/api/platter/certificate.json?id='+created.id,undefined,owner)).value,factsBefore)
   assert.equal((await h.send(path+'/client-files/'+clientFile.id,undefined,verified.cookie)).status,404);assert.equal((await uploadClientOriginal(h,path,verified.cookie,{bytes:clientOriginal})).status,404)
@@ -996,7 +1010,7 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
  let h
  try{
   for(const root of [source,restored])await checkout(root)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,assetsDirectory:'public'})
   const {configureTaxes,taxRequest,taxPackages,taxTables}=await import('./taxes-fixture.mjs')
   const version=await configureTaxes(h.cmd),client=await h.cmd('client.save',{name:'Synthetic tax client',email:h.auth.OWNER_EMAIL})
@@ -1045,7 +1059,7 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
  const temporary=await mkdtemp(join(tmpdir(),'platter-drive-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=driveFixture();let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectDrive(h)
   const completed=await completeDriveAgreement(h)
   await h.cmd('archive.dispatch',{})

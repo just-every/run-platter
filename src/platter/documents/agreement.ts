@@ -1,3 +1,6 @@
+import { zipSync } from 'fflate'
+import { downloadAttachment } from '../attachments'
+import { actorById } from '../credentials'
 import { collectionView } from '../collection'
 import type { Bindings } from '../../auth.server'
 import { commit, need, type Actor } from '../model'
@@ -12,7 +15,7 @@ import { PdfText } from './pdf-text'
 export async function agreementArtifact(env:Bindings,id:string,kind:string,authority:{actor:Actor}|{client:any}){
  const db=env.DB
  const authorize=async()=>{
-  if('actor' in authority){await permitted(db,authority.actor,id);need(authority.actor.role!=='agent','A person downloads the agreement',403)}
+  if('actor' in authority){const live=await actorById(db,authority.actor.id);need(live&&live.role===authority.actor.role&&(live.memberVersion??0)===(authority.actor.memberVersion??0),'Agreement download authority changed',403);await permitted(db,live,id);need(live.role!=='agent','A person downloads the agreement',403)}
   else {const c=authority.client;need(c.verified&&c.row.id===id,'Verify the invited signer before downloading',401);need(await db.prepare("SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id WHERE s.token=? AND s.session_hash=? AND s.session_expires>? AND p.id=? AND p.status='accepted' AND s.revision=p.revision").bind(c.token,c.share.session_hash,await currentTime(db),id).first(),'The signer session changed',401)}
  }
  await authorize()
@@ -43,6 +46,17 @@ export async function agreementArtifact(env:Bindings,id:string,kind:string,autho
  await authorize()
  const headers={'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}
  if(kind==='certificate.json')return new Response(saved.facts,{headers:{...headers,'content-type':'application/json'}})
+ if(kind==='agreement.zip'){
+  const frozen=JSON.parse(a.snapshot),files:Record<string,Uint8Array>={'agreement.pdf':new Uint8Array(saved.document),'certificate.pdf':new Uint8Array(saved.certificate),'manifest.json':new TextEncoder().encode(saved.facts)}
+  for(const file of [...(frozen.attachments??[]),...(frozen.clientFiles??[])]){
+   await authorize()
+   const original=await downloadAttachment(db,file)
+   files['originals/'+file.id+'/'+file.filename]=new Uint8Array(await original.arrayBuffer())
+  }
+  const bytes=zipSync(files,{level:0})
+  await authorize()
+  return new Response(bytes,{headers:{...headers,'content-type':'application/zip','content-disposition':'attachment; filename="agreement.zip"'}})
+ }
  need(kind==='agreement.pdf'||kind==='certificate.pdf','Unknown agreement artifact',404)
  const stored=kind==='agreement.pdf'?saved.document:saved.certificate
  return new Response(new Uint8Array(stored).buffer,{headers:{...headers,'content-type':'application/pdf','content-disposition':'attachment; filename="'+kind+'"'}})

@@ -899,11 +899,11 @@ test('FOLLOW-001 / FOLLOW-006 template and workspace delivery snapshots preview 
 test('FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority', {timeout:120000}, async()=>{const {reminderMessagesHttp}=await import('./reminders-http.mjs');await reminderMessagesHttp()})
 
 
-async function notificationFixture(options={}) {
+async function notificationFixture(beforeMail=async()=>{}) {
  const messages=[],chats=[];let uncertain=false
  const h=await harness({assetsDirectory:'public',origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7000'},outboundService:async request=>{
   const url=new URL(request.url)
-  if(url.hostname==='api.resend.com'){messages.push(await request.json());return Response.json({id:'synthetic-platter-7001'})}
+  if(url.hostname==='api.resend.com'){const message=await request.json();await beforeMail(message);messages.push(message);return Response.json({id:'synthetic-platter-7001'})}
   if(url.pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-7002'})
   if(url.pathname==='/api/users.info')return Response.json({ok:true,user:{team_id:'synthetic-platter-7002',profile:{email:h.auth.OWNER_EMAIL}}})
   if(url.pathname==='/api/conversations.info')return Response.json({ok:true,channel:{id:'synthetic-platter-7003',is_member:true}})
@@ -1014,7 +1014,9 @@ test('FOLLOW-003 sender expiry notices create dated follow-ups independently of 
    await h.cmd('proposal.approve',{id:p.id,version:3,revision:1});const sent=await h.cmd('proposal.send',{id:p.id,version:4})
    return {...p,path:new URL(sent.shareUrl).pathname}
   }
-  const normal=await create('Normal'),extended=await create('Extended'),accepted=await create('Accepted'),withdrawn=await create('Withdrawn')
+  const normal=await create('Normal'),extended=await create('Extended'),accepted=await create('Accepted'),withdrawn=await create('Withdrawn'),declined=await create('Declined'),manual=await create('Manual')
+  await h.cmd('followup.schedule',{id:manual.id,action:'Call about the existing scope',dueDate:'2030-03-20'})
+  const manualBefore=await h.db.prepare('SELECT * FROM p_followups WHERE proposal_id=?').bind(manual.id).first()
   await h.cmd('notification.defaults',{version:0,enabled:false,leadDays:3,renewalEnabled:true,renewalDays:30})
   const disabled=await create('Disabled')
   await h.cmd('expiry.set',{id:extended.id,version:5,mode:'date',date:'2030-03-22',warningDays:1})
@@ -1022,16 +1024,89 @@ test('FOLLOW-003 sender expiry notices create dated follow-ups independently of 
   const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(accepted.id).first()).body.match(/\b\d{6}\b/)[0],verified=await h.send(accepted.path+'/action?name=code.verify',{code})
   assert.equal((await h.send(accepted.path+'/action?name=accept',{optionId:'one',name:'Synthetic client',consent:true},verified.cookie)).status,200)
   await h.cmd('proposal.withdraw',{id:withdrawn.id,version:5,reason:'Closed',notice:false})
+  await h.send(declined.path+'/action?name=code.request',{})
+  const declineCode=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(declined.id).first()).body.match(/\b\d{6}\b/)[0]
+  const declineSession=await h.send(declined.path+'/action?name=code.verify',{code:declineCode})
+  assert.equal((await h.send(declined.path+'/action?name=decline',{revision:1,reason:'Not proceeding'},declineSession.cookie)).status,410)
   const notices=()=>h.messages.filter(m=>m.subject==='Proposal expiry approaching')
   await h.tick('2030-03-11T23:59:59Z');assert.equal(notices().length,0)
-  await Promise.all([h.tick('2030-03-12T00:00:00Z'),h.tick('2030-03-12T00:00:00Z')]);assert.equal(notices().length,1);assert.deepEqual(notices()[0].to,[h.auth.OWNER_EMAIL])
+  await Promise.all([h.tick('2030-03-12T00:00:00Z'),h.tick('2030-03-12T00:00:00Z')]);assert.equal(notices().length,2);for(const notice of notices())assert.deepEqual(notice.to,[h.auth.OWNER_EMAIL])
+  assert.deepEqual(await h.db.prepare('SELECT * FROM p_followups WHERE proposal_id=?').bind(manual.id).first(),manualBefore)
   const followup=(await h.send('/api/platter/followups',undefined,h.owner)).value.rows.find(r=>r.id===normal.id);assert.equal(followup.dueDate,'2030-03-12');assert.equal(followup.action,'Review approaching expiry')
   assert.equal((await h.db.prepare('SELECT deadline_at FROM p_expiry WHERE proposal_id=?').bind(normal.id).first()).deadline_at,Date.parse('2030-03-15T00:00:00Z'))
-  await h.tick('2030-03-14T00:00:00Z');assert.equal(h.messages.filter(m=>m.subject.startsWith('Expiry warning:')).length,2,'signer warnings remain independent for enabled and disabled sender notices')
-  await h.tick('2030-03-19T00:00:00Z');assert.equal(notices().length,2);assert.match(notices()[1].text,/2030-03-22/)
-  const runs=(await h.db.prepare('SELECT * FROM p_sender_notice_runs ORDER BY notice_date').all()).results;assert.deepEqual(runs.map(r=>r.notice_date),['2030-03-12','2030-03-19'])
+  await h.tick('2030-03-14T00:00:00Z');assert.equal(h.messages.filter(m=>m.subject.startsWith('Expiry warning:')).length,3,'signer warnings remain independent for enabled and disabled sender notices')
+  await h.tick('2030-03-19T00:00:00Z');assert.equal(notices().length,3);assert.match(notices().find(m=>m.text.includes(extended.id)).text,/2030-03-22/)
+  const runs=(await h.db.prepare('SELECT * FROM p_sender_notice_runs ORDER BY notice_date').all()).results;assert.deepEqual(runs.map(r=>r.notice_date),['2030-03-12','2030-03-12','2030-03-19'])
   await h.send('/auth/invite',{email:'sales@synthetic-platter.example',role:'member',displayName:'Sales'},h.owner);const cookie=await h.signIn('sales@synthetic-platter.example')
   await h.cmd('notification.defaults',{version:1,enabled:true,leadDays:2,renewalEnabled:true,renewalDays:20},cookie,403)
+ }finally{await h.close()}
+})
+
+test('FOLLOW-003 saved settings stay inactive and queued expiry email rechecks revocation, settings, sender demotion and revision authority', {timeout:120000},async()=>{
+ let race=null
+ const h=await notificationFixture(async message=>{if(message.subject==='Proposal expiry approaching'&&race){const change=race;race=null;await change(message)}})
+ try{
+  await h.tick('2031-03-01T12:00:00Z')
+  const email=['expiry-sender','synthetic-platter.example'].join(String.fromCharCode(64))
+  await h.send('/auth/invite',{email,role:'member',displayName:'Expiry sender'},h.owner)
+  const cookie=await h.signIn(email),sender=(await h.state(cookie)).actor
+  const adminEmail=['expiry-admin','synthetic-platter.example'].join(String.fromCharCode(64))
+  await h.send('/auth/invite',{email:adminEmail,role:'member',displayName:'Expiry admin'},h.owner)
+  const adminCookie=await h.signIn(adminEmail),admin=(await h.state(adminCookie)).actor
+  await h.cmd('member.set',{operatorId:admin.id,version:0,role:'admin',teams:[]})
+  const prepare=async(title,person=h.owner)=>{
+   const p=await h.cmd('proposal.prepare',{...offer,title,clientId:h.client.id},person)
+   await h.cmd('expiry.set',{id:p.id,version:1,mode:'days',days:14,warningDays:1},person)
+   return p
+  }
+  const saved=await prepare('Inactive settings')
+  await h.cmd('notification.expiry',{id:saved.id,version:2,action:'save',enabled:true,leadDays:3})
+  await h.cmd('proposal.approve',{id:saved.id,version:3,revision:1});await h.cmd('proposal.send',{id:saved.id,version:4})
+  for(const path of ['/app/settings','/app/proposal?id='+saved.id]){
+   assert.equal((await h.send(path,undefined,h.owner)).status,200)
+   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sender_notice_authority').first()).n,0)
+  }
+  const revoked=await prepare('Revoked before queue')
+  await h.cmd('notification.expiry',{id:revoked.id,version:2,consent:true})
+  await h.cmd('notification.expiry',{id:revoked.id,version:3,action:'revoke'})
+  await h.cmd('proposal.approve',{id:revoked.id,version:4,revision:1});await h.cmd('proposal.send',{id:revoked.id,version:5})
+  const authorized=[]
+  for(const kind of ['revoke','revoke','settings','settings','revision','revision','demotion','demotion','authorizer','authorizer']){
+   const person=kind==='demotion'?cookie:h.owner,p=await prepare(kind,person)
+   await h.cmd('notification.expiry',{id:p.id,version:2,consent:true},kind==='authorizer'?adminCookie:person)
+   await h.cmd('proposal.approve',{id:p.id,version:3,revision:1});await h.cmd('proposal.send',{id:p.id,version:4},person)
+   authorized.push({...p,kind,person})
+  }
+  // The first accepted delivery proves the allowed case. While its receiver is
+  // responding, invalidate the remaining already-queued work through public commands.
+  let first,demoted=false,adminDemoted=false
+  race=async message=>{
+   first=authorized.find(p=>message.text.includes(p.id));assert.ok(first)
+   for(const p of authorized.filter(p=>p.id!==first.id)){
+    if(p.kind==='revoke')await h.cmd('notification.expiry',{id:p.id,version:5,action:'revoke'})
+    if(p.kind==='settings')await h.cmd('notification.expiry',{id:p.id,version:5,action:'save',enabled:true,leadDays:2})
+    if(p.kind==='revision'){
+     const next=await h.cmd('proposal.negotiate',{...offer,id:p.id,version:5,clientId:h.client.id,scope:'Changed scope'})
+     await h.cmd('proposal.approve',{id:p.id,version:next.version,revision:next.revision})
+     await h.cmd('proposal.send',{id:p.id,version:next.version+1})
+    }
+    if(p.kind==='authorizer'&&!adminDemoted){await h.cmd('member.set',{operatorId:admin.id,version:1,role:'content_editor',teams:[]});adminDemoted=true}
+    if(p.kind==='demotion'&&!demoted){await h.cmd('member.set',{operatorId:sender.id,version:0,role:'content_editor',teams:[]});demoted=true}
+   }
+  }
+  await h.tick('2031-03-12T00:00:00Z')
+  assert.equal(h.messages.filter(m=>m.subject==='Proposal expiry approaching').length,1)
+  const runs=(await h.db.prepare('SELECT * FROM p_notification_outbox WHERE event_key LIKE ?').bind('expiry:%').all()).results
+  assert.equal(runs.length,10);assert.equal(runs.filter(r=>r.status==='sent').length,1);assert.equal(runs.filter(r=>r.status==='withheld').length,9)
+  await h.tick('2031-03-12T00:00:00Z')
+  assert.equal(h.messages.filter(m=>m.subject==='Proposal expiry approaching').length,1,'held work never replays')
+  const history=(await h.state()).expiryNotices.events
+  assert.ok(history.some(r=>r.proposal_id===revoked.id&&r.action==='revoked'))
+  assert.ok(history.some(r=>r.proposal_id===saved.id&&r.action==='saved'))
+  const baseline=await h.state()
+  await h.cmd('notification.expiry',{id:saved.id,version:1,consent:true},h.owner,409)
+  await h.cmd('notification.expiry',{id:saved.id,version:5,action:'authorize'},h.owner,400)
+  assert.deepEqual(await h.state(),baseline,'refused authority changes nothing')
  }finally{await h.close()}
 })
 

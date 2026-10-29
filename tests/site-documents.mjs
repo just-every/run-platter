@@ -879,3 +879,64 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
   await context.close()
  }finally{await browser?.close();await app?.close()}
 })
+
+test('FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke expiry email without activation on inspection', {timeout:120000},async()=>{
+ let app,browser
+ try{
+  app=await installedApp()
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  const context=await browser.newContext({viewport:{width:1440,height:1000}})
+  try{
+   const page=await context.newPage(),request=context.request
+   assert.equal((await request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Expiry owner'},maxRedirects:0})).status(),303)
+   await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+   const cmd=async(name,input)=>{const response=await request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
+   const state=async()=>{const response=await request.get(app.origin+'/api/platter/state');assert.equal(response.status(),200);return response.json()}
+   const client=await cmd('client.save',{name:'Expiry client',email:['expiry-client','synthetic-platter.example'].join(String.fromCharCode(64))})
+   const p=await cmd('proposal.prepare',{clientId:client.id,title:'Expiry controls',scope:'Notice timing controls',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+   await page.goto(app.origin+'/app/settings')
+   const defaults=page.locator('section').filter({has:page.getByRole('heading',{name:'Sender expiry defaults',exact:true})})
+   await defaults.getByLabel('Expiry lead days',{exact:true}).fill('5')
+   await defaults.getByRole('button',{name:'Save sender defaults'}).click()
+   assert.equal((await state()).expiryNoticeDefaults.lead_days,5)
+   assert.deepEqual((await state()).expiryNotices.active,[])
+   await page.goto(app.origin+'/app/proposal?id='+p.id)
+   const notice=page.locator('section').filter({has:page.getByRole('heading',{name:'Sender expiry notice',exact:true})})
+   assert.match(await notice.innerText(),/Inactive/)
+   assert.equal((await state()).expiryNotices.events.length,0,'inspection creates no consent')
+   await notice.getByText('Expiry notice Settings',{exact:true}).click()
+   await notice.getByLabel('Proposal expiry lead days').fill('3')
+   await notice.getByRole('button',{name:'Save expiry settings'}).click()
+   assert.deepEqual((await state()).expiryNotices.active,[])
+   const consent=notice.getByRole('checkbox')
+   await consent.check();await notice.getByRole('button',{name:'Authorize expiry email',exact:true}).click()
+   assert.match(await notice.innerText(),/Authorized for this revision/)
+   assert.deepEqual((await state()).expiryNotices.active,[p.id])
+   await notice.getByText('Expiry notice Settings',{exact:true}).click()
+   await notice.getByLabel('Proposal expiry lead days').fill('4')
+   await notice.getByRole('button',{name:'Save expiry settings'}).click()
+   assert.deepEqual((await state()).expiryNotices.active,[],'editing needs new authorization')
+   await consent.check();await notice.getByRole('button',{name:'Authorize expiry email',exact:true}).click()
+   await notice.getByRole('button',{name:'Revoke expiry email',exact:true}).click()
+   let snapshot=await state()
+   assert.deepEqual(snapshot.expiryNotices.active,[])
+   assert.equal(snapshot.expiryNotices.events.filter(e=>e.action==='authorized').length,2)
+   assert.equal(snapshot.expiryNotices.events.filter(e=>e.action==='revoked').length,1)
+   const fields=await notice.locator('input,select,button,summary,p,label').evaluateAll(nodes=>nodes.filter(n=>getComputedStyle(n).display!=='none').every(n=>parseFloat(getComputedStyle(n).fontSize)>=13))
+   assert.equal(fields,true)
+   const screenshots=process.env.PLATTER_SCREENSHOTS
+   if(screenshots){
+    await mkdir(screenshots,{recursive:true})
+    for(const width of [1440,390]){
+     await page.setViewportSize({width,height:1000})
+     await page.goto(app.origin+'/app/settings')
+     await defaults.screenshot({path:join(screenshots,'FOLLOW-003-defaults-'+width+'.png')})
+     await page.goto(app.origin+'/app/proposal?id='+p.id)
+     await notice.getByText('Expiry notice Settings',{exact:true}).click()
+     await notice.getByText('Expiry notice history',{exact:true}).click()
+     await notice.screenshot({path:join(screenshots,'FOLLOW-003-controls-'+width+'.png')})
+    }
+   }
+  }finally{await context.close()}
+ }finally{await browser?.close();await app?.close()}
+})

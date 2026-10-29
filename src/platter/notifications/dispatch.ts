@@ -3,7 +3,7 @@ import type { Bindings } from '../../auth.server'
 import { demoEffect } from '@runeditrun/rer/internal/modules/demo/index.mjs'
 import { operatorMail } from '../../mail.server.mjs'
 import { capturesMail } from '../mail'
-import { providerCredential } from '../connections'
+import { providerCredential, providerFetch, type ProviderCredential } from '../connections'
 import { actorById } from '../credentials'
 import { approvalPlan } from '../approvals'
 import { permitted } from '../permissions'
@@ -22,8 +22,8 @@ export async function activeRequest(env:Bindings,r:any) {
   return plan.plan===r.plan&&plan.steps.some(s=>s.id===r.step&&s.canApprove)
  }catch{return false}
 }
-export async function chatJson(url:string,token:string,body?:unknown) {
- const response=await fetch(url,{method:body===undefined?'GET':'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)}),redirect:'manual'})
+export async function chatJson(env:Bindings,credential:ProviderCredential,url:string,body?:unknown) {
+ const response=await providerFetch(env,credential,url,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)}),redirect:'manual'})
  need(response.ok,'Chat provider refused the request',409)
  const raw=await response.text();need(raw.length<=262144,'Chat provider response too large',409)
  const value=JSON.parse(raw);need(value&&value.ok!==false,'Chat provider refused the request',409);return value
@@ -47,12 +47,12 @@ export async function flushNotifications(env:Bindings) {
   try{
    if(capturesMail(env)){await db.prepare("UPDATE p_notification_outbox SET status='local' WHERE id=?").bind(row.id).run();continue}
    if(row.route_id){
-    const r=await db.prepare('SELECT * FROM p_notification_routes WHERE id=?').bind(row.route_id).first<any>(),{secret}=await providerCredential(env,'workspace:'+r.provider)
+    const r=await db.prepare('SELECT * FROM p_notification_routes WHERE id=?').bind(row.route_id).first<any>(),credential=await providerCredential(env,'workspace:'+r.provider)
     let destination=r.destination
-    if(r.provider==='slack'&&r.kind==='direct')destination=(await chatJson('https://slack.com/api/conversations.open',secret.token,{users:r.destination})).channel?.id
+    if(r.provider==='slack'&&r.kind==='direct')destination=(await chatJson(env,credential,'https://slack.com/api/conversations.open',{users:r.destination})).channel?.id
     need(destination,'The direct conversation is unavailable',409)
     if(!await allowed()){await db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE id=?").bind(row.id).run();continue}
-    await demoEffect(()=>r.provider==='slack'?chatJson('https://slack.com/api/chat.postMessage',secret.token,{channel:destination,text:row.subject+'\n'+row.body,unfurl_links:false,unfurl_media:false}):chatJson('https://graph.microsoft.com/v1.0/chats/'+encodeURIComponent(destination)+'/messages',secret.token,{body:{contentType:'text',content:row.subject+'\n'+row.body}}),()=>({}))
+    await demoEffect(()=>r.provider==='slack'?chatJson(env,credential,'https://slack.com/api/chat.postMessage',{channel:destination,text:row.subject+'\n'+row.body,unfurl_links:false,unfurl_media:false}):chatJson(env,credential,'https://graph.microsoft.com/v1.0/chats/'+encodeURIComponent(destination)+'/messages',{body:{contentType:'text',content:row.subject+'\n'+row.body}}),()=>({}))
    }else{
     const mail=operatorMail(env);need(mail,'Configure installation mail before sending notifications',409)
     if(!await allowed()){await db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE id=?").bind(row.id).run();continue}

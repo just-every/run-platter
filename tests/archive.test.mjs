@@ -801,8 +801,8 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
 
 
 test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority', {timeout:180000},async()=>{
- const fixed=Date.parse('2030-03-01T12:00:00Z'),sourceTexts=[]
- const sourceEdge=async request=>{if(new URL(request.url).hostname==='api.twilio.com'){sourceTexts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(7112+sourceTexts.length)},{status:201})}return Response.json({ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})}
+ const fixed=Date.parse('2030-03-01T12:00:00Z'),sourceTexts=[];let rejected=false
+ const sourceEdge=async request=>{if(new URL(request.url).hostname==='slack.com'&&rejected)return Response.json({ok:false,error:'token_revoked'});if(new URL(request.url).hostname==='api.twilio.com'){sourceTexts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(7112+sourceTexts.length)},{status:201})}return Response.json({ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})}
  const temporary=await mkdtemp(join(tmpdir(),'platter-notification-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored');let h
  try{
   for(const path of [source,restored])await checkout(path)
@@ -871,7 +871,10 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.equal((await h.send(completedPath+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},completedVerification.cookie)).status,200)
   assert.equal(sourceTexts.length,3);assert.ok(sourceTexts.at(-1).Body.includes(completedShare.shareUrl))
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sms_completion_authority').first()).n,1,'a real completion grant exists before export')
-  const tables=['p_sms_provider_optins','p_sms_reenable_history','p_sms_assents','p_sms_revocations','p_sms_code_runs','p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
+  rejected=true
+  await h.cmd('notification.route',{provider:'slack',event:'signed',kind:'channel',destination:'synthetic-platter-7101',consent:true},h.owner,409)
+  assert.equal((await h.state()).connections.find(c=>c.provider==='slack').status,'broken')
+  const tables=['p_connections','p_sms_provider_optins','p_sms_reenable_history','p_sms_assents','p_sms_revocations','p_sms_code_runs','p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
   assert.equal(before.p_sms_assents.length,3);assert.equal(before.p_sms_provider_optins.length,1);assert.equal(before.p_sms_reenable_history.length,1);assert.equal(before.p_sms_runs.filter(r=>r.kind==='completion').length,1)
   for(const table of ['p_sms_revocations','p_sms_code_runs','p_sms_optouts'])assert.equal(before[table].length,1,table+' has real history')
   assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,8,'the added scheduler tick retains the newly observed signature notice')
@@ -1039,26 +1042,34 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectDrive(h)
+  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService,auth:{GOOGLE_DRIVE_CLIENT_ID:'synthetic-platter-archive-oauth-client',GOOGLE_DRIVE_CLIENT_SECRET:'synthetic-platter-archive-oauth-secret'}});await connectDrive(h)
   const completed=await completeDriveAgreement(h)
   await h.cmd('archive.dispatch',{})
+  const broken=await completeDriveAgreement(h,'Broken credential archive history',completed.client.id)
+  fake.setHook(()=>Response.json({error:{message:driveToken}},{status:401}));await h.cmd('archive.dispatch',{});fake.setHook(undefined)
+  assert.equal((await h.state()).connections.find(c=>c.provider==='google_drive').status,'broken')
+  await h.cmd('provider.connect',{provider:'google_drive',version:1,token:driveToken,consent:true})
+  await h.cmd('archive.configure',{...driveSettings,version:1,connectionVersion:2})
   const queued=await completeDriveAgreement(h,'Queued archive history',completed.client.id)
-  const tables=['p_archive_settings','p_archive_jobs','p_archive_files','p_archive_folders','p_agreement_artifacts'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
-  assert.deepEqual(before.p_archive_jobs.map(j=>j.status).sort(),['complete','queued'])
+  const tables=['p_connections','p_archive_settings','p_archive_jobs','p_archive_files','p_archive_folders','p_agreement_artifacts'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
+  assert.deepEqual(before.p_archive_jobs.map(j=>j.status).sort(),['complete','held','queued'])
   const artifacts={}
   for(const kind of ['agreement','certificate']){
    const response=await h.mf.dispatchFetch(h.origin+completed.path+'/'+kind+'.pdf',{headers:{cookie:completed.cookie}});assert.equal(response.status,200);artifacts[kind]=Buffer.from(await response.arrayBuffer())
   }
   const certificate=(await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).value
+  const authorization=await h.send('/api/platter/drive/authorize',{consent:true},h.owner);assert.equal(authorization.status,303)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_drive_oauth').first()).n,1)
+  await h.db.prepare('INSERT INTO p_reminder_dispatch_lock VALUES(1,?,?)').bind(crypto.randomUUID(),Date.now()+900000).run()
   await h.close();h=undefined
   const archive=join(temporary,'drive.rer');await command(source,['export','--output',archive])
   const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(driveToken))
   const records=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
-  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0)
+  for(const table of ['p_drive_oauth','p_reminder_dispatch_lock','p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0)
   await command(restored,['import','--input',archive,'--yes'])
   const restoredFake=driveFixture();h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:restoredFake.outboundService})
   for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table],table+' retains exact history')
-  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  for(const table of ['p_drive_oauth','p_reminder_dispatch_lock','p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'});assert.equal(restoredFake.calls.length,0)
   const owner=await h.signIn(h.auth.OWNER_EMAIL)
   for(const kind of ['agreement','certificate']){
@@ -1068,9 +1079,11 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   const history=(await h.send('/api/platter/archives',undefined,owner)).value;assert.equal(history.settings.active,false);assert.ok(history.jobs.every(j=>!j.executable))
   assert.equal((await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).status,404)
   // Even reconnecting and explicitly authorizing future agreements cannot replay imported jobs.
-  await h.cmd('provider.connect',{provider:'google_drive',version:1,token:driveToken,consent:true},owner)
-  await h.cmd('archive.configure',{...driveSettings,version:1,connectionVersion:2},owner)
+  await h.cmd('provider.connect',{provider:'google_drive',version:2,token:driveToken,consent:true},owner)
+  await h.cmd('archive.configure',{...driveSettings,version:2,connectionVersion:3},owner)
   const calls=restoredFake.calls.length;await h.cmd('archive.dispatch',{},owner);assert.equal(restoredFake.calls.length,calls)
   await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
+  await h.cmd('archive.reconcile',{id:broken.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
+  assert.equal((await h.send('/api/platter/archives',undefined,owner)).value.jobs.find(j=>j.proposal_id===broken.proposal.id).status,'held')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

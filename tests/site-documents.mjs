@@ -775,7 +775,7 @@ test('CAT-001 reviewed CSV promotion and explicit recurring insertion preserve i
 
 test('AUTO-002 Settings authorizes Drive archiving and shows completed and held jobs with safe reconciliation', {timeout:120000},async()=>{
  const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{driveFixture,driveToken,driveRoot,completeDriveAgreement}=await import('./drive-fixture.mjs')
- const fake=driveFixture(),edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,outboundService:fake.outboundService});edge.attach(h)
+ const fake=driveFixture(),edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,auth:{GOOGLE_DRIVE_CLIENT_ID:'synthetic-platter-site-drive-client',GOOGLE_DRIVE_CLIENT_SECRET:'synthetic-platter-site-drive-secret'},outboundService:request=>new URL(request.url).hostname==='slack.com'?(new URL(request.url).pathname.endsWith('/auth.test')?Response.json({ok:true,team_id:'synthetic-platter-site-chat'}):Response.json({ok:false,error:'token_revoked'})):fake.outboundService(request)});edge.attach(h)
  let browser,context
  try{
   browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
@@ -784,7 +784,7 @@ test('AUTO-002 Settings authorizes Drive archiving and shows completed and held 
   const page=await context.newPage();await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
   await page.goto(h.origin+'/app/settings')
   const connection=page.locator('article').filter({has:page.getByRole('heading',{name:'Google Drive',exact:true})})
-  await connection.getByLabel('Google Drive access token').fill(driveToken);await connection.getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect Google Drive',exact:true}).click()
+  await connection.getByLabel('Google Drive access token').fill(driveToken);await connection.locator('form').filter({has:page.getByRole('button',{name:'Connect Google Drive',exact:true})}).getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect Google Drive',exact:true}).click()
   const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Completed document archiving',exact:true})})
   await panel.getByLabel('Drive destination folder id').fill(driveRoot);await panel.getByLabel('Archive naming pattern').fill('{client} - {title} - r{revision}');await panel.getByRole('checkbox').check();await panel.getByRole('button',{name:'Authorize Drive archiving',exact:true}).click()
   assert.equal(await page.getByRole('alert').count(),0);assert.match(await panel.innerText(),/Archiving is authorized/)
@@ -809,8 +809,42 @@ test('AUTO-002 Settings authorizes Drive archiving and shows completed and held 
    await panel.screenshot({path:join(screenshots,'AUTO-002-settings-390.png')})
   }
   await page.setViewportSize({width:1440,height:1000})
+  const stopped=await completeDriveAgreement(h,'Credential rejected archive',signed.client.id)
+  fake.setUncertain(false);fake.setHook(()=>Response.json({error:{message:driveToken}},{status:401}))
+  await fire();await page.reload()
+  assert.match(await connection.innerText(),/broken/)
+  assert.match(await connection.innerText(),/Reconnect to restore access/)
+  assert.match(await panel.innerText(),/Archiving is inactive/)
+  assert.match(await panel.getByRole('list',{name:'Document archive history'}).innerText(),/Credential rejected archive[\s\S]*held/)
+  const blockedCalls=fake.calls.length;await fire();assert.equal(fake.calls.length,blockedCalls)
+  assert.ok(!(await page.content()).includes(driveToken))
+  assert.ok(await connection.locator('p,button,label,input').evaluateAll(nodes=>nodes.every(node=>parseFloat(getComputedStyle(node).fontSize)>=13)))
+  await h.cmd('provider.connect',{provider:'slack',version:0,token:'synthetic-platter-site-chat-credential',consent:true})
+  await h.cmd('notification.route',{provider:'slack',event:'signed',kind:'channel',destination:'synthetic-platter-site-channel',consent:true},h.owner,409)
+  await page.reload()
+  const chat=page.locator('article').filter({has:page.getByRole('heading',{name:'Slack',exact:true})})
+  assert.match(await chat.innerText(),/broken/);assert.match(await chat.innerText(),/Reconnect to restore access/);assert.match(await chat.innerText(),/held work remains for review/)
+  if(screenshots){
+   for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000});await documentFonts(page)
+    await connection.screenshot({path:join(screenshots,'SEC-001-broken-connection-'+width+'.png')})
+    await chat.screenshot({path:join(screenshots,'SEC-001-broken-chat-'+width+'.png')})
+    await panel.screenshot({path:join(screenshots,'SEC-001-held-archives-'+width+'.png')})
+   }
+  }
+  await page.setViewportSize({width:1440,height:1000});fake.setHook(undefined)
+  await connection.getByLabel('Google Drive access token').fill(driveToken);await connection.locator('form').filter({has:page.getByRole('button',{name:'Connect Google Drive',exact:true})}).getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect Google Drive',exact:true}).click()
+  assert.doesNotMatch(await connection.innerText(),/broken/)
+  assert.match(await panel.innerText(),/Archiving is inactive/)
+  await panel.getByRole('checkbox').check();await panel.getByRole('button',{name:'Authorize Drive archiving',exact:true}).click()
+  const reconnectedCalls=fake.calls.length;await fire();assert.equal(fake.calls.length,reconnectedCalls)
+  assert.equal((await h.send('/api/platter/archives',undefined,h.owner)).value.jobs.find(j=>j.proposal_id===stopped.proposal.id).status,'held')
   await panel.getByRole('button',{name:'Revoke archiving authorization',exact:true}).click()
   assert.match(await panel.innerText(),/Archiving is inactive/)
+  await connection.getByLabel('I authorize app-selected Drive files and folders.').check()
+  await connection.getByRole('button',{name:'Authorize Google Drive',exact:true}).click()
+  const provider=new URL(await page.getByRole('link',{name:'Continue to Google',exact:true}).getAttribute('href'))
+  assert.equal(provider.origin,'https://accounts.google.com');assert.equal(provider.searchParams.get('scope'),'https://www.googleapis.com/auth/drive.file')
  }finally{await context?.close();await browser?.close();await edge.close();await h.close()}
 })
 async function documentFonts(page){await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))})}

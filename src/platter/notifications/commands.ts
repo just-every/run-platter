@@ -26,15 +26,15 @@ export async function notificationCommand(env:Bindings,a:Actor,name:string,p:Rec
   need(['channel','direct'].includes(kind)&&(provider!=='teams'||kind==='direct'),'Teams currently supports verified direct chats')
   need(event!=='approval'||kind==='direct','Approval requests require a verified direct recipient')
   const destination=text(p.destination,'a provider destination',200);need(/^[A-Za-z0-9_:@.\-]+$/.test(destination),'Use a provider destination identifier')
-  const {connection,secret}=await providerCredential(env,'workspace:'+provider)
+  const credential=await providerCredential(env,'workspace:'+provider),{connection}=credential
   let operatorId:string|null=null,recipientEmail:string|null=null
   if(kind==='direct'){
    const person=await actorById(db,text(p.operatorId,'a notification recipient'));need(person,'Choose an active person');operatorId=person.id;recipientEmail=person.email
-   if(provider==='slack'){const result=await chatJson('https://slack.com/api/users.info?user='+encodeURIComponent(destination),secret.token);need(!result.user?.deleted&&result.user?.team_id===connection.account_id&&result.user?.profile?.email?.toLowerCase()===person.email.toLowerCase(),'The Slack user must match the active member')}
-   else {const result=await chatJson('https://graph.microsoft.com/v1.0/chats/'+encodeURIComponent(destination)+'?$expand=members',secret.token);need(result.chatType==='oneOnOne'&&result.members?.some((m:any)=>m.email?.toLowerCase()===person.email.toLowerCase())&&result.members?.some((m:any)=>m.userId===connection.account_id),'The Teams chat must include the connected user and active member')}
-  }else {const result=await chatJson('https://slack.com/api/conversations.info?channel='+encodeURIComponent(destination),secret.token);need(result.channel?.id===destination&&result.channel?.is_member===true&&!result.channel?.is_archived,'Connect a joined active Slack channel')}
+   if(provider==='slack'){const result=await chatJson(env,credential,'https://slack.com/api/users.info?user='+encodeURIComponent(destination));need(!result.user?.deleted&&result.user?.team_id===connection.account_id&&result.user?.profile?.email?.toLowerCase()===person.email.toLowerCase(),'The Slack user must match the active member')}
+   else {const result=await chatJson(env,credential,'https://graph.microsoft.com/v1.0/chats/'+encodeURIComponent(destination)+'?$expand=members');need(result.chatType==='oneOnOne'&&result.members?.some((m:any)=>m.email?.toLowerCase()===person.email.toLowerCase())&&result.members?.some((m:any)=>m.userId===connection.account_id),'The Teams chat must include the connected user and active member')}
+  }else {const result=await chatJson(env,credential,'https://slack.com/api/conversations.info?channel='+encodeURIComponent(destination));need(result.channel?.id===destination&&result.channel?.is_member===true&&!result.channel?.is_archived,'Connect a joined active Slack channel')}
   const id=crypto.randomUUID()
-  await commit(db,a,[db.prepare('INSERT INTO p_notification_routes(id,event,provider,kind,destination,operator_id,recipient_email,connection_version,configured_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,event,provider,kind,destination,operatorId,recipientEmail,connection.version,a.id,at),db.prepare('INSERT INTO p_notification_route_authority(route_id) VALUES(?)').bind(id)],false,{sql:"EXISTS(SELECT 1 FROM p_connections WHERE id=? AND version=? AND status='connected')",values:[connection.id,connection.version]})
+  await commit(db,a,[db.prepare('INSERT INTO p_notification_routes(id,event,provider,kind,destination,operator_id,recipient_email,connection_version,configured_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,event,provider,kind,destination,operatorId,recipientEmail,connection.version,a.id,at),db.prepare('INSERT INTO p_notification_route_authority(route_id) VALUES(?)').bind(id)],false,{sql:"EXISTS(SELECT 1 FROM p_connections WHERE id=? AND version=? AND status='connected' AND broken_at IS NULL)",values:[connection.id,connection.version]})
   return {id}
  }
  if(name==='notification.route.remove'){

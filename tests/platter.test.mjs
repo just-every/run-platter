@@ -1365,8 +1365,8 @@ test('SEND-014 self-test mail uses only the active sign-in address, previews an 
 
 
 test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval',async()=>{
- const patches=[],reads=[],crm={timeout:false,revoke:null,pipeline:'synthetic-platter-9901'};let h
- h=await harness({outboundService:async request=>{const url=new URL(request.url);assert.equal(url.hostname,'api.hubapi.com');if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-9900'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9901',stages:[{id:'synthetic-platter-9902',metadata:{isClosed:'true',probability:'1.0'}},{id:'synthetic-platter-9903',metadata:{isClosed:'true',probability:'0.0'}},{id:'synthetic-platter-9982',metadata:{isClosed:'true',probability:'1.0'}},{id:'synthetic-platter-9983',metadata:{isClosed:'true',probability:'0.0'}}]}]});const id=url.pathname.split('/').at(-1);if(request.method==='GET'){reads.push(id);if(crm.revoke){const revoke=crm.revoke;crm.revoke=null;await revoke()}return Response.json({id,properties:{pipeline:crm.pipeline}})}assert.equal(request.method,'PATCH');const body=await request.json();patches.push({id,body});if(crm.timeout)throw Error('Synthetic uncertain CRM response');return Response.json({id,properties:body.properties})}})
+ const patches=[],reads=[],requests=[],crm={timeout:false,revoke:null,pipeline:'synthetic-platter-9901'};let h
+ h=await harness({outboundService:async request=>{const url=new URL(request.url);assert.equal(url.hostname,'api.hubapi.com');requests.push({path:url.pathname,method:request.method});if(crm.hook){const response=await crm.hook(request);if(response)return response}if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-9900'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9901',stages:[{id:'synthetic-platter-9902',metadata:{isClosed:'true',probability:'1.0'}},{id:'synthetic-platter-9903',metadata:{isClosed:'true',probability:'0.0'}},{id:'synthetic-platter-9982',metadata:{isClosed:'true',probability:'1.0'}},{id:'synthetic-platter-9983',metadata:{isClosed:'true',probability:'0.0'}}]}]});const id=url.pathname.split('/').at(-1);if(request.method==='GET'){reads.push(id);if(crm.revoke){const revoke=crm.revoke;crm.revoke=null;await revoke()}return Response.json({id,properties:{pipeline:crm.pipeline}})}assert.equal(request.method,'PATCH');const body=await request.json();patches.push({id,body});if(crm.timeout)throw Error('Synthetic uncertain CRM response');return Response.json({id,properties:body.properties})}})
  try{
  await h.cmd('provider.connect',{provider:'hubspot',version:0,token:'synthetic-platter-9904',consent:true})
  let destination=9910
@@ -1524,6 +1524,7 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
  const moved=await make('Destination moved after consent');await bind(moved.id,3);const movedBaseline=patches.length;crm.pipeline='synthetic-platter-9993';await h.cmd('proposal.lose',{id:moved.id,version:3,reason:'Budget'});crm.pipeline='synthetic-platter-9901';assert.equal(patches.length,movedBaseline);assert.equal((await h.state()).crmOutcomes.attempts.find(r=>r.proposal_id===moved.id).status,'withheld');await h.cmd('outcome.crm.sync',{id:moved.id});assert.equal(patches.length,movedBaseline,'a repaired destination never retries a held write')
  const reconnect=await make('Reconnected provider requires fresh consent');await bind(reconnect.id,3);await h.cmd('provider.connect',{provider:'hubspot',version:1,token:'synthetic-platter-9994',consent:true});assert.equal((await h.state()).crmOutcomes.bindings.find(r=>r.proposal_id===reconnect.id).authorized,0);const reconnectBaseline=patches.length;await h.cmd('proposal.lose',{id:reconnect.id,version:3,reason:'Budget'});await noCrm(reconnect.id,reconnectBaseline)
  assert.ok((await h.send('/api/platter/audit?action=outcome.crm.authorize',undefined,h.owner)).value.rows.some(r=>r.subject===won.id))
+ const {crmCredentialJourney}=await import('./crm-credential-journey.mjs');await crmCredentialJourney(h,{make,bind,crm,requests,patches})
 
  }finally{await h.close()}
 })
@@ -1797,8 +1798,8 @@ test('TEAM-001 provider connections verify accounts, seal credentials, enforce a
 })
 
 test('TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund',async()=>{
- const calls=[];let accepted,refunded=0,uncertain=false
- const h=await harness({outboundService:async request=>{const url=new URL(request.url);assert.equal(url.hostname,'api.stripe.com');calls.push({path:url.pathname,method:request.method});if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2400'});if(url.pathname==='/v1/charges/synthetic-platter-2401')return Response.json({id:'synthetic-platter-2401',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:refunded,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}});assert.equal(url.pathname,'/v1/refunds');assert.equal(request.method,'POST');assert.match(request.headers.get('idempotency-key'),/^platter-refund-/);const body=new URLSearchParams(await request.text());assert.equal(body.get('charge'),'synthetic-platter-2401');if(uncertain)return new Response(null,{status:503});const amount=Number(body.get('amount'));refunded+=amount;assert.ok(refunded<=accepted.deposit_cents);return Response.json({id:'synthetic-platter-'+(2500+calls.length),charge:'synthetic-platter-2401',amount,status:'succeeded'})}})
+ const calls=[];let accepted,refunded=0,uncertain=false,providerHook
+ const h=await harness({outboundService:async request=>{const url=new URL(request.url);assert.equal(url.hostname,'api.stripe.com');calls.push({path:url.pathname,method:request.method});if(providerHook){const response=await providerHook(request);if(response)return response}if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2400'});if(url.pathname==='/v1/charges/synthetic-platter-2401')return Response.json({id:'synthetic-platter-2401',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:refunded,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}});assert.equal(url.pathname,'/v1/refunds');assert.equal(request.method,'POST');assert.match(request.headers.get('idempotency-key'),/^platter-refund-/);const body=new URLSearchParams(await request.text());assert.equal(body.get('charge'),'synthetic-platter-2401');if(uncertain)return new Response(null,{status:503});const amount=Number(body.get('amount'));refunded+=amount;assert.ok(refunded<=accepted.deposit_cents);return Response.json({id:'synthetic-platter-'+(2500+calls.length),charge:'synthetic-platter-2401',amount,status:'succeeded'})}})
  try{
   const people={};for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[]});people[role]=cookie}
   const {p,path}=await sent(h),cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},cookie)).status,200);accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
@@ -1872,7 +1873,8 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   await worker.scheduled({scheduledTime:new Date(saved.nextRunAt),cron:'*/15 * * * *'});await worker.scheduled({scheduledTime:new Date(saved.nextRunAt),cron:'*/15 * * * *'})
   const nativeMail=(await h.state()).reportOutbox.filter(m=>m.body.includes('Booked first-year value: $16,900.00 USD'))
   assert.equal(nativeMail.length,1);assert.ok(nativeMail[0].body.includes((await h.send('/api/platter/pipeline.csv?'+filters,undefined,h.owner)).text));assert.match(nativeMail[0].body,/Received payments: \$3,600\.00 USD/)
-
+ uncertain=false
+ const {paymentCredentialJourney}=await import('./payment-credential-journey.mjs');await paymentCredentialJourney(h,{linked,calls,setHook:value=>{providerHook=value},chargeId:'synthetic-platter-2401'})
 
  }finally{await h.close()}
 })
@@ -3480,6 +3482,8 @@ test('AUTO-002 completed agreements archive exact PDFs once under explicit curre
   let revoked=false;fake.setHook(async request=>{if(!revoked&&new URL(request.url).pathname.endsWith('/generateIds')){revoked=true;await h.cmd('archive.revoke',{version:3})}})
   const preRevokePosts=posts();await tick();assert.equal(revoked,true);assert.equal(posts(),preRevokePosts)
   const audit=await h.send('/api/platter/audit?action=archive.configure',undefined,h.owner);assert.ok(audit.value.rows.length>=3)
+  const {driveCredentialJourney}=await import('./drive-credential-journey.mjs');await driveCredentialJourney(h,fake)
+  const {driveOAuthJourney}=await import('./drive-oauth-journey.mjs');await driveOAuthJourney()
  }finally{await h.close()}
 })
 

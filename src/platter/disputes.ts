@@ -1,5 +1,5 @@
 import type { Bindings } from '../auth.server'
-import { providerCredential, providerJson } from './connections'
+import { providerCredential, connectedJson, providerFetch } from './connections'
 import { commit, exact, need, text, type Actor } from './model'
 import { paperRow } from './paper-record'
 import { copyAttachments } from './attachments'
@@ -24,7 +24,7 @@ export async function disputeState(env:Bindings,a:Actor){
 async function paymentFor(env:Bindings,id:string){const p=await env.DB.prepare("SELECT * FROM p_payment_records WHERE id=? AND method='stripe'").bind(id).first<any>();need(p,'Choose a linked Stripe deposit',404);return p}
 async function remoteDispute(env:Bindings,payment:any,id:string){
  const credentials=await providerCredential(env,'workspace:stripe');need(credentials.secret.accountId===payment.reference,'Reconnect the Stripe account holding this deposit',409)
- const value=await providerJson('https://api.stripe.com/v1/disputes/'+encodeURIComponent(id),credentials.secret.token)
+ const value=await connectedJson(env,credentials,'https://api.stripe.com/v1/disputes/'+encodeURIComponent(id))
  need(value.id===id&&value.charge===payment.provider_charge&&value.currency?.toUpperCase()===payment.currency&&Number.isSafeInteger(value.amount)&&value.amount>0&&value.amount<=payment.cents,'Stripe dispute does not match this deposit',409)
  const deadline=Number(value.evidence_details?.due_by)*1000
  need(Number.isSafeInteger(deadline)&&deadline>0,'Stripe did not provide an evidence deadline',409)
@@ -119,10 +119,10 @@ export async function disputeCommand(env:Bindings,a:Actor,name:string,p:Record<s
   const remote=await remoteDispute(env,payment,id)
   need(remote.value.amount===packet.cents&&remote.deadline===packet.deadline,'The disputed amount or deadline changed. Reconcile with Stripe.',409)
   need(responseStatuses.includes(remote.value.status)&&remote.deadline>Date.now(),'Stripe no longer accepts this response',409)
-  const token=remote.credentials.secret.token,upload=new FormData();upload.set('purpose','dispute_evidence');upload.set('file',new File([bytes],'acceptance-evidence.pdf',{type:'application/pdf'}))
-  const receipt=await fetch('https://files.stripe.com/v1/files',{method:'POST',redirect:'manual',headers:{authorization:'Bearer '+token,'idempotency-key':'platter-dispute-file-'+requestId},body:upload})
+  const upload=new FormData();upload.set('purpose','dispute_evidence');upload.set('file',new File([bytes],'acceptance-evidence.pdf',{type:'application/pdf'}))
+  const receipt=await providerFetch(env,remote.credentials,'https://files.stripe.com/v1/files',{method:'POST',redirect:'manual',headers:{'idempotency-key':'platter-dispute-file-'+requestId},body:upload})
   if(receipt.ok){const file:any=await receipt.json();need(packet.deadline>Date.now(),'Evidence deadline passed during upload',409);if(typeof file.id==='string'&&file.id.length<=200){
-   const response=await fetch('https://api.stripe.com/v1/disputes/'+encodeURIComponent(id),{method:'POST',redirect:'manual',headers:{authorization:'Bearer '+token,'content-type':'application/x-www-form-urlencoded','idempotency-key':'platter-dispute-submit-'+requestId},body:new URLSearchParams({'evidence[service_documentation]':file.id,submit:'true'})})
+   const response=await providerFetch(env,remote.credentials,'https://api.stripe.com/v1/disputes/'+encodeURIComponent(id),{method:'POST',redirect:'manual',headers:{'content-type':'application/x-www-form-urlencoded','idempotency-key':'platter-dispute-submit-'+requestId},body:new URLSearchParams({'evidence[service_documentation]':file.id,submit:'true'})})
    if(response.ok){const result:any=await response.json();if(result.id===id){if(['under_review','warning_under_review'].includes(result.status)){status='submitted';providerStatus=result.status}else if(['won','lost'].includes(result.status))providerStatus=result.status}}
   }}
  }catch{/* Exact bytes and the claim remain held for explicit provider reconciliation. */}

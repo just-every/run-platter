@@ -1,16 +1,25 @@
-import { need } from '../model'
+import { credentialRefused } from '../connections'
+import { fail, need } from '../model'
 
 // Each request obtains a fresh credential only after checking execution authority.
-export type DriveAuthority = () => Promise<string>
+export type DriveAuthority = () => Promise<{token:string;credentialRejected:()=>Promise<void>}>
 const base='https://www.googleapis.com/drive/v3/files'
 export async function driveRequest(authorize:DriveAuthority,url:string,init:RequestInit={}){
- const token=await authorize()
- return fetch(url,{...init,headers:{...init.headers,authorization:'Bearer '+token},redirect:'manual',signal:AbortSignal.timeout(30000)})
+ const credential=await authorize(),timeout=AbortSignal.timeout(30000)
+ let response:Response
+ try{response=await fetch(url,{...init,headers:{...init.headers,authorization:'Bearer '+credential.token},redirect:'manual',signal:timeout})}
+ catch{return fail(timeout.aborted?'Drive request timed out; its outcome is uncertain. Review the held archive; no automatic write retry.':'Drive request outcome is uncertain. Review the held archive; no automatic write retry.',409)}
+ if(await credentialRefused(response)){
+  await credential.credentialRejected()
+  fail('Drive rejected this credential or its access scope. Reconnect in Settings; affected archives stay held for review.',409)
+ }
+ need(response.status!==429,'Drive rate limit reached. Review the held archive before further requests.',409)
+ return response
 }
 async function json(response:Response){
  need(response.ok,'Drive refused the archive request; reconcile before any further write',409)
  const raw=await response.text();need(raw.length<=262144,'Drive returned an oversized archive response',409)
- return JSON.parse(raw)
+ try{return JSON.parse(raw)}catch{return fail('Drive returned an invalid archive response; review before any further request',409)}
 }
 export async function driveFolder(authorize:DriveAuthority,id:string){
  const value=await json(await driveRequest(authorize,base+'/'+encodeURIComponent(id)+'?fields=id,name,mimeType,trashed,parents,appProperties,capabilities(canAddChildren)'))

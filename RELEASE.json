@@ -269,6 +269,14 @@
     {
       "id": "0090_client_locale.sql",
       "buyerSteps": "None. Adds owner-selected English or Spanish client language while retaining historical agreement language without inference."
+    },
+    {
+      "id": "0099_drive_oauth.sql",
+      "buyerSteps": "None. Adds private, single-use Drive OAuth callback state; owners must explicitly authorize app-selected Drive access. Existing held jobs do not restart."
+    },
+    {
+      "id": "0100_reminder_dispatch_lock.sql",
+      "buyerSteps": "None. Serializes scheduled reminder dispatch without changing existing reminder authorization."
     }
   ],
   "breaking": false,

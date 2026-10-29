@@ -19,14 +19,63 @@ export async function openCredential(env:Bindings,id:string,sealed:string){
  const plaintext=await crypto.subtle.decrypt({name:'AES-GCM',iv:bytes(envelope.iv),additionalData:new TextEncoder().encode(id)},await encryptionKey(env),bytes(envelope.data))
  return JSON.parse(new TextDecoder().decode(plaintext))
 }
-export async function providerCredential(env:Bindings,id:string){
- const row=await env.DB.prepare("SELECT c.*,s.sealed FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.status='connected'").bind(id).first<any>()
+export async function providerCredential(env:Bindings,id:string):Promise<{connection:any;secret:any}>{
+ const row=await env.DB.prepare("SELECT c.*,s.sealed FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.status='connected' AND c.broken_at IS NULL").bind(id).first<any>()
  need(row,'Connect this provider again before using it',409)
  try{
   const secret=await openCredential(env,id,row.sealed)
   need(secret.accountId===row.account_id&&secret.provider===row.provider,'Provider credential binding changed',409)
-  return {connection:row,secret}
- }catch{return fail('Connect this provider again before using it',409)}
+  const credential={connection:row,secret}
+  return row.provider==='google_drive'&&secret.oauth?await (await import('./drive-oauth')).refreshDrive(env,credential):credential
+ }catch(error){if(error instanceof Error&&'status' in error)throw error;return fail('Connect this provider again before using it',409)}
+}
+// A provider response belongs to the credential version used for that request.
+// A delayed refusal must never break a replacement connection.
+export async function markConnectionBroken(env:Bindings,id:string,version:number,sealed?:string){
+ await env.DB.prepare("UPDATE p_connections SET broken_at=? WHERE id=? AND version=? AND status='connected' AND broken_at IS NULL AND (? IS NULL OR EXISTS(SELECT 1 FROM p_connection_secrets s WHERE s.connection_id=p_connections.id AND s.sealed=?))").bind(Date.now(),id,version,sealed??null,sealed??null).run()
+}
+export type ProviderCredential = Awaited<ReturnType<typeof providerCredential>>
+export class ProviderCredentialRejected extends Error { status=409 }
+// Resource permissions and transient failures do not establish credential loss.
+export async function credentialRefused(response:Response,provider?:string){
+ if(response.status===401)return true
+ if(response.status===403&&/\berror=(?:"insufficient_scope"|insufficient_scope\b)/i.test(response.headers.get('www-authenticate')??''))return true
+ if(response.status!==403&&!(provider==='slack'&&response.ok))return false
+ try{
+  const raw=await response.clone().text();if(raw.length>262144)return false
+  const value=JSON.parse(raw),error=value?.error
+  if(provider==='slack'&&value?.ok===false)return ['invalid_auth','not_authed','token_revoked','token_expired','account_inactive','missing_scope'].includes(error)
+  if(provider==='hubspot'&&value?.category==='MISSING_SCOPES')return true
+  return error?.errors?.some((item:any)=>item.reason==='insufficientPermissions')===true||error?.details?.some((item:any)=>item.reason==='ACCESS_TOKEN_SCOPE_INSUFFICIENT')===true
+ }catch{return false}
+}
+export async function currentConnection(env:Bindings,credential:ProviderCredential){
+ const {id,version,sealed}=credential.connection
+ need(await env.DB.prepare("SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL AND (? IS NULL OR s.sealed=?)").bind(id,version,sealed??null,sealed??null).first(),'The provider connection changed. Review this operation before trying again.',409)
+}
+export async function rejectCredential(env:Bindings,credential:ProviderCredential){
+ const {id,version,sealed}=credential.connection
+ await markConnectionBroken(env,id,version,sealed)
+ // A replacement connection must not inherit an old request's failure or work.
+ need(await env.DB.prepare("SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.version=? AND c.status='connected' AND (? IS NULL OR s.sealed=?)").bind(id,version,sealed??null,sealed??null).first(),'The provider connection changed. Review this operation before trying again.',409)
+ throw new ProviderCredentialRejected('The provider rejected this credential or its access scope. Reconnect in Settings; affected work stays held for review.')
+}
+export async function providerFetch(env:Bindings,credential:ProviderCredential,url:string,init:RequestInit={}){
+ await currentConnection(env,credential)
+ const headers=new Headers(init.headers);headers.set('authorization','Bearer '+credential.secret.token)
+ let response:Response
+ try{response=await fetch(url,{...init,headers,redirect:'manual',signal:init.signal??AbortSignal.timeout(30000)})}
+ catch{return fail('The provider request outcome is uncertain. Review the held operation before any further write.',409)}
+ if(await credentialRefused(response,credential.connection.provider))await rejectCredential(env,credential)
+ await currentConnection(env,credential)
+ return response
+}
+export async function connectedJson(env:Bindings,credential:ProviderCredential,url:string){
+ const response=await providerFetch(env,credential,url,{headers:{accept:'application/json'}})
+ need(response.ok,'The provider refused this request. Review the held operation before any further write.',409)
+ const raw=await response.text();need(raw.length<=262144,'The provider response was too large',409)
+ try{const value=JSON.parse(raw);need(value&&typeof value==='object','The provider response was invalid',409);return value}
+ catch{return fail('The provider response was invalid. Review the held operation before any further write.',409)}
 }
 export async function providerJson(url:string,token:string){
  try{
@@ -52,7 +101,7 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
  const guard:{sql:string;values:any[]}={sql:'COALESCE((SELECT version FROM p_connections WHERE id=?),0)=?',values:[id,old?.version??0]}
  if(name==='provider.disconnect'){
   need(old,'Connection not found',404)
-  await commit(db,a,[db.prepare("UPDATE p_connections SET status='disconnected',broken_at=NULL,version=version+1 WHERE id=?").bind(id),db.prepare('DELETE FROM p_connection_secrets WHERE connection_id=?').bind(id)],false,guard)
+  await commit(db,a,[db.prepare("UPDATE p_connections SET status='disconnected',broken_at=NULL,version=version+1 WHERE id=?").bind(id),db.prepare('DELETE FROM p_connection_secrets WHERE connection_id=?').bind(id),...(provider==='google_drive'?[db.prepare('DELETE FROM p_drive_oauth')]:[])],false,guard)
   return {id,status:'disconnected'}
  }
  need(name==='provider.connect','Unknown provider action',404)

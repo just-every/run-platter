@@ -421,7 +421,7 @@ test('MAIL-001 hosted mail commits and claims before provider acceptance; timeou
 
 // The fake is only the configured provider's outbound HTTP and signed callback.
 // Native sessions, application HTTP, D1, serializers and intake are production.
-test('SEND-006 / SEND-002 signed provider delivery, durable sender notice and actionable address correction', { timeout: 120000 }, async () => {
+test('SEND-006 / SEND-002 / SEND-012 signed provider delivery, durable sender notice and actionable address correction', { timeout: 120000 }, async () => {
  const { createHmac, randomBytes } = await import('node:crypto')
  const keyBytes=randomBytes(32), webhookKey='whsec_'+keyBytes.toString('base64')
  const calls=[]
@@ -511,7 +511,7 @@ test('SEND-006 / SEND-002 signed provider delivery, durable sender notice and ac
  }finally{await h.close()}
 })
 
-test('SEND-002 SendGrid signed correlation, queued state, uncertainty and logged dismissal', {timeout:60000}, async()=>{
+test('SEND-002 / SEND-012 SendGrid signed correlation, queued state, uncertainty and logged dismissal', {timeout:60000}, async()=>{
  const {generateKeyPairSync,sign,randomBytes}=await import('node:crypto')
  const {publicKey,privateKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'})
  const key=publicKey.export({type:'spki',format:'der'}).toString('base64'),calls=[]
@@ -582,7 +582,7 @@ test('APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign send
  }finally{await h.close()}
 })
 
-test('SEND-001 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail', async()=>{
+test('SEND-001 / SEND-011 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail', async()=>{
  let address='mailbox@synthetic-platter.example',verified=true,aliasVerified=true,hasSmtp=true,hasScope=true,refused=false,timeout=false,demoteDuringRefresh=false
  const inbound=inboundMailFixture(),calls=[],gmail=[],graph=[],installation=[]
  const h=await harness({origin:'https://platter.example',auth:{...inbound.settings,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5100',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5101',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5102',MICROSOFT_MAIL_CLIENT_ID:'synthetic-platter-5103',MICROSOFT_MAIL_CLIENT_SECRET:'synthetic-platter-5104'},outboundService:async request=>{
@@ -808,7 +808,7 @@ test('SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient q
  }finally{await h.close()}
 })
 
-test('FOLLOW-001 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap', {timeout:120000}, async()=>{
+test('FOLLOW-008 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap', {timeout:120000}, async()=>{
  const mail=[];const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-6300'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mail.push(await request.json());return Response.json({id:'synthetic-platter-'+(6301+mail.length)})}})
  try{
   await finishSetup(h);const people={}
@@ -894,7 +894,7 @@ test('SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdra
  }finally{await h.close()}
 })
 
-test('FOLLOW-001 / FOLLOW-006 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority', {timeout:120000}, async()=>{const {remindersHttp}=await import('./reminders-http.mjs');await remindersHttp()})
+test('FOLLOW-001 / FOLLOW-006 / FOLLOW-011 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority', {timeout:120000}, async()=>{const {remindersHttp}=await import('./reminders-http.mjs');await remindersHttp()})
 
 test('FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority', {timeout:120000}, async()=>{const {reminderMessagesHttp}=await import('./reminders-http.mjs');await reminderMessagesHttp()})
 

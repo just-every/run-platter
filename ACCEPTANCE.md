@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `2231cdd8595340fa66cabf955a79a377361dd4dc` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. EDIT-009 is a builder completion claim with independently filled West and East variable conditions, pending exact-candidate Verify and guarded landing. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -321,7 +321,7 @@ Core · target · **missing** · Cites BASE-PUBLIC-002, BASE-MAIL-001 · Rules D
 
 #### EDIT-009 — Conditional content by package
 
-Core · target · **partial** · Rules D-1
+Core · target · **done** · Rules D-1
 
 **Requirement.** Sections can depend on a package, optional item or variable value. Each selection’s client page, unsigned and signed PDFs and immutable agreement contain exactly its visible sections. Optional-item conditions require that the chosen package contains and selects that item at an allowed quantity; unconditional content remains visible. Members compare selections in EDIT-018. Detailed condition custody is in [proposal behavior](docs/contract-behavior.md#edit-009).
 
@@ -330,8 +330,8 @@ Core · target · **partial** · Rules D-1
 
 2. A variable-dependent section follows the filled variable on preview, client page, agreement and PDF.
 
-**Evidence.** `src/platter/conditional.ts`; `tests/platter.test.mjs` — “EDIT-009 conditional sections match selected preview, client, PDF and immutable agreement; revisions, copies and negotiations retain rules”; `tests/site.test.mjs` — “MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
-**Gap.** Delivered: Package and optional-item conditions retain matching client, agreement and PDF content. Missing “EDIT-009 complete conditional content by package journey”: A filled-variable condition is followed through preview, client, immutable agreement and PDF in one complete selection journey.
+**Evidence.** `src/platter/conditional.ts`; `src/platter/variables.ts`; `tests/platter.test.mjs` — “EDIT-009 conditional sections match selected preview, client, PDF and immutable agreement; revisions, copies and negotiations retain rules”, calling regionalConditions in `tests/conditional-journey.mjs`; `tests/site.test.mjs` — “EDIT-009 desktop and phone configure, preview, select, download and accept conditional package sections” (registered through `tests/site-documents.mjs`, calling regionalBrowser in `tests/conditional-browser.mjs`); `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority”, calling regionalConditions and restoredRegionalConditions in `tests/conditional-journey.mjs`
+**Gap.** None.
 
 #### EDIT-010 — Attachments and vendor documents
 

@@ -1,5 +1,6 @@
 import type { Bindings } from '../auth.server'
 import { providerCredential, providerJson } from './connections'
+import { hubspotJson } from './crm/hubspot-request'
 import { editablePackages, pricingInput } from './pricing'
 import { editableTerms } from './payment-terms'
 import { need, type Actor } from './model'
@@ -29,7 +30,7 @@ async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFiel
  if(deal){
   need(['owner','admin'].includes(a.role),'Only owner and admins read connected deals',403)
   need(deal.provider!=='orbit','Orbit currently exposes deal fields but no scoped contact-read route. Its contact API is required for complete variable refill.',409)
-  const {secret}=await providerCredential(env,'workspace:'+deal.provider)
+  const {connection,secret}=await providerCredential(env,'workspace:'+deal.provider)
   if(deal.provider==='salesforce'){
    need(typeof secret.instanceOrigin==='string','Reconnect Salesforce with a verified REST instance before reading opportunities',409)
    const d=await providerJson(secret.instanceOrigin+'/services/data/v64.0/sobjects/Opportunity/'+encodeURIComponent(deal.id)+'?fields=Name,Amount,Account.Name,Account.BillingStreet',secret.token)
@@ -38,11 +39,11 @@ async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFiel
    if(contact){for(const [key,v]of Object.entries({'Client.FirstName':contact.FirstName,'Client.LastName':contact.LastName,'Client.Name':[contact.FirstName,contact.LastName].filter(Boolean).join(' '),'Contact.Name':[contact.FirstName,contact.LastName].filter(Boolean).join(' '),'Contact.Title':contact.Title,'Client.Title':contact.Title,'Client.Email':contact.Email}))if(v)values[key]=String(v)}
    return values
   }
-  const d=await providerJson('https://api.hubapi.com/crm/v3/objects/deals/'+encodeURIComponent(deal.id)+'?properties=dealname,amount&associations=contacts',secret.token),props=d.properties??{}
+  const d=await hubspotJson(env,connection,secret.token,'https://api.hubapi.com/crm/v3/objects/deals/'+encodeURIComponent(deal.id)+'?properties=dealname,amount&associations=contacts'),props=d.properties??{}
   if(props.dealname)values['Deal.Name']=String(props.dealname)
   if(props.amount!==undefined&&props.amount!==null)values['Deal.Amount']=String(props.amount)
   const id=d.associations?.contacts?.results?.[0]?.id
-  if(id){const contact=await providerJson('https://api.hubapi.com/crm/v3/objects/contacts/'+encodeURIComponent(id)+'?properties=firstname,lastname,jobtitle,company,address,email',secret.token),p=contact.properties??{}
+  if(id){const contact=await hubspotJson(env,connection,secret.token,'https://api.hubapi.com/crm/v3/objects/contacts/'+encodeURIComponent(id)+'?properties=firstname,lastname,jobtitle,company,address,email'),p=contact.properties??{}
    for(const [key,v]of Object.entries({'Client.Company':p.company,'Client.FirstName':p.firstname,'Client.LastName':p.lastname,'Client.Name':[p.firstname,p.lastname].filter(Boolean).join(' '),'Contact.Name':[p.firstname,p.lastname].filter(Boolean).join(' '),'Client.Title':p.jobtitle,'Contact.Title':p.jobtitle,'Client.Address':p.address,'Client.Email':p.email}))if(v)values[key]=String(v)
   }
  }

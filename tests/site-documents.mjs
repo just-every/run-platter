@@ -883,9 +883,9 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
 test('CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows', { timeout: 120000 }, async () => {
  const { harness } = await import('./harness.mjs'), { browserEdge } = await import('./browser-edge.mjs'), { hubspotSyncFixture } = await import('./hubspot-sync-fixture.mjs')
  const edge = await browserEdge(), provider = hubspotSyncFixture()
- let h, browser
+ let h, browser, refuseCrm = false
  try {
-  h = await harness({ entry: './dist/server/index.js', assetsDirectory: './dist/client', origin: edge.origin, outboundService: provider.request }); edge.attach(h)
+  h = await harness({ entry: './dist/server/index.js', assetsDirectory: './dist/client', origin: edge.origin, outboundService: request => refuseCrm && new URL(request.url).pathname.includes('/objects/deals/') ? new Response(null, { status: 401 }) : provider.request(request) }); edge.attach(h)
   browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ignoreHTTPSErrors: true })
   try {
@@ -928,6 +928,16 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
    assert.equal(provider.calls.length, calls, 'opening a copied draft never synchronizes provider data')
    assert.equal((await h.state()).proposals[0].options[0].cents, 36122)
    await (await import('./hubspot-browser.mjs')).hubspotBrowser({h,page,provider,current,capture})
+   refuseCrm = true
+   await h.cmd('crm.deal.review', { ...provider.selected, dealId: provider.state.deal.id }, h.owner, 409)
+   await page.setViewportSize({ width: 1440, height: 900 }); await page.goto(h.origin + '/app/settings')
+   const connections = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Workspace provider connections', exact: true }) })
+   assert.match(await connections.innerText(), /hubspot.*broken/is)
+   await capture(connections, 'revoked-connection')
+   await page.goto(h.origin + '/app')
+   assert.equal(await page.getByRole('button', { name: 'Read HubSpot deal', exact: true }).count(), 0)
+   assert.match(await page.getByRole('heading', { name: 'Start from HubSpot', exact: true }).locator('..').innerText(), /Connect HubSpot under Settings/)
+   await capture(page.getByRole('heading', { name: 'Start from HubSpot', exact: true }).locator('..'), 'revoked-start')
   } finally { await context.close() }
  } finally { await browser?.close(); await h?.close(); await edge.close() }
 })

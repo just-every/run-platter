@@ -2562,15 +2562,15 @@
       "executable": false
     },
     "src/platter/crm/hubspot-draft.ts": {
-      "sha256": "1ac576ed96d6b0e784326a3d479b6ff7c155ba011599fe8a8bae3580dc779ca7",
+      "sha256": "c6f8dfb2011eff14db3bb861ceda84687cb490f099600c2cc5424a67bf069062",
       "executable": false
     },
     "src/platter/crm/hubspot-sync-plan.ts": {
-      "sha256": "8dbf82b5da81104cb88adaafb39325bb4bf94622e363dbc634d12545f98fe036",
+      "sha256": "3ac939090d851e2cfe645a8fc733e15d0012cee6803780ca4cfbb81569227682",
       "executable": false
     },
     "src/platter/crm/hubspot-sync.ts": {
-      "sha256": "a8c1e2c5a647daf8979c1e6776257d4e94def539773e5a9fa6f6d8c4e2399d8e",
+      "sha256": "a9144d8851c375b849c624155486dfcc0c27c241b23785b2dcb1c7146929daff",
       "executable": false
     },
     "src/platter/delivery-intake.d.mts": {
@@ -3270,7 +3270,7 @@
       "executable": false
     },
     "src/platter/variables.ts": {
-      "sha256": "5eea383a8824a64bd8d8dbf619def12d8670410c5991252bd6247f3424a3cd59",
+      "sha256": "062eeaa65c52d91c1844d02ed5ffbc7828e746fd0da7bac92c8ddca1bc4b1606",
       "executable": false
     },
     "src/platter/withdrawal.ts": {
@@ -3494,7 +3494,7 @@
       "executable": false
     },
     "tests/hubspot-sync-journey.mjs": {
-      "sha256": "9d9d56501b56cd13416835a53e04cf226f5481c15c1d8490e227c434cb4dae7f",
+      "sha256": "966d13e649862c68a4cd9009e9b7b00d6e2d81e6083b1ef2bfce28122c031d18",
       "executable": false
     },
     "tests/inbound-mail-fixture.mjs": {
@@ -3586,7 +3586,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "583da9415960756e1aa17eeccd68bcfff23f4af4bb68b9225483b3521b698604",
+      "sha256": "94f8c61baf15ebdbfbc4323619e258e71d92b94a4fce0d8d1f0ca2be5b9a0267",
       "executable": false
     },
     "tests/site-harness.mjs": {

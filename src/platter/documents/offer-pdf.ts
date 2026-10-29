@@ -109,6 +109,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   pdf.text('Signed by: '+signed.name);pdf.text('Recipient: '+signed.email);pdf.text('Verification method: '+signed.method)
   pdf.text('Accepted at: '+new Date(signed.signedAt??signed.acceptedAt).toISOString());pdf.text('Consent: '+signed.consent)
  }
+ if(signer&&view.electronicConsent){pdf.heading('Electronic-record consent');pdf.text('Disclosure version: '+view.electronicConsent.version);pdf.text('Offer revision: '+view.electronicConsent.revision);pdf.text(view.electronicConsent.disclosure);pdf.text(view.electronicConsent.consent);pdf.text('Consented at: '+new Date(view.electronicConsent.consentedAt).toISOString())}
  const generated=await pdf.document.save();if(doc.fixedPdf){need(media,'Fixed PDF is unavailable',503);return fixedPagesPdf(await media(doc.fixedPdf.fileId),generated,view,Boolean(signer),fontBytes)}
  return generated
 }

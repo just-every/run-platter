@@ -478,9 +478,9 @@ Evidence: `src/platter/suggestions.ts`, `tests/platter.test.mjs`, `tests/site.te
 
 Status: **partial**.
 
-Gap: Typed Client signature blocks retain explicit adoption with the accepted name and consent. Gap: consumer disclosure, withdrawal, drawn or uploaded signatures, initials and additional signer roles remain.
+Gap: New English-language, mailbox-verified single-client offers with collection off retain exact revision-bound electronic-record consent and typed adoption. Verified withdrawal and paper requests stop future signing on that revision and notify the firm once without changing accepted agreements. Gap: drawn and uploaded signatures, initials, additional signer roles, other-language consumer disclosures, configured multi-recipient and payment-gated execution, full agreement packaging and legal or provider qualification remain. Conservative consent and human paper-delivery default adopted under the standing scope policy, pending ct approval; no automatic paper delivery, inferred fee or legal qualification.
 
-Evidence: `src/platter/signing.ts`, `tests/platter.test.mjs`
+Evidence: `tests/platter.test.mjs`, `tests/mail.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs`
 
 ## SIGN-004 — Multiple signers, signing order and countersignature
 

@@ -278,6 +278,19 @@ test('MAIL-001 local proposal and verification mail are captured without provide
     const questionNotice=(await mailRows(h)).find(row=>row.body.includes('Can we schedule the shoot next week?'))
     assert.ok(questionNotice);assert.equal(questionNotice.reply_to,null)
     assert.equal(calls, 0, 'local mail never contacts an external sender')
+    const disclosure=(await h.send(path+'/data.json',undefined,verified.cookie)).value.signingConsent
+    const request={revision:1,disclosureVersion:disclosure.version,confirm:true}
+    const before=(await mailRows(h)).length
+    assert.equal((await h.send(path+'/action?name=signing.withdraw',request)).status,401)
+    assert.equal((await mailRows(h)).length,before)
+    const results=await Promise.all([h.send(path+'/action?name=signing.withdraw',request,verified.cookie),h.send(path+'/action?name=signing.withdraw',request,verified.cookie)])
+    assert.ok(results.some(r=>r.status===200));assert.ok(results.every(r=>[200,409].includes(r.status)))
+    assert.equal((await h.send(path+'/action?name=signing.withdraw',request,verified.cookie)).status,200)
+    const notices=(await mailRows(h)).filter(m=>m.subject.startsWith('Electronic-record consent withdrawn:'))
+    assert.equal(notices.length,1);assert.equal(notices[0].recipient,h.auth.OWNER_EMAIL)
+    assert.match(notices[0].body,/withdrawn electronic-record consent and requested paper/);assert.match(notices[0].body,/Revision: 1/)
+    assert.match(notices[0].body,new RegExp(recipient.replaceAll('.', '\\.')))
+    assert.equal(notices[0].status,'local')
   } finally { await h.close() }
 })
 

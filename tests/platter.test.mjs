@@ -122,15 +122,48 @@ test('PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations i
  response=await h.send(newPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},newCookie);assert.equal(response.status,200)
  assert.deepEqual(terms((await h.state()).proposals.find(x=>x.id===p.id)),terms(before))
 }))
-test('email verification precedes acceptance, code is single-use, immutable option and deposit exported once',()=>run(async h=>{
- const{p,path}=await sent(h);let r=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true});assert.equal(r.status,401)
- const cookie=await verified(h,path);r=await h.send(path+'/action?name=code.verify',{code:'000000'});assert.equal(r.status,401)
- r=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'other',consent:true},cookie);assert.equal(r.status,400)
- r=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:'yes'},cookie);assert.equal(r.status,200,r.text);assert.match(r.text,/Proposal accepted/)
+test('SIGN-003 verified typed acceptance retains exact electronic records and paper requests stop signing without changing agreements',()=>run(async h=>{
+ const {p,path}=await sent(h)
+ const disclosure=(await h.state()).proposals.find(row=>row.id===p.id).signingConsent;assert.ok(disclosure?.version&&disclosure.disclosure&&disclosure.consent)
+ assert.equal(disclosure.revision,1);assert.match(disclosure.disclosure,/PDF reader/);assert.match(disclosure.consent,/adopt my typed full name/)
+ const input={name:'Avery Chen',optionId:'two',consent:true,disclosureVersion:disclosure.version,revision:disclosure.revision}
+ const history=async()=>Object.fromEntries(await Promise.all(['p_acceptances','p_signing_requests','p_proposals','p_mail','p_audit'].map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
+ const refuse=async(action,body,cookie,status)=>{const before=await history();const r=await h.send(path+'/action?name='+action,body,cookie);assert.equal(r.status,status,r.text);assert.deepEqual(await history(),before);return r}
+ await refuse('accept',input,'',401)
+ await refuse('signing.withdraw',{revision:1,disclosureVersion:disclosure.version,confirm:true},'',401)
+ const cookie=await verified(h,path)
+ assert.equal((await h.send(path+'/action?name=code.verify',{code:'000000'})).status,401)
+ await refuse('accept',{...input,optionId:'other'},cookie,400)
+ await refuse('accept',{...input,consent:false},cookie,400)
+ await refuse('accept',{...input,disclosureVersion:'synthetic-platter-obsolete'},cookie,409)
+ await refuse('accept',{...input,revision:0},cookie,409)
+ let r=await h.send(path+'/action?name=accept',{...input,consent:'yes'},cookie);assert.equal(r.status,200,r.text);assert.match(r.text,/Proposal accepted/)
+ const accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first(),frozen=JSON.parse(accepted.snapshot)
+ assert.deepEqual(frozen.electronicConsent,{version:disclosure.version,revision:1,disclosure:disclosure.disclosure,consent:disclosure.consent,consentedAt:accepted.accepted_at})
  r=await h.send(path+'/action?name=accept',{name:'Changed',optionId:'one',consent:true},cookie);assert.equal(r.status,200)
  const state=await h.state();assert.equal(state.proposals[0].acceptance.name,'Avery Chen');assert.equal(state.proposals[0].acceptance.totalCents,420000);assert.equal(state.proposals[0].acceptance.depositCents,105000)
  const exports=await Promise.all([h.cmd('invoice.export',{id:p.id}),h.cmd('invoice.export',{id:p.id})]);assert.equal(exports[0].id,exports[1].id);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_invoices').first()).n,1)
  r=await h.send('/api/platter/invoices/'+exports[0].id+'.csv',undefined,h.owner);assert.equal(r.status,200);assert.match(r.text,/1050\.00/);assert.match(r.text,/No Tax,USD/);assert.match(r.text,/Northstar Coffee/)
+ const request={revision:1,disclosureVersion:disclosure.version,confirm:true}
+ assert.equal((await h.send(path+'/action?name=signing.withdraw',request,cookie)).status,200)
+ assert.deepEqual(await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first(),accepted,'a later withdrawal never changes the agreement')
+ const secondP=await h.cmd('proposal.prepare',{...offer,clientId:(await h.state()).clients[0].id});await h.cmd('proposal.approve',{id:secondP.id,version:1,revision:1});const second={p:secondP,path:new URL((await h.cmd('proposal.send',{id:secondP.id,version:2})).shareUrl).pathname},secondCookie=await verified(h,second.path),secondView=(await h.send(second.path+'/data.json',undefined,secondCookie)).value
+ const withdrawal={revision:1,disclosureVersion:secondView.signingConsent.version,confirm:true}
+ const before=await history()
+ assert.equal((await h.send(second.path+'/action?name=signing.withdraw',{...withdrawal,revision:0},secondCookie)).status,409)
+ assert.deepEqual(await history(),before)
+ assert.equal((await h.send(second.path+'/action?name=signing.withdraw',withdrawal,secondCookie)).status,200)
+ assert.equal((await h.send(second.path+'/action?name=accept',{...input,disclosureVersion:withdrawal.disclosureVersion},secondCookie)).status,409)
+ assert.equal(await h.db.prepare('SELECT 1 FROM p_acceptances WHERE proposal_id=?').bind(second.p.id).first(),null)
+ const unsigned=(await h.state()).proposals.find(row=>row.id===second.p.id)
+ const fresh=new URL((await h.cmd('proposal.send',{id:unsigned.id,version:unsigned.version})).shareUrl).pathname
+ const beforeStale=await history()
+ assert.equal((await h.send(second.path+'/action?name=signing.withdraw',withdrawal,secondCookie)).status,404)
+ assert.deepEqual(await history(),beforeStale)
+ const freshCookie=await verified(h,fresh),beforeReplay=await history()
+ assert.equal((await h.send(fresh+'/action?name=accept',input,freshCookie)).status,409,'reissuing the same revision never revives signing consent')
+ assert.deepEqual(await history(),beforeReplay)
+ const stopped=await h.send(fresh,undefined,freshCookie);assert.match(stopped.text,/Electronic signing stopped/);assert.ok(!stopped.text.includes('id="platter-acceptance"'))
 }))
 test('code attempt limits, resend throttling and revision-bound sessions',()=>run(async h=>{
  const{path}=await sent(h);await h.send(path+'/action?name=code.request',{});assert.equal((await h.send(path+'/action?name=code.request',{})).status,429)

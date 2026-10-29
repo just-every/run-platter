@@ -725,13 +725,24 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
     await h.cmd('proposal.approve',{id:completed.id,version:1,revision:1})
     const completionShare=await h.cmd('proposal.send',{id:completed.id,version:2})
     await page.goto(completionShare.shareUrl)
+    const electronic=page.locator('section').filter({has:page.getByRole('heading',{name:'Electronic records',exact:true})})
+    if(width===1440){assert.match(await electronic.innerText(),/current web browser/);assert.match(await electronic.innerText(),/download and save or print PDF files/)}
+    if(process.env.PLATTER_SCREENSHOTS)await electronic.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-003-disclosure-${width}.png`)})
     await page.getByRole('button',{name:'Send verification code',exact:true}).click()
     await page.getByLabel('Email verification code',{exact:true}).fill(mail.at(-1).text.match(/\b\d{6}\b/)[0])
     await page.getByRole('button',{name:'Verify email',exact:true}).click()
     await page.getByRole('heading',{name:'Accept this proposal',exact:true}).waitFor()
     await page.locator('input[name="optionId"][value="one"]').check()
     await page.getByLabel('Your full name',{exact:true}).fill('Synthetic signer')
+    if(width===1440){
+     const consent=page.locator('#platter-acceptance label').filter({has:page.locator('[name=consent]')})
+     assert.match(await consent.innerText(),/consent to use electronic records for this proposal revision/)
+     assert.match(await consent.innerText(),/adopt my typed full name as my signature/)
+     await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
+     assert.equal(await page.getByRole('heading',{name:'Agreement downloads',exact:true}).count(),0,'unchecked consent cannot sign')
+    }
     await page.locator('input[name="consent"]').check()
+    if(process.env.PLATTER_SCREENSHOTS)await page.locator('#platter-acceptance').screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-003-consenting-${width}.png`)})
     await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
     await page.getByRole('heading',{name:'Agreement downloads',exact:true}).waitFor()
     const completionMail=mail.filter(m=>m.subject==='Agreement complete: Mailbox completion attachments')
@@ -739,8 +750,24 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
     const agreement=await attachmentDownload('Signed agreement PDF'),certificate=await attachmentDownload('Certificate of completion')
     if(width===1440){assert.equal(completionMail.length,2);assert.deepEqual(completionMail.map(m=>m.to[0]).sort(),[['client','synthetic-platter.example'].join('@'),h.auth.OWNER_EMAIL].sort());for(const m of completionMail){assert.deepEqual(m.attachments.map(a=>a.filename),['agreement.pdf','certificate.pdf']);assert.deepEqual(Buffer.from(m.attachments[0].content,'base64'),agreement);assert.deepEqual(Buffer.from(m.attachments[1].content,'base64'),certificate)}}
     if(process.env.PLATTER_SCREENSHOTS)await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-005-completion-${width}.png`),fullPage:true})
+    // Paper requests remain available after signing without changing either immutable artifact.
+    await page.getByRole('button',{name:'Withdraw consent and request paper',exact:true}).click()
+    await page.getByRole('heading',{name:'Electronic signing stopped',exact:true}).waitFor()
+    if(width===1440){assert.deepEqual(await attachmentDownload('Signed agreement PDF'),agreement);assert.deepEqual(await attachmentDownload('Certificate of completion'),certificate)}
+    if(process.env.PLATTER_SCREENSHOTS)await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-003-paper-request-${width}.png`),fullPage:true})
+    const unsigned=await h.cmd('proposal.prepare',{clientId:client.id,title:'Paper decision',scope:'Unsigned paper scope',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+    await h.cmd('proposal.approve',{id:unsigned.id,version:1,revision:1});const unsignedShare=await h.cmd('proposal.send',{id:unsigned.id,version:2})
+    await page.goto(unsignedShare.shareUrl);await page.getByRole('button',{name:'Send verification code',exact:true}).click()
+    await page.getByLabel('Email verification code',{exact:true}).fill(mail.at(-1).text.match(/\b\d{6}\b/)[0]);await page.getByRole('button',{name:'Verify email',exact:true}).click()
+    await page.getByRole('button',{name:'Withdraw consent and request paper',exact:true}).click()
+    await page.getByRole('heading',{name:'Electronic signing stopped',exact:true}).waitFor()
+    if(width===1440){assert.equal(await page.getByRole('button',{name:'Accept proposal',exact:true}).count(),0);assert.equal(await page.locator('[name=consent]').count(),0)}
+    assert.ok(await page.locator('main button,main input,main p').evaluateAll(nodes=>nodes.every(n=>parseFloat(getComputedStyle(n).fontSize)>=13)))
+    for(const button of await page.locator('main button').all())assert.ok((await button.innerText()).trim())
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+    if(process.env.PLATTER_SCREENSHOTS)await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-003-stopped-${width}.png`),fullPage:true})
     const firmContext=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
-    try{await firmContext.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}]);const firm=await firmContext.newPage();await firm.goto(h.origin+'/app/proposal?id='+completed.id);if(width===1440){const pdf=await firmContext.request.get(h.origin+'/api/platter/agreement.pdf?id='+completed.id);assert.equal(pdf.status(),200);assert.deepEqual(await pdf.body(),agreement);const proof=await firmContext.request.get(h.origin+'/api/platter/certificate.pdf?id='+completed.id);assert.equal(proof.status(),200);assert.deepEqual(await proof.body(),certificate)};if(process.env.PLATTER_SCREENSHOTS)await firm.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-005-firm-${width}.png`),fullPage:true})}finally{await firmContext.close()}
+    try{await firmContext.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}]);const firm=await firmContext.newPage();await firm.goto(h.origin+'/app/proposal?id='+completed.id);if(width===1440)assert.match(await firm.locator('main').innerText(),/verified client withdrew consent and requested paper/);if(width===1440){const pdf=await firmContext.request.get(h.origin+'/api/platter/agreement.pdf?id='+completed.id);assert.equal(pdf.status(),200);assert.deepEqual(await pdf.body(),agreement);const proof=await firmContext.request.get(h.origin+'/api/platter/certificate.pdf?id='+completed.id);assert.equal(proof.status(),200);assert.deepEqual(await proof.body(),certificate)};if(process.env.PLATTER_SCREENSHOTS)await firm.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-005-firm-${width}.png`),fullPage:true})}finally{await firmContext.close()}
    }finally{await context?.close();await h?.close();await edge?.close()}
   }
  }finally{await browser?.close()}

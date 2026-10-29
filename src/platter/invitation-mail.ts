@@ -1,3 +1,4 @@
+import { signingDisclosureStatement } from './signing-consent'
 import { clientLocale } from './locales'
 import { resendReplyAvailable } from './question-reply-mail'
 import type { Bindings } from '../auth.server'
@@ -28,6 +29,7 @@ export function invitationMail(
  need(!replies||resendReplyAvailable(env),'Email replies are not configured',409)
  if(replies)body+='\n\nYou may reply once from this invited address to add a plain-text message to the proposal. The full reply, including quoted text, is visible to the firm’s proposal collaborators. Remove private reply addresses and attachments before sending. This email is a record only, never an approval, signature or proposal state change. The From address is a claim, not proven client identity. Automatic replies and bulk mail are discarded. Only one reply is recorded per invitation; the owner receives one in-app notice if the limit is reached. A fresh invitation replaces this reply address.'
  return [
+  signingDisclosureStatement(env.DB,offer.id,offer.revision,at),
   queueMail(env, offer.id, recipient, subject, body, actor.id, null, crypto.randomUUID(), true, replies),
   env.DB.prepare('INSERT INTO p_invitation_messages(id,proposal_id,revision,recipient,subject,message,queued_at,actor_id) VALUES(?,?,?,?,?,?,?,?)')
    .bind(crypto.randomUUID(), offer.id, offer.revision, recipient, subject, message, at, actor.id),

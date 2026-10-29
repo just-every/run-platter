@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "70b51b13ccd140b5713eb0421dc203f99de3eef8375bdaaf1618bd1f2202513e",
+      "sha256": "1ed787a511030e24d5d4215faa4a1be466d9d0c8d2adf8c2c7affb4eb18a1f94",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "ac24ba0064c93ddd31ffde5863e776e0f74e0cfe9e7c5126e56338051ee2fdf4",
+      "sha256": "5a272d636be780cd2701af1bc739511b19ea63f33d712a3b81a6b0202fb8bfe7",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "b12091b2f39ae105fdee89b5a243ee86c9c371c823f96688924f7c72cac84651",
+      "sha256": "e5689ac05e10c054e5d8c8251c37fa777a87cd18aa897a72d9186126975bf058",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -2398,7 +2398,7 @@
       "executable": false
     },
     "src/platter/archive-policy.mjs": {
-      "sha256": "c780141db01cecb0800dda514d46094d49674058175ed1b7e6a2389be40aaa1e",
+      "sha256": "9310c1b6d7b31eb0d0876ff7d564ab635fb2280c5319703ca3779ea6bc5ef923",
       "executable": false
     },
     "src/platter/archiving/google-drive.ts": {
@@ -2438,7 +2438,7 @@
       "executable": false
     },
     "src/platter/client-data.ts": {
-      "sha256": "025862f70efb44fcad88e2fd211e39531acaa17505d53ad4433d29e1a4c5536e",
+      "sha256": "33a4c6a7e771dff2cfbf6716d79cfc6d12405ddda94dce877621f052c2585afa",
       "executable": false
     },
     "src/platter/client-mail-replies.ts": {
@@ -2526,7 +2526,7 @@
       "executable": false
     },
     "src/platter/documents/agreement.ts": {
-      "sha256": "1e80a4f47f153f9f857e2c74d4660d8a3a7fdc366322bcc008e2d8a5c73c1c11",
+      "sha256": "80a48522fa1c2e94ff657562c205979e85ce49b7abf8b6e33ad7ba6125747570",
       "executable": false
     },
     "src/platter/documents/blocks.ts": {
@@ -2550,7 +2550,7 @@
       "executable": false
     },
     "src/platter/documents/offer-pdf.ts": {
-      "sha256": "b48d80709ba43d660eac885078abc4545e2e66e27c9c768d4ddf1b06ac3ae85d",
+      "sha256": "3cc454ad63d1257820a63c373121adb59d3bb73ebc62a786a61a5f2c9848d348",
       "executable": false
     },
     "src/platter/documents/pdf-fonts.ts": {
@@ -2606,7 +2606,7 @@
       "executable": false
     },
     "src/platter/invitation-mail.ts": {
-      "sha256": "d3b1dde811844655f2c197b09232f003c7840f11a35de09493e8a2c31e41562e",
+      "sha256": "601f7d449ba7c188545744664b118e908e3ebab1e7171eab8224f9e3ee21face",
       "executable": false
     },
     "src/platter/invoices.ts": {
@@ -2638,7 +2638,7 @@
       "executable": false
     },
     "src/platter/mail.ts": {
-      "sha256": "65b7b9b82dcb517ed8bb40d1825ca21aeb6908eedfd790f103949becf1cea882",
+      "sha256": "fb2d47e0251ce5bbf96a9f6445de07c026667793839b06e8d6c7b2b47a5ece69",
       "executable": false
     },
     "src/platter/mailboxes.ts": {
@@ -2878,7 +2878,7 @@
       "executable": false
     },
     "src/platter/signing.ts": {
-      "sha256": "e1907075a510705c3e5b9c0f7edc8217149866f5cfa60c4095ad6a1ed5397160",
+      "sha256": "71df9dbf9a2254d0415081bd32ba2029a38c0933bbb8a7078b3dcf718c86b24b",
       "executable": false
     },
     "src/platter/sms.ts": {
@@ -2890,7 +2890,7 @@
       "executable": false
     },
     "src/platter/state.ts": {
-      "sha256": "f64d68d6eb37318fe7023654d0624152d9ef06018c2c7f3c5dba076961943e28",
+      "sha256": "956e336d0b4e1a811b3698da8ebe31f6cc186a1467200b3d83752e5a40c7bf92",
       "executable": false
     },
     "src/platter/suggestions.ts": {
@@ -2966,7 +2966,7 @@
       "executable": false
     },
     "src/platter/ui/client.ts": {
-      "sha256": "1657d09d027ac1ea229f27ee29b47d77e9864b8caeb60b5a65241eaee4eafc0e",
+      "sha256": "050a72c2c45494c36ad0b88358577c27ca6561349c4560d12edcb6bd65045143",
       "executable": false
     },
     "src/platter/ui/clients.ts": {
@@ -3082,7 +3082,7 @@
       "executable": false
     },
     "src/platter/ui/proposals.ts": {
-      "sha256": "8b082e352d3336e92d5252f7b565d2e6474c925d4b7684c3eaea3a14f8f2d82f",
+      "sha256": "b9591642602eb2837308624107b3179006e355b8ec15b3ba0992ba146d822f51",
       "executable": false
     },
     "src/platter/ui/questions.ts": {
@@ -3162,7 +3162,7 @@
       "executable": false
     },
     "src/platter/withdrawal.ts": {
-      "sha256": "82ca5325ed0f16687833cfccd802bb49b262df3ed54443aff956f3a14664e2e9",
+      "sha256": "9eb6712066bca689ed51f512d9a9c94c8d999cf6d98a5a02075deff2d2c74116",
       "executable": false
     },
     "src/platter/workspace.ts": {
@@ -3278,7 +3278,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "67d9f0af1ab5ee4944eb18dc0c6ec7dcee30c043fe4dc6730346870e163d2874",
+      "sha256": "8a5239916329bdce71f226bcbd697c4e3c421b8053242dffae73e680ea486f77",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3382,11 +3382,11 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "d4c53a560eecde9560391be4a7d0b9c3daea827a07a979be9006eaacf32dfe62",
+      "sha256": "85b430bba88cb393eb606a9cb887b4a6568635db002f18343ddbb9a6f0c80bf6",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {
-      "sha256": "12eaf4517b230f4417606d0ba4360cd9505730a6563818248cb5fa924b15b31a",
+      "sha256": "7ed6f655e0b92de48cd2966a3fdfaa088209802a3730d0ac441d8d71354ab503",
       "executable": false
     },
     "tests/packages-fixture.mjs": {
@@ -3402,7 +3402,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "3a1afc0518aa5f4eeaf811b4c9903f73c8c3aa7c3f426248a80ebb97fba23ebf",
+      "sha256": "cfd67ab083f1b0974ac7fa23a59372e412a830a1d7f6e6430c47e55125c15e84",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3462,7 +3462,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "3469fea37d40cb9ac8e9e40ff68a340f27445286f7237b9ce7e41a759b6a939f",
+      "sha256": "190b061e27de10490882331a03e44086a5c39cb8122fa9a650319c67485e4a48",
       "executable": false
     },
     "tests/site.test.mjs": {

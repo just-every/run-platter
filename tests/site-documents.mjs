@@ -156,7 +156,7 @@ test('EDIT-014 client selects and downloads revision 2 at desktop and phone; own
  let app,browser
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try {
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
    app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
@@ -166,7 +166,7 @@ test('EDIT-014 client selects and downloads revision 2 at desktop and phone; own
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
     const client=await cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),offer={clientId:client.id,title:'Brand photography for Northstar Coffee',scope:'One studio shoot, edited photographs, and campaign usage rights.',terms:'Delivery within 30 days, following client feedback.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'}
-    const made=await cmd('proposal.prepare',offer);await cmd('proposal.revise',{...offer,id:made.id,version:1,scope:'Two studio shoots, edited photographs, and campaign usage rights.'})
+    const made=await cmd('proposal.prepare',offer);await cmd('proposal.revise',{...offer,id:made.id,version:1,scope:Array.from({length:70},(_,i)=>`Deliverable ${i+1}: Two studio shoots, edited photographs, and campaign usage rights.`).join('\n')})
     await page.goto(app.origin+'/app/proposal?id='+made.id);await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();await capture('owner-enabled')
     await page.getByRole('link',{name:'Open client proposal',exact:true}).click();const clientUrl=page.url()
     assert.equal(await page.getByRole('button',{name:'Download unsigned proposal PDF'}).count(),0)
@@ -174,7 +174,7 @@ test('EDIT-014 client selects and downloads revision 2 at desktop and phone; own
     const state=await (await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
     await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click();await page.getByRole('radio',{name:/Full campaign/}).check();await capture('client-selection')
     const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Download unsigned proposal PDF'}).click(),page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/download.pdf')).then(async r=>assert.equal(r.status(),200,r.status()===200?'PDF response':await r.text()))])
-    const pages=await pdfPages(await readFile(await download.path()));assert.ok(pages.every(p=>p.includes('Not signed, revision 2')));assert.ok(pages.join(' ').includes('Selected option total: USD 4,200.00'));assert.ok(pages.join(' ').includes('Deposit due: USD 1,050.00'))
+    const pages=await pdfPages(await readFile(await download.path()));assert.ok(pages.length>=2);for(const p of pages){assert.ok(p.includes('Not signed, revision 2'));assert.ok(p.includes('Selected option: Full campaign'))};assert.ok(pages.join(' ').includes('Selected option total: USD 4,200.00'));assert.ok(pages.join(' ').includes('Deposit due: USD 1,050.00'))
     await page.goto(app.origin+'/app/proposal?id='+made.id);assert.match(await page.getByRole('list',{name:'PDF download timeline'}).innerText(),/Revision 2.*two/);await capture('owner-timeline')
     await page.getByRole('button',{name:'Turn off client PDF downloads'}).click();await capture('owner-disabled')
     await page.goto(clientUrl);assert.equal(await page.getByRole('button',{name:'Download unsigned proposal PDF'}).count(),0);await capture('client-disabled')

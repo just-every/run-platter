@@ -16,6 +16,7 @@ export class PdfText {
  private linkTarget?:string
  private page!: PDFPage
  private y = 0
+ private contentTop=0
  private pageIndex=-1
  private textX=margin
  private textWidth=letter[0]-margin*2
@@ -27,7 +28,7 @@ export class PdfText {
  private readonly choices = new Map<string, PDFFont>()
  private readonly segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
- private constructor(readonly document: PDFDocument, private fonts: PDFFont[], private revision: number, private footer?: string,brand?:ProposalDocument['brand'],paperSize?:string) {
+ private constructor(readonly document: PDFDocument, private fonts: PDFFont[], private revision: number, private footer?: string,brand?:ProposalDocument['brand'],paperSize?:string,private pageLabel?:string) {
   if(paperSize==='a4')this.size=[595.28,841.89]
   this.textWidth=this.size[0]-margin*2
   const color=(hex:string)=>rgb(...[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255) as [number,number,number]);if(brand){this.ink=color(brand.ink);this.accent=color(brand.accent);this.paper=color(brand.paper)}
@@ -35,13 +36,13 @@ export class PdfText {
   this.newPage()
  }
 
- static async create(revision: number, fontBytes: (Uint8Array | ArrayBuffer)[] = [], footer?: string,brand?:ProposalDocument['brand'],paperSize?:string) {
+ static async create(revision: number, fontBytes: (Uint8Array | ArrayBuffer)[] = [], footer?: string,brand?:ProposalDocument['brand'],paperSize?:string,pageLabel?:string) {
   need(fontBytes.length > 0, 'PDF fonts are unavailable.', 503)
   const document = await PDFDocument.create()
   document.registerFontkit(fontkit)
   const fonts: PDFFont[] = []
   for (const bytes of fontBytes) fonts.push(await document.embedFont(bytes, { subset: true }))
-  return new PdfText(document, fonts, revision, footer,brand,paperSize)
+  return new PdfText(document, fonts, revision, footer,brand,paperSize,pageLabel)
  }
 
  private runs(text: string): Run[] {
@@ -78,13 +79,21 @@ export class PdfText {
  private newPage() {
   this.pageIndex++
   const existing=this.document.getPages()[this.pageIndex]
-  if(existing){this.page=existing;this.y=this.size[1]-margin;return}
+  if(existing){this.page=existing;this.y=this.contentTop;return}
   this.page = this.document.addPage(this.size)
   this.page.drawRectangle({x:0,y:0,width:this.size[0],height:this.size[1],color:this.paper})
   this.page.drawLine({ start: { x: margin, y: 48 }, end: { x: this.size[0] - margin, y: 48 }, thickness: 0.6, color: rgb(0.8, 0.83, 0.81) })
   this.draw(this.footer??`Not signed, revision ${this.revision}`, margin, 32, 9, this.ink)
   this.draw(`Page ${this.document.getPageCount()}`, this.size[0] - margin - 48, 32, 9, this.ink)
   this.y = this.size[1] - margin
+  if(this.pageLabel){
+   // Repeated labels use the full page width, including pages added by columns.
+   const x=this.textX,width=this.textWidth,link=this.linkTarget
+   this.textX=margin;this.textWidth=this.size[0]-margin*2;this.linkTarget=undefined
+   this.text(this.pageLabel,13);this.gap()
+   this.textX=x;this.textWidth=width;this.linkTarget=link
+  }
+  this.contentTop=this.y
  }
 
  private room(height: number) {

@@ -98,6 +98,8 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const request=async()=>{const r=await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'request_send',arguments:{id:work.id,revision:2}}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,200);assert.ok(!r.value.result.isError);return JSON.parse(r.value.result.content[0].text).request}
     const dismissed=await request();await h.cmd('send-request.resolve',{id:dismissed.id,status:'dismissed'});await request()
     const pdf=await h.mf.dispatchFetch(h.origin+suggestPath+'/download.pdf?optionId=two',{headers:{cookie:suggestSession.cookie,host:new URL(h.origin).host}});assert.equal(pdf.status,200);assert.equal(pdf.headers.get('content-type'),'application/pdf');await pdf.arrayBuffer()
+    const pdfBefore=(await h.state()).proposals.find(p=>p.id===pending.id).pdfDownloads
+    assert.equal(pdfBefore.length,1);assert.equal(pdfBefore[0].revision,1);assert.equal(pdfBefore[0].option_id,'two');assert.equal(pdfBefore[0].client_id,client.id);assert.ok(pdfBefore[0].downloaded_at>0)
     await h.cmd('pdf.downloads',{id:work.id,version:2,enabled:false})
     await h.cmd('expiry.set',{id:work.id,version:3,mode:'days',days:14,warningDays:1})
     let live=(await h.state()).proposals.find(p=>p.id===pending.id)
@@ -317,7 +319,8 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id},restoredOwner),journal)
     assert.equal((await h.send(invoicePath,undefined,restoredOwner)).text,invoiceCsv)
     for(const file of frozenAttachments){const r=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+proposal.id+'/'+file.id,{headers:{cookie:restoredOwner,host:new URL(h.origin).host}});assert.equal(r.status,200);assert.deepEqual(new Uint8Array(await r.arrayBuffer()),file.kind==='w9'?attachmentBytes:new TextEncoder().encode('%PDF insurance'))}
-    assert.equal(restoredState.proposals.find(p=>p.id===pending.id).pdfDownloads.length,1,'EDIT-014 download timeline survives CLI restore')
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===pending.id).pdfDownloads,pdfBefore,'EDIT-014 exact client, chosen package, revision and time survive CLI restore')
+    assert.equal((await h.send(suggestPath+'/download.pdf?optionId=two',undefined,suggestSession.cookie)).status,404,'archived history restores no invitation authority')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===pending.id).expiry.reopenRequests,beforeReopen,'SEND-004 reopen request and resolution survive CLI restore')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===work.id).expiry,expiryRequests,'SEND-004 per-proposal expiry settings survive CLI restore')
     assert.equal(restoredState.proposals.find(p=>p.id===work.id).pdfDownloadsEnabled,false,'EDIT-014 per-proposal PDF policy survives CLI restore')

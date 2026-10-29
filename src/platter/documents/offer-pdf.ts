@@ -32,7 +32,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   need(Number.isSafeInteger(cents) && cents >= 0 && Number.isSafeInteger(cents * depositBps), 'Invalid offer price')
   return view.payment_terms ? depositCents(cents,depositBps,view) : Math.round(cents * depositBps / 10000)
  }
- const pdf = await PdfText.create(revision, fontBytes,signer?`Signed agreement, revision ${revision}`:undefined,documentOf(view).brand,view.paperSize)
+ const pdf = await PdfText.create(revision, fontBytes,signer?`Signed agreement, revision ${revision}`:undefined,documentOf(view).brand,view.paperSize,signer?undefined:`Selected option: ${selected.label}`)
  pdf.document.setTitle(String(view.title ?? ''))
  pdf.document.setSubject(`${signer?'Signed agreement':'Not signed'}, revision ${revision}`)
  pdf.document.setCreator('Platter')

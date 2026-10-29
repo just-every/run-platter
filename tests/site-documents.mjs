@@ -421,7 +421,7 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
     const approvalPages={owner:op,admin:settingsPage,manager:review},approvalContexts={owner,admin,manager}
     for(const defaultRole of ['owner','admin','manager']){
      await op.goto(app.origin+'/app/approvals')
-     await op.getByLabel('Require approval for every proposal').selectOption('yes');await op.getByLabel('Default approver',{exact:true}).selectOption(defaultRole);await op.getByRole('button',{name:'Save approval policy',exact:true}).click()
+     await op.getByLabel('Require approval for every proposal').selectOption('yes');await op.getByLabel('Default approver').selectOption(defaultRole);await op.getByRole('button',{name:'Save approval policy',exact:true}).click()
      if(width===1440){const saved=(await state()).approvalSettings.policy;assert.equal(saved.required,1);assert.equal(saved.default_role,defaultRole);assert.equal(await op.getByRole('alert').count(),0)}
      await capture(op,'approval-default-'+defaultRole)
      const draft=await command(sales,'proposal.prepare',{clientId:client.id,title:'Default '+defaultRole+' decision',scope:'Ordinary single-client delivery',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'3000'}]})

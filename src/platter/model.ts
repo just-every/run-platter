@@ -2,7 +2,8 @@ import { paymentTerms } from './payment-terms'
 import { documentFields } from './documents/blocks'
 import { sectionConditions } from './conditional'
 import { copyAttachments } from './attachments'
-export interface Actor { id:string; email:string; role:'owner'|'admin'|'manager'|'sales'|'content_editor'|'viewer'|'billing'|'member'|'agent'; keyId?:string; agentVersion?:number; memberVersion?:number; permission?:{sql:string;values:any[]} }
+import type { AgentSource } from './agent-sources'
+export interface Actor { id:string; email:string; role:'owner'|'admin'|'manager'|'sales'|'content_editor'|'viewer'|'billing'|'member'|'agent'; keyId?:string; agentVersion?:number; agentSources?:AgentSource[]; memberVersion?:number; permission?:{sql:string;values:any[]} }
 export const fail = (message:string,status=400):never => { throw Object.assign(new Error(message),{status}) }
 export function need(value:unknown,message:string,status=400):asserts value { if(!value)fail(message,status) }
 export function text(value:unknown,label:string,max=200) { need(typeof value==='string'&&value.trim().length>0&&value.length<=max,`Enter ${label} (up to ${max} characters)`);return value.trim() }

@@ -235,8 +235,11 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const rows=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part')
     assert.ok(rows(bytes).length>0);assert.deepEqual(rows(await readFile(again,'utf8')),rows(bytes))
     const archived=rows(bytes).flatMap(part=>part.items).filter(item=>item.kind==='row')
-    const storedReceipts=agentReceipts.map(({records,...row})=>row).sort((a,b)=>a.id.localeCompare(b.id))
+    const storedReceipts=agentReceipts.map(({records,sources,...row})=>row).sort((a,b)=>a.id.localeCompare(b.id))
     assert.deepEqual(archived.filter(item=>item.table==='p_agent_receipts').map(item=>item.row).sort((a,b)=>a.id.localeCompare(b.id)),storedReceipts,'AGENT-009 exact receipts survive the public CLI without keys or control authority')
+    const storedSources=(await h.db.prepare('SELECT * FROM p_agent_receipt_sources ORDER BY receipt_id,kind,source_id,source_version,digest').all()).results
+    assert.ok(storedSources.length>0)
+    assert.deepEqual(archived.filter(item=>item.table==='p_agent_receipt_sources').map(item=>item.row).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))),storedSources.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))))
     assert.equal(archived.filter(item=>item.table==='p_agent_keys').length,0)
     assert.equal(archived.filter(item=>item.table==='p_agent_receipt_records').length,agentReceipts.flatMap(r=>r.records).length)
 

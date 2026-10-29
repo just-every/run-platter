@@ -1,4 +1,5 @@
 import type { Bindings } from '../auth.server'
+import { citeAgentSource } from './agent-sources'
 import { providerCredential, providerJson } from './connections'
 import { editablePackages, pricingInput } from './pricing'
 import { editableTerms } from './payment-terms'
@@ -23,6 +24,7 @@ const replace=(text:string,values:Record<string,string>)=>text.replace(variableT
 export function editableVariableFields(row:any){return {clientId:row.client_id,title:row.title,scope:row.scope,terms:row.terms??'',depositPercent:row.deposit_bps/100,packages:editablePackages(typeof row.options==='string'?JSON.parse(row.options):row.options),pricingTables:pricingInput(typeof row.options==='string'?JSON.parse(row.options):row.options),recipientPlan:typeof row.recipient_plan==='string'?JSON.parse(row.recipient_plan):row.recipient_plan??[],sectionConditions:row.section_conditions??{},document:typeof row.document==='string'?JSON.parse(row.document):row.document,paymentTerms:editableTerms(row)}}
 async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFields['deal']){
  const c=await env.DB.prepare('SELECT * FROM p_clients WHERE id=?').bind(clientId).first<any>();need(c,'Client not found',404)
+ await citeAgentSource(a,'client',c.id,null,c)
  const profile=JSON.parse(c.variable_fields??'{}'),sender=await env.DB.prepare('SELECT display_name FROM oa_operators WHERE id=?').bind(a.id).first<any>(),name=sender?.display_name??''
  const values:Record<string,string>={'Client.Company':c.name,'Client.Email':c.email,'Client.LastName':profile.lastName??profile.contactName?.split(' ').slice(1).join(' ')??'','Client.Name':profile.contactName??'','Client.FirstName':profile.firstName??profile.contactName?.split(' ')[0]??'','Client.Title':profile.title??'','Contact.Name':profile.contactName??'','Contact.Title':profile.title??'','Client.Address':profile.address??'','Sender.Name':name,'Sender.LastName':name.split(' ').slice(1).join(' '),'Date.Today':new Date(await currentTime(env.DB)).toISOString().slice(0,10),'Sender.FirstName':name.split(' ')[0],'Sender.Email':a.email,...Object.fromEntries(Object.entries(profile.custom??{}).map(([k,v])=>['Custom.'+k,String(v)]))}
  for(const key of Object.keys(values))if(!values[key])delete values[key]

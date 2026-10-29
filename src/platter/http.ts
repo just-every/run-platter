@@ -1,4 +1,5 @@
 import { agentRequest, agentLedger, agentApproval } from './agent-ledger'
+import type { AgentSource } from './agent-sources'
 import { archiveState } from './archiving/jobs'
 import { clientLocale } from './locales'
 import { fixedPagePreview, importDocument, exportDocument } from './documents/import-export'
@@ -61,10 +62,10 @@ const headers={'cache-control':'no-store','x-content-type-options':'nosniff','re
 const json=(v:unknown,status=200)=>Response.json(v,{status,headers})
 const pages=new Set(['/app','/app/proposal','/app/clients','/app/import','/app/access','/app/audit','/app/settings','/app/team','/app/approvals','/app/library','/app/catalog'])
 async function body(request:Request,maxBytes=150000){const raw=await request.text();need(new TextEncoder().encode(raw).length<=maxBytes,'Request too large',413);if(request.headers.get('content-type')?.includes('application/json')){let v;try{v=JSON.parse(raw)}catch{fail('Invalid JSON')}need(v&&typeof v==='object'&&!Array.isArray(v),'Expected an object');return v as Record<string,unknown>}need(request.headers.get('content-type')?.includes('application/x-www-form-urlencoded'),'Use JSON or a form',415);return Object.fromEntries(new URLSearchParams(raw))}
-async function respond(request:Request,original:Bindings):Promise<Response|null>{const env=runtimeBindings(original),url=new URL(request.url),path=url.pathname,isClient=path.startsWith('/p/'),isAgent=path.startsWith('/api/platter/agent/');if(!isClient&&!path.startsWith('/api/platter/')&&path!=='/app'&&!path.startsWith('/app/'))return null
+async function respond(request:Request,original:Bindings,sources?:AgentSource[]):Promise<Response|null>{const env=runtimeBindings(original),url=new URL(request.url),path=url.pathname,isClient=path.startsWith('/p/'),isAgent=path.startsWith('/api/platter/agent/');if(!isClient&&!path.startsWith('/api/platter/')&&path!=='/app'&&!path.startsWith('/app/'))return null
  let actor:Actor|undefined;const requestedBack=new URL(url.searchParams.get('returnTo')||'/app',env.AUTH_ORIGIN);const back=requestedBack.origin===env.AUTH_ORIGIN&&pages.has(requestedBack.pathname)?requestedBack.pathname+requestedBack.search:'/app';let context:any,submitted:Record<string,unknown>|undefined
  try{
-  const api=await publicApi(request,env);if(api)return api
+  const api=await publicApi(request,env,sources);if(api)return api
   need(url.origin===env.AUTH_ORIGIN&&(!request.headers.has('host')||request.headers.get('host')===url.host),'Wrong application origin',403);need(['GET','POST'].includes(request.method),'Method not allowed',405)
   if(path==='/api/platter/sms/status'||path==='/api/platter/sms/inbound')return await smsWebhook(request,env,path.endsWith('/status'))
   if(path==='/api/platter/client-mail-replies')return await clientMailReplyResponse(request,env)
@@ -85,6 +86,7 @@ async function respond(request:Request,original:Bindings):Promise<Response|null>
    fail('Not found',404)
   }
   actor=await principal(request,env,isAgent)
+  actor.agentSources=sources
   if(path==='/api/platter/mailbox/authorize'){
    need(request.method==='POST'&&request.headers.get('origin')===env.AUTH_ORIGIN,'Authorize from this installation',403)
    const result=await mailboxAuthorize(env,actor,await body(request))
@@ -151,6 +153,6 @@ async function respond(request:Request,original:Bindings):Promise<Response|null>
 export async function platterResponse(request:Request,original:Bindings):Promise<Response|null>{
  const path=new URL(request.url).pathname
  if(path.startsWith('/api/platter/agent/')||(path.startsWith('/api/platter/v1/')&&request.headers.has('authorization')))
-  return agentRequest(request,runtimeBindings(original),()=>respond(request,original))
+  return agentRequest(request,runtimeBindings(original),actor=>respond(request,original,actor.agentSources))
  return respond(request,original)
 }

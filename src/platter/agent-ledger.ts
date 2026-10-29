@@ -18,7 +18,7 @@ function describe(request: Request, raw: string) {
 const failure = (error: any) => Response.json({error: error.status && error.status < 500 ? error.message : 'The agent request could not be completed'}, {status: error.status || 500, headers:{'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}})
 
 /** Digest the exact request and returned response bodies, excluding headers and credentials. */
-export async function agentRequest(request: Request, env: Bindings, run: () => Promise<Response | null>): Promise<Response | null> {
+export async function agentRequest(request: Request, env: Bindings, run: (actor: Actor) => Promise<Response | null>): Promise<Response | null> {
  let actor: Actor
  try { actor = await principal(request, env, true, true, true) } catch (error) { return failure(error) }
  const db = env.DB, control = await db.prepare('SELECT paused_at,ledger_consent_at FROM p_agent_keys WHERE id=?').bind(actor.keyId!).first<any>()
@@ -31,9 +31,10 @@ export async function agentRequest(request: Request, env: Bindings, run: () => P
   raw = parts.join('') + decoder.decode()
  }
  const id = crypto.randomUUID(), started = Date.now(), descriptor = describe(request, raw)
+ if (control?.ledger_consent_at) actor.agentSources = []
  if (control?.ledger_consent_at) await db.prepare("INSERT INTO p_agent_receipts(id,owner_id,key_id,transport,action,started_at,status,input_digest) VALUES(?,?,?,?,?,?,'pending',?)").bind(id,actor.id,actor.keyId!,descriptor.transport,descriptor.action,started,await hash(raw)).run()
  let response: Response | null
- try { need(control && control.paused_at === null, 'This agent key is paused', 403); response = await run() } catch (error) { response = failure(error) }
+ try { need(control && control.paused_at === null, 'This agent key is paused', 403); response = await run(actor) } catch (error) { response = failure(error) }
  if (!response || !control?.ledger_consent_at) return response
  const output = await response.clone().text()
  let value: any; try { value = JSON.parse(output) } catch { value = null }
@@ -53,7 +54,11 @@ export async function agentRequest(request: Request, env: Bindings, run: () => P
    SELECT ?,p.id,r.revision FROM json_each(?) supplied
    JOIN p_proposals p ON p.id=json_extract(supplied.value,'$.id')
    JOIN p_revisions r ON r.proposal_id=p.id AND r.revision=COALESCE(json_extract(supplied.value,'$.revision'),p.revision)
-   WHERE (${visible.sql})`).bind(id,JSON.stringify(returned),...visible.values)
+   WHERE (${visible.sql})`).bind(id,JSON.stringify(returned),...visible.values),
+  db.prepare(`INSERT OR IGNORE INTO p_agent_receipt_sources(receipt_id,kind,source_id,source_version,digest,client_id)
+   SELECT ?,json_extract(value,'$.kind'),json_extract(value,'$.id'),json_extract(value,'$.version'),json_extract(value,'$.digest'),
+   CASE WHEN json_extract(value,'$.kind')='client' THEN (SELECT id FROM p_clients WHERE id=json_extract(value,'$.id')) ELSE NULL END
+   FROM json_each(?) WHERE json_extract(value,'$.kind')!='client' OR EXISTS(SELECT 1 FROM p_clients WHERE id=json_extract(value,'$.id'))`).bind(id,JSON.stringify(actor.agentSources ?? []))
  ])
  return response
 }
@@ -63,9 +68,10 @@ export async function agentLedger(db: D1Database, actor: Actor) {
  const receipts = (await db.prepare('SELECT * FROM p_agent_receipts WHERE owner_id=? ORDER BY started_at DESC,id DESC LIMIT 100').bind(actor.id).all<any>()).results
  const ids=JSON.stringify(receipts.map(r=>r.id))
  const records=(await db.prepare('SELECT * FROM p_agent_receipt_records WHERE receipt_id IN (SELECT value FROM json_each(?)) ORDER BY proposal_id,revision').bind(ids).all<any>()).results
+ const sources=(await db.prepare('SELECT receipt_id,kind,source_id,source_version,digest FROM p_agent_receipt_sources WHERE receipt_id IN (SELECT value FROM json_each(?)) ORDER BY kind,source_id,source_version,digest').bind(ids).all<any>()).results
  const decisions=(await db.prepare(`SELECT DISTINCT a.* FROM p_approval_decisions a JOIN p_agent_receipt_records r ON r.proposal_id=a.proposal_id AND r.revision=a.revision WHERE r.receipt_id IN (SELECT value FROM json_each(?)) ORDER BY a.occurred_at,a.id`).bind(ids).all<any>()).results
  const approvals=(await db.prepare(`SELECT DISTINCT a.* FROM p_approvals a JOIN p_agent_receipt_records r ON r.proposal_id=a.proposal_id AND r.revision=a.revision WHERE r.receipt_id IN (SELECT value FROM json_each(?)) ORDER BY a.approved_at,a.id`).bind(ids).all<any>()).results
- return receipts.map(receipt=>({...receipt,records:records.filter(r=>r.receipt_id===receipt.id).map(({receipt_id,...record})=>({...record,
+ return receipts.map(receipt=>({...receipt,sources:sources.filter(s=>s.receipt_id===receipt.id).map(({receipt_id,...source})=>source),records:records.filter(r=>r.receipt_id===receipt.id).map(({receipt_id,...record})=>({...record,
   approvals:decisions.filter(a=>a.proposal_id===record.proposal_id&&a.revision===record.revision).map(({id,actor_id,decision,occurred_at})=>({id,actor_id,decision,occurred_at})),
   legacyApprovals:approvals.filter(a=>a.proposal_id===record.proposal_id&&a.revision===record.revision).map(({id,actor_id,approved_at})=>({id,actor_id,approved_at}))
  }))}))

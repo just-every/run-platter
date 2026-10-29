@@ -1,3 +1,4 @@
+import { citeAgentSource } from './agent-sources'
 import { archiveCommand } from './archiving/jobs'
 import { clientLocale, saveClientLocale } from './locales'
 import { hasTaxable, taxRequest, optionTax, resolveTax, saveTaxRate, validateTaxOptions, type TaxSnapshot } from './taxes'
@@ -162,6 +163,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  }
  if(name==='proposal.negotiate'||name==='proposal.revise'){
   const current=await proposal(db,p.id)
+  await citeAgentSource(a,'proposal',current.id,current.revision,current)
   if(p.pricingTables!==undefined&&tableInputs(p.pricingTables).length)need(current.currency==='USD','Historical AUD proposals keep their original pricing form',409)
   if(p.packages!==undefined&&current.currency!=='USD'){const requested=packageInputs(p.packages,[]);need(requested.length===2&&requested.every((o:any,i:number)=>o.id===['one','two'][i]&&!o.optionalItems?.length&&!o.discountBps&&!o.discountFixedCents&&!o.concealDiscount&&!o.discountExpiresOn),'Historical AUD proposals keep their original pricing form',409)}
   if(p.packages===undefined){const pending=await pendingNegotiation(db,current.id);const content=pending?JSON.parse(pending.snapshot):current;const options=typeof content.options==='string'?JSON.parse(content.options):content.options;if(options.length!==2||options.some((o:any,i:number)=>o.taxable||o.taxCode||o.id!==['one','two'][i]||o.optionalItems?.length||o.discount||o.concealDiscount||o.discountExpiresOn))p={...p,packages:editablePackages(options).map(o=>{const suffix=o.id==='one'?'One':o.id==='two'?'Two':null;return suffix?{...o,...(p['option'+suffix]!==undefined?{label:p['option'+suffix]}:{}),...(p['price'+suffix]!==undefined?{price:p['price'+suffix]}:{})}:o})}}

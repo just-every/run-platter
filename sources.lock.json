@@ -3462,7 +3462,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "e97bb04fe75d48e81176a33796a21a73047f2e559403bdcb33ce8fc723ee09c4",
+      "sha256": "578d3d2766591bcb6d7a63933585c4c5f99452423c2e004eb235cefaa5e9a63f",
       "executable": false
     },
     "tests/site-harness.mjs": {

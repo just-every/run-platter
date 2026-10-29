@@ -54,7 +54,12 @@ try{
  await page.waitForFunction(()=>document.querySelector('[data-document-editor]').dataset.saveState==='saved')
  const source=page.locator('[data-block-id="page-30"]'),previous=source.locator('xpath=preceding-sibling::*[1]'),before=await page.locator('[data-block-id]').evaluateAll(nodes=>nodes.map(n=>n.dataset.blockId)),previousId=await previous.getAttribute('data-block-id')
  await page.evaluate(()=>{window.budgetDrop=null;document.addEventListener('drop',()=>{const start=performance.now();requestAnimationFrame(()=>requestAnimationFrame(()=>window.budgetDrop=performance.now()-start))},{capture:true,once:true})})
- await source.getByRole('button',{name:'Drag block',exact:true}).dragTo(previous.locator('.document-block-bar'))
+ // Start the native drag before scrolling so the source remains under the pointer.
+ const dragHandle=source.getByRole('button',{name:'Drag block',exact:true})
+ await dragHandle.hover();const dragStart=await dragHandle.boundingBox()
+ await page.mouse.down();await page.mouse.move(dragStart.x+dragStart.width/2+8,dragStart.y+dragStart.height/2,{steps:3})
+ const destination=previous.locator('.document-block-bar');await destination.scrollIntoViewIfNeeded();const dragTarget=await destination.boundingBox()
+ await page.mouse.move(dragTarget.x+24,dragTarget.y+dragTarget.height/2,{steps:8});await page.mouse.up()
  await page.waitForFunction(()=>window.budgetDrop!==null);report.dragReorderMs=await page.evaluate(()=>window.budgetDrop)
  const after=await page.locator('[data-block-id]').evaluateAll(nodes=>nodes.map(n=>n.dataset.blockId)),expected=before.filter(id=>id!=='page-30');expected.splice(expected.indexOf(previousId),0,'page-30');assert.deepEqual(after,expected)
  await page.waitForFunction(()=>document.querySelector('[data-document-editor]').dataset.saveState==='saved')

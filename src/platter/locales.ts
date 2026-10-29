@@ -94,6 +94,7 @@ export const spanish: Record<string, string> = {
  'Total: ': 'Total: ',
  'Agreement downloads': 'Descargas del acuerdo',
  'Signed agreement PDF': 'Acuerdo firmado en PDF',
+ 'Download agreement package': 'Descargar el paquete del acuerdo',
  'Certificate of completion': 'Certificado de finalización',
  'Proposal accepted': 'Propuesta aceptada',
  'This agreement is complete and cannot be changed.': 'Este acuerdo está completo y no se puede modificar.',

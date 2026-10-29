@@ -2172,7 +2172,7 @@ Platter is one product. Where the market sells a neighboring product separately,
 
 ## Status
 
-Judged from the code and tests at commit `1035bb53f7df8dd9a64caf00c6f44f473e1f7f5a` (29 October 2026). The landing candidate retains these exact source and test bytes; the handoff records its full SHA and Verify receipt. Existing ct judgments and demotions are retained. SIGN-007 remains PARTIAL under its named conservative accounting and CRM authority defaults; no DONE promotion is claimed. SEND-008 retains its existing builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold.
+Judged from the code and tests at commit `1035bb53f7df8dd9a64caf00c6f44f473e1f7f5a` (29 October 2026). This is the SIGN-007 implementation baseline; the candidate also localizes its package-download label and repairs the existing budget journey’s native pointer drag without changing its assertions or thresholds. The handoff records the full candidate SHA, exact-SHA local proof and Verify receipt. Existing ct judgments and demotions are retained. SIGN-007 remains PARTIAL under its named conservative accounting and CRM authority defaults; no DONE promotion is claimed. SEND-008 retains its existing builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |

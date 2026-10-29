@@ -127,7 +127,7 @@ async function multiRecipientAccept(env:Bindings,c:Awaited<ReturnType<typeof cli
   const final={...content,recipient_plan:plan,...(Object.keys(combinedFields).length?{fieldValues:combinedFields}:{}),signatures,...(policy.enabled?{collectionPolicy:policy}:{})}
   writes.push(db.prepare('INSERT INTO p_acceptances(proposal_id,revision,snapshot,name,email,option_id,total_cents,deposit_cents,accepted_at,consent,currency) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(row.id,row.revision,JSON.stringify(final),first.name,first.email,choice.optionId,choice.totalCents,choice.depositCents,at,first.consent,content.currency),
    db.prepare('INSERT INTO p_signature_facts(proposal_id,revision,method,verified_at,context) VALUES(?,?,?,?,?)').bind(row.id,row.revision,first.method,first.verified_at,JSON.stringify(JSON.parse(first.snapshot).context??null)),
-   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),...completionMailStatements(env,row.id))
+   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),...handoffCompletion(db,row.id),...completionMailStatements(env,row.id))
  }
  const ownerGuard=recipient.role==='countersigner'?" AND EXISTS(SELECT 1 FROM oa_operators WHERE lower(email)=? AND role='owner' AND status='active')":''
  await atomic(env,c,writes,'p.version=? AND s.slot_id=? AND s.session_hash=? AND s.session_expires>? AND '+expiryOpenSql('p')+' AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))'+ownerGuard,[row.version,recipient.id,share.session_hash,at,at,discountDeadline([option]),at,...(ownerGuard?[row.clientEmail.toLowerCase()]:[])])

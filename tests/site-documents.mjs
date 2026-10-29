@@ -881,7 +881,7 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
 })
 
 test('HAND-001 Settings authorizes Asana delivery and displays completed and uncertain handoffs', {timeout:120000},async()=>{
- const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{handoffFixture,asanaToken,asanaWorkspace,asanaTeam,completeHandoffAgreement}=await import('./handoff-fixture.mjs')
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{handoffFixture,asanaToken,asanaWorkspace,asanaTeam,completeHandoffAgreement,handoffOffer,recordHandoffUpload}=await import('./handoff-fixture.mjs')
  const fake=handoffFixture(),edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,outboundService:fake.outboundService});edge.attach(h)
  let browser,context
  try{
@@ -908,6 +908,19 @@ test('HAND-001 Settings authorizes Asana delivery and displays completed and unc
   assert.equal(await panel.getByRole('button',{name:/retry/i}).count(),0)
   const posts=fake.calls.filter(c=>c.method==='POST').length
   await page.reload();assert.equal(fake.calls.filter(c=>c.method==='POST').length,posts)
+  await completeHandoffAgreement(h,'Waiting for required deposit',signed.client.id,true,{completion:'required'})
+  await page.reload();assert.match(await history.innerText(),/Waiting for required deposit/)
+  assert.equal(await panel.getByRole('button',{name:'Process queued handoffs',exact:true}).count(),0,'an unpaid agreement has no process action')
+  fake.setUncertain(undefined)
+  const paper=await handoffOffer(h,'Accepted outside Platter delivery',signed.client.id),uploaded=await recordHandoffUpload(h,paper)
+  assert.equal(uploaded.status,200,uploaded.text)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'});await page.reload()
+  const paperHistory=history.locator('article').filter({has:page.getByRole('heading',{name:'Accepted outside Platter delivery',exact:true})})
+  assert.match(await paperHistory.innerText(),/complete/)
+  const paperLink=await paperHistory.getByRole('link',{name:'Download accepted agreement',exact:true}).getAttribute('href')
+  assert.match(paperLink,/^\/api\/platter\/attachments\//)
+  const original=await context.request.get(h.origin+paperLink);assert.equal(original.status(),200);assert.equal(await original.text(),'Synthetic retained signed agreement')
+  assert.equal(fake.projects.length,3);assert.equal(fake.tasks.length,8,'held and unpaid completions add no tasks')
   assert.equal(await panel.getByLabel('Asana workspace id').inputValue(),asanaWorkspace)
   assert.ok(await panel.locator('button,input,p,summary').evaluateAll(nodes=>nodes.every(node=>parseFloat(getComputedStyle(node).fontSize)>=13)))
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))

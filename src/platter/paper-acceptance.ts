@@ -1,4 +1,6 @@
 import { discountDeadline } from './discounts'
+import { collectionPolicy } from './collection-policy'
+import { handoffCompletion } from './handoff/jobs'
 import { currentTime } from './expiry-time'
 import { prepareAttachment } from './attachments'
 import { acceptanceTerms } from './signing'
@@ -29,6 +31,8 @@ export async function paperAcceptance(db: D1Database, a: Actor, form: FormData) 
  need(file.size <= 10 * 1024 * 1024, 'The signed copy must be 10 MB or smaller', 413)
  const at = await currentTime(db), signer = text(form.get('signer'), "the signer's full name", 200), date = signedOn(form.get('signedOn'), at)
  const { option, deposit, frozen } = acceptanceTerms(row, form.get('optionId'), Object.fromEntries(form),at)
+ const policy=await collectionPolicy(db,row.id)
+ if(policy.enabled)Object.assign(frozen,{collectionPolicy:policy})
  const prepared = await prepareAttachment(db, { filename: file.name, mediaType: file.type, bytes: await file.arrayBuffer() })
  await commit(db, a, [
   ...prepared.writes,
@@ -36,6 +40,7 @@ export async function paperAcceptance(db: D1Database, a: Actor, form: FormData) 
   db.prepare('INSERT INTO p_paper_acceptances(proposal_id,file_id,signed_on,attested_by,attested_at) VALUES(?,?,?,?,?)').bind(row.id, prepared.attachment.id, date, a.email, at),
   db.prepare("UPDATE p_proposals SET status='accepted',version=version+1 WHERE id=?").bind(row.id),
   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),
+  ...handoffCompletion(db,row.id),
  ], true, { sql: "EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status='sent' AND approved_by IS NOT NULL) AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))", values: [row.id, row.version, row.revision,discountDeadline([option]),at] })
  return { id: row.id }
 }

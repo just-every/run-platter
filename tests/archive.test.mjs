@@ -1017,17 +1017,24 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
 })
 
 test('HAND-001 public CLI retains document archive history for Asana handoff without credentials or execution', {timeout:180000},async()=>{
- const {handoffFixture,asanaToken,handoffSettings,connectAsana,completeHandoffAgreement}=await import('./handoff-fixture.mjs')
+ const {handoffFixture,asanaToken,handoffSettings,connectAsana,completeHandoffAgreement,handoffOffer,verifyHandoff,recordHandoffUpload}=await import('./handoff-fixture.mjs')
  const temporary=await mkdtemp(join(tmpdir(),'platter-handoff-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=handoffFixture();let h
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
   h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectAsana(h)
   const completed=await completeHandoffAgreement(h);await h.cmd('handoff.dispatch',{})
+  assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
+  const paper=await handoffOffer(h,'Retained uploaded delivery',completed.client.id),uploaded=await recordHandoffUpload(h,paper)
+  assert.equal(uploaded.status,200,uploaded.text)
+  const multi=await handoffOffer(h,'Retained configured delivery',completed.client.id,{recipients:[{id:'client',name:'Client',email:['synthetic-platter-9450','example.test'].join('@'),role:'signer',group:1},{id:'owner',name:'Owner',email:h.auth.OWNER_EMAIL,role:'countersigner',group:2}]})
+  for(const r of multi.recipients){const path=new URL(r.shareUrl).pathname,cookie=await verifyHandoff(h,path);const signed=await h.send(path+'/action?name=accept',completed.input,cookie);assert.equal(signed.status,200,signed.text)}
+  await h.cmd('handoff.dispatch',{})
+  const waiting=await completeHandoffAgreement(h,'Retained unpaid delivery',completed.client.id,true,{completion:'required'})
   const queued=await completeHandoffAgreement(h,'Queued delivery history',completed.client.id)
   const tables=['p_handoff_settings','p_handoff_jobs','p_handoff_writes'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
-  assert.deepEqual(before.p_handoff_jobs.map(j=>j.status).sort(),['complete','queued'])
-  assert.equal(before.p_handoff_writes.length,5);assert.ok(before.p_handoff_writes.every(w=>w.provider_id&&w.status==='complete'))
+  assert.deepEqual(before.p_handoff_jobs.map(j=>j.status).sort(),['complete','complete','complete','queued','queued'])
+  assert.equal(before.p_handoff_writes.length,15);assert.ok(before.p_handoff_writes.every(w=>w.provider_id&&w.status==='complete'))
   const artifact=await h.mf.dispatchFetch(h.origin+completed.path+'/agreement.pdf',{headers:{cookie:completed.cookie}});assert.equal(artifact.status,200);const document=Buffer.from(await artifact.arrayBuffer())
   await h.close();h=undefined
   const archive=join(temporary,'handoff.rer');await command(source,['export','--output',archive])
@@ -1041,11 +1048,17 @@ test('HAND-001 public CLI retains document archive history for Asana handoff wit
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'});assert.equal(receiver.calls.length,0)
   const owner=await h.signIn(h.auth.OWNER_EMAIL),history=(await h.send('/api/platter/handoffs',undefined,owner)).value
   assert.equal(history.settings.active,false);assert.ok(history.jobs.every(j=>!j.executable))
+  const paperPath=history.jobs.find(j=>j.proposal_id===paper.proposal.id).agreementPath
+  const original=await h.send(paperPath,undefined,owner);assert.equal(original.status,200);assert.equal(original.text,'Synthetic retained signed agreement');assert.match(original.headers.get('content-disposition'),/^attachment/)
+  assert.equal((await h.send(paperPath)).status,401)
+  assert.equal(history.jobs.find(j=>j.proposal_id===waiting.proposal.id).waiting_for_payment,1)
   const download=await h.mf.dispatchFetch(h.origin+'/api/platter/agreement.pdf?id='+completed.proposal.id,{headers:{cookie:owner}});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),document)
   assert.equal((await h.send(completed.path+'/agreement.pdf',undefined,completed.cookie)).status,404)
   await h.cmd('provider.connect',{provider:'asana',version:1,token:asanaToken,consent:true},owner)
   await h.cmd('handoff.configure',{...handoffSettings,version:1,connectionVersion:2},owner)
   const calls=receiver.calls.length;await h.cmd('handoff.dispatch',{},owner);assert.equal(receiver.calls.length,calls)
-  assert.equal((await h.send('/api/platter/handoffs',undefined,owner)).value.jobs.find(j=>j.proposal_id===queued.proposal.id).status,'queued')
+  const after=(await h.send('/api/platter/handoffs',undefined,owner)).value
+  assert.equal(after.jobs.find(j=>j.proposal_id===queued.proposal.id).status,'queued')
+  assert.equal(after.jobs.find(j=>j.proposal_id===waiting.proposal.id).status,'queued')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

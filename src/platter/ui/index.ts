@@ -1,4 +1,5 @@
 import { archivePanel } from './archiving'
+import { watcherSettingsPage } from './watchers'
 import { trackingPanel, trackingNotices } from './tracking'
 import { collaborationSettings } from './collaboration'
 import { documentBrandCss } from './blocks'
@@ -35,6 +36,7 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
     let above = ''
     let layout = ''
     switch (url.pathname) {
+      case '/app/settings/notifications': title='Notification settings'; above=eyebrow('Settings · personal proposal preferences'); content=watcherSettingsPage(state); break
       case '/app/catalog': title='Catalog'; content=catalogPage(state); break
       case '/app/library': title='Content library'; content=libraryPage(state,url.searchParams); break
       case '/app/team': title='Team'; content=teamPage(state)+foldersPanel(state)+connectionsPanel(state,true); break
@@ -44,7 +46,7 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
       case '/app/proposal': {
         const id = url.searchParams.get('id') ?? ''
         title = state.proposals?.find((p: any) => String(p.id) === id)?.title ?? 'Proposal'; above = proposalEyebrow(state, id); layout = 'proposal-page'
-        content = proposalPage(state, id, url.searchParams, feedback); break
+        content = proposalPage(state, id, url.searchParams, feedback); if(content!==null&&state.actor?.role!=='agent')content='<p><a href="/app/settings/notifications?id='+encodeURIComponent(id)+'">Notification settings</a></p>'+content; break
       }
       case '/app/clients': title = 'Clients'; above = eyebrow(`Clients · ${count((state.clients ?? []).length, 'client')} on file`); layout = 'clients-page'; content = clientsPage(state); break
       case '/app/import': title = 'Import'; above = eyebrow('Move in · documents, clients and catalog'); content = importPage(state, feedback); break

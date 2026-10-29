@@ -4,7 +4,7 @@ import { fail } from './errors'
 export type NativeRow = { table: string; key: Record<string,string|number>; values: Record<string,string|number|null> }
 const tables = new Set(['p_attachment_files','p_attachment_chunks','p_document_media','p_template_document_media','p_library_media',
  'p_proposals','p_revisions','p_personal_templates','p_library_items','p_imported_library','p_pdf_settings','p_expiry',
- 'p_proposal_folders','p_proposal_filing','p_imported_document_links'])
+ 'p_proposal_folders','p_proposal_filing','p_imported_document_links','p_imported_document_folders'])
 const sql=(sql:string,...params:unknown[]):D1Sql=>({sql,params})
 function columns(row:NativeRow) {
  if(!tables.has(row.table)||![...Object.keys(row.key),...Object.keys(row.values)].every(k=>/^[a-z_][a-z_0-9]*$/.test(k)))fail('invalid_import_target',409)
@@ -41,7 +41,7 @@ export const nativeTargets:D1TargetAdapter={
   const groups:Record<string,string[]>={p_proposals:['p_imported_document_links','p_proposal_filing','p_pdf_settings','p_document_media','p_revisions','p_proposals'],p_personal_templates:['p_template_document_media','p_personal_templates'],p_library_items:['p_imported_library','p_library_media','p_library_items']}
   for(const table of groups[owned]??[owned]) {
    if(!tables.has(table))fail('invalid_import_target',409)
-   const key=table==='p_attachment_chunks'?['file_id','part']:table==='p_document_media'?['proposal_id','file_id']:table==='p_template_document_media'?['template_id','file_id']:table==='p_library_media'?['item_id','file_id']:table==='p_revisions'?['proposal_id','revision']:table==='p_imported_library'?['item_id']:table==='p_imported_document_links'?['document_id','proposal_id']:['p_pdf_settings','p_expiry','p_proposal_filing'].includes(table)?['proposal_id']:['id']
+   const key=table==='p_imported_document_folders'?['document_id','folder_id']:table==='p_attachment_chunks'?['file_id','part']:table==='p_document_media'?['proposal_id','file_id']:table==='p_template_document_media'?['template_id','file_id']:table==='p_library_media'?['item_id','file_id']:table==='p_revisions'?['proposal_id','revision']:table==='p_imported_library'?['item_id']:table==='p_imported_document_links'?['document_id','proposal_id']:['p_pdf_settings','p_expiry','p_proposal_filing'].includes(table)?['proposal_id']:['id']
    writes.push(sql('DELETE FROM '+table+' WHERE EXISTS(SELECT 1 FROM p_document_native_imports n,json_each(n.rows_json) r WHERE n.id=? AND json_extract(r.value,\'$.table\')=? AND '+key.map(k=>table+'.'+k+' IS json_extract(r.value,\'$.key.'+k+'\')').join(' AND ')+')',id,table))
   }
   // Children precede their parent in a receipt, so delete in reverse row order.

@@ -85,7 +85,7 @@ export async function assertNativeMovein(h,move,cookie=h.owner){
  assert.match(JSON.stringify(template.snapshot.document.merge.patterns),/Client.Company/)
  assert.equal(state.libraryItems.filter(i=>resources.some(r=>r.kind==='library'&&r.id===i.id)).length,10)
  const folders=state.resourceFolders.filter(f=>f.name==='Open'||f.name==='Open/2026'||f.name==='Open/2026/January')
- assert.equal(folders.length,3);assert.equal(folders.find(f=>f.name==='Open/2026/January').parent_id,folders.find(f=>f.name==='Open/2026').id)
+ assert.equal(folders.length,3);assert.equal(move.reviewed.report.arrivedFolders,5);assert.equal(state.importedDocuments.find(d=>d.id===hash(move.fixture.originals[0])).folders[0].name,'Completed');assert.equal(folders.find(f=>f.name==='Open/2026/January').parent_id,folders.find(f=>f.name==='Open/2026').id)
  assert.equal(draft.folderId,folders.find(f=>f.name==='Open/2026/January').id)
  assert.equal(state.businessRecords.contacts.filter(c=>c.email===['synthetic-platter-9','example.invalid'].join('@')).length,1)
  assert.equal(state.businessRecords.catalog.filter(c=>/^SKU[1-5]$/.test(c.sku)).length,5)

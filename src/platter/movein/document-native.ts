@@ -35,8 +35,14 @@ export async function nativeDocumentSource(db:D1Database,actor:Actor,movein:{id:
  const folder=(path:string)=>{
   if(!path)return null
   let parent:string|null=null,prefix=''
-  for(const part of path.split('/')){prefix+=(prefix?'/':'')+part;if(!folders.has(prefix)){const folderId=id('folder',prefix);folders.set(prefix,folderId);add(folderId,[row('p_proposal_folders',{id:folderId},{id:folderId,name:prefix.slice(0,100),parent_id:parent,version:1,updated_by:actor.id,updated_at:at})],sha256(prefix))}parent=folders.get(prefix)!}
+  for(const part of path.split('/')){prefix+=(prefix?'/':'')+part;if(!folders.has(prefix)){const folderId=id('folder',prefix);folders.set(prefix,folderId);resources.push({id:folderId,kind:'folder',title:prefix});add(folderId,[row('p_proposal_folders',{id:folderId},{id:folderId,name:prefix.slice(0,100),parent_id:parent,version:1,updated_by:actor.id,updated_at:at})],sha256(prefix))}parent=folders.get(prefix)!}
   return parent
+ }
+ if(Object.keys(rules).length)for(const pdf of documents){
+  const folderIds=[...new Set(pdf.sources.map((source:string)=>{const filename=source.includes(': ')?source.slice(source.indexOf(': ')+2):source;return folder(filename.split('/').slice(0,-1).join('/'))}).filter(Boolean))] as string[]
+  if(folderIds.length)add(id('document-folders',pdf.sha256),folderIds.map(folderId=>row('p_imported_document_folders',{document_id:pdf.sha256,folder_id:folderId},{document_id:pdf.sha256,folder_id:folderId})),pdf.sha256)
+  const record=source.records.find(r=>r.kind==='documents'&&r.sourceId===pdf.id)!
+  ;(record.payload as any).value.folders=folderIds.map(folderId=>({id:folderId,name:[...folders].find(([,v])=>v===folderId)![0]}));record.payloadHash=sha256(canonicalJson(record.payload))
  }
  const catalog=[...(await db.prepare('SELECT id,sku,name FROM p_priced_catalog').all<any>()).results,...(await db.prepare('SELECT data_json FROM p_catalog_items').all<{data_json:string}>()).results.map(r=>JSON.parse(r.data_json))]
  // Business parents precede document resources and are undone after their users.
@@ -99,7 +105,8 @@ export async function nativeDocumentSource(db:D1Database,actor:Actor,movein:{id:
    rows.push(row('p_personal_templates',{id:nativeId},{id:nativeId,owner_id:actor.id,name:title,version:1,snapshot:JSON.stringify(template),pdf_enabled:1,expiry:JSON.stringify({mode:'never',period_days:null,expires_on:null,time_zone:'UTC',warning_days:null}),suggestion_sections:'[]',created_at:at,updated_at:at,shared:0}))
   }
   for(const mediaId of mediaIds){const table=rule.kind==='draft'?'p_document_media':'p_template_document_media',key=rule.kind==='draft'?'proposal_id':'template_id';rows.push(row(table,{[key]:nativeId,file_id:mediaId},{[key]:nativeId,file_id:mediaId}))}
-  add(nativeId,rows,file.sha256);resources.push({id:nativeId,kind:rule.kind,title,filename:file.filename,report:document.importReport})
+  add(nativeId,rows,file.sha256);resources.push({id:nativeId,kind:rule.kind,title,filename:file.filename,sourceSha256:file.sha256,report:document.importReport})
+  if(rule.kind==='draft'&&isPdf){const record=source.records.find(r=>r.kind==='documents'&&r.sourceId===file.sha256)!;(record.payload as any).value.nativeDraftId=nativeId;record.payloadHash=sha256(canonicalJson(record.payload))}
  }
  if(Object.keys(rules).some(hash=>!files.some(f=>f.sha256===hash)))fail('invalid_mapping',409,'Review only files present in this move-in')
  source.records.push(...business,...additions)

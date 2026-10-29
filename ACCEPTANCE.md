@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `e1b6142ec39826f007b39d5d36f18945656fb920` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 and EDIT-022 are builder completion claims pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -465,7 +465,7 @@ Core · target · **partial** · Rules D-1
 
 #### EDIT-022 — Preview isolation and exact approval link
 
-Core · target · **partial** · From EDIT-018 · Cites BASE-ROLE-001, BASE-AUDIT-001 · Rules D-1
+Core · target · **done** · From EDIT-018 · Cites BASE-ROLE-001, BASE-AUDIT-001 · Rules D-1
 
 **Requirement.** Preview interactions create no client or business lifecycle effects. Approval requests open the exact revision awaiting the decision. These obligations apply to every content, provider, record kind and public door as it arrives.
 
@@ -476,8 +476,8 @@ Core · target · **partial** · From EDIT-018 · Cites BASE-ROLE-001, BASE-AUDI
 4. A person outside proposal scope is refused; signed-out and client-only sessions see no private preview.
 5. Preview audit records retain actor, subject and server time through archive; refusals add no preview audit.
 
-**Evidence.** `src/platter/preview.ts`; `tests/platter.test.mjs` — “EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state”; `tests/site.test.mjs`; `tests/archive.test.mjs`
-**Gap.** Delivered: Preview submissions are refused and previewing leaves proposal revisions, approvals and outbound/tracking activity unchanged apart from its own audit. Missing “EDIT-022 complete preview isolation and exact approval link journey”: A pending manager follows the exact approval-request preview, an out-of-scope reader sees no content, and that specific preview audit survives public CLI custody without restoring authority.
+**Evidence.** `tests/platter.test.mjs` — “EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state” (disabled submissions, complete unchanged business history, scoped and session refusals); `tests/mail.test.mjs` — “APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once” (emitted manager URL, revision-bound approval and stale refusal); `tests/approval-preview-fixture.mjs` — managerApprovalPreview (independent manager, subject and server-time audit); `tests/site.test.mjs` — “APPROVE-002 email preview and decision links work under a member session at desktop and phone widths” (registered through `tests/site-documents.mjs`); `tests/archive.test.mjs` — “APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority” (exact manager preview audit after public CLI restore, without session or invitation authority)
+**Gap.** None.
 
 ### Catalog and pricing
 

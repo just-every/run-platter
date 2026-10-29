@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "cd17e8c6ee31394a7572f771cd2a5f12953853ca4ffee3018f1297419c9aeae2",
+      "sha256": "13982d4e0c9a098bae21275a239110a484e62de8bf5e6ea3bfa9c4341856d410",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "262fb55d326a334018a36b1fa09fc41fcac0ffce521c9d1a341bddfd2b9336be",
+      "sha256": "2cfed3ed9103d6e6e0fca74fabe2b955998c430895462f7f6c20335028772c26",
       "executable": false
     },
     "deploy-demo.json": {
@@ -595,6 +595,10 @@
     },
     "migrations/core/0095_sms_completion.sql": {
       "sha256": "e5095fbd3deaa2c09bfee7efc34bd6afdb1a66efd959a463c559a3562597173e",
+      "executable": false
+    },
+    "migrations/core/0096_sms_reenable.sql": {
+      "sha256": "cbebdc3767ad5463c708c3ddac223639549305289aad9a1f12678d1b2c92d62b",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -2913,6 +2917,10 @@
       "sha256": "6c5776a41e3a9fe70aaf52d380be728eb72f6d7b5ba2f52da8d21b9b06ec8f22",
       "executable": false
     },
+    "src/platter/sms-reenable.ts": {
+      "sha256": "164a4694067c20295d967046d2f7fabd5b4f7000de2efb41fe45b0d56df30a6c",
+      "executable": false
+    },
     "src/platter/sms.ts": {
       "sha256": "db9f1b75af4e99e6cb94c56e1b8cdb16f1c9fdd106849ada711e3bcebedcea91",
       "executable": false
@@ -3511,6 +3519,14 @@
     },
     "tests/sms-installer-journey.mjs": {
       "sha256": "a19229da646e152ae893fb9f358bed22b9b8f8a2728f9aaf7b27cf02ca8a74d2",
+      "executable": false
+    },
+    "tests/sms-reenable-browser.mjs": {
+      "sha256": "b03414cf95fd6db53fd150f7008590fc877f3f858be508d3b8aa48f3453757bf",
+      "executable": false
+    },
+    "tests/sms-reenable-journey.mjs": {
+      "sha256": "6089495c10e05b46f2de8b46c4a4dcaeb9081be1c5fa5f422ae10f4f5159f05a",
       "executable": false
     },
     "tests/stripe-sandbox.mjs": {

@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 13 | 100 | 46 | 159 |
+| Core | 14 | 99 | 46 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 13 | 100 | 50 | 163 |
+| Full target | 14 | 99 | 50 | 163 |
 
-Judged from the code and tests at commit `56c6fb72f04a58cdc5d169af6fd59b0996a3745c` (28 October 2026). Existing ct judgments and demotions are retained. SEND-008 native completion proof is being refreshed for this continuation; field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -853,7 +853,7 @@ Core · target · **partial** · Rules D-1
 
 #### SEND-008 — Sending and reminders by text message
 
-Core · target · **partial** · Cites BASE-MAIL-001, BASE-ROLE-001 · Rules D-1 · Register R-3
+Core · target · **done** · Cites BASE-MAIL-001, BASE-ROLE-001 · Rules D-1 · Register R-3
 
 **Requirement.** A sender delivers the proposal link, reminders and completion notices by text message to a US mobile number through Twilio, alongside or instead of email. Texts go from a registered A2P 10DLC number or toll-free number, record the recipient's consent, honor STOP and HELP under carrier rules and the TCPA, respect the quiet hours of `FOLLOW-001`, and appear on the timeline with their delivery status. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#send-008).
 
@@ -867,7 +867,7 @@ Core · target · **partial** · Cites BASE-MAIL-001, BASE-ROLE-001 · Rules D-1
 7. Assert actual timeline message content without credential-bearing links, distinct provider acceptance and delivery states, existing HELP behavior, and atomic withdrawal cancellation.
 
 **Evidence.** `tests/mail.test.mjs` — “SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP preserve independent email reminders” (calls `tests/sms-completion-journey.mjs` — completionSmsJourney and `tests/sms-reenable-journey.mjs` — smsReenableJourney and smsDisabledJourney); “SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically cancels queued texts without duplicate transport”; “SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes cannot replay sending authority”; “SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash”; “SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links”; `tests/site.test.mjs` — “SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the compiled client at desktop and phone widths” (calls `tests/sms-installer-journey.mjs` — smsInstallerJourney and `tests/sms-reenable-browser.mjs` — smsReenableBrowser); `tests/archive.test.mjs` — “APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority”
-**Gap.** Final native completion, text-only preparation and safe re-enablement journeys are being refreshed on this candidate. Field proof register R-3 remains not run; no live provider or legal qualification is claimed.
+**Gap.** None.
 
 #### SEND-009 — Reusable public signing link
 

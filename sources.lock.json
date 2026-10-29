@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "66d5ed11247e2555c62a3d15716f703214740f6676c745fac15d3376af9ab9ec",
+      "sha256": "3a7c276f971537a7ea1016411795df443fcc37269cf10914d97b9b7b40b31b6a",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "352e4dd945b8b1e4e544f5c9603c275c2b9dd0df0a34efe6892d80dfe01bd303",
+      "sha256": "e02056b8edca2c17fd173253ac693b232215deb7479584ff38badf49c7acfd08",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2606,7 +2606,7 @@
       "executable": false
     },
     "src/platter/handoff/jobs.ts": {
-      "sha256": "8fc3a07fdc20cf013a373c2be4a60e695a775f247c9170e883be16b2217b0823",
+      "sha256": "f76757ab66f988e8439d4f8326d3d04a1e4f13d844cd70a50b087df44cd78953",
       "executable": false
     },
     "src/platter/history.ts": {
@@ -3046,7 +3046,7 @@
       "executable": false
     },
     "src/platter/ui/handoff.ts": {
-      "sha256": "78044c6f352745247a6604f50cf52cb46a75957c116efba8186b9c82c5ee8c0c",
+      "sha256": "f86b9f16c58a883613eea5cdd6651b9c276e369ea4c41614a1b5b2504e61a53d",
       "executable": false
     },
     "src/platter/ui/history.ts": {
@@ -3382,7 +3382,7 @@
       "executable": false
     },
     "tests/handoff-fixture.mjs": {
-      "sha256": "a2c6a1e226d6ff04042fbf6dfa26d7f5d9900ba97ccccbac386e1e89df3f3c6e",
+      "sha256": "e56c7bc41a74242c345416463da4c556c4d8a3f1926f1d9a1156f54dc1103897",
       "executable": false
     },
     "tests/harness.mjs": {
@@ -3426,7 +3426,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "204e9637bd6d116d9fdc320240936093854f0b6b85c4c4dc7560ce80f2eb5568",
+      "sha256": "94287a4efec6a7235e870522a29a0d88346d7b1d04c8fe6745d682825472a243",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3478,7 +3478,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "8c7a19f7437d756c08d16f3ac889c34457752128215d2077b4f37914a185528f",
+      "sha256": "4e44c46f941c081f199671a2253ae36b2d26244e3bb20ef3e85f274027e66ee1",
       "executable": false
     },
     "tests/site-harness.mjs": {

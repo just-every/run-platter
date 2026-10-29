@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 13 | 101 | 45 | 159 |
+| Core | 13 | 102 | 44 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 13 | 101 | 49 | 163 |
+| Full target | 13 | 102 | 48 | 163 |
 
 Judged from the code and tests at commit `56c6fb72f04a58cdc5d169af6fd59b0996a3745c` (28 October 2026). Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -1655,15 +1655,15 @@ Core · target · **missing**
 
 #### RENEW-002 — Renewal proposals from accepted agreements
 
-Core · target · **missing**
+Core · target · **partial**
 
 **Requirement.** Before an agreement's term ends, Platter prepares a renewal from it with the same scope, an optional price increase the owner sets (percentage or amount), and the notice period stated in the agreement. It follows the `APPROVE-003` approval policy as any revision does. Evergreen agreements show their renewal and cancellation terms to the client before signing. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#renew-002).
 
 **Acceptance.**
 1. Accept a 12-month retainer; 45 days before term end a renewal draft with a 5% increase is waiting for approval; approve, send and accept it, and see a new schedule start when the old one ends.
 
-**Evidence.** None.
-**Gap.** No renewals.
+**Evidence.** `tests/platter.test.mjs` — “RENEW-002 owner-authorized fixed-term drafts require fresh approval and preserve accepted scope without replay”, implemented by `tests/renewal-journey.mjs`, proves no early draft, one draft at the 45-day boundary, the $1,200 monthly retainer becoming $1,260 after 5%, integer-cent fixed increases, selected package and optional quantities, fresh ordinary approval and mailbox verification, a new informational term starting at the previous term end, unchanged original artifacts, concurrent and repeated exclusion, stale configuration and non-owner refusals, revocation and invalidated owner authority. `tests/site.test.mjs` loads `tests/site-documents.mjs` — “RENEW-002 Settings authorizes and revokes fixed-term renewal drafting and opens an independent draft”, implemented by `tests/recurring-browser.mjs`, proves the compiled Settings controls and fresh draft; browser proof records those screens at 1440 and 390 pixels. `tests/archive.test.mjs` — “AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority” additionally proves exact renewal lineage, pending settings, draft rates and accepted scope through public CLI export and import, with no restored execution or signer authority and once-only drafting after fresh specific authorization.
+**Gap.** Evergreen renewal and cancellation disclosures, configurable agreement notice periods and renewal notices, automatic sending, configured recipient roles, percentage-based retainers, agreements with differing recurring term ends and executable payment schedules remain. The conservative current-owner-only, explicit per-agreement drafting authorization is adopted under the standing scope policy pending ct approval; scoped delegation and provider boundaries remain unqualified. The supported fixed-term slice uses a 45-day lead and increases each recurring unit rate by the chosen percentage or fixed amount, retaining one-off rates, discounts and informational payment terms. Dated informational milestones move forward by the fixed term; event-based milestones keep their events. Restores confer no execution authority. FOLLOW-003 internal notices and FOLLOW-001 reminder authorization remain separate obligations; no reminder, notice, approval, verification, sending or payment authority is copied. PAY-003 still requires the real Stripe test account and key for executable charges and payment-method updates.
 
 ### Reporting
 

@@ -931,3 +931,7 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
   } finally { await context.close() }
  } finally { await browser?.close(); await h?.close(); await edge.close() }
 })
+
+test('RENEW-002 Settings authorizes and revokes fixed-term renewal drafting and opens an independent draft',{timeout:120000},async()=>{
+ const {renewalBrowserJourney}=await import('./recurring-browser.mjs');await renewalBrowserJourney()
+})

@@ -589,6 +589,7 @@ test('APPROVE-002 email preview and decision links work under a member session a
     await panel.getByLabel('Decision note',{exact:true}).fill('Please revise this exact offer')
     await panel.getByRole('button',{name:'Record requested decision',exact:true}).click()
     await page.getByText('Rejected. Save a new revision before requesting approval again.',{exact:true}).waitFor()
+    assert.match(await panel.innerText(),/Decision: rejected · Please revise this exact offer/)
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'decision fits the viewport')
     if(screenshots){await page.screenshot({path:join(screenshots,'APPROVE-002-decision-'+width+'.png'),fullPage:true});await page.getByRole('heading',{name:'Revision approvals',exact:true}).locator('..').screenshot({path:join(screenshots,'APPROVE-002-approval-panel-'+width+'.png')})}
     const decisions=(await app.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(p.id).all()).results;assert.equal(decisions.length,1);assert.equal(decisions[0].revision,2);assert.equal(decisions[0].note,'Please revise this exact offer')

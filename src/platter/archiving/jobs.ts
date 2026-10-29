@@ -1,6 +1,6 @@
 import type { Bindings } from '../../auth.server'
 import { agreementArtifact } from '../documents/agreement'
-import { markConnectionBroken, providerCredential } from '../connections'
+import { currentConnection, markConnectionBroken, providerCredential } from '../connections'
 import { commit, need, text, type Actor } from '../model'
 import { administrators } from '../permissions'
 import { recordAudit } from '../audit'
@@ -65,11 +65,19 @@ function driveAccess(env:Bindings,credential:Awaited<ReturnType<typeof providerC
  const {id,version,sealed}=credential.connection
  return {token:credential.secret.token,credentialRejected:()=>markConnectionBroken(env,id,version,sealed)}
 }
-async function execution(env:Bindings,job:any){
+async function archiveAuthority(env:Bindings,job:any){
  const config=await env.DB.prepare(live).first<any>()
  need(config&&config.version===job.settings_version&&config.account_id===job.account_id&&config.root_folder===job.root_folder,'Archive authorization or connection changed; fresh configuration applies only to future completions',409)
  need(await env.DB.prepare("SELECT 1 FROM p_archive_job_authority g JOIN p_acceptances a ON a.proposal_id=g.proposal_id JOIN p_proposals p ON p.id=a.proposal_id JOIN p_clients c ON c.id=p.client_id WHERE g.proposal_id=? AND a.revision=? AND p.status='accepted'").bind(job.proposal_id,job.revision).first(),'This job has no current completion authority; restored history never executes',409)
+ return config
+}
+async function execution(env:Bindings,job:any){
+ await archiveAuthority(env,job)
  const credential=await providerCredential(env,'workspace:google_drive')
+ // Refresh can yield to a successful revocation. Recheck the job and grant
+ // after it completes, before returning any credential to the Drive request.
+ const config=await archiveAuthority(env,job)
+ await currentConnection(env,credential)
  need(credential.connection.version===config.connection_version&&credential.connection.account_id===job.account_id,'Drive connection changed',409)
  return {...driveAccess(env,credential),actor:{id:config.authorized_by,email:config.email,role:config.native_role==='owner'?'owner':'admin',memberVersion:config.member_version} as Actor}
 }

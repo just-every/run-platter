@@ -577,6 +577,10 @@
       "sha256": "1b5e5ea514657f441235813a0698d70d14bfc0d036cce6e7ebe77ba2de13077c",
       "executable": false
     },
+    "migrations/core/0095_reminder_dispatch_lock.sql": {
+      "sha256": "ca225c6fbf0d170010c8c00e8e532df2b77c9c07ae006b936293fe2685b66cfd",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -2402,7 +2406,7 @@
       "executable": false
     },
     "src/platter/archive-policy.mjs": {
-      "sha256": "71b39c710f13b1a94df4234ba29983713e50bca166c55dac41ef23d4d3d9f37a",
+      "sha256": "09cddab8d64b258bbd07ff4709e6f97fa8510efec6a1ed896ece2a34e584ada2",
       "executable": false
     },
     "src/platter/archiving/google-drive.ts": {
@@ -2410,7 +2414,7 @@
       "executable": false
     },
     "src/platter/archiving/jobs.ts": {
-      "sha256": "73caf6831dc69c57536e7ceebc6e08bf76211cef8e17172cf057faf883ed0102",
+      "sha256": "8604b4cc5b4cb1898bcb90e1fae06f02f401a7bcd846891ea0fde6401234e6e2",
       "executable": false
     },
     "src/platter/attachment-commands.ts": {
@@ -2834,7 +2838,7 @@
       "executable": false
     },
     "src/platter/reminders.ts": {
-      "sha256": "ece390c8c6166b9b1092181628646f88603d3fc98151edfa9231e2d196c37aeb",
+      "sha256": "4dcf6aaebfd7cd5c8318741606d8134cbc7e56b40598c41dff412c167ecb42b5",
       "executable": false
     },
     "src/platter/reports/pipeline-csv.ts": {
@@ -3286,7 +3290,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "e41136de304abd6ce1dfa23abef2fc1b8fcd4fe2f5ea0914df7b8c76f8e47d00",
+      "sha256": "815fd29bd201bed5a45932efd62d095ccfc27454f138ba328c7e20c41c355338",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3374,7 +3378,7 @@
       "executable": false
     },
     "tests/drive-oauth-journey.mjs": {
-      "sha256": "7358933524a739cc398f2ae8887c916da68a09e4cd77f4f67ad856ae4e80a404",
+      "sha256": "443f7ea58e7e11ffde0bcd32160ecfba2fab9913e7f6223064e8c5a21bb3e846",
       "executable": false
     },
     "tests/editor-budget.mjs": {

@@ -59,6 +59,25 @@ export async function driveOAuthJourney(){
   await h.cmd('archive.configure',{...driveSettings,version:2,connectionVersion:3})
   const fresh=await completeDriveAgreement(h,'Fresh OAuth completion',completed.client.id);await h.cmd('archive.dispatch',{})
   assert.equal((await history()).jobs.find(j=>j.proposal_id===fresh.proposal.id).status,'complete')
+  const withdrawn=await completeDriveAgreement(h,'Revoke during PDF upload refresh',completed.client.id)
+  const uploadsBefore=[...fake.files.values()].filter(file=>file.bytes).length
+  let revokedAt
+  const revokeOnUpload=async()=>{
+   const file=await h.db.prepare("SELECT 1 FROM p_archive_files WHERE proposal_id=? AND status='writing'").bind(withdrawn.proposal.id).first()
+   if(!file){hook=revokeOnUpload;return}
+   await h.cmd('archive.revoke',{version:3});revokedAt=fake.calls.length
+  }
+  hook=revokeOnUpload;await h.cmd('archive.dispatch',{})
+  assert.ok(revokedAt!==undefined,'revocation completes during the upload credential refresh')
+  assert.equal([...fake.files.values()].filter(file=>file.bytes).length,uploadsBefore,'revocation during refresh must not transfer or store a private PDF')
+  assert.equal(fake.calls.length,revokedAt,'no Drive request follows successful revocation')
+  assert.equal((await history()).jobs.find(j=>j.proposal_id===withdrawn.proposal.id).status,'held')
+  assert.equal((await history()).settings.active,false)
+  await h.cmd('archive.dispatch',{});await h.cmd('archive.reconcile',{id:withdrawn.proposal.id},h.owner,409)
+  assert.equal(fake.calls.length,revokedAt,'held work cannot retry after revocation')
+  await h.cmd('archive.configure',{...driveSettings,version:3,connectionVersion:3})
+  const future=await completeDriveAgreement(h,'Fresh consent after revoked upload',completed.client.id);await h.cmd('archive.dispatch',{})
+  assert.equal((await history()).jobs.find(j=>j.proposal_id===future.proposal.id).status,'complete')
   const pending=await authorize();await h.cmd('provider.disconnect',{provider:'google_drive',version:3});const disconnected=calls.length
   assert.equal((await h.send(pending,undefined,h.owner)).status,403);await h.cmd('archive.dispatch',{});assert.equal(calls.length,disconnected)
   for(const value of [await h.state(),await history(),(await h.send('/api/platter/audit',undefined,h.owner)).value,(await h.send('/app/settings',undefined,h.owner)).text]){

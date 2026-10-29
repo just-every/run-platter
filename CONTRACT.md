@@ -2177,8 +2177,8 @@ Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d3
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 1 | 11 | 0 | 12 |
-| Target and push further | 13 | 88 | 50 | 151 |
-| All | 14 | 99 | 50 | 163 |
+| Target and push further | 13 | 89 | 49 | 151 |
+| All | 14 | 100 | 49 | 163 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -2290,7 +2290,7 @@ Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d3
 | `ACCT-005` | Invoice and payment export files | target | partial | `src/platter/invoices.ts`, `tests/platter.test.mjs` | A currency-tagged Xero deposit CSV only; no QuickBooks files, sandbox-verified USD imports, payment or schedule export. |
 | `ACCT-006` | Stripe payouts, fees and clearing in accounting | target | missing |  | No payment or accounting connection, so no payout or fee posting. |
 | `ACCT-007` | Invoices created on their issue day, never ahead | target | missing |  | No invoices are created for scheduled amounts; the only invoice is the owner's deposit CSV export after acceptance. |
-| `CRM-001` | HubSpot two-way deal sync | target | missing |  | No HubSpot connection. |
+| `CRM-001` | HubSpot two-way deal sync | target | partial | `tests/platter.test.mjs` — “CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance and refuse changed source or authority without writes”, extended by `tests/hubspot-sync-journey.mjs`, covers exact rows, reviewed outbound amounts and custom status and protected-link fields, Closed won, four distinct timeline notes after recorded full payment, current authority, changed destination refusals and uncertainty without replay. `tests/site.test.mjs` loads `tests/site-documents.mjs` — “CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows”, extended by `tests/hubspot-browser.mjs`, covers Settings review and apply, signed card launch to another deal and linked status at 1440 and 390. `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority”, extended by `tests/hubspot-archive.mjs`, retains exact source, consent and receipt history while excluding reviews, card credentials and execution authority. | Conservative standing-scope default: only current owners and admins read or start connected-deal drafts or authorize one explicitly reviewed outbound snapshot. Broader member and delegated access, ct approval of the expanded authority default and unattended lifecycle synchronization under FOLLOW-007 remain. The modern HubSpot card source and signed backend are present, but installed-app rendering, actual account scopes and live-provider qualification need a HubSpot account, installed app and client credentials not supplied to this run. Timeline activity uses notes; custom app events are not qualified. Added or removed source rows and optional, recurring, discounted or taxed prices are explicitly held for manual preparation. Existing FOLLOW-005 stage-only consent and uncertainty riders remain unchanged; no standing grant is created. |
 | `CRM-002` | Salesforce two-way opportunity sync | target | missing |  | No Salesforce connection. |
 | `CRM-003` | Orbit two-way deal sync | target | missing |  | No Orbit connection. |
 | `CRM-004` | Pipedrive and Zoho CRM sync | target | missing |  | No Pipedrive or Zoho connection. |

@@ -1,3 +1,6 @@
+import { configureHubspotCard } from './crm/hubspot-card'
+import { hubspotSyncCommand } from './crm/hubspot-sync'
+import { hubspotDraftCommand } from './crm/hubspot-draft'
 import { archiveCommand } from './archiving/jobs'
 import { clientLocale, saveClientLocale } from './locales'
 import { hasTaxable, taxRequest, optionTax, resolveTax, saveTaxRate, validateTaxOptions, type TaxSnapshot } from './taxes'
@@ -72,6 +75,9 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
+ if(name==='crm.card.configure')return configureHubspotCard(env,a,p)
+ if(name.startsWith('crm.sync.'))return hubspotSyncCommand(env,a,name,p)
+ if(name.startsWith('crm.deal.'))return hubspotDraftCommand(env,a,name,p)
  if(name==='proposal.locale')return saveClientLocale(db,a,p)
  if(name==='tax.rate')return saveTaxRate(db,a,p)
  let tax:TaxSnapshot|undefined
@@ -158,7 +164,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   need(a.role==='owner','Only the owner erases clients',403);const id=text(p.id,'a client'),c=await db.prepare('SELECT * FROM p_clients WHERE id=?').bind(id).first<any>();need(c,'Client not found',404);need(p.confirmName===c.name,'Type the exact client name to confirm erasure');
   const unused=`NOT EXISTS(SELECT 1 FROM p_proposals WHERE client_id=?) AND NOT EXISTS(SELECT 1 FROM p_import_client_revisions WHERE client_id=?)`
   const check=await db.prepare(`SELECT (${unused}) AS ok`).bind(id,id).first<any>();need(check?.ok,'Clients with proposal or import history must be retained. Undo an unused import first.',409)
-  const portability=await createPortability({db,policy:archivePolicy});await commit(db,a,[...await portability.erasureStatements('p_clients',{id}),...await portability.invalidateTransfersStatements(),db.prepare('DELETE FROM p_clients WHERE id=?').bind(id)],true,{sql:unused,values:[id,id]});return{erased:true}
+  const portability=await createPortability({db,policy:archivePolicy});await commit(db,a,[...await portability.erasureStatements('p_clients',{id}),...await portability.invalidateTransfersStatements(),db.prepare("DELETE FROM p_crm_draft_reviews WHERE json_extract(source_json,'$.contact.email')=? OR json_extract(client_json,'$.id')=?").bind(c.email,id),db.prepare('DELETE FROM p_clients WHERE id=?').bind(id)],true,{sql:unused,values:[id,id]});return{erased:true}
  }
  if(name==='proposal.negotiate'||name==='proposal.revise'){
   const current=await proposal(db,p.id)

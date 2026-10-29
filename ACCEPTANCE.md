@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 99 | 46 | 159 |
+| Core | 14 | 100 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 99 | 50 | 163 |
+| Full target | 14 | 100 | 49 | 163 |
 
 Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -1505,7 +1505,7 @@ Core · target · **missing**
 
 #### CRM-001 — HubSpot two-way deal sync
 
-Core · target · **missing** · Register R-2
+Core · target · **partial** · Register R-2
 
 **Requirement.** The owner or an admin connects HubSpot. A member starts a proposal from a deal (or from a HubSpot CRM card), with company, contacts, deal fields and line items pulled in. Platter writes back status, amount, line items, the proposal link and timeline events (sent, viewed, signed, paid), and moves the deal stage according to rules the admin sets. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#crm-001).
 
@@ -1513,8 +1513,8 @@ Core · target · **missing** · Register R-2
 1. With a HubSpot API fake: create a proposal from a deal with two line items, send, view and sign; see the deal's line items, amount, stage Closed won and four timeline events.
 2. Open the Platter CRM card on another deal in the fake, start a proposal from it, and see the proposal linked to that deal with its company, contacts and line items filled, and the card listing the proposal with its status.
 
-**Evidence.** None.
-**Gap.** No HubSpot connection.
+**Evidence.** `tests/platter.test.mjs` — “CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance and refuse changed source or authority without writes”, extended by `tests/hubspot-sync-journey.mjs`, covers exact rows, reviewed outbound amounts and custom status and protected-link fields, Closed won, four distinct timeline notes after recorded full payment, current authority, changed destination refusals and uncertainty without replay. `tests/site.test.mjs` loads `tests/site-documents.mjs` — “CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows”, extended by `tests/hubspot-browser.mjs`, covers Settings review and apply, signed card launch to another deal and linked status at 1440 and 390. `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority”, extended by `tests/hubspot-archive.mjs`, retains exact source, consent and receipt history while excluding reviews, card credentials and execution authority.
+**Gap.** Conservative standing-scope default: only current owners and admins read or start connected-deal drafts or authorize one explicitly reviewed outbound snapshot. Broader member and delegated access, ct approval of the expanded authority default and unattended lifecycle synchronization under FOLLOW-007 remain. The modern HubSpot card source and signed backend are present, but installed-app rendering, actual account scopes and live-provider qualification need a HubSpot account, installed app and client credentials not supplied to this run. Timeline activity uses notes; custom app events are not qualified. Added or removed source rows and optional, recurring, discounted or taxed prices are explicitly held for manual preparation. Existing FOLLOW-005 stage-only consent and uncertainty riders remain unchanged; no standing grant is created.
 
 #### CRM-002 — Salesforce two-way opportunity sync
 

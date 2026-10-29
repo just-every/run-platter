@@ -1,0 +1,11 @@
+{
+  "uid": "platter_app",
+  "type": "app",
+  "config": {
+    "name": "Platter",
+    "description": "Review proposals linked to a HubSpot deal.",
+    "distribution": "private",
+    "auth": {"type": "static", "requiredScopes": ["oauth", "crm.objects.deals.read"]},
+    "permittedUrls": {"fetch": [], "iframe": [], "img": []}
+  }
+}

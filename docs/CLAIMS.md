@@ -11,7 +11,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 3 | Shows what each client read | `TRACK-001` partial; `TRACK-002` done | partial |
 | 4 | Collects the signature and deposit together | `SIGN-001` partial; `SIGN-003` partial; `PAY-001` partial; `PAY-002` partial | partial |
 | 5 | Good / Better / Best packages, add-ons, Austin sales tax, 50% deposit | `PRICE-001` partial; `PRICE-002` partial; `PRICE-005` partial; `PRICE-007` partial | partial |
-| 6 | HubSpot deal won, QuickBooks invoice paid | `CRM-001` missing; `ACCT-001` missing | missing |
+| 6 | HubSpot deal won, QuickBooks invoice paid | `CRM-001` partial; `ACCT-001` missing | partial |
 | 7 | 100% free, open source alternative to PandaDoc, Proposify and Better Proposals; MIT licensed | `MIG-001` missing; `MIG-002` missing; `MIG-003` missing | missing |
 | 8 | Run Platter (the one-line start) | `SITE-001` partial | partial |
 | 9 | Sent, read, back and forth, signed, first payment, per proposal | `SEND-001` partial; `SEND-011` partial; `TRACK-001` partial; `NEG-001` done; `SIGN-003` partial; `PAY-001` partial; `PAY-002` partial; `PAY-004` missing | partial |
@@ -27,7 +27,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 19 | Delivery status, bounce shown, resent to the right address | `SEND-002` partial; `SEND-012` partial | partial |
 | 20 | Reading time per section | `TRACK-002` done | done |
 | 21 | The agent drafts from recorded client reading; outbound follow-ups carry external and company policy decides | `AGENT-004` missing; `FOLLOW-002` partial; `FOLLOW-010` partial; `FOLLOW-009` partial | partial |
-| 22 | The resend uses the address on Tom's HubSpot contact | `CRM-001` missing | missing |
+| 22 | The resend uses the address on Tom's HubSpot contact | `CRM-001` partial | partial |
 | 23 | Retainers: $1,200.00/mo × 12, $650.00/mo × 6 | `PRICE-003` done; `PAY-003` missing | partial |
 | 24 | Clients ask on the page; the firm replies | `FOLLOW-004` partial | partial |
 | 25 | Rev 2 with every change marked; the rev 1 link retired | `NEG-001` done; `COLLAB-003` partial; `PROP-002` partial | partial |
@@ -48,4 +48,4 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 40 | Catalog CSV with bundles as packages; bulk PDFs kept with their certificates | `MIG-001` missing; `CAT-001` partial | partial |
 | 41 | Planned move-in support for Proposify, Better Proposals, Qwilr and Ignition | `MIG-002` missing; `MIG-003` missing; `MIG-004` missing | missing |
 
-Claims: 41; 1 done, 34 partial, 6 missing.
+Claims: 41; 1 done, 36 partial, 4 missing.

@@ -1,8 +1,8 @@
 import { date, escape, field, form, hidden, panel } from './shared'
 
-// REPORT-005: export the filtered pipeline and email it to named people on a UTC schedule.
+// REPORT-005/REPORT-006: export the filtered pipeline and email it to named people on a UTC schedule.
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const filterKeys = ['view','q', 'owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
+const filterKeys = ['view','currency','bookedFrom','bookedTo','receivedFrom','receivedTo','q', 'owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
 const statusLabel: Record<string, string> = { local: 'Captured locally; no email was sent', pending: 'Queued', sending: 'Sending', accepted: 'Accepted by provider', uncertain: 'Provider result uncertain; not resent' }
 const when = (s: any, zone: string) => `${s.cadence === 'weekly' ? `Weekly on ${days[s.weekday]}` : 'Daily'} at ${String(s.hour).padStart(2, '0')}:00 ${zone}`
 

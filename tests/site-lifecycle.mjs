@@ -1,3 +1,5 @@
+import {smsReenableBrowser} from './sms-reenable-browser.mjs'
+import {smsInstallerJourney} from './sms-installer-journey.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
 import { documentJourney } from './document-journey.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
@@ -36,6 +38,12 @@ test('SITE-001 built homepage opens run instructions, Markdown docs work without
         assert.equal(new URL(page.url()).pathname, '/docs/proposals')
         assert.ok(await page.locator('article').innerText())
         await capture(page, 'docs-proposals', width)
+        if (width === 1440) {
+          for (const document of ['contract', 'acceptance']) {
+            assert.equal((await page.goto(site.origin + '/docs/' + document)).status(), 200)
+            assert.doesNotMatch(await page.locator('article').innerText(), /<!--|Generated from CONTRACT\.md by contract-docs/)
+          }
+        }
         await page.goto(site.origin + '/docs')
         await capture(page, 'docs', width)
         assert.equal((await page.goto(app.origin)).status(), 200)
@@ -228,7 +236,7 @@ test('TEAM-004 owner searches audit actions and downloads the same filtered acti
 test('AI-003 desktop and phone owners review MCP requests, approve/send explicitly, and dismiss stale requests', {timeout:120000}, async()=>{
  let app,browser
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   const screenshots=process.env.PLATTER_SCREENSHOTS
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
@@ -239,18 +247,19 @@ test('AI-003 desktop and phone owners review MCP requests, approve/send explicit
     assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     const client=await command('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),key=await command('agent.create',{label:'Campaign drafting assistant'})
+    assert.equal((await context.request.put(app.origin+'/agents/api/policy',{headers:{origin:app.origin},data:{document:{schema:'rer-agent-policy/1',catalogue:'rer-agent-classes/1',rules:[{id:'all',class:'*',do:'autonomous'}],spend:{none:true}}}})).status(),200)
     let id=0
-    const rpc=async(method,params={})=>{const r=await context.request.post(app.origin+'/api/platter/agent/mcp',{headers:{authorization:'Bearer '+key.token,accept:'application/json, text/event-stream','mcp-protocol-version':'2025-06-18'},data:{jsonrpc:'2.0',id:++id,method,params}});assert.equal(r.status(),200);const v=await r.json();assert.ok(!v.error);return v.result}
-    const tool=async(name,args)=>{const r=await rpc('tools/call',{name,arguments:args});assert.ok(!r.isError,JSON.stringify(r));return JSON.parse(r.content[0].text)}
-    await rpc('initialize',{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'Browser acceptance MCP client',version:'1'}})
+    const rpc=async(method,params={})=>{const r=await context.request.post(app.origin+'/api/platter/agent/mcp',{headers:{authorization:'Bearer '+key.token,accept:'application/json, text/event-stream','mcp-protocol-version':'2025-11-25'},data:{jsonrpc:'2.0',id:++id,method,params}});assert.equal(r.status(),200);const v=await r.json();assert.ok(!v.error);return v.result}
+    const tool=async(name,args)=>{const r=await rpc('tools/call',{name,arguments:{...args,idempotency_key:crypto.randomUUID()}});assert.ok(!r.isError,JSON.stringify(r));return JSON.parse(r.content[0].text)}
+    await rpc('initialize',{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'Browser acceptance MCP client',version:'1'}})
     await page.getByRole('link',{name:'Agent access',exact:true}).click();assert.match(await page.locator('main').innerText(),/No send requests yet/);await capture('empty')
     const offer={clientId:client.id,title:'Autumn campaign photography',scope:'Campaign planning, studio production and edited photographs.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:25}
-    const p=await tool('prepare_proposal',offer);await tool('request_send',{id:p.id,revision:1});await page.reload()
+    const p=await tool('platter.proposals.prepare',offer);await tool('platter.send_requests.create',{id:p.id,revision:1});await page.reload()
     assert.match(await page.locator('main').innerText(),/Ready for review/);await capture('pending')
     await page.getByRole('link',{name:offer.title,exact:true}).click();assert.equal(await page.getByRole('button',{name:'Approve this revision'}).count(),1)
     await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click()
     await page.getByRole('link',{name:'Agent access',exact:true}).click();await page.getByRole('button',{name:'Mark request fulfilled'}).click();assert.match(await page.locator('main').innerText(),/fulfilled/);await capture('fulfilled')
-    const other=await tool('prepare_proposal',{...offer,title:'Winter campaign concept'});await tool('request_send',{id:other.id,revision:1});await tool('revise_proposal',{...offer,id:other.id,version:1,title:'Winter campaign concept',scope:'A changed draft awaits a new owner review.'})
+    const other=await tool('platter.proposals.prepare',{...offer,title:'Winter campaign concept'});await tool('platter.send_requests.create',{id:other.id,revision:1});await tool('platter.proposals.revise',{...offer,id:other.id,version:1,title:'Winter campaign concept',scope:'A changed draft awaits a new owner review.'})
     await page.reload();assert.match(await page.locator('main').innerText(),/Stale request/);await capture('stale')
     await page.getByRole('button',{name:'Dismiss request',exact:true}).click();assert.match(await page.locator('main').innerText(),/dismissed/);assert.equal(await page.getByRole('button',{name:'Dismiss request',exact:true}).count(),0);await capture('dismissed')
    }finally{await context.close();await app.close();app=undefined}
@@ -371,7 +380,7 @@ test('SIGN-008 desktop and phone record a client-signed copy as accepted by uplo
  }finally{await browser?.close();await app?.close()}
 })
 
-test('REPORT-005 desktop and phone export the filtered pipeline CSV and schedule weekly email in the installation time zone', {timeout:120000}, async()=>{
+test('REPORT-005 / REPORT-006 desktop and phone export the filtered pipeline CSV and schedule weekly email in the installation time zone', {timeout:120000}, async()=>{
  let app,browser
  try{
   browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
@@ -379,7 +388,7 @@ test('REPORT-005 desktop and phone export the filtered pipeline CSV and schedule
   for(const width of [1440,390]){
    app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
    try{
-    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`REPORT-005-${name}-${width}.png`),fullPage:true})}
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`REPORT-005-006-${name}-${width}.png`),fullPage:true})}
     assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
@@ -681,22 +690,68 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
  try{
   browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(process.env.PLATTER_SCREENSHOTS)await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true})
+  await smsInstallerJourney(browser)
   for(const width of [1440,390]){
    let h,edge,context
-   const texts=[]
+   const texts=[],mail=[]
    try{
     edge=await browserEdge()
     h=await harness({entry:'dist/server/index.js',origin:edge.origin,assetsDirectory:'dist/client',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9400',TWILIO_ACCOUNT_SID:'synthetic-platter-9401',TWILIO_AUTH_TOKEN:'synthetic-platter-9402',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
-     if(new URL(request.url).hostname==='api.twilio.com'){texts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-9403'},{status:201})}
-     return Response.json({id:'synthetic-platter-9404'})
+     if(new URL(request.url).hostname==='api.twilio.com'){texts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(9403+texts.length)},{status:201})}
+     mail.push(await request.json());return Response.json({id:'synthetic-platter-'+(9404+mail.length)})
     }})
     edge.attach(h)
     const finish=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(finish.status,303)
     await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T12:00:00Z'),cron:'*/15 * * * *'})
     const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
     const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Text verified agreement',scope:'Synthetic studio scope',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
-    await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const sent=await h.cmd('proposal.send',{id:p.id,version:2}),row=(await h.state()).proposals.find(row=>row.id===p.id)
-    await h.cmd('sms.configure',{id:p.id,version:row.version,consent:true,phone:'+12025550129',timeZone:'Etc/UTC',evidence:'synthetic-platter-9405'})
+    await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});let sent,row
+    const controls=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
+    try{
+     await controls.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}])
+     const sender=await controls.newPage();await sender.goto(h.origin+'/app/proposal?id='+p.id)
+     await sender.getByLabel('Invitation delivery',{exact:true}).selectOption('sms')
+     if(process.env.PLATTER_SCREENSHOTS)await sender.locator('section').filter({has:sender.getByRole('heading',{name:'Review invitation email',exact:true})}).screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SEND-008-text-only-${width}.png`)})
+     await sender.getByRole('button',{name:'Send this invitation',exact:true}).click()
+     row=(await h.state()).proposals.find(row=>row.id===p.id);sent={shareUrl:h.origin+'/p/'+row.shareToken}
+     assert.equal(row.status,'sent');assert.equal(row.invitationMessages.length,0);assert.equal(mail.length,0,'preparing text-only delivery sends no email')
+     const smsPanel=sender.locator('section').filter({has:sender.getByRole('heading',{name:'SMS Settings',exact:true})})
+     await smsPanel.getByText('Inspect SMS consent and texts',{exact:true}).click()
+     assert.match(await smsPanel.innerText(),/SMS is inactive/)
+     assert.equal((await h.state()).proposals.find(r=>r.id===p.id).sms.assents.length,0,'loading Settings cannot authorize SMS')
+     const record=async(reenable=false)=>{
+      const button=reenable?'Record new assent and re-enable SMS':'Record assent and authorize SMS'
+      await smsPanel.getByText(reenable?'Record new assent to re-enable':'Record recipient assent',{exact:true}).click()
+      const form=smsPanel.locator('form').filter({has:sender.getByRole('button',{name:button,exact:true})})
+      await form.getByLabel('US mobile number',{exact:true}).fill('(202) 555-0129')
+      await form.getByLabel('Sending firm',{exact:true}).fill('Synthetic Platter firm')
+      for(const label of ['Proposal invitations','Proposal reminders','Identity verification codes','Agreement completion notices'])await form.getByLabel(label,{exact:true}).check()
+      await form.getByLabel('Recipient assent time with UTC offset',{exact:true}).fill(reenable?'2030-06-01T12:01:00Z':'2030-06-01T11:55:00Z')
+      await form.getByLabel('Assent collection method',{exact:true}).fill('Recipient signed instruction')
+      await form.getByLabel('Recipient evidence supporting the entry',{exact:true}).fill('synthetic-platter-9405')
+      await form.getByLabel('Recipient IANA time zone',{exact:true}).fill('Etc/UTC')
+      await form.locator('input[name=consent]').check()
+      if(reenable)await form.locator('input[name=reenableConsent]').check()
+      await form.getByRole('button',{name:button,exact:true}).click()
+      assert.equal(await sender.getByRole('alert').count(),0)
+      await smsPanel.getByText('Inspect SMS consent and texts',{exact:true}).click()
+     }
+     await record()
+     assert.match(await smsPanel.innerText(),/SMS is authorized/)
+     await smsPanel.getByText('Synthetic Platter firm · +12025550129 · revision 1 · active',{exact:true}).click()
+     assert.ok((await smsPanel.innerText()).includes('synthetic-platter-9405'))
+     assert.equal(await sender.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+     assert.equal(await smsPanel.locator('button:not([title])').evaluateAll(nodes=>nodes.every(node=>node.textContent.trim().length>0)),true,'SMS controls have visible labels')
+     if(width===1440)assert.equal(await smsPanel.locator('input,textarea,select,button,p,summary,dt,dd,label,legend').evaluateAll(nodes=>nodes.every(n=>parseFloat(getComputedStyle(n).fontSize)>=13)),true,'SMS Settings text is at least 13 pixels')
+     if(process.env.PLATTER_SCREENSHOTS)await smsPanel.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SEND-008-assent-${width}.png`)})
+     await smsPanel.getByRole('button',{name:'Revoke SMS authorization',exact:true}).click()
+     await smsPanel.getByText('Inspect SMS consent and texts',{exact:true}).click()
+     assert.match(await smsPanel.innerText(),/SMS is inactive/)
+     assert.equal((await h.state()).proposals.find(r=>r.id===p.id).sms.revocations.length,1)
+     if(process.env.PLATTER_SCREENSHOTS)await smsPanel.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SEND-008-revoked-${width}.png`)})
+     await record()
+     await smsReenableBrowser(h,sender,smsPanel,record,width)
+    }finally{await controls.close()}
     await h.cmd('signer.method',{id:p.id,version:row.version,method:'SMS code'})
     context=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
     const page=await context.newPage();assert.equal((await page.goto(sent.shareUrl)).status(),200)
@@ -712,6 +767,8 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
     await page.locator('input[name="consent"]').check()
     await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
     await page.getByRole('heading',{name:'Agreement downloads',exact:true}).waitFor()
+    assert.equal(texts.length,2,'the explicitly consented completion follows SMS signing once')
+    assert.ok(texts[1].Body.includes(sent.shareUrl))
     assert.ok((await page.locator('main').innerText()).includes('Platter e-signature after text-code verification'))
     const download=page.waitForEvent('download');await page.getByRole('link',{name:'Signed agreement PDF',exact:true}).click();const file=await download;assert.equal(file.suggestedFilename(),'agreement.pdf')
     const certificateDownload=page.waitForEvent('download');await page.getByRole('link',{name:'Certificate of completion',exact:true}).click();assert.equal((await certificateDownload).suggestedFilename(),'certificate.pdf')
@@ -720,7 +777,27 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
     for(const button of await page.locator('button').all())assert.ok((await button.innerText()).trim(),'client controls have visible labels')
     if(process.env.PLATTER_SCREENSHOTS)await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-006-complete-${width}.png`),fullPage:true})
     const ownerContext=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
-    try{await ownerContext.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}]);const ownerPage=await ownerContext.newPage();await ownerPage.goto(h.origin+'/app/proposal?id='+p.id);assert.ok((await ownerPage.locator('main').innerText()).includes('Platter e-signature after text-code verification'));assert.equal(await ownerPage.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);if(process.env.PLATTER_SCREENSHOTS)await ownerPage.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-006-owner-${width}.png`),fullPage:true})}finally{await ownerContext.close()}
+    try{await ownerContext.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}]);const ownerPage=await ownerContext.newPage();await ownerPage.goto(h.origin+'/app/proposal?id='+p.id);await ownerPage.getByText('Inspect SMS consent and texts',{exact:true}).click();assert.match(await ownerPage.locator('main').innerText(),/completion · accepted/);assert.ok((await ownerPage.locator('main').innerText()).includes('Platter e-signature after text-code verification'));assert.equal(await ownerPage.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);if(process.env.PLATTER_SCREENSHOTS)await ownerPage.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-006-owner-${width}.png`),fullPage:true})}finally{await ownerContext.close()}
+    const completed=await h.cmd('proposal.prepare',{clientId:client.id,title:'Mailbox completion attachments',scope:'Exact retained scope',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+    await h.cmd('proposal.approve',{id:completed.id,version:1,revision:1})
+    const completionShare=await h.cmd('proposal.send',{id:completed.id,version:2})
+    await page.goto(completionShare.shareUrl)
+    await page.getByRole('button',{name:'Send verification code',exact:true}).click()
+    await page.getByLabel('Email verification code',{exact:true}).fill(mail.at(-1).text.match(/\b\d{6}\b/)[0])
+    await page.getByRole('button',{name:'Verify email',exact:true}).click()
+    await page.getByRole('heading',{name:'Accept this proposal',exact:true}).waitFor()
+    await page.locator('input[name="optionId"][value="one"]').check()
+    await page.getByLabel('Your full name',{exact:true}).fill('Synthetic signer')
+    await page.locator('input[name="consent"]').check()
+    await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
+    await page.getByRole('heading',{name:'Agreement downloads',exact:true}).waitFor()
+    const completionMail=mail.filter(m=>m.subject==='Agreement complete: Mailbox completion attachments')
+    const attachmentDownload=async label=>{const waiting=page.waitForEvent('download');await page.getByRole('link',{name:label,exact:true}).click();return readFile(await (await waiting).path())}
+    const agreement=await attachmentDownload('Signed agreement PDF'),certificate=await attachmentDownload('Certificate of completion')
+    if(width===1440){assert.equal(completionMail.length,2);assert.deepEqual(completionMail.map(m=>m.to[0]).sort(),[['client','synthetic-platter.example'].join('@'),h.auth.OWNER_EMAIL].sort());for(const m of completionMail){assert.deepEqual(m.attachments.map(a=>a.filename),['agreement.pdf','certificate.pdf']);assert.deepEqual(Buffer.from(m.attachments[0].content,'base64'),agreement);assert.deepEqual(Buffer.from(m.attachments[1].content,'base64'),certificate)}}
+    if(process.env.PLATTER_SCREENSHOTS)await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-005-completion-${width}.png`),fullPage:true})
+    const firmContext=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
+    try{await firmContext.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}]);const firm=await firmContext.newPage();await firm.goto(h.origin+'/app/proposal?id='+completed.id);if(width===1440){const pdf=await firmContext.request.get(h.origin+'/api/platter/agreement.pdf?id='+completed.id);assert.equal(pdf.status(),200);assert.deepEqual(await pdf.body(),agreement);const proof=await firmContext.request.get(h.origin+'/api/platter/certificate.pdf?id='+completed.id);assert.equal(proof.status(),200);assert.deepEqual(await proof.body(),certificate)};if(process.env.PLATTER_SCREENSHOTS)await firm.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-005-firm-${width}.png`),fullPage:true})}finally{await firmContext.close()}
    }finally{await context?.close();await h?.close();await edge?.close()}
   }
  }finally{await browser?.close()}

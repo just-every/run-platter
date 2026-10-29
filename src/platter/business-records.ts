@@ -1,3 +1,4 @@
+import { promoteCatalog } from './catalog-import'
 import { Buffer } from 'node:buffer'
 import type { Bindings } from '../auth.server'
 import { need, type Actor } from './model'
@@ -14,6 +15,7 @@ export async function businessRecords(db: D1Database, actor: Actor) {
 }
 export async function businessCommand(env: Bindings, actor: Actor, name: string, input: Record<string,unknown>) {
  need(actor.role==='owner'&&await env.DB.prepare("SELECT id FROM oa_operators WHERE id=? AND role='owner' AND status='active'").bind(actor.id).first(),'Only the active owner imports business records',403)
+ if(['business-import.promote-preview','business-import.promote'].includes(name))return promoteCatalog(env.DB,actor,input,name==='business-import.promote')
  const images=['business-import.preview','business-import.apply'].includes(name)?await acquireCatalogImages(businessImageUrls(input)):{}
  return businessImportCommand(env.DB,actor,name,input,{...images,allowUnfetched:input.omitUnfetchedImages===true||input.omitUnfetchedImages==='yes'})
 }

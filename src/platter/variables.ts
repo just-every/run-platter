@@ -86,3 +86,8 @@ export function missingMerge(row:any){const doc=typeof row.document==='string'?J
 
 export const variableCondition=(value:string)=>/^variable:([A-Za-z][A-Za-z0-9_.]{0,99})=(.{0,200})$/.exec(value)
 export function variableVisible(condition:string,values:Record<string,string>={}){const parsed=variableCondition(condition);return Boolean(parsed&&Object.hasOwn(values,parsed[1])&&values[parsed[1]]===parsed[2])}
+
+/** Copy reviewed contact values; no provider credential or execution grant travels. */
+export function copiedContactFields(contact:{name:string;firstName:string;lastName:string;title:string},address:string){
+ return clientVariableFields({contactName:contact.name,firstName:contact.firstName,lastName:contact.lastName,title:contact.title,address})
+}

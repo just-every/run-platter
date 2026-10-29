@@ -15,6 +15,7 @@ const verbs: Record<string, string> = {
  'payment.record':'recorded received money','payment.bind':'verified a Stripe deposit','payment.refund':'requested the deposit refund','dispute.import':'verified the Stripe dispute','dispute.submit':'submitted the available dispute evidence','dispute.evidence':'downloaded available dispute evidence for',
 
  'proposal.data':'read structured proposal data for',
+ 'sms.invitation.prepare':'prepared a text-only invitation for', 'sms.reenable':'SMS number explicitly re-enabled', 'sms.consent': 'recorded recipient SMS assent for', 'sms.revoke': 'revoked SMS authorization for',
  'client.save': 'saved the client', 'client.erase': 'erased an unused client',
  'proposal.prepare': 'prepared', 'proposal.revise': 'saved a new revision of', 'proposal.restore': 'restored an earlier revision of',
  'proposal.approve': 'approved', 'proposal.send': 'sent', 'proposal.negotiate': 'prepared a negotiated revision of',
@@ -31,6 +32,7 @@ const verbs: Record<string, string> = {
  'followup.schedule': 'scheduled a sales follow-up for', 'followup.complete': 'completed a sales follow-up for', 'followup.dismiss': 'dismissed a sales follow-up for', 'followup.notify': 'notified the sales owner of',
  'agent.create': 'created the agent key', 'agent.revoke': 'revoked the agent key', 'send-request.resolve': 'resolved an agent send request',
  'import.preview': 'previewed a client import', 'import.apply': 'applied a client import', 'import.journal': 'opened an import journal', 'import.undo': 'undid a client import',
+ 'business-import.promote-preview':'reviewed imported prices','business-import.promote':'promoted reviewed catalog items',
  'business-import.preview': 'previewed a catalog and records import', 'business-import.apply': 'imported catalog and records',
  'report.time-zone': 'set the installation time zone', 'report.schedule': 'scheduled a pipeline report email', 'report.unschedule': 'stopped a pipeline report email', 'report.export': 'exported the pipeline report',
  'native.auth.bootstrap': 'claimed this installation', 'native.setup': 'finished first-run setup', 'native.auth.invite': 'invited',

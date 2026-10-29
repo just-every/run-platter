@@ -31,7 +31,7 @@
     }
   },
   "managed": {
-    "workflowRef": "runeditrun/delivery/.github/workflows/trusted-build.yml@34cf6c23b5cb86eff0068049bc39feeb38c8ffa9",
+    "workflowRef": "runeditrun/delivery/.github/workflows/trusted-build.yml@ff70d729948753ffdcceeca94aad063af2dcd979",
     "artifactFile": "platter-worker-artifact.json",
     "buildProfile": "project",
     "verificationProfiles": [
@@ -54,7 +54,9 @@
         "IDENTITY_PROVIDER",
         "GOOGLE_MAIL_CLIENT_ID",
         "MICROSOFT_MAIL_CLIENT_ID",
-        "QUESTION_REPLY_DOMAIN"
+        "QUESTION_REPLY_DOMAIN",
+        "SMS_PROVIDER",
+        "TWILIO_FROM"
       ],
       "secretNames": [
         "SESSION_SECRET",
@@ -64,7 +66,9 @@
         "MAIL_API_KEY",
         "MAIL_WEBHOOK_KEY",
         "GOOGLE_MAIL_CLIENT_SECRET",
-        "MICROSOFT_MAIL_CLIENT_SECRET"
+        "MICROSOFT_MAIL_CLIENT_SECRET",
+        "TWILIO_ACCOUNT_SID",
+        "TWILIO_AUTH_TOKEN"
       ],
       "providerEffects": [
         "outbound-mail",

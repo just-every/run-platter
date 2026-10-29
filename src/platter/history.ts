@@ -1,3 +1,4 @@
+import { optionTax } from './taxes'
 import { editableTerms } from './payment-terms'
 import { editablePackages, pricingInput } from './pricing'
 import type { Actor } from './model'
@@ -19,5 +20,5 @@ export async function restoreFields(db: D1Database, actor: Actor, input: Record<
  const source = await db.prepare('SELECT snapshot FROM p_revisions WHERE proposal_id=? AND revision=?').bind(current.id, revision).first<any>()
  need(source, 'Revision not found', 404)
  const saved = JSON.parse(source.snapshot)
- return { ...input, paymentTerms:editableTerms(saved), document:saved.document??{}, packages:editablePackages(saved.options), pricingTables:pricingInput(saved.options), clientId: saved.client_id, title: saved.title, scope: saved.scope, terms:saved.terms??'', sectionConditions:saved.section_conditions??{}, restoredAttachments:saved.attachments??[], depositPercent: String(saved.deposit_bps / 100), optionOne: saved.options[0].label, priceOne: (saved.options[0].cents / 100).toFixed(2), optionTwo: saved.options[1]?.label??'', priceTwo: ((saved.options[1]?.cents??0) / 100).toFixed(2) }
+ return { ...input, restoredTax:optionTax(saved.options)??null, paymentTerms:editableTerms(saved), document:saved.document??{}, packages:editablePackages(saved.options), pricingTables:pricingInput(saved.options), clientId: saved.client_id, title: saved.title, scope: saved.scope, terms:saved.terms??'', sectionConditions:saved.section_conditions??{}, restoredAttachments:saved.attachments??[], depositPercent: String(saved.deposit_bps / 100), optionOne: saved.options[0].label, priceOne: (saved.options[0].cents / 100).toFixed(2), optionTwo: saved.options[1]?.label??'', priceTwo: ((saved.options[1]?.cents??0) / 100).toFixed(2) }
 }

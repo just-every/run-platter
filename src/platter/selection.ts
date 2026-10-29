@@ -1,3 +1,4 @@
+import { selectionTax, taxFlags } from './taxes'
 import { recurringSelection } from './recurring'
 import { paymentTerms, paymentSchedule } from './payment-terms'
 import { scopedNet } from './discounts'
@@ -35,16 +36,16 @@ export function offerSelection(options: any[], depositBps: number, optionId: unk
   need(item.editable || quantity === item.quantity, `Quantity for ${item.label} is fixed`)
   const totalCents = quantity * item.unitCents * (item.recurrence?.term??1)
   need(Number.isSafeInteger(totalCents), 'Invalid optional-item total')
-  return { ...(item.recurrence?{recurrence:item.recurrence}:{}),id: item.id, label: item.label, quantity, unitCents: item.unitCents, totalCents }
+  return { ...taxFlags(item),...(item.recurrence?{recurrence:item.recurrence}:{}),id: item.id, label: item.label, quantity, unitCents: item.unitCents, totalCents }
  })
  // Freeze items in the sender's order, independent of request order.
  items.sort((a: any, b: any) => offered.optionalItems.findIndex((x: any) => x.id === a.id) - offered.optionalItems.findIndex((x: any) => x.id === b.id))
  const gross=(offered.discount?.grossCents??offered.cents)+items.reduce((sum:number,item:any)=>sum+item.totalCents,0),bps=offered.discount?.bps??0
  need(Number.isSafeInteger(gross),'Invalid selected total')
- const cents=scopedNet(gross,bps,offered.discount?.fixedCents??0);need(Number.isSafeInteger(cents)&&cents<=1000000000,'Selected total must not exceed $10,000,000')
- const discount=offered.discount?{...offered.discount,bps,grossCents:gross,cents:gross-cents}:undefined
+ const subtotalCents=scopedNet(gross,bps,offered.discount?.fixedCents??0);const tax=selectionTax(offered,items,subtotalCents),cents=subtotalCents+(tax?.taxCents??0);need(Number.isSafeInteger(cents)&&cents<=1000000000,'Selected total must not exceed $10,000,000')
+ const discount=offered.discount?{...offered.discount,bps,grossCents:gross,cents:gross-subtotalCents}:undefined
  const t=paymentTerms(terms),deposit=t?.depositFixedCents??Math.round(cents*depositBps/10000),schedule=paymentSchedule(cents,deposit,t)
  const recurring=recurringSelection(offered,items,cents,deposit,t)
  need(!recurring||!t?.retainer,'Use recurring pricing lines instead of an additional schedule retainer')
- return {...(schedule?{paymentSchedule:schedule}:{}),...(recurring??{}),option:{...offered,cents,...(discount?{discount}:{})},items,baseCents:offered.cents,deposit,...(discount?{grossCents:gross,discountCents:gross-cents,discountBps:bps}:{})}
+ return {...(tax?{tax}:{}),...(schedule?{paymentSchedule:schedule}:{}),...(recurring??{}),option:{...offered,cents,...(discount?{discount}:{})},items,baseCents:offered.cents,deposit,...(discount?{grossCents:gross,discountCents:gross-subtotalCents,discountBps:bps}:{})}
 }

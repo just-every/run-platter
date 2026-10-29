@@ -33,6 +33,7 @@ export interface Bindings {
  RER_OWNER_CLAIM_PUBLIC_KEYS?: string
  RER_DEV_KEY?: string
  RER_DEV_IDENTITY?: string
+ RER_BUSINESS_TRUST?: string
  RER_INSTALLATION_ID?: string
  RER_MANAGEMENT_ORIGIN?: string
  OWNER_EMAIL: string
@@ -49,6 +50,7 @@ export interface Bindings {
  MICROSOFT_MAIL_CLIENT_ID?: string
  MICROSOFT_MAIL_CLIENT_SECRET?: string
  TWILIO_ACCOUNT_SID?: string
+ SMS_PROVIDER?: string
  TWILIO_AUTH_TOKEN?: string
  TWILIO_FROM?: string
  MAIL_ACCOUNT_ID?: string

@@ -21,12 +21,12 @@ export async function harness(options = {}) {
     if(!file.startsWith(root+sep))return new Response(null,{status:404})
     try{return new Response(await readFile(file),{headers:{'content-type':({'.css':'text/css','.js':'text/javascript','.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2'})[extname(file)]??'application/octet-stream'}})}catch{return new Response(null,{status:404})}
   } } } : {}) }), resourcePersistencePath: dir })
-  const mf = new Miniflare(runtimeOptions())
+  const mf = new Miniflare({...runtimeOptions(),...(options.cf===false?{cf:{}}:{})})
   try {
     const db = await mf.getD1Database('DB')
     if (!options.root) for (const file of (await readdir('migrations/core')).filter(f => f.endsWith('.sql') && (!options.migrateThrough || f <= options.migrateThrough)).sort()) await db.batch(unstable_splitSqlQuery(await readFile('migrations/core/' + file, 'utf8')).map(sql => db.prepare(sql)))
     const send = async (path, body, cookie = '', headers = {}) => {
-      const response = await mf.dispatchFetch(origin + path, { method: body === undefined ? 'GET' : 'POST', headers: { host: new URL(origin).host, origin, 'content-type': 'application/json', cookie, ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'manual' })
+      const response = await mf.dispatchFetch(origin + path, { method: body === undefined ? 'GET' : 'POST', headers: { host: new URL(origin).host, origin, 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID(), cookie, ...(options.cf===false?{'user-agent':''}:{}), ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'manual' })
       const text = await response.text(); let value
       try { value = JSON.parse(text) } catch { value = text }
       return { status: response.status, value, text, headers: response.headers, cookie: response.headers.get('set-cookie')?.split(';')[0] }
@@ -34,6 +34,10 @@ export async function harness(options = {}) {
     const bootstrap = options.owner || options.unclaimed ? null : await send('/auth/bootstrap', { token: auth.SETUP_TOKEN, displayName: 'Jordan Venue' })
     if (bootstrap) assert.equal(bootstrap.status, 303, bootstrap.text)
     const owner = options.owner ?? bootstrap?.cookie
+    if (owner && bootstrap && !options.migrateThrough) {
+      const response=await mf.dispatchFetch(origin+'/agents/api/policy',{method:'PUT',headers:{host:new URL(origin).host,origin,cookie:owner,'content-type':'application/json'},body:JSON.stringify({document:{schema:'rer-agent-policy/1',catalogue:'rer-agent-classes/1',rules:[{id:'all',class:'*',do:'autonomous'}],spend:{none:true}}})})
+      assert.equal(response.status,200,'fixture owner explicitly chooses an autonomous policy')
+    }
     const cmd = async (name, input, cookie = owner, status = 200, headers = {}) => {
       const r = await send('/api/platter/command', { name, input }, cookie, headers)
       assert.equal(r.status, status, `${name}: ${JSON.stringify(r.value)}`)

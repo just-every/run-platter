@@ -1,3 +1,5 @@
+import { acceptRevenue } from './revenue-fixture.mjs'
+import { localeBrowser } from './locale-browser.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
 import { documentJourney } from './document-journey.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
@@ -9,6 +11,8 @@ import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { pdfPages } from './pdf-document.mjs'
 import { builtSite, installedApp } from './site-harness.mjs'
+
+test('EDIT-017 owner-selected Spanish invitation, verification, consent and completion preserve authored English through the compiled client', {timeout:120000},()=>localeBrowser())
 
 test('COLLAB-003 desktop and phone compare revisions and restore an earlier draft requiring fresh approval', { timeout: 120000 }, async () => {
  let app, browser
@@ -693,4 +697,237 @@ test('PRICE-003 and PRICE-002 recurring line editing, preview, client selection 
 
 test('EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads', {timeout:120000},async()=>{
  const {documentImportBrowser}=await import('./document-import-browser.mjs');await documentImportBrowser()
+})
+
+
+test('REPORT-004 booked snapshots and independent receipt periods export and schedule the visible report', {timeout:120000}, async()=>{
+ const {harness}=await import('./harness.mjs')
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ let browser
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   const h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',unclaimed:true})
+   const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const bootstrap=await context.request.post(h.origin+'/auth/bootstrap',{headers:{origin:h.origin},data:{token:h.auth.SETUP_TOKEN,displayName:'Synthetic owner'},maxRedirects:0})
+    assert.equal(bootstrap.status(),303)
+    const owner=bootstrap.headers()['set-cookie'].split(';')[0],page=await context.newPage()
+    await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const app={...h,owner,cmd:(name,input,cookie=owner)=>h.cmd(name,input,cookie),state:(cookie=owner)=>h.state(cookie)}
+    const client=await app.cmd('client.save',{name:'Reporting client',email:h.auth.OWNER_EMAIL})
+    const first=await acceptRevenue(app,{clientId:client.id}),later=await acceptRevenue(app,{clientId:client.id,term:24,date:'2099-04-01',title:'Two-year care'})
+    for(const [id,amount,receivedOn] of [[first.id,'2500','2099-03-31'],[first.id,'1200','2099-04-01'],[later.id,'2400','2099-06-30']])await app.cmd('payment.record',{id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4500',consent:true})
+    await page.goto(h.origin+'/app?view=recorded-revenue')
+    const ownerId=(await app.state()).actor.id
+    await page.getByLabel('Currency',{exact:true}).selectOption('USD');await page.getByLabel('Owner',{exact:true}).selectOption(ownerId)
+    for(const [label,value] of [['Booked from (UTC)','2099-01-15'],['Booked through (UTC)','2099-03-31'],['Received from','2099-04-01'],['Received through','2099-06-30']])await page.getByLabel(label,{exact:true}).fill(value)
+    await page.getByRole('button',{name:'Filter pipeline',exact:true}).click()
+    const report=page.locator('section').filter({has:page.getByRole('heading',{name:'Recorded revenue',exact:true})})
+    if(width===1440){
+     assert.equal(await report.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'2')
+     const totals=report.locator('.line-totals');assert.match(await totals.innerText(),/Booked one-off value\s+\$2,500\.00 USD/);assert.match(await totals.innerText(),/Booked first-year value\s+\$16,900\.00 USD/);assert.match(await totals.innerText(),/Received payments\s+\$3,600\.00 USD/)
+     assert.equal(await page.getByLabel('Booked through (UTC)',{exact:true}).inputValue(),'2099-03-31');assert.equal(await page.getByLabel('Received from',{exact:true}).inputValue(),'2099-04-01')
+    }
+    await page.evaluate(()=>document.fonts.ready)
+    if(screenshots){await report.screenshot({path:join(screenshots,'REPORT-004-periods-'+width+'.png')});await page.screenshot({path:join(screenshots,'REPORT-004-screen-'+width+'.png'),fullPage:true})}
+    const exports=page.locator('section').filter({has:page.getByRole('heading',{name:'Report export and email',exact:true})})
+    const csv=await context.request.get(h.origin+await exports.getByRole('link',{name:'Download recorded revenue CSV',exact:true}).getAttribute('href'))
+    if(width===1440){assert.equal(csv.status(),200);assert.match(await csv.text(),/Total \(2 proposals\),,,,,USD,16900\.00,,,,2500\.00,16900\.00,3600\.00/)}
+    await exports.getByRole('checkbox').first().check();await exports.getByRole('button',{name:'Schedule report email',exact:true}).click()
+    if(width===1440){assert.equal(await page.getByRole('alert').count(),0);const saved=(await app.state()).reportSchedules[0],filters=new URLSearchParams(saved.filters);assert.equal(filters.get('receivedFrom'),'2099-04-01');assert.equal(filters.get('bookedTo'),'2099-03-31');assert.equal(filters.get('owner'),ownerId);assert.equal(filters.get('currency'),'USD');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))}
+    await page.getByRole('button',{name:'Stop this schedule',exact:true}).click()
+   }finally{await context.close();await h.close()}
+  }
+ }finally{await browser?.close()}
+})
+
+test('PRICE-005 native owner-configured tax settings, selected quantities and frozen agreement', {timeout:120000},async()=>{
+ const {taxesBrowserJourney}=await import('./packages-journey.mjs')
+ const browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+ try{await taxesBrowserJourney(browser,process.env.PLATTER_SCREENSHOTS)}finally{await browser.close()}
+})
+
+
+test('CAT-001 reviewed CSV promotion and explicit recurring insertion preserve independent defaults', {timeout:180000},async()=>{
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{catalogBrowser}=await import('./catalog-browser.mjs')
+ const mail=[]
+ const edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-1'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mail.push(await request.json());return Response.json({id:'synthetic-platter-'+(6500+mail.length)})}});edge.attach(h)
+ let browser,owner,sales
+ try{
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  owner=await browser.newContext({viewport:{width:1440,height:900},ignoreHTTPSErrors:true});sales=await browser.newContext({viewport:{width:1440,height:900},ignoreHTTPSErrors:true})
+  const putCookie=async(context,cookie)=>{const [name,value]=cookie.split('=');await context.addCookies([{name,value,url:h.origin}])}
+  await putCookie(owner,h.owner)
+  const op=await owner.newPage();await op.goto(h.origin+'/setup');await op.getByRole('checkbox').check();await op.getByRole('button',{name:'Finish setup'}).click()
+  assert.equal((await h.send('/auth/invite',{email:h.auth.MAIL_FROM,displayName:'Synthetic sales',role:'member',returnTo:'/app'},h.owner)).status,202)
+  assert.equal((await h.send('/auth/magic-link',{email:h.auth.MAIL_FROM})).status,202)
+  const message=mail.findLast(m=>m.to.includes(h.auth.MAIL_FROM)),link=message.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]
+  const confirmed=await h.send('/auth/confirm',{token:new URL(link).searchParams.get('token')});assert.equal(confirmed.status,303);await putCookie(sales,confirmed.cookie)
+  const client=await h.cmd('client.save',{name:'Synthetic catalog client',email:h.auth.OWNER_EMAIL})
+  const command=async(context,name,input,status=200)=>{const response=await context.request.post(h.origin+'/api/platter/command',{headers:{origin:h.origin},data:{name,input}});assert.equal(response.status(),status,await response.text());return response.json()}
+  const state=async(context=owner)=>(await context.request.get(h.origin+'/api/platter/state')).json()
+  const page=await sales.newPage(),review=await owner.newPage()
+  await catalogBrowser({origin:h.origin,owner,sales,op,page,review,command,state,capture:async()=>{},client,width:1440})
+ }finally{await owner?.close();await sales?.close();await browser?.close();await edge.close();await h.close()}
+})
+
+test('AUTO-002 Settings authorizes Drive archiving and shows completed and held jobs with safe reconciliation', {timeout:120000},async()=>{
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{driveFixture,driveToken,driveRoot,completeDriveAgreement}=await import('./drive-fixture.mjs')
+ const fake=driveFixture(),edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,outboundService:fake.outboundService});edge.attach(h)
+ let browser,context
+ try{
+  browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  context=await browser.newContext({viewport:{width:1440,height:1000},ignoreHTTPSErrors:true})
+  const [name,value]=h.owner.split('=');await context.addCookies([{name,value,url:h.origin}])
+  const page=await context.newPage();await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  await page.goto(h.origin+'/app/settings')
+  const connection=page.locator('article').filter({has:page.getByRole('heading',{name:'Google Drive',exact:true})})
+  await connection.getByLabel('Google Drive access token').fill(driveToken);await connection.getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect Google Drive',exact:true}).click()
+  const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Completed document archiving',exact:true})})
+  await panel.getByLabel('Drive destination folder id').fill(driveRoot);await panel.getByLabel('Archive naming pattern').fill('{client} - {title} - r{revision}');await panel.getByRole('checkbox').check();await panel.getByRole('button',{name:'Authorize Drive archiving',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0);assert.match(await panel.innerText(),/Archiving is authorized/)
+  const signed=await completeDriveAgreement(h),fire=async()=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  await page.reload();await panel.getByRole('button',{name:'Process queued archives',exact:true}).click()
+  assert.match(await panel.getByRole('list',{name:'Document archive history'}).innerText(),/Synthetic archive agreement[\s\S]*complete/)
+  fake.setUncertain(true);await completeDriveAgreement(h,'Uncertain archive agreement',signed.client.id);await fire();await page.reload()
+  assert.match(await panel.innerText(),/held/);assert.equal(await panel.getByRole('button',{name:'Reconcile archive',exact:true}).count(),1)
+  assert.equal(await panel.getByLabel('Archive naming pattern').inputValue(),'{client} - {title} - r{revision}')
+  const posts=fake.calls.filter(c=>c.method==='POST').length
+  await panel.getByRole('button',{name:'Reconcile archive',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0);assert.equal(await panel.getByRole('button',{name:'Reconcile archive',exact:true}).count(),0)
+  assert.equal(fake.calls.filter(c=>c.method==='POST').length,posts)
+  assert.equal(await panel.getByRole('listitem').count(),2)
+  assert.ok(await panel.locator('button,input').evaluateAll(nodes=>nodes.every(node=>parseFloat(getComputedStyle(node).fontSize)>=13)))
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+  const screenshots=process.env.PLATTER_SCREENSHOTS
+  if(screenshots){
+   await mkdir(screenshots,{recursive:true});await documentFonts(page)
+   await panel.screenshot({path:join(screenshots,'AUTO-002-settings-1440.png')})
+   await page.setViewportSize({width:390,height:900});await documentFonts(page)
+   await panel.screenshot({path:join(screenshots,'AUTO-002-settings-390.png')})
+  }
+  await page.setViewportSize({width:1440,height:1000})
+  await panel.getByRole('button',{name:'Revoke archiving authorization',exact:true}).click()
+  assert.match(await panel.innerText(),/Archiving is inactive/)
+ }finally{await context?.close();await browser?.close();await edge.close();await h.close()}
+})
+async function documentFonts(page){await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))})}
+
+test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in', {timeout:180000},async()=>{
+ const {moveinFixture,hash}=await import('./document-movein-fixture.mjs'),fixture=await moveinFixture()
+ let app,browser
+ try{
+  app=await installedApp()
+  browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage()
+  const capture=async phase=>{
+   if(!process.env.PLATTER_SCREENSHOTS)return
+   await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true})
+   for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000})
+    await page.evaluate(async()=>{await document.fonts.ready})
+    await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,'MIG-007-'+phase+'-'+width+'.png'),fullPage:true})
+   }
+   await page.setViewportSize({width:1440,height:1000})
+  }
+  assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic platter owner'},maxRedirects:0})).status(),303)
+  await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  await page.goto(app.origin+'/app/import')
+  await page.getByLabel('Move-in name',{exact:true}).fill('Synthetic exported documents')
+  await page.getByRole('button',{name:'Start document move-in',exact:true}).click()
+  let section=page.locator('section').filter({has:page.getByRole('heading',{name:'Synthetic exported documents',exact:true})})
+  const id=await section.locator('[data-document-upload]').getAttribute('data-movein')
+  const api=async(name,input)=>{
+   const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name:'document-import.'+name,input:{id,...input}}})
+   assert.equal(response.status(),200,await response.text());return response.json()
+  }
+  const file=fixture.zips[0],sha256=hash(file.bytes),half=Math.floor(file.bytes.length/2)
+  await api('upload-start',{filename:file.filename,sha256,size:file.bytes.length})
+  await api('upload-chunk',{sha256,position:0,base64:file.bytes.subarray(0,half).toString('base64')})
+  await page.reload();assert.match(await section.innerText(),/Upload interrupted/)
+  await section.getByLabel('Exported files').setInputFiles(fixture.zips.map(z=>({name:z.filename,mimeType:'application/zip',buffer:z.bytes})))
+  await section.getByRole('button',{name:'Upload or resume files',exact:true}).click()
+  await page.waitForURL('**/app/import')
+  await page.waitForFunction(()=>Array.from(document.querySelectorAll('[data-document-upload]')).every(f=>!f.querySelector('input[type=file]').files.length))
+  await section.getByRole('button',{name:'Preview document move-in',exact:true}).click()
+  assert.equal(await section.getByRole('button',{name:'Apply reviewed document move-in',exact:true}).count(),0)
+  assert.match(await section.innerText(),/Arrived agreements\s+4\s+Held for review\s+2\s+Unmapped items\s+2/)
+  const select=section.locator('select[name^="match:"]').filter({has:page.locator('option[value="'+hash(fixture.originals[2])+'"]')})
+  await select.selectOption(hash(fixture.originals[2]))
+  await section.getByRole('button',{name:'Review report matches',exact:true}).click()
+  assert.match(await section.innerText(),/Arrived agreements\s+4\s+Held for review\s+1\s+Unmapped items\s+2/)
+  await capture('review')
+  await section.getByRole('button',{name:'Apply reviewed document move-in',exact:true}).click()
+  const retained=page.locator('section').filter({has:page.getByRole('heading',{name:'Retained imported originals',exact:true})})
+  assert.equal(await retained.getByRole('link',{name:'Download original PDF',exact:true}).count(),5)
+  assert.equal(await retained.getByText('Read-only retained agreement',{exact:true}).count(),4)
+  for(const bytes of fixture.originals){
+   const response=await context.request.get(app.origin+'/api/platter/imported-original?document='+hash(bytes))
+   assert.equal(response.status(),200);assert.deepEqual(await response.body(),bytes)
+  }
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+  await capture('retained')
+  await section.getByRole('button',{name:'Open document journal',exact:true}).click()
+  assert.match(await section.innerText(),/5 document changes recorded/)
+  assert.ok(await section.getByRole('link',{name:/Download uploads/}).count()>=3)
+  await capture('journal')
+  await section.getByRole('button',{name:'Undo document move-in',exact:true}).click()
+  assert.equal(await page.getByRole('heading',{name:'Retained imported originals',exact:true}).count(),0)
+  assert.match(await section.innerText(),/Import undone/)
+  await context.close()
+ }finally{await browser?.close();await app?.close()}
+})
+
+test('CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows', { timeout: 120000 }, async () => {
+ const { harness } = await import('./harness.mjs'), { browserEdge } = await import('./browser-edge.mjs'), { hubspotSyncFixture } = await import('./hubspot-sync-fixture.mjs')
+ const edge = await browserEdge(), provider = hubspotSyncFixture()
+ let h, browser
+ try {
+  h = await harness({ entry: './dist/server/index.js', assetsDirectory: './dist/client', origin: edge.origin, outboundService: provider.request }); edge.attach(h)
+  browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ignoreHTTPSErrors: true })
+  try {
+   const [name, value] = h.owner.split('='); await context.addCookies([{ name, value, url: h.origin }])
+   const page = await context.newPage()
+   await page.goto(h.origin + '/setup'); await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Finish setup' }).click()
+   await h.cmd('provider.connect', { provider: 'hubspot', version: 0, token: 'synthetic-platter-4607', consent: true })
+   await page.goto(h.origin + '/app')
+   const panel = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Start from HubSpot', exact: true }) })
+   await panel.getByLabel('HubSpot deal ID', { exact: true }).fill(provider.selected.dealId); await panel.getByLabel('Draft scope (optional)', { exact: true }).fill('A separately reviewed CRM scope.'); await panel.getByRole('button', { name: 'Read HubSpot deal', exact: true }).click()
+   assert.equal(await panel.getByLabel('Company from deal').inputValue(), ''); assert.equal(await panel.getByLabel('Contact from deal').inputValue(), '')
+   assert.equal((await h.state()).proposals.length, 0)
+   await panel.getByLabel('Company from deal').selectOption(provider.selected.companyId); await panel.getByLabel('Contact from deal').selectOption(provider.selected.contactId)
+   await panel.getByRole('button', { name: 'Review selected deal', exact: true }).click()
+   const review = panel.getByRole('article', { name: 'Reviewed HubSpot draft' })
+   assert.equal(await panel.getByLabel('Company from deal').inputValue(), provider.selected.companyId); assert.equal(await panel.getByLabel('Contact from deal').inputValue(), provider.selected.contactId)
+   assert.match(await review.innerText(), /Synthetic reviewed company/); assert.match(await review.innerText(), /Taylor Reed/)
+   assert.match(await review.innerText(), /2\.5 × \$120\.50 USD/); assert.match(await review.innerText(), /3 × \$19\.99 USD/); assert.match(await review.innerText(), /\$361\.22 USD/)
+   assert.equal((await h.state()).proposals.length, 0, 'review alone creates no draft or approval')
+   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+   const shots = process.env.PLATTER_SCREENSHOTS
+   const capture = async (locator, label) => {
+    if (!shots) return
+    await mkdir(shots, { recursive: true })
+    for (const width of [1440, 390]) { await page.setViewportSize({ width, height: 900 }); await locator.scrollIntoViewIfNeeded(); await locator.screenshot({ path: join(shots, `CRM-001-${label}-${width}.png`) }) }
+    await page.setViewportSize({ width: 1440, height: 900 })
+   }
+   await capture(panel, 'review')
+   await review.getByRole('checkbox').check(); await review.getByRole('button', { name: 'Create reviewed draft', exact: true }).click()
+   await page.waitForURL(/\/app\/proposal\?id=/)
+   const current = (await h.state()).proposals[0]
+   assert.equal(current.scope, 'A separately reviewed CRM scope.'); assert.equal(current.title, 'Synthetic launch engagement'); assert.equal(current.options[0].cents, 36122); assert.equal(current.collection.enabled, false)
+   assert.equal(current.status, 'draft'); assert.equal(current.approved_by, null)
+   assert.equal(await page.getByRole('button', { name: 'Approve this revision', exact: true }).count(), 1); assert.equal(await page.getByRole('button', { name: 'Send approved proposal', exact: true }).count(), 0)
+   const source = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Copied HubSpot source', exact: true }) })
+   assert.match(await source.innerText(), /synthetic-platter-4605/); assert.match(await source.innerText(), /no synchronization or sending authority/)
+   await capture(source, 'copied-source')
+   const calls = provider.calls.length
+   provider.state.line_items[0].properties.price = '999.00'; await page.reload()
+   assert.equal(provider.calls.length, calls, 'opening a copied draft never synchronizes provider data')
+   assert.equal((await h.state()).proposals[0].options[0].cents, 36122)
+   await (await import('./hubspot-browser.mjs')).hubspotBrowser({h,page,provider,current,capture})
+  } finally { await context.close() }
+ } finally { await browser?.close(); await h?.close(); await edge.close() }
 })

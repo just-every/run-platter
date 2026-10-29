@@ -2,6 +2,11 @@ import { calendarDate } from './expiry-time'
 import { allocateNet } from './discounts'
 import { need } from './model'
 
+export const catalogIntervals=['one-off','weekly','monthly','quarterly','annual'] as const
+export function catalogInterval(input:unknown){
+ need(typeof input==='string'&&(catalogIntervals as readonly string[]).includes(input),'Choose a supported catalog recurrence')
+ return input as typeof catalogIntervals[number]
+}
 export type Recurrence={interval:'weekly'|'monthly'|'quarterly'|'annual';term:number;startsOn:string}
 export function recurrenceInput(input:any):{recurrence?:Recurrence} {
  const interval=input.interval??input.recurrence?.interval
@@ -46,8 +51,8 @@ export function recurringSelection(option:any,items:any[],total:number,deposit:n
  need(credit===0,'Deposit exceeds the agreed term value')
  return {fees:{oneOffCents,firstYearCents,termTotalCents:total,recurring},paymentSchedule:{netDays:terms?.netDays??0,rows:[{kind:'deposit',label:'Deposit',event:'Acceptance',amountCents:deposit,netDays:0},...due,...rows]}}
 }
-export function feeLines(fees:any,currency:string):string[] {
+export function feeLines(fees:any,currency:string,tr:(value:string)=>string=value=>value):string[] {
  if(!fees)return []
  const money=(n:number)=>currency+' '+(n/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
- return ['One-off total: '+money(fees.oneOffCents),...fees.recurring.map((r:any)=>money(r.amountCents)+' per '+({weekly:'week',monthly:'month',quarterly:'quarter',annual:'year'}[r.interval as Recurrence['interval']])+' · '+r.label+' · '+r.term+' installments from '+r.startsOn+' · renewal date '+r.renewalOn),'First-year value: '+money(fees.firstYearCents)]
+ return [tr('One-off total: ')+money(fees.oneOffCents),...fees.recurring.map((r:any)=>money(r.amountCents)+tr(' per ')+tr({weekly:'week',monthly:'month',quarterly:'quarter',annual:'year'}[r.interval as Recurrence['interval']])+' · '+r.label+' · '+r.term+tr(' installments from ')+r.startsOn+tr(' · renewal date ')+r.renewalOn),tr('First-year value: ')+money(fees.firstYearCents)]
 }

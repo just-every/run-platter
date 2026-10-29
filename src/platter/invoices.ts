@@ -9,7 +9,7 @@ export function invoiceFile(proposalId:string,accepted:any,at:number){const snap
  return{number,csv,currency}
 }
 export async function exportInvoice(db:D1Database,a:Actor,p:Record<string,unknown>){need(a.role==='owner','Only the owner exports deposits',403);const id=text(p.id,'a proposal'),existing=await db.prepare('SELECT * FROM p_invoices WHERE proposal_id=?').bind(id).first<any>();if(existing)return existing
- const accepted=await db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(id).first<any>();need(accepted,'A client must accept before a deposit is exported',409);const at=Date.now(),{number,csv,currency}=invoiceFile(id,accepted,at)
+ const accepted=await db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(id).first<any>();need(accepted,'A client must accept before a deposit is exported',409);need(!JSON.parse(accepted.snapshot).selection?.tax,'Accounting export for taxed agreements is not supported. The tax-inclusive deposit is retained in the agreement.',409);const at=Date.now(),{number,csv,currency}=invoiceFile(id,accepted,at)
  await commit(db,a,[db.prepare('INSERT OR IGNORE INTO p_invoices(id,proposal_id,number,csv,exported_at,exported_by,currency) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(),id,number,csv,at,a.email,currency)],true)
  return await db.prepare('SELECT * FROM p_invoices WHERE proposal_id=?').bind(id).first<any>()
 }

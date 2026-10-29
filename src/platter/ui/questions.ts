@@ -1,9 +1,10 @@
+import { ui, clientEnum } from '../locales'
 import { documentOf } from '../documents/blocks'
 import { area, date, escape, form, hidden, panel, proposalPath, statusPill } from './shared'
 import type { QuestionThread } from '../questions'
 
 function thread(question:QuestionThread,answerForm='',closed=false) {
- return `<article id="question-${escape(question.id)}"><h3>${escape(question.block_title||question.section)} · Revision ${escape(question.revision)}</h3><p>${statusPill(closed?'closed':question.status)} · Asked ${date(question.created_at)}</p><p class="preserve">${escape(question.text)}</p>${question.answers.map(answer=>`<article><h4>Team answer</h4><p>${date(answer.created_at)}</p><p class="preserve">${escape(answer.text)}</p></article>`).join('')}${answerForm}</article>`
+ return ui`<article id="question-${escape(question.id)}"><h3>${escape(question.block_title||clientEnum(question.section))} · Revision ${escape(question.revision)}</h3><p>${statusPill(clientEnum(closed?'closed':question.status))} · Asked ${date(question.created_at)}</p><p class="preserve">${escape(question.text)}</p>${question.answers.map(answer=>ui`<article><h4>Team answer</h4><p>${date(answer.created_at)}</p><p class="preserve">${escape(answer.text)}</p></article>`).join('')}${answerForm}</article>`
 }
 
 /** Proposal history is visible to people; only the current owner receives answer controls. */
@@ -16,10 +17,10 @@ export function ownerQuestions(state:any,p:any) {
 }
 
 export function clientQuestions(view:any,publicForm:(name:string,body:string)=>string) {
- if(!view.verified)return ['sent','expired'].includes(view.status)?panel('Questions for the owner','<p>Verify your '+(view.verificationMethod==='SMS code'?'identity':'email')+' to ask about scope, pricing, or terms.</p>'):''
+ if(!view.verified)return ['sent','expired'].includes(view.status)?panel(ui('Questions for the owner'),ui('<p>Verify your ')+(view.verificationMethod==='SMS code'?'identity':ui('email'))+ui(' to ask about scope, pricing, or terms.</p>')):''
  const questions:QuestionThread[]=view.questions??[]
- const create=['sent','expired'].includes(view.status)?publicForm('question.create',hidden('revision',view.revision)+'<label>Question about<select name="section" aria-label="Question about" required><option value="scope">Scope</option><option value="pricing">Pricing</option><option value="terms">Terms</option>'+documentOf(view).blocks.filter(b=>b.type!=='page_break').map(b=>'<option value="block:'+escape(b.id)+'">'+escape(b.title||b.type)+'</option>').join('')+'</select></label>'+area('Your question','text','','required maxlength="10000"')+'<button>Send question to owner</button>'):''
- return questions.length||create?panel(view.status==='accepted'?'Agreement question history':'Questions for the owner',questions.map(q=>thread(q)).join('')+create):''
+ const create=['sent','expired'].includes(view.status)?publicForm('question.create',hidden('revision',view.revision)+ui('<label>Question about<select name="section" aria-label="Question about" required><option value="scope">Scope</option><option value="pricing">Pricing</option><option value="terms">Terms</option>')+documentOf(view).blocks.filter(b=>b.type!=='page_break').map(b=>'<option value="block:'+escape(b.id)+'">'+escape(b.title||b.type)+'</option>').join('')+'</select></label>'+area(ui('Your question'),'text','','required maxlength="10000"')+ui('<button>Send question to owner</button>')):''
+ return questions.length||create?panel(view.status==='accepted'?ui('Agreement question history'):ui('Questions for the owner'),questions.map(q=>thread(q)).join('')+create):''
 }
 
 export function openQuestionsPanel(state:any) {

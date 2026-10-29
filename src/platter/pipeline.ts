@@ -1,5 +1,5 @@
 import { documentText } from './documents/blocks'
-import { revenueKeys } from './reports/recorded-revenue'
+import { periodRevenue, revenueKeys, revenuePeriods } from './reports/recorded-revenue'
 import { need } from './model'
 
 export const nextActions = { approve: 'Approve revision', send: 'Send approved offer', 'await-client': 'Await client decision', 'export-deposit': 'Export deposit invoice', complete: 'Deposit invoice exported', withdrawn: 'Prepare a new revision', reopen: 'Review expiry or reopening', followup: 'Sales follow-up' }
@@ -13,6 +13,8 @@ function bound(params: URLSearchParams, key: string, money = false) {
 }
 export function pipeline(proposals: any[], params = new URLSearchParams(), now = Date.now(), followups?:any) {
  const revenue=params.get('view')==='recorded-revenue';need(!params.get('view')||revenue,'Choose a report view');if(revenue)proposals=proposals.filter(p=>p.acceptance)
+ const periods=revenue?revenuePeriods(params):undefined,currency=params.get('currency')||''
+ need(!currency||/^[A-Z]{3}$/.test(currency),'Choose a currency')
  const query = params.get('q') || ''
  need(query.length <= 200, 'Search must be at most 200 characters')
  const phrase = query.trim().replace(/\s+/g, ' ').toLowerCase()
@@ -26,25 +28,27 @@ export function pipeline(proposals: any[], params = new URLSearchParams(), now =
  const minValue = bound(params, 'minValue', true), maxValue = bound(params, 'maxValue', true), minAge = bound(params, 'minAge'), maxAge = bound(params, 'maxAge')
  need(minValue === undefined || maxValue === undefined || minValue <= maxValue, 'Minimum value exceeds maximum')
  need(minAge === undefined || maxAge === undefined || minAge <= maxAge, 'Minimum age exceeds maximum')
- let rows = proposals.map(p => ({
-  ...(revenue?{recordedRevenue:p.recordedRevenue}:{}),folderId:p.folderId??null,id: String(p.id), title: String(p.title), status: String(p.pipelineStatus ?? p.status), currency: String(p.currency),
-  valueCents: Number(p.acceptance ? p.acceptance.totalCents : Math.max(...p.options.map((o: any) => o.cents))),
+ const financial=new Map(proposals.filter(p=>revenue).map(p=>[p.id,periodRevenue(p,periods!)]))
+ let rows = proposals.filter(p=>!revenue||financial.get(p.id)!.included).map(p => ({
+  ...(revenue?{recordedRevenue:financial.get(p.id)!.recordedRevenue,bookedOn:financial.get(p.id)!.bookedOn}:{}),folderId:p.folderId??null,id: String(p.id), title: String(p.title), status: String(p.pipelineStatus ?? p.status), currency: String(revenue?p.acceptance.currency:p.currency),
+  valueCents: Number(revenue?financial.get(p.id)!.valueCents:p.acceptance ? p.acceptance.totalCents : Math.max(...p.options.map((o: any) => o.cents))),
   ownerId: p.sales_owner_id as string | null, owner: p.sales_owner_name || 'Not recorded',
   clientId: String(p.client_id), client: String(p.clientName), age: Math.max(0, Math.floor((now - p.created_at) / 86400000)),
   dueDate: followups?.rows.find((r:any)=>r.id===p.id)?.dueDate??null,
   dueFollowup: Boolean(followups?.rows.some((r:any)=>r.id===p.id&&['overdue','today'].includes(r.period))),
   nextAction: (followups?.rows.some((r:any)=>r.id===p.id&&r.scheduled)?'followup':p.pipelineStatus === 'withdrawn' || p.status === 'withdrawn' ? 'withdrawn' : p.pipelineStatus === 'expired' || p.status === 'expired' ? 'reopen' : ['draft','approved'].includes(p.status) ? (p.approval ? p.approval.complete ? 'send' : 'approve' : p.status==='draft'?'approve':'send') : p.status === 'sent' ? 'await-client' : p.invoice ? 'complete' : 'export-deposit') as keyof typeof nextActions,
  }))
+ const currencies=[...new Set(proposals.map(p=>String(revenue?p.acceptance.currency:p.currency)))].sort()
  const owners = [...new Map(rows.map(r => [r.ownerId || 'unrecorded', { id: r.ownerId || 'unrecorded', name: r.owner }])).values()].sort((a,b) => a.name.localeCompare(b.name))
  const clients = [...new Map(rows.map(r => [r.clientId, { id: r.clientId, name: r.client }])).values()].sort((a,b) => a.name.localeCompare(b.name))
- rows = rows.filter(r => matching.has(r.id) && (!params.get('folder')||r.folderId===params.get('folder')) && (!due||(due==='yes')===r.dueFollowup) && (!status || r.status === status) && (!params.get('owner') || (r.ownerId || 'unrecorded') === params.get('owner')) && (!params.get('client') || r.clientId === params.get('client')) && (!nextAction || r.nextAction === nextAction) && (minValue === undefined || r.valueCents >= minValue) && (maxValue === undefined || r.valueCents <= maxValue) && (minAge === undefined || r.age >= minAge) && (maxAge === undefined || r.age <= maxAge))
+ rows = rows.filter(r => (!currency||r.currency===currency) && matching.has(r.id) && (!params.get('folder')||r.folderId===params.get('folder')) && (!due||(due==='yes')===r.dueFollowup) && (!status || r.status === status) && (!params.get('owner') || (r.ownerId || 'unrecorded') === params.get('owner')) && (!params.get('client') || r.clientId === params.get('client')) && (!nextAction || r.nextAction === nextAction) && (minValue === undefined || r.valueCents >= minValue) && (maxValue === undefined || r.valueCents <= maxValue) && (minAge === undefined || r.age >= minAge) && (maxAge === undefined || r.age <= maxAge))
  rows.sort((a,b) => {
   const order = sort === 'value' ? a.currency.localeCompare(b.currency) || a.valueCents - b.valueCents : sort === 'age' ? a.age - b.age : sort === 'dueDate' ? (a.dueDate??'9999').localeCompare(b.dueDate??'9999') : String(a[sort as 'status' | 'owner' | 'client' | 'nextAction']).localeCompare(String(b[sort as 'status' | 'owner' | 'client' | 'nextAction']))
   return order * (direction === 'asc' ? 1 : -1) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id)
  })
  const totals = [...new Set(rows.map(r => r.currency))].sort().map(currency => ({ currency, count: rows.filter(r => r.currency === currency).length, valueCents: rows.filter(r => r.currency === currency).reduce((sum,r) => sum + r.valueCents, 0) }))
- if(revenue)for(const total of totals)for(const key of revenueKeys){const sum=rows.filter(r=>r.currency===total.currency).reduce((n,r)=>n+(r.recordedRevenue?.[key]??0),0);need(Number.isSafeInteger(sum),'Recorded revenue exceeds the exact reporting limit',409);Object.assign(total,{[key]:sum})}
- return { ...(revenue?{view:'recorded-revenue'}:{}),rows, count: rows.length, totals, owners, clients, generatedAt: now }
+ if(revenue)for(const total of totals)for(const key of ['valueCents',...revenueKeys]){const sum=rows.filter(r=>r.currency===total.currency).reduce((n,r)=>n+(key==='valueCents'?r.valueCents:r.recordedRevenue?.[key as typeof revenueKeys[number]]??0),0);need(Number.isSafeInteger(sum),'Recorded revenue exceeds the exact reporting limit',409);Object.assign(total,{[key]:sum})}
+ return { ...(revenue?{view:'recorded-revenue'}:{}),rows, count: rows.length, totals, owners, clients, currencies, generatedAt: now }
 }
 
 /** Search only offer content and visible metadata; invitation and verification credentials never participate. */

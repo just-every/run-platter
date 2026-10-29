@@ -1,17 +1,30 @@
+import { clientLocale } from './locales'
 import { resendReplyAvailable } from './question-reply-mail'
 import type { Bindings } from '../auth.server'
 import { proposalMail, queueMail } from './mail'
 import { need, text, type Actor } from './model'
+import {smsTransportConfigured} from './sms'
+import { recipientPlan } from './recipients'
+
+export function smsOnlyDelivery(env:Bindings,input:Record<string,unknown>,offer:any){
+ need(input.delivery===undefined||['email','sms'].includes(String(input.delivery)),'Choose email or text delivery')
+ if(input.delivery!=='sms')return false
+ need(!recipientPlan(offer).length,'Text-only preparation currently requires one invitation recipient',409)
+ need(smsTransportConfigured(env),'Configure Twilio before preparing a text-only invitation',409)
+ need(!input.mailRepliesConsent||input.mailRepliesConsent==='no','Email reply consent requires an email invitation',400)
+ return true
+}
 
 /** Queue transport and retain link-free invitation text in the caller's atomic send. */
 export function invitationMail(
  env: Bindings, actor: Actor, input: Record<string, unknown>,
- offer: { id: string; title: string; revision: number },
- recipient: string, shareUrl: string, at: number,
+ offer: { id: string; title: string; revision: number; client_locale?: string },
+ recipient: string, shareUrl: string, at: number, smsOnly=false,
 ): D1PreparedStatement[] {
+ if(smsOnly)return [env.DB.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),actor.id,actor.role,'sms.invitation.prepare',offer.id,at)]
  let subject: string, message: string, body: string
  if (input.mailSubject === undefined && input.mailMessage === undefined) {
-  const defaults = proposalMail(offer.title, shareUrl)
+  const defaults = proposalMail(offer.title, shareUrl, clientLocale(offer))
   subject = defaults[0]
   body = defaults[1]
   message = body.slice(0, -(shareUrl.length + 1))

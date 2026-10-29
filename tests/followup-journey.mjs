@@ -46,6 +46,20 @@ export async function followupJourney(h, {offer, verified}) {
   assert.equal(all.today, '2027-03-10')
   assert.equal(all.timeZone, 'UTC')
   assert.deepEqual(all.rows.map(row => row.title), ['A', 'C', 'D', 'F', 'E', 'B', 'G'], 'viewed proposals rank before unopened proposals')
+  const measured=await h.send(fixture.F.path),viewId=measured.text.match(/data-engagement-view="([^"]+)"/)[1]
+  await h.db.prepare('UPDATE p_expiry_clock SET observed_at=? WHERE singleton=1').bind(at+40000).run()
+  assert.equal((await h.send(fixture.F.path+'/engagement',{viewId,section:'pricing',milliseconds:40000,optionId:'one'})).status,200)
+  const detailed=(await queue()).rows
+  assert.deepEqual(detailed.map(r=>r.title),['A','C','D','F','E','B','G'],'section detail preserves the original reason ranks')
+  assert.equal(detailed.find(r=>r.title==='F').engagementReason,'Read Pricing for 40.0 seconds')
+  await h.send('/auth/invite',{email:['synthetic-platter-queue','example.test'].join('@'),displayName:'Queue admin',role:'member',returnTo:'/app'},h.owner)
+  const admin=await h.signIn(['synthetic-platter-queue','example.test'].join('@')),adminId=(await h.state(admin)).actor.id
+  await h.cmd('member.set',{operatorId:adminId,version:0,role:'admin',teams:[]})
+  const generic=await h.send('/api/platter/followups',undefined,admin);assert.equal(generic.status,200)
+  assert.deepEqual(generic.value.rows.map(r=>r.title),['A','C','D','F','E','B','G'])
+  assert.equal(generic.value.rows.find(r=>r.title==='F').reason,'viewed')
+  assert.ok(generic.value.rows.every(r=>!r.engagementReason),'non-owner queue keeps generic engagement labels')
+  await h.db.prepare('UPDATE p_expiry_clock SET observed_at=? WHERE singleton=1').bind(at).run()
   assert.equal(all.count, 7)
   for(const [title,period] of [['A','overdue'],['B','today'],['G','upcoming']])assert.equal(all.rows.find(r=>r.title===title).period,period)
   assert.equal(all.totals.find(total => total.currency === 'USD').valueCents, 12400000)

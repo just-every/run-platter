@@ -2926,7 +2926,7 @@
       "executable": false
     },
     "src/platter/renewals.ts": {
-      "sha256": "2f7196b2de8a01cef0699cf8d01977e3c3cb9140e35353ce7ab61b80b66abade",
+      "sha256": "fc58b6e6d1d5b3dd85f0babcb6434323d5653893c0ee993c9228b4c25b85b9e9",
       "executable": false
     },
     "src/platter/reports/pipeline-csv.ts": {
@@ -3586,7 +3586,7 @@
       "executable": false
     },
     "tests/renewal-journey.mjs": {
-      "sha256": "5484762d36a365cd8117bba9a91ea3081e598cc4246bdb2096bd5745f947bd9a",
+      "sha256": "6986dc37ec009ae3418de288ac08a5aabb4322df14852257a350a6df07aae8bb",
       "executable": false
     },
     "tests/revenue-fixture.mjs": {

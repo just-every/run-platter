@@ -13,7 +13,7 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 | Later | 0 | 0 | 0 | 0 |
 | Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `150f5ef225d346795d4b9c1d02b65b784ab14435` (29 October 2026). The EDIT-018 named journeys retain these exact bytes; the landing candidate also repairs the independent editor-budget drag driver and defers layout of offscreen editor controls. Its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. EDIT-018 is a builder completion claim from the combined native preview, sent-page and custody journeys, pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `64df9cb8efcadc4d4975b045643f8303eb903f65` (29 October 2026). The landing candidate retains these exact source and test bytes, including the repaired native drag driver and deferred layout of offscreen editor controls. Its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. EDIT-018 is a builder completion claim from the combined native preview, sent-page and custody journeys, pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 

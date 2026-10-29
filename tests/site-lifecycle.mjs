@@ -233,10 +233,10 @@ test('TEAM-004 owner searches audit actions and downloads the same filtered acti
  }finally{await browser?.close();await app?.close()}
 })
 
-test('AI-003 desktop and phone owners review MCP requests, approve/send explicitly, and dismiss stale requests', {timeout:120000}, async()=>{
+test('AI-003 desktop and phone owners review MCP requests, approve and send explicitly, and dismiss stale requests; AGENT-009 inspect digest receipts and pause keys', {timeout:120000}, async()=>{
  let app,browser
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   const screenshots=process.env.PLATTER_SCREENSHOTS
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
@@ -261,6 +261,56 @@ test('AI-003 desktop and phone owners review MCP requests, approve/send explicit
     const other=await tool('prepare_proposal',{...offer,title:'Winter campaign concept'});await tool('request_send',{id:other.id,revision:1});await tool('revise_proposal',{...offer,id:other.id,version:1,title:'Winter campaign concept',scope:'A changed draft awaits a new owner review.'})
     await page.reload();assert.match(await page.locator('main').innerText(),/Stale request/);await capture('stale')
     await page.getByRole('button',{name:'Dismiss request',exact:true}).click();assert.match(await page.locator('main').innerText(),/dismissed/);assert.equal(await page.getByRole('button',{name:'Dismiss request',exact:true}).count(),0);await capture('dismissed')
+    await page.goto(app.origin+'/app/settings#agent-controls')
+    const controls=()=>page.locator('[data-agent-key="'+key.id+'"]')
+    await controls().getByRole('button',{name:'Authorize digest receipts',exact:true}).click()
+    await tool('read_proposal',{id:p.id})
+    await page.goto(app.origin+'/app/access#agent-receipts')
+    const receipt=page.locator('[data-agent-receipt]').filter({hasText:'mcp.read_proposal'}).first()
+    await receipt.locator('summary').click()
+    if(width===1440){
+     const data=await (await context.request.get(app.origin+'/api/platter/agent-ledger')).json(),record=data.receipts.find(r=>r.action==='mcp.read_proposal')
+     assert.match(await receipt.innerText(),new RegExp(record.input_digest));assert.match(await receipt.innerText(),new RegExp(record.output_digest));assert.match(await receipt.innerText(),/not recorded/)
+     const source=record.sources.find(s=>s.kind==='proposal'&&s.source_id===p.id);assert.ok(source);assert.match(await receipt.locator('[data-agent-source=proposal]').filter({hasText:p.id}).first().innerText(),new RegExp(source.digest))
+     const link=receipt.getByRole('link',{name:'Human approved record',exact:true}).first(),approvalResponse=await context.request.get(app.origin+await link.getAttribute('href'))
+     assert.equal(approvalResponse.status(),200);assert.equal((await approvalResponse.json()).approval.proposal_id,p.id)
+    }
+    const produced=await tool('prepare_proposal',{...offer,title:'Synthetic receipted draft'})
+    await page.reload()
+    await receipt.locator('summary').click()
+    const producedReceipt=page.locator('[data-agent-receipt]').filter({hasText:'mcp.prepare_proposal'}).first()
+    await producedReceipt.locator('summary').click()
+    if(width===1440){
+     const {createHash}=await import('node:crypto'),ownerState=await (await context.request.get(app.origin+'/api/platter/state')).json()
+     const saved=ownerState.revisions.find(row=>row.proposal_id===produced.id&&row.revision===1).snapshot
+     assert.match(await producedReceipt.innerText(),/Produced revision/)
+     assert.match(await producedReceipt.innerText(),new RegExp(createHash('sha256').update(JSON.stringify(saved)).digest('hex')))
+    }
+    await capture('agent-receipt')
+    await page.goto(app.origin+'/app/settings#agent-controls');await controls().getByRole('button',{name:'Pause key',exact:true}).click()
+    if(width===1440){const refused=await context.request.post(app.origin+'/api/platter/agent/mcp',{headers:{authorization:'Bearer '+key.token},data:{jsonrpc:'2.0',id:100,method:'tools'+'/call',params:{name:'read_proposal',arguments:{id:p.id}}}});assert.equal(refused.status(),403);assert.match(await controls().innerText(),/Paused/)}
+    await capture('agent-paused')
+    await controls().getByRole('button',{name:'Resume key',exact:true}).click();await tool('read_proposal',{id:p.id})
+    await controls().getByRole('button',{name:'Stop receipt collection',exact:true}).click()
+    if(width===1440)assert.match(await controls().innerText(),/Receipt collection off/)
+    await controls().getByLabel('Monthly model budget (USD)',{exact:true}).fill('25.37')
+    await controls().getByRole('checkbox',{name:'Hold unmetered requests',exact:true}).check()
+    await controls().getByRole('button',{name:'Save model budget',exact:true}).click()
+    if(width===1440){
+     assert.match(await controls().innerText(),/Budget hold.*25.37/)
+     const budgetRefusal=await context.request.post(app.origin+'/api/platter/agent/mcp',{headers:{authorization:'Bearer '+key.token},data:{jsonrpc:'2.0',id:101,method:'ping'}})
+     assert.equal(budgetRefusal.status(),409);assert.match(await budgetRefusal.text(),/not independently recorded/)
+    }
+    await capture('agent-model-budget')
+    await page.goto(app.origin+'/app/access')
+    if(width===1440)assert.match(await page.locator('section').filter({has:page.getByRole('heading',{name:'Agent keys',exact:true})}).innerText(),new RegExp('Budget held','i'))
+    await capture('agent-budget-held-key')
+    await page.goto(app.origin+'/app/settings#agent-controls')
+    await controls().getByLabel('Monthly model budget (USD)',{exact:true}).fill('')
+    await controls().getByRole('button',{name:'Save model budget',exact:true}).click()
+    await rpc('ping')
+
+
    }finally{await context.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}

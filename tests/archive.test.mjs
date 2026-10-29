@@ -44,6 +44,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     h=await harness({root:source,assetsDirectory:'public',outboundService:()=>new Response(null,{status:204})})
     const p=await h.cmd('client.save',{name:'Temporary joiner',email:'temporary@studio.example'})
     const key=await h.cmd('agent.create',{label:'Excluded secret'})
+    await h.cmd('agent.receipts',{id:key.id,version:0,consent:true})
     assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,200)
     const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
     const offer={document:documentFixture(),clientId:client.id,title:'Campaign agreement',scope:'Studio photographs and usage licence',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'}
@@ -208,6 +209,14 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal(acceptedThread[0].answers[0].text,'Yes, delivery is included in the campaign price.')
     assert.equal(openThread.length,1)
     assert.equal(openThread[0].answers.length,0)
+    const agentHistory=(await h.send('/api/platter/agent-ledger',undefined,h.owner)).value.receipts
+    assert.ok(agentHistory.length>=3);assert.ok(agentHistory.some(r=>r.records.some(ref=>ref.proposal_id===work.id)))
+    await h.cmd('agent.pause',{id:key.id,version:1})
+    assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,403)
+    await h.cmd('agent.budget',{id:key.id,version:2,budget:'50',consent:true})
+    const agentReceipts=(await h.send('/api/platter/agent-ledger',undefined,h.owner)).value.receipts
+    const storedSources=(await h.db.prepare('SELECT * FROM p_agent_receipt_sources ORDER BY receipt_id,kind,source_id,source_version,digest').all()).results
+    assert.ok(agentReceipts.some(r=>r.status==='refused'))
     const beforeAuditView=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
     // The API joins withdrawal reasons and sender attribution. Compare stored
     // audit rows exactly here, then assert the complete joined view on restore.
@@ -228,6 +237,13 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const rows=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part')
     assert.ok(rows(bytes).length>0);assert.deepEqual(rows(await readFile(again,'utf8')),rows(bytes))
     const archived=rows(bytes).flatMap(part=>part.items).filter(item=>item.kind==='row')
+    const storedReceipts=agentReceipts.map(({records,sources,...row})=>row).sort((a,b)=>a.id.localeCompare(b.id))
+    assert.deepEqual(archived.filter(item=>item.table==='p_agent_receipts').map(item=>item.row).sort((a,b)=>a.id.localeCompare(b.id)),storedReceipts,'AGENT-009 exact receipts survive the public CLI without keys or control authority')
+    assert.ok(storedSources.length>0)
+    assert.deepEqual(archived.filter(item=>item.table==='p_agent_receipt_sources').map(item=>item.row).sort((a,b)=>[a.receipt_id,a.kind,a.source_id,a.source_version,a.digest].join(':').localeCompare([b.receipt_id,b.kind,b.source_id,b.source_version,b.digest].join(':'))),storedSources.sort((a,b)=>[a.receipt_id,a.kind,a.source_id,a.source_version,a.digest].join(':').localeCompare([b.receipt_id,b.kind,b.source_id,b.source_version,b.digest].join(':'))))
+    assert.equal(archived.filter(item=>item.table==='p_agent_keys').length,0)
+    assert.equal(archived.filter(item=>item.table==='p_agent_receipt_records').length,agentReceipts.flatMap(r=>r.records).length)
+
     for(const [table,key] of [['p_views','views'],['p_tracking_alerts','alerts'],['p_tracking_holds','holds']])assert.deepEqual(archived.filter(item=>item.table===table).map(item=>item.row),beforeTracking[key],'Tracking business data survives export exactly')
     assert.equal(archived.filter(item=>item.table==='p_tracking_authority').length,0,'Tracking transport authority never leaves the installation')
     assert.equal(archived.filter(item=>item.table==='p_questions').length,2,'FOLLOW-004 retains answered and unanswered questions')
@@ -253,6 +269,10 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal((await h.send(path,undefined,verified.cookie)).status,404)
     const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
     const restoredState=await h.state(restoredOwner)
+    assert.deepEqual((await h.send('/api/platter/agent-ledger',undefined,restoredOwner)).value.receipts,agentReceipts,'AGENT-009 restores exact digests, outcomes, scoped revisions and actual human approval links')
+    assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_agent_keys').first()).n,0)
+    assert.equal((await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'ping'},'',{authorization:'Bearer '+key.token})).status,401)
+
     const restoredHooks=(await h.send('/api/platter/v1/webhooks',undefined,restoredOwner)).value;assert.equal(restoredHooks.length,1);assert.equal(restoredHooks[0].id,webhook.id);assert.equal(restoredHooks[0].url,webhook.url);assert.equal(restoredHooks[0].connected,0)
     assert.deepEqual((await h.send('/api/platter/v1/deliveries',undefined,restoredOwner)).value,webhookDeliveries)
     assert.equal((await h.send('/api/platter/v1/proposals',undefined,'',{authorization:'Bearer '+restKey.token})).status,401)
@@ -353,6 +373,10 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
   h=await harness({root:source})
   const p=await h.cmd('client.save',{name:'Temporary joiner',email:'synthetic-platter-8200@example.com'}),client=await h.cmd('client.save',{name:'Retained client',email:'synthetic-platter-8201@example.com'})
+  const sourceKey=await h.cmd('agent.create',{label:'Synthetic erased citation key'})
+  await h.cmd('agent.receipts',{id:sourceKey.id,version:0,consent:true})
+  assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+sourceKey.token})).status,200)
+  assert.ok((await h.send('/api/platter/agent-ledger',undefined,h.owner)).value.receipts.flatMap(row=>row.sources).some(source=>source.kind==='client'&&source.source_id===p.id),'the erased client starts with a genuine observed citation')
   const proposal=await h.cmd('proposal.prepare',{clientId:client.id,title:'Retained agreement',scope:'Retained business record',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
   await h.cmd('proposal.approve',{id:proposal.id,version:1,revision:1});const sent=await h.cmd('proposal.send',{id:proposal.id,version:2}),path=new URL(sent.shareUrl).pathname
   await h.send(path+'/action?name=code.request',{});const code=(await h.state()).outbox.find(x=>x.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],verified=await h.send(path+'/action?name=code.verify',{code})
@@ -391,6 +415,9 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
     h=await harness({root:erased,unclaimed:true,auth:identity.auth})
     const restoredOwner=await h.signIn(identity.auth.OWNER_EMAIL),restoredState=await h.state(restoredOwner)
     assert.ok(!restoredState.clients.some(row=>row.id===p.id),'erased clients stay absent through the restored app door')
+    const restoredCitations=(await h.send('/api/platter/agent-ledger',undefined,restoredOwner)).value.receipts.flatMap(row=>row.sources)
+    assert.ok(restoredCitations.some(source=>source.kind==='client'&&source.source_id===client.id),'the retained client citation still works after erasure and restore')
+    assert.ok(!restoredCitations.some(source=>source.kind==='client'&&source.source_id===p.id),'restored receipt citations cannot resurrect the erased client')
     const retained=restoredState.proposals.find(row=>row.id===proposal.id)
     assert.equal(retained.acceptance.depositCents,105000)
     const retainedCsv=await h.send('/api/platter/invoices/'+retained.invoice.id+'.csv',undefined,restoredOwner)

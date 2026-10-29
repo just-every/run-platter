@@ -81,3 +81,29 @@ returns the same request. Editing the proposal makes the old request visibly sta
 The owner can dismiss it, or mark it fulfilled only after that same revision was
 actually sent. Requests and their opaque key provenance travel in business archives;
 the credentials themselves never do.
+
+
+## Inspect receipts and control requests
+
+In **Settings → Agent controls**, explicitly authorize digest receipts for each key.
+The owner can inspect them under **Agent access → Agent receipts**. A receipt shows
+the transport, action, times, outcome and SHA-256 digests of the exact request and
+response bodies. It retains no raw bodies or credentials. Source citations retain
+digests of the context and record projections actually read, with recorded versions;
+later edits do not rewrite those citations. A successful draft also records the digest
+of the immutable proposal revision it produced. Human approval links open the actual
+record for that revision and do not grant any approval themselves.
+
+**Pause key** stops later requests and prevents an already authenticated draft from
+committing after the pause. Receipt consent and all key controls stay local; restored
+receipt history cannot restore access or execute a request.
+
+A **Monthly model budget (USD)** requires explicit confirmation. Platter currently
+has no independently verified meter for an external assistant's model spending.
+A zero cap refuses requests; any positive cap also holds unmetered requests with a
+notice, rather than assuming zero spending or trusting caller-reported usage.
+Leave the field empty to remove this installation hold. Changing a cap also fences
+in-flight mutations. These controls cannot stop a model call or spending outside
+Platter. Verified model identity, usage accounting, actual monthly spend enforcement
+and outbound model execution remain unfinished; unknown model identity stays
+**not recorded**. The cap does not authorize any model call or data disclosure.

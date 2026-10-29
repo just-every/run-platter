@@ -920,6 +920,8 @@ test('EDIT-012 duplicate accepted content into an independent member-owned draft
  const sourcePdf=await artifact('agreement.pdf'),sourceCertificate=await artifact('certificate.pdf')
  await h.send('/auth/invite',{email:mailbox(1204),displayName:'Morgan Sales',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn(mailbox(1204)),actor=(await h.state(member)).actor
  const before=await get(p.id),sourceRevisions=(await h.state()).revisions.filter(r=>r.proposal_id===p.id),accepted=(await h.send(path,undefined,cookie)).text
+ await h.cmd('proposal.duplicate',{id:p.id,version:before.version,clientId:beta.id},member,403)
+ assert.deepEqual(await get(p.id),before,'an unscoped copy request leaves the populated source unchanged')
  await h.cmd('proposal.share',{id:p.id,operatorId:actor.id})
  await h.cmd('proposal.duplicate',{id:p.id,version:1,clientId:beta.id},member,409)
  const copy=await h.cmd('proposal.duplicate',{id:p.id,version:before.version,clientId:beta.id},member),after=await get(copy.id)
@@ -964,6 +966,8 @@ test('EDIT-012 duplicate accepted content into an independent member-owned draft
  assert.equal((await get(optional.id)).status,'sent');assert.equal((await get(optional.id)).approved_by,null)
  assert.deepEqual((await h.state()).paymentRecords.filter(r=>r.proposal_id===p.id),sourcePayments)
  assert.deepEqual(await artifact('agreement.pdf'),sourcePdf)
+ await h.cmd('proposal.share',{id:p.id,operatorId:actor.id,shared:false})
+ const revokedState=await h.state();await h.cmd('proposal.duplicate',{id:p.id,version:before.version,clientId:beta.id},member,403);assert.deepEqual(await h.state(),revokedState,'revoked source access cannot copy content or resurrect authority')
  const key=await h.cmd('agent.create',{label:'Draft only'});assert.equal((await h.send('/api/platter/agent/command',{name:'proposal.duplicate',input:{id:p.id,version:before.version}},'',{authorization:'Bearer '+key.token})).status,403)
 }finally{await h.close()}})
 

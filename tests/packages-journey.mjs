@@ -1,3 +1,4 @@
+import { scheduleFixture } from './packages-fixture.mjs'
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import { mkdir, readFile } from 'node:fs/promises'
@@ -164,4 +165,50 @@ export async function taxesBrowserJourney(browser,screenshots){
   assert.match(await clientPage.locator('main').innerText(),/This agreement is complete/);assert.match(await clientPage.locator('main').innerText(),/Sales tax: USD 78\.85/);assert.match(await clientPage.getByLabel('Selected deposit').innerText(),/734\.43/);await capture(clientPage,'agreement')
   const accepted=(await state()).proposals.find(x=>x.id===p.id).acceptance;assert.equal(accepted.selection.tax.taxCents,7885);assert.equal(accepted.totalCents,146885)
  }finally{await clientContext?.close();await context.close();await app.close()}
+}
+
+export async function duplicatePackagesJourney(){
+ let app,browser
+ const screenshots=process.env.PLATTER_SCREENSHOTS
+ try{
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']});if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   try{
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));for(const control of await page.locator('.document-tool button:not(:disabled)').all()){const id=await control.getAttribute('aria-describedby');assert.ok(id);await control.focus();assert.equal(await page.locator('#'+id).isVisible(),true)};if(screenshots){await page.screenshot({path:join(screenshots,`EDIT-012-${name}-${width}.png`),fullPage:true});if(name==='copy')await page.locator('section').filter({has:page.getByRole('heading',{name:'Email reminders',exact:true})}).screenshot({path:join(screenshots,`EDIT-012-reminder-controls-${width}.png`)})}}
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+    const address=n=>['synthetic-platter-'+n,'example.test'].join(String.fromCharCode(64))
+    const client=await cmd('client.save',{name:'Acme',email:address(1221),variableFields:{contactName:'Avery Chen',custom:{Region:'West'}}}),beta=await cmd('client.save',{name:'Beta Co',email:address(1222),variableFields:{contactName:'Casey Lane',custom:{Region:'East'}}})
+    const source=await cmd('proposal.prepare',{title:'Brand photography',clientId:client.id,scope:'Studio photography and campaign usage.',terms:'For {{Client.Company}}, {{Contact.Name}} in {{Custom.Region}}.',variableValues:{},paymentTerms:scheduleFixture(),document:{version:1,blocks:[{id:'destination',type:'text',title:'Recipient',text:'Prepared for {{Client.Company}} in {{Custom.Region}}'}]},optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'})
+    await cmd('payment.collection',{id:source.id,version:1,completion:'off',paymentMethods:['ach','card']})
+    await cmd('expiry.set',{id:source.id,version:2,mode:'days',days:14,warningDays:1})
+    await cmd('reminder.configure',{id:source.id,version:3,enabled:true,consent:true,timeZone:'America/Chicago',afterDays:[3,8],beforeDays:[2],cap:4,subject:'Review the proposed scope',message:'Please review the quoted services.'})
+    await cmd('proposal.approve',{id:source.id,version:4,revision:1});const invitation=await cmd('proposal.send',{id:source.id,version:5})
+    await page.goto(invitation.shareUrl);await page.getByRole('button',{name:'Send verification code'}).click();const state=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click();await page.getByRole('radio',{name:/Studio essentials/}).check();await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
+    assert.equal(await page.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1);await capture('source-client')
+    await cmd('payment.record',{id:source.id,method:'wire',amount:'600',receivedOn:'2026-10-20',reference:'synthetic-platter-1223',consent:true})
+    await cmd('invoice.export',{id:source.id})
+    const getState=async()=>{const r=await context.request.get(app.origin+'/api/platter/state');assert.equal(r.status(),200);return r.json()},sourceState=(await getState()).proposals.find(p=>p.id===source.id)
+    const sourcePdfResponse=await context.request.get(app.origin+'/api/platter/agreement.pdf?id='+source.id);assert.equal(sourcePdfResponse.status(),200);const sourcePdf=await sourcePdfResponse.body()
+
+    await page.goto(app.origin+'/app/proposal?id='+source.id);await page.getByLabel('Copy for client').selectOption(beta.id);await capture('source')
+    await page.getByRole('button',{name:'Duplicate proposal',exact:true}).click();assert.notEqual(new URL(page.url()).searchParams.get('id'),source.id)
+    assert.equal(await page.getByRole('heading',{name:'Brand photography (copy)',exact:true}).count(),1);assert.match(await page.locator('.proposal-status').innerText(),/draft.*Revision 1/i);assert.match(await page.locator('main').innerText(),/Beta Co/);assert.equal(await page.locator('textarea[name="scope"]').inputValue(),'Studio photography and campaign usage.');assert.equal(await page.locator('[name="priceOne"]').inputValue(),'2400.00');await capture('copy')
+    const copyId=new URL(page.url()).searchParams.get('id');const copyState=(await getState()).proposals.find(p=>p.id===copyId)
+    assert.equal(copyState.terms,'For Beta Co, Casey Lane in East.');assert.equal(copyState.document.blocks[0].text,'Prepared for Beta Co in East');assert.equal(copyState.reminderSettings,null);assert.equal(copyState.invoice,undefined);assert.equal(copyState.acceptance,undefined);assert.equal(copyState.approved_by,null)
+    for(const key of ['options','payment_terms','collectionPolicy','deliveryDefaults'])assert.deepEqual(copyState[key],sourceState[key],key+' is copied independently')
+    assert.deepEqual((await getState()).paymentRecords.filter(r=>r.proposal_id===copyId),[])
+    assert.equal(await page.getByLabel('Recipient IANA time zone').inputValue(),'');assert.equal(await page.getByLabel('Days after sending',{exact:true}).inputValue(),'3, 8');assert.equal(await page.getByLabel('Scheduled reminder subject',{exact:true}).inputValue(),'Review the proposed scope');assert.equal(await page.getByLabel('Scheduled reminder message',{exact:true}).inputValue(),'Please review the quoted services.');
+    const beforeApproval=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name:'proposal.send',input:{id:copyId,version:1}}});assert.equal(beforeApproval.status(),409)
+    await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();await capture('sent-copy')
+    const final=await(await context.request.get(app.origin+'/api/platter/state')).json();assert.equal(final.proposals.find(p=>p.id===source.id).status,'accepted');assert.equal(final.proposals.find(p=>p.id===copyId).status,'sent');assert.equal(final.proposals.find(p=>p.id===source.id).acceptance.name,'Avery Chen')
+    assert.deepEqual(final.proposals.find(p=>p.id===source.id),sourceState);assert.equal(final.paymentRecords.filter(r=>r.proposal_id===source.id)[0].cents,60000)
+    const repeatedPdf=await context.request.get(app.origin+'/api/platter/agreement.pdf?id='+source.id);assert.equal(repeatedPdf.status(),200);assert.deepEqual(await repeatedPdf.body(),sourcePdf)
+
+   }finally{await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
 }

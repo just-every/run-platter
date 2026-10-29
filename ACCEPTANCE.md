@@ -13,7 +13,7 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 | Later | 0 | 0 | 0 | 0 |
 | Full target | 14 | 100 | 49 | 163 |
 
-Judged from the code and tests at commit `0bcd3027a8f3451fac175f6c8c4f94b0708d21d9` (29 October 2026). This is the preserved baseline for existing ct judgments and demotions. SIGN-007 remains PARTIAL under its named conservative accounting and CRM authority defaults; its new builder proof is recorded in its Evidence cell and the exact candidate handoff, with no DONE promotion. SEND-008 retains its existing builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `1035bb53f7df8dd9a64caf00c6f44f473e1f7f5a` (29 October 2026). The landing candidate retains these exact source and test bytes; the handoff records its full SHA and Verify receipt. Existing ct judgments and demotions are retained. SIGN-007 remains PARTIAL under its named conservative accounting and CRM authority defaults; no DONE promotion is claimed. SEND-008 retains its existing builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 

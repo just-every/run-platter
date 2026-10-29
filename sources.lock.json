@@ -3470,7 +3470,7 @@
       "executable": false
     },
     "tests/followup-journey.mjs": {
-      "sha256": "b556090814969ad742ecd04459924646cb6cddfbe839d157a5b9659cc2d320ad",
+      "sha256": "dafa716f83369cfadfe726636fe44e9b5afb11a887cf5b8a1f6aa16fb857c4f8",
       "executable": false
     },
     "tests/harness.mjs": {
@@ -3594,7 +3594,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "b2ecc84879b367fc6b90b072b81b06889253b13d5c59ba3f9e7f4b3a1aefdfdb",
+      "sha256": "65a4b51f8e4d36f29528c05531bb3c90403fe46883eb0379c9c54daae60d99dc",
       "executable": false
     },
     "tests/site.test.mjs": {

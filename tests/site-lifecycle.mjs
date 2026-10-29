@@ -1,3 +1,4 @@
+import { followupBoundaryJourney } from './followup-journey.mjs'
 import {smsReenableBrowser} from './sms-reenable-browser.mjs'
 import {smsInstallerJourney} from './sms-installer-journey.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
@@ -553,16 +554,20 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect rev
 
 
 test('MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting', {timeout:120000}, async()=>{
- let app,browser
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs')
+ let app,browser,edge
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM_PATH,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   const screenshots=process.env.PLATTER_SCREENSHOTS
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
-   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
+   edge=await browserEdge()
+   app=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,unclaimed:true})
+   app.token=app.auth.SETUP_TOKEN;edge.attach(app)
+   const context=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
    try{
     const page=await context.newPage(),command=async(name,input)=>{const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
-    const capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`FOLLOW-002-${name}-${width}.png`),fullPage:true})}
+    const capture=async (name,captureWidth=width)=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`FOLLOW-002-${name}-${captureWidth}.png`),fullPage:true})}
     assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     const client=await command('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
@@ -579,9 +584,22 @@ test('MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss
     await page.getByLabel('Next action',{exact:true}).fill('Confirm the location');await page.getByLabel('Due date',{exact:true}).fill('2027-03-11');await page.getByRole('button',{name:'Save sales follow-up',exact:true}).click()
     await page.getByLabel('Dismissal reason',{exact:true}).fill('Avery confirmed the location by email.');await page.getByRole('button',{name:'Dismiss sales follow-up',exact:true}).click();assert.match(await page.locator('main').innerText(),/Sales follow-up closed/);await capture('dismissed')
     await page.goto(app.origin+'/app');assert.equal(await page.locator('[data-followup-id]').count(),0)
-   }finally{await context.close();await app.close();app=undefined}
+    if(width===1440){
+     app.owner=(await context.cookies(app.origin)).map(cookie=>cookie.name+'='+cookie.value).join('; ')
+     const proof=await followupBoundaryJourney(app,{offer:{title:'Personal-zone campaign',scope:'A studio campaign and usage licence.',optionOne:'Campaign',optionTwo:'Campaign plus',depositPercent:'25'}})
+     await page.goto(app.origin+'/app')
+     const expected=[proof.ownerPast,proof.peerPast,...proof.expectedTies,proof.peerNext,proof.ownerFuture]
+     assert.deepEqual(await page.locator('[data-followup-id]').evaluateAll(rows=>rows.map(row=>row.dataset.followupId)),expected)
+     for(const [id,period] of [[proof.ownerPast,'overdue'],[proof.peerPast,'overdue'],[proof.expectedTies[0],'today'],[proof.peerNext,'today'],[proof.ownerFuture,'upcoming']])assert.match(await page.locator(`[data-followup-id="${id}"]`).innerText(),new RegExp(period))
+     for(const {currency,valueCents} of proof.expectedTotals)assert.ok((await page.locator(`[data-pipeline-total="${currency}"]`).innerText()).includes((valueCents/100).toLocaleString('en-US',{minimumFractionDigits:2})))
+     assert.match(await page.locator('[aria-label="Sales follow-ups"]').innerText(),/Engagement unavailable/)
+     await capture('personal-zones-and-ties')
+     await page.setViewportSize({width:390,height:900});await capture('personal-zones-and-ties',390)
+    }
+
+   }finally{await context.close();await app.close();app=undefined;await edge.close();edge=undefined}
   }
- }finally{await browser?.close();await app?.close()}
+ }finally{await browser?.close();await app?.close();await edge?.close()}
 })
 
 test('SEND-006 desktop and phone rehearse to self, then edit invitations, fresh links and negotiated sends with exact retained history', {timeout:180000},async()=>{

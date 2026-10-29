@@ -536,37 +536,74 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
 })
 
 test('APPROVE-002 email preview and decision links work under a member session at desktop and phone widths', {timeout:120000},async()=>{
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs')
  let app,browser
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   const screenshots=process.env.PLATTER_SCREENSHOTS;if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
-   app=await installedApp({scheduled:true});const context=await browser.newContext({viewport:{width,height:900}})
+   const edge=await browserEdge(),mailCalls=[]
+   let h
+   try{h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,unclaimed:true,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7223'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mailCalls.push(await request.json());return Response.json({id:'synthetic-platter-'+(7230+mailCalls.length)})}});edge.attach(h)}catch(error){await edge.close();throw error}
+   app={...h,token:h.auth.SETUP_TOKEN,close:async()=>{await edge.close();await h.close()}}
+   const context=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),manager=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
    try{
     const page=await context.newPage()
     assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic approver'},maxRedirects:0})).status(),303)
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     const cmd=async(name,input)=>{const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
+    const email=['synthetic-platter-7220','example.test'].join('@')
+    assert.equal((await context.request.post(app.origin+'/auth/invite',{headers:{origin:app.origin},data:{email,displayName:'Preview manager',role:'member',returnTo:'/app'}})).status(),202)
+    assert.equal((await manager.request.post(app.origin+'/auth/magic-link',{headers:{origin:app.origin},data:{email}})).status(),202)
+    const authMail=mailCalls.findLast(m=>m.to.includes(email))
+    const confirm=new URL(authMail.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0])
+    assert.equal((await manager.request.post(app.origin+'/auth/confirm',{headers:{origin:app.origin},data:{token:confirm.searchParams.get('token')},maxRedirects:0})).status(),303)
+    const managerActor=(await(await manager.request.get(app.origin+'/api/platter/state')).json()).actor,ownerActor=(await(await context.request.get(app.origin+'/api/platter/state')).json()).actor
+    const team=await cmd('team.create',{name:'Preview approval team'})
+    await cmd('member.set',{operatorId:managerActor.id,version:0,role:'manager',teams:[team.id]})
+    await cmd('team.member',{operatorId:ownerActor.id,teamId:team.id})
+    await cmd('approval.policy',{version:0,required:true,defaultRole:'manager'})
+    const review=await manager.newPage()
     const client=await cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
-    const p=await cmd('proposal.prepare',{clientId:client.id,title:'Notification preview',scope:'Scope reviewed from an email notification',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+    const input={clientId:client.id,title:'Notification preview',scope:'Scope reviewed from an email notification',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'}
+    const p=await cmd('proposal.prepare',input)
     await cmd('notification.request',{id:p.id,version:1,consent:true})
     const mail=await app.db.prepare('SELECT * FROM p_notification_outbox WHERE proposal_id=?').bind(p.id).first()
     const preview=mail.body.match(/https?:\/\/[^\s]+\/app\/preview[^\s]+/)[0]
-    assert.equal((await page.goto(preview+'&width='+width)).status(),200)
-    await page.frameLocator('iframe[title="Client-page preview"]').getByRole('heading',{name:'Notification preview',exact:true}).waitFor()
-    assert.match(await page.locator('main').innerText(),/Revision 1/)
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'preview fits the viewport')
-    if(screenshots)await page.screenshot({path:join(screenshots,'APPROVE-002-preview-'+width+'.png'),fullPage:true})
+    assert.equal(preview,app.origin+'/app/preview?id='+p.id+'&revision=1')
+    assert.equal(mail.recipient,email)
+    const beforePreview=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals
+    assert.equal((await review.goto(preview+'&width='+width)).status(),200)
+    await review.frameLocator('iframe[title="Client-page preview"]').getByRole('heading',{name:'Notification preview',exact:true}).waitFor()
+    assert.match(await review.locator('main').innerText(),/Revision 1/)
+    assert.ok(await review.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'preview fits the viewport')
+    if(screenshots)await review.screenshot({path:join(screenshots,'APPROVE-002-preview-'+width+'.png'),fullPage:true})
+    const frame=review.frameLocator('iframe[title="Client-page preview"]')
+    const disabled=frame.locator('fieldset[disabled]');assert.ok(await disabled.count()>0)
+    assert.ok(await frame.getByRole('button',{name:'Accept proposal',exact:true}).isDisabled())
+    const audit=(await(await context.request.get(app.origin+'/api/platter/audit?action=proposal.preview&subject='+p.id)).json()).rows
+    assert.ok(audit.length>=2);assert.ok(audit.every(r=>r.actor_id===managerActor.id&&r.actor_role==='manager'&&r.subject===p.id))
+    assert.deepEqual((await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals,beforePreview)
     const decision=mail.body.match(/Review and decide: (https?:\/\/[^\s]+)/)[1]
-    assert.equal((await page.goto(decision)).status(),200)
-    const iconOnly=await page.locator('button,a[role="button"]').evaluateAll(nodes=>nodes.filter(n=>!n.textContent.trim()).map(n=>n.outerHTML));assert.deepEqual(iconOnly,[],'the notification destination has no icon-only controls')
-    await page.getByLabel('Rejection note',{exact:true}).fill('Please revise this exact offer')
-    await page.getByRole('button',{name:'Reject revision',exact:true}).click()
-    await page.getByText('Rejected. Save a new revision before requesting approval again.',{exact:true}).waitFor()
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'decision fits the viewport')
-    if(screenshots){await page.screenshot({path:join(screenshots,'APPROVE-002-decision-'+width+'.png'),fullPage:true});await page.getByRole('heading',{name:'Revision approvals',exact:true}).locator('..').screenshot({path:join(screenshots,'APPROVE-002-approval-panel-'+width+'.png')})}
-    const decisions=(await app.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(p.id).all()).results;assert.equal(decisions.length,1);assert.equal(decisions[0].revision,1);assert.equal(decisions[0].note,'Please revise this exact offer')
-   }finally{await context.close();await app.close();app=undefined}
+    assert.equal((await review.goto(decision)).status(),200)
+    const iconOnly=await review.locator('button,a[role="button"]').evaluateAll(nodes=>nodes.filter(n=>!n.textContent.trim()).map(n=>n.outerHTML));assert.deepEqual(iconOnly,[],'the notification destination has no icon-only controls')
+    await review.getByRole('button',{name:'Approve this revision',exact:true}).click()
+    await review.getByText('All required approvals complete.',{exact:true}).waitFor()
+    const approved=await app.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(p.id).first()
+    assert.equal(approved.actor_id,managerActor.id);assert.equal(approved.revision,1);assert.equal(approved.decision,'approved')
+    if(screenshots)await review.screenshot({path:join(screenshots,'EDIT-022-manager-approved-'+width+'.png'),fullPage:true})
+    const rejected=await cmd('proposal.prepare',{...input,title:'Notification rejection'})
+    await cmd('notification.request',{id:rejected.id,version:1,consent:true})
+    const rejectMail=await app.db.prepare('SELECT * FROM p_notification_outbox WHERE proposal_id=?').bind(rejected.id).first()
+    const rejectDecision=rejectMail.body.match(/Review and decide: (https?:\/\/[^\s]+)/)[1]
+    assert.equal((await review.goto(rejectDecision)).status(),200)
+    await review.getByLabel('Rejection note',{exact:true}).fill('Please revise this exact offer')
+    await review.getByRole('button',{name:'Reject revision',exact:true}).click()
+    await review.getByText('Rejected. Save a new revision before requesting approval again.',{exact:true}).waitFor()
+    assert.ok(await review.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'decision fits the viewport')
+    if(screenshots){await review.screenshot({path:join(screenshots,'APPROVE-002-decision-'+width+'.png'),fullPage:true});await review.getByRole('heading',{name:'Revision approvals',exact:true}).locator('..').screenshot({path:join(screenshots,'APPROVE-002-approval-panel-'+width+'.png')})}
+    const decisions=(await app.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(rejected.id).all()).results;assert.equal(decisions.length,1);assert.equal(decisions[0].revision,1);assert.equal(decisions[0].note,'Please revise this exact offer')
+   }finally{await manager.close();await context.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}
 })

@@ -1,5 +1,6 @@
 import {smsReenableJourney,smsDisabledJourney} from './sms-reenable-journey.mjs'
 import {completionSmsJourney} from './sms-completion-journey.mjs'
+import {managerApprovalPreview,previewBusiness} from './approval-preview-fixture.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -950,6 +951,19 @@ test('APPROVE-002 explicit requests deliver exact revision previews by email and
   await h.cmd('notification.decide',{requestId:otherRequest.requests[0],version:1,decision:'rejected',note:'Please correct the terms from email'})
   assert.equal((await h.state()).proposals.find(p=>p.id===other.id).approval.rejected,true)
   await h.tick(r.remind_at+5*86400000);assert.equal(h.messages.filter(m=>m.subject==='Approval overdue').length,1)
+  const scoped=await managerApprovalPreview(h,{...offer,clientId:h.client.id,title:'Scoped manager request'})
+  const managerMail=h.messages.find(message=>message.to.includes(scoped.manager.email)&&message.subject==='Approval requested')
+  assert.ok(managerMail);assert.ok(managerMail.text.includes('Preview: '+scoped.preview+'\n'))
+  const decisionAt=Date.now()
+  await h.cmd('notification.decide',{requestId:scoped.request.id,version:1,decision:'approved',note:'Manager reviewed revision one'},scoped.manager.cookie)
+  const managerDecision=await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(scoped.proposal.id).first()
+  assert.deepEqual({actor:managerDecision.actor_id,revision:managerDecision.revision,plan:managerDecision.plan,step:managerDecision.step,decision:managerDecision.decision,note:managerDecision.note},{actor:scoped.manager.id,revision:1,plan:scoped.request.plan,step:'default',decision:'approved',note:'Manager reviewed revision one'})
+  assert.ok(managerDecision.occurred_at>=decisionAt)
+  await h.cmd('proposal.revise',{...offer,clientId:h.client.id,id:scoped.proposal.id,version:2,scope:'Changed after the manager decision'})
+  const unchanged=await previewBusiness(h),auditBefore=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+  const stale=await h.send(scoped.path,undefined,scoped.manager.cookie);assert.equal(stale.status,409);assert.ok(!stale.text.includes('Scoped manager request'))
+  await h.cmd('notification.decide',{requestId:scoped.request.id,version:3,decision:'approved',note:'Stale request'},scoped.manager.cookie,409)
+  assert.deepEqual(await previewBusiness(h),unchanged);assert.deepEqual((await h.send('/api/platter/audit',undefined,h.owner)).value.rows,auditBefore)
  }finally{await h.close()}
 })
 

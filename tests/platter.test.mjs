@@ -1,4 +1,5 @@
 import { acceptRevenue } from './revenue-fixture.mjs'
+import {previewBusiness} from './approval-preview-fixture.mjs'
 import { collectionLifecycle, collectionFees, collectionMethodInheritance } from './collection-journey.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { richLibraryPropagation, richLibrarySource } from './library-fixture.mjs'
@@ -937,6 +938,9 @@ test('EDIT-018 / EDIT-022 member-only exact-revision previews share selection ma
  const member=await h.signIn('previewer@studio.example')
  await h.cmd('proposal.share',{id:p.id,operatorId:(await h.state(member)).actor.id})
  const key=await h.cmd('agent.create',{label:'Preview boundary'})
+ const outsiderEmail=['synthetic-platter-7221','example.test'].join('@')
+ await h.send('/auth/invite',{email:outsiderEmail,displayName:'Outside proposal scope',role:'member',returnTo:'/app'},h.owner)
+ const outsider=await h.signIn(outsiderEmail)
  const url=`/app/preview?id=${p.id}&revision=2`,inner=url.replace('/app/preview?','/app/preview/client?')
  const unchanged=()=>h.state(),audit=async()=>(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
  await h.cmd('tracking.settings',{enabled:'yes',alerts:'yes',retentionDays:90,quietMinutes:30,consent:'yes'})
@@ -955,14 +959,17 @@ test('EDIT-018 / EDIT-022 member-only exact-revision previews share selection ma
  const viewedAudit=await audit(),previewRows=viewedAudit.filter(row=>row.action==='proposal.preview')
  assert.equal(previewRows.length,12);for(const row of previewRows){assert.equal(row.subject,p.id);assert.ok(row.actor_id);assert.ok(['owner','sales'].includes(row.actor_role));assert.ok(Number.isFinite(row.occurred_at))}
  assert.deepEqual(viewedAudit.filter(row=>row.action!=='proposal.preview'),initialAudit)
+ const businessBeforeRefusals=await previewBusiness(h)
  for(const path of [url,inner]){
-  assert.equal((await h.send(path)).status,401)
+  const signedOut=await h.send(path);assert.equal(signedOut.status,401);assert.ok(!signedOut.text.includes(offer.scope));assert.ok(!signedOut.text.includes('campaign.pdf'))
+  const denied=await h.send(path,undefined,outsider);assert.equal(denied.status,403);assert.ok(!denied.text.includes(offer.scope));assert.ok(!denied.text.includes('campaign.pdf'))
   assert.equal((await h.send(path,undefined,'',{authorization:'Bearer '+key.token})).status,401)
   for(const name of ['accept','pay','decline','question.create','suggestion.create','code.request','code.verify'])assert.equal((await h.send(path.split('?')[0]+'/action?'+path.split('?')[1]+'&name='+name,{name,optionId:'two',consent:true},h.owner)).status,403)
  }
  assert.equal((await h.send(inner+'&optionId=unknown',undefined,h.owner)).status,400)
  assert.equal((await h.send(inner+'&width=500',undefined,h.owner)).status,400)
  assert.equal((await h.send(inner.replace('revision=2','revision=3'),undefined,h.owner)).status,409)
+ assert.deepEqual(await previewBusiness(h),businessBeforeRefusals,'unauthorized and stale previews create no business or outbound records')
  assert.deepEqual(await unchanged(),before);assert.deepEqual(await audit(),viewedAudit)
  const attachment=before.proposals.find(row=>row.id===p.id).attachments[0]
  const download=await h.send(`/app/preview/client/attachments/${attachment.id}?id=${p.id}&revision=2`,undefined,member);assert.equal(download.status,200);assert.equal(download.text,'%PDF preview attachment');assert.deepEqual(await unchanged(),before)
@@ -971,8 +978,10 @@ test('EDIT-018 / EDIT-022 member-only exact-revision previews share selection ma
  const approved=await unchanged();assert.equal((await h.send(inner,undefined,member)).status,200);assert.deepEqual(await unchanged(),approved)
  const sentOffer=await h.cmd('proposal.send',{id:p.id,version:4}),path=new URL(sentOffer.shareUrl).pathname
  const cookie=await verified(h,path)
- assert.equal((await h.send(inner,undefined,cookie)).status,401)
+ const clientRefusalBefore=await previewBusiness(h),clientAuditBefore=await audit()
+ const clientOnly=await h.send(inner,undefined,cookie);assert.equal(clientOnly.status,401);assert.ok(!clientOnly.text.includes(offer.scope));assert.ok(!clientOnly.text.includes('campaign.pdf'))
  assert.equal((await h.send(inner,undefined,h.owner)).status,409)
+ assert.deepEqual(await previewBusiness(h),clientRefusalBefore);assert.deepEqual(await audit(),clientAuditBefore,'a client-only session and a sent revision add no preview audit')
  await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:p.id,version:5,scope:'New negotiated scope for preview.',priceTwo:'4300.03',depositPercent:'33.33'})
  const negotiationUrl=inner.replace('revision=2','revision=3')+'&optionId=two',pendingBefore=await unchanged()
  const pending=await h.send(negotiationUrl,undefined,member);assert.equal(pending.status,200);assert.match(pending.text,/New negotiated scope for preview/);assert.match(pending.text,/Changes since your previous offer/);assert.match(pending.text,/Selected total">\$4,300.03 USD/);assert.match(pending.text,/Selected deposit">\$1,433.20 USD/)

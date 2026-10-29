@@ -45,6 +45,8 @@ export async function watcherBrowser(width=1440) {
   const screenshots=process.env.PLATTER_SCREENSHOTS
   if(screenshots)await mkdir(screenshots,{recursive:true})
   const capture=async(target,name)=>{
+   await target.evaluate(()=>document.fonts.ready)
+   assert.ok(await target.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'notification settings fit the test viewport')
    if(!screenshots)return
    const panel=target.locator('section').filter({has:target.getByRole('heading',{name:'Your proposal notifications',exact:true})})
    for(const shownWidth of [1440,390]){

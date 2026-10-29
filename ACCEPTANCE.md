@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `52b522f3f6b6a4c6d0952450af264026070c8b4e` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 and PROP-001 are builder completion claims pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -49,7 +49,7 @@ Core · published · **partial** · Cites BASE-AGENT-004, BASE-AGENT-005, BASE-A
 
 #### PROP-001 — Approval binds the exact revision
 
-Core · published · **partial** · Cites BASE-AGENT-007, BASE-AGENT-008
+Core · published · **done** · Cites BASE-AGENT-007, BASE-AGENT-008
 
 **Requirement.** Every proposal approval binds one exact revision. Revised scope, price or terms clear prior approvals. APPROVE-001 and APPROVE-003 choose the applicable proposal approval steps. An agent’s binding decision carries commitment and follows company policy. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#prop-001).
 
@@ -58,8 +58,8 @@ Core · published · **partial** · Cites BASE-AGENT-007, BASE-AGENT-008
 2. After approving the new revision and sending, two retained approval records identify their respective revisions, approvers, roles, rules and times.
 3. A manager’s approval under a matching rule binds the same exact revision.
 
-**Evidence.** `tests/platter.test.mjs` — “PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations invalidate old authority”; “APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied”; `src/platter/commands.ts`
-**Gap.** Delivered: Exact revisions govern stale approval, edit invalidation and manager decisions; command helpers check refusals. Missing “PROP-001 complete approval binds the exact revision journey”: The held-policy revision journey reads the complete retained approver, role, rule and time history after the second approval and send.
+**Evidence.** `tests/platter.test.mjs` — “PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations invalidate old authority” (stale refusal, price-edit invalidation, refused send and complete independently expected records for both revisions); “APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied” (matching manager rule and plan, unchanged history after role and rule changes); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”; “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” (exact retained facts and owner readback without restored credentials or replay authority).
+**Gap.** None.
 
 #### PROP-002 — Sending freezes the offer
 

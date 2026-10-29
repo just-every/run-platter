@@ -16,7 +16,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 8 | Run Platter (the one-line start) | `SITE-001` partial | partial |
 | 9 | Sent, read, back and forth, signed, first payment, per proposal | `SEND-001` partial; `SEND-011` partial; `TRACK-001` partial; `NEG-001` done; `SIGN-003` partial; `PAY-001` partial; `PAY-002` partial; `PAY-004` missing | partial |
 | 10 | The agent drafts a priced proposal from a Zoom call, each line cited | `AGENT-001` partial; `AI-001` partial | partial |
-| 11 | Proposal agents use the company’s class policy for drafting and sending | `ACCESS-001` partial; `PROP-001` partial | partial |
+| 11 | Proposal agents use the company’s class policy for drafting and sending | `ACCESS-001` partial; `PROP-001` done | partial |
 | 12 | Lines from the catalog; items not in it left out | `CAT-001` partial; `PRICE-001` partial | partial |
 | 13 | Checked against Gauge: margin against the floor | `AGENT-002` missing; `PRICE-006` done; `HAND-002` missing | partial |
 | 14 | Template, content library, brand kit, fields, locked sections | `EDIT-001` partial; `EDIT-002` partial; `EDIT-003` partial; `EDIT-004` partial; `EDIT-015` partial | partial |

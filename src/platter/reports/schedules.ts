@@ -1,3 +1,4 @@
+import { contentPerformance, filterContentReport, contentMail } from './content-performance'
 import { actorById } from '../credentials'
 import type { Bindings } from '../../auth.server'
 import { operatorMail } from '../../mail.server.mjs'
@@ -11,13 +12,14 @@ import { activePeople, installationZone } from './report-state'
 import { nextRun, validZone } from './zone'
 
 // REPORT-005: owner-named people receive a report at an hour in the installation's time zone; each run is claimed once.
-const filterKeys = ['view','currency','bookedFrom','bookedTo','receivedFrom','receivedTo','q', 'owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
+const filterKeys = ['kind','view','currency','bookedFrom','bookedTo','receivedFrom','receivedTo','q', 'owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
 
 /** Keep only the pipeline's own filters, in a fixed order, after the pipeline validates them. */
 export function savedFilters(value: unknown) {
  const raw = new URLSearchParams(typeof value === 'string' ? value : ''), params = new URLSearchParams()
  for (const key of filterKeys) { const v = raw.get(key); if (v) params.set(key, v) }
- pipeline([], params)
+ if(params.get('view')==='content-performance')filterContentReport({decidedCount:0,unavailableHistory:0,unavailableTemplate:0,unavailableLibrary:0,rows:[]},params)
+ else pipeline([], params)
  return params.toString()
 }
 
@@ -41,7 +43,8 @@ export async function reportCommand(env: Bindings, a: Actor, name: string, p: Re
  }
  if (name === 'report.unschedule') {
   const id = text(p.id, 'a schedule')
-  need(await db.prepare('SELECT id FROM p_report_schedules WHERE id=?').bind(id).first(), 'Schedule not found', 404)
+  const saved=await db.prepare('SELECT filters FROM p_report_schedules WHERE id=?').bind(id).first<any>();need(saved,'Schedule not found',404)
+  need(new URLSearchParams(saved.filters).get('view')!=='content-performance'||a.role==='owner','Only the owner manages content reports',403)
   await commit(db, a, [db.prepare('DELETE FROM p_report_schedules WHERE id=?').bind(id)], true)
   return { id, deleted: true }
  }
@@ -53,6 +56,8 @@ export async function reportCommand(env: Bindings, a: Actor, name: string, p: Re
  need(weekday === null || (Number.isInteger(weekday) && weekday >= 0 && weekday <= 6), 'Choose a weekday')
  const people = await activePeople(db), recipients = recipientEmails(p).map(email => people.find(person => person.email === email)?.id ?? fail(`${email} is not an active person in this installation`))
  const id = crypto.randomUUID(), at = Date.now(), filters = savedFilters(p.filters)
+ const content=new URLSearchParams(filters).get('view')==='content-performance'
+ if(content){need(a.role==='owner','Only the owner schedules content performance',403);need(recipients.length===1&&recipients[0]===a.id,'Content reports may only be emailed to the current owner',403)}
  await commit(db, a, [db.prepare('INSERT INTO p_report_schedules(id,report,filters,cadence,weekday,hour,recipients,owner_id,created_at,next_run_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
   .bind(id, 'pipeline', filters, cadence, weekday, hour, JSON.stringify(recipients), a.id, at, nextRun(cadence, weekday, hour, at, await installationZone(db)))], true)
  return { id }
@@ -66,12 +71,14 @@ export async function runDueReports(env: Bindings, at: number) {
   if (!claimed.meta.changes) continue
   const person=await actorById(db,s.owner_id),owner=person&&['owner','admin'].includes(person.role)?person:undefined
   const runId = crypto.randomUUID(), people = await activePeople(db), ids: string[] = JSON.parse(s.recipients)
-  const to = owner ? people.filter(p => ids.includes(p.id)) : [], skipped = owner ? ids.filter(id => !to.some(p => p.id === id)).map(() => 'no longer active') : ['schedule owner is no longer an active owner']
+  const content=new URLSearchParams(s.filters).get('view')==='content-performance'
+  const to = owner ? people.filter(p => ids.includes(p.id)&&(!content||owner.role==='owner'&&p.id===owner.id&&p.role==='owner')) : [], skipped = owner ? ids.filter(id => !to.some(p => p.id === id)).map(() => 'no longer active') : ['schedule owner is no longer an active owner']
   const snapshot=owner?await state(env,owner):null
-  const report = snapshot ? pipeline(snapshot.proposals,new URLSearchParams(s.filters),at,snapshot.followups) : { rows: [], count: 0 }
+  const contentReport=owner?.role==='owner'&&content?filterContentReport(await contentPerformance(db,owner),new URLSearchParams(s.filters)):null
+  const report = contentReport ?? (snapshot && !content ? pipeline(snapshot.proposals,new URLSearchParams(s.filters),at,snapshot.followups) : { rows: [], count: 0 })
   const writes = [db.prepare('INSERT INTO p_report_runs(id,schedule_id,ran_at,row_count,skipped) VALUES(?,?,?,?,?)').bind(runId, s.id, at, report.count, JSON.stringify(skipped))]
   if (owner) {
-   const [subject, body] = pipelineMail(report as any, s.filters)
+   const [subject, body] = contentReport?contentMail(contentReport):pipelineMail(report as any, s.filters)
    for (const person of to) writes.push(db.prepare('INSERT INTO p_report_mail(id,run_id,recipient,subject,body,status,created_at) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(), runId, person.email, subject, body, capturesMail(env) ? 'local' : 'pending', at))
   }
   await db.batch(writes)

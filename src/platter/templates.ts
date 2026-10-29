@@ -1,3 +1,4 @@
+import { placedLibrarySources } from './reports/content-performance'
 import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields } from './variables'
 import { proposalFields } from './commands'
@@ -10,7 +11,7 @@ import { folderGuard, resourceScope, resourceEditors, requireAudienceConsent } f
 import { templateDefaults, resolveTemplateDelivery, dayList } from './workspace'
 import { saveTemplateCosts, startTemplateCosts } from './internal-pricing'
 import type { Bindings } from '../auth.server'
-import { starterTemplate } from './starter-templates'
+import { starterTemplate, starterTemplates } from './starter-templates'
 import { copyAttachments, vendorDocuments } from './attachments'
 import { currentTime } from './expiry'
 import { commit, exact, need, proposal, snapshot, text, type Actor } from './model'
@@ -66,12 +67,14 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   ])
   const expiry = savedExpiry ? { ...savedExpiry, expires_on: savedExpiry.mode === 'date' ? savedExpiry.expires_on : null }
    : { mode: 'never', period_days: null, expires_on: null, time_zone: await installationZone(db), warning_days: null }
+  const libraryUses=await placedLibrarySources(db,displayed),origin=await db.prepare('SELECT library_known FROM p_content_origins WHERE proposal_id=?').bind(source.id).first<any>()
   const id = existing?.id ?? crypto.randomUUID(), version = (existing?.version ?? 0) + 1
   content.options=withoutTaxAddresses(content.options)
   const values = [templateName, JSON.stringify(content), pdf?.enabled === 0 ? 0 : 1, JSON.stringify(expiry), JSON.stringify(sections.results.map(s => s.section))]
   const writes = existing
    ? [db.prepare('UPDATE p_personal_templates SET name=?,snapshot=?,pdf_enabled=?,expiry=?,suggestion_sections=?,version=version+1,updated_at=? WHERE id=? AND version=?').bind(...values, at, id, existing.version)]
    : [db.prepare('INSERT INTO p_personal_templates(name,snapshot,pdf_enabled,expiry,suggestion_sections,id,owner_id,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,1,?,?)').bind(...values, id, a.id, at, at)]
+  writes.push(db.prepare('INSERT INTO p_template_content_sources(template_id,library_known,library_uses) VALUES(?,?,?) ON CONFLICT(template_id) DO UPDATE SET library_known=excluded.library_known,library_uses=excluded.library_uses').bind(id,origin?.library_known??0,JSON.stringify(libraryUses)))
   writes.push(db.prepare('UPDATE p_personal_templates SET shared=?,folder_id=? WHERE id=?').bind(shared?1:0,folderId,id))
   writes.push(db.prepare('INSERT OR IGNORE INTO p_template_locks(template_id,section) SELECT ?,section FROM p_proposal_locks WHERE proposal_id=?').bind(id,source.id))
   writes.push(db.prepare('INSERT OR IGNORE INTO p_template_block_locks(template_id,section) SELECT ?,section FROM p_proposal_block_locks WHERE proposal_id=?').bind(id,source.id))
@@ -103,13 +106,17 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  need(!templateLocks.includes('title')||title===content.title,'The template title is locked',403)
  const attachments = copyAttachments(content.attachments ?? [])
  const row = { ...content, options:withoutTaxAddresses(content.options), document:bindDocument(content.document,clientId), id, client_id: clientId, title, revision: 1, attachments }
+ const provenance=starter?{library_known:1,library_uses:'[]'}:await db.prepare('SELECT * FROM p_template_content_sources WHERE template_id=?').bind(template.id).first<any>()
+ const sourceName=starter?starterTemplates().find(t=>t.id===starter.id)!.name:personal.name
  const preparer = a.role === 'agent' ? `agent:${a.keyId}` : a.email
  await commit(db, a, [
   db.prepare(`INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,
    prepared_by,created_at,currency,sales_owner_id,sales_owner_name,attachments)
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
    .bind(id, clientId, title, row.scope, row.terms ?? '', row.deposit_bps, JSON.stringify(row.options), preparer, at, 'USD', a.id, a.email, JSON.stringify(attachments)),
-  db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) VALUES(?,?,?)').bind(id,template.id,template.version),
+  db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version,template_name) VALUES(?,?,?,?)').bind(id,template.id,template.version,sourceName),
+  db.prepare('INSERT INTO p_content_origins(proposal_id,library_known) VALUES(?,?)').bind(id,provenance?.library_known??0),
+  ...JSON.parse(provenance?.library_uses??'[]').map((u:any)=>db.prepare('INSERT INTO p_library_uses(proposal_id,block_id,item_id,linked,item_version,title,content,kind) VALUES(?,?,?,0,?,?,?,?)').bind(id,u.block_id,u.item_id,u.item_version,u.title,u.content,u.kind)),
   ...(!starter?[db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_template_locks WHERE template_id=?').bind(id,template.id),db.prepare('INSERT INTO p_proposal_block_locks(proposal_id,section) SELECT ?,section FROM p_template_block_locks WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_template_document_media WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify(resolved.settings)),

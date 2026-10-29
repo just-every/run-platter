@@ -7,7 +7,7 @@ import { canonical, readDeal } from './hubspot-draft'
 
 const base = 'https://api.hubapi.com/crm/v3'
 const identifier = (v: unknown) => { const id = text(v, 'a HubSpot identifier', 100); need(/^[A-Za-z0-9_-]+$/.test(id), 'Use a HubSpot identifier'); return id }
-export type SyncOperation = { key: string; method: 'PATCH' | 'POST'; path: string; body: any; label: string }
+export type SyncOperation = { key: string; method: 'PATCH' | 'POST'; path: string; body: any; label: string; expectedTotalCents?: number }
 export async function syncProposal(env: Bindings, actor: Actor, id: unknown) {
  need(administrators.includes(actor.role), 'Only owner and admins review CRM writes', 403)
  const row = await permitted(env.DB, actor, id, 'send')
@@ -52,8 +52,8 @@ export async function buildSyncPlan(env: Bindings, actor: Actor, input: Record<s
   providerJson(base + '/pipelines/deals', secret.token), providerJson(base + '/objects/deals/' + source.deal_id + '?properties=pipeline,dealstage,' + statusProperty + ',' + linkProperty, secret.token),
  ])
  const facts = await syncFacts(env, row)
- need(statusMeta.name === statusProperty && statusMeta.type === 'enumeration' && statusMeta.options?.some((o: any) => o.value === facts.status && !o.hidden) && !statusMeta.modificationMetadata?.readOnlyValue && !statusMeta.calculated, 'Choose a writable status property with the current status option', 409)
- need(linkMeta.name === linkProperty && linkMeta.type === 'string' && !linkMeta.modificationMetadata?.readOnlyValue && !linkMeta.calculated, 'Choose a writable text property for the protected proposal link', 409)
+ need(statusMeta.name === statusProperty && statusMeta.hubspotDefined === false && !statusMeta.archived && statusMeta.type === 'enumeration' && statusMeta.options?.some((o: any) => o.value === facts.status && !o.hidden) && !statusMeta.modificationMetadata?.readOnlyValue && !statusMeta.calculated, 'Choose a writable status property with the current status option', 409)
+ need(linkMeta.name === linkProperty && linkMeta.hubspotDefined === false && !linkMeta.archived && linkMeta.type === 'string' && !linkMeta.modificationMetadata?.readOnlyValue && !linkMeta.calculated, 'Choose a writable text property for the protected proposal link', 409)
  const stages = pipelines.results?.find((p: any) => String(p.id) === pipelineId)?.stages ?? []
  const closed = (id: string, probability: number) => stages.some((s: any) => String(s.id) === id && String(s.metadata?.isClosed) === 'true' && Number(s.metadata?.probability) === probability)
  need(closed(wonStage, 1) && closed(lostStage, 0), 'HubSpot must confirm the selected Closed won and Closed lost stages', 409)
@@ -83,7 +83,7 @@ export async function buildSyncPlan(env: Bindings, actor: Actor, input: Record<s
  for (const [index, line] of lines.entries()) {
   const id = lineIds[index]
   need(read.source!.lines.some((s: any) => s.id === id), 'A source line is no longer associated with the deal', 409)
-  operations.push({ key: '', method: 'PATCH', path: '/objects/line_items/' + id, label: 'Priced row ' + id, body: { properties: { name: line.name, description: line.description ?? '', quantity: line.quantity, price: line.unitPrice } } })
+  operations.push({ key: '', method: 'PATCH', path: '/objects/line_items/' + id, label: 'Priced row ' + id, expectedTotalCents: line.lineTotalCents, body: { properties: { name: line.name, description: line.description ?? '', quantity: line.quantity, price: line.unitPrice } } })
  }
  operations.push({ key: '', method: 'PATCH', path: '/objects/deals/' + source.deal_id, label: 'Deal amount, status, protected link and stage', body: { properties } })
  for (const event of facts.events) operations.push({ key: 'event:' + row.id + ':' + row.revision + ':' + event.kind, method: 'POST', path: '/objects/notes', label: event.kind + ' timeline note', body: { properties: { hs_timestamp: new Date(event.at).toISOString(), hs_note_body: 'Platter proposal ' + row.id + ', revision ' + row.revision + ': ' + event.kind + '. ' + link }, associations: [{ to: { id: source.deal_id }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 214 }] }] } })

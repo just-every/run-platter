@@ -19,7 +19,7 @@ export async function configureHubspotCard(env: Bindings, actor: Actor, input: R
  need(/^[A-Za-z0-9_-]+$/.test(appId), 'Use the installed app id')
  const clientSecret = text(input.clientSecret, 'the HubSpot app client secret', 8192)
  const sealed = await sealCredential(env, credentialId, { clientSecret, accountId: connection.account_id, appId })
- await commit(env.DB, actor, [env.DB.prepare('INSERT INTO p_crm_card_secrets(singleton,connection_version,sealed) VALUES(1,?,?) ON CONFLICT(singleton) DO UPDATE SET connection_version=excluded.connection_version,sealed=excluded.sealed').bind(connection.version, sealed)], true, guard)
+ await commit(env.DB, actor, [env.DB.prepare('INSERT INTO p_crm_card_secrets(singleton,connection_version,authorized_at,sealed) VALUES(1,?,?,?) ON CONFLICT(singleton) DO UPDATE SET connection_version=excluded.connection_version,authorized_at=excluded.authorized_at,sealed=excluded.sealed').bind(connection.version, await currentTime(env.DB), sealed)], true, guard)
  return { saved: true }
 }
 export async function hubspotCardData(env: Bindings, actor: Actor, deal: unknown, account: unknown) {
@@ -38,7 +38,7 @@ export async function hubspotCardResponse(env: Bindings, request: Request) {
  need(/^\d{13}$/.test(timestamp) && Math.abs(await currentTime(env.DB) - Number(timestamp)) <= 300000, 'The HubSpot card request expired', 401)
  const { connection } = await providerCredential(env, 'workspace:hubspot')
  const row = await env.DB.prepare('SELECT * FROM p_crm_card_secrets WHERE singleton=1').first<any>()
- need(row && row.connection_version === connection.version && !connection.broken_at, 'Configure the connected HubSpot app card again', 401)
+ need(row && row.connection_version === connection.version && Number(timestamp) >= row.authorized_at && !connection.broken_at, 'Configure the connected HubSpot app card again', 401)
  const secret = await openCredential(env, credentialId, row.sealed)
  need(secret.accountId === connection.account_id && url.searchParams.get('portalId') === secret.accountId && url.searchParams.get('appId') === secret.appId, 'This app card belongs to another account', 403)
  const decodedUri = request.url.replace(/%(3A|2F|3F|40|21|24|27|28|29|2A|2C|3B)/gi, v => decodeURIComponent(v))

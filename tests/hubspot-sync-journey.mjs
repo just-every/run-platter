@@ -4,9 +4,12 @@ import { harness } from './harness.mjs'
 import { hubspotSyncFixture, syncMapping } from './hubspot-sync-fixture.mjs'
 
 export async function signedCard(h, query = {}, headerOverrides = {}) {
- const params = new URLSearchParams({ dealId: 'synthetic-platter-4600', objectTypeId: '0-3', portalId: 'synthetic-platter-portal', appId: 'synthetic-platter-app', userEmail: h.auth.OWNER_EMAIL, ...query })
+ const values = { dealId: 'synthetic-platter-4600', objectTypeId: '0-3', portalId: 'synthetic-platter-portal', appId: 'synthetic-platter-app', userEmail: h.auth.OWNER_EMAIL, ...query }
+ const params = new URLSearchParams(values)
  const path = '/api/platter/crm/card?' + params, timestamp = String(Date.now())
- const uri = (h.origin + path).replace(/%(3A|2F|3F|40|21|24|27|28|29|2A|2C|3B)/gi, v => decodeURIComponent(v))
+ // All test values are plain identifiers or a mailbox. Sign the original URI,
+ // independently of the backend's percent-decoding implementation.
+ const uri = h.origin + '/api/platter/crm/card?' + Object.entries(values).map(([k, v]) => k + '=' + v).join('&')
  const signature = createHmac('sha256', 'synthetic-platter-4700').update('GET' + uri + timestamp).digest('base64')
  return h.send(path, undefined, '', { 'x-hubspot-request-timestamp': timestamp, 'x-hubspot-signature-v3': signature, ...headerOverrides })
 }
@@ -50,7 +53,10 @@ export async function reviewedSyncJourney(verified) {
   const success = await apply(checked); assert.equal(success.held, 0); assert.equal(success.confirmed, 5)
   assert.equal(edge.state.deal.properties.amount, '361.22'); assert.equal(edge.state.deal.properties.synthetic_status, 'viewed'); assert.equal(edge.state.deal.properties.synthetic_link, h.origin + '/app/proposal?id=' + made.id)
   assert.ok(!JSON.stringify(edge.writes).includes(new URL(invitation.shareUrl).pathname)); assert.ok(!JSON.stringify(edge.writes).includes(edge.state.contacts[0].properties.email))
-  const written = edge.writes.length; await apply(checked, h.owner, 409); assert.equal(edge.writes.length, written); await apply(await fresh()); assert.equal(edge.notes.length, 2, 'fresh explicit reviews never duplicate timeline notes')
+  const written = edge.writes.length; await apply(checked, h.owner, 409); assert.equal(edge.writes.length, written)
+  edge.state.line_items[0].properties.price = '200.00'; edge.state.line_items[0].properties.amount = '500.00'; edge.state.deal.properties.amount = '559.97'
+  assert.equal((await h.send(path + '/data.json', undefined, clientCookie)).value.options[0].cents, 36122)
+  await apply(await fresh()); assert.equal(edge.state.line_items[0].properties.price, '120.50'); assert.equal(edge.state.line_items[0].properties.amount, '301.25'); assert.equal(edge.state.deal.properties.amount, '361.22'); assert.equal(edge.notes.length, 2, 'a fresh explicit review reconciles changed provider prices without duplicating timeline notes')
   const accepted = await h.send(path + '/action?name=accept', { name: 'Taylor Reed', optionId: 'one', consent: true }, clientCookie); assert.equal(accepted.status, 200, accepted.text)
   await apply(await fresh()); assert.equal(edge.state.deal.properties.dealstage, syncMapping.wonStage); assert.equal(edge.state.deal.properties.synthetic_status, 'signed'); assert.equal(edge.notes.length, 3, 'signing does not manufacture a paid event')
   await h.cmd('payment.record', { id: made.id, method: 'wire', amount: '361.22', receivedOn: '2030-01-01', reference: 'synthetic-platter-4701', consent: true })

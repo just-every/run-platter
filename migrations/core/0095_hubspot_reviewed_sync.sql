@@ -18,8 +18,9 @@ CREATE TABLE p_crm_sync_attempts (
 CREATE TABLE p_crm_sync_consents (
  id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL,
  account_id TEXT NOT NULL, deal_id TEXT NOT NULL, actor_id TEXT NOT NULL, actor_role TEXT NOT NULL,
+ connection_version INTEGER NOT NULL, source_json TEXT NOT NULL,
  plan_json TEXT NOT NULL, digest TEXT NOT NULL, authorized_at INTEGER NOT NULL
 );
 CREATE TABLE p_crm_card_secrets (
- singleton INTEGER PRIMARY KEY CHECK(singleton=1), connection_version INTEGER NOT NULL, sealed TEXT NOT NULL
+ singleton INTEGER PRIMARY KEY CHECK(singleton=1), connection_version INTEGER NOT NULL, authorized_at INTEGER NOT NULL, sealed TEXT NOT NULL
 );

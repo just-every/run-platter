@@ -8,6 +8,20 @@ import { canonical } from './hubspot-draft'
 import { buildSyncPlan, syncProposal, type SyncOperation } from './hubspot-sync-plan'
 
 const endpoint = 'https://api.hubapi.com/crm/v3'
+function decimalEqual(left: unknown, right: unknown) {
+ const a = String(left ?? ''), b = String(right ?? '')
+ if (![a, b].every(v => /^\d{1,12}(\.\d{1,12})?$/.test(v))) return false
+ const [aw, af = ''] = a.split('.'), [bw, bf = ''] = b.split('.'), scale = Math.max(af.length, bf.length)
+ return BigInt(aw + af.padEnd(scale, '0')) === BigInt(bw + bf.padEnd(scale, '0'))
+}
+function matchesProperty(key: string, actual: unknown, expected: unknown) {
+ if (['amount', 'price', 'quantity'].includes(key)) return decimalEqual(actual, expected)
+ if (key === 'hs_timestamp') {
+  const time = (value: unknown) => /^\d+$/.test(String(value)) ? Number(value) : Date.parse(String(value))
+  return Number.isFinite(time(actual)) && time(actual) === time(expected)
+ }
+ return String(actual) === String(expected)
+}
 function guard(review: any) {
  return { sql: "EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id='workspace:hubspot' AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL) AND EXISTS(SELECT 1 FROM p_proposals p WHERE p.id=? AND p.version=? AND p.revision=? AND NOT EXISTS(SELECT 1 FROM p_negotiations n WHERE n.proposal_id=p.id))", values: [review.account_id, review.connection_version, review.proposal_id, review.proposal_version, review.revision] as any[] }
 }
@@ -19,7 +33,10 @@ async function writeOperation(operation: SyncOperation, token: string) {
   const receipt = JSON.parse(raw)
   need(typeof receipt.id === 'string' && receipt.id.length > 0 && !receipt.archived, 'HubSpot did not identify the written record', 409)
   if (operation.method === 'PATCH') need(receipt.id === operation.path.split('/').at(-1), 'HubSpot wrote another record', 409)
-  need(Object.entries(operation.body.properties).every(([k, v]) => String(receipt.properties?.[k]) === String(v)), 'HubSpot returned different values', 409)
+  need(Object.entries(operation.body.properties).every(([k, v]) => matchesProperty(k, receipt.properties?.[k], v)), 'HubSpot returned different values', 409)
+  if (operation.expectedTotalCents !== undefined) {
+   need(decimalEqual(receipt.properties?.amount, (operation.expectedTotalCents / 100).toFixed(2)), 'HubSpot returned a different row total', 409)
+  }
   return receipt.id as string
  }, () => operation.path.split('/').at(-1)!)
 }
@@ -45,7 +62,7 @@ export async function hubspotSyncCommand(env: Bindings, actor: Actor, name: stri
  const executionGuard = guard(review)
  executionGuard.sql += ' AND EXISTS(SELECT 1 FROM p_crm_sync_reviews WHERE id=? AND consumed_at IS NULL)'
  executionGuard.values.push(review.id)
- await commit(db, actor, [db.prepare('UPDATE p_crm_sync_reviews SET consumed_at=? WHERE id=?').bind(at, review.id), db.prepare('INSERT INTO p_crm_sync_consents(id,proposal_id,revision,account_id,deal_id,actor_id,actor_role,plan_json,digest,authorized_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(review.id, review.proposal_id, review.revision, review.account_id, plan.dealId, actor.id, actor.role, review.plan_json, review.digest, at)], true, executionGuard)
+ await commit(db, actor, [db.prepare('UPDATE p_crm_sync_reviews SET consumed_at=? WHERE id=?').bind(at, review.id), db.prepare('INSERT INTO p_crm_sync_consents(id,proposal_id,revision,account_id,deal_id,actor_id,actor_role,connection_version,source_json,plan_json,digest,authorized_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(review.id, review.proposal_id, review.revision, review.account_id, plan.dealId, actor.id, actor.role, review.connection_version, review.source_json, review.plan_json, review.digest, at)], true, executionGuard)
  let confirmed = 0, held = 0
  for (const operation of plan.operations as SyncOperation[]) {
   const previous = await db.prepare("SELECT status FROM p_crm_sync_attempts WHERE account_id=? AND deal_id=? AND json_extract(request_json,'$.key')=? ORDER BY attempted_at DESC,id DESC LIMIT 1").bind(review.account_id, plan.dealId, operation.key).first<any>()

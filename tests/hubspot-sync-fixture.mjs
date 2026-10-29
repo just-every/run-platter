@@ -5,7 +5,7 @@ export const syncMapping = { statusProperty: 'synthetic_status', linkProperty: '
 export function hubspotSyncFixture() {
  const edge = hubspotFixture(), writes = [], notes = [], state = edge.state
  Object.assign(state.deal.properties, { pipeline: syncMapping.pipelineId, dealstage: 'synthetic-platter-open', synthetic_status: '', synthetic_link: '' })
- const metadata = { synthetic_status: { name: 'synthetic_status', type: 'enumeration', options: ['sent', 'viewed', 'signed', 'paid', 'declined', 'lost', 'won', 'withdrawn'].map(value => ({ value })), modificationMetadata: { readOnlyDefinition: true, readOnlyValue: false } }, synthetic_link: { name: 'synthetic_link', type: 'string', modificationMetadata: { readOnlyValue: false } } }
+ const metadata = { synthetic_status: { name: 'synthetic_status', type: 'enumeration', hubspotDefined: false, options: ['sent', 'viewed', 'signed', 'paid', 'declined', 'lost', 'won', 'withdrawn'].map(value => ({ value })), modificationMetadata: { readOnlyDefinition: true, readOnlyValue: false } }, synthetic_link: { name: 'synthetic_link', type: 'string', hubspotDefined: false, modificationMetadata: { readOnlyValue: false } } }
  let hook, loseResponse = false
  const request = async req => {
   const url = new URL(req.url)
@@ -23,7 +23,9 @@ export function hubspotSyncFixture() {
    assert.ok(match); const row = match[1] === 'deals' ? state.deal : state.line_items.find(row => row.id === match[2]); assert.equal(row.id, match[2])
    Object.assign(row.properties, payload.properties)
    if (match[1] === 'line_items') row.properties.amount = (Math.round(Number(row.properties.quantity) * Number(row.properties.price) * 100) / 100).toFixed(2)
-   return Response.json(structuredClone(row))
+   const receipt = structuredClone(row)
+   for (const key of ['quantity', 'price', 'amount']) if (receipt.properties[key]?.includes('.')) receipt.properties[key] += '00'
+   return Response.json(receipt)
   }
   assert.equal(req.method, 'POST'); assert.equal(url.pathname, '/crm/v3/objects/notes')
   assert.deepEqual(payload.associations, [{ to: { id: state.deal.id }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 214 }] }])

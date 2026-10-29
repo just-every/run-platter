@@ -774,6 +774,7 @@ test('SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient q
   await tick('2030-03-10T13:00:00Z');assert.equal(reminders().length,0,'a 6 am Pacific due time waits, including across DST')
   await tick('2030-03-10T14:59:00Z');assert.equal(reminders().length,0)
   await Promise.all([tick('2030-03-10T15:00:00Z'),tick('2030-03-10T15:00:00Z')]);assert.equal(reminders().length,8)
+  assert.deepEqual(reminders().map(m=>m.subject).sort(),['cap','accepted','optout','withdrawn','declined','expired','timeout','fallback'].map(name=>'Reminder: '+name).sort(),'each eligible proposal sends exactly once under concurrent cron deliveries')
   assert.ok(reminders().every(m=>m.provider==='gmail'&&m.from==='own-mailbox@synthetic-platter.example'))
   const first=(await h.state()).proposals.find(p=>p.id===proposals.cap.id).reminderRuns[0];assert.equal(first.queued_at,Date.parse('2030-03-10T15:00:00Z'));assert.equal(first.time_zone,'America/Los_Angeles');assert.equal(first.transport_status,'accepted');assert.doesNotMatch(first.message,/\/p\/[a-f0-9]{64}/)
   assert.deepEqual((await h.state()).proposals.find(p=>p.id===proposals.cap.id).deliveryPreview.reminders.map(r=>r.slot),['after:5'],'only the remaining unclaimed capped date is previewed')

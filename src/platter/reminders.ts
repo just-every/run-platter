@@ -84,9 +84,16 @@ async function queueReminder(env:Bindings,a:Actor,row:any,input:{subject:string;
 /** Called only by the exported Worker cron, after the monotone clock has advanced. */
 export async function runReminders(env:Bindings,at:number){
  need(Number.isSafeInteger(at)&&at>=0,'Invalid cron trigger time')
- const db=env.DB,now=await currentTime(db),policy=await reminderPolicy(db)
+ // Concurrent cron deliveries must not rotate one mailbox grant out from under
+ // another reminder. Keep the durable mail claims and uncertain-send holds.
+ const db=env.DB,token=crypto.randomUUID(),started=Date.now()
+ const lock=await db.prepare('INSERT INTO p_reminder_dispatch_lock VALUES(1,?,?) ON CONFLICT(singleton) DO UPDATE SET token=excluded.token,expires_at=excluded.expires_at WHERE expires_at<? RETURNING token').bind(token,started+900000,started).first()
+ if(!lock)return
+ try{
+ const now=await currentTime(db),policy=await reminderPolicy(db)
  const due=(await db.prepare("SELECT s.*,e.sent_at,e.expires_on,e.deadline_at FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version JOIN p_proposals p ON p.id=s.proposal_id AND p.revision=s.revision JOIN p_expiry e ON e.proposal_id=p.id WHERE s.enabled=1 AND p.status='sent' AND e.sent_at IS NOT NULL").all<any>()).results
  for(const s of due){
+  const lease=await db.prepare('UPDATE p_reminder_dispatch_lock SET expires_at=? WHERE singleton=1 AND token=? RETURNING token').bind(Date.now()+900000,token).first();if(!lease)return
   if(reminderQuiet(now,s.time_zone,policy))continue
   const actor=await actorById(db,s.sender_id);if(!actor||!senders.includes(actor.role))continue
   let row:any;try{row=await permitted(db,actor,s.proposal_id,'send')}catch{continue}
@@ -96,4 +103,5 @@ export async function runReminders(env:Bindings,at:number){
    break
   }
  }
+ }finally{await db.prepare('DELETE FROM p_reminder_dispatch_lock WHERE singleton=1 AND token=?').bind(token).run()}
 }

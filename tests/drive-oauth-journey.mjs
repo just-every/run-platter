@@ -59,6 +59,27 @@ export async function driveOAuthJourney(){
   await h.cmd('archive.configure',{...driveSettings,version:2,connectionVersion:3})
   const fresh=await completeDriveAgreement(h,'Fresh OAuth completion',completed.client.id);await h.cmd('archive.dispatch',{})
   assert.equal((await history()).jobs.find(j=>j.proposal_id===fresh.proposal.id).status,'complete')
+  // Revoke while the upload's own credential refresh is waiting at the provider.
+  const withheld=await completeDriveAgreement(h,'Archive revoked during upload refresh',completed.client.id)
+  const storedBefore=[...fake.files.values()].filter(file=>file.bytes).length
+  let armed=false,revokedCalls
+  fake.setHook(async request=>{
+   if(!armed&&new URL(request.url).pathname.endsWith('/generateIds')){
+    armed=true;hook=async()=>{await h.cmd('archive.revoke',{version:3});revokedCalls=fake.calls.length}
+   }
+  })
+  await h.cmd('archive.dispatch',{});fake.setHook(undefined)
+  assert.equal(typeof revokedCalls,'number','the pending upload reached its credential refresh')
+  assert.equal(fake.calls.length,revokedCalls,'successful refresh cannot authorize a request after archive revocation')
+  assert.equal([...fake.files.values()].filter(file=>file.bytes).length,storedBefore,'revocation leaves no private PDF at the destination')
+  assert.equal((await history()).settings.active,false)
+  assert.equal((await history()).jobs.find(j=>j.proposal_id===withheld.proposal.id).status,'held')
+  await h.cmd('archive.dispatch',{});await h.cmd('archive.reconcile',{id:withheld.proposal.id},h.owner,409)
+  assert.equal(fake.calls.length,revokedCalls,'dispatch and reconciliation cannot reuse revoked authority')
+  await h.cmd('archive.configure',{...driveSettings,version:3,connectionVersion:3})
+  const renewed=calls.length;await h.cmd('archive.dispatch',{});assert.equal(calls.length,renewed,'new consent never reactivates the held upload')
+  const allowed=await completeDriveAgreement(h,'Fresh completion after archive authorization',completed.client.id);await h.cmd('archive.dispatch',{})
+  assert.equal((await history()).jobs.find(j=>j.proposal_id===allowed.proposal.id).status,'complete')
   const pending=await authorize();await h.cmd('provider.disconnect',{provider:'google_drive',version:3});const disconnected=calls.length
   assert.equal((await h.send(pending,undefined,h.owner)).status,403);await h.cmd('archive.dispatch',{});assert.equal(calls.length,disconnected)
   for(const value of [await h.state(),await history(),(await h.send('/api/platter/audit',undefined,h.owner)).value,(await h.send('/app/settings',undefined,h.owner)).text]){

@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `150f5ef225d346795d4b9c1d02b65b784ab14435` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. EDIT-018 is a builder completion claim from the combined native preview, sent-page and custody journeys, pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -450,7 +450,7 @@ Core · target · **partial** · Rules D-1
 
 #### EDIT-018 — Client-page preview before sending
 
-Core · target · **partial** · Rules D-1
+Core · target · **done** · Rules D-1
 
 **Requirement.** Before sending, viewers, collaborators and pending approvers preview the exact revision’s client page at desktop and phone widths. The recipient-role selection and language match the client, with filled variables or the same missing-variable warning. Draft and unsent negotiated revisions use the same preview. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-018).
 
@@ -460,8 +460,8 @@ Core · target · **partial** · Rules D-1
 3. Quantity 11 is refused in both preview and sent page.
 4. Viewing as signer 2 shows only signer 2’s fields.
 
-**Evidence.** `src/platter/preview.ts`; `tests/platter.test.mjs` — “EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state”; `tests/site.test.mjs` — “EDIT-018 desktop and phone preview exact client content, switch widths and select without sending” (registered through tests/site-documents.mjs); “MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
-**Gap.** Delivered: Revision banners, preview selection, package conditions, quantity bounds and the sent-page money comparison have real preview/browser journeys. Missing “EDIT-018 complete client-page preview before sending journey”: A complete three-package, tax/deposit/schedule and two-signer preview journey verifies signer-two fields and the same exact subsequently sent selection.
+**Evidence.** `src/platter/preview.ts`; `tests/platter.test.mjs` — “EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state”, including combinedPreviewHttp for three packages, independent tax, 30% deposit, each schedule row, quantity refusals, unchanged state and both signer field projections; `tests/site.test.mjs` — “EDIT-018 desktop and phone preview exact client content, switch widths and select without sending” (registered through `tests/site-documents.mjs`, including combinedPreviewBrowser in `tests/packages-journey.mjs` for exact preview and mailbox-verified sent selections, signer-two isolation and browser proof at 1440 and 390); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences” for byte-identical selected tax, deposit, schedule, sent rates and agreement custody without restored client authority
+**Gap.** None.
 
 #### EDIT-022 — Preview isolation and exact approval link
 

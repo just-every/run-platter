@@ -770,11 +770,11 @@ Evidence: None recorded.
 
 ## RENEW-002 — Renewal proposals from accepted agreements
 
-Status: **missing**.
+Status: **partial**.
 
-Gap: No renewals.
+Gap: Evergreen renewal and cancellation disclosures, configurable agreement notice periods and renewal notices, automatic sending, configured recipient roles, percentage-based retainers, agreements with differing recurring term ends and executable payment schedules remain. The conservative current-owner-only, explicit per-agreement drafting authorization is adopted under the standing scope policy pending ct approval; scoped delegation and provider boundaries remain unqualified. The supported fixed-term slice uses a 45-day lead and increases each recurring unit rate by the chosen percentage or fixed amount, retaining one-off rates, discounts and informational payment terms. Dated informational milestones move forward by the fixed term; event-based milestones keep their events. Restores confer no execution authority. FOLLOW-003 internal notices and FOLLOW-001 reminder authorization remain separate obligations; no reminder, notice, approval, verification, sending or payment authority is copied. PAY-003 still requires the real Stripe test account and key for executable charges and payment-method updates.
 
-Evidence: None recorded.
+Evidence: `tests/platter.test.mjs`, `tests/renewal-journey.mjs`, `tests/site.test.mjs`, `tests/site-documents.mjs`, `tests/recurring-browser.mjs`, `tests/archive.test.mjs`
 
 ## REPORT-001 — Proposal pipeline dashboard
 

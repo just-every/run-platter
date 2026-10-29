@@ -879,3 +879,7 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
   await context.close()
  }finally{await browser?.close();await app?.close()}
 })
+
+test('RENEW-002 Settings authorizes and revokes fixed-term renewal drafting and opens an independent draft',{timeout:120000},async()=>{
+ const {renewalBrowserJourney}=await import('./recurring-browser.mjs');await renewalBrowserJourney()
+})

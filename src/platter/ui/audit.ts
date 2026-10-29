@@ -15,6 +15,7 @@ const verbs: Record<string, string> = {
  'payment.record':'recorded received money','payment.bind':'verified a Stripe deposit','payment.refund':'requested the deposit refund','dispute.import':'verified the Stripe dispute','dispute.submit':'submitted the available dispute evidence','dispute.evidence':'downloaded available dispute evidence for',
 
  'proposal.data':'read structured proposal data for',
+ 'renewal.configure': 'authorized renewal drafting', 'renewal.revoke': 'revoked renewal drafting', 'renewal.run': 'checked due renewal drafts', 'renewal.drafted': 'prepared a renewal draft',
  'client.save': 'saved the client', 'client.erase': 'erased an unused client',
  'proposal.prepare': 'prepared', 'proposal.revise': 'saved a new revision of', 'proposal.restore': 'restored an earlier revision of',
  'proposal.approve': 'approved', 'proposal.send': 'sent', 'proposal.negotiate': 'prepared a negotiated revision of',

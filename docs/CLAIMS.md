@@ -510,9 +510,9 @@ Evidence: `tests/mail.test.mjs`, `tests/site.test.mjs`
 
 Status: **partial**.
 
-Gap: Client-assigned text, date and checkbox fields enforce required values at acceptance; typed signature blocks adopt the same acceptance name. Values freeze with the agreement and survive the public CLI. Evidence: tests/platter.test.mjs — “EDIT-001 Client-assigned required fields and typed signature blocks validate at signing and freeze exact values with the selected agreement”, tests/site.test.mjs — “EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths” and tests/archive.test.mjs — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority”. Gap: recipient roles beyond Client, file collection, invoice or CRM propagation and certificate listing remain.
+Gap: Configured recipient and template-role execution, invoice and CRM propagation, full completion-email attachment packaging, external-store coverage and provider or legal qualification remain. SIGN-004 retains its recorded owner-only authority approval hold; SIGN-005 retains its downstream prerequisites, and EDIT-010 remains download-only.
 
-Evidence: `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+Evidence: `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/site-documents.mjs`, `tests/document-journey.mjs`, `tests/archive.test.mjs`
 
 ## SIGN-008 — Acceptance on the client's own paper
 

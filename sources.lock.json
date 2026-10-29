@@ -3390,7 +3390,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "68a393fd90d8526e5d37f13f88c17901a140e195a3c16a056acf75d25ad936e9",
+      "sha256": "057858c4855f2fd1726d0566fe19785a4ed53161bb7f3573e8c59b64c640cb73",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3526,7 +3526,7 @@
       "executable": false
     },
     "tests/packages-journey.mjs": {
-      "sha256": "1c721bc96ead42261697ad558c3d80f64654b7cc068593168151af6dd0db283c",
+      "sha256": "fe1e79f48fa6a594024019855a1e13ef4748e7d2a29d6e14c1680aa3d89c0376",
       "executable": false
     },
     "tests/pdf-document.mjs": {

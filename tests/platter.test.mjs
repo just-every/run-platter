@@ -888,28 +888,62 @@ test('SEND-010 / SEND-015 / FOLLOW-009 withdrawal revokes every current public d
 }))
 
 
-test('EDIT-012 duplicate accepted content into an independent member-owned draft for another client without changing the source',()=>run(async h=>{
+test('EDIT-012 duplicate accepted content into an independent member-owned draft for another client without changing the source',async()=>{const h=await harness({assetsDirectory:'public'});try{
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
- const {client,p}=await draft(h),beta=await h.cmd('client.save',{name:'Beta Co',email:'contact@beta.example'})
+ const tick=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'}),at=Date.parse('2030-06-03T15:00:00Z')
+ await tick(at)
+ const mailbox=n=>['synthetic-platter-'+n,'example.test'].join(String.fromCharCode(64))
+ const client=await h.cmd('client.save',{name:'Acme',email:mailbox(1201),variableFields:{contactName:'Avery Chen',title:'Director',address:'10 Synthetic Street',custom:{Region:'West'}}}),beta=await h.cmd('client.save',{name:'Beta Co',email:mailbox(1202),variableFields:{contactName:'Casey Lane',title:'Buyer',address:'20 Synthetic Street',custom:{Region:'East'}}})
+ const {scheduleFixture}=await import('./packages-fixture.mjs')
+ await h.cmd('workspace.defaults',{version:0,remindersEnabled:true,reminderDays:[3,8],beforeExpiryDays:[2],reminderCap:4,paymentMethods:['ach','card'],expiryDays:14,warningDays:1})
+ const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Offer for {{Client.Company}}',scope:'{{Contact.Name}}, {{Contact.Title}} at {{Client.Address}} in {{Custom.Region}}',variableValues:{},terms:'Independent agreed terms.',document:{version:1,blocks:[{id:'destination',type:'text',title:'Recipient scope',text:'Prepared for {{Client.Company}} in {{Custom.Region}}'}]},paymentTerms:scheduleFixture()})
  const form=new FormData();form.set('id',p.id);form.set('version','1');form.set('file',new File(['%PDF exact retained source bytes'],'statement.pdf',{type:'application/pdf'}))
  const uploadRequest=new Request(h.origin+'/app/attachment',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:form});const uploaded=await h.mf.dispatchFetch(uploadRequest.url,{method:'POST',headers:uploadRequest.headers,body:await uploadRequest.arrayBuffer()});assert.equal(uploaded.status,200);assert.match(await uploaded.text(),/Document saved/)
  const get=async id=>(await h.state()).proposals.find(p=>p.id===id)
  await h.cmd('pdf.downloads',{id:p.id,version:2,enabled:false});await h.cmd('expiry.set',{id:p.id,version:3,mode:'days',days:14,warningDays:1})
- await h.cmd('proposal.approve',{id:p.id,version:4,revision:2});const share=await h.cmd('proposal.send',{id:p.id,version:5}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+ await h.cmd('payment.collection',{id:p.id,version:4,completion:'off',paymentMethods:['ach','card']})
+ await h.cmd('reminder.configure',{id:p.id,version:5,enabled:true,consent:true,timeZone:'America/Chicago',afterDays:[3,8],beforeDays:[2],cap:4,subject:'Review the proposed scope',message:'Please review the agreed services.'})
+ await h.cmd('notification.expiry',{id:p.id,version:6,enabled:true,leadDays:4,consent:true})
+ await h.cmd('tracking.settings',{id:p.id,enabled:'yes',consent:'yes',alerts:'no',quietMinutes:30,retentionDays:90})
+ await h.cmd('proposal.approve',{id:p.id,version:7,revision:2});const share=await h.cmd('proposal.send',{id:p.id,version:8}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+ await h.send(path,undefined,cookie)
+ assert.equal((await h.send(path+'/action?name=question.create',{revision:2,section:'scope',text:'Does the quoted scope include delivery?'},cookie)).status,200)
+ const question=(await h.state()).proposals.find(row=>row.id===p.id).questions[0]
+ await h.cmd('question.answer',{id:p.id,questionId:question.id,text:'Yes, delivery is included.',requestId:crypto.randomUUID()})
  assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
+ await h.cmd('tracking.settings',{enabled:'no',alerts:'no',quietMinutes:30,retentionDays:90})
  await h.cmd('invoice.export',{id:p.id})
- await h.send('/auth/invite',{email:'sales@studio.example',displayName:'Morgan Sales',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('sales@studio.example'),actor=(await h.state(member)).actor
- const before=await get(p.id),accepted=(await h.send(path,undefined,cookie)).text
+ const receipt=await h.cmd('payment.record',{id:p.id,amount:'600',method:'wire',receivedOn:'2030-06-03',reference:'synthetic-platter-1203',consent:true})
+ const sourcePayments=(await h.state()).paymentRecords.filter(r=>r.proposal_id===p.id)
+ assert.equal(sourcePayments.length,1);assert.equal(sourcePayments[0].id,receipt.id);assert.equal(sourcePayments[0].cents,60000);assert.equal(sourcePayments[0].received_on,'2030-06-03')
+ const artifact=async kind=>{const r=await h.mf.dispatchFetch(h.origin+'/api/platter/'+kind+'?id='+p.id,{headers:{cookie:h.owner}});assert.equal(r.status,200,kind);return new Uint8Array(await r.arrayBuffer())}
+ const sourcePdf=await artifact('agreement.pdf'),sourceCertificate=await artifact('certificate.pdf')
+ await h.send('/auth/invite',{email:mailbox(1204),displayName:'Morgan Sales',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn(mailbox(1204)),actor=(await h.state(member)).actor
+ const before=await get(p.id),sourceRevisions=(await h.state()).revisions.filter(r=>r.proposal_id===p.id),accepted=(await h.send(path,undefined,cookie)).text
  await h.cmd('proposal.share',{id:p.id,operatorId:actor.id})
  await h.cmd('proposal.duplicate',{id:p.id,version:1,clientId:beta.id},member,409)
  const copy=await h.cmd('proposal.duplicate',{id:p.id,version:before.version,clientId:beta.id},member),after=await get(copy.id)
- assert.notEqual(copy.id,p.id);assert.equal(after.status,'draft');assert.equal(after.revision,1);assert.equal(after.version,1);assert.equal(after.client_id,beta.id);assert.equal(after.clientName,'Beta Co');assert.equal(after.clientEmail,'contact@beta.example');assert.equal(after.sales_owner_id,actor.id);assert.equal(after.prepared_by,actor.email)
- for(const field of ['scope','terms','options','currency','deposit_bps','attachments','pdfDownloadsEnabled'])assert.deepEqual(after[field],before[field],field+' copied exactly')
+ assert.notEqual(copy.id,p.id);assert.equal(after.status,'draft');assert.equal(after.revision,1);assert.equal(after.version,1);assert.equal(after.client_id,beta.id);assert.equal(after.clientName,'Beta Co');assert.equal(after.clientEmail,mailbox(1202));assert.equal(after.sales_owner_id,actor.id);assert.equal(after.prepared_by,actor.email)
+ for(const field of ['terms','options','currency','deposit_bps','payment_terms','attachments','pdfDownloadsEnabled','deliveryDefaults','collectionPolicy'])assert.deepEqual(after[field],before[field],field+' copied exactly')
+ assert.equal(before.scope,'Avery Chen, Director at 10 Synthetic Street in West');assert.equal(after.scope,'Casey Lane, Buyer at 20 Synthetic Street in East');assert.equal(after.title,'Offer for Beta Co (copy)');assert.equal(after.document.blocks[0].text,'Prepared for Beta Co in East')
+ assert.deepEqual(after.document.merge.values,{'Client.Company':'Beta Co','Contact.Name':'Casey Lane','Contact.Title':'Buyer','Client.Address':'20 Synthetic Street','Custom.Region':'East'})
+ assert.deepEqual(after.deliveryDefaults,{remindersEnabled:true,reminderDays:[3,8],beforeExpiryDays:[2],reminderCap:4,paymentMethods:['ach','card'],reminderTemplateId:null,reminderMessageTemplate:null,reminderSubject:'Review the proposed scope',reminderMessage:'Please review the agreed services.'})
+ assert.deepEqual(after.collectionPolicy,{enabled:false,completion:'off',methods:['ach','card']})
  assert.equal(after.expiry.mode,'days');assert.equal(after.expiry.days,14);assert.equal(after.expiry.warningDays,1);assert.equal(after.expiry.sentAt,null);assert.equal(after.expiry.deadlineAt,null);assert.equal(after.expiry.date,null);assert.equal(after.expiry.warningSentAt,null)
  assert.equal(after.approved_by,null);assert.equal(after.approved_at,null);assert.equal(after.acceptance,undefined);assert.equal(after.invoice,undefined);assert.equal(after.shareToken,undefined);assert.deepEqual(after.questions,[]);assert.deepEqual(after.suggestions,[]);assert.deepEqual(after.deliveries,[]);assert.deepEqual(after.pdfDownloads,[]);assert.deepEqual(after.withdrawals,[])
+ assert.ok(before.questions.length>0);assert.ok(before.engagementDetails.views.length>0);assert.ok(before.reminderSettings.authorized);assert.ok(before.invoice);assert.ok(before.acceptance)
+ assert.equal(after.reminderSettings,null);assert.deepEqual(after.reminderRuns,[]);assert.deepEqual(after.reminderOptouts,[]);assert.deepEqual(after.deliveryChanges,[]);assert.deepEqual(after.invitationMessages,[]);assert.deepEqual(after.recipientLinks,[]);assert.deepEqual(after.recipientSignatures,[]);assert.deepEqual(after.engagementDetails.views,[]);assert.deepEqual(after.collaboration.threads,[])
+ assert.ok(!(await h.state()).paymentRecords.some(r=>r.proposal_id===copy.id));assert.deepEqual(after.recordedRevenue,{receivedCents:0,refundedCents:0,netReceivedCents:0,uncertainRefundCents:0,exportedDepositCents:0})
+ assert.equal((await h.send('/api/platter/agreement.pdf?id='+copy.id,undefined,member)).status,409)
+ assert.equal((await h.send(path+'/action?name=accept',{name:'Casey Lane',optionId:'one',consent:true},cookie)).status,200,'replayed source acceptance remains idempotent')
+ assert.deepEqual(await get(copy.id),after,'replayed source acceptance cannot change the new draft')
  assert.ok(!(await h.state()).outbox.some(m=>m.proposal_id===copy.id));assert.equal((await h.send('/api/platter/audit?subject='+copy.id,undefined,h.owner)).value.rows.filter(r=>r.action==='proposal.view').length,0)
  const file=await h.send('/api/platter/attachments/'+copy.id+'/'+after.attachments[0].id,undefined,member);assert.equal(file.text,'%PDF exact retained source bytes')
- await h.cmd('proposal.send',{id:copy.id,version:1},h.owner,409);await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1},member,403);await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1});await h.cmd('proposal.send',{id:copy.id,version:2})
+ await h.cmd('proposal.send',{id:copy.id,version:1},h.owner,409);await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1},member,403);await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1});await h.cmd('proposal.send',{id:copy.id,version:2},member)
+ const sentCopy=await get(copy.id);assert.notEqual(sentCopy.shareToken,before.shareToken);assert.equal(sentCopy.reminderSettings,null);assert.deepEqual(sentCopy.reminderRuns,[]);assert.equal(sentCopy.expiry.sentAt,at);assert.ok((await h.state()).outbox.some(m=>m.proposal_id===copy.id&&m.recipient===mailbox(1202)))
+ const copyInvitation='/p/'+sentCopy.shareToken
+ assert.equal((await h.send(copyInvitation+'/action?name=accept',{name:'Casey Lane',optionId:'one',consent:true},cookie)).status,401,'Acme verification never authorizes Beta')
+ assert.deepEqual((await h.state()).paymentRecords.filter(r=>r.proposal_id===p.id),sourcePayments);assert.deepEqual((await h.state()).revisions.filter(r=>r.proposal_id===p.id),sourceRevisions);assert.deepEqual(await artifact('agreement.pdf'),sourcePdf);assert.deepEqual(await artifact('certificate.pdf'),sourceCertificate)
  assert.deepEqual(await get(p.id),before);assert.equal((await h.send(path,undefined,cookie)).text,accepted,'source accepted agreement remains byte-identical')
  const same=await h.cmd('proposal.duplicate',{id:p.id,version:before.version});assert.equal((await get(same.id)).client_id,client.id)
  const states=['draft','approved','sent','expired','withdrawn']
@@ -924,8 +958,14 @@ test('EDIT-012 duplicate accepted content into an independent member-owned draft
  }
  const draftSource=await get(same.id);await h.cmd('proposal.approve',{id:same.id,version:draftSource.version,revision:1});await h.cmd('proposal.send',{id:same.id,version:2});await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:same.id,version:3,scope:'Unsent negotiated scope'})
  const negotiated=await h.cmd('proposal.duplicate',{id:same.id,version:4});assert.equal((await get(negotiated.id)).scope,'Unsent negotiated scope')
+ await h.cmd('approval.policy',{version:(await h.state()).approvalSettings.policy.version,required:false,defaultRole:'owner'})
+ const optional=await h.cmd('proposal.duplicate',{id:p.id,version:before.version,clientId:beta.id},member)
+ await h.cmd('proposal.send',{id:optional.id,version:1},member)
+ assert.equal((await get(optional.id)).status,'sent');assert.equal((await get(optional.id)).approved_by,null)
+ assert.deepEqual((await h.state()).paymentRecords.filter(r=>r.proposal_id===p.id),sourcePayments)
+ assert.deepEqual(await artifact('agreement.pdf'),sourcePdf)
  const key=await h.cmd('agent.create',{label:'Draft only'});assert.equal((await h.send('/api/platter/agent/command',{name:'proposal.duplicate',input:{id:p.id,version:before.version}},'',{authorization:'Bearer '+key.token})).status,403)
-}))
+}finally{await h.close()}})
 
 test('EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state',()=>run(async h=>{
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)

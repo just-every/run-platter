@@ -150,6 +150,31 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const withdrawalHistory=(await h.state()).proposals.find(p=>p.id===withdrawn.id).withdrawals
     const duplicate=await h.cmd('proposal.duplicate',{id:work.id,version:4})
     const duplicateBefore=(await h.state()).proposals.find(p=>p.id===duplicate.id)
+    const address=n=>['synthetic-platter-'+n,'example.test'].join(String.fromCharCode(64))
+    const acme=await h.cmd('client.save',{name:'Synthetic Acme custody',email:address(1211),variableFields:{contactName:'Avery Chen',custom:{Region:'West'}}}),beta=await h.cmd('client.save',{name:'Synthetic Beta custody',email:address(1212),variableFields:{contactName:'Casey Lane',custom:{Region:'East'}}})
+    const {scheduleFixture:duplicateSchedule}=await import('./packages-fixture.mjs')
+    const paidSource=await h.cmd('proposal.prepare',{...offer,clientId:acme.id,title:'{{Client.Company}} custody',scope:'{{Contact.Name}} in {{Custom.Region}}',variableValues:{},document:{version:1,blocks:[{id:'destination',type:'text',title:'Recipient',text:'Prepared for {{Client.Company}}'}]},paymentTerms:duplicateSchedule()})
+    const copyFileBytes='%PDF synthetic-platter-1213 exact copy custody'
+    await upload({id:paidSource.id,version:1},'synthetic-platter-1213.pdf',copyFileBytes)
+    await h.cmd('payment.collection',{id:paidSource.id,version:2,completion:'off',paymentMethods:['ach','card']})
+    await h.cmd('expiry.set',{id:paidSource.id,version:3,mode:'days',days:14,warningDays:2})
+    await h.cmd('reminder.configure',{id:paidSource.id,version:4,enabled:false,timeZone:'America/Chicago',afterDays:[3,8],beforeDays:[2],cap:4,subject:'Review the quoted scope',message:'Please review the quoted services.'})
+    await h.cmd('proposal.approve',{id:paidSource.id,version:5,revision:2})
+    const paidShare=await h.cmd('proposal.send',{id:paidSource.id,version:6}),paidPath=new URL(paidShare.shareUrl).pathname
+    assert.equal((await h.send(paidPath+'/action?name=code.request',{})).status,200)
+    const paidCode=(await h.state()).outbox.find(m=>m.proposal_id===paidSource.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],paidSession=await h.send(paidPath+'/action?name=code.verify',{code:paidCode})
+    assert.equal(paidSession.status,200);assert.equal((await h.send(paidPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},paidSession.cookie)).status,200)
+    await h.cmd('payment.record',{id:paidSource.id,method:'wire',amount:'600',receivedOn:'2026-10-20',reference:'synthetic-platter-1214',consent:true})
+    const paidInvoice=await h.cmd('invoice.export',{id:paidSource.id}),paidCsv=(await h.send('/api/platter/invoices/'+paidInvoice.id+'.csv',undefined,h.owner)).text
+    const paidRead=async(id,kind,cookie=h.owner)=>{const r=await h.mf.dispatchFetch(h.origin+'/api/platter/'+kind+'?id='+id,{headers:{cookie}});assert.equal(r.status,200,kind);return new Uint8Array(await r.arrayBuffer())}
+    const paidPdf=await paidRead(paidSource.id,'agreement.pdf'),paidCertificate=await paidRead(paidSource.id,'certificate.pdf'),paidBefore=(await h.state()).proposals.find(p=>p.id===paidSource.id),paidRecords=(await h.state()).paymentRecords.filter(p=>p.proposal_id===paidSource.id)
+    const paidCopy=await h.cmd('proposal.duplicate',{id:paidSource.id,version:paidBefore.version,clientId:beta.id}),paidCopyBefore=(await h.state()).proposals.find(p=>p.id===paidCopy.id)
+    assert.equal(paidCopyBefore.scope,'Casey Lane in East');assert.equal(paidCopyBefore.document.blocks[0].text,'Prepared for Synthetic Beta custody')
+    for(const field of ['options','terms','payment_terms','deliveryDefaults','collectionPolicy','attachments'])assert.deepEqual(paidCopyBefore[field],paidBefore[field],field+' copied from the paid source')
+    assert.equal(paidCopyBefore.reminderSettings,null);assert.equal(paidCopyBefore.acceptance,undefined);assert.equal(paidCopyBefore.invoice,undefined);assert.equal(paidCopyBefore.shareToken,undefined);assert.equal(paidCopyBefore.approved_by,null)
+    assert.deepEqual((await h.state()).paymentRecords.filter(p=>p.proposal_id===paidCopy.id),[])
+    assert.deepEqual(await paidRead(paidSource.id,'agreement.pdf'),paidPdf)
+
     assert.deepEqual(JSON.parse(duplicateBefore.section_conditions),{terms:'two'},'EDIT-009 duplicate preserves conditional sections')
     const clientPreview=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=two`,undefined,h.owner);assert.equal(clientPreview.status,200);assert.match(clientPreview.text,/Preview only/)
     await h.cmd('followup.schedule',{id:pending.id,action:'Call Avery about scope',dueDate:'2027-03-10'})
@@ -213,7 +238,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     // audit rows exactly here, then assert the complete joined view on restore.
     const beforeAudit=beforeAuditView.map(({reason,mail_route,sender_address,...row})=>row)
     assert.ok(beforeAudit.some(row=>row.action==='proposal.preview'&&row.subject===duplicate.id&&row.actor_role==='owner'),'EDIT-018 / TEAM-004 preview action is retained without payload or invitation authority')
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','accepted','approved','draft','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -289,6 +314,19 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     await h.cmd('proposal.send',{id:withdrawn.id,version:4},restoredOwner,409)
     assert.equal(archived.filter(item=>item.table==='p_withdrawn_links').length,0)
     assert.deepEqual(restoredState.proposals.find(p=>p.id===duplicate.id),duplicateBefore,'EDIT-012 copied content, files and delivery configuration survive CLI restore exactly')
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===paidSource.id).acceptance,paidBefore.acceptance)
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===paidCopy.id),paidCopyBefore,'paid-source destination bindings and inactive delivery settings survive exactly')
+    assert.deepEqual(restoredState.paymentRecords.filter(p=>p.proposal_id===paidSource.id),paidRecords,'the real source receipt remains with Acme')
+    assert.deepEqual(restoredState.paymentRecords.filter(p=>p.proposal_id===paidCopy.id),[])
+    assert.equal((await h.send('/api/platter/invoices/'+paidInvoice.id+'.csv',undefined,restoredOwner)).text,paidCsv)
+    assert.deepEqual(await paidRead(paidSource.id,'agreement.pdf',restoredOwner),paidPdf);assert.deepEqual(await paidRead(paidSource.id,'certificate.pdf',restoredOwner),paidCertificate)
+    for(const id of [paidSource.id,paidCopy.id]){
+      const row=restoredState.proposals.find(p=>p.id===id),file=row.attachments.find(f=>f.filename==='synthetic-platter-1213.pdf')
+      assert.ok(file);const download=await h.send('/api/platter/attachments/'+id+'/'+file.id,undefined,restoredOwner);assert.equal(download.status,200);assert.equal(download.text,copyFileBytes)
+    }
+    assert.equal((await h.send(paidPath,undefined,paidSession.cookie)).status,404,'restore never restores the paid source invitation')
+    await h.cmd('proposal.send',{id:paidCopy.id,version:1},restoredOwner,409)
+
     assert.equal(restoredState.proposals.find(p=>p.id===work.id).options[0].cents,pricingExpected.grandCents,'PRICE-001 server totals survive public CLI restore')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===work.id).options, before.proposals.find(p=>p.id===work.id).options,'PRICE-001 all table, line, quantity, unit, group and subtotal fields survive public CLI restore exactly')
     assert.equal((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(packages.id).first()).snapshot,scheduleBytes,'Frozen schedule snapshot survives restore byte-identically');assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).acceptance,packagesBefore.acceptance,'PRICE-002 immutable selected quantities and totals survive public CLI restore')

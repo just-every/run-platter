@@ -748,7 +748,7 @@ Evidence: None recorded.
 
 Status: **partial**.
 
-Gap: Trello, monday.com, ClickUp, Jira, Vector, configured multi-recipient and payment-gated completion, accepted-by-upload execution and live-provider qualification remain. Conservative owner and admin authorization default: explicit verified Asana account, workspace and destination team; configuration, connection and authorizing role versions checked before every request; uncertain writes held for provider review without automatic retry. Matching dated schedule milestone labels supply task due dates; other recorded dates remain in project notes. Restores confer no credentials or execution authority. SEND-003 and SIGN-004 retain their recorded authority holds; scoped delegation and broader provider boundaries remain unapproved.
+Gap: Trello, monday.com, ClickUp, Jira, Vector, configured multi-recipient and payment-gated completion and live-provider qualification remain. Conservative owner and admin authorization default: explicit verified Asana account, workspace and destination team; configuration, connection and authorizing role versions checked before every request; uncertain writes held for provider review without automatic retry. Matching dated schedule milestone labels supply task due dates; other recorded dates remain in project notes. Restores confer no credentials or execution authority. SEND-003 and SIGN-004 retain their recorded authority holds; scoped delegation and broader provider boundaries remain unapproved.
 
 Evidence: `tests/platter.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 

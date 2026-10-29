@@ -3569,8 +3569,9 @@ test('MIG-007 exported document move-in resumes across sessions, holds ambiguous
 }))
 
 test('HAND-001 Asana handoff uses immutable selected scope once and holds uncertain or revoked writes',async()=>{
- const {handoffFixture,handoffSettings,asanaAccount,asanaWorkspace,asanaTeam,asanaToken,connectAsana,completeHandoffAgreement}=await import('./handoff-fixture.mjs'),fake=handoffFixture(),h=await harness({assetsDirectory:'public',outboundService:fake.outboundService})
+ const {handoffFixture,handoffSettings,asanaAccount,asanaWorkspace,asanaTeam,asanaToken,connectAsana,completeHandoffAgreement,recordHandoffUpload}=await import('./handoff-fixture.mjs'),fake=handoffFixture(),h=await harness({assetsDirectory:'public',outboundService:fake.outboundService})
  try{
+  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303);await setup.text()
   const historical=await completeHandoffAgreement(h,'Before authorization')
   const address=['synthetic-platter-9411','example.test'].join('@')
   await h.send('/auth/invite',{email:address,displayName:'Delivery administrator',role:'member',returnTo:'/app'},h.owner)
@@ -3640,5 +3641,36 @@ test('HAND-001 Asana handoff uses immutable selected scope once and holds uncert
   const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
   for(const action of ['handoff.configure','handoff.revoke','handoff.dispatch'])assert.ok(audit.some(r=>r.action===action&&r.actor_id&&r.occurred_at))
   assert.equal((await read()).settings.account_id,asanaAccount)
+  // The signed-upload door requires its own fresh opt-in; prior grants never expand.
+  await h.cmd('handoff.configure',{...handoffSettings,version:3,connectionVersion:3})
+  const excludedUpload=await completeHandoffAgreement(h,'Upload without authorization',signed.client.id,false)
+  await recordHandoffUpload(h,excludedUpload)
+  const beforeUploadCalls=fake.calls.length;await tick();assert.equal(fake.calls.length,beforeUploadCalls)
+  assert.ok(!(await read()).jobs.some(j=>j.proposal_id===excludedUpload.proposal.id))
+  await h.cmd('handoff.configure',{...handoffSettings,version:4,connectionVersion:3,includeUploads:true},adminCookie,403)
+  await h.cmd('handoff.configure',{...handoffSettings,version:4,connectionVersion:3,includeUploads:true})
+  const upload=await completeHandoffAgreement(h,'Explicitly authorized signed upload',signed.client.id,false)
+  await recordHandoffUpload(h,upload,adminCookie,403)
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_acceptances WHERE proposal_id=?').bind(upload.proposal.id).first()).n,0)
+  const bytes=await recordHandoffUpload(h,upload),projectCount=fake.projects.length,taskCount=fake.tasks.length
+  await Promise.all([tick(),tick(),h.cmd('handoff.dispatch',{})])
+  job=(await read()).jobs.find(j=>j.proposal_id===upload.proposal.id)
+  assert.equal(job.status,'complete');assert.equal(fake.projects.length,projectCount+1);assert.equal(fake.tasks.length,taskCount+4)
+  const project=fake.projects.at(-1),tasks=fake.tasks.slice(-4)
+  assert.deepEqual(tasks.map(t=>[t.name,t.due_on]),[['Design','2099-03-01'],['Build','2099-03-08'],['Launch',undefined],['Training','2099-03-15']])
+  assert.match(tasks[1].notes,/Reviewed build\nQuantity: 2 day/);assert.match(tasks[3].notes,/Quantity: 2/)
+  assert.deepEqual(tasks.map(t=>t.projects),Array.from({length:4},()=>[project.gid]))
+  assert.match(project.notes,/Accepted by upload: signed outside Platter\. Platter did not verify this signature\./)
+  const filePath=job.agreementPath;assert.ok(filePath.startsWith('/api/platter/attachments/'+upload.proposal.id+'/'))
+  for(const resource of [project,...tasks])assert.ok(resource.notes.includes(h.origin+filePath))
+  const original=await h.mf.dispatchFetch(h.origin+filePath,{headers:{cookie:h.owner}})
+  assert.equal(original.status,200);assert.deepEqual(Buffer.from(await original.arrayBuffer()),bytes)
+  assert.equal((await h.send(filePath,undefined,'')).status,401)
+  assert.equal((await h.send(filePath,undefined,adminCookie)).status,403)
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_signature_facts WHERE proposal_id=?').bind(upload.proposal.id).first()).n,0,'an upload never manufactures mailbox verification')
+  const callsBeforeReplay=fake.calls.length
+  await recordHandoffUpload(h,upload,h.owner,409)
+  await tick();await h.cmd('handoff.dispatch',{});assert.equal(fake.calls.length,callsBeforeReplay)
+  assert.ok(!(await read()).jobs.some(j=>j.proposal_id===excludedUpload.proposal.id),'fresh authorization never backfills earlier uploads')
  }finally{await h.close()}
 })

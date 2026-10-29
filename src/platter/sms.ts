@@ -10,6 +10,7 @@ import { reminderPolicy } from './reminders'
 import { afterQuietHours, reminderSlots } from './reminder-schedule'
 import { validZone } from './reports/zone'
 import { completionSmsReadySql, queueCompletionSms } from './sms-completion'
+import { recordProviderOptIn, reenableEligibility, reenableStatements } from './sms-reenable'
 
 const audit=(db:D1Database,a:Actor,action:string,id:string,at:number)=>db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),a.id,a.role,action,id,at)
 
@@ -18,6 +19,7 @@ const purposes:Purpose[]=['invitation','reminder','identity','completion']
 export const smsDisclosure='I agree to receive the selected proposal texts from the named firm at my US mobile number. Message and data rates may apply. Reply STOP to stop all texts or HELP for help. SMS assent does not consent to electronic signatures.'
 const purposeFor=(kind:string):Purpose=>kind==='completion'?'completion':kind==='invitation'?'invitation':'reminder'
 const isReminder=(kind:string)=>kind==='manual'||kind==='scheduled'
+export const smsTransportConfigured=(env:Bindings)=>Boolean((env.SMS_PROVIDER===undefined||env.SMS_PROVIDER==='twilio')&&env.TWILIO_ACCOUNT_SID&&env.TWILIO_AUTH_TOKEN&&env.TWILIO_FROM&&env.AUTH_LOCAL!=='true')
 function withoutInvitation(value:string,token:string){need(!value.toLowerCase().includes(token.toLowerCase())&&!/\/p\/[a-f0-9]{64}\b/i.test(value),'Keep invitation credentials out of SMS business history')}
 function phoneNumber(value:unknown){
  const input=text(value,'a US mobile number',40)
@@ -63,7 +65,7 @@ const live=(env:Bindings,id:string,kind='invitation')=>smsContext(env,id,purpose
 function clearVerification(db:D1Database,id:string){return db.prepare("UPDATE p_shares SET code_hash=NULL,session_hash=NULL,session_expires=NULL WHERE proposal_id=? AND (code_method='SMS code' OR session_method='SMS code')").bind(id)}
 async function suppress(env:Bindings,phone:string,source:string){
  const db=env.DB,at=await currentTime(db)
- await db.batch([db.prepare('INSERT INTO p_sms_optouts(phone,stopped_at,source) VALUES(?,?,?) ON CONFLICT DO NOTHING').bind(phone,at,source),db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE phone=? AND status='queued'").bind(phone),db.prepare("UPDATE p_sms_code_runs SET status='cancelled' WHERE proposal_id IN (SELECT proposal_id FROM p_sms_consent WHERE phone=?) AND status='queued'").bind(phone),db.prepare("UPDATE p_shares SET code_hash=NULL,session_hash=NULL,session_expires=NULL WHERE proposal_id IN (SELECT proposal_id FROM p_sms_consent WHERE phone=?) AND (code_method='SMS code' OR session_method='SMS code')").bind(phone),db.prepare('DELETE FROM p_sms_authority WHERE proposal_id IN (SELECT proposal_id FROM p_sms_consent WHERE phone=?)').bind(phone)])
+ await db.batch([db.prepare('DELETE FROM p_sms_reenable_eligibility WHERE phone=?').bind(phone),db.prepare('INSERT INTO p_sms_optouts(phone,stopped_at,source) VALUES(?,?,?) ON CONFLICT DO NOTHING').bind(phone,at,source),db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE phone=? AND status='queued'").bind(phone),db.prepare("UPDATE p_sms_code_runs SET status='cancelled' WHERE proposal_id IN (SELECT proposal_id FROM p_sms_consent WHERE phone=?) AND status='queued'").bind(phone),db.prepare("UPDATE p_shares SET code_hash=NULL,session_hash=NULL,session_expires=NULL WHERE proposal_id IN (SELECT proposal_id FROM p_sms_consent WHERE phone=?) AND (code_method='SMS code' OR session_method='SMS code')").bind(phone),db.prepare('DELETE FROM p_sms_authority WHERE proposal_id IN (SELECT proposal_id FROM p_sms_consent WHERE phone=?)').bind(phone)])
 }
 export async function smsCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  need(senders.includes(a.role),'Your role cannot send SMS',403)
@@ -74,7 +76,9 @@ export async function smsCommand(env:Bindings,a:Actor,name:string,p:Record<strin
   await commit(db,a,[db.prepare('INSERT INTO p_sms_revocations VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),row.id,active?.assent_id??null,a.id,at),db.prepare('DELETE FROM p_sms_authority WHERE proposal_id=?').bind(row.id),db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE proposal_id=? AND status='queued'").bind(row.id),db.prepare("UPDATE p_sms_code_runs SET status='cancelled' WHERE proposal_id=? AND status='queued'").bind(row.id),clearVerification(db,row.id),audit(db,a,'sms.revoke',row.id,at)],false,{sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?)',values:[row.id,row.version]})
   return {id:row.id}
  }
- if(name==='sms.configure'){
+ if(name==='sms.configure'||name==='sms.reenable'){
+  const reenabling=name==='sms.reenable'
+  if(reenabling)need(a.role==='owner'&&(p.reenableConsent===true||p.reenableConsent==='yes'),'Only the owner explicitly re-enables a number with new recipient assent',403)
   exact(row,p);need(row.status==='sent'&&!(await expiryFor(db,row,at)).expired,'Send an approved invitation before configuring SMS',409)
   need(!recipientPlan(row).length,'Configure mailbox verification for multiple recipients',409)
   need(p.consent===true||p.consent==='yes','Record explicit recipient SMS assent')
@@ -87,13 +91,15 @@ export async function smsCommand(env:Bindings,a:Actor,name:string,p:Record<strin
   need(Number.isSafeInteger(assentedAt)&&assentedAt>0&&assentedAt<=at,'Supply the actual assent time with its UTC offset')
   const selected=Array.isArray(p.purposes)?p.purposes:purposes.filter(purpose=>p['purpose:'+purpose]==='yes')
   need(selected.length>0&&selected.length<=purposes.length&&new Set(selected).size===selected.length&&selected.every(purpose=>purposes.includes(purpose as Purpose)),'Choose the SMS purposes the recipient permitted')
-  need(!await db.prepare('SELECT 1 FROM p_sms_optouts WHERE phone=?').bind(phone).first(),'STOP remains in force; sending cannot be reactivated here',409)
+  const eligibility=reenabling?await reenableEligibility(env,phone):null
+  if(reenabling)need(eligibility&&assentedAt>eligibility.stopped_at,'A new recipient assent and a current authenticated provider opt-in are required',409)
+  else need(!await db.prepare('SELECT 1 FROM p_sms_optouts WHERE phone=?').bind(phone).first(),'STOP remains in force; sending cannot be reactivated here',409)
   const share=await db.prepare('SELECT * FROM p_shares WHERE proposal_id=? AND revision=?').bind(row.id,row.revision).first<any>();need(share,'Send a current invitation first',409)
   for(const value of [firm,disclosure,method,evidence])withoutInvitation(value,share.token)
   const client=await db.prepare('SELECT email FROM p_clients WHERE id=?').bind(row.client_id).first<any>(),recipient=text(p.recipient,'the assenting recipient',254)
   need(recipient===(share.recipient||client?.email),'Record assent from this invitation recipient')
   const assentId=crypto.randomUUID(),invitationHash=await hash(share.token),operator=await db.prepare('SELECT version FROM oa_operators WHERE id=?').bind(a.id).first<any>()
-  await commit(db,a,[db.prepare('INSERT INTO p_sms_assents VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(assentId,row.id,row.revision,invitationHash,recipient,phone,firm,JSON.stringify(selected),disclosure,assentedAt,method,evidence,zone,a.id,at),db.prepare('INSERT INTO p_sms_consent VALUES(?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,phone=excluded.phone,time_zone=excluded.time_zone,evidence=excluded.evidence,actor_id=excluded.actor_id,consented_at=excluded.consented_at').bind(row.id,row.revision,phone,zone,evidence,a.id,at),db.prepare('INSERT INTO p_sms_authority(proposal_id,revision,share_hash,actor_id,member_version,consented_at,assent_id,operator_version) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,share_hash=excluded.share_hash,actor_id=excluded.actor_id,member_version=excluded.member_version,consented_at=excluded.consented_at,assent_id=excluded.assent_id,operator_version=excluded.operator_version').bind(row.id,row.revision,invitationHash,a.id,a.memberVersion??0,at,assentId,operator.version),db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE proposal_id=? AND status='queued'").bind(row.id),clearVerification(db,row.id),audit(db,a,'sms.consent',row.id,at)],false,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status='sent') AND EXISTS(SELECT 1 FROM p_shares WHERE proposal_id=? AND token=?) AND NOT EXISTS(SELECT 1 FROM p_sms_optouts WHERE phone=?) AND NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=? AND revision=?) AND EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND version=?)",values:[row.id,row.version,row.revision,row.id,share.token,phone,row.id,row.revision,a.id,operator.version]})
+  await commit(db,a,[db.prepare('INSERT INTO p_sms_assents VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(assentId,row.id,row.revision,invitationHash,recipient,phone,firm,JSON.stringify(selected),disclosure,assentedAt,method,evidence,zone,a.id,at),db.prepare('INSERT INTO p_sms_consent VALUES(?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,phone=excluded.phone,time_zone=excluded.time_zone,evidence=excluded.evidence,actor_id=excluded.actor_id,consented_at=excluded.consented_at').bind(row.id,row.revision,phone,zone,evidence,a.id,at),db.prepare('INSERT INTO p_sms_authority(proposal_id,revision,share_hash,actor_id,member_version,consented_at,assent_id,operator_version) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,share_hash=excluded.share_hash,actor_id=excluded.actor_id,member_version=excluded.member_version,consented_at=excluded.consented_at,assent_id=excluded.assent_id,operator_version=excluded.operator_version').bind(row.id,row.revision,invitationHash,a.id,a.memberVersion??0,at,assentId,operator.version),db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE proposal_id=? AND status='queued'").bind(row.id),clearVerification(db,row.id),...(reenabling?reenableStatements(db,phone,row.id,assentId,a.id,at,eligibility):[]),audit(db,a,reenabling?'sms.reenable':'sms.consent',row.id,at)],reenabling,{sql:`EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status='sent') AND EXISTS(SELECT 1 FROM p_shares WHERE proposal_id=? AND token=?) AND ${reenabling?'EXISTS(SELECT 1 FROM p_sms_optouts o JOIN p_sms_reenable_eligibility e ON e.phone=o.phone AND e.stopped_at=o.stopped_at WHERE o.phone=? AND e.event_id=?)':'NOT EXISTS(SELECT 1 FROM p_sms_optouts WHERE phone=?)'} AND NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=? AND revision=?) AND EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND version=?)`,values:[row.id,row.version,row.revision,row.id,share.token,phone,...(reenabling?[eligibility.event_id]:[]),row.id,row.revision,a.id,operator.version]})
   return {id:row.id,assentId}
  }
  need(name==='sms.send','Unknown SMS command',404)
@@ -124,7 +130,8 @@ export async function smsState(env:Bindings,a:Actor,id:string){
  const authorization=await db.prepare('SELECT assent_id FROM p_sms_authority WHERE proposal_id=?').bind(id).first<any>()
  let authorized=false
  if(authorization?.assent_id)for(const purpose of purposes){try{const ctx=await smsContext(env,id,purpose,purpose==='completion');authorized=ctx.a.id===a.id;if(authorized)break}catch(error){if(![400,403,409].includes((error as any).status))throw error}}
- return {consent,assents,revocations,suppression,authorized,activeAssentId:authorized?authorization.assent_id:null,disclosure:smsDisclosure,messages:(await db.prepare('SELECT id,revision,phone,kind,message,queued_at,due_at,status,assent_id FROM p_sms_runs WHERE proposal_id=? ORDER BY queued_at,id').bind(id).all()).results,codes:(await db.prepare('SELECT id,revision,generation,queued_at,status,assent_id FROM p_sms_code_runs WHERE proposal_id=? ORDER BY queued_at,id').bind(id).all()).results}
+ const reenables=(await db.prepare('SELECT * FROM p_sms_reenable_history WHERE proposal_id=? ORDER BY reenabled_at,id').bind(id).all()).results
+ return {consent,assents,revocations,reenables,suppression,canReenable:a.role==='owner',reenablement:consent&&suppression?Boolean(await reenableEligibility(env,consent.phone)):false,authorized,activeAssentId:authorized?authorization.assent_id:null,disclosure:smsDisclosure,messages:(await db.prepare('SELECT id,revision,phone,kind,message,queued_at,due_at,status,assent_id FROM p_sms_runs WHERE proposal_id=? ORDER BY queued_at,id').bind(id).all()).results,codes:(await db.prepare('SELECT id,revision,generation,queued_at,status,assent_id FROM p_sms_code_runs WHERE proposal_id=? ORDER BY queued_at,id').bind(id).all()).results}
 }
 export async function smsHistory(env:Bindings,a:Actor,id:unknown){
  const row=await permitted(env.DB,a,id,'send');need(senders.includes(a.role),'Only proposal senders read SMS history',403)
@@ -137,13 +144,13 @@ export async function flushSms(env:Bindings){
   let ctx:Awaited<ReturnType<typeof live>>
   try{ctx=await live(env,r.proposal_id,r.kind);need(ctx.row.revision===r.revision&&ctx.c.phone===r.phone&&ctx.a.id===r.actor_id&&ctx.c.assent_id===r.assent_id,'SMS consent changed',409);if(r.kind==='scheduled')need(await db.prepare('SELECT 1 FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version WHERE s.proposal_id=? AND s.revision=? AND s.version=? AND s.enabled=1').bind(r.proposal_id,r.revision,r.settings_version).first(),'SMS reminder schedule changed',409);if(isReminder(r.kind))need(!await db.prepare('SELECT 1 FROM p_reminder_optouts WHERE proposal_id=? AND revision=?').bind(r.proposal_id,r.revision).first(),'The recipient opted out of reminders',409)}catch(error){if(![400,403,409].includes((error as any).status))throw error;await db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE id=? AND status='queued'").bind(r.id).run();continue}
   const due=afterQuietHours(at,r.time_zone,await reminderPolicy(db));if(due>at){await db.prepare("UPDATE p_sms_runs SET due_at=? WHERE id=? AND status='queued'").bind(due,r.id).run();continue}
-  if(!env.TWILIO_ACCOUNT_SID||!env.TWILIO_AUTH_TOKEN||!env.TWILIO_FROM||env.AUTH_LOCAL==='true')continue
+  if(!smsTransportConfigured(env))continue
   const reminderGuard=!isReminder(r.kind)?{sql:'',values:[] as any[]}:{sql:' AND NOT EXISTS(SELECT 1 FROM p_reminder_optouts WHERE proposal_id=? AND revision=?)'+(r.kind==='scheduled'?' AND EXISTS(SELECT 1 FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version WHERE s.proposal_id=? AND s.revision=? AND s.version=? AND s.enabled=1)':''),values:[r.proposal_id,r.revision,...(r.kind==='scheduled'?[r.proposal_id,r.revision,r.settings_version]:[])]}
   try{await commit(db,ctx.a,[db.prepare("UPDATE p_sms_runs SET status='sending' WHERE id=? AND status='queued'").bind(r.id)],false,{sql:smsGuard(ctx).sql+" AND EXISTS(SELECT 1 FROM p_sms_runs WHERE id=? AND status='queued')"+reminderGuard.sql,values:[...smsGuard(ctx).values,r.id,...reminderGuard.values]})}catch(error){if((error as any).status===409)continue;throw error}
   try{
    const ready=await live(env,r.proposal_id,r.kind)
    need(ready.c.assent_id===r.assent_id&&ready.c.phone===r.phone&&ready.a.id===r.actor_id&&ready.share.token===ctx.share.token,'SMS authorization changed before transport',409)
-   const payload=new URLSearchParams({To:r.phone,From:env.TWILIO_FROM,Body:r.message+'\n'+env.AUTH_ORIGIN+'/p/'+ctx.share.token+'\nReply STOP to stop. HELP for help.',StatusCallback:env.AUTH_ORIGIN+'/api/platter/sms/status'})
+   const payload=new URLSearchParams({To:r.phone,From:env.TWILIO_FROM!,Body:r.message+'\n'+env.AUTH_ORIGIN+'/p/'+ctx.share.token+'\nReply STOP to stop. HELP for help.',StatusCallback:env.AUTH_ORIGIN+'/api/platter/sms/status'})
    const response=await demoEffect(()=>fetch('https://api.twilio.com/2010-04-01/Accounts/'+encodeURIComponent(env.TWILIO_ACCOUNT_SID!)+'/Messages.json',{method:'POST',headers:{authorization:'Basic '+btoa(env.TWILIO_ACCOUNT_SID+':'+env.TWILIO_AUTH_TOKEN),'content-type':'application/x-www-form-urlencoded'},body:payload,redirect:'manual',signal:AbortSignal.timeout(15000)}),()=>Response.json({sid:'synthetic-platter-'+r.id}))
    const receipt=await response.json() as any
    if(Number(receipt.code)===21610){await suppress(env,r.phone,'provider');await db.prepare("UPDATE p_sms_runs SET status='failed' WHERE id=? AND status='sending'").bind(r.id).run();continue}
@@ -192,6 +199,7 @@ export async function smsWebhook(request:Request,env:Bindings,status:boolean){
  need(form.get('To')===env.TWILIO_FROM,'Wrong inbound SMS destination',403)
  const phone=form.get('From')??'',word=(form.get('Body')??'').trim().toUpperCase();need(/^\+1\d{10}$/.test(phone),'Invalid inbound number')
  if(['STOP','STOPALL','UNSUBSCRIBE','CANCEL','END','QUIT'].includes(word)||form.get('OptOutType')==='STOP')await suppress(env,phone,'recipient')
+ else await recordProviderOptIn(env,form,phone)
  // START does not restore consent. Twilio handles mandatory carrier STOP responses.
  return new Response(word==='HELP'?'<?xml version="1.0"?><Response><Message>Platter proposal messages. Contact the sender for help. Reply STOP to stop. Message and data rates may apply.</Message></Response>':'<?xml version="1.0"?><Response/>',{headers:{'content-type':'text/xml; charset=utf-8'}})
 }
@@ -199,7 +207,7 @@ export async function smsWebhook(request:Request,env:Bindings,status:boolean){
 /** User-requested verification codes use the same explicit consent and quiet hours. */
 export async function smsCodeContext(env:Bindings,id:string,quiet=true){
  const ctx=await smsContext(env,id,'identity',true)
- need(env.TWILIO_ACCOUNT_SID&&env.TWILIO_AUTH_TOKEN&&env.TWILIO_FROM&&env.AUTH_LOCAL!=='true','Configure SMS transport before requesting a text code',409)
+ need(smsTransportConfigured(env),'Configure SMS transport before requesting a text code',409)
  if(quiet)need(afterQuietHours(ctx.at,ctx.c.time_zone,await reminderPolicy(env.DB))===ctx.at,'Text verification waits until recipient quiet hours end',429)
  return ctx
 }

@@ -40,6 +40,7 @@ export async function completionSmsJourney(){
   await accept(immediate);await Promise.all([tick('2030-03-09T19:01:00Z'),tick('2030-03-09T19:01:00Z')]);assert.equal(texts.length,1,'repeated acceptance and concurrent processing never repeat completion')
   const noPurpose=await prepare('+12025550141',['invitation'])
   await accept(noPurpose);await tick('2030-03-09T19:02:00Z');assert.equal(texts.length,1);assert.equal((await history(noPurpose.id)).messages.length,0,'invitation assent never implies completion assent')
+  const stopOrigin=await prepare('+12025550144',['invitation'])
   const deferred=await prepare('+12025550142'),revoked=await prepare('+12025550143'),stopped=await prepare('+12025550144'),held=await prepare('+12025550145')
   await tick('2030-03-10T06:00:00Z')
   for(const p of [deferred,revoked,stopped,held])await accept(p)
@@ -49,6 +50,7 @@ export async function completionSmsJourney(){
   const url=h.origin+'/api/platter/sms/inbound',form=new URLSearchParams({AccountSid:'synthetic-platter-9801',From:'+12025550144',To:'+15005550006',Body:'STOP'})
   const signature=createHmac('sha1','synthetic-platter-9802').update(url+[...form.keys()].sort().map(k=>k+form.get(k)).join('')).digest('base64')
   const callback=await h.mf.dispatchFetch(url,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','x-twilio-signature':signature},body:form.toString()});assert.equal(callback.status,200);await callback.text()
+  await h.cmd('sms.send',{id:stopOrigin.id,message:'Suppressed across invitations',requestId:'synthetic-platter-9870'},h.owner,409)
   await tick('2030-03-10T14:59:00Z');assert.equal(texts.length,1)
   // Make just one number uncertain so the supported completion is observed too.
   uncertain=true

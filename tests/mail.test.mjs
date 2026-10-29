@@ -1,3 +1,4 @@
+import {smsReenableJourney,smsDisabledJourney} from './sms-reenable-journey.mjs'
 import {completionSmsJourney} from './sms-completion-journey.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { test } from 'node:test'
@@ -1132,6 +1133,8 @@ test('SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP pr
   assert.ok(first.smsId)
  }finally{await h.close()}
  await completionSmsJourney()
+ await smsReenableJourney()
+ await smsDisabledJourney()
 })
 
 test('SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically cancels queued texts without duplicate transport', {timeout:120000}, async()=>{

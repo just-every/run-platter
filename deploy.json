@@ -49,6 +49,11 @@
       "binding": "TWILIO_FROM",
       "environment": "TWILIO_FROM",
       "optional": true
+    },
+    {
+      "binding": "SMS_PROVIDER",
+      "environment": "SMS_PROVIDER",
+      "optional": true
     }
   ]
 }

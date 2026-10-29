@@ -576,6 +576,12 @@
       "name": "0095_sms_completion.sql",
       "sha256": "e5095fbd3deaa2c09bfee7efc34bd6afdb1a66efd959a463c559a3562597173e",
       "sql": "-- Extend the retained text timeline without changing existing attempts.\nCREATE TABLE p_sms_runs_new (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n phone TEXT NOT NULL, time_zone TEXT NOT NULL, actor_id TEXT NOT NULL,\n kind TEXT NOT NULL CHECK(kind IN ('invitation','manual','scheduled','completion')),\n slot TEXT NOT NULL, settings_version INTEGER, message TEXT NOT NULL, queued_at INTEGER NOT NULL, due_at INTEGER NOT NULL,\n status TEXT NOT NULL CHECK(status IN ('queued','sending','accepted','delivered','failed','held','cancelled')),\n provider_id TEXT UNIQUE, request_id TEXT NOT NULL UNIQUE, assent_id TEXT,\n UNIQUE(proposal_id,revision,kind,slot)\n);\nINSERT INTO p_sms_runs_new SELECT * FROM p_sms_runs;\nDROP TABLE p_sms_runs;\nALTER TABLE p_sms_runs_new RENAME TO p_sms_runs;\nCREATE TABLE p_sms_completion_authority (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n assent_id TEXT NOT NULL REFERENCES p_sms_assents(id)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0096_sms_reenable.sql",
+      "sha256": "cbebdc3767ad5463c708c3ddac223639549305289aad9a1f12678d1b2c92d62b",
+      "sql": "-- Provider opt-in receipts are history, never consent or sending authority.\nCREATE TABLE p_sms_provider_optins (\n id TEXT PRIMARY KEY, phone TEXT NOT NULL, transport_hash TEXT NOT NULL, received_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_reenable_eligibility (\n phone TEXT PRIMARY KEY, event_id TEXT NOT NULL REFERENCES p_sms_provider_optins(id), stopped_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_reenable_history (\n id TEXT PRIMARY KEY, phone TEXT NOT NULL, proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n assent_id TEXT NOT NULL REFERENCES p_sms_assents(id), actor_id TEXT NOT NULL,\n provider_event_id TEXT NOT NULL REFERENCES p_sms_provider_optins(id), stopped_at INTEGER NOT NULL,\n source TEXT NOT NULL, reenabled_at INTEGER NOT NULL\n);\nCREATE TRIGGER p_frozen_sms_provider_optin BEFORE UPDATE ON p_sms_provider_optins BEGIN SELECT RAISE(ABORT,'Provider opt-in history is immutable'); END;\nCREATE TRIGGER p_frozen_sms_reenable BEFORE UPDATE ON p_sms_reenable_history BEGIN SELECT RAISE(ABORT,'SMS re-enablement history is immutable'); END;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

@@ -1,3 +1,4 @@
+import {smsReenableBrowser} from './sms-reenable-browser.mjs'
 import {smsInstallerJourney} from './sms-installer-journey.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
 import { documentJourney } from './document-journey.mjs'
@@ -703,27 +704,34 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
     await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T12:00:00Z'),cron:'*/15 * * * *'})
     const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
     const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Text verified agreement',scope:'Synthetic studio scope',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
-    await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const sent=await h.cmd('proposal.send',{id:p.id,version:2}),row=(await h.state()).proposals.find(row=>row.id===p.id)
+    await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});let sent,row
     const controls=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
     try{
      await controls.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}])
      const sender=await controls.newPage();await sender.goto(h.origin+'/app/proposal?id='+p.id)
+     await sender.getByLabel('Invitation delivery',{exact:true}).selectOption('sms')
+     if(process.env.PLATTER_SCREENSHOTS)await sender.locator('section').filter({has:sender.getByRole('heading',{name:'Review invitation email',exact:true})}).screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SEND-008-text-only-${width}.png`)})
+     await sender.getByRole('button',{name:'Send this invitation',exact:true}).click()
+     row=(await h.state()).proposals.find(row=>row.id===p.id);sent={shareUrl:h.origin+'/p/'+row.shareToken}
+     assert.equal(row.status,'sent');assert.equal(row.invitationMessages.length,0);assert.equal(mail.length,0,'preparing text-only delivery sends no email')
      const smsPanel=sender.locator('section').filter({has:sender.getByRole('heading',{name:'SMS Settings',exact:true})})
      await smsPanel.getByText('Inspect SMS consent and texts',{exact:true}).click()
      assert.match(await smsPanel.innerText(),/SMS is inactive/)
      assert.equal((await h.state()).proposals.find(r=>r.id===p.id).sms.assents.length,0,'loading Settings cannot authorize SMS')
-     const record=async()=>{
-      await smsPanel.getByText('Record recipient assent',{exact:true}).click()
-      const form=smsPanel.locator('form').filter({has:sender.getByRole('button',{name:'Record assent and authorize SMS',exact:true})})
+     const record=async(reenable=false)=>{
+      const button=reenable?'Record new assent and re-enable SMS':'Record assent and authorize SMS'
+      await smsPanel.getByText(reenable?'Record new assent to re-enable':'Record recipient assent',{exact:true}).click()
+      const form=smsPanel.locator('form').filter({has:sender.getByRole('button',{name:button,exact:true})})
       await form.getByLabel('US mobile number',{exact:true}).fill('(202) 555-0129')
       await form.getByLabel('Sending firm',{exact:true}).fill('Synthetic Platter firm')
       for(const label of ['Proposal invitations','Proposal reminders','Identity verification codes','Agreement completion notices'])await form.getByLabel(label,{exact:true}).check()
-      await form.getByLabel('Recipient assent time with UTC offset',{exact:true}).fill('2030-06-01T11:55:00Z')
+      await form.getByLabel('Recipient assent time with UTC offset',{exact:true}).fill(reenable?'2030-06-01T12:01:00Z':'2030-06-01T11:55:00Z')
       await form.getByLabel('Assent collection method',{exact:true}).fill('Recipient signed instruction')
       await form.getByLabel('Recipient evidence supporting the entry',{exact:true}).fill('synthetic-platter-9405')
       await form.getByLabel('Recipient IANA time zone',{exact:true}).fill('Etc/UTC')
-      await form.getByRole('checkbox').last().check()
-      await form.getByRole('button',{name:'Record assent and authorize SMS',exact:true}).click()
+      await form.locator('input[name=consent]').check()
+      if(reenable)await form.locator('input[name=reenableConsent]').check()
+      await form.getByRole('button',{name:button,exact:true}).click()
       assert.equal(await sender.getByRole('alert').count(),0)
       await smsPanel.getByText('Inspect SMS consent and texts',{exact:true}).click()
      }
@@ -741,6 +749,7 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
      assert.equal((await h.state()).proposals.find(r=>r.id===p.id).sms.revocations.length,1)
      if(process.env.PLATTER_SCREENSHOTS)await smsPanel.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SEND-008-revoked-${width}.png`)})
      await record()
+     await smsReenableBrowser(h,sender,smsPanel,record,width)
     }finally{await controls.close()}
     await h.cmd('signer.method',{id:p.id,version:row.version,method:'SMS code'})
     context=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})

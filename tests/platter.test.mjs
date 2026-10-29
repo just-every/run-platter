@@ -3655,6 +3655,7 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
   const erasedClient = await h.cmd('client.save', { name: 'Synthetic alternate company', email: edge.state.contacts[1].properties.email, variableFields: { contactName: 'Casey Lane', firstName: 'Casey', lastName: 'Lane', title: '', address: '' } })
   const eraseReview = await h.cmd('crm.deal.review', alternate)
   await h.cmd('client.erase', { id: erasedClient.id, confirmName: 'Synthetic alternate company' })
+  assert.equal((await h.db.prepare("SELECT COUNT(*) AS n FROM p_crm_draft_reviews WHERE json_extract(source_json,'$.contact.email')=?").bind(edge.state.contacts[1].properties.email).first()).n, 0, 'client erasure removes retained CRM review captures')
   const erasedBaseline = await counts()
   await apply(eraseReview, h.owner, 409)
   assert.deepEqual(await counts(), erasedBaseline, 'a captured review cannot recreate a client erased after review')

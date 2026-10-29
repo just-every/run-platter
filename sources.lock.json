@@ -2466,7 +2466,7 @@
       "executable": false
     },
     "src/platter/commands.ts": {
-      "sha256": "ffafa647aecc2bc976bf2dceb6bd7c7f669f0b17943e4e9e32fe304ba9e5ae03",
+      "sha256": "a2e0ec1d66b83db652f3edeb9bb41f769a7a3d66e6b9e3c624e0089c9e9f0cbf",
       "executable": false
     },
     "src/platter/completion-mail.ts": {
@@ -3418,7 +3418,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "5c78334bb8ef1821d082612372713acedadce38799944c4612919c72ecd6ee41",
+      "sha256": "773fed0791edf35b50cb55e1a3105179fd8b63c7aeed7e1e502389e6cd7fece2",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

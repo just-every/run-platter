@@ -107,6 +107,7 @@ async function multiRecipientAccept(env:Bindings,c:Awaited<ReturnType<typeof cli
  need(progress.ready,'Wait for the preceding signing group to finish',409)
  need(p.consent===true||['on','yes'].includes(String(p.consent)),'Confirm your decision')
  const signer=text(p.name,'your full name',200),{option,deposit,frozen,consent}=acceptanceTerms(row,p.optionId,p,at)
+ await acceptedClientFiles(env,c,frozen.document,p)
  const fieldValues=acceptanceFields(frozen.document,p,signer,recipient.id,progress.clientSlot)
  if(fieldValues)Object.assign(frozen,{fieldValues})
  const choice={optionId:option.id,totalCents:option.cents,depositCents:deposit,items:(frozen as any).selection?.items??[]}

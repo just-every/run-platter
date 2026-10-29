@@ -1444,3 +1444,75 @@ test('COLLAB-002 scoped colleagues comment, receive consented generic email and 
   assert.deepEqual([...new Set(actions.map(row=>row.action))].sort(),['collaboration.assign','collaboration.comment','collaboration.resolve','collaboration.route'])
  }finally{await h.close()}
 })
+
+test('SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports', {timeout:240000}, async()=>{
+ const {createHash}=await import('node:crypto')
+ for(const provider of ['resend','sendgrid','cloudflare','gmail','microsoft','local']){
+  const sent=[];let fail=false,stall=false,release,entered
+  let arrived=new Promise(resolve=>{entered=resolve}),waiting=new Promise(resolve=>{release=resolve})
+  const h=await harness({assetsDirectory:'public',...(provider==='local'?{}:{origin:'https://platter.example'}),auth:{AUTH_LOCAL:provider==='local'?'true':'false',MAIL_PROVIDER:['gmail','microsoft'].includes(provider)?'resend':provider==='local'?'development':provider,MAIL_ACCOUNT_ID:'0'.repeat(32),MAIL_API_KEY:'synthetic-platter-9801',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-9802',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-9803',MICROSOFT_MAIL_CLIENT_ID:'synthetic-platter-9804',MICROSOFT_MAIL_CLIENT_SECRET:'synthetic-platter-9805'},outboundService:async request=>{
+   const url=new URL(request.url)
+   if(['oauth2.googleapis.com','login.microsoftonline.com'].includes(url.hostname))return Response.json({access_token:'synthetic-platter-9806',refresh_token:'synthetic-platter-9807',scope:provider==='gmail'?'openid email https://www.googleapis.com/auth/gmail.send':'User.Read Mail.Send'})
+   if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-9808',email:h.auth.OWNER_EMAIL,email_verified:true})
+   if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-9809',mail:h.auth.OWNER_EMAIL})
+   const payload=await request.json();let message
+   if(provider==='gmail'){
+    const raw=Buffer.from(payload.raw,'base64url').toString('utf8'),boundary=raw.match(/boundary="([^"]+)"/)?.[1]
+    message={to:[raw.match(/\r\nTo: ([^\r]+)/)[1]],subject:Buffer.from(raw.match(/Subject: =\?UTF-8\?B\?([^?]+)\?=/)[1],'base64').toString(),attachments:[]}
+    if(boundary){for(const part of raw.split('--'+boundary)){const filename=part.match(/filename="([^"]+)"/)?.[1];if(filename){assert.match(part,/Content-Type: application\/pdf/);message.attachments.push({filename,bytes:Buffer.from(part.split('\r\n\r\n')[1].trim(),'base64')})}}}
+    else message.text=Buffer.from(raw.split('\r\n\r\n')[1],'base64').toString()
+   }else if(provider==='microsoft')message={to:payload.message.toRecipients.map(r=>r.emailAddress.address),subject:payload.message.subject,text:payload.message.body.content,attachments:(payload.message.attachments??[]).map(a=>{assert.equal(a['@odata.type'],'#microsoft.graph.fileAttachment');assert.equal(a.contentType,'application/pdf');return {filename:a.name,bytes:Buffer.from(a.contentBytes,'base64')}})}
+   else message={to:provider==='sendgrid'?payload.personalizations[0].to.map(r=>r.email):payload.to,subject:payload.subject,text:payload.text??payload.content?.find(c=>c.type==='text/plain')?.value,attachments:(payload.attachments??[]).map(a=>{assert.equal(a.content_type??a.type,'application/pdf');return {filename:a.filename,bytes:Buffer.from(a.content,'base64')}})}
+   sent.push(message)
+   if(message.subject.startsWith('Agreement complete:')){if(stall&&message.to.includes(recipient)){entered();await waiting}if(fail)throw Error('Synthetic uncertain completion response')}
+   return provider==='sendgrid'?new Response(null,{status:202}):provider==='microsoft'?new Response(null,{status:202}):provider==='cloudflare'?Response.json({success:true,result:{message_id:'synthetic-platter-'+(9900+sent.length)}}):Response.json({id:'synthetic-platter-'+(9900+sent.length)})
+  }})
+  try{
+   if(['gmail','microsoft'].includes(provider)){
+    const start=await h.send('/api/platter/mailbox/authorize',{provider,consent:true},h.owner),state=new URL(start.headers.get('location')).searchParams.get('state')
+    assert.equal((await h.send('/api/platter/mailbox/callback?'+new URLSearchParams({state,code:'synthetic-platter-9810'}),undefined,h.owner)).status,303)
+   }
+   const id=await approved(h),invitation=await h.cmd('proposal.send',{id,version:2}),path=new URL(invitation.shareUrl).pathname
+   const accept={name:'Synthetic signer',optionId:'one',consent:true}
+   const before=sent.length
+   assert.equal((await h.send(path+'/action?name=accept',accept)).status,401);assert.equal(sent.length,before)
+   await h.send(path+'/action?name=code.request',{})
+   const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(id).first()).body.match(/\b\d{6}\b/)[0]
+   const verified=await h.send(path+'/action?name=code.verify',{code});assert.equal(verified.status,200,verified.text)
+   const cron=async()=>await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+   stall=provider==='resend'
+   const accepted=h.send(path+'/action?name=accept',accept,verified.cookie)
+   if(stall){await arrived;await Promise.all([cron(),cron()]);release()}
+   assert.equal((await accepted).status,200)
+   const completion=sent.filter(m=>m.subject.startsWith('Agreement complete:'))
+   const references=(await h.db.prepare('SELECT * FROM p_completion_mail WHERE proposal_id=?').bind(id).all()).results
+   assert.equal(references.length,2)
+   const download=async(url,cookie)=>{const r=await h.mf.dispatchFetch(h.origin+url,{headers:{cookie}});assert.equal(r.status,200);return Buffer.from(await r.arrayBuffer())}
+   const pdf=await download(path+'/agreement.pdf',verified.cookie),certificate=await download(path+'/certificate.pdf',verified.cookie),facts=(await h.send(path+'/certificate.json',undefined,verified.cookie)).value
+   assert.equal(facts.documentSha256,createHash('sha256').update(pdf).digest('hex'));assert.equal(facts.signers[0].method,'mailbox code');assert.equal(facts.location,'not recorded');assert.equal(facts.userAgent,'not recorded')
+   assert.deepEqual(await download('/api/platter/agreement.pdf?id='+id,h.owner),pdf);assert.deepEqual(await download('/api/platter/certificate.pdf?id='+id,h.owner),certificate)
+   if(provider==='local'){
+    const captured=(await mailRows(h)).filter(m=>references.some(r=>r.mail_id===m.id));assert.equal(captured.length,2);assert.ok(captured.every(m=>m.status==='local'));assert.equal(sent.length,0)
+   }else{
+    assert.equal(completion.length,2,provider);assert.deepEqual(completion.map(m=>m.to[0]).sort(),[recipient,h.auth.OWNER_EMAIL].sort())
+    for(const message of completion){assert.deepEqual(message.attachments.map(a=>a.filename),['agreement.pdf','certificate.pdf']);assert.deepEqual(message.attachments[0].bytes,pdf);assert.deepEqual(message.attachments[1].bytes,certificate)}
+   }
+   assert.equal((await h.send(path+'/action?name=accept',accept,verified.cookie)).status,200)
+   await Promise.all([cron(),cron()]);assert.equal(sent.filter(m=>m.subject.startsWith('Agreement complete:')).length,completion.length)
+   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_agreement_artifacts WHERE proposal_id=?').bind(id).first()).n,1)
+   if(provider==='resend'){
+    stall=false;fail=true
+    const uncertain=await approved(h),share=await h.cmd('proposal.send',{id:uncertain,version:2}),otherPath=new URL(share.shareUrl).pathname
+    await h.send(otherPath+'/action?name=code.request',{});const otherCode=sent.at(-1).text.match(/\b\d{6}\b/)[0],v=await h.send(otherPath+'/action?name=code.verify',{code:otherCode})
+    assert.equal((await h.send(otherPath+'/action?name=accept',accept,v.cookie)).status,200)
+    const n=sent.length;await cron();assert.equal((await h.send(otherPath+'/action?name=accept',accept,v.cookie)).status,200);assert.equal(sent.length,n,'uncertain completion outcomes never replay')
+    assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_mail m JOIN p_completion_mail c ON c.mail_id=m.id WHERE c.proposal_id=? AND m.status='uncertain'").bind(uncertain).first()).n,2)
+    fail=false
+    const stale=await approved(h),old=await h.cmd('proposal.send',{id:stale,version:2}),oldPath=new URL(old.shareUrl).pathname,row=(await h.state()).proposals.find(p=>p.id===stale)
+    await h.cmd('proposal.send',{id:stale,version:row.version})
+    const unchanged=sent.length;assert.equal((await h.send(oldPath+'/action?name=accept',accept,v.cookie)).status,404);assert.equal(sent.length,unchanged)
+    assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_completion_mail WHERE proposal_id=?').bind(stale).first()).n,0)
+   }
+  }finally{release();await h.close()}
+ }
+})

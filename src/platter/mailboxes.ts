@@ -1,3 +1,5 @@
+import { completionAuthority } from './completion-mail'
+import { mailboxMime, type MailAttachment } from '../mail.server.mjs'
 import { reminderPolicy, reminderQuiet } from './reminders'
 import { currentTime } from './expiry-time'
 import { approvalPlan } from './approvals'
@@ -74,6 +76,7 @@ export async function mailboxCallback(env:Bindings,a:Actor,url:URL){
  return id
 }
 export async function sendingActor(env:Bindings,row:any){
+ await completionAuthority(env,row)
  if(!row.sender_id)return null
  const a=await actorById(env.DB,row.sender_id);need(a&&senders.includes(a.role),'The sender no longer has permission to send',403)
  const proposal=await permitted(env.DB,a,row.proposal_id,'send')
@@ -106,7 +109,7 @@ export async function memberMailbox(env:Bindings,a:Actor){
   return {broken:true,connection:row}
  }
 }
-export async function sendMailbox(env:Bindings,a:Actor,row:any,mailbox:NonNullable<Awaited<ReturnType<typeof memberMailbox>>>,replyTo?:string){
+export async function sendMailbox(env:Bindings,a:Actor,row:any,mailbox:NonNullable<Awaited<ReturnType<typeof memberMailbox>>>,replyTo?:string,attachments?:MailAttachment[]){
  // Refresh/identity checks can take time. Recheck current sending authority and
  // the exact connection immediately before the outbound operation.
  await sendingActor(env,row)
@@ -116,11 +119,10 @@ export async function sendMailbox(env:Bindings,a:Actor,row:any,mailbox:NonNullab
  const from=email(c.mailbox_email),to=email(row.recipient)
  let response:Response
  if(c.provider==='gmail'){
-  const header=(value:string)=>'=?UTF-8?B?'+btoa(Array.from(new TextEncoder().encode(value),c=>String.fromCharCode(c)).join(''))+'?='
-  const raw=['From: '+from,'To: '+to,'Subject: '+header(row.subject),'MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: base64',...(replyTo?['Reply-To: '+replyTo]:[]),'',btoa(Array.from(new TextEncoder().encode(row.body),c=>String.fromCharCode(c)).join(''))].join('\r\n')
+  const raw=mailboxMime(from,to,row.subject,row.body,replyTo,attachments)
   response=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',headers:{authorization:'Bearer '+mailbox.token,'content-type':'application/json'},body:JSON.stringify({raw:base64url(new TextEncoder().encode(raw))}),redirect:'manual',signal:AbortSignal.timeout(15000)})
  }else{
-  response=await fetch('https://graph.microsoft.com/v1.0/me/sendMail',{method:'POST',headers:{authorization:'Bearer '+mailbox.token,'content-type':'application/json'},body:JSON.stringify({message:{subject:row.subject,body:{contentType:'Text',content:row.body},from:{emailAddress:{address:from}},toRecipients:[{emailAddress:{address:to}}],...(replyTo?{replyTo:[{emailAddress:{address:replyTo}}]}:{})},saveToSentItems:true}),redirect:'manual',signal:AbortSignal.timeout(15000)})
+  response=await fetch('https://graph.microsoft.com/v1.0/me/sendMail',{method:'POST',headers:{authorization:'Bearer '+mailbox.token,'content-type':'application/json'},body:JSON.stringify({message:{subject:row.subject,body:{contentType:'Text',content:row.body},from:{emailAddress:{address:from}},toRecipients:[{emailAddress:{address:to}}],...(replyTo?{replyTo:[{emailAddress:{address:replyTo}}]}:{}),...(attachments?{attachments:attachments.map(a=>({'@odata.type':'#microsoft.graph.fileAttachment',name:a.filename,contentType:a.contentType,contentBytes:btoa(Array.from(a.content,c=>String.fromCharCode(c)).join(''))}))}:{})},saveToSentItems:true}),redirect:'manual',signal:AbortSignal.timeout(15000)})
  }
  if([401,403].includes(response.status)){
   await env.DB.prepare('UPDATE p_connections SET broken_at=? WHERE id=? AND version=?').bind(Date.now(),c.id,c.version).run()

@@ -1,4 +1,6 @@
 import { currentTime } from './expiry-time'
+import { queueReadyCompletionMail } from './completion-mail'
+import { dispatchMail } from './mail'
 import { collectionQuote } from './collection-fees'
 import type { Bindings } from '../auth.server'
 import { providerCredential } from './connections'
@@ -74,6 +76,7 @@ export async function clientCollection(env:Bindings,c:any,input:Record<string,un
  }
  await db.prepare('UPDATE p_collection_intents SET status=?,provider_mandate=COALESCE(?,provider_mandate),updated_at=? WHERE id=? AND (status!=\'succeeded\' OR ?=\'succeeded\')').bind(intent.status,typeof mandate==='string'?mandate:null,Date.now(),saved.id,intent.status).run()
  const status=(await db.prepare('SELECT status FROM p_collection_intents WHERE id=?').bind(saved.id).first<{status:string}>())!.status
+ if(status==='succeeded'){await queueReadyCompletionMail(env,accepted.proposal_id);await dispatchMail(env,accepted.proposal_id)}
  return {quote:{depositCents:saved.deposit_cents,feeCents:saved.fee_cents,cents:saved.cents},status,complete:policy.completion==='due'||status==='succeeded'&&Boolean(saved.authorized_at),...(refresh||status==='succeeded'?{}:{clientSecret:intent.client_secret,publishableKey:secret.publishableKey,methods:policy.methods,method:saved.method}),authorization:saved.authorization}
 }
 
@@ -86,5 +89,6 @@ export async function authorizeCollection(env:Bindings,c:any,input:Record<string
  need(saved?.provider_intent&&saved.deposit_cents===accepted.deposit_cents&&saved.currency===accepted.currency,'Prepare this deposit before authorizing it',409)
  need(input.consent===true&&Number(input.cents)===saved.cents,'Review and authorize the exact payment total',400)
  await db.batch([db.prepare('INSERT INTO p_guard(ok) VALUES(EXISTS(SELECT 1 FROM p_shares WHERE token=? AND session_hash=? AND session_expires>?))').bind(c.token,c.share.session_hash,await currentTime(db)),db.prepare('UPDATE p_collection_intents SET authorized_at=COALESCE(authorized_at,?) WHERE id=?').bind(await currentTime(db),saved.id),db.prepare('DELETE FROM p_guard')])
+ await queueReadyCompletionMail(env,accepted.proposal_id);await dispatchMail(env,accepted.proposal_id)
  return {authorized:true}
 }

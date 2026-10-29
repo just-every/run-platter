@@ -1,12 +1,15 @@
+import { clientLocale } from '../locales'
+import { proposalMail } from '../mail'
 import { recipientPlan } from '../recipients'
 import { action, date, escape, field, hidden, panel, proposalPath, type Feedback } from './shared'
 
 export function invitationComposer(state: any, p: any, feedback?: Feedback) {
  if (!p.canSend || (!p.approval?.complete && !['sent','expired'].includes(p.status))) return ''
+ const defaults=proposalMail(p.title,'',clientLocale(p))
  const retry = feedback?.command === 'proposal.send' && feedback.input?.id === p.id ? feedback.input : undefined
  return panel('Review invitation email', `<form id="invitation-${escape(p.id)}" method="post" action="${action('proposal.send', proposalPath(p.id))}">${hidden('id', p.id)}${hidden('version', p.version)}<p>The personal message goes with a new client link. Sending freezes this revision’s content.</p>` +
-  field('Invitation subject', 'mailSubject', retry?.mailSubject ?? ('Your proposal: ' + p.title).slice(0, 200), 'required maxlength="200"') +
-  `<label for="invitation-message-${escape(p.id)}">Invitation message</label><textarea id="invitation-message-${escape(p.id)}" name="mailMessage" rows="4" required maxlength="10000">${escape(retry?.mailMessage ?? 'Review your proposal and verify your email before accepting:')}</textarea><p class="muted">Platter appends the new client link. Fill all variables before sending.</p>${state.clientMailRepliesAvailable?'<label><input type="checkbox" name="mailRepliesConsent" value="yes"> Allow one client email reply to be saved on this proposal, visible to its collaborators. The email is a record, not an approval or signature. From is not proven identity; Resend SPF/DKIM results are shown. Automatic replies and bulk mail are dropped. The owner receives one in-app notice if the one-reply limit is reached. This consent is audited.</label>':''}<button>Send this invitation</button></form>`)
+  field('Invitation subject', 'mailSubject', retry?.mailSubject ?? defaults[0].slice(0, 200), 'required maxlength="200"') +
+  `<label for="invitation-message-${escape(p.id)}">Invitation message</label><textarea id="invitation-message-${escape(p.id)}" name="mailMessage" rows="4" required maxlength="10000">${escape(retry?.mailMessage ?? defaults[1].trimEnd())}</textarea><p class="muted">Platter appends the new client link. Fill all variables before sending.</p>${state.clientMailRepliesAvailable?'<label><input type="checkbox" name="mailRepliesConsent" value="yes"> Allow one client email reply to be saved on this proposal, visible to its collaborators. The email is a record, not an approval or signature. From is not proven identity; Resend SPF/DKIM results are shown. Automatic replies and bulk mail are dropped. The owner receives one in-app notice if the one-reply limit is reached. This consent is audited.</label>':''}<button>Send this invitation</button></form>`)
 }
 
 export function invitationTimeline(p: any) {

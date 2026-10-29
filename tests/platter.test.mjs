@@ -1,3 +1,4 @@
+import { acceptRevenue } from './revenue-fixture.mjs'
 import { collectionLifecycle, collectionFees, collectionMethodInheritance } from './collection-journey.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { richLibraryPropagation, richLibrarySource } from './library-fixture.mjs'
@@ -15,6 +16,85 @@ async function audited(h,action,actor,role,subject){const query=new URLSearchPar
 async function draft(h){const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'});const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id});return{client,p}}
 async function sent(h){const{client,p}=await draft(h);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:p.id,version:2});return{client,p,path:new URL(share.shareUrl).pathname}}
 async function verified(h,path){let r=await h.send(path+'/action?name=code.request',{});assert.equal(r.status,200,r.text);const mail=(await h.state()).outbox.find(x=>x.subject.includes('verification code'));const code=mail.body.match(/\b\d{6}\b/)[0];r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,200,r.text);assert.ok(r.cookie);return r.cookie}
+test('EDIT-017 Spanish mailbox journey preserves authority, verification limits, authored content and actual certificate language',async()=>{const h=await harness({assetsDirectory:'public'});try{
+ const {client,p}=await draft(h)
+ const at=Date.parse('2030-06-01T15:00:00Z'),tick=async time=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(time),cron:'*/15 * * * *'})
+ await tick(at)
+ const before=(await h.state()).proposals.find(row=>row.id===p.id)
+ const memberEmail='synthetic-platter-9708'+String.fromCharCode(64)+'example.test'
+ await h.send('/auth/invite',{email:memberEmail,displayName:'Client member',role:'member',returnTo:'/app'},h.owner)
+ const member=await h.signIn(memberEmail)
+ await h.cmd('proposal.locale',{id:p.id,version:1,locale:'es'},member,403)
+ await h.cmd('proposal.locale',{id:p.id,version:0,locale:'es'},h.owner,409)
+ await h.cmd('proposal.locale',{id:p.id,version:1,locale:'fr'},h.owner,400)
+ assert.deepEqual((await h.state()).proposals.find(row=>row.id===p.id),before)
+ await h.cmd('proposal.locale',{id:p.id,version:1,locale:'es'})
+ await h.cmd('proposal.approve',{id:p.id,version:2,revision:1})
+ const invitation=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(invitation.shareUrl).pathname
+ await h.cmd('proposal.locale',{id:p.id,version:4,locale:'en'},h.owner,409)
+ await h.cmd('signer.method',{id:p.id,version:4,method:'SMS code'},h.owner,409)
+ let r=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true});assert.equal(r.status,401);assert.match(r.text,/Verifique su correo electrónico antes de aceptar/)
+ r=await h.send(path,undefined,'',{'accept-language':'fr'});assert.match(r.text,/<html lang="es">/);assert.ok(r.text.includes(offer.scope));assert.ok(r.text.includes(offer.optionOne))
+ assert.match(r.text,/Privacidad de las visitas/);assert.match(r.text,/No se utilizan rastreadores de terceros/)
+ await h.cmd('tracking.settings',{enabled:'yes',alerts:'no',retentionDays:90,quietMinutes:30,consent:'yes'})
+ r=await h.send(path);assert.match(r.text,/Se miden las visitas a esta página/);assert.match(r.text,/No se almacena la dirección IP completa/);assert.match(r.text,/¿Ha recibido un enlace reenviado\?/)
+ r=await h.send(path+'/action?name=code.request',{});assert.equal(r.status,200)
+ const code=(await h.state()).outbox.find(m=>m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0],wrong=code==='000000'?'000001':'000000'
+ assert.equal((await h.send(path+'/action?name=code.request',{})).status,429)
+ for(let i=0;i<5;i++){r=await h.send(path+'/action?name=code.verify',{code:wrong});assert.equal(r.status,401);assert.match(r.text,/Código de verificación incorrecto/)}
+ r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,401);assert.match(r.text,/límite de intentos/)
+ await tick(at+60000)
+ assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+ const next=(await h.state()).outbox.find(m=>m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0]
+ r=await h.send(path+'/action?name=code.verify',{code:next});assert.equal(r.status,200,r.text);const cookie=r.cookie
+ assert.equal((await h.send(path+'/action?name=code.verify',{code:next})).status,401)
+ assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:false},cookie)).status,400)
+ r=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true},cookie);assert.equal(r.status,200,r.text);assert.match(r.text,/Propuesta aceptada/)
+ const accepted=(await h.state()).proposals.find(row=>row.id===p.id)
+ assert.equal(accepted.acceptance.language,'es');assert.equal(accepted.acceptance.totalCents,420000);assert.equal(accepted.acceptance.depositCents,105000)
+ const frozen=JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot)
+ assert.equal(frozen.language,'es');assert.equal(frozen.scope,offer.scope);assert.equal(frozen.options[0].label,offer.optionOne)
+ assert.equal((await h.send(path+'/certificate.json')).status,401)
+ const certificate=await h.send(path+'/certificate.json',undefined,cookie);assert.equal(certificate.status,200,certificate.text);assert.equal(certificate.value.language,'es');assert.equal(certificate.value.signers[0].language,'es')
+ const response=await h.mf.dispatchFetch(h.origin+path+'/certificate.pdf',{headers:{cookie}});assert.equal(response.status,200)
+ assert.match((await pdfPages(new Uint8Array(await response.arrayBuffer()))).join(' '),/Language shown: Spanish \(es\)/)
+ const legacyP=await h.cmd('proposal.prepare',{...offer,clientId:client.id})
+ await h.cmd('proposal.approve',{id:legacyP.id,version:1,revision:1})
+ const legacy={p:legacyP,path:new URL((await h.cmd('proposal.send',{id:legacyP.id,version:2})).shareUrl).pathname},legacyCookie=await verified(h,legacy.path)
+ const historical=(await h.state()).proposals.find(row=>row.id===legacy.p.id)
+ // Seed a retained pre-language agreement without changing any immutable fact.
+ await h.db.batch([
+  h.db.prepare('INSERT INTO p_acceptances(proposal_id,revision,snapshot,name,email,option_id,total_cents,deposit_cents,accepted_at,consent,currency) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(legacy.p.id,1,JSON.stringify(historical),'Avery Chen',historical.clientEmail??h.auth.OWNER_EMAIL,'one',240000,60000,at,'I accept the selected option, scope and deposit.','USD'),
+  h.db.prepare('INSERT INTO p_signature_facts(proposal_id,revision,method,verified_at) VALUES(?,?,?,?)').bind(legacy.p.id,1,'mailbox code',at),
+  h.db.prepare("UPDATE p_proposals SET status='accepted' WHERE id=?").bind(legacy.p.id)
+ ])
+ const old=await h.send(legacy.path+'/certificate.json',undefined,legacyCookie);assert.equal(old.status,200);assert.equal(old.value.language,undefined);assert.equal(old.value.signers[0].language,undefined);assert.equal(old.value.location,'not recorded');assert.equal(old.value.userAgent,'not recorded')
+ const limited=await h.cmd('proposal.prepare',{...offer,clientId:client.id})
+ await h.cmd('payment.collection',{id:limited.id,version:1,completion:'required',paymentMethods:['card']})
+ await h.cmd('proposal.locale',{id:limited.id,version:2,locale:'es'},h.owner,409)
+ await h.cmd('payment.collection',{id:limited.id,version:2,completion:'off'})
+ await h.cmd('proposal.locale',{id:limited.id,version:3,locale:'es'})
+ await h.cmd('proposal.approve',{id:limited.id,version:4,revision:1})
+ const limitedPath=new URL((await h.cmd('proposal.send',{id:limited.id,version:5})).shareUrl).pathname
+ assert.equal((await h.send(limitedPath+'/action?name=code.request',{})).status,200)
+ const expired=(await h.state()).outbox.find(m=>m.proposal_id===limited.id&&m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0]
+ let now=at+660000;await tick(now)
+ assert.equal((await h.send(limitedPath+'/action?name=code.verify',{code:expired})).status,401,'a ten-minute-old code cannot verify a Spanish invitation')
+ for(let generation=2;generation<=10;generation++){await tick(now+=60000);assert.equal((await h.send(limitedPath+'/action?name=code.request',{})).status,200)}
+ await tick(now+=60000)
+ const exhausted=await h.db.prepare('SELECT * FROM p_shares WHERE token=?').bind(limitedPath.split('/').at(-1)).first()
+ r=await h.send(limitedPath+'/action?name=code.request',{});assert.equal(r.status,429);assert.match(r.text,/límite de solicitudes/)
+ assert.deepEqual(await h.db.prepare('SELECT * FROM p_shares WHERE token=?').bind(limitedPath.split('/').at(-1)).first(),exhausted)
+ const fresh=new URL((await h.cmd('proposal.send',{id:limited.id,version:6})).shareUrl).pathname
+ assert.equal((await h.send(limitedPath+'/action?name=code.verify',{code:expired})).status,404)
+ assert.equal((await h.send(limitedPath)).status,404)
+ const freshRequest=await h.send(fresh+'/action?name=code.request',{});assert.equal(freshRequest.status,200)
+ const freshCode=(await h.state()).outbox.find(m=>m.proposal_id===limited.id&&m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0]
+ const freshVerification=await h.send(fresh+'/action?name=code.verify',{code:freshCode});assert.equal(freshVerification.status,200)
+ r=await h.send(fresh+'/action?name=decline',{revision:1,reason:'No se necesita',consent:true},freshVerification.cookie);assert.equal(r.status,410);assert.match(r.text,/Propuesta retirada/);assert.ok(!r.text.includes(offer.scope))
+ r=await h.send(fresh,undefined,freshVerification.cookie);assert.equal(r.status,410);assert.match(r.text,/<html lang="es">/);assert.ok(!r.text.includes(offer.scope))
+ }finally{await h.close()}
+})
 test('native auth, CSRF, roles and revocable agent boundary',()=>run(async h=>{
  await h.state('',401);await h.cmd('client.save',{name:'Unsafe',email:'a@b.example'},h.owner,403,{origin:'https://elsewhere.example'})
  const key=await h.cmd('agent.create',{label:'Draft assistant'});let r=await h.send('/api/platter/agent/command',{name:'client.save',input:{}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,403)
@@ -1743,7 +1823,7 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   await h.cmd('proposal.approve',{id:second.id,version:1,revision:1});const secondSend=await h.cmd('proposal.send',{id:second.id,version:2},people.sales),secondPath=new URL(secondSend.shareUrl).pathname,secondCookie=await verified(h,secondPath)
   assert.equal((await h.send(secondPath+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},secondCookie)).status,200)
   await h.cmd('payment.record',{id:second.id,amount:'7',receivedOn:'2026-10-21',method:'check',reference:'synthetic-platter-4200',consent:true},people.billing);await h.cmd('invoice.export',{id:p.id})
-  const query='view=recorded-revenue&sort=value&direction=desc',totals={currency:'USD',count:2,valueCents:480000,receivedCents:61000,refundedCents:40000,netReceivedCents:21000,uncertainRefundCents:5000,exportedDepositCents:60000}
+  const query='view=recorded-revenue&sort=value&direction=desc',totals={currency:'USD',count:2,valueCents:480000,oneOffCents:480000,firstYearCents:480000,receivedCents:61000,refundedCents:40000,netReceivedCents:21000,uncertainRefundCents:5000,exportedDepositCents:60000}
   for(const [role,cookie] of Object.entries({owner:h.owner,...people})){
    const report=await h.send('/api/platter/pipeline?'+query,undefined,cookie)
    if(role==='content_editor'){assert.equal(report.status,403);assert.equal((await h.send('/app?'+query,undefined,cookie)).status,403);assert.ok((await h.state(cookie)).proposals.every(p=>!Object.hasOwn(p,'recordedRevenue')));continue}
@@ -1751,9 +1831,48 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
    if(['owner','admin','billing'].includes(role))assert.deepEqual(report.value.totals,[totals]);else{assert.deepEqual(report.value.rows.map(r=>r.id),[second.id]);assert.equal(report.value.totals[0].netReceivedCents,700)}
    assert.doesNotMatch(report.text,/provider_charge|reference|recorded_by|internalPricing|synthetic-platter-2401/)
   }
-  const csv=await h.send('/api/platter/pipeline.csv?'+query,undefined,h.owner);assert.equal(csv.status,200);assert.match(csv.text,/Received payments,Confirmed refunds,Net received,Unconfirmed refunds,Exported deposit CSV value/);assert.match(csv.text,/Total \(2 proposals\),,,,,USD,4800\.00,,?,610\.00,400\.00,210\.00,50\.00,600\.00/)
+  const csv=await h.send('/api/platter/pipeline.csv?'+query,undefined,h.owner);assert.equal(csv.status,200);assert.match(csv.text,/Received payments,Confirmed refunds,Net received,Unconfirmed refunds,Exported deposit CSV value/);assert.match(csv.text,/Total \(2 proposals\),,,,,USD,4800\.00,,,,4800\.00,4800\.00,610\.00,400\.00,210\.00,50\.00,600\.00/)
   const scheduled=await h.cmd('report.schedule',{filters:query,cadence:'daily',hour:8,recipients:[h.auth.OWNER_EMAIL]});const due=(await h.state()).reportSchedules.find(r=>r.id===scheduled.id).nextRunAt,worker=await h.mf.getWorker();await worker.scheduled({scheduledTime:new Date(due),cron:'*/15 * * * *'});await worker.scheduled({scheduledTime:new Date(due),cron:'*/15 * * * *'})
   const email=(await h.state()).reportOutbox;assert.equal(email.length,1);assert.match(email[0].subject,/recorded revenue/);const asOfRun=await h.send('/api/platter/pipeline.csv?'+query,undefined,h.owner);assert.equal(asOfRun.status,200);assert.ok(email[0].body.includes(asOfRun.text),'scheduled CSV equals the same filtered rows as of the run time');assert.match(email[0].body,/Net received: \$210\.00 USD/);assert.match(email[0].body,/Unconfirmed refunds: \$50\.00 USD/)
+
+  const undated=new URLSearchParams({view:'recorded-revenue',q:offer.title,bookedFrom:'2099-01-01',bookedTo:'2099-12-31',receivedFrom:'2000-01-01',receivedTo:'2100-12-31'})
+  const datedOnly=await h.send('/api/platter/pipeline?'+undated,undefined,h.owner);assert.equal(datedOnly.status,200);assert.equal(datedOnly.value.totals[0].receivedCents,300,'A linked Stripe receipt has no recorded receipt date and cannot be placed in a collection period');assert.equal(datedOnly.value.totals[0].refundedCents,0)
+  const ownerId=(await h.state()).actor.id
+  const first=await acceptRevenue(h,{clientId:client.id}),later=await acceptRevenue(h,{clientId:client.id,term:24,date:'2099-04-01',title:'Two-year care'})
+  const other=await acceptRevenue(h,{clientId:client.id,cookie:people.sales,title:'Sales care'}),aud=await acceptRevenue(h,{clientId:client.id,currency:'AUD',title:'Historical AUD care'})
+  for(const [id,amount,receivedOn] of [[first.id,'2500','2099-03-31'],[first.id,'1200','2099-04-01'],[later.id,'2400','2099-06-30'],[other.id,'900','2099-04-01'],[aud.id,'700','2099-04-01']])await h.cmd('payment.record',{id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4300',consent:true},people.billing)
+  const filters=new URLSearchParams({view:'recorded-revenue',currency:'USD',owner:ownerId,bookedFrom:'2099-01-15',bookedTo:'2099-03-31',receivedFrom:'2099-04-01',receivedTo:'2099-06-30',sort:'value',direction:'desc'}).toString()
+  const read=async query=>{const r=await h.send('/api/platter/pipeline?'+query,undefined,h.owner);assert.equal(r.status,200,r.text);return r.value}
+  const native=await read(filters)
+  assert.deepEqual(native.rows.map(r=>r.id),[first.id,later.id])
+  assert.deepEqual(native.totals,[{currency:'USD',count:2,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:360000,refundedCents:0,netReceivedCents:360000,uncertainRefundCents:0,exportedDepositCents:0}])
+  assert.equal(native.rows[0].bookedOn,'2099-01-15')
+  assert.deepEqual(native.rows.map(r=>[r.recordedRevenue.oneOffCents,r.recordedRevenue.firstYearCents,r.recordedRevenue.receivedCents]),[[250000,1690000,120000],[0,0,240000]])
+  const reverse=new URLSearchParams(filters);reverse.set('bookedFrom','2099-04-01');reverse.set('bookedTo','2099-06-30');reverse.set('receivedFrom','2099-01-01');reverse.set('receivedTo','2099-03-31')
+  const secondQuarter=await read(reverse)
+  assert.deepEqual(secondQuarter.totals,[{currency:'USD',count:2,valueCents:3130000,oneOffCents:250000,firstYearCents:1690000,receivedCents:250000,refundedCents:0,netReceivedCents:250000,uncertainRefundCents:0,exportedDepositCents:0}])
+  const sameDay=new URLSearchParams(filters);sameDay.set('bookedTo','2099-01-15');sameDay.set('receivedFrom','2099-03-31');sameDay.set('receivedTo','2099-03-31')
+  assert.deepEqual((await read(sameDay)).rows.map(r=>[r.id,r.recordedRevenue.receivedCents]),[[first.id,250000]],'Both date endpoints are inclusive')
+  const foreign=new URLSearchParams(filters);foreign.set('currency','AUD');assert.deepEqual((await read(foreign)).totals,[{currency:'AUD',count:1,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:70000,refundedCents:0,netReceivedCents:70000,uncertainRefundCents:0,exportedDepositCents:0}])
+  for(const cookie of [people.sales,people.manager,people.viewer])assert.equal((await h.send('/api/platter/pipeline?'+filters,undefined,cookie)).value.count,0,'Owner filter cannot widen live revenue scope')
+  const frozen=(await h.state()).proposals.find(p=>p.id===first.id).acceptance
+  await h.cmd('proposal.revise',{...first.input,id:first.id,version:4},h.owner,409)
+  assert.equal((await h.send(first.path+'/action?name=accept',{name:'Changed',optionId:'two',consent:true},first.cookie)).status,200)
+  assert.deepEqual((await h.state()).proposals.find(p=>p.id===first.id).acceptance,frozen)
+  assert.deepEqual((await read(filters)).totals,native.totals,'Retries and refused repricing cannot change booked snapshots')
+  for(const bad of ['bookedFrom=2099-02-30','bookedFrom=2099-04-01&bookedTo=2099-01-01','receivedFrom=2099-07-01&receivedTo=2099-04-01','currency=usd']){
+   assert.equal((await h.send('/api/platter/pipeline?view=recorded-revenue&'+bad,undefined,h.owner)).status,400)
+   const before=(await h.state()).reportSchedules;await h.cmd('report.schedule',{filters:'view=recorded-revenue&'+bad,cadence:'daily',hour:8,recipients:[h.auth.OWNER_EMAIL]},h.owner,400);assert.deepEqual((await h.state()).reportSchedules,before)
+  }
+  const filteredCsv=await h.send('/api/platter/pipeline.csv?'+filters,undefined,h.owner)
+  assert.equal(filteredCsv.status,200);assert.match(filteredCsv.text,/Accepted on \(UTC\),Booked one-off value,Booked first-year value/)
+  assert.match(filteredCsv.text,/Total \(2 proposals\),,,,,USD,16900\.00,,,,2500\.00,16900\.00,3600\.00,0\.00,3600\.00/)
+  const scheduledNative=await h.cmd('report.schedule',{filters,cadence:'daily',hour:8,recipients:[h.auth.OWNER_EMAIL]})
+  const saved=(await h.state()).reportSchedules.find(r=>r.id===scheduledNative.id);assert.deepEqual(Object.fromEntries(new URLSearchParams(saved.filters)),Object.fromEntries(new URLSearchParams(filters)))
+  await worker.scheduled({scheduledTime:new Date(saved.nextRunAt),cron:'*/15 * * * *'});await worker.scheduled({scheduledTime:new Date(saved.nextRunAt),cron:'*/15 * * * *'})
+  const nativeMail=(await h.state()).reportOutbox.filter(m=>m.body.includes('Booked first-year value: $16,900.00 USD'))
+  assert.equal(nativeMail.length,1);assert.ok(nativeMail[0].body.includes((await h.send('/api/platter/pipeline.csv?'+filters,undefined,h.owner)).text));assert.match(nativeMail[0].body,/Received payments: \$3,600\.00 USD/)
+
 
  }finally{await h.close()}
 })
@@ -1976,6 +2095,7 @@ test('TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices an
  await h.cmd('catalog.insert',{id:fresh.id,version:2,catalogId:catalog[0].id,catalogVersion:1,optionId:'one',quantity:'1'},people.sales,409)
  await h.cmd('catalog.save',{...input,sku:input.sku+'-owner'},h.owner,409);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_priced_catalog').first()).n,3)
  await h.cmd('catalog.save',{...input,sku:'synthetic-platter-3101',unitCost:'0.00'});assert.equal((await h.state()).catalogItems.find(r=>r.sku==='synthetic-platter-3101').unitCostCents,0);await audited(h,'catalog.save',(await h.state(people.manager)).actor.id,'manager',catalog[0].id);await audited(h,'catalog.insert',(await h.state(people.sales)).actor.id,'sales',p.id)
+ const {catalogJourney}=await import('./catalog-journey.mjs');await catalogJourney(h,{client,people,offer,verified})
  }finally{await h.close()}
 })
 
@@ -2736,18 +2856,76 @@ test('TRACK-004 owner retention and erasure remove views and dependent engagemen
 
 
 test('TRACK-002 reading events retain monotonic section times and validated package choices on the exact view',()=>run(async h=>{
- const {p,path}=await sent(h),at=Date.parse('2027-05-01T12:00:00Z')
+ const {client}=await draft(h),at=Date.parse('2027-05-01T12:00:00Z')
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':['application','x-www-form-urlencoded'].join('/')},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+ const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,document:{version:1,blocks:[{id:'case-stable',type:'case_study',title:'Case study',text:'Synthetic Platter case study'}]},packages:[{id:'one',label:'Essential',price:'2400',optionalItems:[{id:'rush',label:'Rush',unitPrice:'100',min:1,max:3,quantity:1,editable:true}]},{id:'two',label:'Campaign',price:'4200'}]})
+ const form=new FormData();form.set('id',p.id);form.set('version','1');form.set('file',new File(['Synthetic Platter attachment'],'synthetic-platter-1.txt',{type:['text','plain'].join('/')}))
+ const request=new Request(h.origin+'/app/attachment',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:form}),uploaded=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});assert.equal(uploaded.status,200,await uploaded.text())
+ await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const share=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(share.shareUrl).pathname
+ const file=(await h.state()).proposals.find(r=>r.id===p.id).attachments[0]
  const clock=async n=>h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET observed_at=excluded.observed_at').bind(at+n).run()
  await clock(0);await h.cmd('tracking.settings',{id:p.id,enabled:'yes',consent:'yes',alerts:'no',quietMinutes:30,retentionDays:90})
  const page=await h.send(path),viewId=page.text.match(/data-engagement-view="([^"]+)"/)[1]
- const event=async(section,milliseconds,optionId='two')=>h.send(path+'/engagement',{viewId,section,milliseconds,optionId})
+ assert.match(page.text,/data-engagement-section="block:case-stable"/)
+ const event=async(section,milliseconds,optionId='two',extra={})=>h.send(path+'/engagement',{viewId,section,milliseconds,optionId,...extra})
  assert.equal((await event('pricing',40000)).status,400)
  await clock(45000)
  for(const [section,ms,option] of [['pricing',40000,'two'],['scope',5000,'two'],['pricing',10000,'one']])assert.equal((await event(section,ms,option)).status,200)
- const data=(await h.send('/api/platter/engagement?id='+p.id,undefined,h.owner)).value
- assert.deepEqual(data.views[0].reading.map(r=>[r.section,r.milliseconds]),[['pricing',40000],['scope',5000]])
- assert.deepEqual(data.views[0].choices.map(c=>c.option_id).sort(),['one','two'])
+ assert.equal((await event('block:case-stable',5000,'one',{choiceSequence:3,items:[{id:'rush',quantity:2}]})).status,200)
+ const transition={viewId,choiceSequence:4,optionId:'two',readings:{pricing:40000,'block:case-stable':5000}}
+ assert.equal((await h.send(path+'/engagement',transition)).status,200)
+ assert.equal((await h.send(path+'/engagement',transition)).status,200,'a transport retry records the same choice once')
+ assert.equal((await h.send(path+'/engagement',{...transition,optionId:'one'})).status,409)
+ assert.equal((await event('block:missing',1)).status,400)
+ assert.equal((await event('pricing',40001,'one',{items:[{id:'not-offered',quantity:1}]})).status,400)
+ const download=await h.send(path+'/attachments/'+file.id+'?viewId='+viewId);assert.equal(download.status,200);assert.equal(download.text,'Synthetic Platter attachment')
+ const read=async()=>(await h.send('/api/platter/engagement?id='+p.id,undefined,h.owner)).value
+ let data=await read()
+ assert.deepEqual(data.views[0].reading.map(r=>[r.section,r.milliseconds]),[['block:case-stable',5000],['pricing',40000],['scope',5000]])
+ assert.equal(data.views[0].reading[0].label,'Case study')
+ assert.deepEqual([...new Set(data.views[0].choices.map(c=>c.option_id))].sort(),['one','two'])
+ assert.deepEqual(data.views[0].choices.map(c=>[c.sequence,c.option_id,c.items]),[[1,'two',[]],[2,'one',[]],[3,'one',[{id:'rush',quantity:2}]],[4,'two',[]]])
+ assert.equal(data.views[0].attachments[0].file_id,file.id)
+ assert.deepEqual(data.recipients.map(r=>[r.recipient,r.revision,r.viewCount,r.reading.find(x=>x.section==='pricing').milliseconds,r.attachments.length]),[[['avery','northstar.example'].join('@'),2,1,40000,1]])
  assert.equal((await h.send(path+'/engagement',{viewId:'foreign',section:'scope',milliseconds:1})).status,404)
+ const foreign=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Other proposal'});await h.cmd('proposal.approve',{id:foreign.id,version:1,revision:1});const foreignShare=await h.cmd('proposal.send',{id:foreign.id,version:2}),other={path:new URL(foreignShare.shareUrl).pathname},otherPage=await h.send(other.path),otherView=otherPage.text.match(/data-engagement-view="([^"]+)"/)[1]
+ assert.equal((await h.send(path+'/attachments/'+file.id+'?viewId='+otherView)).status,404)
+ assert.equal((await h.send(other.path+'/engagement',{viewId,section:'pricing',milliseconds:1,optionId:'two'})).status,404)
+ assert.deepEqual(await read(),data,'foreign proposal events and downloads change no history')
+ const replacement=await h.cmd('signer.replace',{id:p.id,version:4,recipient:['synthetic-platter-2','example.test'].join('@'),reason:'New invited client'})
+ const replacementPath=new URL(replacement.shareUrl).pathname
+ assert.equal((await h.send(path+'/engagement',transition)).status,410)
+ assert.equal((await h.send(replacementPath+'/engagement',transition)).status,404)
+ const replacementPage=await h.send(replacementPath),replacementView=replacementPage.text.match(/data-engagement-view="([^"]+)"/)[1]
+ assert.equal((await h.send(replacementPath+'/engagement',{viewId:replacementView,section:'pricing',milliseconds:0,optionId:'one'})).status,200)
+ data=await read();assert.deepEqual(data.recipients.map(r=>[r.recipient,r.revision,r.viewCount]).sort(),[[['avery','northstar.example'].join('@'),2,1],[['synthetic-platter-2','example.test'].join('@'),2,1]])
+ assert.equal(data.recipients.find(r=>r.recipient===['synthetic-platter-2','example.test'].join('@')).attachments.length,0)
+ const current=(await h.state()).proposals.find(r=>r.id===p.id)
+ await h.cmd('proposal.negotiate',{...offer,id:p.id,clientId:client.id,version:current.version,document:{version:1,blocks:[{id:'case-stable',type:'case_study',title:'Updated case study',text:'New revision story'}]}})
+ const next=(await h.state()).proposals.find(r=>r.id===p.id)
+ await h.cmd('proposal.approve',{id:p.id,version:next.version,revision:next.revision});const nextShare=await h.cmd('proposal.send',{id:p.id,version:next.version+1}),activePath=new URL(nextShare.shareUrl).pathname
+ assert.ok([404,409,410].includes((await h.send(replacementPath+'/engagement',{viewId:replacementView,section:'pricing',milliseconds:0})).status))
+ const activePage=await h.send(activePath),activeView=activePage.text.match(/data-engagement-view="([^"]+)"/)[1]
+ assert.equal((await h.send(activePath+'/engagement',{viewId:replacementView,section:'pricing',milliseconds:0})).status,404)
+ assert.equal((await h.send(activePath+'/engagement',{viewId:activeView,section:'block:case-stable',milliseconds:0,optionId:'one'})).status,200)
+ data=await read();assert.equal(data.views.find(r=>r.id===viewId).reading[0].label,'Case study');assert.equal(data.views.find(r=>r.id===activeView).reading[0].label,'Updated case study')
+ assert.deepEqual(data.recipients.map(r=>r.revision).sort(),[2,2,3])
+ for(const role of ['sales','manager','admin','viewer','billing','content_editor']){
+  const address='synthetic-platter-'+role+'@example.test';await h.send('/auth/invite',{email:address,displayName:role,role:'member',returnTo:'/app'},h.owner)
+  const cookie=await h.signIn(address),person=(await h.state(cookie)).actor
+  await h.cmd('member.set',{operatorId:person.id,version:0,role,teams:[]})
+  assert.equal((await h.send('/api/platter/engagement?id='+p.id,undefined,cookie)).status,403)
+  assert.ok(!(await h.state(cookie)).proposals.some(r=>r.engagementDetails),'other roles never receive section or recipient details')
+ }
+ await h.cmd('tracking.hold',{id:p.id,held:'yes',reason:'Retain the measured history'})
+ await h.cmd('tracking.erase',{id:p.id,confirm:'erase'},h.owner,409);assert.deepEqual(await read(),data)
+ await h.cmd('tracking.hold',{id:p.id,held:'no'});await h.cmd('tracking.erase',{id:p.id,confirm:'erase'})
+ assert.deepEqual((await read()).recipients,[])
+ assert.equal((await h.send(activePath+'/engagement',{viewId:activeView,section:'pricing',milliseconds:0})).status,404)
+ assert.equal((await h.send(activePath+'/attachments/'+file.id+'?viewId='+activeView)).status,404)
+ assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_tracking_choices WHERE view_id=?').bind(viewId).first()).n,0)
+ assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_tracking_attachment_opens').first()).n,0)
+
 }))
 
 test('TRACK-003 forwarded viewers verify their own mailbox before owner conversion to an approver record without inherited signing authority',()=>run(async h=>{
@@ -2819,28 +2997,74 @@ test('AUTO-004 scoped REST drafting, immutable owner keys and human-only authori
 test('AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation',async()=>{
  const {createHmac}=await import('node:crypto'),received=[]
  let refuse=true,revokeDuringDelivery=null
- const h=await harness({outboundService:async request=>{received.push({url:request.url,body:await request.text(),headers:Object.fromEntries(request.headers)});if(revokeDuringDelivery){const id=revokeDuringDelivery;revokeDuringDelivery=null;assert.equal((await h.send('/api/platter/v1/webhooks/'+id+'/revoke',{},h.owner)).status,200)}return new Response(refuse?'synthetic-platter-92':null,{status:refuse?503:204})}})
+ const h=await harness({assetsDirectory:'public',outboundService:async request=>{received.push({url:request.url,body:await request.text(),headers:Object.fromEntries(request.headers)});if(revokeDuringDelivery){const id=revokeDuringDelivery;revokeDuringDelivery=null;assert.equal((await h.send('/api/platter/v1/webhooks/'+id+'/revoke',{},h.owner)).status,200)}return new Response(refuse?'synthetic-platter-92':null,{status:refuse?503:204})}})
  try{
   const api=(path,input,cookie=h.owner)=>h.send('/api/platter/v1'+path,input,cookie)
   assert.equal((await api('/webhooks',{url:'https://hooks.example.com/events',consent:false})).status,400)
   for(const url of ['http://hooks.example.com/events','https://127.0.0.1/events','https://localhost/events','https://hooks.example.com/events?token=private'])assert.equal((await api('/webhooks',{url,consent:true})).status,400)
   const hook=(await api('/webhooks',{url:'https://hooks.example.com/events',consent:true})).value;assert.ok(hook.secret)
-  const {p,path}=await sent(h),cookie=await verified(h,path)
-  const accepted=await h.send(path+'/action?name=accept',{name:'Synthetic Signer',optionId:'one',consent:true},cookie);assert.equal(accepted.status,200)
+  // PRICE-006: distinct nonzero private amounts travel with each revision, never with an event.
+  const client=await h.cmd('client.save',{name:'Synthetic priced client',email:h.auth.MAIL_FROM})
+  const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic priced package',scope:'Public delivery',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'15000',optionalItems:[{id:'rush',label:'Rush delivery',unitPrice:'1000',min:1,max:5,quantity:2,editable:true}]},{id:'alternative',label:'Alternative',price:'20000'}],pricingTables:[{optionId:'main',name:'Services',lines:[{name:'Delivery work',description:'Public work',quantity:'1.5',unit:'hour',unitPrice:'10000'}]}]})
+  const current=async(cookie=h.owner)=>(await h.state(cookie)).proposals.find(row=>row.id===p.id)
+  let row=await current()
+  await h.cmd('pricing.cost',{id:p.id,version:row.version,lineKey:row.internalPricing.lines.find(l=>l.kind==='base'&&l.optionId==='main').key,unitCost:'4137.29'})
+  row=await current();await h.cmd('pricing.cost',{id:p.id,version:row.version,lineKey:row.internalPricing.lines.find(l=>l.kind==='optional').key,unitCost:'317.29'})
+  row=await current();await h.cmd('pricing.cost',{id:p.id,version:row.version,lineKey:row.internalPricing.lines.find(l=>l.optionId==='alternative').key,unitCost:'8329.41'})
+  row=await current()
+  assert.deepEqual(row.internalPricing.lines.map(l=>[l.unitCostCents,l.costCents,l.marginCents]),[[413729,620594,879406],[31729,63458,136542],[832941,832941,1167059]])
+  assert.deepEqual(row.internalPricing.packages.map(o=>[o.revenueCents,o.costCents,o.marginCents]),[[1500000,620594,879406],[2000000,832941,1167059]])
+  assert.deepEqual([row.internalPricing.total.costCents,row.internalPricing.total.marginCents],[620594,879406])
+  const privateAmounts=['413729','620594','879406','31729','63458','136542','832941','1167059','95187','715781','1084219','204813','4137.29','6205.94','8794.06','317.29','634.58','1365.42','8329.41','11670.59','951.87','7157.81','10842.19','2048.13']
+  const costFree=value=>{
+   assert.doesNotMatch(value,/internalPricing|unitCost|unit_cost|costCents|cost_cents|margin/i)
+   for(const amount of privateAmounts){assert.ok(!value.includes(amount),'private amount excluded: '+amount);const [whole,fraction]=amount.split('.');if(fraction)assert.ok(!value.includes(Number(whole).toLocaleString('en-US')+'.'+fraction),'formatted private amount excluded: '+amount)}
+  }
+  await h.send('/auth/invite',{email:h.auth.MAIL_FROM,displayName:'Synthetic sales',role:'member',returnTo:'/app'},h.owner)
+  const sales=await h.signIn(h.auth.MAIL_FROM),salesActor=(await h.state(sales)).actor
+  await h.cmd('member.set',{operatorId:salesActor.id,version:0,role:'sales',teams:[]})
+  await h.cmd('proposal.share',{id:p.id,operatorId:salesActor.id})
+  assert.equal((await current(sales)).internalPricing,undefined);costFree(JSON.stringify(await current(sales)))
+  await h.cmd('pricing.cost',{id:p.id,version:row.version,lineKey:row.internalPricing.lines[0].key,unitCost:'0'},sales,403)
+  assert.deepEqual((await current()).internalPricing,row.internalPricing,'a refused sales edit changes no private amounts')
+  await h.cmd('proposal.approve',{id:p.id,version:row.version,revision:row.revision})
+  row=await current();const path=new URL((await h.cmd('proposal.send',{id:p.id,version:row.version})).shareUrl).pathname
+  const unsigned=await current()
+  const unverified=await h.send(path+'/action?name=accept',{name:'Synthetic Signer',optionId:'main',items:[{id:'rush',quantity:3}],consent:true})
+  assert.equal(unverified.status,401);const refused=await current();assert.equal(refused.acceptance,undefined)
+  assert.deepEqual([refused.version,refused.revision,refused.status,refused.internalPricing],[unsigned.version,unsigned.revision,unsigned.status,unsigned.internalPricing],'unverified acceptance leaves the sent revision and private amounts unchanged')
+  const cookie=await verified(h,path),query='?optionId=main&add.rush=yes&qty.rush=3'
+  const data=await h.send(path+'/data.json'+query,undefined,cookie);assert.equal(data.status,200,data.text);assert.equal(data.value.selection.totalCents,1800000);costFree(data.text)
+  const page=await h.send(path+query,undefined,cookie);assert.equal(page.status,200);costFree(page.text)
+  const file=await h.mf.dispatchFetch(h.origin+path+'/download.pdf'+query,{headers:{cookie}});assert.equal(file.status,200)
+  const publicPdf=(await pdfPages(await file.arrayBuffer())).join(' ');assert.match(publicPdf,/18,?000\.00/);costFree(publicPdf)
+  const accepted=await h.send(path+'/action?name=accept',{name:'Synthetic Signer',optionId:'main',items:[{id:'rush',quantity:3}],consent:true},cookie);assert.equal(accepted.status,200)
+  row=await current();assert.equal(row.acceptance.totalCents,1800000)
+  assert.deepEqual([row.internalPricing.total.revenueCents,row.internalPricing.total.costCents,row.internalPricing.total.marginCents,row.internalPricing.total.marginBps],[1800000,715781,1084219,6023])
+  assert.deepEqual([row.internalPricing.lines[1].quantity,row.internalPricing.lines[1].costCents,row.internalPricing.lines[1].marginCents],['3',95187,204813])
+  const acceptedData=await h.send(path+'/data.json',undefined,cookie);assert.equal(acceptedData.status,200);costFree(acceptedData.text)
+  const acceptedPage=await h.send(path,undefined,cookie);assert.equal(acceptedPage.status,200);costFree(acceptedPage.text)
+  costFree(JSON.stringify(await current(sales)))
   const now=Date.now()+1000,cron=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
   await cron(now)
-  let log=await api('/deliveries');assert.equal(log.status,200);assert.deepEqual(log.value.map(d=>d.type).sort(),['proposal.approved','proposal.created','proposal.sent','proposal.signed'])
+  let log=await api('/deliveries');assert.equal(log.status,200);assert.deepEqual(log.value.map(d=>d.type).sort(),['proposal.approved','proposal.created','proposal.revised','proposal.revised','proposal.revised','proposal.sent','proposal.signed'])
   assert.ok(log.value.every(d=>d.status==='retry'&&d.attempts===1&&d.httpStatus===503),'all failed deliveries are retained for retry')
   const sentEvent=received.find(r=>JSON.parse(r.body).type==='proposal.sent'),signedEvent=received.find(r=>JSON.parse(r.body).type==='proposal.signed')
   assert.ok(sentEvent&&signedEvent)
-  for(const r of received){const event=JSON.parse(r.body);assert.equal(r.url,hook.url);assert.equal(r.headers['platter-event-id'],event.id);assert.equal(r.headers['platter-signature'],'v1='+createHmac('sha256',hook.secret).update(r.headers['platter-timestamp']+'.'+r.body).digest('hex'));assert.notEqual(r.headers['platter-signature'],'v1='+createHmac('sha256',hook.secret).update(r.headers['platter-timestamp']+'.'+r.body+' ').digest('hex'));assert.deepEqual(Object.keys(event.data).sort(),['id','revision','status']);assert.equal(event.data.id,p.id);assert.doesNotMatch(r.body,/cost|margin|email|token|secret|scope/i)}
+  const expected=[['proposal.created',1,'draft'],['proposal.revised',2,'draft'],['proposal.revised',3,'draft'],['proposal.revised',4,'draft'],['proposal.approved',4,'approved'],['proposal.sent',4,'sent'],['proposal.signed',4,'accepted']]
+  assert.deepEqual(received.map(r=>{const e=JSON.parse(r.body);return [e.type,e.data.revision,e.data.status]}).sort(),expected.sort(),'the receiver sees every priced lifecycle projection')
+  const checkRequests=()=>{for(const r of received){const event=JSON.parse(r.body);assert.equal(r.url,hook.url);assert.equal(r.headers['platter-event-id'],event.id);assert.equal(r.headers['platter-signature'],'v1='+createHmac('sha256',hook.secret).update(r.headers['platter-timestamp']+'.'+r.body).digest('hex'));assert.notEqual(r.headers['platter-signature'],'v1='+createHmac('sha256',hook.secret).update(r.headers['platter-timestamp']+'.'+r.body+' ').digest('hex'));assert.deepEqual(Object.keys(event).sort(),['data','id','occurredAt','type']);assert.ok(Number.isSafeInteger(event.occurredAt));assert.deepEqual(Object.keys(event.data).sort(),['id','revision','status']);assert.equal(event.data.id,p.id);assert.ok(expected.some(([type,revision,status])=>event.type===type&&event.data.revision===revision&&event.data.status===status));assert.doesNotMatch(r.body,/cost|margin|email|token|secret|scope/i);costFree(r.body)}}
+  checkRequests()
+  const firstBodies=new Map(received.map(r=>[JSON.parse(r.body).id,r.body]))
   refuse=false;await cron(now+60001)
   log=await api('/deliveries');assert.ok(log.value.every(d=>d.status==='delivered'&&d.attempts===2&&d.httpStatus===204))
   assert.equal(received.filter(r=>JSON.parse(r.body).id===JSON.parse(sentEvent.body).id).length,2,'retry keeps the same event id')
+  assert.equal(received.length,14);checkRequests()
+  for(const [id,body] of firstBodies)assert.deepEqual(received.filter(r=>JSON.parse(r.body).id===id).map(r=>r.body),[body,body],'every retry keeps the same cost-free body')
   const n=received.length;await cron(now+120002);assert.equal(received.length,n,'delivered events are not resent')
   assert.doesNotMatch((await api('/webhooks')).text,new RegExp(hook.secret))
   assert.doesNotMatch((await h.state()).proposals.map(p=>JSON.stringify(p)).join(''),new RegExp(hook.secret))
-  await api('/webhooks/'+hook.id+'/revoke',{});const client=(await h.state()).clients[0];await h.cmd('proposal.prepare',{...offer,clientId:client.id});await cron(now+180003);assert.equal(received.length,n,'revocation stops future delivery')
+  await api('/webhooks/'+hook.id+'/revoke',{});await h.cmd('proposal.prepare',{...offer,clientId:client.id});await cron(now+180003);assert.equal(received.length,n,'revocation stops future delivery')
   const second=(await api('/webhooks',{url:'https://hooks.example.com/second',consent:true})).value
   const queued=await h.cmd('proposal.prepare',{...offer,clientId:client.id});await h.cmd('proposal.approve',{id:queued.id,version:1,revision:1});revokeDuringDelivery=second.id
   await cron(now+240004);assert.equal(received.length,n+1,'revocation during one request withholds the other preselected deliveries')
@@ -3122,3 +3346,224 @@ test('EDIT-005 Word and PDF exports retain heading styles, four exact table line
   assert.equal((await h.send('/api/platter/document-export?id='+p.id+'&format=docx')).status,401)
  }finally{await h.close()}
 })
+
+test('PRICE-005 owner tax follows selected quantities and discounts, freezes rates and refuses unsafe writes',async()=>{const h=await harness({assetsDirectory:'public'});try{
+ assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
+ const {configureTaxes,taxRequest,taxPackages,taxTables}=await import('./taxes-fixture.mjs')
+ let rateVersion=await configureTaxes(h.cmd)
+ const {client}=await draft(h),input={clientId:client.id,title:'Taxed services',scope:'One-off services',depositPercent:50,packages:taxPackages(),pricingTables:taxTables(),tax:taxRequest()}
+ const billing=await h.cmd('proposal.prepare',{...input,tax:{...taxRequest(),addressKind:'billing'}})
+ const p=await h.cmd('proposal.prepare',input),portland=await h.cmd('proposal.prepare',{...input,tax:taxRequest('Portland','OR')})
+ const preview=async(id,option='one',items=[])=>h.send('/app/preview/client?'+new URLSearchParams({id,revision:1,optionId:option,items:JSON.stringify(items)}),undefined,h.owner)
+ let response=await preview(p.id);assert.equal(response.status,200,response.text);assert.match(response.text,/Sales tax: USD 82\.50/);assert.match(response.text,/1,582\.50/);assert.match(response.text,/791\.25/)
+ response=await preview(portland.id);assert.match(response.text,/Sales tax: USD 0\.00/);assert.match(response.text,/1,500\.00/)
+ response=await preview(billing.id);assert.match(response.text,/Sales tax: USD 0\.00/)
+ const selected=[{id:'extra',quantity:4}]
+ // $1,600 less 10% and $50 = $1,390. Allocated taxable base $955.62;
+ // each jurisdiction rounds separately: $59.73 + $9.56 + $9.56 = $78.85.
+ response=await preview(p.id,'two',selected);for(const value of ['Sales tax: USD 78.85','1,468.85','734.43'])assert.ok(response.text.includes(value),value)
+ const noWrites=async action=>{const before=await h.state();await action();assert.deepEqual(await h.state(),before)}
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,pricingTables:taxTables().map(t=>({...t,lines:t.lines.map(l=>({...l,taxCode:''}))}))},h.owner,400))
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,pricingTables:[],packages:[{id:'large',label:'Large package',price:'10000000',taxable:true,taxCode:'synthetic-platter-service'}]},h.owner,400))
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,tax:{...taxRequest(),method:'stripe'}},h.owner,409))
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,tax:{...taxRequest(),method:'avatax'}},h.owner,409))
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,tax:{...taxRequest(),serviceAddress:{...taxRequest().serviceAddress,region:'WA'}}},h.owner,409))
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,pricingTables:taxTables().map(t=>({...t,lines:t.lines.map(l=>({...l,recurrence:{interval:'monthly',term:12,startsOn:'2030-01-01'}}))}))},h.owner,409))
+ await noWrites(()=>h.cmd('proposal.prepare',{...input,paymentTerms:{netDays:15,milestones:[],retainer:{percent:10,startsOn:'2030-01-01',months:2}}},h.owner,409))
+ await noWrites(()=>h.cmd('proposal.revise',{...input,id:p.id,version:0},h.owner,409))
+ await noWrites(()=>h.cmd('tax.rate',{level:'city',region:'TX',jurisdiction:'Austin',percent:'2',startsOn:'2099-01-01',version:0},h.owner,409))
+ const key=await h.cmd('agent.create',{label:'Synthetic tax refusal'})
+ const agent=(name,input)=>h.send('/api/platter/agent/command',{name,input},'',{authorization:'Bearer '+key.token})
+ await noWrites(async()=>{assert.equal((await agent('tax.rate',{level:'state',region:'TX',percent:'99',startsOn:'2020-01-01',version:rateVersion})).status,403);assert.equal((await agent('proposal.prepare',input)).status,403)})
+ await h.cmd('agent.revoke',{id:key.id});assert.equal((await agent('proposal.prepare',input)).status,401)
+ await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:p.id,version:2}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+ const sentOptions=(await h.state()).proposals.find(x=>x.id===p.id).options
+ await h.cmd('tax.rate',{level:'city',region:'TX',jurisdiction:'Austin',percent:'2',startsOn:'2099-01-01',version:rateVersion++})
+ // A later effective rate also cannot recalculate an already sent revision.
+ await h.cmd('tax.rate',{level:'city',region:'TX',jurisdiction:'Austin',percent:'3',startsOn:'2021-01-01',version:rateVersion++})
+ assert.deepEqual((await h.state()).proposals.find(x=>x.id===p.id).options,sentOptions)
+ const newer=await h.cmd('proposal.prepare',{...input,title:'New dated rates'});response=await preview(newer.id);assert.match(response.text,/Sales tax: USD 102\.50/)
+ const query='?optionId=two&items='+encodeURIComponent(JSON.stringify(selected));response=await h.send(path+query,undefined,cookie)
+ for(const value of ['Sales tax: USD 78.85','1,468.85','734.43'])assert.ok(response.text.includes(value),value)
+ const data=(await h.send(path+'/data.json'+query,undefined,cookie)).value;assert.equal(data.selection.tax.taxableCents,95562);assert.equal(data.selection.tax.taxCents,7885);assert.deepEqual(data.selection.tax.lines.map(l=>l.netCents),[86875,43438,8687]);assert.equal(data.selection.tax.lines[0].taxCode,'synthetic-platter-service')
+ const pdf=await h.mf.dispatchFetch(h.origin+path+'/download.pdf'+query,{headers:{host:new URL(h.origin).host,cookie}});assert.equal(pdf.status,200);const pdfText=(await pdfPages(new Uint8Array(await pdf.arrayBuffer()))).join(' ')
+ for(const value of ['Sales tax: USD 78.85','Selected option total: USD 1,468.85','Deposit due: USD 734.43','Austin city tax (1%): USD 9.56'])assert.ok(pdfText.includes(value),value)
+ await noWrites(async()=>{assert.equal((await h.send(path+'/action?name=accept',{optionId:'two',items:[{id:'extra',quantity:11}],consent:true,name:'Synthetic signer'},cookie)).status,400)})
+ assert.equal((await h.send(path+'/action?name=accept',{optionId:'two',items:selected,consent:true,name:'Synthetic signer'},cookie)).status,200)
+ let agreement=(await h.state()).proposals.find(x=>x.id===p.id).acceptance
+ assert.equal(agreement.totalCents,146885);assert.equal(agreement.depositCents,73443);assert.equal(agreement.selection.tax.taxCents,7885);assert.deepEqual(agreement.selection.tax.components.map(c=>c.taxCents),[5973,0,956,956])
+ response=await h.send(path+'/data.json',undefined,cookie);assert.deepEqual(response.value.selection.tax,agreement.selection.tax)
+ const agreementPdf=await h.mf.dispatchFetch(h.origin+path+'/agreement.pdf',{headers:{host:new URL(h.origin).host,cookie}});assert.equal(agreementPdf.status,200);assert.match((await pdfPages(new Uint8Array(await agreementPdf.arrayBuffer()))).join(' '),/Sales tax: USD 78\.85/)
+ await noWrites(()=>h.cmd('invoice.export',{id:p.id},h.owner,409))
+ const frozen=await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
+ assert.equal((await h.send(path+'/action?name=accept',{optionId:'one',consent:true,name:'Replay'},cookie)).status,200)
+ assert.equal((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot,frozen.snapshot)
+ const paper=await h.cmd('proposal.prepare',{...input,title:'Taxed signed copy'})
+ await h.cmd('proposal.approve',{id:paper.id,version:1,revision:1});await h.cmd('proposal.send',{id:paper.id,version:2})
+ const form=new FormData();for(const [key,value]of Object.entries({id:paper.id,version:3,optionId:'one',signer:'Synthetic signer',signedOn:'2020-01-01',attest:'yes'}))form.set(key,String(value));form.set('file',new File(['%PDF synthetic-platter-tax-signed-copy'],'synthetic-platter-tax.pdf',{type:'application/pdf'}))
+ const upload=new Request(h.origin+'/app/paper-acceptance',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:form}),uploaded=await h.mf.dispatchFetch(upload.url,{method:'POST',headers:upload.headers,body:await upload.arrayBuffer()});assert.equal(uploaded.status,200)
+ const paperAgreement=(await h.state()).proposals.find(x=>x.id===paper.id).acceptance;assert.equal(paperAgreement.selection.tax.taxCents,10250);assert.equal(paperAgreement.totalCents,160250);assert.equal(paperAgreement.depositCents,80125)
+ const restored=await h.cmd('proposal.duplicate',{id:p.id,version:4})
+ await h.cmd('proposal.revise',{...input,id:restored.id,version:1,tax:{...taxRequest(),addressKind:'billing'}})
+ await h.cmd('proposal.restore',{id:restored.id,version:2,revision:1})
+ response=await h.send('/app/preview/client?'+new URLSearchParams({id:restored.id,revision:3,optionId:'one'}),undefined,h.owner);assert.match(response.text,/Sales tax: USD 82\.50/)
+ // New client drafts cannot silently inherit another client's address, or send taxable lines without one.
+ const destination=await h.cmd('client.save',{name:'Synthetic destination',email:h.auth.OWNER_EMAIL}),copy=await h.cmd('proposal.duplicate',{id:p.id,version:4,clientId:destination.id})
+ assert.ok((await h.state()).proposals.find(x=>x.id===copy.id).options.every(o=>!o.tax));await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1});await h.cmd('proposal.send',{id:copy.id,version:2},h.owner,409)
+}finally{await h.close()}})
+
+test('AUTO-002 completed agreements archive exact PDFs once under explicit current Drive authority and reconcile uncertain writes without replay',async()=>{
+ const {driveFixture,driveSettings,driveRoot,connectDrive,completeDriveAgreement}=await import('./drive-fixture.mjs'),fake=driveFixture(),h=await harness({assetsDirectory:'public',outboundService:fake.outboundService})
+ try{
+  const before=await sent(h),oldCookie=await verified(h,before.path)
+  assert.equal((await h.send(before.path+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},oldCookie)).status,200)
+  await h.send('/auth/invite',{email:['synthetic-platter-admin','example.test'].join('@'),displayName:'Archive administrator',role:'member',returnTo:'/app'},h.owner)
+  const adminCookie=await h.signIn(['synthetic-platter-admin','example.test'].join('@')),admin=(await h.state(adminCookie)).actor
+  await h.cmd('archive.configure',driveSettings,adminCookie,403);assert.equal(fake.calls.length,0)
+  await h.cmd('member.set',{operatorId:admin.id,role:'admin',version:0,teams:[]})
+  await connectDrive(h,adminCookie)
+  const calls=fake.calls.length
+  await h.cmd('archive.configure',{...driveSettings,version:1,consent:false},h.owner,400)
+  await h.cmd('archive.configure',{...driveSettings,version:0},h.owner,409)
+  await h.cmd('archive.configure',{...driveSettings,version:1,accountId:'synthetic-platter-wrong-account'},h.owner,409)
+  assert.equal(fake.calls.length,calls)
+  assert.equal((await h.send('/api/platter/archives',undefined,'')).status,401)
+  const signed=await completeDriveAgreement(h),worker=await h.mf.getWorker(),tick=()=>worker.scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  assert.equal((await h.send(signed.path+'/action?name=accept',signed.input,signed.cookie)).status,200)
+  let history=(await h.send('/api/platter/archives',undefined,h.owner)).value
+  assert.equal(history.jobs.length,1);assert.equal(history.jobs[0].status,'queued')
+  assert.equal(history.jobs[0].proposal_id,signed.proposal.id,'enabling never backfills historical agreements')
+  await Promise.all([tick(),tick(),h.cmd('archive.dispatch',{})])
+  history=(await h.send('/api/platter/archives',undefined,h.owner)).value;assert.equal(history.jobs[0].status,'complete')
+  const folder=[...fake.files.values()].find(f=>f.parents?.includes(driveRoot));assert.ok(folder);assert.equal(folder.appProperties.platterClient,signed.client.id);assert.ok(folder.name.startsWith('Synthetic archive client - '))
+  const artifacts=await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(signed.proposal.id).first()
+  const {createHash}=await import('node:crypto')
+  for(const kind of ['agreement','certificate']){
+   const uploaded=[...fake.files.values()].find(f=>f.name.endsWith(' - '+kind+'.pdf'))
+   assert.ok(uploaded);assert.deepEqual(uploaded.parents,[folder.id]);assert.equal(uploaded.name,'Synthetic archive client - Synthetic archive agreement - '+new Date(history.jobs[0].accepted_at).toISOString().slice(0,10)+' - r1 - '+kind+'.pdf')
+   const download=await h.mf.dispatchFetch(h.origin+signed.path+'/'+kind+'.pdf',{headers:{cookie:signed.cookie}});assert.equal(download.status,200)
+   const bytes=Buffer.from(await download.arrayBuffer());assert.deepEqual(uploaded.bytes,bytes);assert.deepEqual(Buffer.from(kind==='agreement'?artifacts.document:artifacts.certificate),bytes)
+   assert.equal(uploaded.appProperties.platterSha256,createHash('sha256').update(bytes).digest('hex'))
+  }
+  const facts=JSON.parse(artifacts.facts);assert.equal(facts.documentSha256,createHash('sha256').update(Buffer.from(artifacts.document)).digest('hex'))
+  const parallel=await Promise.all([completeDriveAgreement(h,'Parallel archive one',signed.client.id),completeDriveAgreement(h,'Parallel archive two',signed.client.id)])
+  await Promise.all([tick(),tick()]);await tick()
+  const parallelHistory=(await h.send('/api/platter/archives',undefined,h.owner)).value.jobs
+  for(const agreement of parallel)assert.equal(parallelHistory.find(j=>j.proposal_id===agreement.proposal.id).status,'complete')
+
+  const posts=()=>fake.calls.filter(c=>c.method==='POST').length,completedPosts=posts();await tick();assert.equal(posts(),completedPosts)
+  // A second agreement uses the same client folder. A lost acknowledgement is held, never replayed.
+  fake.setUncertain(true)
+  const uncertain=await completeDriveAgreement(h,'Uncertain archive agreement',signed.client.id);await tick()
+  history=(await h.send('/api/platter/archives',undefined,h.owner)).value
+  assert.equal(history.jobs.find(j=>j.proposal_id===uncertain.proposal.id).status,'held')
+  const afterUnknown=posts();await tick();await h.cmd('archive.dispatch',{});assert.equal(posts(),afterUnknown)
+  await h.cmd('archive.reconcile',{id:uncertain.proposal.id})
+  history=(await h.send('/api/platter/archives',undefined,h.owner)).value
+  assert.equal(history.jobs.find(j=>j.proposal_id===uncertain.proposal.id).status,'complete');assert.equal(posts(),afterUnknown)
+  assert.equal([...fake.files.values()].filter(f=>f.parents?.includes(driveRoot)).length,1)
+  // Demotion invalidates execution even though the connection and old consent remain.
+  const demoted=await completeDriveAgreement(h,'Demoted archive agreement',signed.client.id)
+  await h.cmd('member.set',{operatorId:admin.id,role:'sales',version:1,teams:[]})
+  const noCalls=fake.calls.length;await tick();assert.equal(fake.calls.length,noCalls)
+  history=(await h.send('/api/platter/archives',undefined,h.owner)).value;assert.equal(history.settings.active,false);assert.equal(history.jobs.find(j=>j.proposal_id===demoted.proposal.id).status,'held')
+  await h.cmd('archive.dispatch',{},adminCookie,403);await h.cmd('archive.reconcile',{id:demoted.proposal.id},adminCookie,403)
+  assert.equal((await h.send('/api/platter/archives',undefined,adminCookie)).status,403);assert.equal(fake.calls.length,noCalls)
+  await h.cmd('archive.configure',{...driveSettings,version:1},h.owner)
+  await completeDriveAgreement(h,'Disconnected archive agreement',signed.client.id)
+  await h.cmd('provider.disconnect',{provider:'google_drive',version:1})
+  const disconnected=fake.calls.length;await tick();assert.equal(fake.calls.length,disconnected)
+  // The configuration is also rechecked between individual network requests.
+  const {driveToken}=await import('./drive-fixture.mjs');await h.cmd('provider.connect',{provider:'google_drive',version:2,token:driveToken,consent:true})
+  await h.cmd('archive.configure',{...driveSettings,version:2,connectionVersion:3})
+  await completeDriveAgreement(h,'Revoked during dispatch',signed.client.id)
+  let revoked=false;fake.setHook(async request=>{if(!revoked&&new URL(request.url).pathname.endsWith('/generateIds')){revoked=true;await h.cmd('archive.revoke',{version:3})}})
+  const preRevokePosts=posts();await tick();assert.equal(revoked,true);assert.equal(posts(),preRevokePosts)
+  const audit=await h.send('/api/platter/audit?action=archive.configure',undefined,h.owner);assert.ok(audit.value.rows.length>=3)
+ }finally{await h.close()}
+})
+
+test('MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo', {timeout:120000},()=>run(async h=>{
+ const {moveinFixture,hash,uploadMovein}=await import('./document-movein-fixture.mjs'),fixture=await moveinFixture()
+ const {id}=await h.cmd('document-import.create',{label:'Synthetic document move-in'})
+ const file=fixture.zips[0],sha256=hash(file.bytes),half=Math.floor(file.bytes.length/2),part=file.bytes.subarray(0,half).toString('base64')
+ await h.cmd('document-import.upload-start',{id,filename:file.filename,sha256,size:file.bytes.length})
+ await h.cmd('document-import.upload-chunk',{id,sha256,position:0,base64:part})
+ await h.cmd('document-import.preview',{id},h.owner,409)
+ await h.cmd('document-import.upload-finish',{id,sha256},h.owner,409)
+ const second=await h.signIn(h.auth.OWNER_EMAIL)
+ assert.equal((await h.cmd('document-import.upload-start',{id,filename:file.filename,sha256,size:file.bytes.length},second)).received,half)
+ assert.equal((await h.cmd('document-import.upload-chunk',{id,sha256,position:0,base64:part},second)).received,half)
+ await h.cmd('document-import.upload-chunk',{id,sha256,position:0,base64:Buffer.from('changed').toString('base64')},second,409)
+ for(const zip of fixture.zips)await uploadMovein(h,id,zip,second)
+ const before=await h.cmd('document-import.preview',{id},second)
+ assert.equal(before.canApply,false)
+ assert.deepEqual([before.report.arrived,before.report.held,before.report.unmapped,before.report.duplicateDocuments],[4,2,2,1])
+ assert.equal(before.documents.length,5)
+ const ambiguous=before.report.rows.find(r=>r.candidates.length===2)
+ await h.cmd('document-import.preview',{id,choices:{[ambiguous.id]:''}},second,409)
+ assert.deepEqual(new Set(ambiguous.candidates),new Set(fixture.originals.slice(2,4).map(hash)))
+ assert.equal(before.report.rows.find(r=>r.fields.Client==='Another client').candidates.length,0,'client and date mismatches cannot auto-match by title')
+ await h.cmd('document-import.apply',{id,fingerprint:before.fingerprint},second,409)
+ const choices={[ambiguous.id]:hash(fixture.originals[2])}
+ await h.cmd('document-import.apply',{id,choices,fingerprint:before.fingerprint},second,409)
+ let reviewed=await h.cmd('document-import.preview',{id,choices},second)
+ assert.notEqual(reviewed.fingerprint,before.fingerprint)
+ assert.deepEqual([reviewed.report.arrived,reviewed.report.held,reviewed.report.unmapped],[4,1,2])
+ assert.equal(reviewed.canApply,true)
+ await uploadMovein(h,id,{filename:'report.csv',bytes:Buffer.from(fixture.csv)},second)
+ await h.cmd('document-import.apply',{id,choices,fingerprint:reviewed.fingerprint},second,409)
+ const priorFingerprint=reviewed.fingerprint
+ reviewed=await h.cmd('document-import.preview',{id,choices},second)
+ assert.notEqual(reviewed.fingerprint,priorFingerprint,'new uploaded bytes require a new review even when report rows deduplicate')
+ let applied=await h.cmd('document-import.apply',{id,choices,fingerprint:reviewed.fingerprint},second)
+ while(applied.job.state!=='completed')applied=await h.cmd('document-import.continue',{id},second)
+ await h.cmd('document-import.apply',{id,choices,fingerprint:reviewed.fingerprint},second)
+ await h.cmd('document-import.upload-start',{id,filename:'later.pdf',sha256:hash(fixture.originals[0]),size:fixture.originals[0].length},second,409)
+ const state=await h.state(second),documents=state.importedDocuments
+ assert.equal(documents.length,5);assert.equal(documents.filter(p=>p.disposition==='retained-agreement').length,4)
+ assert.deepEqual(documents.find(p=>p.id===hash(fixture.originals[1])).signatureEvidence,[{kind:'signature-page',page:2,text:'Signature page'}])
+ assert.equal(documents.find(p=>p.id===hash(fixture.originals[2])).report.Value,'2400')
+ assert.equal(documents.find(p=>p.id===hash(fixture.originals[3])).report,null)
+ for(const bytes of fixture.originals){
+  const document=documents.find(p=>p.id===hash(bytes));assert.equal(document.sha256,hash(bytes))
+  const response=await h.mf.dispatchFetch(h.origin+'/api/platter/imported-original?document='+document.id,{headers:{cookie:second}})
+  assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)
+ }
+ const journal=await h.cmd('document-import.journal',{id},second)
+ assert.equal(journal.provenance.length,5)
+ for(const zip of fixture.zips)assert.deepEqual(Buffer.from(journal.originals.find(o=>o.name.endsWith('/'+zip.filename)).original.base64,'base64'),zip.bytes)
+ const standalone=await h.cmd('document-import.create',{label:'Synthetic existing-document review'},second)
+ await uploadMovein(h,standalone.id,{filename:'Alpha.pdf',bytes:fixture.originals[0]},second)
+ const conflict=await h.cmd('document-import.preview',{id:standalone.id},second)
+ assert.equal(conflict.canApply,false);assert.deepEqual(conflict.existing,[hash(fixture.originals[0])]);assert.equal(conflict.report.held,1);assert.equal(conflict.report.arrived,0)
+ await h.cmd('document-import.apply',{id:standalone.id,fingerprint:conflict.fingerprint},second,409)
+ assert.deepEqual((await h.state(second)).importedDocuments,documents,'a later import cannot replace existing originals')
+ const tables=['p_document_moveins','p_document_uploads','p_document_upload_chunks','p_imported_documents','ik_jobs','p_audit']
+ const snapshot=async()=>Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all().then(r=>r.results)))
+ const frozen=await snapshot()
+ assert.equal((await h.send('/api/platter/command',{name:'document-import.undo',input:{id}})).status,401)
+ const client=await h.cmd('client.save',{name:'Synthetic platter dependent client',email:h.auth.OWNER_EMAIL})
+ const draft=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Synthetic dependent draft'})
+ const originalId=hash(fixture.originals[2])
+ await h.db.prepare('INSERT INTO p_imported_document_links(document_id,proposal_id) VALUES(?,?)').bind(originalId,draft.id).run()
+ await h.cmd('document-import.undo',{id},second,409)
+ assert.deepEqual((await h.state(second)).importedDocuments,documents,'dependent undo preserves all originals')
+ await h.db.prepare('DELETE FROM p_imported_document_links WHERE document_id=?').bind(originalId).run()
+ await h.cmd('document-import.undo',{id},second)
+ assert.deepEqual((await h.state(second)).importedDocuments,[])
+ assert.equal((await h.send('/api/platter/imported-original?document='+originalId,undefined,second)).status,404)
+ assert.ok((await h.cmd('document-import.journal',{id},second)).provenance.every(p=>p.reversed))
+ const actor=(await h.state(second)).actor
+ const successorAddress=['synthetic-platter-6','example.invalid'].join('@')
+ await h.send('/auth/invite',{email:successorAddress,displayName:'Synthetic successor',role:'member',returnTo:'/app'},second)
+ const successor=await h.signIn(successorAddress),successorId=(await h.state(successor)).actor.id
+ assert.equal((await h.send('/auth/operator/role',{operatorId:successorId,role:'owner'},second)).status,200)
+ assert.equal((await h.send('/auth/operator/role',{operatorId:actor.id,role:'admin'},await h.signIn(successorAddress))).status,200)
+ const demoted=await h.signIn(actor.email),afterDemotion=await snapshot()
+ await h.cmd('document-import.preview',{id},demoted,403)
+ await h.cmd('document-import.undo',{id},demoted,403)
+ assert.equal((await h.send('/api/platter/imported-original?id='+id+'&name=reviewed-report-choices.json',undefined,demoted)).status,403)
+ assert.deepEqual(await snapshot(),afterDemotion,'revoked owner authority cannot expose source bytes or mutate imports')
+ assert.equal(frozen[3].length,5)
+}))

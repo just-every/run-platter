@@ -1,3 +1,5 @@
+import { runCompletionMail } from '../src/platter/mail'
+import { runArchives } from '../src/platter/archiving/jobs'
 import { runWebhooks } from '../src/platter/api/webhooks'
 import { runSms } from '../src/platter/sms'
 import { runNotifications } from '../src/platter/notifications/scheduled'
@@ -19,4 +21,4 @@ export default {async fetch(request:Request,env:Bindings){
   return withAuthAudit(request,env,async()=>await memberAuthHandler(request,env,auth),auth)
  }
  return await authResponse(request,env)??await platterResponse(request,env)??new Response('Not found',{status:404})
-},async scheduled(controller:ScheduledController,env:Bindings){await runExpiry(runtimeBindings(env),controller.scheduledTime);await runReminders(runtimeBindings(env),controller.scheduledTime);await runSms(runtimeBindings(env));await runDueReports(runtimeBindings(env),controller.scheduledTime);await runNotifications(runtimeBindings(env));await runWebhooks(runtimeBindings(env),controller.scheduledTime)}}
+},async scheduled(controller:ScheduledController,env:Bindings){await runExpiry(runtimeBindings(env),controller.scheduledTime);await runReminders(runtimeBindings(env),controller.scheduledTime);await runSms(runtimeBindings(env));await runDueReports(runtimeBindings(env),controller.scheduledTime);await runNotifications(runtimeBindings(env));await runWebhooks(runtimeBindings(env),controller.scheduledTime);await runArchives(runtimeBindings(env));await runCompletionMail(runtimeBindings(env))}}

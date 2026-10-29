@@ -27,6 +27,32 @@ async function finishSetup(h) {
 
 const mailRows = async h => (await h.db.prepare('SELECT * FROM p_mail ORDER BY created_at, id').all()).results
 
+test('EDIT-017 Spanish invitation and mailbox code retain authored mail and consume localized code transport', async()=>{
+ const sent=[]
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9701'},outboundService:async request=>{sent.push(await request.json());return Response.json({id:'synthetic-platter-'+(9702+sent.length)})}})
+ try{
+  const id=await approved(h)
+  await h.cmd('proposal.locale',{id,version:2,locale:'es'})
+  const invitation=await h.cmd('proposal.send',{id,version:3}),path=new URL(invitation.shareUrl).pathname
+  assert.equal(sent[0].subject,'Su propuesta: '+offer.title)
+  assert.equal(sent[0].text,'Revise su propuesta y verifique su correo electrónico antes de aceptarla:\n'+invitation.shareUrl)
+  assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+  assert.equal(sent[1].subject,'Su código de verificación de Platter')
+  const code=sent[1].text.match(/\b\d{6}\b/)[0]
+  assert.equal(sent[1].text,'Su código de verificación es '+code+'. Caduca en 10 minutos.\nPropuesta: '+offer.title)
+  const verification=await h.send(path+'/action?name=code.verify',{code});assert.equal(verification.status,200,verification.text)
+  assert.equal((await h.db.prepare('SELECT body FROM p_mail WHERE proposal_id=? AND subject=?').bind(id,sent[1].subject).first()).body,'Verification code consumed')
+  assert.equal((await h.send(path+'/action?name=code.verify',{code})).status,401)
+  const second=await approved(h)
+  await h.cmd('proposal.locale',{id:second,version:2,locale:'es'})
+  const subject='Your proposal: escrito por la empresa',message='Review your proposal and verify your email before accepting:\nTexto propio sin traducción.'
+  await h.cmd('proposal.send',{id:second,version:3,mailSubject:subject,mailMessage:message})
+  assert.equal(sent.at(-1).subject,subject);assert.ok(sent.at(-1).text.startsWith(message+'\n\n'))
+  const history=(await h.state()).proposals.find(p=>p.id===second).invitationMessages[0]
+  assert.equal(history.subject,subject);assert.equal(history.message,message)
+ }finally{await h.close()}
+})
+
 test('SEND-006 invitation, fresh link and negotiated send deliver edited text and retain exact link-free history atomically', async()=>{
  const sent=[]
  const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'fake-invitation-edge-key'},outboundService:async request=>{
@@ -1159,7 +1185,7 @@ test('SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes
 
 test('SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links', {timeout:120000}, async()=>{
  const messages=[],chats=[],intents=new Map();let h
- h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9000'},outboundService:async request=>{
+ h=await harness({cf:false,assetsDirectory:'public',origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9000'},outboundService:async request=>{
   const url=new URL(request.url)
   if(url.hostname==='api.resend.com'){messages.push(await request.json());return Response.json({id:'synthetic-platter-'+(9100+messages.length)})}
   if(url.hostname==='slack.com'){
@@ -1197,6 +1223,7 @@ test('SEND-005 personal Slack and email preferences deliver client open, comment
   assert.equal(preferences.value.watcher.email_enabled,1);assert.equal(preferences.value.watcher.slack_route,null);assert.deepEqual(JSON.parse(preferences.value.watcher.events),['comment','signed','paid'])
   assert.equal((await h.send('/api/platter/watch?id='+p.id)).status,401)
   const tick=async()=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  const completions=()=>messages.filter(m=>m.subject==='Agreement complete: '+offer.title)
   const notices=()=>messages.filter(m=>['Proposal opened','Proposal comment','Proposal signed','Proposal payment recorded'].includes(m.subject))
   assert.equal((await h.send(path)).status,200);await tick()
   assert.equal(notices().length,1);assert.equal(chats.length,1)
@@ -1205,11 +1232,24 @@ test('SEND-005 personal Slack and email preferences deliver client open, comment
   const verification=await h.send(path+'/action?name=code.verify',{code}),cookie=verification.cookie;assert.equal(verification.status,200,verification.text)
   assert.equal((await h.send(path+'/action?name=question.create',{revision:1,section:'scope',text:'Synthetic private question'},cookie)).status,200);await tick()
   assert.equal((await h.send(path+'/action?name=accept',{optionId:'one',name:'Avery Chen',consent:true},cookie)).status,200);await tick()
+  assert.equal(completions().length,0,'required payment gates completion mail after signing')
+  assert.equal((await h.send(path+'/certificate.json',undefined,cookie)).status,409,'required payment gates completion downloads')
   const payment=await h.send(path+'/payment.json',{method:'card',consent:true},cookie);assert.equal(payment.status,200,payment.text)
   const saved=await h.db.prepare('SELECT * FROM p_collection_intents WHERE proposal_id=?').bind(p.id).first()
-  assert.equal((await h.send(path+'/payment-consent.json',{consent:true,cents:saved.cents},cookie)).status,200)
+  assert.equal((await h.send(path+'/payment-consent.json',{consent:true,cents:saved.cents+1},cookie)).status,400)
+  assert.equal((await h.send(path+'/payment-consent.json',{consent:true,cents:saved.cents})).status,401)
+  assert.equal(completions().length,0,'unverified and mismatched payment authorization send nothing')
   const intent=intents.get(saved.provider_intent);intent.status='succeeded';intent.latest_charge={id:'synthetic-platter-9010',paid:true,status:'succeeded',amount:intent.amount,currency:intent.currency}
+  const unauthorizedReceipt=await h.send(path+'/payment-status.json',{},cookie);assert.equal(unauthorizedReceipt.status,200,unauthorizedReceipt.text);assert.equal(unauthorizedReceipt.value.complete,false)
+  await tick();assert.equal(completions().length,0,'provider success without the client’s exact authorization cannot release completion')
+  assert.equal((await h.send(path+'/certificate.json',undefined,cookie)).status,409)
+  assert.equal((await h.send(path+'/payment-consent.json',{consent:true,cents:saved.cents},cookie)).status,200)
   const receipt=await h.send(path+'/payment-status.json',{},cookie);assert.equal(receipt.status,200,receipt.text);await tick()
+  assert.equal(completions().length,2,'a confirmed and authorized deposit releases completion once')
+  const agreementResponse=await h.mf.dispatchFetch(h.origin+path+'/agreement.pdf',{headers:{cookie}}),certificateResponse=await h.mf.dispatchFetch(h.origin+path+'/certificate.pdf',{headers:{cookie}})
+  assert.equal(agreementResponse.status,200);assert.equal(certificateResponse.status,200)
+  const agreement=Buffer.from(await agreementResponse.arrayBuffer()),certificate=Buffer.from(await certificateResponse.arrayBuffer())
+  for(const message of completions()){assert.deepEqual(message.attachments.map(a=>a.filename),['agreement.pdf','certificate.pdf']);assert.deepEqual(Buffer.from(message.attachments[0].content,'base64'),agreement);assert.deepEqual(Buffer.from(message.attachments[1].content,'base64'),certificate)}
   const ownerMail=notices().filter(m=>m.to.includes(h.auth.OWNER_EMAIL)),memberMail=notices().filter(m=>m.to.includes(person.email))
   assert.deepEqual(ownerMail.map(m=>m.subject),['Proposal opened','Proposal comment','Proposal signed','Proposal payment recorded'])
   assert.deepEqual(memberMail.map(m=>m.subject),['Proposal comment','Proposal signed','Proposal payment recorded']);assert.equal(chats.length,4)
@@ -1217,6 +1257,7 @@ test('SEND-005 personal Slack and email preferences deliver client open, comment
   const link=new URL(ownerMail[0].text.match(/https:\/\/[^\s]+/)[0]);const signedOut=await h.send(link.pathname+link.search);assert.equal(signedOut.status,303);assert.match(signedOut.headers.get('location'),/^\/signin\?/);assert.equal((await h.send(link.pathname+link.search,undefined,h.owner)).status,200)
   await Promise.all([tick(),tick()]);assert.equal(notices().length,7);assert.equal(chats.length,4)
   await h.send(path+'/payment-status.json',{},cookie);await tick();assert.equal(notices().length,7,'reconciliation never creates another paid notification')
+  assert.equal(completions().length,2,'payment refresh and concurrent workers cannot repeat completion attachments')
   await h.send(path,undefined,cookie);await tick();assert.equal(notices().length,7,'only the first client view notifies watchers')
  }finally{await h.close()}
 })
@@ -1251,7 +1292,7 @@ test('SEND-005 personal notification revocation and lost proposal scope suppress
 
 test('SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash', {timeout:120000},async()=>{
  const {createHash}=await import('node:crypto'),texts=[];let acceptedId
- const h=await harness({origin:'https://platter.example',assetsDirectory:'public',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9200',TWILIO_ACCOUNT_SID:'synthetic-platter-9201',TWILIO_AUTH_TOKEN:'synthetic-platter-9202',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
+ const h=await harness({cf:false,origin:'https://platter.example',assetsDirectory:'public',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9200',TWILIO_ACCOUNT_SID:'synthetic-platter-9201',TWILIO_AUTH_TOKEN:'synthetic-platter-9202',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
   if(new URL(request.url).hostname==='api.twilio.com'){texts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(9300+texts.length)},{status:201})}
   const url=new URL(request.url)
   if(url.hostname==='api.stripe.com'){
@@ -1417,4 +1458,88 @@ test('COLLAB-002 scoped colleagues comment, receive consented generic email and 
   const actions=(await audit()).filter(row=>row.action.startsWith('collaboration.'))
   assert.deepEqual([...new Set(actions.map(row=>row.action))].sort(),['collaboration.assign','collaboration.comment','collaboration.resolve','collaboration.route'])
  }finally{await h.close()}
+})
+
+test('SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports', {timeout:240000}, async()=>{
+ const {createHash}=await import('node:crypto')
+ for(const provider of ['resend','sendgrid','cloudflare','gmail','microsoft','local']){
+  const sent=[];let fail=false,stall=false,revokeDuringRefresh=false,release,entered
+  let arrived=new Promise(resolve=>{entered=resolve}),waiting=new Promise(resolve=>{release=resolve})
+  const h=await harness({cf:false,assetsDirectory:'public',...(provider==='local'?{}:{origin:'https://platter.example'}),auth:{AUTH_LOCAL:provider==='local'?'true':'false',MAIL_PROVIDER:['gmail','microsoft'].includes(provider)?'resend':provider==='local'?'development':provider,MAIL_ACCOUNT_ID:'0'.repeat(32),MAIL_API_KEY:'synthetic-platter-9801',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-9802',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-9803',MICROSOFT_MAIL_CLIENT_ID:'synthetic-platter-9804',MICROSOFT_MAIL_CLIENT_SECRET:'synthetic-platter-9805'},outboundService:async request=>{
+   const url=new URL(request.url)
+   if(['oauth2.googleapis.com','login.microsoftonline.com'].includes(url.hostname)){if(revokeDuringRefresh){revokeDuringRefresh=false;await h.db.prepare("UPDATE oa_operators SET version=version+1 WHERE role='owner'").run()}return Response.json({access_token:'synthetic-platter-9806',refresh_token:'synthetic-platter-9807',scope:provider==='gmail'?'openid email https://www.googleapis.com/auth/gmail.send':'User.Read Mail.Send'})}
+   if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-9808',email:h.auth.OWNER_EMAIL,email_verified:true})
+   if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-9809',mail:h.auth.OWNER_EMAIL})
+   const payload=await request.json();let message
+   if(provider==='gmail'){
+    const raw=Buffer.from(payload.raw,'base64url').toString('utf8'),boundary=raw.match(/boundary="([^"]+)"/)?.[1]
+    message={to:[raw.match(/\r\nTo: ([^\r]+)/)[1]],subject:Buffer.from(raw.match(/Subject: =\?UTF-8\?B\?([^?]+)\?=/)[1],'base64').toString(),attachments:[]}
+    if(boundary){for(const part of raw.split('--'+boundary)){const filename=part.match(/filename="([^"]+)"/)?.[1];if(filename){assert.match(part,/Content-Type: application\/pdf/);message.attachments.push({filename,bytes:Buffer.from(part.split('\r\n\r\n')[1].trim(),'base64')})}}}
+    else message.text=Buffer.from(raw.split('\r\n\r\n')[1],'base64').toString()
+   }else if(provider==='microsoft')message={to:payload.message.toRecipients.map(r=>r.emailAddress.address),subject:payload.message.subject,text:payload.message.body.content,attachments:(payload.message.attachments??[]).map(a=>{assert.equal(a['@odata.type'],'#microsoft.graph.fileAttachment');assert.equal(a.contentType,'application/pdf');return {filename:a.name,bytes:Buffer.from(a.contentBytes,'base64')}})}
+   else message={to:provider==='sendgrid'?payload.personalizations[0].to.map(r=>r.email):payload.to,subject:payload.subject,text:payload.text??payload.content?.find(c=>c.type==='text/plain')?.value,attachments:(payload.attachments??[]).map(a=>{assert.equal(a.content_type??a.type,'application/pdf');return {filename:a.filename,bytes:Buffer.from(a.content,'base64')}})}
+   sent.push(message);const providerMessageId='synthetic-platter-'+(9900+sent.length)
+   if(message.subject.startsWith('Agreement complete:')){if(stall&&message.to.includes(recipient)){entered();await waiting}if(fail)throw Error('Synthetic uncertain completion response')}
+   return provider==='sendgrid'?new Response(null,{status:202}):provider==='microsoft'?new Response(null,{status:202}):provider==='cloudflare'?Response.json({success:true,errors:[],result:{message_id:providerMessageId,queued:message.to,delivered:[],permanent_bounces:[]}}):Response.json({id:providerMessageId})
+  }})
+  try{
+   if(['gmail','microsoft'].includes(provider)){
+    const start=await h.send('/api/platter/mailbox/authorize',{provider,consent:true},h.owner),state=new URL(start.headers.get('location')).searchParams.get('state')
+    assert.equal((await h.send('/api/platter/mailbox/callback?'+new URLSearchParams({state,code:'synthetic-platter-9810'}),undefined,h.owner)).status,303)
+   }
+   const id=await approved(h),invitation=await h.cmd('proposal.send',{id,version:2}),path=new URL(invitation.shareUrl).pathname
+   const accept={name:'Synthetic signer',optionId:'one',consent:true}
+   const before=sent.length
+   assert.equal((await h.send(path+'/action?name=accept',accept)).status,401);assert.equal(sent.length,before)
+   await h.send(path+'/action?name=code.request',{})
+   const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(id).first()).body.match(/\b\d{6}\b/)[0]
+   const verified=await h.send(path+'/action?name=code.verify',{code});assert.equal(verified.status,200,verified.text)
+   const cron=async()=>await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+   stall=provider==='resend'
+   const accepted=h.send(path+'/action?name=accept',accept,verified.cookie)
+   if(stall){await arrived;await Promise.all([cron(),cron()]);release()}
+   assert.equal((await accepted).status,200)
+   const completion=sent.filter(m=>m.subject.startsWith('Agreement complete:'))
+   const references=(await h.db.prepare('SELECT * FROM p_completion_mail WHERE proposal_id=?').bind(id).all()).results
+   assert.equal(references.length,2)
+   const download=async(url,cookie)=>{const r=await h.mf.dispatchFetch(h.origin+url,{headers:{cookie}});assert.equal(r.status,200);return Buffer.from(await r.arrayBuffer())}
+   const pdf=await download(path+'/agreement.pdf',verified.cookie),certificate=await download(path+'/certificate.pdf',verified.cookie),facts=(await h.send(path+'/certificate.json',undefined,verified.cookie)).value
+   assert.equal(facts.documentSha256,createHash('sha256').update(pdf).digest('hex'));assert.equal(facts.signers[0].method,'mailbox code');assert.equal(facts.location,'not recorded');assert.equal(facts.userAgent,'not recorded')
+   assert.deepEqual(await download('/api/platter/agreement.pdf?id='+id,h.owner),pdf);assert.deepEqual(await download('/api/platter/certificate.pdf?id='+id,h.owner),certificate)
+   if(provider==='local'){
+    const captured=(await mailRows(h)).filter(m=>references.some(r=>r.mail_id===m.id));assert.equal(captured.length,2);assert.ok(captured.every(m=>m.status==='local'));assert.equal(sent.length,0)
+   }else{
+    const outcomes=(await h.db.prepare('SELECT m.status FROM p_mail m JOIN p_completion_mail c ON c.mail_id=m.id WHERE c.proposal_id=?').bind(id).all()).results;assert.ok(outcomes.every(m=>m.status==='accepted'),provider+' completion has provider acceptance')
+    assert.equal(completion.length,2,provider);assert.deepEqual(completion.map(m=>m.to[0]).sort(),[recipient,h.auth.OWNER_EMAIL].sort())
+    for(const message of completion){assert.deepEqual(message.attachments.map(a=>a.filename),['agreement.pdf','certificate.pdf']);assert.deepEqual(message.attachments[0].bytes,pdf);assert.deepEqual(message.attachments[1].bytes,certificate)}
+   }
+   assert.equal((await h.send(path+'/action?name=accept',accept,verified.cookie)).status,200)
+   await Promise.all([cron(),cron()]);assert.equal(sent.filter(m=>m.subject.startsWith('Agreement complete:')).length,completion.length)
+   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_agreement_artifacts WHERE proposal_id=?').bind(id).first()).n,1)
+   stall=false
+   const {completionRecipients}=await import('./completion-recipients.mjs')
+   await completionRecipients(h,sent,provider,cron)
+   if(provider==='resend'){
+    stall=false;fail=true
+    const uncertain=await approved(h),share=await h.cmd('proposal.send',{id:uncertain,version:2}),otherPath=new URL(share.shareUrl).pathname
+    await h.send(otherPath+'/action?name=code.request',{});const otherCode=sent.at(-1).text.match(/\b\d{6}\b/)[0],v=await h.send(otherPath+'/action?name=code.verify',{code:otherCode})
+    assert.equal((await h.send(otherPath+'/action?name=accept',accept,v.cookie)).status,200)
+    const n=sent.length;await cron();assert.equal((await h.send(otherPath+'/action?name=accept',accept,v.cookie)).status,200);assert.equal(sent.length,n,'uncertain completion outcomes never replay')
+    assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_mail m JOIN p_completion_mail c ON c.mail_id=m.id WHERE c.proposal_id=? AND m.status='uncertain'").bind(uncertain).first()).n,2)
+    fail=false
+    const stale=await approved(h),old=await h.cmd('proposal.send',{id:stale,version:2}),oldPath=new URL(old.shareUrl).pathname,row=(await h.state()).proposals.find(p=>p.id===stale)
+    await h.cmd('proposal.send',{id:stale,version:row.version})
+    const unchanged=sent.length;assert.equal((await h.send(oldPath+'/action?name=accept',accept,v.cookie)).status,404);assert.equal(sent.length,unchanged)
+    assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_completion_mail WHERE proposal_id=?').bind(stale).first()).n,0)
+   }
+   if(provider==='gmail'){
+    const revoked=await approved(h),share=await h.cmd('proposal.send',{id:revoked,version:2}),revokedPath=new URL(share.shareUrl).pathname
+    await h.send(revokedPath+'/action?name=code.request',{});const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(revoked).first()).body.match(/\b\d{6}\b/)[0],v=await h.send(revokedPath+'/action?name=code.verify',{code})
+    const before=sent.length;revokeDuringRefresh=true
+    assert.equal((await h.send(revokedPath+'/action?name=accept',accept,v.cookie)).status,200)
+    await cron();assert.equal(sent.length,before,'owner credential revocation during refresh withholds both attachments without a provider send')
+    assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_mail m JOIN p_completion_mail c ON c.mail_id=m.id WHERE c.proposal_id=? AND m.held_reason='sender_not_authorized'").bind(revoked).first()).n,2)
+   }
+  }finally{release();await h.close()}
+ }
 })

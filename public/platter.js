@@ -204,10 +204,22 @@ for(const button of document.querySelectorAll('[data-embed-url]'))button.addEven
 // Measure only disclosed, explicitly enabled client pages, never member previews.
 (() => {
  const view=document.querySelector('[data-engagement-view]');if(!view)return;
- const totals=new Map();let previous=performance.now();
- const sections=[...document.querySelectorAll('[data-engagement-section]')];
- function tick(){const now=performance.now(),elapsed=now-previous;previous=now;if(document.visibilityState!=='visible')return;let best=null,pixels=0;for(const heading of sections){const rect=heading.closest('section').getBoundingClientRect(),height=Math.max(0,Math.min(innerHeight,rect.bottom)-Math.max(0,rect.top));if(height>pixels){best=heading.dataset.engagementSection;pixels=height;}}if(best)totals.set(best,(totals.get(best)||0)+elapsed);}
- function selection(){const optionId=document.querySelector('input[name="optionId"]:checked')?.value||document.querySelector('select[name="optionId"]')?.value||view.dataset.engagementOption;const added=[...document.querySelectorAll('input[name^="add."]:checked')];const items=added.length?added.map(input=>({id:input.name.slice(4),quantity:Number([...document.querySelectorAll('input[name^="qty."]')].find(q=>q.name==='qty.'+input.name.slice(4))?.value||1)})):JSON.parse(view.dataset.engagementItems);return {optionId,items};}
- function flush(){tick();for(const [section,ms] of totals){fetch(view.dataset.engagementEndpoint,{method:'POST',headers:{'content-type':['application','json'].join('/')},credentials:'same-origin',keepalive:true,body:JSON.stringify({viewId:view.dataset.engagementView,section,milliseconds:Math.floor(ms),...selection()})}).catch(()=>{});}}
- setInterval(flush,1000);document.addEventListener('change',flush);document.addEventListener('visibilitychange',flush);window.addEventListener('pagehide',flush);
+ const totals=new Map(),sections=[...document.querySelectorAll('[data-engagement-section]')];
+ let previous=performance.now(),visible=document.visibilityState==='visible',active=null,sequence=0,lastChoice='',pending=Promise.resolve();
+ function current(){let best=null,pixels=0;for(const node of sections){const rect=node.closest('section').getBoundingClientRect(),height=Math.max(0,Math.min(innerHeight,rect.bottom)-Math.max(0,rect.top));if(height>pixels){best=node.dataset.engagementSection;pixels=height;}}return best;}
+ function tick(){const now=performance.now();if(visible&&active)totals.set(active,(totals.get(active)||0)+now-previous);previous=now;active=current();}
+ function selection(){
+  const select=document.querySelector('select[name="optionId"]'),optionId=select?.value||document.querySelector('input[name="optionId"]:checked')?.value||view.dataset.engagementOption;
+  const controls=[...document.querySelectorAll('input[name^="add."]')],renderedOption=select?.form?.querySelector('input[name="itemsOptionId"]')?.value,items=select&&optionId!==renderedOption?[]:controls.length?controls.filter(input=>input.checked).map(input=>({id:input.name.slice(4),quantity:Number([...document.querySelectorAll('input[name^="qty."]')].find(q=>q.name==='qty.'+input.name.slice(4))?.value||1)})):JSON.parse(view.dataset.engagementItems);
+  return {optionId,items:items.sort((a,b)=>a.id.localeCompare(b.id))};
+ }
+ function flush(){
+  tick();const choice=selection(),key=JSON.stringify(choice);if(key!==lastChoice){sequence++;lastChoice=key;}
+  const payload={viewId:view.dataset.engagementView,readings:Object.fromEntries([...totals].map(([section,ms])=>[section,Math.floor(ms)])),choiceSequence:sequence,...choice};
+  pending=pending.catch(()=>{}).then(()=>fetch(view.dataset.engagementEndpoint,{method:'POST',headers:{'content-type':['application','json'].join('/')},credentials:'same-origin',keepalive:true,body:JSON.stringify(payload)}));
+ }
+ for(const link of document.querySelectorAll('a[href*="/attachments/"]')){const url=new URL(link.href);if(url.origin===location.origin){url.searchParams.set('viewId',view.dataset.engagementView);link.href=url.pathname+url.search;}}
+ active=current();flush();setInterval(flush,1000);
+ document.addEventListener('change',flush);document.addEventListener('scroll',tick,{passive:true});
+ document.addEventListener('visibilitychange',()=>{tick();visible=document.visibilityState==='visible';flush();});window.addEventListener('pagehide',flush);
 })();

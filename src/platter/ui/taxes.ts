@@ -1,0 +1,16 @@
+import { optionTax } from '../taxes'
+import { escape, field, form, hidden, panel } from './shared'
+
+export function taxRatePanel(s:any){
+ if(s.actor?.role!=='owner'||!s.taxSettings)return ''
+ const settings=s.taxSettings
+ return panel('Sales tax rates','<p>Owner-configured rates for one-off USD offers. Enter the applicable jurisdictions explicitly; Platter does not look up addresses or determine tax obligations. Future effective rates apply only when a new tax snapshot is requested. Stripe Tax, AvaTax, certificates and accounting tax exports are not supported.</p>'+ (settings.rates.length?'<ul>'+settings.rates.map((r:any)=>'<li>'+escape(r.region)+' · '+escape(r.jurisdiction)+' · '+escape(r.level)+' · '+escape(r.bps/100)+'% from '+escape(r.startsOn)+'</li>').join('')+'</ul>':'<p>No tax rates configured.</p>')+form('tax.rate','/app/settings',hidden('version',settings.version)+'<label>Jurisdiction component<select name="level"><option value="state">State</option><option value="county">County</option><option value="city">City</option><option value="district">Special district</option></select></label>'+field('State code','region','','required maxlength="2" placeholder="TX"')+field('Jurisdiction name','jurisdiction','','maxlength="100"')+field('Tax rate (%)','percent','','required inputmode="decimal"')+field('Effective from','startsOn','','required type="date"')+'<button>Save tax rate</button>'))
+}
+export function taxFields(value:any={},kind='package'){
+ return `<label>Tax treatment<select data-${kind}-field="taxable"><option value="no"${!value.taxable?' selected':''}>Non-taxable</option><option value="yes"${value.taxable?' selected':''}>Taxable</option></select></label><label>Tax code<input data-${kind}-field="taxCode" value="${escape(value.taxCode??'')}" maxlength="80"></label>`
+}
+export function taxEditor(options:any[]){
+ const tax=optionTax(options)
+ const address=(kind:string,label:string)=>{const a=(tax as any)?.[kind+'Address']??{};return '<fieldset><legend>'+label+' address</legend>'+[['Street','line1'],['City','city'],['State code','region'],['ZIP code','postalCode'],['County','county']].map(([label,key])=>field(label,'tax.'+kind+'.'+key,a[key]??'','maxlength="200"')).join('')+field('Special districts (comma separated)','tax.'+kind+'.districts',(a.districts??[]).join(', '),'maxlength="2000"')+hidden('tax.'+kind+'.country','US')+'</fieldset>'}
+ return '<details><summary>Sales tax and addresses</summary><p>Use rates configured by the owner in Settings. Tax includes selected optional quantities and allocated discounts. Only one-off USD offers are supported. Enter both addresses and the applicable county and special districts.</p><label>Tax method<select name="taxMethod" aria-label="Tax method">'+(tax?'<option value="keep">Keep this revision’s saved rates and addresses</option>':'')+'<option value="none">No tax calculation</option><option value="owner">Owner-configured rates — take a new snapshot</option></select></label><label>Address used for tax<select name="taxAddressKind"><option value="service"'+(tax?.addressKind!=='billing'?' selected':'')+'>Service address</option><option value="billing"'+(tax?.addressKind==='billing'?' selected':'')+'>Billing address</option></select></label>'+address('service','Service')+address('billing','Billing')+'</details>'
+}

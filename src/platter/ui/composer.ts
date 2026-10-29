@@ -1,3 +1,4 @@
+import { taxEditor, taxFields } from './taxes'
 import { variableCondition } from '../variables'
 import { depositCents, paymentTerms } from '../payment-terms'
 import { scheduleEditor } from './payment-terms'
@@ -30,6 +31,7 @@ function tier(option: any, index: number, currency: string, bps: number | undefi
     + `<label class="tier-name">Option label<input${named('option')} value="${escape(option?.label)}" required maxlength="200" autocomplete="off"></label>`
     + `<label class="tier-price">Price${(Number(option?.discountPercent??0)>0||Number(option?.discountAmount??0)>0)?' before discount':''} in ${escape(currency)}<span class="money-field"><span class="money-sign" aria-hidden="true">$</span><input${id ? ` id="${escape(formId)}-price-${escape(id)}"` : ''}${named('price')} value="${escape(option?.price ?? '')}" required inputmode="decimal" placeholder="0.00" autocomplete="off"><span class="money-figure" aria-hidden="true">${figure((Number(option?.discountPercent??0)>0||Number(option?.discountAmount??0)>0)?{...option,cents:Math.round(Number(option.price)*100)}:option)}</span></span></label>`
     + (packages?`<label>Package discount (%)<input data-package-field="discountPercent" value="${escape(option?.discountPercent??'0')}" inputmode="decimal" aria-label="Package discount (%)"></label><label>Package discount in USD<input data-package-field="discountAmount" value="${escape(option?.discountAmount??'0')}" inputmode="decimal"></label><label>Show discounts to client<select data-package-field="showDiscount"><option value="yes"${option?.showDiscount!=='no'?' selected':''}>Show discounts</option><option value="no"${option?.showDiscount==='no'?' selected':''}>Show net prices only</option></select></label><label>Discount expiry date (UTC)<input type="date" data-package-field="discountExpiresOn" value="${escape(option?.discountExpiresOn??'')}"></label>`:'')
+    + (packages?taxFields(option):'')
     + `<dl class="tier-lines"><dt>Deposit at acceptance</dt><dd data-line="deposit">${shown(deposit)}</dd><dt>Balance after the deposit</dt><dd data-line="balance">${shown(deposit === undefined ? undefined : option.cents - deposit)}</dd></dl>`
     + `<p class="chip sage tier-deposit"><span class="tick" aria-hidden="true"></span><span><output data-line="percent">${paymentTerms(terms)?.depositFixedCents!=null?'Fixed':bps === undefined ? '—' : escape(bps / 100)}</output>${paymentTerms(terms)?.depositFixedCents!=null?' deposit':'% deposit'}</span></p>${extras}</fieldset>`
 }
@@ -59,7 +61,7 @@ export function composerForm(state: any, proposal: any, mode: ComposerMode, id: 
     + field('Proposal title', 'title', proposal?.title, 'required maxlength="200"')
     + field('Deposit percentage', 'depositPercent', proposal ? Number(proposal.deposit_bps) / 100 : '', 'inputmode="decimal" placeholder="25"') + '</div>'
   const command = mode === 'negotiate' ? 'proposal.negotiate' : mode === 'revise' ? 'proposal.revise' : 'proposal.prepare'
-  const body = (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + tiers + `<h2 class="shelf-title">Details</h2>` + details + (['owner','admin','manager'].includes(state.actor?.role)?scheduleEditor(proposal):'<fieldset disabled><legend>Payment schedule (owner, admin or team manager)</legend>'+scheduleEditor(proposal)+'</fieldset>') + (currency === 'USD' ? `<div class="itemised">${pricingEditor(options)}</div>` : '') + (inlineButton ? `<div class="composer-actions"><button>${inlineButton}</button></div>` : '')
+  const body = (proposal ? hidden('id', proposal.id) + hidden('version', proposal.version) : '') + tiers + `<h2 class="shelf-title">Details</h2>` + details + (currency==='USD'&&state.actor?.role==='owner'?taxEditor(options):'') + (['owner','admin','manager'].includes(state.actor?.role)?scheduleEditor(proposal):'<fieldset disabled><legend>Payment schedule (owner, admin or team manager)</legend>'+scheduleEditor(proposal)+'</fieldset>') + (currency === 'USD' ? `<div class="itemised">${pricingEditor(options)}</div>` : '') + (inlineButton ? `<div class="composer-actions"><button>${inlineButton}</button></div>` : '')
   return form(command, proposal ? proposalPath(proposal.id) : '/app', body, proposal ? `proposal-${proposal.id}-${proposal.version}` : 'proposal-new')
     .replace('<form ', `<form id="${escape(id)}" class="composer" `)
 }
@@ -68,7 +70,7 @@ export function composerForm(state: any, proposal: any, mode: ComposerMode, id: 
 export function receiptSum(options: any[], bps: number, currency: string, chosen?: string,terms?:any): string {
   const named = options.map((o: any) => `<span class="${o.id === chosen ? 'picked' : ''}"><strong class="serif">${escape(o.label)}</strong> <span data-sum-price="${escape(o.id)}">${money(o.cents, currency === 'AUD' ? currency : undefined)}</span></span>`).join(' <span class="muted">or</span> ')
   const deposits = options.map((o: any) => `<span data-sum-deposit="${escape(o.id)}">${depositOf(o, bps, currency,terms)}</span>`).join(' or ')
-  return `<p class="receipt-sum">${named} <span class="sep">·</span> <span data-sum-percent>${paymentTerms(terms)?.depositFixedCents!=null?'Fixed':escape(bps / 100)}</span>${paymentTerms(terms)?.depositFixedCents!=null?' deposit':'% deposit'} ${deposits}<span class="currency-note"> <span class="sep">·</span> <span class="muted">${currency === 'AUD' ? 'GST-free in AUD' : 'USD · sales tax not calculated'}</span></span></p>`
+  return `<p class="receipt-sum">${named} <span class="sep">·</span> <span data-sum-percent>${paymentTerms(terms)?.depositFixedCents!=null?'Fixed':escape(bps / 100)}</span>${paymentTerms(terms)?.depositFixedCents!=null?' deposit':'% deposit'} ${deposits}<span class="currency-note"> <span class="sep">·</span> <span class="muted">${currency === 'AUD' ? 'GST-free in AUD' : options.some(o=>o.tax)?'USD · selection includes sales tax':'USD · sales tax not calculated'}</span></span></p>`
 }
 
 export function receipt(sum: string, actions: string, note = ''): string {

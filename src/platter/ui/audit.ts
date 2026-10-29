@@ -31,6 +31,7 @@ const verbs: Record<string, string> = {
  'followup.schedule': 'scheduled a sales follow-up for', 'followup.complete': 'completed a sales follow-up for', 'followup.dismiss': 'dismissed a sales follow-up for', 'followup.notify': 'notified the sales owner of',
  'agent.create': 'created the agent key', 'agent.revoke': 'revoked the agent key', 'send-request.resolve': 'resolved an agent send request',
  'import.preview': 'previewed a client import', 'import.apply': 'applied a client import', 'import.journal': 'opened an import journal', 'import.undo': 'undid a client import',
+ 'business-import.promote-preview':'reviewed imported prices','business-import.promote':'promoted reviewed catalog items',
  'business-import.preview': 'previewed a catalog and records import', 'business-import.apply': 'imported catalog and records',
  'report.time-zone': 'set the installation time zone', 'report.schedule': 'scheduled a pipeline report email', 'report.unschedule': 'stopped a pipeline report email', 'report.export': 'exported the pipeline report',
  'native.auth.bootstrap': 'claimed this installation', 'native.setup': 'finished first-run setup', 'native.auth.invite': 'invited',

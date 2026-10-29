@@ -11,7 +11,7 @@ export function pipelineCsv(report: Report & {view?:string}) {
  const lines = [['Title', 'Client', 'Owner', 'Status', 'Next action', 'Currency', 'Value', 'Age in days','Follow-up due']]
  for (const r of report.rows) lines.push([r.title, r.client, r.owner, r.status, nextActions[r.nextAction as keyof typeof nextActions], r.currency, decimal(r.valueCents), String(r.age),r.dueDate??''])
  for (const t of report.totals) lines.push([`Total (${t.count} proposals)`, '', '', '', '', t.currency, decimal(t.valueCents), '', ''])
- if(report.view==='recorded-revenue'){lines[0].push(...revenueLabels);for(const [i,row] of report.rows.entries())lines[i+1].push(...revenueKeys.map(k=>decimal(row.recordedRevenue?.[k]??0)));for(const [i,total] of report.totals.entries())lines[report.rows.length+i+1].push(...revenueKeys.map(k=>decimal((total as any)[k]??0)))}
+ if(report.view==='recorded-revenue'){lines[0][6]='Booked signed value';lines[0].push('Accepted on (UTC)',...revenueLabels);for(const [i,row] of report.rows.entries())lines[i+1].push(row.bookedOn,...revenueKeys.map(k=>decimal(row.recordedRevenue?.[k]??0)));for(const [i,total] of report.totals.entries())lines[report.rows.length+i+1].push('',...revenueKeys.map(k=>decimal((total as any)[k]??0)))}
  return lines.map(line => line.map(cell).join(',')).join('\r\n') + '\r\n'
 }
 

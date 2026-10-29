@@ -1,3 +1,4 @@
+export { documentImportCommand, documentMoveinState, importedOriginal } from './document-import'
 import {
   planD1Import, createD1ImportJob, applyD1ImportBatches, undoD1Import,
   readD1ImportJob, readD1ImportOriginals,

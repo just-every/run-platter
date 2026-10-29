@@ -80,7 +80,7 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   const owner = state.actor?.role === 'owner'
   const person = Boolean(p.canEdit)
   const frozen = p.status === 'sent' || p.status === 'accepted' || p.status === 'expired' || p.status === 'withdrawn'
-  const pricing = p.currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.'
+  const pricing = p.currency === 'AUD' ? 'All prices are GST-free in AUD.' : p.options?.some((o:any)=>o.tax)?'All prices are in USD. Package prices exclude tax; the selected total includes sales tax.':'All prices are in USD. Sales tax is not calculated.'
   const sum = receiptSum(p.options ?? [], Number(p.deposit_bps), p.currency, p.acceptance?.optionId,p)
   const withdrawn = p.withdrawals?.some((w: any) => w.revision === p.sentRevision)
   const clientView = owner && p.shareToken && !withdrawn ? `<div class="band-actions"><a class="button-link secondary" href="/p/${encodeURIComponent(p.shareToken)}">Open revision ${escape(p.sentRevision)} as ${escape(p.clientName)} sees it</a></div>` : ''

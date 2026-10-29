@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 11 | 98 | 50 | 159 |
+| Core | 13 | 100 | 46 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 11 | 98 | 54 | 163 |
+| Full target | 13 | 100 | 50 | 163 |
 
 Judged from the code and tests at commit `56c6fb72f04a58cdc5d169af6fd59b0996a3745c` (28 October 2026). Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -438,15 +438,15 @@ Core · target · **done** · Cites BASE-ROLE-001 · Rules D-1
 
 #### EDIT-017 — Client page in the client's language
 
-Core · target · **missing** · Rules D-1
+Core · target · **partial** · Rules D-1
 
 **Requirement.** Each recipient sees the client page, emails, disclosures (`SIGN-003`, `TRACK-004`), verification and signing steps in their language: at least English, Spanish, French, German and Portuguese, set per recipient or taken from the browser. An agent’s translation edit carries standard and follows the company policy (`AI-002`), and the certificate of completion (`SIGN-005`) records the language shown. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-017).
 
 **Acceptance.**
 1. Set a recipient to Spanish: the invitation email, client page controls, ESIGN disclosure, verification and signing steps are in Spanish, the string catalog check finds no untranslated English string on those screens, and the certificate records Spanish.
 
-**Evidence.** None.
-**Gap.** The client page and mail are English only.
+**Evidence.** `tests/mail.test.mjs` — “EDIT-017 Spanish invitation and mailbox code retain authored mail and consume localized code transport”; `tests/platter.test.mjs` — “EDIT-017 Spanish mailbox journey preserves authority, verification limits, authored content and actual certificate language”; `tests/site.test.mjs` and `tests/site-documents.mjs` — “EDIT-017 owner-selected Spanish invitation, verification, consent and completion preserve authored English through the compiled client”; `tests/archive.test.mjs` — “SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority”
+**Gap.** Owner-selected Spanish and English defaults now cover the single-client mailbox journey with collection off, retaining authored text and actual new acceptance and certificate language without historical inference. Gap: French, German and Portuguese, browser-language fallback, full SIGN-003 consumer disclosures, other email events, payment and provider identity screens and configured multi-recipient flows remain. SEND-003 and SIGN-004 retain their own authority-policy Gaps.
 
 #### EDIT-018 — Client-page preview before sending
 
@@ -490,8 +490,8 @@ Core · target · **partial**
 **Acceptance.**
 1. Import 50 items from CSV with a preview, one row with an image URL served by a file-host fake, sync items from a QuickBooks Online fake, add two items to a pricing table set to show images and see the imported image on its line in the editor, the client page and the PDF, change an item's price, and see the sent proposal unchanged and a new draft use the new price.
 
-**Evidence.** `src/platter/catalog.ts`, `src/platter/movein/business-import.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Native USD catalog items now support name/description/SKU/unit/price/private cost, owner/admin/manager versioned editing and reviewed insertion into independent drafts. tests/platter.test.mjs — “TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices and private costs stay frozen in proposals” proves no-write role refusals, private cost copying, immutable sent prices, stale-price refusal and new draft pricing. The named role browser and CLI journeys prove 1440/390 controls and exact custody. Imported catalog metadata and image originals remain review-only records; no imported metadata is charged automatically. Gap: recurrence, tax/account metadata, native image editing/rendering and provider item synchronization remain.
+**Evidence.** `src/platter/catalog.ts`, `src/platter/catalog-import.ts`, `tests/platter.test.mjs`, `tests/catalog-journey.mjs`, `tests/site.test.mjs`, `tests/catalog-browser.mjs`, `tests/archive.test.mjs`
+**Gap.** Native USD catalog items retain name, description, SKU, unit, price, private cost, default recurrence, taxable flag, tax code and income account under the existing owner, admin and manager version guards. Selected image-free fixed-price CSV records become priced items only after a separate owner-only review bound to the exact records and pricing choices. Insertion requires explicit recurring term and start date and copies independent metadata into drafts, templates and sent revisions; ordinary editor saves preserve it. `tests/platter.test.mjs` — “TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices and private costs stay frozen in proposals”, extended by `tests/catalog-journey.mjs`, proves 50 reviewed CSV records, explicit promotion, no-write role and stale refusals, private recurring costs, immutable sent prices and metadata, future defaults, one-off tax calculation and explicit refusal of taxed recurrence. `tests/site.test.mjs` — “CAT-001 reviewed CSV promotion and explicit recurring insertion preserve independent defaults”, using `tests/catalog-browser.mjs`, proves promotion, metadata controls and recurring insertion at 1440, with browser proof at 1440 and 390. `tests/archive.test.mjs` — “PRICE-005 public CLI preserves business tax rates and frozen agreements without restoring signing authority” proves exact restored imported records, promotion provenance, defaults and template copies without duplicate promotion; the named TEAM-001 role archive journey retains sent catalog prices and metadata. No imported metadata is charged automatically. Gap: native image editing and rendering, URL-image acceptance and QuickBooks Online, Xero, HubSpot and Salesforce item synchronization remain. Image acquisition requires a qualified Base image-GET egress door with validated public address pinning, original-host TLS, no redirects and 5-MiB image and 20-MiB batch bounds; the recorded POST-only 64-KiB relay does not qualify. Explicit image failure and apply without images remain. Recurring tax and provider tax execution remain held under PRICE-005.
 
 #### PRICE-001 — USD pricing tables with line items
 
@@ -543,7 +543,7 @@ Core · target · **partial** · Rules D-1
 
 #### PRICE-005 — US sales tax
 
-Core · target · **missing** · Rules D-1
+Core · target · **partial** · Rules D-1
 
 **Requirement.** Each line is taxable or not under a tax code. Tax is calculated from the client's service or billing address by one of three methods the owner picks: owner-configured rates, Stripe Tax or Avalara AvaTax. Owner-configured rates are set per jurisdiction as state, county, city and special-district components with effective dates; Platter sums the components that apply to the address, computes tax on the taxable subtotal per jurisdiction in integer cents rounded half up, and freezes the rate used with the sent revision, so a later rate change never alters a sent quote. With Stripe Tax or AvaTax, Platter sends each line's amount, tax code and the addresses, applies the returned tax to the cent, and commits the AvaTax transaction when the invoice is issued. A tax-exempt client uploads an exemption or resale certificate, which is stored with the agreement. Tax shows as its own line and flows to invoices with the matching tax code (`ACCT-001`, `ACCT-002`). Platter calculates; filing returns stays with the tax service (see Honest boundaries). Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#price-005).
 
@@ -552,20 +552,20 @@ Core · target · **missing** · Rules D-1
 2. Run the same two quotes through a Stripe Tax fake and an Avalara AvaTax fake: each fake's request carries the line tax codes and addresses, the returned tax is applied to the cent, and the AvaTax transaction is committed when the invoice is issued.
 3. Mark a client exempt with a certificate and see zero tax; sync the invoice and see the tax code in the QuickBooks Online fake.
 
-**Evidence.** None.
-**Gap.** No tax handling beyond a fixed GST-free export.
+**Evidence.** `src/platter/taxes.ts`, `src/platter/selection.ts`, `tests/platter.test.mjs` — “PRICE-005 owner tax follows selected quantities and discounts, freezes rates and refuses unsafe writes”; `tests/site-documents.mjs` — “PRICE-005 native owner-configured tax settings, selected quantities and frozen agreement” via `tests/packages-journey.mjs`; `tests/archive.test.mjs` — “PRICE-005 public CLI preserves business tax rates and frozen agreements without restoring signing authority”
+**Gap.** Stripe Tax and AvaTax adapters, AvaTax commit on invoice issuance, recurring tax, exemption-certificate custody and accounting tax-code propagation remain unimplemented. Owner-only configuration is the conservative interim authority floor; scoped delegation is not claimed. The named native journeys prove the one-off path; no live provider, filing, exemption or accounting determination is claimed.
 
 #### PRICE-006 — Internal cost and margin
 
-Core · target · **partial** · Rules D-1
+Core · target · **done** · Rules D-1
 
 **Requirement.** Line items carry internal cost (from the catalog or entered), and the editor shows margin per line, per package and in total. Cost and margin are visible only to the roles `TEAM-001` allows (owner, admin, manager and billing) and never appear in the client page, PDF, client API or webhooks. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#price-006).
 
 **Acceptance.**
 1. Price a package with costs, see margin per line and total as an owner, then load the client page, PDF, client API response and webhook payload and find no cost or margin; a sales role without cost access sees none either.
 
-**Evidence.** `src/platter/internal-pricing.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Version-bound internal unit costs now produce cent-exact line costs and line/package margins. Only owner, admin, manager and billing proposal views carry internalPricing; billing reads but does not edit proposals. Sales, content editor and viewer responses omit it. Agent reads carry standard and follow company policy within the sponsor’s cost-read role and grant; this class and policy path remains unproved. The separate /api/platter/internal-pricing.pdf export requires those same read rights and proposal scope; public offer PDFs always use the public snapshot and contain no costs. tests/platter.test.mjs — “TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions and templates, and stay out of sales/client data and public PDFs” proves the amounts, role/API/private-PDF boundaries, public-page/PDF exclusion, revisions, negotiation, restoration, duplication and personal templates. The named team browser journey proves manager cost editing and sales exclusion at 1440/390; the role CLI journey restores exact costs and templates. Optional-item and flat-package costs now ship with selected/base totals. tests/platter.test.mjs — “TEAM-001 / PRICE-006 optional and flat-package costs produce exact selected totals while verified client JSON, pages and PDFs exclude private state” proves exact optional quantities, selected total margins, template/catalog carryover, unverified and cross-invitation refusal, and absence of private fields from the new mailbox-verified /p/<invitation>/data.json projection. The named role browser and CLI journeys prove 1440/390 total selectors, selected margins and exact custody. Gap: outbound webhook payload proof remains when AUTO-004 adds that door; no lifecycle webhook is currently sent. AUTO-004 inherits the cost-free public projection before its webhook capability ships.
+**Evidence.** `src/platter/internal-pricing.ts`; `tests/platter.test.mjs` — “TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions and templates, and stay out of sales/client data and public PDFs”, “TEAM-001 / PRICE-006 optional and flat-package costs produce exact selected totals while verified client JSON, pages and PDFs exclude private state”, and “AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation” prove owner margins and exclusion from sales, client pages, PDFs, client JSON and actual initial and retried webhook requests. `tests/site-documents.mjs` — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” proves cost controls and sales exclusion at 1440 and 390 pixels. `tests/archive.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” proves exact private-cost custody.
+**Gap.** None.
 
 #### PRICE-007 — Payment terms and schedules on the proposal
 
@@ -930,15 +930,15 @@ Core · target · **partial** · Cites BASE-PUBLIC-001, BASE-MAIL-001
 
 #### TRACK-002 — Section-level reading analytics
 
-Core · target · **partial**
+Core · target · **done**
 
 **Requirement.** For each view, Platter measures time spent on each section and on pricing, which packages and items were toggled, and which attachments were opened, and summarizes engagement per recipient. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#track-002).
 
 **Acceptance.**
 1. Run a scripted client session spending 40 seconds on pricing and 5 on the case study; the analytics show those times within 2 seconds and the toggled options.
 
-**Evidence.** `tests/platter.test.mjs`, `tests/tracking-details-browser.mjs`
-**Gap.** Opted-in client pages measure the most visible current section while the tab is visible, send same-origin cumulative readings, validate elapsed bounds, retain monotonic times and record valid package and optional-item selections per view. Named HTTP assertions prove 40-second pricing and 5-second scope readings and package choices; the desktop and phone journey proves actual first-party browser measurement. Gap: The committed exact-SHA scripted 40-second pricing and 5-second case-study session with the two-second tolerance, attachment-open attribution, complete toggle history and per-recipient summaries remain. FOLLOW-002 section-specific engagement reasons remain; its required original seven-proposal viewed ordering now passes. Owner-only access and explicit measurement consent await ct approval.
+**Evidence.** `tests/platter.test.mjs` — “TRACK-002 reading events retain monotonic section times and validated package choices on the exact view”; `tests/tracking-details-browser.mjs` — “TRACK-001 and TRACK-004 client disclosure, first-party measurement and private owner controls work at desktop and phone widths”; `tests/followup-journey.mjs` — followupJourney; `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
+**Gap.** None.
 
 #### TRACK-003 — Forwarded stakeholder identification
 
@@ -1190,8 +1190,8 @@ Core · target · **partial** · Rules D-1
 **Acceptance.**
 1. Complete a two-signer agreement, download the PDF and certificate as each party, recompute the SHA-256 and see it match the certificate, and find both attached to the completion email.
 
-**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Two-signer completion, completion-email attachments, full agreement attachment packaging, IP-derived location and user-agent recording remain. Missing historical methods are never inferred; currently unrecorded location and user agent are labelled not recorded. This prerequisite remains PARTIAL.
+**Evidence.** New single-client signatures retain their actual verification method and verification time when recorded. Immutable signed PDFs and method-bearing certificates are downloadable through scoped person and verified-client doors, with matching SHA-256. `tests/mail.test.mjs` — “SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash” proves both parties’ identical bytes, certificate hash, actual SMS and mailbox methods and refusal without verification. The named SIGN-006 compiled browser journey in `tests/site.test.mjs` proves signed downloads at 1440 and 390. The named notification business-history public CLI journey in `tests/archive.test.mjs` retains exact certificate and document bytes and completion references without restoring invitations, outbox rows or completion execution grants. New mailbox-verified single-client completions with collection off atomically queue both parties’ completion mail with durable references to the same immutable PDF and certificate. `tests/mail.test.mjs` — “SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports” proves attachment byte equality with scoped downloads and the certificate digest, concurrent dispatch exclusion, repeated acceptance, stale and unverified refusals, owner credential revocation during mailbox refresh, and uncertainty without replay through Resend, SendGrid, Cloudflare, Gmail and Microsoft network-edge fakes and local capture. The same journey now completes a two-signer client and firm agreement on each transport, compares each party’s downloads and decoded mail attachments with the retained document and certificate, recomputes the hash, refuses wrong-party and out-of-order attempts, and proves repeated decisions and concurrent dispatch send no duplicate. The named SIGN-004 browser journey proves each signer’s completion downloads and retained completion references; the named SEND-006 public CLI journey restores the identical multi-party artifacts and references without an outbox or execution grant. Completion uses the final recipient plan after any unsigned-signer replacement, and sends the firm one copy when it also signs. The signed PDF now lists every retained signature or client approval. New signing facts retain each signer’s reported user agent and only coarse trusted edge location, never caller-supplied location or raw addresses. The same mail journey verifies both signers’ facts and certificate text; the EDIT-017 historical journey preserves absent historical facts. `tests/mail.test.mjs` — “SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links” now proves that a required deposit releases exact PDF and certificate attachments only after both confirmed provider success and exact client authorization, with unverified or mismatched authorization refused and reconciliation unable to duplicate completion mail. Original signing grants remain local and restoration cannot mint a replacement grant.
+**Gap.** Full agreement, vendor and client-upload attachment packaging and live-provider qualification remain. EDIT-010’s current download-only boundary for original attachment bytes is preserved; no new provider disclosure is authorized here. The pinned Managed relay does not support attachments; completion mail on that transport remains held without a send. External-store archiving for configured or payment-gated completions and provider qualification remain with AUTO-002. Missing historical methods are never inferred; historical missing location and user agent remain labelled not recorded. This prerequisite remains PARTIAL.
 
 #### SIGN-006 — Signer identity options
 
@@ -1568,15 +1568,15 @@ Core · target · **missing**
 
 #### AUTO-002 — Completed documents archived to file storage
 
-Core · target · **missing** · Register R-2
+Core · target · **partial** · Register R-2
 
 **Requirement.** Signed PDFs, certificates and attachments are filed to Google Drive, Microsoft OneDrive or SharePoint, Box or [Chest](https://github.com/just-every/run-chest) in a folder per client, named by a pattern the admin sets. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#auto-002).
 
 **Acceptance.**
 1. Connect a Google Drive fake, complete an agreement and see the PDF and certificate in the client's folder with the configured name.
 
-**Evidence.** None.
-**Gap.** No document archiving.
+**Evidence.** `tests/platter.test.mjs` — “AUTO-002 completed agreements archive exact PDFs once under explicit current Drive authority and reconcile uncertain writes without replay” proves the Google Drive network-edge fake through public configuration and real mailbox-verified single-client completion with collection off, exact immutable PDF and certificate bytes and hashes, configured filenames and client folders, concurrent once-only dispatch, current authority and connection refusals, and read-only reconciliation of uncertain uploads. `tests/site-documents.mjs` — “AUTO-002 Settings authorizes Drive archiving and shows completed and held jobs with safe reconciliation” proves the native Settings controls and completion history. `tests/archive.test.mjs` — “AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority” proves byte-identical restored downloads and historical jobs without credentials, grants, replay or client invitation authority, including after fresh authorization for future completions.
+**Gap.** OneDrive, SharePoint, Box, Chest, full agreement attachments, payment-gated completion, configured multi-recipient completion and live-provider qualification remain. Conservative owner and admin authorization default: explicit verified account, destination folder and naming pattern; configuration, connection and authorizing role versions checked before each request; uncertain writes held without automatic replay. Restores confer no credentials or execution authority. SEND-003 and SIGN-004 retain their recorded authority holds.
 
 #### AUTO-003 — Team chat notifications
 
@@ -1716,7 +1716,7 @@ Core · target · **partial**
 1. Accept and pay a fixture of agreements and see booked, invoiced, collected and overdue totals match payments and the QuickBooks Online fake.
 
 **Evidence.** `src/platter/reports/recorded-revenue.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** The recorded-revenue pipeline view now shows accepted value, explicitly received payments, confirmed refunds, net received, unconfirmed refunds and exported deposit CSV value, separately by currency. It never labels an export as a paid provider invoice. Owner/admin/billing see all, manager/viewer see teams and sales sees own; content editors receive no revenue facts. Agent reads carry standard and follow company policy within the sponsor’s report role and grant; this class and policy path remains unproved. tests/platter.test.mjs — “TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund” proves hand-computed totals, each role, exact filtered CSV and once-only scheduled email with identical rows and money. The named role browser journey proves sales/manager/billing views and owner CSV/scheduling at 1440/390; the named role CLI archive journey preserves receipts, refunds, filters and identical report rows/totals. Gap: recurring/MRR/first-year figures, provider invoiced/overdue amounts, accepted/payment-period reporting and accounting reconciliation with the QuickBooks fake remain.
+**Gap.** The recorded-revenue pipeline shows booked signed value, booked one-off and first-year values from immutable accepted PRICE-003 fee snapshots, explicitly received payments, confirmed refunds, net received, unconfirmed refunds and exported deposit CSV value, separately by currency and recorded sales owner. Independent inclusive date ranges select bookings by UTC acceptance date and collections by the recorded receipt date. A row remains when either selected booking or selected receipt exists; booking values outside their range are zero. Refunds reduce the selected receipts. Linked receipts without a recorded receipt date appear only without receipt-date bounds; no provider payment date is inferred. Exported deposit CSV value follows the booking period and is never labelled a paid provider invoice. Owner, admin and billing see all; manager and viewer see teams; sales sees own; content editors receive no revenue facts. Agent reads carry standard and follow company policy within the sponsor’s report role and grant; this class and policy path remains unproved. `tests/platter.test.mjs` — “TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund” proves the $2,500 setup plus $1,200 monthly agreement, $16,900 first-year value for both twelve and twenty-four installments, separate quarters with hand-computed filtered totals, inclusive dates, historical currency isolation, each role, immutable acceptance retries, invalid-filter no-write refusals, matching CSV and once-only scheduled email. `tests/site.test.mjs` — “REPORT-004 booked snapshots and independent receipt periods export and schedule the visible report” proves native date, owner and currency controls, visible values, matching CSV and saved schedule filters, with the changed screen at 1440 and 390. `tests/archive.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” proves identical restored filtered and all-period rows, totals, CSV and schedule filters. Gap: MRR, provider invoiced and overdue amounts, accounting reconciliation with the QuickBooks fake, and charge and invoice execution remain. The assigned native reporting points do not establish live-provider proof or clear the existing real-key holds.
 
 #### REPORT-005 — Report export and scheduled delivery
 
@@ -2005,15 +2005,15 @@ Core · target · **partial** · Cites BASE-DATA-001, BASE-INPUT-003 · Rules D-
 
 #### MIG-007 — Move-in from exported files without API access
 
-Core · target · **missing** · Rules D-1
+Core · target · **partial** · Rules D-1
 
 **Requirement.** For every incumbent, a buyer without API access moves in from the files the incumbent lets any customer export: document PDFs (one at a time or in bulk zips, across several uploads into one import), catalog and contact CSVs, and report CSVs. Platter detects signed documents by their signature certificate or signature page and keeps them as retained, read-only agreements with the original file byte-identical and its SHA-256 recorded; matches each PDF to report rows by title, client and date and holds ambiguous matches for the buyer to review; converts template and library files to editable blocks (`EDIT-005`); and resumes an interrupted upload without duplicating anything. Every import ends with a report of what arrived, what is held for review and what did not map, under `IMPORT-001`'s preview, journal and undo. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#mig-007).
 
 **Acceptance.**
 1. Import three zips in two sessions with an interrupted upload between them and one PDF present in two zips: there is one agreement per document and nothing is duplicated; an ambiguous report row is held for review until the buyer picks its PDF; the report's counts of arrived, held and unmapped items match the fixture; undo removes everything the import wrote.
 
-**Evidence.** None.
-**Gap.** No document import; only the client CSV kit exists.
+**Evidence.** `tests/platter.test.mjs` — “MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo” (three ZIPs across two sign-ins, interrupted upload, content hashes, certificate and signature-page source evidence, exact original downloads, report matching, changed-byte and choice refusals, duplicate conflicts, current owner authority and dependent undo); `tests/site.test.mjs` loads `tests/site-documents.mjs` — “MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in” (compiled upload, review, journal and undo at 1440, browser proof at 1440 and 390); `tests/archive.test.mjs` — “MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody” (restored exact originals, SHA-256, report, provenance and dependency-safe undo).
+**Gap.** The document and report-CSV slice uses the conservative current-owner-only authority floor under the standing scope policy; scoped delegation and provider boundaries remain unqualified. Signature certificates and pages are recognized only as supplied source evidence, not cryptographically validated signatures. Open documents are held read-only: open-document reissue, editable template and library conversion in this combined move-in, native folder creation, catalog and contact integration, provider enrichment and complete qualification for every incumbent export remain. Existing documents are held rather than replaced by a later import. Image acquisition still requires the qualified Base image-GET egress door with validated public address pinning, original-host TLS, no redirects and the required 5-MiB image and 20-MiB batch bounds; the recorded POST-only 64-KiB relay does not qualify. Explicit image failure and apply without images remain in MIG-006. EDIT-013 prerequisites remain unchanged. No live-provider, full migration or DONE claim.
 
 ### Mobile
 

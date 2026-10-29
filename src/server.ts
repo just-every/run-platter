@@ -1,3 +1,5 @@
+import { runCompletionMail } from './platter/mail'
+import { runArchives } from './platter/archiving/jobs'
 import { runWebhooks } from './platter/api/webhooks'
 import { purgeTracking } from './platter/tracking'
 import { runSms } from './platter/sms'
@@ -56,5 +58,7 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
     await runDueReports(runtimeBindings(env), controller.scheduledTime)
     await runNotifications(runtimeBindings(env))
     await runWebhooks(runtimeBindings(env),controller.scheduledTime)
+    await runArchives(runtimeBindings(env))
+    await runCompletionMail(runtimeBindings(env))
   },
 } satisfies ExportedHandler<Bindings>, { seed: seedDemo })

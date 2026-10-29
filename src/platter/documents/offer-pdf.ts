@@ -1,3 +1,4 @@
+import { taxLines } from '../taxes'
 import { fixedPagesPdf } from './import-export'
 import { feeLines } from '../recurring'
 import { depositCents, paymentTerms, scheduleLines } from '../payment-terms'
@@ -48,6 +49,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  if(selected.discount&&!selected.concealDiscount)pdf.text(`Package discount: ${selected.discount.bps/100}% off ${amount(selected.discount.grossCents,currency)}; discount ${amount(selected.discount.cents,currency)}${selected.discount.fixedCents?`; fixed reduction ${amount(selected.discount.fixedCents,currency)}`:''}`)
  pdf.text(`Selected option total: ${amount(selected.cents, currency)}`)
  pdf.text(`Deposit due: ${amount(deposit(selected.cents), currency)}`)
+ for(const line of taxLines(selection.tax,currency))pdf.text(line)
  for(const line of feeLines(selection.fees,currency))pdf.text(line)
  if(selection.paymentSchedule){pdf.heading('Payment schedule');pdf.text('Informational schedule. No automatic charges or invoices. Recurring pricing installments are included in the term total; any separately configured monthly retainer is additional.');for(const line of scheduleLines(selection.paymentSchedule,currency))pdf.text(line)}
  if(selection.items.length){pdf.heading('Selected optional items');for(const item of selection.items)pdf.text(`${item.label}: ${item.quantity} x ${amount(item.unitCents,currency)}${item.recurrence?` x ${item.recurrence.term} installments`:""} = ${amount(item.totalCents,currency)}`)}
@@ -72,7 +74,7 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
  if(!view.hiddenSections.includes('terms')) { pdf.heading('Terms'); pdf.text(view.terms ? String(view.terms) : 'No additional terms.') }
 
  pdf.heading('Offer options')
- pdf.text(currency === 'AUD' ? 'All prices are GST-free in AUD.' : 'All prices are in USD. Sales tax is not calculated.')
+ pdf.text(currency === 'AUD' ? 'All prices are GST-free in AUD.' : selection.tax?'All prices are in USD. Selected total includes sales tax.':'All prices are in USD. Sales tax is not calculated.')
  pdf.text(view.payment_terms&&paymentTerms(view)?.depositFixedCents!=null?'Fixed deposit applies.':`Deposit: ${depositBps / 100}% of the chosen option.`)
  for (const option of displayOptions(options)) {
   pdf.gap(8)
@@ -102,7 +104,11 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   if (attachment.sha256) pdf.text(`SHA-256: ${attachment.sha256}`, 9)
   pdf.gap(6)
  }
- if(signer){pdf.heading('Signature');pdf.text('Signed by: '+signer.name);pdf.text('Recipient: '+signer.email);pdf.text('Verification method: '+signer.method);pdf.text('Accepted at: '+new Date(signer.acceptedAt).toISOString());pdf.text('Consent: '+signer.consent)}
+ if(signer)for(const signed of view.signatures??[signer]){
+  pdf.heading(signed.role==='approver'?'Client approval':'Signature')
+  pdf.text('Signed by: '+signed.name);pdf.text('Recipient: '+signed.email);pdf.text('Verification method: '+signed.method)
+  pdf.text('Accepted at: '+new Date(signed.signedAt??signed.acceptedAt).toISOString());pdf.text('Consent: '+signed.consent)
+ }
  const generated=await pdf.document.save();if(doc.fixedPdf){need(media,'Fixed PDF is unavailable',503);return fixedPagesPdf(await media(doc.fixedPdf.fileId),generated,view,Boolean(signer),fontBytes)}
  return generated
 }

@@ -1,3 +1,6 @@
+import { archiveCommand } from './archiving/jobs'
+import { clientLocale, saveClientLocale } from './locales'
+import { hasTaxable, taxRequest, optionTax, resolveTax, saveTaxRate, validateTaxOptions, type TaxSnapshot } from './taxes'
 import { resolveVariables, editableVariableFields, missingMerge, clientVariableFields } from './variables'
 import { recipientCommand, recipientInvitations, recipientInput } from './recipients'
 import { unfilledVariables } from './api/variables'
@@ -56,18 +59,30 @@ import { suggestionCommand } from './suggestions'
 import { restoreFields } from './history'
 import { negotiationCommand, pendingNegotiation, negotiatedView } from './negotiation'
 
-export function proposalFields(p:Record<string,unknown>){
+export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
  const tables=tableInputs(p.pricingTables)
  const price=(id:string,value:unknown)=>tables.some(t=>t&&t.optionId===id)?1:dollars(value,'package:'+id)
  const schedule=scheduleInput(p),deposit=Number(schedule?.depositFixedCents!=null&&(p.depositPercent===undefined||p.depositPercent==='')?100:p.depositPercent);need(Number.isFinite(deposit)&&Number.isInteger(deposit*100)&&deposit>0&&deposit<=100,'Deposit must be from 0.01 to 100 percent')
  const terms=p.terms??'';need(typeof terms==='string'&&terms.length<=10000,'Terms must be text up to 10000 characters')
  const options=p.packages===undefined?null:packageInputs(p.packages,tables)
  const conditions=sectionConditions(p.sectionConditions??Object.fromEntries(['scope','terms'].filter(k=>p[k+'Option']).map(k=>[k,p[k+'Option']==='variable'?'variable:'+String(p[k+'Variable']??'')+'='+String(p[k+'VariableValue']??''):p[k+'Option']])),options??[{id:'one'},{id:'two'}])
- const priced=pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)
+ const rawPriced=pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)
+ const priced=rawPriced.map(o=>tax?{...o,tax}:o);validateTaxOptions(priced,schedule)
  return{payment_terms:schedule,document:proposalDocument(p.document,priced,String(p.clientId??'')),section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:priced}
 }
-export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
+export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
+ if(name==='proposal.locale')return saveClientLocale(db,a,p)
+ if(name==='tax.rate')return saveTaxRate(db,a,p)
+ let tax:TaxSnapshot|undefined
+ if(['proposal.prepare','proposal.revise','proposal.negotiate'].includes(name)){
+  const current=name==='proposal.prepare'?null:negotiatedView(await proposal(db,p.id),await pendingNegotiation(db,String(p.id)))
+  const existing=current?optionTax(snapshot(current).options):undefined
+  if(current)exact(await proposal(db,p.id),p)
+  const request=taxRequest(p);if(restoredTax!==undefined)need(a.role==='owner'||JSON.stringify(restoredTax??undefined)===JSON.stringify(existing),'Only the owner restores changed tax settings',403);tax=restoredTax!==undefined?restoredTax??undefined:request!==undefined?await resolveTax(db,a,request,at):existing
+  need(!tax||!current||current.currency==='USD','Historical AUD proposals keep their original GST-free form',409)
+  need(!tax||!current||p.clientId===undefined||p.clientId===current.client_id||request!==undefined,'Supply explicit tax addresses for the new client',409)
+ }
  if(name.startsWith('recipient.'))return recipientCommand(env,a,name,p)
  if(name==='tracking.recipient')return stakeholderRecipient(env,a,p)
  if(name.startsWith('tracking.'))return trackingCommand(env,a,name,p)
@@ -113,6 +128,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='payment.surcharge')return surchargeCommand(db,a,p)
  if(name==='payment.collection')return collectionPolicyCommand(env,a,name,p)
  if(name.startsWith('payment.'))return paymentCommand(env,a,name,p)
+ if(name.startsWith('archive.'))return archiveCommand(env,a,name,p)
  if(name.startsWith('provider.'))return connectionCommand(env,a,name,p)
  if(name==='workspace.defaults')return workspaceCommand(db,a,p)
  if(name==='pricing.cost')return saveCost(env,a,p,(fields,patch)=>command(env,a,'proposal.revise',fields,undefined,patch))
@@ -134,7 +150,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name.startsWith('report.'))return reportCommand(env,a,name,p)
  if(name==='attachments.refresh')return refreshVendorDocuments(db,a,p)
  if(name==='suggestions.allow'||name==='suggestion.resolve')return suggestionCommand(env,a,name,p)
- if(name==='proposal.restore'){const fields=await restoreFields(db,a,p);return command(env,a,'proposal.revise',fields,fields.restoredAttachments,undefined,Number(p.revision))}
+ if(name==='proposal.restore'){const fields=await restoreFields(db,a,p);return command(env,a,'proposal.revise',fields,fields.restoredAttachments,undefined,Number(p.revision),fields.restoredTax)}
  if(name==='client.save'){
   need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email,variable_fields) VALUES(?,?,?,?)').bind(id,text(p.name,'a client name'),email(p.email),JSON.stringify(clientVariableFields(p.variableFields??Object.fromEntries(['contactName','firstName','lastName','title','address'].filter(key=>p[key]!==undefined).map(key=>[key,p[key]])))))]);return{id}
  }
@@ -148,25 +164,25 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   const current=await proposal(db,p.id)
   if(p.pricingTables!==undefined&&tableInputs(p.pricingTables).length)need(current.currency==='USD','Historical AUD proposals keep their original pricing form',409)
   if(p.packages!==undefined&&current.currency!=='USD'){const requested=packageInputs(p.packages,[]);need(requested.length===2&&requested.every((o:any,i:number)=>o.id===['one','two'][i]&&!o.optionalItems?.length&&!o.discountBps&&!o.discountFixedCents&&!o.concealDiscount&&!o.discountExpiresOn),'Historical AUD proposals keep their original pricing form',409)}
-  if(p.packages===undefined){const pending=await pendingNegotiation(db,current.id);const content=pending?JSON.parse(pending.snapshot):current;const options=typeof content.options==='string'?JSON.parse(content.options):content.options;if(options.length!==2||options.some((o:any,i:number)=>o.id!==['one','two'][i]||o.optionalItems?.length||o.discount||o.concealDiscount||o.discountExpiresOn))p={...p,packages:editablePackages(options).map(o=>{const suffix=o.id==='one'?'One':o.id==='two'?'Two':null;return suffix?{...o,...(p['option'+suffix]!==undefined?{label:p['option'+suffix]}:{}),...(p['price'+suffix]!==undefined?{price:p['price'+suffix]}:{})}:o})}}
+  if(p.packages===undefined){const pending=await pendingNegotiation(db,current.id);const content=pending?JSON.parse(pending.snapshot):current;const options=typeof content.options==='string'?JSON.parse(content.options):content.options;if(options.length!==2||options.some((o:any,i:number)=>o.taxable||o.taxCode||o.id!==['one','two'][i]||o.optionalItems?.length||o.discount||o.concealDiscount||o.discountExpiresOn))p={...p,packages:editablePackages(options).map(o=>{const suffix=o.id==='one'?'One':o.id==='two'?'Two':null;return suffix?{...o,...(p['option'+suffix]!==undefined?{label:p['option'+suffix]}:{}),...(p['price'+suffix]!==undefined?{price:p['price'+suffix]}:{})}:o})}}
   if(p.pricingTables===undefined){const pending=await pendingNegotiation(db,current.id);const content=pending?JSON.parse(pending.snapshot):current;p={...p,pricingTables:pricingInput(typeof content.options==='string'?JSON.parse(content.options):content.options)}}
   if(p.sectionConditions===undefined&&p.scopeOption===undefined&&p.termsOption===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,sectionConditions:pending?JSON.parse(pending.snapshot).section_conditions??{}:current.section_conditions}}
   if(p.terms===undefined){const pending=await pendingNegotiation(db,current.id);p={...p,terms:pending?JSON.parse(pending.snapshot).terms??'':current.terms}}
   if(p.paymentTerms===undefined&&p.scheduleEnabled===undefined)p={...p,paymentTerms:editableTerms(negotiatedView(current,await pendingNegotiation(db,current.id)))}
   if(p.document===undefined)p={...p,document:documentOf(negotiatedView(current,await pendingNegotiation(db,current.id)))}
   p=(await resolveVariables(env,a,p)).fields
-  const nextFields=proposalFields(p),oldContent=negotiatedView(current,await pendingNegotiation(db,current.id)),oldOptions=snapshot(oldContent).options
+  const nextFields=proposalFields(p,tax),oldContent=negotiatedView(current,await pendingNegotiation(db,current.id)),oldOptions=snapshot(oldContent).options
   if(JSON.stringify(paymentTerms(oldContent))!==JSON.stringify(nextFields.payment_terms)||Boolean(paymentTerms(oldContent))&&oldContent.deposit_bps!==nextFields.deposit_bps)need(['owner','admin','manager'].includes(a.role),'Only owner, admins and scoped managers edit payment schedules',403)
   const external=(document:any)=>document.blocks.filter((b:any)=>b.type==='embed').sort((a:any,b:any)=>a.id.localeCompare(b.id))
   if(JSON.stringify(external(nextFields.document))!==JSON.stringify(external(documentOf(oldContent))))need(['owner','admin'].includes(a.role),'Only owner and admins change external content',403)
   for(const block of documentOf(oldContent).blocks.filter(b=>b.type==='pricing')){const retained=nextFields.document.blocks.find(b=>b.id===block.id&&b.type==='pricing'&&b.optionId===block.optionId&&b.tableIndex===block.tableIndex);if(retained)need((oldOptions.find((o:any)=>o.id===block.optionId)?.tables?.length??0)===(nextFields.options.find((o:any)=>o.id===block.optionId)?.tables?.length??0),'Remove or reassign placed document pricing blocks before changing the number of tables')}
-  await validateDocumentMedia(db,proposalFields(p).document,current.id)
-  await assertSectionLocks(db,negotiatedView(current,await pendingNegotiation(db,current.id)),proposalFields(p))
-  if(name==='proposal.negotiate'||await pendingNegotiation(db,current.id))return negotiationCommand(env,a,name,p,current,{...proposalFields(p),...(restoredAttachments!==undefined?{attachments:restoredAttachments}:{}),internalCosts,costSourceRevision})
+  await validateDocumentMedia(db,proposalFields(p,tax).document,current.id)
+  await assertSectionLocks(db,negotiatedView(current,await pendingNegotiation(db,current.id)),proposalFields(p,tax))
+  if(name==='proposal.negotiate'||await pendingNegotiation(db,current.id))return negotiationCommand(env,a,name,p,current,{...proposalFields(p,tax),...(restoredAttachments!==undefined?{attachments:restoredAttachments}:{}),internalCosts,costSourceRevision})
  }
  if(name==='proposal.prepare'||name==='proposal.revise'){
   p=(await resolveVariables(env,a,p)).fields
-  const f=proposalFields(p);need(!f.payment_terms?.retainer||!f.options.some((o:any)=>o.tables?.some((t:any)=>t.lines.some((l:any)=>l.recurrence))||o.optionalItems?.some((i:any)=>i.recurrence)),'Use recurring pricing lines instead of an additional schedule retainer');if(name==='proposal.prepare'&&f.payment_terms)need(['owner','admin','manager'].includes(a.role),'Only owner, admins and scoped managers set payment schedules',403);if(f.payment_terms?.depositFixedCents!=null)need(f.options.every((o:any)=>o.cents>=f.payment_terms.depositFixedCents),'Fixed deposit must fit every package');need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(f.client_id).first(),'Client not found',404)
+  const f=proposalFields(p,tax);need(!f.payment_terms?.retainer||!f.options.some((o:any)=>o.tables?.some((t:any)=>t.lines.some((l:any)=>l.recurrence))||o.optionalItems?.some((i:any)=>i.recurrence)),'Use recurring pricing lines instead of an additional schedule retainer');if(name==='proposal.prepare'&&f.payment_terms)need(['owner','admin','manager'].includes(a.role),'Only owner, admins and scoped managers set payment schedules',403);if(f.payment_terms?.depositFixedCents!=null)need(f.options.every((o:any)=>o.cents>=f.payment_terms.depositFixedCents),'Fixed deposit must fit every package');need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(f.client_id).first(),'Client not found',404)
   const old=name==='proposal.revise'?await proposal(db,p.id):null;await validateDocumentMedia(db,f.document,old?.id);if(old){exact(old,p);need(['draft','approved'].includes(old.status),'Sent and accepted proposals are frozen',409)}
   if(p.recipientPlan!==undefined&&JSON.stringify(p.recipientPlan)!==JSON.stringify(JSON.parse(old?.recipient_plan??'[]')))need(a.role==='owner','Only the current owner changes recipient role slots',403)
   const id=old?.id??crypto.randomUUID(),revision=(old?.revision??0)+1,currency=old?.currency??'USD',attachments=old?restoredAttachments??JSON.parse(old.attachments):await vendorDocuments(db),row={id,...f,recipient_plan:p.recipientPlan===undefined?old?.recipient_plan??'[]':JSON.stringify(Array.isArray(p.recipientPlan)&&!p.recipientPlan.length?[]:recipientInput(p.recipientPlan,a)),revision,currency,attachments};const writes:D1PreparedStatement[]=[]
@@ -183,7 +199,8 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='invoice.export')return exportInvoice(db,a,p)
  if(name==='proposal.approve'||name==='proposal.send'){
   const old=await proposal(db,p.id);exact(old,p)
-  const pending=await pendingNegotiation(db,old.id);if(name==='proposal.send'){const missing=[...new Set([...unfilledVariables(snapshot(negotiatedView(old,pending))),...missingMerge(negotiatedView(old,pending))])];need(!missing.length,'Fill variables before sending: '+missing.join(', '),409)}assertDiscountDates(snapshot(negotiatedView(old,pending)).options,at)
+  const pending=await pendingNegotiation(db,old.id);if(name==='proposal.send'){
+   if(clientLocale(old)==='es'){need(!old.recipient_plan||old.recipient_plan==='[]','Spanish currently requires a single client mailbox',409);need(!await db.prepare('SELECT 1 FROM p_collection_policy WHERE proposal_id=?').bind(old.id).first(),'Turn off collection before sending in Spanish',409);need(!p.mailRepliesConsent||p.mailRepliesConsent==='no','Spanish invitation reply disclosure is not available',409)}const offered=snapshot(negotiatedView(old,pending)).options;need(!hasTaxable(offered)||optionTax(offered),'Set explicit owner-configured tax addresses before sending taxable items.',409);const missing=[...new Set([...unfilledVariables(snapshot(negotiatedView(old,pending))),...missingMerge(negotiatedView(old,pending))])];need(!missing.length,'Fill variables before sending: '+missing.join(', '),409)}assertDiscountDates(snapshot(negotiatedView(old,pending)).options,at)
   if(pending)return negotiationCommand(env,a,name,p,old)
   need(['draft','approved','sent'].includes(old.status),'Only an open proposal can be sent',409);const approval=await approvalPlan(db,old,a);need(approval.complete,'Approve this revision before sending',409);const token=secret(),client=await db.prepare('SELECT c.*,COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(old.id,old.client_id).first<any>(),shareUrl=env.AUTH_ORIGIN+'/p/'+token
   const invitations=await recipientInvitations(env,a,p,old,at)

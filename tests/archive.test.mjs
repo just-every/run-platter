@@ -464,7 +464,7 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await Promise.all([source,restored].map(cwd=>exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})))
   const events=resendEvents(),messages=[];let submitted=0
   h=await harness({root:source,origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'network-edge-key',MAIL_WEBHOOK_KEY:events.key},outboundService:async request=>{const id='archive-provider-'+(++submitted);messages.push({...await request.json(),id});return Response.json({id})}})
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
@@ -486,12 +486,13 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
   assert.ok(!bytes.includes(events.key));assert.ok(!bytes.includes('archive-provider-'))
   await command(restored,['import','--input',file,'--yes','--no-queue'])
   const restoredMessages=[]
-  h=await harness({root:restored,origin:'https://platter.example',...identity,outboundService:async request=>{restoredMessages.push(await request.json());return Response.json({id:'restored-correction'})}})
+  h=await harness({root:restored,origin:'https://platter.example',...identity,outboundService:async request=>{restoredMessages.push(await request.json());return Response.json({id:'synthetic-platter-'+(9990+restoredMessages.length)})}})
   const cookie=await h.signIn(identity.auth.OWNER_EMAIL)
   assert.deepEqual((await h.state(cookie)).bounceNotices,notices)
   assert.ok((await h.state(cookie)).proposals.every(p=>p.deliveries.length===0&&!p.shareToken))
   const restoredState=await h.state(cookie)
   assert.deepEqual(restoredState.followupActions,actionsBefore,'the full history survives public CLI restore byte for byte')
+  assert.deepEqual(restoredState.revisions.filter(r=>lifecycle.ids.includes(r.proposal_id)),lifecycle.revisions,'all creation and revision snapshots retain their exact authors and server times')
   assert.deepEqual(lifecycle.project(restoredState.followupActions),lifecycle.expectedActions,'restored history still matches independently expected actions, reasons, actors and server times')
   assert.deepEqual(restoredState.proposals.filter(p=>lifecycle.ids.includes(p.id)).map(p=>({id:p.id,acceptance:p.acceptance,outcomes:p.outcomes,withdrawals:p.withdrawals,questions:p.questions})),lifecycle.histories)
   assert.ok(!restoredState.followups.rows.some(r=>r.id===lifecycle.cId),'restoring a completed action cannot reopen it')

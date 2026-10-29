@@ -281,6 +281,10 @@ export async function followupLifecycle(h, events, messages) {
   state=await h.state()
   const project = rows => rows.filter(r=>ids.includes(r.proposal_id)).map(({id,...row})=>row).sort((a,b)=>a.occurred_at-b.occurred_at)
   assert.deepEqual(project(state.followupActions),expectedActions,'every action, reason, actor, revision and server time matches the independent history')
+  const revisions=state.revisions.filter(r=>ids.includes(r.proposal_id))
+  const expectedRevisions=[[c.id,1,0],[c.id,2,3],[e.id,1,5],...terminal.map((p,i)=>[p.id,1,9+i])].map(([id,revision,seconds])=>({proposal_id:id,revision,prepared_by:owner.email,prepared_at:at+seconds*1000}))
+  const revisionOrder=(a,b)=>a.proposal_id.localeCompare(b.proposal_id)||a.revision-b.revision
+  assert.deepEqual(revisions.map(({proposal_id,revision,prepared_by,prepared_at})=>({proposal_id,revision,prepared_by,prepared_at})).sort(revisionOrder),expectedRevisions.sort(revisionOrder),'creation and revision have independently expected author and server time')
   const histories=state.proposals.filter(p=>ids.includes(p.id)).map(p=>({id:p.id,acceptance:p.acceptance,outcomes:p.outcomes,withdrawals:p.withdrawals,questions:p.questions}))
-  return {ids,expectedActions,histories,acceptanceQuestionId,acceptedId:terminal[0].id,questionId:question.id,bounceId:bounce.id,cId:c.id,eId:e.id,invitations:[cInvitation,...terminal],project}
+  return {ids,expectedActions,histories,revisions,acceptanceQuestionId,acceptedId:terminal[0].id,questionId:question.id,bounceId:bounce.id,cId:c.id,eId:e.id,invitations:[cInvitation,...terminal],project}
 }

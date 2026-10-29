@@ -3483,6 +3483,7 @@ test('AUTO-002 completed agreements archive exact PDFs once under explicit curre
   const preRevokePosts=posts();await tick();assert.equal(revoked,true);assert.equal(posts(),preRevokePosts)
   const audit=await h.send('/api/platter/audit?action=archive.configure',undefined,h.owner);assert.ok(audit.value.rows.length>=3)
   const {driveCredentialJourney}=await import('./drive-credential-journey.mjs');await driveCredentialJourney(h,fake)
+  const {driveOAuthJourney}=await import('./drive-oauth-journey.mjs');await driveOAuthJourney()
  }finally{await h.close()}
 })
 

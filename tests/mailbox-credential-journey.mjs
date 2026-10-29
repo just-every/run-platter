@@ -54,6 +54,18 @@ export async function mailboxCredentialJourney(h,{connect,send,calls,gmail,insta
   assert.equal(stale.mailAttributions[0].outcome,'uncertain');assert.equal((await connection()).status,'connected')
   assert.deepEqual(await h.db.prepare('SELECT sealed FROM p_connection_secrets WHERE connection_id=?').bind((await connection()).id).first(),saved)
  }
+ // A newer refresh can rotate the same connection without a reconnection.
+ const version=(await connection()).version,beforeRotation=snapshot();let rotated
+ setHook(async request=>{
+  if(!new URL(request.url).pathname.endsWith('/messages/send'))return
+  setHook(undefined);await send()
+  rotated=await h.db.prepare('SELECT sealed FROM p_connection_secrets WHERE connection_id=?').bind((await connection()).id).first()
+  return failure(401,'invalid_token')
+ })
+ const old=await send();assert.equal(old.mailAttributions[0].outcome,'uncertain');assert.equal(old.mailAttributions[0].fallback,0)
+ assert.deepEqual(snapshot(),[beforeRotation[0]+1,beforeRotation[1]],'only the new message completes; the stale refusal never switches carrier')
+ assert.equal((await connection()).version,version);assert.equal((await connection()).status,'connected')
+ assert.deepEqual(await h.db.prepare('SELECT sealed FROM p_connection_secrets WHERE connection_id=?').bind((await connection()).id).first(),rotated)
  const fresh=gmail.length;await send();assert.equal(gmail.length,fresh+1,'a fresh message uses the replacement connection')
  await sanitized();setHook(undefined)
 }

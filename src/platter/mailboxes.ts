@@ -119,7 +119,7 @@ export async function memberMailbox(env:Bindings,a:Actor){
   const sealed=await sealCredential(env,c.id,{...stored.secret,token:grant.access_token,refreshToken,scope:grant.scope??stored.secret.scope})
   // A delayed refresh cannot overwrite a rotated grant, disconnection or replacement.
   await commit(env.DB,a,[env.DB.prepare('UPDATE p_connection_secrets SET sealed=? WHERE connection_id=?').bind(sealed,c.id)],false,{sql:"EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL AND s.sealed=?)",values:[c.id,c.version,stored.connection.sealed]})
-  return {broken:false,connection:c,token:grant.access_token as string}
+  return {broken:false,connection:{...c,sealed},token:grant.access_token as string}
  }catch(error){
   if(error instanceof ProviderCredentialRejected)return {broken:true,connection:row}
   if((error as any)?.status===403)throw error

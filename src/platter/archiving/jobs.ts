@@ -62,8 +62,8 @@ export async function archiveCommand(env:Bindings,a:Actor,name:string,p:Record<s
  await commit(db,a,[]);await reconcileArchive(env,text(p.id,'an archive job'));await recordAudit(db,a,'archive.reconciled',String(p.id));return {saved:true}
 }
 function driveAccess(env:Bindings,credential:Awaited<ReturnType<typeof providerCredential>>){
- const {id,version}=credential.connection
- return {token:credential.secret.token,credentialRejected:()=>markConnectionBroken(env,id,version)}
+ const {id,version,sealed}=credential.connection
+ return {token:credential.secret.token,credentialRejected:()=>markConnectionBroken(env,id,version,sealed)}
 }
 async function execution(env:Bindings,job:any){
  const config=await env.DB.prepare(live).first<any>()

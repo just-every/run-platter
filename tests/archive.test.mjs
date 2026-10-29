@@ -983,7 +983,7 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectDrive(h)
+  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService,auth:{GOOGLE_DRIVE_CLIENT_ID:'synthetic-platter-archive-oauth-client',GOOGLE_DRIVE_CLIENT_SECRET:'synthetic-platter-archive-oauth-secret'}});await connectDrive(h)
   const completed=await completeDriveAgreement(h)
   await h.cmd('archive.dispatch',{})
   const broken=await completeDriveAgreement(h,'Broken credential archive history',completed.client.id)
@@ -999,15 +999,17 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
    const response=await h.mf.dispatchFetch(h.origin+completed.path+'/'+kind+'.pdf',{headers:{cookie:completed.cookie}});assert.equal(response.status,200);artifacts[kind]=Buffer.from(await response.arrayBuffer())
   }
   const certificate=(await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).value
+  const authorization=await h.send('/api/platter/drive/authorize',{consent:true},h.owner);assert.equal(authorization.status,303)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_drive_oauth').first()).n,1)
   await h.close();h=undefined
   const archive=join(temporary,'drive.rer');await command(source,['export','--output',archive])
   const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(driveToken))
   const records=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
-  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0)
+  for(const table of ['p_drive_oauth','p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0)
   await command(restored,['import','--input',archive,'--yes'])
   const restoredFake=driveFixture();h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:restoredFake.outboundService})
   for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table],table+' retains exact history')
-  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  for(const table of ['p_drive_oauth','p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'});assert.equal(restoredFake.calls.length,0)
   const owner=await h.signIn(h.auth.OWNER_EMAIL)
   for(const kind of ['agreement','certificate']){

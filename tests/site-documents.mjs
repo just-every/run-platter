@@ -959,7 +959,7 @@ test('HAND-001 Settings authorizes Asana delivery and displays completed and unc
   await page.reload();await panel.getByRole('button',{name:'Process queued handoffs',exact:true}).click()
   assert.equal(fake.projects.length,2);assert.equal(fake.tasks.length,8)
   const uploadRow=history.locator('article').filter({has:page.getByRole('heading',{name:'Owner-recorded delivery handoff',exact:true})})
-  assert.match(await uploadRow.innerText(),/complete/)
+  assert.match(await uploadRow.innerText(),/complete/);assert.match(await uploadRow.innerText(),/Accepted by upload: signed outside Platter\. Platter did not verify this signature\./)
   const uploadLink=await uploadRow.getByRole('link',{name:'Download accepted agreement',exact:true}).getAttribute('href'),uploadDownload=await context.request.get(h.origin+uploadLink)
   assert.equal(uploadDownload.status(),200);assert.deepEqual(await uploadDownload.body(),uploadBytes)
   assert.equal(await panel.getByLabel('Also hand off future owner-recorded signed uploads.',{exact:false}).isChecked(),true)

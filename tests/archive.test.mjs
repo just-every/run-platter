@@ -1042,7 +1042,7 @@ test('HAND-001 public CLI retains document archive history for Asana handoff wit
   await h.cmd('handoff.configure',{...handoffSettings,version:1,includeUploads:true})
   const paper=await completeHandoffAgreement(h,'Retained signed upload',undefined,false),paperBytes=await recordHandoffUpload(h,paper);await h.cmd('handoff.dispatch',{})
   const paperPath=(await h.send('/api/platter/handoffs',undefined,h.owner)).value.jobs.find(j=>j.proposal_id===paper.proposal.id).agreementPath
-  const completed=await completeHandoffAgreement(h);await h.cmd('handoff.dispatch',{})
+  const completed=await completeHandoffAgreement(h,undefined,paper.client.id);await h.cmd('handoff.dispatch',{})
   const queued=await completeHandoffAgreement(h,'Queued delivery history',completed.client.id)
   const tables=['p_handoff_settings','p_handoff_jobs','p_handoff_writes'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
   assert.deepEqual(before.p_handoff_jobs.map(j=>j.status).sort(),['complete','complete','queued'])

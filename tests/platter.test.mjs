@@ -2953,7 +2953,6 @@ test('PRICE-003 recurring fees keep exact schedules, first-year queue value and 
  const {recurringJourney}=await import('./recurring-journey.mjs')
  await recurringJourney(h,{offer,verified})
  }finally{await h.close()}
- const renewal=await harness({assetsDirectory:'public'});try{const {renewalJourney}=await import('./renewal-journey.mjs');await renewalJourney(renewal)}finally{await renewal.close()}
 })
 
 test('AUTO-004 scoped REST drafting, immutable owner keys and human-only authority',async()=>{
@@ -3663,4 +3662,8 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
   const expired = await review(); await h.mf.getWorker().then(w => w.scheduled({ scheduledTime: new Date(Date.now() + 901000), cron: '*/15 * * * *' })); await apply(expired, h.owner, 409)
  } finally { await h.close() }
  await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
+})
+
+test('RENEW-002 owner-authorized fixed-term drafts require fresh approval and preserve accepted scope without replay',async()=>{
+ const h=await harness({assetsDirectory:'public'});try{const {renewalJourney}=await import('./renewal-journey.mjs');await renewalJourney(h)}finally{await h.close()}
 })

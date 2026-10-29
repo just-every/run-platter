@@ -1,4 +1,4 @@
-import { canonicalJson, type D1Sql, type D1TargetAdapter, type TargetRow } from '../../modules/import-kit/src/d1/index.ts'
+import { canonicalJson, type D1Sql, type D1TargetAdapter } from '../../modules/import-kit/src/d1/index.ts'
 import { fail } from './errors'
 
 export type NativeRow = { table: string; key: Record<string,string|number>; values: Record<string,string|number|null> }
@@ -24,7 +24,7 @@ export const nativeTargets:D1TargetAdapter={
   if(!row)return sql('NOT EXISTS(SELECT 1 FROM p_document_native_imports WHERE id=?)',id)
   const rows=(row.value as any).rows as NativeRow[]
   const checks=['EXISTS(SELECT 1 FROM p_document_native_imports WHERE id=? AND revision=? AND rows_json=?)'],params:unknown[]=[id,row.revision,canonicalJson(rows)]
-  for(const r of rows){const names=columns(r);checks.push('EXISTS(SELECT 1 FROM '+r.table+' WHERE '+where(r)+' AND '+names.map(k=>k+' IS ?').join(' AND ')+')');params.push(...Object.values(r.key),...names.map(k=>r.values[k]))}
+  for(const r of rows){const names=columns(r);if(!names.length){checks.push('0');continue}checks.push('EXISTS(SELECT 1 FROM '+r.table+' WHERE '+where(r)+' AND '+names.map(k=>k+' IS ?').join(' AND ')+')');params.push(...Object.values(r.key),...names.map(k=>r.values[k]))}
   return sql(checks.join(' AND '),...params)
  },
  write(row){
@@ -44,7 +44,7 @@ export const nativeTargets:D1TargetAdapter={
    const key=table==='p_imported_document_folders'?['document_id','folder_id']:table==='p_attachment_chunks'?['file_id','part']:table==='p_document_media'?['proposal_id','file_id']:table==='p_template_document_media'?['template_id','file_id']:table==='p_library_media'?['item_id','file_id']:table==='p_revisions'?['proposal_id','revision']:table==='p_imported_library'?['item_id']:table==='p_imported_document_links'?['document_id','proposal_id']:['p_pdf_settings','p_expiry','p_proposal_filing'].includes(table)?['proposal_id']:['id']
    writes.push(sql('DELETE FROM '+table+' WHERE EXISTS(SELECT 1 FROM p_document_native_imports n,json_each(n.rows_json) r WHERE n.id=? AND json_extract(r.value,\'$.table\')=? AND '+key.map(k=>table+'.'+k+' IS json_extract(r.value,\'$.key.'+k+'\')').join(' AND ')+')',id,table))
   }
-  // Children precede their parent in a receipt, so delete in reverse row order.
+  // Relations are removed before their owning records.
   // Separate native targets are undone in reverse import order by the import kit.
   return [...writes,sql('DELETE FROM p_document_native_imports WHERE id=?',id)]
  },

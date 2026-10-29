@@ -141,7 +141,7 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
  }catch(error){
   if(error&&typeof error==='object'&&'status' in error)throw error
   const message=error instanceof Error?error.message:''
-  if(/CONFLICT|GUARD|UNIQUE constraint|FOREIGN KEY constraint|CHECK constraint/.test(message))fail('import_conflict',409,'The import conflicts with current records or authority. Later changes and dependent proposals are preserved.')
+  if(/IMPORT_ALREADY_REVERSING|CONFLICT|GUARD|UNIQUE constraint|FOREIGN KEY constraint|CHECK constraint/.test(message))fail('import_conflict',409,'The import conflicts with current records or authority. Later changes and dependent proposals are preserved.')
   if(/IMPORT_PLAN_TOO_LARGE|IMPORT_D1_.*LIMIT/.test(message))fail('import_limit',413,'This move-in exceeds the reviewed import limit. Use smaller files or fewer documents in a separate move-in.')
   throw error
  }

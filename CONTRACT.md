@@ -2172,7 +2172,7 @@ Platter is one product. Where the market sells a neighboring product separately,
 
 ## Status
 
-Judged from the code and tests at commit `150f5ef225d346795d4b9c1d02b65b784ab14435` (29 October 2026). The EDIT-018 source and its named journeys retain these exact bytes; the landing candidate also repairs the independent editor-budget drag driver. Its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. EDIT-018 is a builder completion claim from the combined native preview, sent-page and custody journeys, pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold.
+Judged from the code and tests at commit `150f5ef225d346795d4b9c1d02b65b784ab14435` (29 October 2026). The EDIT-018 named journeys retain these exact bytes; the landing candidate also repairs the independent editor-budget drag driver and defers layout of offscreen editor controls. Its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. EDIT-018 is a builder completion claim from the combined native preview, sent-page and custody journeys, pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |

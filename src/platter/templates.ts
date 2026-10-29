@@ -1,4 +1,5 @@
 import { withoutTaxAddresses } from './taxes'
+import { citeAgentSource } from './agent-sources'
 import { resolveVariables, editableVariableFields, unfilledVariableFields } from './variables'
 import { proposalFields } from './commands'
 import { packageInputs, pricedOptions } from './pricing'
@@ -119,6 +120,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  const starter = starterTemplate(input.id, client, a)
  const template = starter ? { id: starter.id, version: starter.version, pdf_enabled: 1 } : await ownTemplate(db, a, input.id)
  exact(template, input)
+ await citeAgentSource(a,'client',client.id,null,client)
+ await citeAgentSource(a,starter?'starter-template':'template',template.id,template.version,starter??template)
  const personal = starter ? null : template as any
  const access=starter?{sql:'1',values:[]}:await folderGuard(db,a,personal.folder_id,'template')
  let content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)

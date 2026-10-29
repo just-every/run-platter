@@ -55,7 +55,7 @@ async function readDeal(env: Bindings, input: Record<string, unknown>) {
   company: { id: String(company.id), updatedAt: optional(company.updatedAt), name: string(company.properties.name, 'a company name'), address: ['address', 'city', 'state', 'zip', 'country'].map(k => optional(company.properties[k])).filter(Boolean).join(', ') },
   contact: { id: String(contact.id), updatedAt: optional(contact.updatedAt), firstName: optional(cp.firstname), lastName: optional(cp.lastname), name: string([cp.firstname, cp.lastname].filter(Boolean).join(' '), 'a contact name'), email: email(cp.email), title: optional(cp.jobtitle) }, lines,
  }
- const content = contentFor(source, input.scope || undefined)
+ const content = contentFor(source, (input.crmScope ?? input.scope) || undefined)
  const table = content.options[0].tables![0]
  const cents = (value: string) => { need(/^\d{1,8}(\.\d{1,2})?$/.test(value), 'The source amount is unsupported', 409); const [whole, fraction = ''] = value.split('.'); return Number(whole) * 100 + Number(fraction.padEnd(2, '0')) }
  need(cents(source.amount) === table.subtotalCents && lines.every((line, index) => !line.amount || cents(line.amount) === table.lines[index].lineTotalCents), 'Source totals do not match the exact priced rows; review in HubSpot first', 409)
@@ -76,7 +76,7 @@ export async function hubspotDraftCommand(env: Bindings, actor: Actor, name: str
   const read = await readDeal(env, input)
   if (!read.source) {
    await commit(db, actor, [], true, connectionGuard(read.connection))
-   return { crmReview: true, ...read.choices, draftScope: String(input.scope ?? ''), held: 'Explicitly select the company and contact to review.' }
+   return { crmReview: true, ...read.choices, draftScope: String(input.crmScope ?? input.scope ?? ''), held: 'Explicitly select the company and contact to review.' }
   }
   const content = read.content!, fields = JSON.stringify(copiedContactFields(read.source.contact, read.source.company.address))
   const client = await db.prepare('SELECT * FROM p_clients WHERE email=?').bind(read.source.contact.email).first<any>()

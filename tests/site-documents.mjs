@@ -895,7 +895,7 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
    await h.cmd('provider.connect', { provider: 'hubspot', version: 0, token: 'synthetic-platter-4607', consent: true })
    await page.goto(h.origin + '/app')
    const panel = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Start from HubSpot', exact: true }) })
-   await panel.getByLabel('HubSpot deal ID', { exact: true }).fill(provider.selected.dealId); await panel.getByRole('button', { name: 'Read HubSpot deal', exact: true }).click()
+   await panel.getByLabel('HubSpot deal ID', { exact: true }).fill(provider.selected.dealId); await panel.getByLabel('Draft scope (optional)', { exact: true }).fill('A separately reviewed CRM scope.'); await panel.getByRole('button', { name: 'Read HubSpot deal', exact: true }).click()
    assert.equal(await panel.getByLabel('Company from deal').inputValue(), ''); assert.equal(await panel.getByLabel('Contact from deal').inputValue(), '')
    assert.equal((await h.state()).proposals.length, 0)
    await panel.getByLabel('Company from deal').selectOption(provider.selected.companyId); await panel.getByLabel('Contact from deal').selectOption(provider.selected.contactId)
@@ -917,7 +917,7 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
    await review.getByRole('checkbox').check(); await review.getByRole('button', { name: 'Create reviewed draft', exact: true }).click()
    await page.waitForURL(/\/app\/proposal\?id=/)
    const current = (await h.state()).proposals[0]
-   assert.equal(current.title, 'Synthetic launch engagement'); assert.equal(current.options[0].cents, 36122); assert.equal(current.collection.enabled, false)
+   assert.equal(current.scope, 'A separately reviewed CRM scope.'); assert.equal(current.title, 'Synthetic launch engagement'); assert.equal(current.options[0].cents, 36122); assert.equal(current.collection.enabled, false)
    assert.equal(current.status, 'draft'); assert.equal(current.approved_by, null)
    assert.equal(await page.getByRole('button', { name: 'Approve this revision', exact: true }).count(), 1); assert.equal(await page.getByRole('button', { name: 'Send approved proposal', exact: true }).count(), 0)
    const source = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Copied HubSpot source', exact: true }) })

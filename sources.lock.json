@@ -2486,7 +2486,7 @@
       "executable": false
     },
     "src/platter/crm/hubspot-draft.ts": {
-      "sha256": "68c6745ca533a6c7af1519092aa3da4c72a1d1678e40786104269064c08da657",
+      "sha256": "c27107092f7edb507636ae6d653a798f9216120c50830b5738725616ee5c8e2d",
       "executable": false
     },
     "src/platter/delivery-intake.d.mts": {
@@ -3006,7 +3006,7 @@
       "executable": false
     },
     "src/platter/ui/crm-start.ts": {
-      "sha256": "94aebe9202269c4ebd9ed040df87ef69a2e100a2e0419ca2a2b23e953d2213f6",
+      "sha256": "2a8659eab11b88d409649fc735c60c8f750af6034859285f1709682edec2e77a",
       "executable": false
     },
     "src/platter/ui/delivery.ts": {
@@ -3470,7 +3470,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "65194c89ce8e9316e5547f9eb7d4fbd19cfec07473bd08cd222906738eb3f8b5",
+      "sha256": "f2be38174b1769ceb6344af972fe644392fce7af943d5ce23ef7579bb4c5ea14",
       "executable": false
     },
     "tests/site-harness.mjs": {

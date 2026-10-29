@@ -545,10 +545,11 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
 test('SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority', {timeout:180000},async()=>{
  const temporary=await mkdtemp(join(tmpdir(),'platter-test-mail-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
  let h
+ const pinClock=async instance=>(await instance.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T12:00:00Z'),cron:'*/15 * * * *'})
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source,assetsDirectory:'public'})
+  h=await harness({root:source,assetsDirectory:'public'});await pinClock(h)
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Email rehearsal',scope:'A photography session',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
   await h.cmd('proposal.test-mail',{id:p.id,version:1,subject:'Archive rehearsal only',message:'Test-only message never in the agreement package'})
@@ -632,7 +633,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.equal(tests.length,1)
   assert.equal(tests[0].row.subject,p.id);assert.equal(tests[0].row.actor_role,'owner')
   await command(restored,['import','--input',archive,'--yes'])
-  h=await harness({root:restored,unclaimed:true,assetsDirectory:'public'})
+  h=await harness({root:restored,unclaimed:true,assetsDirectory:'public'});await pinClock(h)
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_electronic_requests ORDER BY sequence').all()).results,electronicRequests)
   assert.deepEqual(after.proposals.find(row=>row.id===p.id),proposal)

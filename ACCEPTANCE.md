@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `cfee1b1103e79253306a2692195fe64f57c9a72b` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. FOLLOW-002 is a builder completion claim pending guarded landing and ct judgment. Existing ct judgments and demotions are retained. SEND-008 remains a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -997,7 +997,7 @@ Core · target · **partial** · From FOLLOW-001
 
 #### FOLLOW-002 — Next-action follow-up queue by sales owner
 
-Core · target · **partial**
+Core · target · **done**
 
 **Requirement.** Each sales owner’s queue and the manager’s team view order overdue dates first, then today, then upcoming. Within a date the reason order is bounce, unanswered question, failed/overdue payment, expiry within three days, viewed unsigned, then unopened. Ties use highest one-off plus first-year recurring value, earliest send and proposal number. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#follow-002).
 
@@ -1007,8 +1007,8 @@ Core · target · **partial**
 3. With engagement unavailable, disclose it and retain the interim exact order A,C,D,B,F,E,G without inferring views.
 4. Equal-date/reason ties and currency-separated totals follow [queue behavior](docs/contract-behavior.md#follow-002).
 
-**Evidence.** `src/platter/followup/queue.ts`; `src/platter/followup/commands.ts`; `tests/followup-journey.mjs`; `tests/platter.test.mjs` — “FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal”; `tests/site.test.mjs`; `tests/archive.test.mjs`
-**Gap.** Delivered: The seven-proposal fixture shows exact engaged/unavailable ordering, due periods, reasons and per-currency totals through followupJourney. Missing “FOLLOW-002 complete next-action follow-up queue by sales owner journey”: The queue journey crosses each recorded owner’s personal-zone boundary and resolves equal-date/reason sent-time/proposal-number ties without combining currencies.
+**Evidence.** `tests/platter.test.mjs` — “FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal”, calling followupJourney and followupBoundaryJourney in `tests/followup-journey.mjs`: original engaged and unavailable seven-proposal orders, recorded-owner personal midnights immediately before and after in New York and Honolulu for both readers, value then first-send then stable-ID ties, missing legacy send times, separate USD and AUD totals, scoped refusals and lifecycle readback; `tests/platter.test.mjs` — “PRICE-003 recurring fees keep exact schedules, first-year queue value and immutable selected documents”, calling `tests/recurring-journey.mjs`: one-off plus first-year valuation; `tests/site.test.mjs` loads `tests/site-lifecycle.mjs` — “MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting”: compiled production queue, periods, exact ordered IDs and currency readback at 1440, with queue browser proof at 1440 and 390; `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”: exact retained open and completed actions.
+**Gap.** None.
 
 #### FOLLOW-009 — Follow-up lifecycle and action history
 

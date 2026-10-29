@@ -26,7 +26,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 18 | "Views of this page are measured." on the client page | `TRACK-004` partial | partial |
 | 19 | Delivery status, bounce shown, resent to the right address | `SEND-002` partial; `SEND-012` partial | partial |
 | 20 | Reading time per section | `TRACK-002` done | done |
-| 21 | The agent drafts from recorded client reading; outbound follow-ups carry external and company policy decides | `AGENT-004` missing; `FOLLOW-002` partial; `FOLLOW-010` partial; `FOLLOW-009` partial | partial |
+| 21 | The agent drafts from recorded client reading; outbound follow-ups carry external and company policy decides | `AGENT-004` missing; `FOLLOW-002` done; `FOLLOW-010` partial; `FOLLOW-009` partial | partial |
 | 22 | The resend uses the address on Tom's HubSpot contact | `CRM-001` partial | partial |
 | 23 | Retainers: $1,200.00/mo × 12, $650.00/mo × 6 | `PRICE-003` done; `PAY-003` missing | partial |
 | 24 | Clients ask on the page; the firm replies | `FOLLOW-004` partial | partial |

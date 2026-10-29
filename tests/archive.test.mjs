@@ -1,3 +1,4 @@
+import { followupLifecycle } from './followup-journey.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { documentFixture } from './document-fixture.mjs'
@@ -464,8 +465,8 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  const events=resendEvents();let submitted=0
-  h=await harness({root:source,origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'network-edge-key',MAIL_WEBHOOK_KEY:events.key},outboundService:()=>Response.json({id:'archive-provider-'+(++submitted)})})
+  const events=resendEvents(),messages=[];let submitted=0
+  h=await harness({root:source,origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'network-edge-key',MAIL_WEBHOOK_KEY:events.key},outboundService:async request=>{const id='archive-provider-'+(++submitted);messages.push({...await request.json(),id});return Response.json({id})}})
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
   const offer={clientId:client.id,title:'Brand campaign',scope:'Studio photographs and usage licence',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'}
   const ids=[]
@@ -475,17 +476,43 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
   await h.cmd('delivery.dismiss',{noticeId:notices[0].id,reason:'Spoke with Avery; offer paused'})
   notices=(await h.state()).bounceNotices
   assert.equal(notices.length,2);assert.ok(notices.some(n=>n.closed_at));assert.ok(notices.some(n=>!n.closed_at))
+  const lifecycle=await followupLifecycle(h,events,messages)
+  notices=(await h.state()).bounceNotices
+  const actionsBefore=(await h.state()).followupActions
   const identity={auth:h.auth,owner:h.owner};await h.close();h=null
   const file=join(temporary,'delivery.rer');await command(source,['export','--output',file,'--no-queue'])
   const bytes=await readFile(file,'utf8')
   assert.ok(bytes.includes('Spoke with Avery; offer paused'))
   assert.ok(!bytes.includes(events.key));assert.ok(!bytes.includes('archive-provider-'))
   await command(restored,['import','--input',file,'--yes','--no-queue'])
-  h=await harness({root:restored,origin:'https://platter.example',...identity,outboundService:()=>Response.json({id:'restored-correction'})})
+  const restoredMessages=[]
+  h=await harness({root:restored,origin:'https://platter.example',...identity,outboundService:async request=>{restoredMessages.push(await request.json());return Response.json({id:'restored-correction'})}})
   const cookie=await h.signIn(identity.auth.OWNER_EMAIL)
   assert.deepEqual((await h.state(cookie)).bounceNotices,notices)
   assert.ok((await h.state(cookie)).proposals.every(p=>p.deliveries.length===0&&!p.shareToken))
-  const open=notices.find(n=>!n.closed_at)
+  const restoredState=await h.state(cookie)
+  assert.deepEqual(restoredState.followupActions,actionsBefore,'the full history survives public CLI restore byte for byte')
+  assert.deepEqual(lifecycle.project(restoredState.followupActions),lifecycle.expectedActions,'restored history still matches independently expected actions, reasons, actors and server times')
+  assert.deepEqual(restoredState.proposals.filter(p=>lifecycle.ids.includes(p.id)).map(p=>({id:p.id,acceptance:p.acceptance,outcomes:p.outcomes,withdrawals:p.withdrawals,questions:p.questions})),lifecycle.histories)
+  assert.ok(!restoredState.followups.rows.some(r=>r.id===lifecycle.cId),'restoring a completed action cannot reopen it')
+  assert.ok(restoredState.followups.rows.some(r=>r.id===lifecycle.eId&&r.action==='Resume work after client confirmation'&&r.dueDate==='2030-06-03'))
+  assert.deepEqual(restoredState.outbox,[])
+  for(const table of ['p_shares','p_mail','p_bounce_notice_transport','p_question_reply_keys','p_reminder_authority','p_notification_authority','p_completion_authority'])assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM '+table).first()).n,0,'restore excludes '+table)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T12:01:00Z'),cron:'*/15 * * * *'})
+  assert.deepEqual(restoredMessages,[],'restored history cannot resume queued mail or completion work')
+  for(const invitation of lifecycle.invitations)assert.equal((await h.send(invitation.path+'/action?name=accept',{name:'Replay',optionId:'one',consent:true},invitation.cookie)).status,404,'old captures confer no restored signing authority')
+  assert.ok(restoredState.openQuestions.some(q=>q.id===lifecycle.questionId))
+  assert.ok(restoredState.openQuestions.some(q=>q.id===lifecycle.acceptanceQuestionId),'the accepted agreement retains its unanswered thread after restore')
+  await h.cmd('question.answer',{id:lifecycle.acceptedId,questionId:lifecycle.acceptanceQuestionId,text:'The schedule is confirmed.'},cookie)
+  assert.ok(!(await h.state(cookie)).openQuestions.some(q=>q.id===lifecycle.acceptanceQuestionId))
+  assert.equal(restoredState.bounceNotices.find(n=>n.id===lifecycle.bounceId).closed_at,null)
+  await h.cmd('question.answer',{id:lifecycle.cId,questionId:lifecycle.questionId,text:'Yes, delivery starts next week.'},cookie)
+  assert.ok(!(await h.state(cookie)).openQuestions.some(q=>q.id===lifecycle.questionId))
+  assert.equal((await h.state(cookie)).bounceNotices.find(n=>n.id===lifecycle.bounceId).closed_at,null,'answering the question cannot close the separate correction')
+  await h.cmd('delivery.dismiss',{noticeId:lifecycle.bounceId,reason:'Confirmed the corrected address by phone'},cookie)
+  assert.ok((await h.state(cookie)).bounceNotices.find(n=>n.id===lifecycle.bounceId).closed_at)
+  assert.deepEqual((await h.state(cookie)).followupActions,actionsBefore,'resolving separate work cannot rewrite sales history')
+  const open=notices.find(n=>!n.closed_at&&n.id!==lifecycle.bounceId)
   await h.cmd('delivery.correct',{noticeId:open.id,email:'corrected@northstar.example'},cookie)
   assert.ok((await h.state(cookie)).bounceNotices.find(n=>n.id===open.id).closed_at)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}

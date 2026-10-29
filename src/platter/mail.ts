@@ -1,4 +1,4 @@
-import { completionAttachments } from './completion-mail'
+import { completionAttachments, queueReadyCompletionMail } from './completion-mail'
 import { clientText, type ClientLocale } from './locales'
 import { prepareClientReply } from './client-mail-replies'
 import { sendingActor, memberMailbox, sendMailbox, recordSender } from './mailboxes'
@@ -56,6 +56,8 @@ export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string
 
 /** Resume only untouched local outbox work; restored history has no outbox or grant. */
 export async function runCompletionMail(env:Bindings){
+ const waiting=(await env.DB.prepare('SELECT g.proposal_id FROM p_completion_authority g WHERE NOT EXISTS(SELECT 1 FROM p_completion_mail m WHERE m.proposal_id=g.proposal_id) LIMIT 10').all<{proposal_id:string}>()).results
+ for(const row of waiting)await queueReadyCompletionMail(env,row.proposal_id)
  const rows=(await env.DB.prepare("SELECT DISTINCT m.proposal_id FROM p_mail m JOIN p_completion_mail c ON c.mail_id=m.id JOIN p_completion_authority g ON g.proposal_id=c.proposal_id WHERE m.status='pending' LIMIT 10").all<{proposal_id:string}>()).results
  for(const row of rows)try{await dispatchMail(env,row.proposal_id)}catch{ /* Revoked authority remains held, without provider contact. */ }
 }

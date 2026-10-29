@@ -578,10 +578,14 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const {recipientFixture,roles,verifyRecipient,decision}=await import('./recipients-http.mjs')
   const multi=await recipientFixture(h,'Retained multiple signatures',roles(h.auth.OWNER_EMAIL)),sessions={}
   for(const [id,path] of Object.entries(multi.links))sessions[id]=await verifyRecipient(h,path)
-  for(const id of ['ceo','cfo','owner'])assert.equal((await decision(h,multi.links[id],sessions[id])).status,200)
+  for(const id of ['ceo','cfo','owner']){
+   const response=await h.mf.dispatchFetch(h.origin+multi.links[id]+'/action?name=accept',{method:'POST',cf:{city:'Austin',region:'Texas',country:'US'},headers:{origin:h.origin,cookie:sessions[id],'content-type':'application/json','user-agent':'Synthetic Platter archive 2401'},body:JSON.stringify({name:'Synthetic signer',optionId:'one',consent:true})})
+   assert.equal(response.status,200,await response.text())
+  }
   const multiCertificate=await h.send(multi.links.owner+'/certificate.json',undefined,sessions.owner)
   assert.equal(multiCertificate.status,200,multiCertificate.text)
   assert.deepEqual(multiCertificate.value.signers.map(s=>s.slotId),['ceo','cfo','owner'])
+  assert.ok(multiCertificate.value.signers.every(s=>s.location==='Austin, Texas, US'&&s.userAgent==='Synthetic Platter archive 2401'))
   const multiArtifacts=await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(multi.id).first()
   const multiCompletion=(await h.db.prepare('SELECT * FROM p_completion_mail WHERE proposal_id=? ORDER BY party').bind(multi.id).all()).results
   assert.equal(multiCompletion.length,3)

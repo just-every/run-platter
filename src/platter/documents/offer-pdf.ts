@@ -104,7 +104,11 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   if (attachment.sha256) pdf.text(`SHA-256: ${attachment.sha256}`, 9)
   pdf.gap(6)
  }
- if(signer){pdf.heading('Signature');pdf.text('Signed by: '+signer.name);pdf.text('Recipient: '+signer.email);pdf.text('Verification method: '+signer.method);pdf.text('Accepted at: '+new Date(signer.acceptedAt).toISOString());pdf.text('Consent: '+signer.consent)}
+ if(signer)for(const signed of view.signatures??[signer]){
+  pdf.heading(signed.role==='approver'?'Client approval':'Signature')
+  pdf.text('Signed by: '+signed.name);pdf.text('Recipient: '+signed.email);pdf.text('Verification method: '+signed.method)
+  pdf.text('Accepted at: '+new Date(signed.signedAt??signed.acceptedAt).toISOString());pdf.text('Consent: '+signed.consent)
+ }
  const generated=await pdf.document.save();if(doc.fixedPdf){need(media,'Fixed PDF is unavailable',503);return fixedPagesPdf(await media(doc.fixedPdf.fileId),generated,view,Boolean(signer),fontBytes)}
  return generated
 }

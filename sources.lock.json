@@ -3282,7 +3282,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "eb64dfe99ac590408580faa79fbcec21810c935e1aaa9d501c6cde2923cd5d85",
+      "sha256": "9d80be751e9a5b66c705446cba260e57940533fc006bb68c2c7bc0f541bf2e56",
       "executable": false
     },
     "tests/browser-edge.mjs": {

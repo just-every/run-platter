@@ -955,6 +955,7 @@ test('FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke exp
    await page.goto(app.origin+'/app/proposal?id='+p.id)
    const notice=page.locator('section').filter({has:page.getByRole('heading',{name:'Sender expiry notice',exact:true})})
    assert.match(await notice.innerText(),/Inactive/)
+   assert.ok((await notice.innerText()).includes((await state()).actor.email),'the recorded recipient is visible')
    assert.equal((await state()).expiryNotices.events.length,0,'inspection creates no consent')
    await notice.getByText('Expiry notice Settings',{exact:true}).click()
    await notice.getByLabel('Proposal expiry lead days').fill('3')

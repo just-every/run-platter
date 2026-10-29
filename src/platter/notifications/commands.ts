@@ -1,3 +1,4 @@
+import { renewalFollowupCommand } from './renewal'
 import { watchCommand } from './watchers'
 import { senderNoticeCommand } from './expiry'
 import type { Bindings } from '../../auth.server'
@@ -17,7 +18,8 @@ export async function requestRows(env:Bindings,a:Actor,id:string){
 export async function notificationCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  const db=env.DB,at=await currentTime(db)
  if(name==='notification.watch')return watchCommand(env,a,p)
- if(name==='notification.defaults'||name==='notification.expiry')return senderNoticeCommand(env,a,name,p)
+ if(name==='notification.renewal.complete')return renewalFollowupCommand(env,a,p)
+ if(name==='notification.defaults'||name==='notification.expiry'||name==='notification.renewal')return senderNoticeCommand(env,a,name,p)
  if(name==='notification.route'){
   need(administrators.includes(a.role),'Only owner and admins route chat notifications',403)
   need(p.consent===true||p.consent==='yes','Explicitly authorize this notification destination')

@@ -1,3 +1,4 @@
+import { workspaceNotices, noticeSnapshots } from './notifications/settings'
 import { reminderMessageDefaults } from './reminder-message-defaults'
 import { commit, need, type Actor } from './model'
 import { administrators } from './permissions'
@@ -36,6 +37,7 @@ export async function workspaceCommand(db:D1Database,a:Actor,p:Record<string,unk
 }
 export async function defaultStatements(db:D1Database,id:string,expiry=true){
  const defaults=await workspaceDefaults(db),writes=[db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify({...delivery(defaults),...await reminderMessageDefaults(db)}))]
+ writes.push(...noticeSnapshots(db,id,await workspaceNotices(db)))
  if(expiry&&defaults.expiryDays!==null)writes.push(db.prepare("INSERT INTO p_expiry(proposal_id,mode,period_days,time_zone,warning_days) VALUES(?,'days',?,?,?)").bind(id,defaults.expiryDays,await installationZone(db),defaults.warningDays))
  return writes
 }

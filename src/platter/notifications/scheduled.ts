@@ -1,3 +1,4 @@
+import { queueRenewalNotices } from './renewal'
 import { queueWatcherEvents } from './watchers'
 import { queueExpiryNotices } from './expiry'
 import type { Bindings } from '../../auth.server'
@@ -25,5 +26,6 @@ export async function runNotifications(env:Bindings){
  }
  await queueWatcherEvents(env)
  await queueExpiryNotices(env)
+ await queueRenewalNotices(env)
  await flushNotifications(env)
 }

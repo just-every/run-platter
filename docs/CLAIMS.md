@@ -428,9 +428,9 @@ Evidence: `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `
 
 Status: **partial**.
 
-Gap: Renewal execution and the RENEW-002 offer, SEND-005 watchers and their channel preferences, default-on activation without per-proposal consent and template inheritance remain. Stored renewal defaults do not execute renewal notices. The ct-approved staged policy (23 October 12:54 UTC and RL-102 in RULINGS.md) requires explicit current-sender authorization per proposal, bound to its revision, settings and recorded active sales owner; upgrades, copies and restores confer no outbound authority. Existing open manual follow-ups are preserved. RENEW-002, SEND-005 and FOLLOW-006 inherit the matching authority, timing and custody obligations. RENEW-002 retains its recorded continuation hold.
+Gap: Full RENEW-002 renewal preparation and the matching renewal offer remain subject to its recorded continuation hold; the current notice offers manual review and an independent copy only. SEND-005 watchers beyond the recorded active sales owner, remaining watcher channel preferences and default-on execution without per-proposal authorization remain. The ct-approved staged policy (23 October 12:54 UTC and RL-102 in RULINGS.md) requires explicit current-sender authorization per proposal, bound to its revision, settings and recorded active sales owner; upgrades, copies and restores confer no outbound authority. Existing open manual follow-ups are preserved. RENEW-002, SEND-005 and FOLLOW-006 inherit the matching authority, timing and custody obligations. RENEW-002 retains its recorded continuation hold.
 
-Evidence: `tests/mail.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
+Evidence: `tests/mail.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`, `tests/sender-notice-journey.mjs`, `tests/site-documents.mjs`, `tests/sender-notice-archive.mjs`
 
 ## FOLLOW-004 — Client questions and comments
 

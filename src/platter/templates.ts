@@ -1,3 +1,4 @@
+import { templateNotices, saveTemplateNotices, editTemplateNotices, noticeSnapshots } from './notifications/settings'
 import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields } from './variables'
 import { proposalFields } from './commands'
@@ -25,7 +26,8 @@ export async function templateState(db: D1Database, a: Actor) {
  const locks=(await db.prepare('SELECT * FROM p_template_locks UNION ALL SELECT * FROM p_template_block_locks ORDER BY section').all<any>()).results
  const delivery=(await db.prepare('SELECT * FROM p_template_defaults').all<any>()).results
  const messages=(await db.prepare('SELECT * FROM p_template_reminder_messages').all<any>()).results
- return rows.map(row => ({reminderTemplateId:messages.some(m=>m.template_id===row.id)?messages.find(m=>m.template_id===row.id).message_id:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}').reminderTemplateId??null,deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:a.role==='agent'?agentDeliveryDefaults(JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}')):JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, attachmentText:(JSON.parse(row.snapshot).attachments??[]).map((f:any)=>search.find(s=>s.file_id===f.id)?.content??'').join('\n'),snapshot:JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
+ const notices=new Map(await Promise.all(rows.map(async row=>[row.id,await templateNotices(db,row.id)] as const)))
+ return rows.map(row => ({noticeDefaults:notices.get(row.id),reminderTemplateId:messages.some(m=>m.template_id===row.id)?messages.find(m=>m.template_id===row.id).message_id:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}').reminderTemplateId??null,deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:a.role==='agent'?agentDeliveryDefaults(JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}')):JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, attachmentText:(JSON.parse(row.snapshot).attachments??[]).map((f:any)=>search.find(s=>s.file_id===f.id)?.content??'').join('\n'),snapshot:JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
 }
 
 async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false) {
@@ -77,7 +79,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   writes.push(db.prepare('INSERT OR IGNORE INTO p_template_block_locks(template_id,section) SELECT ?,section FROM p_proposal_block_locks WHERE proposal_id=?').bind(id,source.id))
   const mediaIds=documentMediaIds(documentOf(displayed))
   writes.push(db.prepare('DELETE FROM p_template_document_media WHERE template_id=?').bind(id),db.prepare('INSERT INTO p_template_document_media(template_id,file_id) SELECT ?,file_id FROM p_document_media WHERE proposal_id=? AND file_id IN ('+(mediaIds.map(()=>'?').join(',')||'NULL')+')').bind(id,source.id,...mediaIds))
-  writes.push(...saveTemplateCosts(db,source.id,displayed.revision,id),...templateDefaults(db,source.id,id))
+  writes.push(...saveTemplateCosts(db,source.id,displayed.revision,id),...templateDefaults(db,source.id,id),await saveTemplateNotices(db,source.id,id))
   await commit(db, a, writes, false, {
    sql: 'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND '+folder.sql+' AND '+previous.sql+(existing?' AND EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?)':''),
    values:[source.id,source.version,...folder.values,...previous.values,...(existing?[id,existing.version]:[])],
@@ -95,7 +97,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  const access=starter?{sql:'1',values:[]}:await folderGuard(db,a,personal.folder_id,'template')
  let content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
  if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...editableVariableFields(content),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan}}
- const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry
+ const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry,notices=await templateNotices(db,personal?.id)
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)
  need(content.currency === 'USD', 'Personal templates require USD content', 409)
  const id = crypto.randomUUID(), title = input.title === undefined || input.title === '' ? content.title : text(input.title, 'a title')
@@ -110,6 +112,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
    .bind(id, clientId, title, row.scope, row.terms ?? '', row.deposit_bps, JSON.stringify(row.options), preparer, at, 'USD', a.id, a.email, JSON.stringify(attachments)),
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) VALUES(?,?,?)').bind(id,template.id,template.version),
+  ...noticeSnapshots(db,id,notices.settings),
   ...(!starter?[db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_template_locks WHERE template_id=?').bind(id,template.id),db.prepare('INSERT INTO p_proposal_block_locks(proposal_id,section) SELECT ?,section FROM p_template_block_locks WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_template_document_media WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify(resolved.settings)),
@@ -142,6 +145,7 @@ async function templateDeliveryCommand(db:D1Database,a:Actor,p:Record<string,unk
  const messageId=p.reminderTemplateId===undefined?undefined:String(p.reminderTemplateId)||null
  if(messageId)need(await db.prepare('SELECT 1 FROM p_reminder_templates WHERE id=?').bind(messageId).first(),'Reminder template not found',404)
  const nextExpiry={...expiry,...(p.expiryDays!==undefined?{mode:expiryDays===null?'never':'days',period_days:expiryDays,expires_on:null}:{}),warning_days:warningDays}
- await commit(db,a,[...(messageId===undefined?[]:[db.prepare('INSERT INTO p_template_reminder_messages(template_id,message_id) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET message_id=excluded.message_id').bind(row.id,messageId)]),db.prepare('UPDATE p_personal_templates SET delivery_sources=?,expiry=?,version=version+1,updated_at=? WHERE id=?').bind(JSON.stringify(sources),JSON.stringify(nextExpiry),at,row.id),db.prepare('INSERT INTO p_template_defaults(template_id,settings) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET settings=excluded.settings').bind(row.id,JSON.stringify(settings))],false,{sql:'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?) AND '+access.sql,values:[row.id,row.version,...access.values]})
+ const noticeSettings=await editTemplateNotices(db,row.id,p)
+ await commit(db,a,[noticeSettings,...(messageId===undefined?[]:[db.prepare('INSERT INTO p_template_reminder_messages(template_id,message_id) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET message_id=excluded.message_id').bind(row.id,messageId)]),db.prepare('UPDATE p_personal_templates SET delivery_sources=?,expiry=?,version=version+1,updated_at=? WHERE id=?').bind(JSON.stringify(sources),JSON.stringify(nextExpiry),at,row.id),db.prepare('INSERT INTO p_template_defaults(template_id,settings) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET settings=excluded.settings').bind(row.id,JSON.stringify(settings))],false,{sql:'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?) AND '+access.sql,values:[row.id,row.version,...access.values]})
  return {id:row.id,version:row.version+1}
 }

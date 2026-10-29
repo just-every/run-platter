@@ -1039,6 +1039,7 @@ test('FOLLOW-003 sender expiry notices create dated follow-ups independently of 
   const runs=(await h.db.prepare('SELECT * FROM p_sender_notice_runs ORDER BY notice_date').all()).results;assert.deepEqual(runs.map(r=>r.notice_date),['2030-03-12','2030-03-12','2030-03-19'])
   await h.send('/auth/invite',{email:'sales@synthetic-platter.example',role:'member',displayName:'Sales'},h.owner);const cookie=await h.signIn('sales@synthetic-platter.example')
   await h.cmd('notification.defaults',{version:1,enabled:true,leadDays:2,renewalEnabled:true,renewalDays:20},cookie,403)
+  await (await import('./sender-notice-journey.mjs')).senderNoticeJourney(notificationFixture)
  }finally{await h.close()}
 })
 

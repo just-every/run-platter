@@ -217,7 +217,9 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const agentHistory=(await h.send('/api/platter/agent-ledger',undefined,h.owner)).value.receipts
     const sourceRefusal=agentHistory.find(receipt=>receipt.output_digest===createHash('sha256').update(staleAgent.text).digest('hex')&&receipt.records.some(ref=>ref.proposal_id===work.id&&ref.relation==='read'))
     assert.ok(sourceRefusal,'a refused stale edit retains its actual source revision for archive custody')
-    assert.ok(sourceRefusal.sources.some(source=>source.kind==='attachment'&&source.source_id===frozenAttachments[0].id)||sourceRefusal.sources.some(source=>source.kind==='attachment'),'the archived receipt identifies actual attached source documents without raw bytes')
+    const readFiles=before.proposals.find(proposal=>proposal.id===work.id).attachments
+    assert.ok(readFiles.length>0)
+    assert.deepEqual(sourceRefusal.sources.filter(source=>source.kind==='attachment'),readFiles.map(file=>({kind:'attachment',source_id:file.id,source_version:file.sha256,digest:createHash('sha256').update(JSON.stringify(file)).digest('hex')})).sort((a,b)=>a.source_id.localeCompare(b.source_id)),'the archived refusal retains every actual source file and independently computed metadata digest without raw bytes')
     assert.ok(agentHistory.length>=3);assert.ok(agentHistory.some(r=>r.records.some(ref=>ref.proposal_id===work.id)))
     await h.cmd('agent.pause',{id:key.id,version:1})
     assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,403)

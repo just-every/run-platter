@@ -94,6 +94,14 @@ later edits do not rewrite those citations. A successful draft also records the 
 of the immutable proposal revision it produced. Human approval links open the actual
 record for that revision and do not grant any approval themselves.
 
+Read revisions are distinguished from returned and produced revisions. A stale edit
+that is refused can still cite the revision it actually read, with its human approval
+history. Direct drafts cite the checked client and any copied vendor documents;
+attachment citations identify immutable file references and metadata digests, without
+retaining file bytes. Scoped analytics cites the exact proposals that contributed to
+its counts from the same database read. Receipt upgrades and archive restores preserve
+this history, including refusals, without restoring any key or execution authority.
+
 **Pause key** stops later requests and prevents an already authenticated draft from
 committing after the pause. Receipt consent and all key controls stay local; restored
 receipt history cannot restore access or execute a request.

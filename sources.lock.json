@@ -114,7 +114,7 @@
       "executable": false
     },
     "docs/AGENT-ACCESS.md": {
-      "sha256": "30d8c9163dab2e9bebb6d1832e71d33b368e1c0e2d469e8ddefc8a6dc87d6ed6",
+      "sha256": "fe77f35bb853e265ad2c506b017cb74dd61a8ebdba8cecfcc98746949c4a13d1",
       "executable": false
     },
     "docs/BACKUP-RESTORE.md": {
@@ -3422,7 +3422,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "5a5dc5885edeaec9c2036efa1345c501604bd33e246361208b18ed0d200553fc",
+      "sha256": "d258909c7a7114f3013ab468404dcd3b8bee6230ec22590540798b19f947f0e3",
       "executable": false
     },
     "tests/browser-edge.mjs": {

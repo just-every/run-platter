@@ -68,7 +68,7 @@ test('EDIT-017 Spanish mailbox journey preserves authority, verification limits,
   h.db.prepare('INSERT INTO p_signature_facts(proposal_id,revision,method,verified_at) VALUES(?,?,?,?)').bind(legacy.p.id,1,'mailbox code',at),
   h.db.prepare("UPDATE p_proposals SET status='accepted' WHERE id=?").bind(legacy.p.id)
  ])
- const old=await h.send(legacy.path+'/certificate.json',undefined,legacyCookie);assert.equal(old.status,200);assert.equal(old.value.language,undefined);assert.equal(old.value.signers[0].language,undefined);assert.equal(old.value.location,'not recorded');assert.equal(old.value.userAgent,'not recorded')
+ const old=await h.send(legacy.path+'/certificate.json',undefined,legacyCookie);assert.equal(old.status,200);assert.equal(old.value.language,undefined);assert.equal(old.value.signers[0].language,undefined);assert.equal(old.value.electronicConsent,undefined,'historical electronic-record consent is never inferred');assert.equal(old.value.location,'not recorded');assert.equal(old.value.userAgent,'not recorded')
  const limited=await h.cmd('proposal.prepare',{...offer,clientId:client.id})
  await h.cmd('payment.collection',{id:limited.id,version:1,completion:'required',paymentMethods:['card']})
  await h.cmd('proposal.locale',{id:limited.id,version:2,locale:'es'},h.owner,409)

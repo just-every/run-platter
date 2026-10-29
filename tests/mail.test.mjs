@@ -320,8 +320,24 @@ test('MAIL-001 Managed relay sends proposal invitations and verification codes t
     assert.equal((await h.send(path + '/action?name=code.request', {})).status, 200)
     const code = calls[1].text.match(/\b\d{6}\b/)?.[0]
     assert.ok(code)
-    assert.equal((await h.send(path + '/action?name=code.verify', {code})).status, 200)
+    const verification=await h.send(path + '/action?name=code.verify', {code});assert.equal(verification.status,200)
     assert.ok((await mailRows(h)).every(row => row.status === 'accepted'))
+    const disclosure=(await h.send(path+'/data.json',undefined,verification.cookie)).value.signingConsent
+    const input={revision:1,disclosureVersion:disclosure.version,confirm:true}
+    const before=calls.length
+    assert.equal((await h.send(path+'/action?name=signing.withdraw',input)).status,401)
+    assert.equal(calls.length,before)
+    const attempts=await Promise.all([h.send(path+'/action?name=signing.withdraw',input,verification.cookie),h.send(path+'/action?name=signing.withdraw',input,verification.cookie)])
+    assert.ok(attempts.some(r=>r.status===200));assert.ok(attempts.every(r=>[200,409].includes(r.status)))
+    assert.equal((await h.send(path+'/action?name=signing.withdraw',input,verification.cookie)).status,200)
+    assert.equal(calls.length,before+1,'concurrent requests and repeat submissions send one firm notice')
+    const notice=calls.at(-1)
+    assert.equal(notice.to,h.auth.OWNER_EMAIL);assert.match(notice.subject,/Electronic-record consent withdrawn/)
+    assert.match(notice.text,/requested paper/);assert.ok(notice.text.includes(recipient));assert.match(notice.text,/Revision: 1/)
+    const retained=await h.db.prepare('SELECT * FROM p_signing_requests WHERE proposal_id=?').bind(id).first()
+    assert.equal(retained.recipient,recipient);assert.equal(retained.paper_requested,1);assert.equal(retained.disclosure_version,disclosure.version)
+    assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},verification.cookie)).status,409)
+    assert.ok((await mailRows(h)).every(row=>row.status==='accepted'))
   } finally { await h.close() }
 })
 

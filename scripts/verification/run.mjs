@@ -7,9 +7,14 @@ const shard=process.env.PLATTER_VERIFY_SHARD
 const businessFiles='tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs'
 const authoringPattern='^(EDIT|PRICE|TEAM)-'
 const businessCommand=filter=>`node --test --test-concurrency=1 ${filter}='${authoringPattern}' ${businessFiles}`
+const documentPattern='^(EDIT-|COLLAB-003|PRICE-001|MIG-006|MOB-001.*EDIT-002)'
+const documentCommand=filter=>`PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 ${filter}='${documentPattern}' tests/site.test.mjs`
 const tasks={
  runtime:['node src/base/contract-docs.mjs check','pnpm build','pnpm exec rer build --site','pnpm typecheck','PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs'],
- browser_documents:['pnpm build','PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 tests/site.test.mjs'],
+ // Complementary selections over the same browser entry keep every journey in
+ // push Verify while the document workload fits the existing job deadline.
+ browser_authoring:['pnpm build',documentCommand('--test-name-pattern')],
+ browser_documents:['pnpm build',documentCommand('--test-skip-pattern')],
  business:['pnpm test:platter'],
  business_authoring:[businessCommand('--test-name-pattern')],
  business_lifecycle:[businessCommand('--test-skip-pattern')],
@@ -19,4 +24,4 @@ const tasks={
  archive_media:["node --test --test-name-pattern='retains real invitation|restores scoped roles|notification business|document archive history|retains displayed' tests/archive.test.mjs"]
 }
 if(shard&&!Object.hasOwn(tasks,shard))throw Error('Unknown verification shard')
-for(const command of shard?tasks[shard]:['runtime','browser_documents','business','archive'].flatMap(key=>tasks[key])){const result=spawnSync(command,{shell:true,stdio:'inherit',env:process.env});if(result.status!==0)process.exit(result.status??1)}
+for(const command of shard?tasks[shard]:['runtime','browser_authoring','browser_documents','business','archive'].flatMap(key=>tasks[key])){const result=spawnSync(command,{shell:true,stdio:'inherit',env:process.env});if(result.status!==0)process.exit(result.status??1)}

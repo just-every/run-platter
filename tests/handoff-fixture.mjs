@@ -35,3 +35,14 @@ export async function completeHandoffAgreement(h,title='Synthetic handoff agreem
  if(accept)assert.equal((await h.send(path+'/action?name=accept',input,verified.cookie)).status,200)
  return {proposal,client,path,cookie:verified.cookie,input}
 }
+
+// Submit the ordinary owner attestation and retain the original download bytes.
+export async function recordHandoffUpload(h,signed,cookie=h.owner,status=200){
+ const bytes=Buffer.from('%PDF synthetic-platter-9412 signed outside Platter'),form=new FormData()
+ for(const [key,value] of Object.entries({id:signed.proposal.id,version:3,optionId:'selected',signer:'Synthetic upload signer',signedOn:'2026-01-01',attest:'yes',items:JSON.stringify(signed.input.items)}))form.set(key,String(value))
+ form.set('file',new File([bytes],'synthetic-platter-9412.pdf',{type:'application/pdf'}))
+ const request=new Request(h.origin+'/app/paper-acceptance',{method:'POST',headers:{origin:h.origin,cookie},body:form})
+ const response=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer(),redirect:'manual'})
+ assert.equal(response.status,status,await response.text())
+ return bytes
+}

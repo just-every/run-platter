@@ -106,12 +106,15 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    const report=Object.assign(prepared.report,{resources,arrivedDrafts:drafts,arrivedResources:resources.filter(r=>r.kind!=='draft').reduce((n,r)=>n+(r.count??1),0),held:prepared.report.held-drafts})
    if(resources.length)report.notes=report.notes.filter(n=>!n.startsWith('Open documents are retained'))
    if(Object.keys(reviewedMapping).length)prepared.source.artifacts.push({name:'reviewed-file-destinations.json',sha256:sha256(canonicalJson(reviewedMapping)),size:Buffer.byteLength(canonicalJson(reviewedMapping)),original:{status:'available',base64:Buffer.from(canonicalJson(reviewedMapping)).toString('base64')}})
+   const contactEmails=new Set<string>()
+   for(const record of prepared.source.records.filter(r=>r.kind==='contacts')){const email=String((record.payload as any).value.email??'');if(email&&contactEmails.has(email))prepared.source.diagnostics.push({severity:'error',code:'duplicate_contact_email',message:'The same contact email appears in more than one reviewed CSV record'});if(email)contactEmails.add(email)}
    const plan=await planD1Import(prepared.source,mapping,kit)
    // A second import never replaces an already retained original or its attribution.
    const prior=await db.prepare('SELECT id FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?').bind(documentDestination,actor.id,id).first<any>()
    const existing:string[]=[]
    if(!prior)for(const p of prepared.documents)if(await db.prepare('SELECT 1 FROM p_imported_documents WHERE id=?').bind(p.id).first())existing.push(p.id)
    if(!prior)for(const entry of plan.entries)for(const effect of entry.effects)if(effect.targetKind!=='documents'&&await documentTargets.read(db,documentDestination,effect.targetKind,effect.targetId))existing.push(effect.targetId)
+   if(!prior)for(const record of prepared.source.records.filter(r=>r.kind==='contacts')){const value=(record.payload as any).value;if(value.email&&await db.prepare("SELECT 1 FROM p_contacts WHERE json_extract(data_json,'$.email')=?").bind(value.email).first())existing.push(value.id)}
    if(existing.length) {
     prepared.report.held+=existing.length
     prepared.report.arrived-=prepared.documents.filter(p=>existing.includes(p.id)&&p.signatureEvidence.length).length

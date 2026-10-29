@@ -2702,7 +2702,7 @@
       "executable": false
     },
     "src/platter/movein/document-import.ts": {
-      "sha256": "dfed0d5e2e12fdcba331c607d9dced608a6c7dabd70860954baf342121488c37",
+      "sha256": "1f44200b93de1fde877d90b99b8ccf451b8661d9ccb9538f4a9120a6d26fd43e",
       "executable": false
     },
     "src/platter/movein/document-native-targets.ts": {
@@ -2714,11 +2714,11 @@
       "executable": false
     },
     "src/platter/movein/document-source.ts": {
-      "sha256": "fa132074a86693be7b9a593a8e427b8a85539120a4d359c0572c5cb948797aa3",
+      "sha256": "bcf2f0daf66ecd93319e7cf9b9bba898545b26f655382665d2a88b935ed6373d",
       "executable": false
     },
     "src/platter/movein/document-targets.ts": {
-      "sha256": "a031e1e511cc08cad5c3005e84ef8e5a51fb5c252fd12cac1657f66f13747284",
+      "sha256": "ef407e1615ae16963c099b0e1cd1c817a9391baa04bac4e21f1b8541d4db43aa",
       "executable": false
     },
     "src/platter/movein/errors.ts": {
@@ -3282,7 +3282,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "5c040451c7e3fba43ac9d62a112898b748c1deeae736942ace98f4fa2b5a7ab2",
+      "sha256": "ad18d5fd0c53cf17f0c3d29fb6f17dc73cfd45d29fb5b6d13a40f572f45ee788",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3346,7 +3346,7 @@
       "executable": false
     },
     "tests/document-movein-fixture.mjs": {
-      "sha256": "aa1f5c7591e4a0b4f58a874f270859d8f49707097b4f7926d62d1f6852fcd351",
+      "sha256": "c12452978dcfc85364cdd22d3ad6baeed95ee159cc2deab1137a3b8f999e7049",
       "executable": false
     },
     "tests/drive-fixture.mjs": {
@@ -3402,7 +3402,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "dfee885f1fdb8e8231ae1e4cfba27c87b2cd08c27a71080075a2569992b53f61",
+      "sha256": "811323ba9e68b355f84a3a8225d08f4b2e068bf44995cc3ae4d397a1e758439b",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3454,7 +3454,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "268936285027bd2a5aa9a45e9c3533aae0b247ac25fec24eb1b00cf41e3fbc93",
+      "sha256": "813cca00cf2c9bfcea30fc5f2b36df83e5d98fe5d5eecd174483985df99ab351",
       "executable": false
     },
     "tests/site-harness.mjs": {

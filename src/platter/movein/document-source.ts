@@ -18,6 +18,7 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
  const exportedFiles:ExportedFile[]=[]
  let expanded = 0, duplicateDocuments = 0
  const artifact = (name: string, bytes: Uint8Array) => {
+  if(artifacts.some(a=>a.name===name))return
   artifacts.push({ name, sha256: sha256(bytes), size: bytes.length, original: { status: 'available', base64: Buffer.from(bytes).toString('base64') } })
  }
  const read = async (filename: string, bytes: Uint8Array, source: string) => {

@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "3faefe8e7e0aa36f2719ed2986e76c1e5f4c7ae4bba262fb956dd100a4e4a4b5",
+      "sha256": "bc56df2dc080be227771c8bc3f29f51aba87bf95fc0c5569d49ed680854f2226",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "1211c486785f4025bb0e613c237ee92a242a86e909740fa1195bf2066ca543d5",
+      "sha256": "1973ca448a4c348f87547146c5b136887e2fd079405d6000036d14d176912f6b",
       "executable": false
     },
     "deploy-demo.json": {
@@ -3534,7 +3534,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "0ed1809cf02e1f604e15828a7604e3ce8008f7362c6f7835bfdc17848f13cb73",
+      "sha256": "3cf3400d4e1f6b691597f001ca267bf0812793cb53526c74cefeb66b99b9bb76",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

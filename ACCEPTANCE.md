@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. HTTP-001 is judged from the code and tests in this landing candidate; its exact full commit and Verify receipt are recorded in the handoff, and its builder completion claim remains subject to guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -21,15 +21,15 @@ Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d3
 
 #### HTTP-001 — Authorized domain dispatch
 
-Core · published · **partial** · Cites BASE-ACCESS-002, BASE-ACCESS-004, BASE-PUBLIC-002, BASE-ROLE-001, BASE-AGENT-005
+Core · published · **done** · Cites BASE-ACCESS-002, BASE-ACCESS-004, BASE-PUBLIC-002, BASE-ROLE-001, BASE-AGENT-005
 
 **Requirement.** The proposal, client, import and invoice doors use TEAM-001 rights and APPROVE-003 proposal authority. Session, origin and agent-authority guarantees belong to the cited Base duties; their conformance journey state is recorded in Shared duties. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#http-001).
 
 **Acceptance.**
 1. A member attempts an owner-only invoice export and import: neither changes records.
 
-**Evidence.** `tests/platter.test.mjs` — “native auth, CSRF, roles and revocable agent boundary”; `src/platter/http.ts`
-**Gap.** Delivered: Role-bound owner-only invoice/import commands are refused through the harness, whose command helper checks the response. Missing “HTTP-001 complete authorized domain dispatch journey”: Member invoice export and import are refused with the complete proposal/client/invoice state read back unchanged.
+**Evidence.** `tests/platter.test.mjs` — “HTTP-001 complete authorized domain dispatch journey and native auth, CSRF, roles and revocable agent boundary”: a collection-off mailbox-verified agreement, retained deposit invoice, populated import journal and valid owner-reviewed CSV; explicit member 403 responses for invoice.export, import.preview and import.apply; complete owner-visible state and journal equality plus independent stored client, proposal, revision, approval, acceptance, invoice and import-job equality after each refusal, including identical invoice download content. The same reviewed CSV then succeeds for the owner.
+**Gap.** None.
 
 #### ACCESS-001 — Proposal preparation grants
 
@@ -42,7 +42,7 @@ Core · published · **partial** · Cites BASE-AGENT-004, BASE-AGENT-005, BASE-A
 2. Under a held company policy, a commitment-class price approval waits for the named person and client creation follows its standard rule; under the all-autonomous company policy, each permitted call runs.
 3. Revoke the grant and read context again: access is refused.
 
-**Evidence.** `tests/platter.test.mjs` — “native auth, CSRF, roles and revocable agent boundary”; “AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund”; `src/platter/credentials.ts`
+**Evidence.** `tests/platter.test.mjs` — “HTTP-001 complete authorized domain dispatch journey and native auth, CSRF, roles and revocable agent boundary”; “AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund”; `src/platter/credentials.ts`
 **Gap.** Delivered: A labelled key prepares an attributed draft and revocation ends context access. Missing “ACCESS-001 complete proposal preparation grants journey”: The same permitted sponsor/grant workflow runs under held and all-autonomous company policies with computed classes.
 
 ### Approval, sending and acceptance

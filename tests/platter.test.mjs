@@ -95,13 +95,61 @@ test('EDIT-017 Spanish mailbox journey preserves authority, verification limits,
  r=await h.send(fresh,undefined,freshVerification.cookie);assert.equal(r.status,410);assert.match(r.text,/<html lang="es">/);assert.ok(!r.text.includes(offer.scope))
  }finally{await h.close()}
 })
-test('native auth, CSRF, roles and revocable agent boundary',()=>run(async h=>{
+test('HTTP-001 complete authorized domain dispatch journey and native auth, CSRF, roles and revocable agent boundary',()=>run(async h=>{
+ await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T15:00:00Z'),cron:'*/15 * * * *'})
  await h.state('',401);await h.cmd('client.save',{name:'Unsafe',email:'a@b.example'},h.owner,403,{origin:'https://elsewhere.example'})
  const key=await h.cmd('agent.create',{label:'Draft assistant'});let r=await h.send('/api/platter/agent/command',{name:'client.save',input:{}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,403)
  const c=await h.cmd('client.save',{name:'Northstar',email:'northstar@studio.example'});r=await h.send('/api/platter/agent/command',{name:'proposal.prepare',input:{...offer,clientId:c.id}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,200,r.text)
  r=await h.send('/api/platter/agent/command',{name:'proposal.approve',input:{id:r.value.id,version:1,revision:1}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,403)
  await h.cmd('agent.revoke',{id:key.id});r=await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token});assert.equal(r.status,401)
- await h.send('/auth/invite',{email:'member@studio.example',displayName:'Studio colleague',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('member@studio.example');await h.cmd('proposal.approve',{id:'anything',version:1,revision:1},member,403);await h.cmd('invoice.export',{id:'anything'},member,403);await h.cmd('import.preview',{csv:'client_id,name,email\na,A,a@b.example'},member,403)
+ const memberEmail='synthetic-platter-9000'+String.fromCharCode(64)+'example.test'
+ const invite=await h.send('/auth/invite',{email:memberEmail,displayName:'Studio colleague',role:'member',returnTo:'/app'},h.owner);assert.equal(invite.status,202,invite.text)
+ const member=await h.signIn(memberEmail)
+ await h.cmd('proposal.approve',{id:'anything',version:1,revision:1},member,403)
+
+ const {p}=await draft(h)
+ await h.cmd('payment.collection',{id:p.id,version:1,completion:'off'})
+ await h.cmd('proposal.approve',{id:p.id,version:2,revision:1})
+ const path=new URL((await h.cmd('proposal.send',{id:p.id,version:3})).shareUrl).pathname,cookie=await verified(h,path)
+ const accepted=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true},cookie);assert.equal(accepted.status,200,accepted.text)
+ const invoice=await h.cmd('invoice.export',{id:p.id})
+ assert.equal(invoice.proposal_id,p.id);assert.equal(invoice.currency,'USD');assert.equal(invoice.exported_by,h.auth.OWNER_EMAIL)
+ const downloadPath='/api/platter/invoices/'+invoice.id+'.csv',download=await h.send(downloadPath,undefined,h.owner)
+ assert.equal(download.status,200,download.text);assert.equal(download.text,invoice.csv);assert.match(download.text,/Northstar Coffee/);assert.match(download.text,/1050\.00/)
+
+ const importedCsv='client_id,name,email\nsynthetic-platter-9001,Retained import,'+'synthetic-platter-9001'+String.fromCharCode(64)+'example.test'
+ const importedPreview=await h.cmd('import.preview',{csv:importedCsv});assert.equal(importedPreview.canApply,true)
+ const imported=await h.cmd('import.apply',{csv:importedCsv,fingerprint:importedPreview.fingerprint});assert.equal(imported.job.state,'completed')
+ const retainedJournal=await h.cmd('import.journal',{id:imported.job.id});assert.ok(retainedJournal.originals.length>0);assert.ok(retainedJournal.provenance.length>0)
+ const csv='client_id,name,email\nsynthetic-platter-9002,Reviewed import,'+'synthetic-platter-9002'+String.fromCharCode(64)+'example.test'
+ const preview=await h.cmd('import.preview',{csv});assert.equal(preview.canApply,true);assert.equal(preview.clients[0].id,'synthetic-platter-9002');assert.ok(preview.fingerprint)
+ const populated=await h.state(),agreement=populated.proposals.find(row=>row.id===p.id)
+ assert.equal(populated.clients.length,3);assert.equal(populated.importJobs.length,1);assert.ok(populated.revisions.some(row=>row.proposal_id===p.id))
+ assert.equal(agreement.status,'accepted');assert.equal(agreement.collection.completion,'off');assert.equal(agreement.acceptance.verificationMethod,'mailbox code');assert.equal(agreement.acceptance.name,'Avery Chen');assert.equal(agreement.acceptance.totalCents,420000);assert.equal(agreement.acceptance.depositCents,105000);assert.equal(agreement.invoice.id,invoice.id)
+
+ const businessRecords=async()=>{
+  const state=await h.state(),invoiceRecord=await h.cmd('invoice.export',{id:p.id}),invoiceDownload=await h.send(downloadPath,undefined,h.owner)
+  assert.equal(invoiceDownload.status,200,invoiceDownload.text)
+  const journals=await Promise.all(state.importJobs.map(job=>h.cmd('import.journal',{id:job.id})))
+  const rawDownload=await h.mf.dispatchFetch(h.origin+downloadPath,{headers:{cookie:h.owner}});assert.equal(rawDownload.status,200)
+  const bytes=new Uint8Array(await rawDownload.arrayBuffer())
+  // Retain every returned field, plus complete stored records as an independent
+  // oracle for changes that a projection could otherwise hide.
+  const stored=Object.fromEntries(await Promise.all(['p_clients','p_proposals','p_revisions','p_approvals','p_acceptances','p_invoices','ik_jobs'].map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results])))
+  return {state,invoiceRecord,journals,stored,invoiceDownload:{bytes,text:invoiceDownload.text,type:invoiceDownload.headers.get('content-type'),disposition:invoiceDownload.headers.get('content-disposition')}}
+ }
+ const baseline=await businessRecords()
+ for(const [name,input] of [['invoice.export',{id:p.id}],['import.preview',{csv}],['import.apply',{csv,fingerprint:preview.fingerprint}]]){
+  const refusal=await h.send('/api/platter/command',{name,input},member)
+  assert.equal(refusal.status,403,name+' refuses a current member with valid business inputs: '+refusal.text)
+  assert.deepEqual(await businessRecords(),baseline,name+' preserves complete owner-visible records, stored business facts and invoice bytes')
+ }
+ // The identical reviewed source succeeds through the authorized door.
+ const applied=await h.cmd('import.apply',{csv,fingerprint:preview.fingerprint});assert.equal(applied.job.state,'completed')
+ const after=await h.state();assert.equal(after.clients.length,4);assert.equal(after.importJobs.length,2);assert.deepEqual(after.clients.find(row=>row.id==='synthetic-platter-9002'),{id:'synthetic-platter-9002',name:'Reviewed import',email:'synthetic-platter-9002'+String.fromCharCode(64)+'example.test',version:1,variable_fields:'{}'})
+ assert.deepEqual(after.proposals,baseline.state.proposals);assert.deepEqual(after.revisions,baseline.state.revisions)
+ assert.deepEqual(await h.cmd('invoice.export',{id:p.id}),invoice);assert.equal((await h.send(downloadPath,undefined,h.owner)).text,download.text)
+ assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id}),retainedJournal)
 }))
 test('PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations invalidate old authority',()=>run(async h=>{
  const{client,p}=await draft(h);await h.cmd('proposal.approve',{id:p.id,version:1,revision:2},h.owner,409);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});await h.cmd('proposal.revise',{...offer,clientId:client.id,id:p.id,version:2,priceOne:'2600'});await h.cmd('proposal.send',{id:p.id,version:3},h.owner,409);await h.cmd('proposal.approve',{id:p.id,version:2,revision:1},h.owner,409);await h.cmd('proposal.approve',{id:p.id,version:3,revision:2});await h.cmd('proposal.send',{id:p.id,version:4});await h.cmd('proposal.revise',{...offer,clientId:client.id,id:p.id,version:5},h.owner,409)

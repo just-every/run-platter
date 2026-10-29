@@ -42,10 +42,10 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 34 | The agent’s exception card carries evidence; money and outbound corrections follow company policy | `AGENT-005` partial; `AGENT-009` partial | partial |
 | 35 | Reconciled: 1 amount, 1 invoice, 2 attempts, 0 mismatches | `ACCT-004` partial | partial |
 | 36 | Out-of-scope request priced as its own change order; the original agreement unchanged | `AGENT-006` missing; `PROP-002` partial | partial |
-| 37 | Asana project made at signing, one task per accepted line | `HAND-001` missing | missing |
+| 37 | Asana project made at signing, one task per accepted line | `HAND-001` partial | partial |
 | 38 | Paid by card that afternoon | `PAY-001` partial | partial |
 | 39 | PandaDoc Word templates become editable pages; tokens become fields; rows matched to the catalog | `MIG-001` missing; `MIG-007` partial; `EDIT-005` done; `EDIT-020` done; `EDIT-019` done; `EDIT-004` partial; `CAT-001` partial | partial |
 | 40 | Catalog CSV with bundles as packages; bulk PDFs kept with their certificates | `MIG-001` missing; `CAT-001` partial | partial |
 | 41 | Planned move-in support for Proposify, Better Proposals, Qwilr and Ignition | `MIG-002` missing; `MIG-003` missing; `MIG-004` missing | missing |
 
-Claims: 41; 1 done, 36 partial, 4 missing.
+Claims: 41; 1 done, 37 partial, 3 missing.

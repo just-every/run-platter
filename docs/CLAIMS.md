@@ -300,9 +300,9 @@ Evidence: `tests/platter.test.mjs`, `tests/platter.test.mjs`, `tests/site.test.m
 
 Status: **partial**.
 
-Gap: Nook and mobile push, automatic next-step request creation, integrated notification settings and request controls, complete trigger details and a chat-native decision interaction remain. Conservative default adopted pending ct approval: explicit audited consent; owner and admins configure verified chat destinations; approval details only to the matching active approver; every decision requires the existing member session and current revision and plan. Uncertain delivery is held without automatic retry. Future Nook, MOB-002, COLLAB-002 and SEND-005 carriers inherit these authority and custody obligations.
+Gap: Nook and mobile push, automatic next-step request creation, workspace notification settings, a chat-native decision interaction and live-provider qualification remain. The ct-approved 23 October notification boundary requires explicit audited consent, owner and admin configuration of verified direct approver destinations, existing member sessions and the current revision and plan for decisions. Uncertain delivery is held without automatic retry. Future Nook, MOB-002, COLLAB-002 and SEND-005 carriers inherit these authority and custody obligations. MOB-002 still needs signed native builds, iOS and Android devices, Apple developer and APNs credentials and an Android push project and key.
 
-Evidence: `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+Evidence: `tests/mail.test.mjs`, `tests/site-documents.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
 
 ## APPROVE-003 — Who approves, who sends and what needs approval
 

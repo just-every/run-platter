@@ -267,6 +267,17 @@ test('AI-003 desktop and phone owners review MCP requests, approve and send expl
      const link=receipt.getByRole('link',{name:'Human approved record',exact:true}).first(),approvalResponse=await context.request.get(app.origin+await link.getAttribute('href'))
      assert.equal(approvalResponse.status(),200);assert.equal((await approvalResponse.json()).approval.proposal_id,p.id)
     }
+    const produced=await tool('prepare_proposal',{...offer,title:'Synthetic receipted draft'})
+    await page.reload()
+    await receipt.locator('summary').click()
+    const producedReceipt=page.locator('[data-agent-receipt]').filter({hasText:'mcp.prepare_proposal'}).first()
+    await producedReceipt.locator('summary').click()
+    if(width===1440){
+     const {createHash}=await import('node:crypto'),ownerState=await (await context.request.get(app.origin+'/api/platter/state')).json()
+     const saved=ownerState.revisions.find(row=>row.proposal_id===produced.id&&row.revision===1).snapshot
+     assert.match(await producedReceipt.innerText(),/Produced revision/)
+     assert.match(await producedReceipt.innerText(),new RegExp(createHash('sha256').update(JSON.stringify(saved)).digest('hex')))
+    }
     await capture('agent-receipt')
     await page.goto(app.origin+'/app/settings#agent-controls');await controls().getByRole('button',{name:'Pause key',exact:true}).click()
     if(width===1440){const refused=await context.request.post(app.origin+'/api/platter/agent/mcp',{headers:{authorization:'Bearer '+key.token},data:{jsonrpc:'2.0',id:100,method:'tools/call',params:{name:'read_proposal',arguments:{id:p.id}}}});assert.equal(refused.status(),403);assert.match(await controls().innerText(),/Paused/)}

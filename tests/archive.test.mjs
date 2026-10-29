@@ -215,6 +215,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,403)
     await h.cmd('agent.budget',{id:key.id,version:2,budget:'50',consent:true})
     const agentReceipts=(await h.send('/api/platter/agent-ledger',undefined,h.owner)).value.receipts
+    const storedSources=(await h.db.prepare('SELECT * FROM p_agent_receipt_sources ORDER BY receipt_id,kind,source_id,source_version,digest').all()).results
     assert.ok(agentReceipts.some(r=>r.status==='refused'))
     const beforeAuditView=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
     // The API joins withdrawal reasons and sender attribution. Compare stored
@@ -238,9 +239,8 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const archived=rows(bytes).flatMap(part=>part.items).filter(item=>item.kind==='row')
     const storedReceipts=agentReceipts.map(({records,sources,...row})=>row).sort((a,b)=>a.id.localeCompare(b.id))
     assert.deepEqual(archived.filter(item=>item.table==='p_agent_receipts').map(item=>item.row).sort((a,b)=>a.id.localeCompare(b.id)),storedReceipts,'AGENT-009 exact receipts survive the public CLI without keys or control authority')
-    const storedSources=(await h.db.prepare('SELECT * FROM p_agent_receipt_sources ORDER BY receipt_id,kind,source_id,source_version,digest').all()).results
     assert.ok(storedSources.length>0)
-    assert.deepEqual(archived.filter(item=>item.table==='p_agent_receipt_sources').map(item=>item.row).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))),storedSources.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))))
+    assert.deepEqual(archived.filter(item=>item.table==='p_agent_receipt_sources').map(item=>item.row).sort((a,b)=>[a.receipt_id,a.kind,a.source_id,a.source_version,a.digest].join(':').localeCompare([b.receipt_id,b.kind,b.source_id,b.source_version,b.digest].join(':'))),storedSources.sort((a,b)=>[a.receipt_id,a.kind,a.source_id,a.source_version,a.digest].join(':').localeCompare([b.receipt_id,b.kind,b.source_id,b.source_version,b.digest].join(':'))))
     assert.equal(archived.filter(item=>item.table==='p_agent_keys').length,0)
     assert.equal(archived.filter(item=>item.table==='p_agent_receipt_records').length,agentReceipts.flatMap(r=>r.records).length)
 
@@ -373,6 +373,10 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
   h=await harness({root:source})
   const p=await h.cmd('client.save',{name:'Temporary joiner',email:'synthetic-platter-8200@example.com'}),client=await h.cmd('client.save',{name:'Retained client',email:'synthetic-platter-8201@example.com'})
+  const sourceKey=await h.cmd('agent.create',{label:'Synthetic erased citation key'})
+  await h.cmd('agent.receipts',{id:sourceKey.id,version:0,consent:true})
+  assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+sourceKey.token})).status,200)
+  assert.ok((await h.send('/api/platter/agent-ledger',undefined,h.owner)).value.receipts.flatMap(row=>row.sources).some(source=>source.kind==='client'&&source.source_id===p.id),'the erased client starts with a genuine observed citation')
   const proposal=await h.cmd('proposal.prepare',{clientId:client.id,title:'Retained agreement',scope:'Retained business record',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
   await h.cmd('proposal.approve',{id:proposal.id,version:1,revision:1});const sent=await h.cmd('proposal.send',{id:proposal.id,version:2}),path=new URL(sent.shareUrl).pathname
   await h.send(path+'/action?name=code.request',{});const code=(await h.state()).outbox.find(x=>x.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],verified=await h.send(path+'/action?name=code.verify',{code})
@@ -411,7 +415,9 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
     h=await harness({root:erased,unclaimed:true,auth:identity.auth})
     const restoredOwner=await h.signIn(identity.auth.OWNER_EMAIL),restoredState=await h.state(restoredOwner)
     assert.ok(!restoredState.clients.some(row=>row.id===p.id),'erased clients stay absent through the restored app door')
-    assert.ok(!(await h.send('/api/platter/agent-ledger',undefined,restoredOwner)).value.receipts.flatMap(row=>row.sources).some(source=>source.kind==='client'&&source.source_id===p.id),'restored receipt citations cannot resurrect the erased client')
+    const restoredCitations=(await h.send('/api/platter/agent-ledger',undefined,restoredOwner)).value.receipts.flatMap(row=>row.sources)
+    assert.ok(restoredCitations.some(source=>source.kind==='client'&&source.source_id===client.id),'the retained client citation still works after erasure and restore')
+    assert.ok(!restoredCitations.some(source=>source.kind==='client'&&source.source_id===p.id),'restored receipt citations cannot resurrect the erased client')
     const retained=restoredState.proposals.find(row=>row.id===proposal.id)
     assert.equal(retained.acceptance.depositCents,105000)
     const retainedCsv=await h.send('/api/platter/invoices/'+retained.invoice.id+'.csv',undefined,restoredOwner)
@@ -766,7 +772,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   const allRevenue=await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,h.owner),beforeRevenueCsv=await h.send('/api/platter/pipeline.csv?'+revenueFilters,undefined,h.owner)
   assert.equal(beforeRevenueCsv.status,200)
   const before=await h.state(),tables=['p_outcome_settings','p_outcomes','p_outcome_records','p_crm_outcome_bindings','p_crm_outcome_consents','p_crm_outcome_attempts','p_reminder_templates','p_template_reminder_messages','p_delivery_changes','p_reminder_policy','p_reminder_settings','p_reminder_runs','p_reminder_optouts','p_mail_reply_cap_notices','p_mail_replies','p_mail_attributions','p_report_schedules','p_report_runs','p_template_sources','p_disputes','p_dispute_packets','p_dispute_packet_parts','p_dispute_authorizations','p_dispute_submissions','p_dispute_documents','p_priced_catalog','p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_template_block_locks','p_proposal_block_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_library_uses','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
-  const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
+  const canonical=rows=>rows.sort((a,b)=>[a.receipt_id,a.kind,a.source_id,a.source_version,a.digest].join(':').localeCompare([b.receipt_id,b.kind,b.source_id,b.source_version,b.digest].join(':')))
   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
   await h.close();h=undefined
   const archive=join(temporary,'teams.rer');await command(source,['export','--output',archive]);await command(restored,['import','--input',archive,'--yes'])

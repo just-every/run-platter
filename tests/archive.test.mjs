@@ -808,6 +808,8 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   h=await harness({root:source,assetsDirectory:'public',outboundService:request=>{
    const url=new URL(request.url)
    if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-7105'})
+   if(url.pathname==='/v1.0/teams/synthetic-platter-7110/channels/synthetic-platter-7111')return Response.json({id:'synthetic-platter-7111',membershipType:'standard'})
+   if(url.pathname==='/v1.0/teams/synthetic-platter-7110/members')return Response.json({value:[{userId:'synthetic-platter-7105'}]})
    if(url.pathname==='/v1.0/chats/synthetic-platter-7106')return Response.json({chatType:'oneOnOne',members:[{email:h.auth.OWNER_EMAIL},{userId:'synthetic-platter-7105'}]})
    return Response.json({ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})
   }})
@@ -844,8 +846,9 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-7106',operatorId:person.id,consent:true})
   const revokedRoute=await h.cmd('notification.route',{provider:'slack',event:'followup',kind:'channel',destination:'synthetic-platter-7101',consent:true,lifecycleEvents:['proposal.sent','proposal.withdrawn']})
   await h.cmd('notification.route.remove',{id:revokedRoute.id})
+  await h.cmd('notification.route',{provider:'teams',event:'signed',kind:'channel',destination:'synthetic-platter-7111',teamId:'synthetic-platter-7110',consent:true,lifecycleEvents:['proposal.sent']})
   const routesBefore=(await h.state()).notificationSettings.routes
-  assert.equal(routesBefore.length,3);assert.equal(routesBefore.filter(r=>r.available).length,2)
+  assert.equal(routesBefore.length,4);assert.equal(routesBefore.filter(r=>r.available).length,3)
   assert.deepEqual(JSON.parse(routesBefore.find(r=>r.id===revokedRoute.id).lifecycle_events),['proposal.sent','proposal.withdrawn'])
   const tables=['p_connections','p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
   assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,7)

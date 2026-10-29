@@ -890,6 +890,8 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
    if(url.pathname==='/api/conversations.info')return Response.json({ok:true,channel:{id:'synthetic-platter-9031',is_member:true}})
    if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-9032'})
    if(url.pathname==='/v1.0/chats/synthetic-platter-9033')return Response.json({chatType:'oneOnOne',members:[{email:ownerEmail},{userId:'synthetic-platter-9032'}]})
+   if(url.pathname==='/v1.0/teams/synthetic-platter-9035/channels/synthetic-platter-9036')return Response.json({id:'synthetic-platter-9036',membershipType:'standard'})
+   if(url.pathname==='/v1.0/teams/synthetic-platter-9035/members')return Response.json({value:[{userId:'synthetic-platter-9032'}]})
    throw Error('Unexpected provider request')
   }})
   browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
@@ -911,7 +913,7 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
   }
   assert.deepEqual(checks,['/api/auth.test','/v1.0/me'])
   await page.goto(app.origin+'/app/settings');assert.equal((await state()).notificationSettings.routes.length,0);assert.equal(checks.length,2)
-  await panel.getByText('Authorize a Slack channel',{exact:true}).click()
+  await panel.getByText('Authorize a chat channel',{exact:true}).click()
   const channel=panel.locator('form').filter({has:page.getByRole('button',{name:'Verify and authorize channel',exact:true})})
   await channel.getByLabel('Notification event',{exact:true}).selectOption('signed')
   await channel.getByLabel('Provider destination id',{exact:true}).fill('synthetic-platter-9031')
@@ -931,25 +933,36 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
   await direct.getByRole('checkbox').check();await direct.getByRole('button',{name:'Verify and authorize direct message',exact:true}).click()
   assert.equal(await page.getByRole('alert').count(),0)
   assert.equal(checks.at(-1),'/v1.0/chats/synthetic-platter-9033')
+  await panel.getByText('Authorize a chat channel',{exact:true}).click()
+  await channel.getByLabel('Chat provider',{exact:true}).selectOption('teams')
+  await channel.getByLabel('Notification event',{exact:true}).selectOption('signed')
+  await channel.getByLabel('Provider destination id',{exact:true}).fill('synthetic-platter-9036')
+  await channel.getByLabel('Teams team id',{exact:true}).fill('synthetic-platter-9035')
+  await channel.getByLabel('I authorize notices to this destination after provider verification.',{exact:true}).check()
+  await channel.getByRole('button',{name:'Verify and authorize channel',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0)
+  assert.deepEqual(checks.slice(-2),['/v1.0/teams/synthetic-platter-9035/channels/synthetic-platter-9036','/v1.0/teams/synthetic-platter-9035/members'])
   const configured=(await state()).notificationSettings.routes
-  assert.equal(configured.length,2)
+  assert.equal(configured.length,3)
   assert.deepEqual(configured.map(r=>[r.event,r.provider,r.kind,r.destination,r.operator_id,r.available,r.consented]).sort(),[
    ['signed','slack','channel','synthetic-platter-9031',null,true,true],
-   ['approval','teams','direct','synthetic-platter-9033',person.id,true,true]
+   ['approval','teams','direct','synthetic-platter-9033',person.id,true,true],
+   ['signed','teams','channel','synthetic-platter-9036',null,true,true]
   ].sort())
   assert.deepEqual(JSON.parse(configured.find(r=>r.provider==='slack').lifecycle_events),['proposal.sent','proposal.declined'])
-  assert.deepEqual(JSON.parse(configured.find(r=>r.provider==='teams').lifecycle_events),[])
+  assert.deepEqual(JSON.parse(configured.find(r=>r.kind==='direct').lifecycle_events),[])
+  assert.equal(configured.find(r=>r.provider==='teams'&&r.kind==='channel').team_id,'synthetic-platter-9035')
   await page.reload()
   assert.deepEqual((await state()).notificationSettings.routes,configured)
-  assert.equal(checks.length,4,'inspection never contacts the providers')
+  assert.equal(checks.length,6,'inspection never contacts the providers')
   const history=panel.getByRole('list',{name:'Chat notification routes',exact:true})
   assert.match(await history.innerText(),/Proposal signed/);assert.match(await history.innerText(),/Approval requested/)
-  assert.equal(await history.getByRole('button',{name:'Revoke route authorization',exact:true}).count(),2)
+  assert.equal(await history.getByRole('button',{name:'Revoke route authorization',exact:true}).count(),3)
   assert.match(await history.innerText(),/Additional events: Proposal sent, Proposal declined/)
   assert.ok(await panel.locator('p,label,summary,button,input,select').evaluateAll(nodes=>nodes.every(n=>parseFloat(getComputedStyle(n).fontSize)>=13)))
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
   if(screenshots){
-   await mkdir(screenshots,{recursive:true});await panel.getByText('Authorize a Slack channel',{exact:true}).click();await panel.getByText('Authorize a direct message',{exact:true}).click();await documentFonts(page)
+   await mkdir(screenshots,{recursive:true});await panel.getByText('Authorize a chat channel',{exact:true}).click();await panel.getByText('Authorize a direct message',{exact:true}).click();await documentFonts(page)
    await panel.screenshot({path:join(screenshots,'AUTO-003-settings-1440.png')})
    await page.setViewportSize({width:390,height:1000});await documentFonts(page)
    await panel.screenshot({path:join(screenshots,'AUTO-003-settings-390.png')})
@@ -958,7 +971,7 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
   for(const route of configured)await panel.locator('[data-notification-route="'+route.id+'"]').getByRole('button',{name:'Revoke route authorization',exact:true}).click()
   const revoked=(await state()).notificationSettings.routes
   assert.deepEqual(revoked.map(({available,consented,...r})=>r),configured.map(({available,consented,...r})=>r))
-  assert.ok(revoked.every(r=>!r.available&&!r.consented));assert.equal(checks.length,4)
+  assert.ok(revoked.every(r=>!r.available&&!r.consented));assert.equal(checks.length,6)
   await page.reload();assert.match(await history.innerText(),/Inactive — new consent required/)
   assert.equal(await history.getByRole('button').count(),0)
  }finally{await context?.close();await browser?.close();await app?.close()}

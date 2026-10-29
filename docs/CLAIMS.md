@@ -724,7 +724,7 @@ Evidence: `tests/platter.test.mjs`, `tests/site-documents.mjs`, `tests/archive.t
 
 Status: **partial**.
 
-Gap: Nook, Teams channel destinations, chat-native approval interactions and live-provider qualification remain. Nook’s supported token API cannot verify a personal destination or send direct messages; its broader destination and approval integration depends on Nook. The 23 October ct-approved notification boundary applies: only owner and admins authorize verified destinations; channel events contain generic event text and a session-protected link, never proposal content; approval details use a verified direct recipient. Restored routes require explicit reconnection and new consent. Future Nook and COLLAB-002 event sources inherit these obligations.
+Gap: Nook, chat-native approval interactions and live-provider qualification remain. Nook’s supported token API cannot verify a personal destination or send direct messages; its broader destination and approval integration depends on Nook. The 23 October ct-approved notification boundary applies: only owner and admins authorize verified destinations; channel events contain generic event text and a session-protected link, never proposal content; approval details use a verified direct recipient. Restored routes require explicit reconnection and new consent. Future Nook and COLLAB-002 event sources inherit these obligations.
 
 Evidence: `tests/mail.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 

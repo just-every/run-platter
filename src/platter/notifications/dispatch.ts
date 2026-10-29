@@ -58,7 +58,7 @@ export async function flushNotifications(env:Bindings) {
     if(r.provider==='slack'&&r.kind==='direct')destination=(await chatJson('https://slack.com/api/conversations.open',secret.token,{users:r.destination})).channel?.id
     need(destination,'The direct conversation is unavailable',409)
     if(!await allowed()){await db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE id=?").bind(row.id).run();continue}
-    await demoEffect(()=>r.provider==='slack'?chatJson('https://slack.com/api/chat.postMessage',secret.token,{channel:destination,text:row.subject+'\n'+row.body,unfurl_links:false,unfurl_media:false}):chatJson('https://graph.microsoft.com/v1.0/chats/'+encodeURIComponent(destination)+'/messages',secret.token,{body:{contentType:'text',content:row.subject+'\n'+row.body}}),()=>({}))
+    await demoEffect(()=>r.provider==='slack'?chatJson('https://slack.com/api/chat.postMessage',secret.token,{channel:destination,text:row.subject+'\n'+row.body,unfurl_links:false,unfurl_media:false}):chatJson('https://graph.microsoft.com/v1.0/'+(r.kind==='channel'?'teams/'+encodeURIComponent(r.team_id)+'/channels/':'chats/')+encodeURIComponent(destination)+'/messages',secret.token,{body:{contentType:'text',content:row.subject+'\n'+row.body}}),()=>({}))
    }else{
     const mail=operatorMail(env);need(mail,'Configure installation mail before sending notifications',409)
     if(!await allowed()){await db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE id=?").bind(row.id).run();continue}

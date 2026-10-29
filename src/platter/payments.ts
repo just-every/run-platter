@@ -1,5 +1,5 @@
 import type { Bindings } from '../auth.server'
-import { providerCredential, providerJson } from './connections'
+import { providerCredential, connectedJson, providerFetch } from './connections'
 import { commit, dollars, need, text, type Actor } from './model'
 const finance=['owner','admin','billing']
 export async function paymentState(env:Bindings,a:Actor){
@@ -8,9 +8,9 @@ export async function paymentState(env:Bindings,a:Actor){
  return (await env.DB.prepare('SELECT * FROM p_payment_records ORDER BY recorded_at,id').all<any>()).results.map(p=>({...p,refunds:refunds.filter(r=>r.payment_id===p.id),heldCents:refunds.filter(r=>r.payment_id===p.id).reduce((n,r)=>n+r.cents,0)}))
 }
 async function chargeFor(env:Bindings,id:string){
- const {secret}=await providerCredential(env,'workspace:stripe'),charge=await providerJson('https://api.stripe.com/v1/charges/'+encodeURIComponent(id),secret.token)
+ const credential=await providerCredential(env,'workspace:stripe'),charge=await connectedJson(env,credential,'https://api.stripe.com/v1/charges/'+encodeURIComponent(id))
  need(charge.id===id&&charge.paid===true&&charge.status==='succeeded'&&Number.isSafeInteger(charge.amount)&&charge.amount>0&&Number.isSafeInteger(charge.amount_refunded)&&charge.amount_refunded>=0&&charge.amount_refunded<=charge.amount,'Stripe did not confirm a refundable successful charge',409)
- return {charge,token:secret.token,accountId:secret.accountId}
+ return {charge,credential,accountId:credential.secret.accountId}
 }
 export async function paymentCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  need(finance.includes(a.role),'Only owner, admins and billing manage payments and refunds',403)
@@ -40,14 +40,14 @@ export async function paymentCommand(env:Bindings,a:Actor,name:string,p:Record<s
  need(p.consent===true||p.consent==='yes','Confirm this refund explicitly')
  const previous=await db.prepare('SELECT * FROM p_refunds WHERE id=?').bind(requestId).first<any>()
  if(previous){need(previous.payment_id===payment.id&&previous.cents===cents&&previous.reason===reason,'This request id already names a different refund',409);return {id:requestId,proposalId:payment.proposal_id,status:previous.status}}
- const {charge,token,accountId}=await chargeFor(env,payment.provider_charge)
+ const {charge,credential,accountId}=await chargeFor(env,payment.provider_charge)
  need(accountId===payment.reference&&charge.amount===payment.cents&&charge.currency?.toUpperCase()===payment.currency&&charge.metadata?.platter_proposal_id===payment.proposal_id&&String(charge.metadata?.platter_revision)===String(payment.revision),'Stripe deposit binding changed. Review the connection and charge.',409)
  need(cents<=charge.amount-charge.amount_refunded,'Refund exceeds the amount remaining at Stripe',409)
  await commit(db,a,[db.prepare("INSERT INTO p_refunds(id,payment_id,cents,reason,status,requested_by,requested_at) VALUES(?,?,?,?,'reserved',?,?)").bind(requestId,payment.id,cents,reason,a.id,Date.now()),db.prepare('UPDATE p_payment_records SET version=version+1 WHERE id=?').bind(payment.id)],false,{sql:'EXISTS(SELECT 1 FROM p_payment_records WHERE id=? AND version=?) AND ?<=?-(SELECT COALESCE(SUM(cents),0) FROM p_refunds WHERE payment_id=?)',values:[payment.id,payment.version,cents,payment.cents,payment.id]})
  // The reservation survives an uncertain provider response. Never issue this request again automatically.
  let status='needs_review',providerId:string|null=null
  try{
-  const response=await fetch('https://api.stripe.com/v1/refunds',{method:'POST',redirect:'manual',headers:{authorization:'Bearer '+token,'content-type':'application/x-www-form-urlencoded','idempotency-key':'platter-refund-'+requestId},body:new URLSearchParams({charge:payment.provider_charge,amount:String(cents)})})
+  const response=await providerFetch(env,credential,'https://api.stripe.com/v1/refunds',{method:'POST',redirect:'manual',headers:{'content-type':'application/x-www-form-urlencoded','idempotency-key':'platter-refund-'+requestId},body:new URLSearchParams({charge:payment.provider_charge,amount:String(cents)})})
   if(response.ok){const value:any=await response.json();if(value.charge===payment.provider_charge&&value.amount===cents&&typeof value.id==='string'&&value.id.length<=200){providerId=value.id;status=value.status==='succeeded'?'succeeded':value.status==='pending'?'pending_provider':'needs_review'}}
  }catch{/* Keep the reservation for explicit provider reconciliation. */}
  await db.prepare('UPDATE p_refunds SET status=?,provider_refund=?,completed_at=? WHERE id=? AND status=\'reserved\'').bind(status,providerId,Date.now(),requestId).run()

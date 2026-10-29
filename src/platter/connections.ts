@@ -33,6 +33,48 @@ export async function providerCredential(env:Bindings,id:string){
 export async function markConnectionBroken(env:Bindings,id:string,version:number){
  await env.DB.prepare("UPDATE p_connections SET broken_at=? WHERE id=? AND version=? AND status='connected' AND broken_at IS NULL").bind(Date.now(),id,version).run()
 }
+export type ProviderCredential = Awaited<ReturnType<typeof providerCredential>>
+export class ProviderCredentialRejected extends Error { status=409 }
+// Resource permissions and transient failures do not establish credential loss.
+export async function credentialRefused(response:Response,provider?:string){
+ if(response.status===401)return true
+ if(response.status===403&&/\berror=(?:"insufficient_scope"|insufficient_scope\b)/i.test(response.headers.get('www-authenticate')??''))return true
+ if(response.status!==403&&!(provider==='slack'&&response.ok))return false
+ try{
+  const raw=await response.clone().text();if(raw.length>262144)return false
+  const value=JSON.parse(raw),error=value?.error
+  if(provider==='slack'&&value?.ok===false)return ['invalid_auth','not_authed','token_revoked','token_expired','account_inactive','missing_scope'].includes(error)
+  return error?.errors?.some((item:any)=>item.reason==='insufficientPermissions')===true||error?.details?.some((item:any)=>item.reason==='ACCESS_TOKEN_SCOPE_INSUFFICIENT')===true
+ }catch{return false}
+}
+export async function currentConnection(env:Bindings,credential:ProviderCredential){
+ const {id,version}=credential.connection
+ need(await env.DB.prepare("SELECT 1 FROM p_connections WHERE id=? AND version=? AND status='connected' AND broken_at IS NULL").bind(id,version).first(),'The provider connection changed. Review this operation before trying again.',409)
+}
+export async function rejectCredential(env:Bindings,credential:ProviderCredential){
+ const {id,version}=credential.connection
+ await markConnectionBroken(env,id,version)
+ // A replacement connection must not inherit an old request's failure or work.
+ need(await env.DB.prepare("SELECT 1 FROM p_connections WHERE id=? AND version=? AND status='connected'").bind(id,version).first(),'The provider connection changed. Review this operation before trying again.',409)
+ throw new ProviderCredentialRejected('The provider rejected this credential or its access scope. Reconnect in Settings; affected work stays held for review.')
+}
+export async function providerFetch(env:Bindings,credential:ProviderCredential,url:string,init:RequestInit={}){
+ await currentConnection(env,credential)
+ const headers=new Headers(init.headers);headers.set('authorization','Bearer '+credential.secret.token)
+ let response:Response
+ try{response=await fetch(url,{...init,headers,redirect:'manual',signal:init.signal??AbortSignal.timeout(30000)})}
+ catch{return fail('The provider request outcome is uncertain. Review the held operation before any further write.',409)}
+ if(await credentialRefused(response,credential.connection.provider))await rejectCredential(env,credential)
+ await currentConnection(env,credential)
+ return response
+}
+export async function connectedJson(env:Bindings,credential:ProviderCredential,url:string){
+ const response=await providerFetch(env,credential,url,{headers:{accept:'application/json'}})
+ need(response.ok,'The provider refused this request. Review the held operation before any further write.',409)
+ const raw=await response.text();need(raw.length<=262144,'The provider response was too large',409)
+ try{const value=JSON.parse(raw);need(value&&typeof value==='object','The provider response was invalid',409);return value}
+ catch{return fail('The provider response was invalid. Review the held operation before any further write.',409)}
+}
 export async function providerJson(url:string,token:string){
  try{
   const response=await fetch(url,{headers:{authorization:'Bearer '+token,accept:'application/json'},redirect:'manual'})

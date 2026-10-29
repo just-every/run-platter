@@ -1,18 +1,9 @@
+import { credentialRefused } from '../connections'
 import { fail, need } from '../model'
 
 // Each request obtains a fresh credential only after checking execution authority.
 export type DriveAuthority = () => Promise<{token:string;credentialRejected:()=>Promise<void>}>
 const base='https://www.googleapis.com/drive/v3/files'
-async function credentialRefused(response:Response){
- if(response.status===401)return true
- if(response.status!==403)return false
- if(/\berror="insufficient_scope"/i.test(response.headers.get('www-authenticate')??''))return true
- try{
-  const raw=await response.clone().text();if(raw.length>262144)return false
-  const error=JSON.parse(raw)?.error
-  return error?.errors?.some((item:any)=>item.reason==='insufficientPermissions')===true||error?.details?.some((item:any)=>item.reason==='ACCESS_TOKEN_SCOPE_INSUFFICIENT')===true
- }catch{return false}
-}
 export async function driveRequest(authorize:DriveAuthority,url:string,init:RequestInit={}){
  const credential=await authorize(),timeout=AbortSignal.timeout(30000)
  let response:Response

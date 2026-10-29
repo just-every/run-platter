@@ -775,7 +775,7 @@ test('CAT-001 reviewed CSV promotion and explicit recurring insertion preserve i
 
 test('AUTO-002 Settings authorizes Drive archiving and shows completed and held jobs with safe reconciliation', {timeout:120000},async()=>{
  const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{driveFixture,driveToken,driveRoot,completeDriveAgreement}=await import('./drive-fixture.mjs')
- const fake=driveFixture(),edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,outboundService:fake.outboundService});edge.attach(h)
+ const fake=driveFixture(),edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,outboundService:request=>new URL(request.url).hostname==='slack.com'?(new URL(request.url).pathname.endsWith('/auth.test')?Response.json({ok:true,team_id:'synthetic-platter-site-chat'}):Response.json({ok:false,error:'token_revoked'})):fake.outboundService(request)});edge.attach(h)
  let browser,context
  try{
   browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
@@ -819,10 +819,16 @@ test('AUTO-002 Settings authorizes Drive archiving and shows completed and held 
   const blockedCalls=fake.calls.length;await fire();assert.equal(fake.calls.length,blockedCalls)
   assert.ok(!(await page.content()).includes(driveToken))
   assert.ok(await connection.locator('p,button,label,input').evaluateAll(nodes=>nodes.every(node=>parseFloat(getComputedStyle(node).fontSize)>=13)))
+  await h.cmd('provider.connect',{provider:'slack',version:0,token:'synthetic-platter-site-chat-credential',consent:true})
+  await h.cmd('notification.route',{provider:'slack',event:'signed',kind:'channel',destination:'synthetic-platter-site-channel',consent:true},h.owner,409)
+  await page.reload()
+  const chat=page.locator('article').filter({has:page.getByRole('heading',{name:'Slack',exact:true})})
+  assert.match(await chat.innerText(),/broken/);assert.match(await chat.innerText(),/Reconnect to restore access/);assert.match(await chat.innerText(),/held work remains for review/)
   if(screenshots){
    for(const width of [1440,390]){
     await page.setViewportSize({width,height:1000});await documentFonts(page)
     await connection.screenshot({path:join(screenshots,'SEC-001-broken-connection-'+width+'.png')})
+    await chat.screenshot({path:join(screenshots,'SEC-001-broken-chat-'+width+'.png')})
     await panel.screenshot({path:join(screenshots,'SEC-001-held-archives-'+width+'.png')})
    }
   }

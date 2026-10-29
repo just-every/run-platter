@@ -3,7 +3,7 @@ import { queueReadyCompletionMail } from './completion-mail'
 import { dispatchMail } from './mail'
 import { collectionQuote } from './collection-fees'
 import type { Bindings } from '../auth.server'
-import { providerCredential } from './connections'
+import { providerCredential, providerFetch, type ProviderCredential } from './connections'
 import { collectionPolicy } from './collection-policy'
 import { need, fail } from './model'
 
@@ -14,9 +14,9 @@ export async function collectionView(db:D1Database,id:string,accepted?:any){
  return {...policy,payment:intent,agreementState:!accepted?'unsigned':!policy.enabled||policy.completion==='due'||accepted.deposit_cents===0||intent?.status==='succeeded'&&Boolean(intent.authorized_at)?'complete':'waiting_for_payment',complete:!policy.enabled||policy.completion==='due'||accepted?.deposit_cents===0||intent?.status==='succeeded'&&Boolean(intent.authorized_at)}
 }
 
-async function stripe(token:string,path:string,body?:URLSearchParams,idempotency?:string){
+async function stripe(env:Bindings,credential:ProviderCredential,path:string,body?:URLSearchParams,idempotency?:string){
  try{
-  const response=await fetch('https://api.stripe.com/v1/'+path,{method:body?'POST':'GET',redirect:'manual',headers:{authorization:'Bearer '+token,...(body?{'content-type':'application/x-www-form-urlencoded'}:{}),...(idempotency?{'idempotency-key':idempotency}:{})},...(body?{body}:{}),signal:AbortSignal.timeout(20000)})
+  const response=await providerFetch(env,credential,'https://api.stripe.com/v1/'+path,{method:body?'POST':'GET',redirect:'manual',headers:{...(body?{'content-type':'application/x-www-form-urlencoded'}:{}),...(idempotency?{'idempotency-key':idempotency}:{})},...(body?{body}:{}),signal:AbortSignal.timeout(20000)})
   need(response.ok,'Stripe could not prepare this payment. Contact the firm.',409)
   return await response.json() as any
  }catch{fail('Stripe could not confirm this payment. Refresh its status before trying again.',409)}
@@ -32,7 +32,7 @@ async function boundClient(env:Bindings,c:any){
 }
 
 export async function clientCollection(env:Bindings,c:any,input:Record<string,unknown>,refresh=false){
- const {accepted,policy}=await boundClient(env,c),db=env.DB,{secret}=await providerCredential(env,'workspace:stripe')
+ const {accepted,policy}=await boundClient(env,c),db=env.DB,credential=await providerCredential(env,'workspace:stripe'),{secret}=credential
  let saved=await db.prepare('SELECT * FROM p_collection_intents WHERE proposal_id=? AND revision=?').bind(accepted.proposal_id,accepted.revision).first<any>()
  const method=String(input.method??saved?.method??'card')
  need(policy.methods.includes(method),'This payment method is not offered',400)
@@ -52,10 +52,10 @@ export async function clientCollection(env:Bindings,c:any,input:Record<string,un
   const body=new URLSearchParams({amount:String(quote.cents),currency:accepted.currency.toLowerCase(),'automatic_payment_methods[enabled]':'true','automatic_payment_methods[allow_redirects]':'never','metadata[platter_proposal_id]':accepted.proposal_id,'metadata[platter_revision]':String(accepted.revision)})
   body.append('excluded_payment_method_types[]',method==='ach'?'card':'us_bank_account')
   // A reservation is retained after a timeout; no second intent is created automatically.
-  const intent=await stripe(secret.token,'payment_intents',body,'platter-deposit-'+id)
+  const intent=await stripe(env,credential,'payment_intents',body,'platter-deposit-'+id)
   const expected=method==='ach'?'us_bank_account':'card'
   if(!Array.isArray(intent.payment_method_types)||!intent.payment_method_types.includes(expected)||intent.payment_method_types.some((m:string)=>m!==expected&&m!=='link')){
-   await stripe(secret.token,'payment_intents/'+encodeURIComponent(intent.id)+'/cancel',new URLSearchParams())
+   await stripe(env,credential,'payment_intents/'+encodeURIComponent(intent.id)+'/cancel',new URLSearchParams())
    await db.prepare("UPDATE p_collection_intents SET status='unavailable',provider_intent=?,updated_at=? WHERE id=?").bind(intent.id,Date.now(),id).run()
    fail('Stripe does not offer this payment method for the connected account',409)
   }
@@ -64,7 +64,7 @@ export async function clientCollection(env:Bindings,c:any,input:Record<string,un
   saved=await db.prepare('SELECT * FROM p_collection_intents WHERE id=?').bind(id).first<any>()
  }
  need(saved.provider_intent,'Payment preparation is held for reconciliation. Contact the firm.',409)
- const intent=await stripe(secret.token,'payment_intents/'+encodeURIComponent(saved.provider_intent)+'?expand[]=latest_charge')
+ const intent=await stripe(env,credential,'payment_intents/'+encodeURIComponent(saved.provider_intent)+'?expand[]=latest_charge')
  need(intent.id===saved.provider_intent&&intent.amount===saved.cents&&intent.currency===saved.currency.toLowerCase()&&intent.metadata?.platter_proposal_id===accepted.proposal_id&&intent.metadata?.platter_revision===String(accepted.revision),'Stripe deposit binding changed. Contact the firm.',409)
  await boundClient(env,c)
  const mandate=intent.latest_charge?.payment_method_details?.us_bank_account?.mandate

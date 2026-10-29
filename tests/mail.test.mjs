@@ -1,3 +1,4 @@
+import { approvalRequestInput } from './approval-request.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -927,7 +928,7 @@ test('APPROVE-002 explicit requests deliver exact revision previews by email and
   await h.connect('slack');const actor=(await h.state()).actor
   await h.cmd('notification.route',{provider:'slack',event:'approval',kind:'direct',destination:'synthetic-platter-7009',operatorId:actor.id,consent:true})
   const p=await h.prepare('Approval notice'),request={id:p.id,version:1,reminderDays:2,consent:true}
-  const result=await h.cmd('notification.request',request),again=await h.cmd('notification.request',request)
+  const result=await h.cmd('notification.request',await approvalRequestInput(h,request)),again=await h.cmd('notification.request',await approvalRequestInput(h,request))
   assert.deepEqual(again,result);assert.equal(h.messages.length,1);assert.equal(h.chats.length,1)
   const email=h.messages[0],slack=h.chats[0].value
   assert.deepEqual(email.to,[h.auth.OWNER_EMAIL]);assert.equal(slack.channel,'synthetic-platter-7004')
@@ -943,10 +944,55 @@ test('APPROVE-002 explicit requests deliver exact revision previews by email and
   await h.cmd('notification.decide',{requestId:r.id,version:1,decision:'approved',note:'Reviewed exact revision from Slack'})
   assert.equal((await h.state()).proposals.find(p=>p.id===r.proposal_id).status,'approved')
   const decision=await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(p.id).first();assert.equal(decision.note,'Reviewed exact revision from Slack');assert.equal(decision.revision,1)
-  const other=await h.prepare('Reject email'),otherRequest=await h.cmd('notification.request',{id:other.id,version:1,consent:true})
+  const other=await h.prepare('Reject email'),otherRequest=await h.cmd('notification.request',await approvalRequestInput(h,{id:other.id,version:1,consent:true}))
   await h.cmd('notification.decide',{requestId:otherRequest.requests[0],version:1,decision:'rejected',note:'Please correct the terms from email'})
   assert.equal((await h.state()).proposals.find(p=>p.id===other.id).approval.rejected,true)
   await h.tick(r.remind_at+5*86400000);assert.equal(h.messages.filter(m=>m.subject==='Approval overdue').length,1)
+  // A later step does not inherit the earlier requester's consent.
+  const billingEmail='synthetic-platter-7010'+String.fromCharCode(64)+'synthetic-platter.example'
+  await h.send('/auth/invite',{email:billingEmail,role:'member',displayName:'Synthetic finance'},h.owner)
+  const billingCookie=await h.signIn(billingEmail),billing=(await h.state(billingCookie)).actor
+  await h.cmd('member.set',{operatorId:billing.id,version:0,role:'billing',teams:[]})
+  const totalRule=await h.cmd('approval.rule',{version:0,name:'Value review',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:owner']})
+  const discountRule=await h.cmd('approval.rule',{version:1,name:'Discount review',position:1,condition:{kind:'discountOver',bps:1500},approvers:['person:'+billing.id]})
+  const routed=await h.cmd('proposal.prepare',{...offer,clientId:h.client.id,currency:'USD',packages:[{id:'main',label:'Campaign',price:'30000',discountPercent:'20'}]})
+  const firstInput=await approvalRequestInput(h,{id:routed.id,version:1,consent:true}),firstRequest=await h.cmd('notification.request',firstInput)
+  const valueMail=h.messages.at(-1);assert.deepEqual(valueMail.to,[h.auth.OWNER_EMAIL]);assert.match(valueMail.text,/Triggered by: Highest offered gross total USD 30000.00 exceeds USD 25000.00\./)
+  assert.match(h.chats.at(-1).value.text,/Highest offered gross total USD 30000.00 exceeds USD 25000.00\./)
+  await h.cmd('notification.decide',{requestId:firstRequest.requests[0],version:1,decision:'approved',note:'Value checked'})
+  const beforeNext=[h.messages.length,h.chats.length]
+  await h.state();await h.tick(r.remind_at+6*86400000)
+  assert.deepEqual([h.messages.length,h.chats.length],beforeNext,'completing or inspecting a step authorizes no later request')
+  const nextRequest=await h.cmd('notification.request',await approvalRequestInput(h,{id:routed.id,version:2,consent:true}))
+  assert.deepEqual(h.messages.at(-1).to,[billingEmail]);assert.match(h.messages.at(-1).text,/Triggered by: Offered discount 20.00% exceeds 15.00%\./)
+  assert.equal(h.chats.length,beforeNext[1],'an owner direct route cannot receive finance approval details')
+  const nextRow=(await h.cmd('notification.requests',{id:routed.id})).requests.find(row=>row.id===nextRequest.requests[0]);assert.equal(nextRow.approver_id,billing.id);assert.equal(nextRow.current,true)
+  await h.cmd('notification.decide',{requestId:nextRow.id,version:2,decision:'approved',note:'Discount checked'},billingCookie)
+  assert.equal((await h.state()).proposals.find(row=>row.id===routed.id).status,'approved')
+  await h.cmd('approval.rule.delete',{id:totalRule.id,version:2});await h.cmd('approval.rule.delete',{id:discountRule.id,version:3})
+  // Each supported trigger is recorded from the requested revision, with
+  // independently written expected outcomes rather than rendered input values.
+  const source=await h.cmd('template.start',{id:'starter:consultancy',version:1,clientId:h.client.id})
+  const sourceRow=(await h.state()).proposals.find(row=>row.id===source.id)
+  const sourceEdit={id:source.id,clientId:h.client.id,version:1,title:sourceRow.title,scope:sourceRow.scope,terms:'Synthetic edited legal terms',depositPercent:'25',packages:sourceRow.options.map(o=>({id:o.id,label:o.label,price:(o.cents/100).toFixed(2)}))}
+  await h.cmd('proposal.revise',sourceEdit)
+  const cases=[
+   [{kind:'marginBelow',bps:5000},'Offered margin requires 50.00%: Studio: costs not recorded; Campaign: costs not recorded. Optional items also require review when their costs are missing or their margin is below the threshold.',null],
+   [{kind:'paymentTerms',minimumDepositBps:5000,standardTerms:'Synthetic standard'},'Deposit 25.00%; required minimum 50.00%. Legal terms differ from the configured standard.',null],
+   [{kind:'termsEdited'},'Legal terms changed from revision 1.',source.id],
+   [{kind:'template'},'Proposal started from template “Consultancy”.',source.id]
+  ]
+  let policyVersion=4
+  for(const [condition,expected,proposalId] of cases){
+   const rule=await h.cmd('approval.rule',{version:policyVersion++,name:'Synthetic trigger review',position:0,condition,approvers:['role:owner']})
+   const target=proposalId??(await h.prepare('Recorded trigger')).id,targetRow=(await h.state()).proposals.find(row=>row.id===target)
+   const result=await h.cmd('notification.request',await approvalRequestInput(h,{id:target,version:targetRow.version,consent:true}))
+   const recorded=(await h.cmd('notification.requests',{id:target})).requests.find(row=>row.id===result.requests[0])
+   assert.equal(recorded.trigger.detail,expected);assert.ok(h.messages.at(-1).text.includes('Triggered by: '+expected));assert.ok(h.chats.at(-1).value.text.includes('Triggered by: '+expected))
+   await h.cmd('approval.rule.delete',{id:rule.id,version:policyVersion++})
+   assert.equal((await h.cmd('notification.requests',{id:target})).requests.find(row=>row.id===recorded.id).trigger.detail,expected,'removing a rule cannot rewrite the request history')
+  }
+
  }finally{await h.close()}
 })
 
@@ -956,14 +1002,14 @@ test('APPROVE-002 notification consent, exact plan, active scope and uncertain d
   await h.connect('slack');const actor=(await h.state()).actor
   const route=await h.cmd('notification.route',{provider:'slack',event:'approval',kind:'direct',destination:'synthetic-platter-7009',operatorId:actor.id,consent:true})
   const p=await h.prepare('Stale approval')
-  await h.cmd('notification.request',{id:p.id,version:1},h.owner,400);assert.equal(h.messages.length,0)
-  const result=await h.cmd('notification.request',{id:p.id,version:1,consent:true}),requestId=result.requests[0]
+  await h.cmd('notification.request',await approvalRequestInput(h,{id:p.id,version:1}),h.owner,400);assert.equal(h.messages.length,0)
+  const result=await h.cmd('notification.request',await approvalRequestInput(h,{id:p.id,version:1,consent:true})),requestId=result.requests[0]
   await h.cmd('proposal.revise',{...offer,clientId:h.client.id,id:p.id,version:1,scope:'Revised scope'})
   await h.cmd('notification.decide',{requestId,version:2,decision:'approved',note:'Stale'},h.owner,409)
   await h.tick(Date.now()+3*86400000);assert.equal(h.messages.length,1,'a changed revision suppresses overdue delivery')
   const q=await h.prepare('Uncertain chat');h.uncertain(true)
-  await h.cmd('notification.request',{id:q.id,version:1,consent:true});assert.equal(h.chats.length,2)
-  await h.cmd('notification.request',{id:q.id,version:1,consent:true});assert.equal(h.chats.length,2,'a lost provider receipt is never retried')
+  await h.cmd('notification.request',await approvalRequestInput(h,{id:q.id,version:1,consent:true}));assert.equal(h.chats.length,2)
+  await h.cmd('notification.request',await approvalRequestInput(h,{id:q.id,version:1,consent:true}));assert.equal(h.chats.length,2,'a lost provider receipt is never retried')
   assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_notification_outbox WHERE status='uncertain'").first()).n,1)
   await h.cmd('notification.route.remove',{id:route.id});await h.tick(Date.now()+4*86400000);assert.equal(h.chats.length,2,'revoked route consent suppresses chat reminders')
   await h.send('/auth/invite',{email:'stranger@synthetic-platter.example',role:'member',displayName:'Stranger'},h.owner)
@@ -972,6 +1018,43 @@ test('APPROVE-002 notification consent, exact plan, active scope and uncertain d
   await h.cmd('notification.requests',{id:q.id},cookie,403)
   await h.cmd('notification.decide',{requestId,version:2,decision:'approved',note:'Unauthorized'},cookie,403)
   assert.doesNotMatch(JSON.stringify(await h.state()),/synthetic-platter-7008/)
+  const revoked=await h.prepare('Explicitly revoked request'),revokeInput=await approvalRequestInput(h,{id:revoked.id,version:1,consent:true}),revokedRequest=await h.cmd('notification.request',revokeInput),revokedId=revokedRequest.requests[0]
+  const revocation={...revokeInput,requestId:revokedId}
+  const noWrite=async(name,input,cookie,status)=>{const tables=['p_approval_requests','p_notification_authority','p_notification_outbox','p_approval_decisions','p_audit'],snapshot=async()=>Object.fromEntries(await Promise.all(tables.map(async t=>[t,(await h.db.prepare('SELECT * FROM '+t+' ORDER BY 1').all()).results]))),before=await snapshot(),calls=[h.messages.length,h.chats.length];await h.cmd(name,input,cookie,status);assert.deepEqual(await snapshot(),before);assert.deepEqual([h.messages.length,h.chats.length],calls)}
+  await noWrite('notification.revoke',revocation,cookie,403)
+  await noWrite('notification.revoke',{...revocation,version:0},h.owner,409)
+  await h.cmd('notification.revoke',revocation)
+  const revokedRow=(await h.cmd('notification.requests',{id:revoked.id})).requests[0]
+  assert.equal(revokedRow.current,false);assert.equal(revokedRow.revoked_by,actor.id);assert.ok(revokedRow.revoked_at)
+  assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_audit WHERE action='notification.revoke' AND subject=?").bind(revoked.id).first()).n,1)
+  await noWrite('notification.decide',{requestId:revokedId,version:1,decision:'approved',note:'Revoked'},h.owner,409)
+  const stopped=[h.messages.length,h.chats.length];await h.cmd('notification.request',revokeInput);await h.tick(revokedRow.remind_at+86400000);assert.deepEqual([h.messages.length,h.chats.length],stopped,'revocation prevents reactivation and overdue delivery')
+  const stalePlan=await h.prepare('Policy changed'),staleInput=await approvalRequestInput(h,{id:stalePlan.id,version:1,consent:true})
+  const policy=(await h.state()).approvalSettings.policy
+  await h.cmd('approval.policy',{version:policy.version,required:true,defaultRole:'owner'})
+  await noWrite('notification.request',staleInput,h.owner,409)
+  const currentInput=await approvalRequestInput(h,{id:stalePlan.id,version:1,consent:true})
+  await noWrite('notification.request',{...currentInput,revision:2},h.owner,409)
+  await noWrite('notification.request',{...currentInput,plan:undefined},h.owner,409)
+  // A scoped sender sees the safe trigger projection but cannot read costs.
+  const privateRule=await h.cmd('approval.rule',{version:policy.version+1,name:'synthetic-platter-private-margin',position:0,condition:{kind:'marginBelow',bps:5000},approvers:['role:owner']})
+  const salesProposal=await h.cmd('proposal.prepare',{...offer,clientId:h.client.id},cookie),salesInput=await approvalRequestInput(h,{id:salesProposal.id,version:1,consent:true})
+  const scopedRequest=await h.cmd('notification.request',salesInput,cookie)
+  assert.match(h.messages.at(-1).text,/synthetic-platter-private-margin/)
+  const salesRows=(await h.cmd('notification.requests',{id:salesProposal.id},cookie)).requests
+  assert.equal(salesRows[0].trigger.detail,'Private pricing requires an eligible approver’s review.')
+  assert.doesNotMatch(JSON.stringify(salesRows),/synthetic-platter-private-margin|50.00|trigger_snapshot/)
+  const salesState=(await h.state(cookie)).proposals.find(row=>row.id===salesProposal.id)
+  assert.doesNotMatch(JSON.stringify(salesState.approval)+JSON.stringify(salesState.approvalRequests),/synthetic-platter-private-margin|50.00|trigger_snapshot/)
+  // Removing the requester's sending scope stops any later reminder.
+  await h.cmd('member.set',{operatorId:(await h.state(cookie)).actor.id,version:0,role:'viewer',teams:[]})
+  const lostScope=[h.messages.length,h.chats.length]
+  await noWrite('notification.request',salesInput,cookie,403)
+  await h.tick((await h.cmd('notification.requests',{id:salesProposal.id})).requests[0].remind_at+86400000)
+  assert.deepEqual([h.messages.length,h.chats.length],lostScope)
+  await noWrite('notification.decide',{requestId:scopedRequest.requests[0],version:2,decision:'approved',note:'Scope lost'},h.owner,409)
+  await h.cmd('approval.rule.delete',{id:privateRule.id,version:policy.version+2})
+
  }finally{await h.close()}
 })
 
@@ -981,7 +1064,7 @@ test('AUTO-003 signed events reach Slack channels and approval requests reach ve
   await h.connect('slack');await h.connect('teams');const actor=(await h.state()).actor
   await h.cmd('notification.route',{provider:'slack',event:'signed',kind:'channel',destination:'synthetic-platter-7003',consent:true})
   await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-7006',operatorId:actor.id,consent:true})
-  const p=await h.prepare('Signed event'),request=await h.cmd('notification.request',{id:p.id,version:1,consent:true})
+  const p=await h.prepare('Signed event'),request=await h.cmd('notification.request',await approvalRequestInput(h,{id:p.id,version:1,consent:true}))
   assert.equal(h.chats.length,1);assert.match(h.chats[0].url,/graph.microsoft.com/);assert.match(h.chats[0].value.body.content,/app\/preview/)
   await h.cmd('notification.decide',{requestId:request.requests[0],version:1,decision:'approved',note:'Approved in Teams'})
   const sent=await h.cmd('proposal.send',{id:p.id,version:2}),path=new URL(sent.shareUrl).pathname

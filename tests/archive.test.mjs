@@ -1,3 +1,4 @@
+import { approvalRequestInput } from './approval-request.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { documentFixture } from './document-fixture.mjs'
@@ -815,7 +816,13 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const comment=await h.cmd('collaboration.comment',{id:p.id,version:1,blockId:'pricing',text:'synthetic-platter-private-custody',recipientId:person.id,consent:true})
   await h.cmd('collaboration.resolve',{id:p.id,version:1,threadId:comment.threadId,threadVersion:1})
   await h.cmd('collaboration.assign',{id:p.id,version:1,blockId:'scope',recipientId:person.id,dueDate:'2030-03-04',consent:true})
-  await h.cmd('notification.request',{id:p.id,version:1,consent:true});await h.cmd('notification.expiry',{id:p.id,version:1,consent:true})
+  await h.cmd('notification.request',await approvalRequestInput(h,{id:p.id,version:1,consent:true}))
+  const revoked=await h.cmd('proposal.prepare',{clientId:client.id,title:'Revoked notification history',scope:'Retained scope',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+  const requestInput=await approvalRequestInput(h,{id:revoked.id,version:1,consent:true}),requested=await h.cmd('notification.request',requestInput)
+  await h.cmd('notification.revoke',{...requestInput,requestId:requested.requests[0]})
+  const retainedRequest=(await h.cmd('notification.requests',{id:revoked.id})).requests[0]
+  assert.equal(retainedRequest.trigger.detail,'Approval is required for every proposal.');assert.equal(retainedRequest.revoked_by,person.id);assert.ok(retainedRequest.revoked_at)
+  await h.cmd('notification.expiry',{id:p.id,version:1,consent:true})
   const expiry=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archived sender notice',scope:'Exact expiry scope',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
   await h.cmd('expiry.set',{id:expiry.id,version:1,mode:'days',days:4,warningDays:1});await h.cmd('notification.expiry',{id:expiry.id,version:2,consent:true});await h.cmd('proposal.approve',{id:expiry.id,version:3,revision:1});await h.cmd('proposal.send',{id:expiry.id,version:4})
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+2*86400000),cron:'*/15 * * * *'})
@@ -836,7 +843,7 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   await h.cmd('sms.configure',{id:expiry.id,version:smsRow.version,consent:true,phone:'+12025550127',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-7103'})
   await h.cmd('sms.send',{id:expiry.id,message:'Review the archived proposal',requestId:'synthetic-platter-7104'})
   const tables=['p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
-  assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,7)
+  assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,8);assert.ok(before.p_approval_requests.find(row=>row.proposal_id===p.id).reminded_at);assert.equal(before.p_approval_requests.find(row=>row.proposal_id===revoked.id).reminded_at,null)
   await h.close();h=undefined
   const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'))
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
@@ -847,6 +854,7 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   for(const table of ['p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+10*86400000),cron:'*/15 * * * *'})
   const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
+  const restoredRequest=(await h.cmd('notification.requests',{id:revoked.id},restoredOwner)).requests[0];assert.deepEqual(restoredRequest.trigger,retainedRequest.trigger);assert.equal(restoredRequest.revoked_at,retainedRequest.revoked_at);assert.equal(restoredRequest.current,false)
   const restoredCertificate=await h.send('/api/platter/certificate.json?id='+signed.id,undefined,restoredOwner);assert.equal(restoredCertificate.status,200,restoredCertificate.text);assert.deepEqual(restoredCertificate.value,certificate.value)
   assert.deepEqual(await download('/api/platter/agreement.pdf?id='+signed.id,restoredOwner),documentBytes)
   assert.deepEqual(await download('/api/platter/certificate.pdf?id='+signed.id,restoredOwner),certificateBytes)

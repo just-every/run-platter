@@ -1058,7 +1058,7 @@ test('SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP pr
   const id=await approved(h)
   await h.cmd('reminder.configure',{id,version:2,enabled:true,consent:true,timeZone:'America/Los_Angeles',afterDays:[2,5],beforeDays:[],cap:2})
   const sent=await h.cmd('proposal.send',{id,version:3}),row=(await h.state()).proposals.find(p=>p.id===id)
-  const input={...smsAssent,id,version:row.version,consent:true,phone:'+12025550123',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-8104'}
+  const input={...smsAssent,disclosure:'  '+smsAssent.disclosure+'\n',id,version:row.version,consent:true,phone:'+12025550123',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-8104'}
   await h.cmd('sms.send',{id,message:'Review your proposal',requestId:'synthetic-platter-8105'},h.owner,409)
   for(const change of [{consent:false},{timeZone:''},{timeZone:'Inferred'},{phone:'+442025550123'},{evidence:''},{recipient:''},{firm:''},{purposes:[]},{purposes:['completion']},{disclosure:''},{assentedAt:''},{assentedAt:'2031-01-01T00:00:00Z'},{method:''},{version:1}])await h.cmd('sms.configure',{...input,...change},h.owner,change.version?409:400)
   assert.equal(sms.length,0)
@@ -1222,6 +1222,12 @@ test('SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes
   await h.cmd('member.set',{operatorId:person.id,version:0,role:'viewer',teams:[]})
   await h.cmd('sms.send',{id:owned.id,message:'Role changed',requestId:'synthetic-platter-8911'},member,403)
   await tick('2030-06-02T15:00:00Z');assert.equal(attempts,1,'demotion cancels the queued SMS without a provider call')
+  await h.cmd('member.set',{operatorId:person.id,version:1,role:'sales',teams:[]})
+  await h.cmd('sms.configure',{...smsAssent,id:owned.id,version:memberRow.version,consent:true,phone:'+12025550130',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-8915'},member)
+  await tick('2030-06-03T05:00:00Z')
+  await h.cmd('sms.send',{id:owned.id,message:'Native role change while deferred',requestId:'synthetic-platter-8916'},member)
+  assert.equal((await h.send('/auth/operator/role',{operatorId:person.id,role:'admin'},h.owner)).status,200)
+
 
   const smsId=await approved(h);const smsFirst=await h.cmd('proposal.send',{id:smsId,version:2})
   const smsRow=(await h.state()).proposals.find(p=>p.id===smsId)
@@ -1237,6 +1243,7 @@ test('SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes
   assert.equal(await h.db.prepare('SELECT 1 FROM p_sms_authority WHERE proposal_id=?').bind(smsId).first(),null)
   assert.equal((await h.db.prepare('SELECT status FROM p_sms_runs WHERE proposal_id=?').bind(smsId).first()).status,'cancelled')
   await tick('2030-06-03T15:00:00Z');assert.equal(attempts,1)
+  const nativeChanged=(await h.send('/api/platter/sms?id='+owned.id,undefined,h.owner)).value;assert.equal(nativeChanged.messages.find(m=>m.message==='Native role change while deferred').status,'cancelled','a changed native credential version invalidates earlier sending authority even when Send remains permitted')
   const codeId=await approved(h),codeSent=await h.cmd('proposal.send',{id:codeId,version:2}),codeRow=(await h.state()).proposals.find(p=>p.id===codeId),codePath=new URL(codeSent.shareUrl).pathname
   const codeConsent={...smsAssent,id:codeId,version:codeRow.version,consent:true,phone:'+12025550133',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-8913'}
   await h.cmd('sms.configure',codeConsent);await h.cmd('signer.method',{id:codeId,version:codeRow.version,method:'SMS code'})
@@ -1267,6 +1274,17 @@ test('SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes
    assert.equal((await h.send(path+'/action?name=code.request',{})).status,409)
   }
   await tick('2030-06-03T16:00:00Z');assert.equal(attempts,3,'provider refusal suppresses every purpose installation-wide')
+  const revisedId=await approved(h),revisedSent=await h.cmd('proposal.send',{id:revisedId,version:2}),beforeRevision=(await h.state()).proposals.find(p=>p.id===revisedId)
+  await h.cmd('sms.configure',{...codeConsent,id:revisedId,version:beforeRevision.version,phone:'+12025550136'})
+  await h.cmd('signer.method',{id:revisedId,version:beforeRevision.version,method:'SMS code'})
+  const draft=await h.cmd('proposal.negotiate',{...offer,id:revisedId,version:beforeRevision.version,clientId:beforeRevision.client_id,scope:'A separately approved revised scope'})
+  await h.cmd('proposal.approve',{id:revisedId,version:draft.version,revision:draft.revision})
+  const revised=await h.cmd('proposal.send',{id:revisedId,version:draft.version+1}),revisedPath=new URL(revised.shareUrl).pathname
+  assert.equal((await h.send(new URL(revisedSent.shareUrl).pathname)).status,404)
+  await h.cmd('sms.send',{id:revisedId,message:'Old revision consent cannot send',requestId:'synthetic-platter-8914'},h.owner,409)
+  assert.equal((await h.send(revisedPath+'/action?name=code.request',{})).status,409,'a revision invalidates assent without silently falling back to mailbox verification')
+  assert.equal(attempts,3)
+
 
 
  }finally{await h.close()}

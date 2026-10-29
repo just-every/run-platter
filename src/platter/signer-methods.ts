@@ -17,6 +17,7 @@ export async function signerMethodCommand(env:Bindings,a:Actor,p:Record<string,u
  await commit(db,a,[db.prepare('INSERT INTO p_signer_methods VALUES(?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,method=excluded.method,configured_by=excluded.configured_by,configured_at=excluded.configured_at').bind(row.id,row.revision,p.method,a.id,at),db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),a.id,a.role,'signer.method',row.id,at)],false,{sql:"EXISTS(SELECT 1 FROM p_proposals p JOIN p_shares s ON s.proposal_id=p.id WHERE p.id=? AND p.version=? AND p.status='sent' AND s.token=? AND s.code_generation=0 AND s.session_hash IS NULL)"+(sms?' AND '+smsGuard(sms).sql:''),values:[row.id,row.version,share.token,...(sms?smsGuard(sms).values:[])]})
  return {id:row.id}
 }
+// A revision may invalidate authorization, but never silently weakens an SMS requirement.
 export async function signerMethod(db:D1Database,id:string,revision:number){
- return (await db.prepare('SELECT method FROM p_signer_methods WHERE proposal_id=? AND revision=?').bind(id,revision).first<any>())?.method??'mailbox code'
+ return (await db.prepare("SELECT method FROM p_signer_methods WHERE proposal_id=? AND (revision=? OR method='SMS code')").bind(id,revision).first<any>())?.method??'mailbox code'
 }

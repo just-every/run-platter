@@ -24,7 +24,7 @@ function phoneNumber(value:unknown){
  return phone
 }
 export async function smsContext(env:Bindings,id:string,purpose:Purpose,completed=false){
- const db=env.DB,c=await db.prepare('SELECT c.*,a.share_hash,a.member_version,a.assent_id,f.recipient,f.purposes FROM p_sms_consent c JOIN p_sms_authority a ON a.proposal_id=c.proposal_id AND a.revision=c.revision AND a.consented_at=c.consented_at JOIN p_sms_assents f ON f.id=a.assent_id AND f.proposal_id=c.proposal_id AND f.revision=c.revision AND f.phone=c.phone AND f.invitation_hash=a.share_hash AND f.recorded_by=a.actor_id WHERE c.proposal_id=?').bind(id).first<any>()
+ const db=env.DB,c=await db.prepare("SELECT c.*,a.share_hash,a.member_version,a.operator_version,a.assent_id,f.recipient,f.purposes FROM p_sms_consent c JOIN p_sms_authority a ON a.proposal_id=c.proposal_id AND a.revision=c.revision AND a.consented_at=c.consented_at JOIN p_sms_assents f ON f.id=a.assent_id AND f.proposal_id=c.proposal_id AND f.revision=c.revision AND f.phone=c.phone AND f.invitation_hash=a.share_hash AND f.recorded_by=a.actor_id JOIN oa_operators o ON o.id=a.actor_id AND o.status='active' AND o.version=a.operator_version WHERE c.proposal_id=?").bind(id).first<any>()
  need(c&&validZone(c.time_zone)&&JSON.parse(c.purposes).includes(purpose),'Record fresh SMS assent for this purpose before sending',409)
  const a=await actorById(db,c.actor_id);need(a&&senders.includes(a.role)&&(a.memberVersion??0)===c.member_version,'SMS sender authority changed',409)
  const row=await permitted(db,a,id,'send');need(!recipientPlan(row).length,'Configure mailbox verification for multiple recipients',409)
@@ -41,16 +41,17 @@ export function smsGuard(ctx:Awaited<ReturnType<typeof smsContext>>){
   JOIN p_clients client ON client.id=p.client_id
   JOIN p_sms_consent c ON c.proposal_id=p.id AND c.revision=p.revision
   JOIN p_sms_authority a ON a.proposal_id=p.id AND a.revision=p.revision AND a.consented_at=c.consented_at AND a.actor_id=c.actor_id
+  JOIN oa_operators o ON o.id=a.actor_id AND o.status='active' AND o.version=a.operator_version
   JOIN p_sms_assents f ON f.id=a.assent_id AND f.proposal_id=p.id AND f.revision=p.revision
    AND f.phone=c.phone AND f.time_zone=c.time_zone AND f.invitation_hash=a.share_hash AND f.recorded_by=a.actor_id
   WHERE p.id=? AND p.revision=? AND p.status ${completed?"IN ('sent','accepted')":"='sent'"}
    AND s.token=? AND c.phone=? AND c.time_zone=? AND c.consented_at=?
-   AND a.actor_id=? AND a.share_hash=? AND a.member_version=? AND a.assent_id=?
+   AND a.actor_id=? AND a.share_hash=? AND a.member_version=? AND a.assent_id=? AND a.operator_version=?
    AND f.recipient=COALESCE(s.recipient,client.email) AND EXISTS(SELECT 1 FROM json_each(f.purposes) WHERE value=?)
    AND NOT EXISTS(SELECT 1 FROM p_sms_optouts o WHERE o.phone=c.phone)
    ${completed?'':'AND NOT EXISTS(SELECT 1 FROM p_acceptances x WHERE x.proposal_id=p.id)'}
    AND NOT EXISTS(SELECT 1 FROM p_withdrawals w WHERE w.proposal_id=p.id AND w.revision=p.revision)
-   AND ${expiryOpenSql('p')})`,values:[row.id,row.revision,share.token,c.phone,c.time_zone,c.consented_at,a.id,c.share_hash,c.member_version,c.assent_id,purpose,at]}
+   AND ${expiryOpenSql('p')})`,values:[row.id,row.revision,share.token,c.phone,c.time_zone,c.consented_at,a.id,c.share_hash,c.member_version,c.assent_id,c.operator_version,purpose,at]}
 }
 
 const live=(env:Bindings,id:string,kind='invitation')=>smsContext(env,id,purposeFor(kind))
@@ -74,7 +75,8 @@ export async function smsCommand(env:Bindings,a:Actor,name:string,p:Record<strin
   need(p.consent===true||p.consent==='yes','Record explicit recipient SMS assent')
   const phone=phoneNumber(p.phone),zone=text(p.timeZone,'the recipient IANA time zone',100),evidence=text(p.evidence,'the recipient evidence supporting this assent',1000)
   need(validZone(zone),'Supply the recipient IANA time zone')
-  const firm=text(p.firm,'the sending firm',200),disclosure=text(p.disclosure,'the exact disclosure shown to the recipient',4000),method=text(p.method,'the assent collection method',200)
+  const firm=text(p.firm,'the sending firm',200),method=text(p.method,'the assent collection method',200)
+  text(p.disclosure,'the exact disclosure shown to the recipient',4000);const disclosure=p.disclosure as string
   need(typeof p.assentedAt==='number'||typeof p.assentedAt==='string'&&/(Z|[+-]\d{2}:\d{2})$/.test(p.assentedAt),'Supply the actual assent time with its UTC offset')
   const assentedAt=typeof p.assentedAt==='number'?p.assentedAt:Date.parse(String(p.assentedAt??''))
   need(Number.isSafeInteger(assentedAt)&&assentedAt>0&&assentedAt<=at,'Supply the actual assent time with its UTC offset')
@@ -84,8 +86,8 @@ export async function smsCommand(env:Bindings,a:Actor,name:string,p:Record<strin
   const share=await db.prepare('SELECT * FROM p_shares WHERE proposal_id=? AND revision=?').bind(row.id,row.revision).first<any>();need(share,'Send a current invitation first',409)
   const client=await db.prepare('SELECT email FROM p_clients WHERE id=?').bind(row.client_id).first<any>(),recipient=text(p.recipient,'the assenting recipient',254)
   need(recipient===(share.recipient||client?.email),'Record assent from this invitation recipient')
-  const assentId=crypto.randomUUID(),invitationHash=await hash(share.token)
-  await commit(db,a,[db.prepare('INSERT INTO p_sms_assents VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(assentId,row.id,row.revision,invitationHash,recipient,phone,firm,JSON.stringify(selected),disclosure,assentedAt,method,evidence,zone,a.id,at),db.prepare('INSERT INTO p_sms_consent VALUES(?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,phone=excluded.phone,time_zone=excluded.time_zone,evidence=excluded.evidence,actor_id=excluded.actor_id,consented_at=excluded.consented_at').bind(row.id,row.revision,phone,zone,evidence,a.id,at),db.prepare('INSERT INTO p_sms_authority(proposal_id,revision,share_hash,actor_id,member_version,consented_at,assent_id) VALUES(?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,share_hash=excluded.share_hash,actor_id=excluded.actor_id,member_version=excluded.member_version,consented_at=excluded.consented_at,assent_id=excluded.assent_id').bind(row.id,row.revision,invitationHash,a.id,a.memberVersion??0,at,assentId),db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE proposal_id=? AND status='queued'").bind(row.id),clearVerification(db,row.id),audit(db,a,'sms.consent',row.id,at)],false,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status='sent') AND EXISTS(SELECT 1 FROM p_shares WHERE proposal_id=? AND token=?) AND NOT EXISTS(SELECT 1 FROM p_sms_optouts WHERE phone=?) AND NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=? AND revision=?)",values:[row.id,row.version,row.revision,row.id,share.token,phone,row.id,row.revision]})
+  const assentId=crypto.randomUUID(),invitationHash=await hash(share.token),operator=await db.prepare('SELECT version FROM oa_operators WHERE id=?').bind(a.id).first<any>()
+  await commit(db,a,[db.prepare('INSERT INTO p_sms_assents VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(assentId,row.id,row.revision,invitationHash,recipient,phone,firm,JSON.stringify(selected),disclosure,assentedAt,method,evidence,zone,a.id,at),db.prepare('INSERT INTO p_sms_consent VALUES(?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,phone=excluded.phone,time_zone=excluded.time_zone,evidence=excluded.evidence,actor_id=excluded.actor_id,consented_at=excluded.consented_at').bind(row.id,row.revision,phone,zone,evidence,a.id,at),db.prepare('INSERT INTO p_sms_authority(proposal_id,revision,share_hash,actor_id,member_version,consented_at,assent_id,operator_version) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,share_hash=excluded.share_hash,actor_id=excluded.actor_id,member_version=excluded.member_version,consented_at=excluded.consented_at,assent_id=excluded.assent_id,operator_version=excluded.operator_version').bind(row.id,row.revision,invitationHash,a.id,a.memberVersion??0,at,assentId,operator.version),db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE proposal_id=? AND status='queued'").bind(row.id),clearVerification(db,row.id),audit(db,a,'sms.consent',row.id,at)],false,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status='sent') AND EXISTS(SELECT 1 FROM p_shares WHERE proposal_id=? AND token=?) AND NOT EXISTS(SELECT 1 FROM p_sms_optouts WHERE phone=?) AND NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=? AND revision=?) AND EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND version=?)",values:[row.id,row.version,row.revision,row.id,share.token,phone,row.id,row.revision,a.id,operator.version]})
   return {id:row.id,assentId}
  }
  need(name==='sms.send','Unknown SMS command',404)
@@ -132,7 +134,8 @@ export async function flushSms(env:Bindings){
   const reminderGuard=r.kind==='invitation'?{sql:'',values:[] as any[]}:{sql:' AND NOT EXISTS(SELECT 1 FROM p_reminder_optouts WHERE proposal_id=? AND revision=?)'+(r.kind==='scheduled'?' AND EXISTS(SELECT 1 FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version WHERE s.proposal_id=? AND s.revision=? AND s.version=? AND s.enabled=1)':''),values:[r.proposal_id,r.revision,...(r.kind==='scheduled'?[r.proposal_id,r.revision,r.settings_version]:[])]}
   try{await commit(db,ctx.a,[db.prepare("UPDATE p_sms_runs SET status='sending' WHERE id=? AND status='queued'").bind(r.id)],false,{sql:smsGuard(ctx).sql+" AND EXISTS(SELECT 1 FROM p_sms_runs WHERE id=? AND status='queued')"+reminderGuard.sql,values:[...smsGuard(ctx).values,r.id,...reminderGuard.values]})}catch(error){if((error as any).status===409)continue;throw error}
   try{
-   await live(env,r.proposal_id,r.kind)
+   const ready=await live(env,r.proposal_id,r.kind)
+   need(ready.c.assent_id===r.assent_id&&ready.c.phone===r.phone&&ready.a.id===r.actor_id&&ready.share.token===ctx.share.token,'SMS authorization changed before transport',409)
    const payload=new URLSearchParams({To:r.phone,From:env.TWILIO_FROM,Body:r.message+'\n'+env.AUTH_ORIGIN+'/p/'+ctx.share.token+'\nReply STOP to stop. HELP for help.',StatusCallback:env.AUTH_ORIGIN+'/api/platter/sms/status'})
    const response=await demoEffect(()=>fetch('https://api.twilio.com/2010-04-01/Accounts/'+encodeURIComponent(env.TWILIO_ACCOUNT_SID!)+'/Messages.json',{method:'POST',headers:{authorization:'Basic '+btoa(env.TWILIO_ACCOUNT_SID+':'+env.TWILIO_AUTH_TOKEN),'content-type':'application/x-www-form-urlencoded'},body:payload,redirect:'manual',signal:AbortSignal.timeout(15000)}),()=>Response.json({sid:'synthetic-platter-'+r.id}))
    const receipt=await response.json() as any
@@ -204,7 +207,8 @@ export async function deliverSmsCode(env:Bindings,id:string,code:string,runId:st
  try{
   const ctx=await smsCodeContext(env,id),guard=smsGuard(ctx)
   await commit(db,ctx.a,[db.prepare("UPDATE p_sms_code_runs SET status='sending' WHERE id=? AND status='queued'").bind(runId)],false,{sql:guard.sql+" AND EXISTS(SELECT 1 FROM p_sms_code_runs r JOIN p_shares s ON s.proposal_id=r.proposal_id WHERE r.id=? AND r.status='queued' AND r.assent_id=? AND r.generation=s.code_generation AND s.code_hash IS NOT NULL)",values:[...guard.values,runId,ctx.c.assent_id]})
-  await smsCodeContext(env,id)
+  const ready=await smsCodeContext(env,id)
+  need(ready.c.assent_id===ctx.c.assent_id&&ready.c.phone===ctx.c.phone&&ready.share.token===ctx.share.token,'SMS authorization changed before transport',409)
   const body=new URLSearchParams({To:ctx.c.phone,From:env.TWILIO_FROM!,Body:'Your Platter verification code is '+code+'. It expires in 10 minutes. Reply STOP to stop. HELP for help.',StatusCallback:env.AUTH_ORIGIN+'/api/platter/sms/status'})
   const response=await demoEffect(()=>fetch('https://api.twilio.com/2010-04-01/Accounts/'+encodeURIComponent(env.TWILIO_ACCOUNT_SID!)+'/Messages.json',{method:'POST',headers:{authorization:'Basic '+btoa(env.TWILIO_ACCOUNT_SID+':'+env.TWILIO_AUTH_TOKEN),'content-type':'application/x-www-form-urlencoded'},body,redirect:'manual',signal:AbortSignal.timeout(15000)}),()=>Response.json({sid:'synthetic-platter-demo'}))
   const receipt=await response.json() as any

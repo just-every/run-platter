@@ -1,5 +1,6 @@
 -- Legacy consent has no complete assent and cannot authorize any text.
 ALTER TABLE p_sms_authority ADD COLUMN assent_id TEXT;
+ALTER TABLE p_sms_authority ADD COLUMN operator_version INTEGER;
 ALTER TABLE p_sms_runs ADD COLUMN assent_id TEXT;
 ALTER TABLE p_sms_optouts ADD COLUMN source TEXT NOT NULL DEFAULT 'recipient';
 CREATE TABLE p_sms_assents (

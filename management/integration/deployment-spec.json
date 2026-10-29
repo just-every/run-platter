@@ -516,6 +516,60 @@
       "name": "0085_catalog_defaults.sql",
       "sha256": "3c245c6071355a82003f63a4f97be5b721900de8e52f2ed35567604495cbd497",
       "sql": "ALTER TABLE p_priced_catalog ADD COLUMN default_recurrence TEXT NOT NULL DEFAULT 'one-off' CHECK(default_recurrence IN ('one-off','weekly','monthly','quarterly','annual'));\nALTER TABLE p_priced_catalog ADD COLUMN taxable INTEGER NOT NULL DEFAULT 0 CHECK(taxable IN (0,1));\nALTER TABLE p_priced_catalog ADD COLUMN tax_code TEXT NOT NULL DEFAULT '';\nALTER TABLE p_priced_catalog ADD COLUMN income_account TEXT NOT NULL DEFAULT '';\nALTER TABLE p_priced_catalog ADD COLUMN source_id TEXT;\nALTER TABLE p_priced_catalog ADD COLUMN source_version INTEGER;\nCREATE UNIQUE INDEX p_priced_catalog_source ON p_priced_catalog(source_id) WHERE source_id IS NOT NULL;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0086_drive_archiving.sql",
+      "sha256": "ef776bb7c8d626f88778b6122f6c97c7d7c2f7cd344f83a3c213844464630a40",
+      "sql": "CREATE TABLE p_archive_settings (\n singleton INTEGER PRIMARY KEY CHECK(singleton=1), version INTEGER NOT NULL,\n account_id TEXT NOT NULL, connection_version INTEGER NOT NULL,\n root_folder TEXT NOT NULL, pattern TEXT NOT NULL, authorized_by TEXT NOT NULL,\n authorized_at INTEGER NOT NULL\n);\nCREATE TABLE p_archive_authority (\n singleton INTEGER PRIMARY KEY REFERENCES p_archive_settings(singleton),\n version INTEGER NOT NULL, operator_version INTEGER NOT NULL, member_version INTEGER NOT NULL\n);\nCREATE TABLE p_archive_jobs (\n proposal_id TEXT PRIMARY KEY REFERENCES p_acceptances(proposal_id), revision INTEGER NOT NULL,\n settings_version INTEGER NOT NULL, account_id TEXT NOT NULL, root_folder TEXT NOT NULL,\n pattern TEXT NOT NULL, client_id TEXT NOT NULL REFERENCES p_clients(id), client_name TEXT NOT NULL,\n title TEXT NOT NULL, accepted_at INTEGER NOT NULL,\n status TEXT NOT NULL CHECK(status IN ('queued','running','held','complete','reconciling')),\n reason TEXT, started_at INTEGER, completed_at INTEGER\n);\nCREATE TABLE p_archive_job_authority (\n proposal_id TEXT PRIMARY KEY REFERENCES p_archive_jobs(proposal_id)\n);\nCREATE TABLE p_archive_folders (\n account_id TEXT NOT NULL, root_folder TEXT NOT NULL, client_id TEXT NOT NULL REFERENCES p_clients(id),\n provider_id TEXT NOT NULL, name TEXT NOT NULL,\n status TEXT NOT NULL CHECK(status IN ('reserved','writing','uncertain','complete')),\n PRIMARY KEY(account_id,root_folder,client_id)\n);\nCREATE TABLE p_archive_files (\n proposal_id TEXT NOT NULL REFERENCES p_archive_jobs(proposal_id),\n kind TEXT NOT NULL CHECK(kind IN ('agreement','certificate')),\n provider_id TEXT NOT NULL, folder_id TEXT NOT NULL, name TEXT NOT NULL, sha256 TEXT NOT NULL,\n status TEXT NOT NULL CHECK(status IN ('reserved','writing','uncertain','complete')),\n PRIMARY KEY(proposal_id,kind)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0087_archive_dispatch_lock.sql",
+      "sha256": "b1e6db4178f2ca9bf8013b5c9c9642286c82844501bb8af7a4b8cfcc487bbb45",
+      "sql": "CREATE TABLE p_archive_dispatch_lock (\n singleton INTEGER PRIMARY KEY CHECK(singleton=1), token TEXT NOT NULL, expires_at INTEGER NOT NULL\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0088_document_movein.sql",
+      "sha256": "1ada2f9fead70090f5b1a548f0924571d40180fef13db033f5e2845be9ae9f03",
+      "sql": "CREATE TABLE p_document_moveins (\n id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, label TEXT NOT NULL,\n job_id TEXT, fingerprint TEXT, choices_json TEXT NOT NULL DEFAULT '{}', report_json TEXT\n);\nCREATE TABLE p_document_uploads (\n movein_id TEXT NOT NULL REFERENCES p_document_moveins(id),\n sha256 TEXT NOT NULL, filename TEXT NOT NULL, size INTEGER NOT NULL,\n received INTEGER NOT NULL DEFAULT 0, complete INTEGER NOT NULL DEFAULT 0,\n PRIMARY KEY(movein_id,sha256)\n);\nCREATE TABLE p_document_upload_chunks (\n movein_id TEXT NOT NULL, sha256 TEXT NOT NULL, position INTEGER NOT NULL,\n base64 TEXT NOT NULL, size INTEGER NOT NULL,\n PRIMARY KEY(movein_id,sha256,position),\n FOREIGN KEY(movein_id,sha256) REFERENCES p_document_uploads(movein_id,sha256)\n);\nCREATE TABLE p_imported_documents (\n id TEXT PRIMARY KEY, data_json TEXT NOT NULL,\n revision TEXT NOT NULL\n);\n-- A later reissue keeps its original alive until that dependency is removed.\nCREATE TABLE p_imported_document_links (\n document_id TEXT NOT NULL REFERENCES p_imported_documents(id),\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n PRIMARY KEY(document_id,proposal_id)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0089_tracking_history.sql",
+      "sha256": "c3520dd099b7650ac0eae79e45cc1a343f210b719f85b358598400aa0501c2d1",
+      "sql": "-- Preserve historical snapshots while allowing a later return to the same choice.\nALTER TABLE p_tracking_choices RENAME TO p_tracking_choice_snapshots;\nCREATE TABLE p_tracking_choices(\n view_id TEXT NOT NULL REFERENCES p_views(id) ON DELETE CASCADE,\n sequence INTEGER NOT NULL,\n option_id TEXT NOT NULL,\n items TEXT NOT NULL,\n observed_at INTEGER NOT NULL,\n PRIMARY KEY(view_id,sequence)\n);\nINSERT INTO p_tracking_choices(view_id,sequence,option_id,items,observed_at)\n SELECT view_id,ROW_NUMBER() OVER(PARTITION BY view_id ORDER BY observed_at,rowid),option_id,items,observed_at\n FROM p_tracking_choice_snapshots;\nDROP TABLE p_tracking_choice_snapshots;\nCREATE TABLE p_tracking_attachment_opens(\n id TEXT PRIMARY KEY,\n view_id TEXT NOT NULL REFERENCES p_views(id) ON DELETE CASCADE,\n file_id TEXT NOT NULL,\n filename TEXT NOT NULL,\n opened_at INTEGER NOT NULL\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0090_client_locale.sql",
+      "sha256": "7153ad1bf73010e227a4da19168994294a241805f8d104fc7255a5e6dc93feca",
+      "sql": "-- Existing agreements retain unknown language; only new browser decisions record it.\nCREATE TABLE p_client_locales (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id) ON DELETE CASCADE,\n locale TEXT NOT NULL CHECK(locale IN ('en','es'))\n);\nALTER TABLE p_signature_facts ADD COLUMN language TEXT CHECK(language IN ('en','es'));\nALTER TABLE p_withdrawn_links ADD COLUMN client_locale TEXT NOT NULL DEFAULT 'en' CHECK(client_locale IN ('en','es'));\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0091_completion_mail.sql",
+      "sha256": "64e865f9388060737b05b9bcc81198e0b722288282e927556a751f6302c84cd1",
+      "sql": "-- Retained artifact references are history; outbox rows and execution grants stay local.\nCREATE TABLE p_completion_mail (\n mail_id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_acceptances(proposal_id),\n revision INTEGER NOT NULL, party TEXT NOT NULL CHECK(party IN ('client','firm')),\n UNIQUE(proposal_id,revision,party)\n);\nCREATE TABLE p_completion_authority (\n proposal_id TEXT PRIMARY KEY REFERENCES p_acceptances(proposal_id), revision INTEGER NOT NULL,\n owner_id TEXT NOT NULL, owner_version INTEGER NOT NULL, firm_email TEXT NOT NULL,\n client_id TEXT NOT NULL, client_email TEXT NOT NULL, recipient TEXT NOT NULL\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0092_completion_recipients.sql",
+      "sha256": "474ab0a4ad70f8842b68d4102c09532c9f1504f9e5f55e2607881165fac2e711",
+      "sql": "-- Preserve historical references while retaining each configured party's destination.\nALTER TABLE p_completion_mail RENAME TO p_completion_mail_legacy;\nCREATE TABLE p_completion_mail (\n mail_id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_acceptances(proposal_id),\n revision INTEGER NOT NULL, party TEXT NOT NULL, recipient TEXT,\n UNIQUE(proposal_id,revision,party)\n);\nINSERT INTO p_completion_mail(mail_id,proposal_id,revision,party)\n SELECT mail_id,proposal_id,revision,party FROM p_completion_mail_legacy;\nDROP TABLE p_completion_mail_legacy;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0093_signing_context.sql",
+      "sha256": "e97f7cddd16317fc7e47a6f96a5912f03668d1112d91d05a56611f2034d89b70",
+      "sql": "-- Null preserves the absence of historical signing-request evidence.\nALTER TABLE p_signature_facts ADD COLUMN context TEXT;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0094_sms_assent.sql",
+      "sha256": "9a7fed6098e78f6d8c773ca615beb6a63289f62dbb715540bea19068ab98269b",
+      "sql": "-- Legacy consent has no complete assent and cannot authorize any text.\nALTER TABLE p_sms_authority ADD COLUMN assent_id TEXT;\nALTER TABLE p_sms_authority ADD COLUMN operator_version INTEGER;\nALTER TABLE p_sms_runs ADD COLUMN assent_id TEXT;\nALTER TABLE p_sms_optouts ADD COLUMN source TEXT NOT NULL DEFAULT 'recipient';\nCREATE TABLE p_sms_assents (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n invitation_hash TEXT NOT NULL, recipient TEXT NOT NULL, phone TEXT NOT NULL, firm TEXT NOT NULL,\n purposes TEXT NOT NULL, disclosure TEXT NOT NULL, assented_at INTEGER NOT NULL,\n method TEXT NOT NULL, evidence TEXT NOT NULL, time_zone TEXT NOT NULL,\n recorded_by TEXT NOT NULL, recorded_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_revocations (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), assent_id TEXT,\n actor_id TEXT NOT NULL, revoked_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_code_runs (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n invitation_hash TEXT NOT NULL, assent_id TEXT NOT NULL REFERENCES p_sms_assents(id),\n generation INTEGER NOT NULL, queued_at INTEGER NOT NULL,\n status TEXT NOT NULL CHECK(status IN ('queued','sending','accepted','held','failed','cancelled')),\n provider_id TEXT, UNIQUE(proposal_id,invitation_hash,generation)\n);\nCREATE TRIGGER p_frozen_sms_assent BEFORE UPDATE ON p_sms_assents BEGIN SELECT RAISE(ABORT,'SMS assent is immutable'); END;\nCREATE TRIGGER p_frozen_sms_revocation BEFORE UPDATE ON p_sms_revocations BEGIN SELECT RAISE(ABORT,'SMS revocation is immutable'); END;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

@@ -387,7 +387,7 @@ test('REPORT-005 / REPORT-006 desktop and phone export the filtered pipeline CSV
   for(const width of [1440,390]){
    app=await installedApp({scheduled:true});const context=await browser.newContext({viewport:{width,height:900}})
    try{
-    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`REPORT-005-006-${name}-${width}.png`),fullPage:true})}
+    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.locator('section.panel:has(h2:text-is("Report export and email"))').screenshot({path:join(screenshots,`REPORT-005-006-${name}-${width}.png`)})}
     assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
@@ -404,7 +404,7 @@ test('REPORT-005 / REPORT-006 desktop and phone export the filtered pipeline CSV
     assert.equal(await page.getByRole('alert').count(),0)
     const schedules=page.getByRole('list',{name:'Report schedules'});assert.match(await schedules.innerText(),/Weekly on Monday at 08:00 America\/New_York[\s\S]*status=sent&sort=value&direction=desc[\s\S]*owner@northstar\.example/);assert.match(await schedules.innerText(),/No runs yet/);await capture('scheduled')
     const saved=(await(await context.request.get(app.origin+'/api/platter/state')).json()).reportSchedules[0]
-    await app.fireCron(saved.nextRunAt+15*86400000);await page.reload()
+    await app.fireCron(saved.nextRunAt+15*86400000);await page.goto(app.origin+'/app?'+saved.filters)
     if(width===1440){
      const runs=page.getByRole('list',{name:'Recent report runs'})
      assert.match(await runs.innerText(),/2 proposals/);assert.match(await runs.innerText(),/Captured locally; no email was sent/)
@@ -412,7 +412,7 @@ test('REPORT-005 / REPORT-006 desktop and phone export the filtered pipeline CSV
     }
     await capture('recovered')
     await app.db.prepare('DELETE FROM p_report_authority WHERE schedule_id=?').bind(saved.id).run()
-    await app.fireCron(saved.nextRunAt+29*86400000);await page.reload()
+    await app.fireCron(saved.nextRunAt+29*86400000);await page.goto(app.origin+'/app?'+saved.filters)
     if(width===1440){assert.match(await schedules.innerText(),/Inactive; create a new schedule/);assert.equal(await page.getByRole('list',{name:'Recent report runs'}).locator('li').count(),1,'inactive history creates no additional run')}
     await capture('inactive')
     await schedules.getByRole('button',{name:'Stop this schedule'}).click();assert.match(await page.locator('section.panel:has(h2:text-is("Report export and email"))').innerText(),/No report email is scheduled/);await capture('stopped')

@@ -1718,7 +1718,7 @@ test('REPORT-006 current filtered recovery reaches two receivers once, holds unc
   const schedule=await h.cmd('report.schedule',input)
   let saved=(await h.state()).reportSchedules.find(s=>s.id===schedule.id)
   const worker=await h.mf.getWorker(),fire=at=>worker.scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
-  const recoveredAt=saved.nextRunAt+22*86400000
+  const recoveredAt=Date.parse('2040-02-01T12:00:00Z')
   // New data arriving while the scheduler is down belongs to the current report.
   const extra=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Synthetic report latest',priceTwo:'6500',scope:'Synthetic report scope'})
   fixture.push({id:extra.id,title:'Synthetic report latest',cents:650000,createdAt:(await h.state()).proposals.find(p=>p.id===extra.id).created_at})

@@ -14,6 +14,9 @@ import { join, resolve } from 'node:path'
 import { getPlatformProxy } from 'wrangler'
 import { harness } from './harness.mjs'
 const exec = promisify(execFile)
+// The complete migration history emits more than two megabytes of progress.
+// Keep diagnostics bounded while preserving command exits and all custody assertions.
+const childOutputLimit = 8 * 1024 * 1024
 const cli = resolve('node_modules/@runeditrun/rer/global/rer.mjs')
 const command = async (cwd, args, expected = 0) => {
   let result
@@ -22,7 +25,7 @@ const command = async (cwd, args, expected = 0) => {
   const env = { ...process.env, CI: 'true', WRANGLER_SEND_METRICS: 'false' }
   delete env.RER_LOCAL_OPERATION
   delete env.RER_LOCAL_STATE_PATH
-  try { result = { ...await exec(process.execPath, [cli, ...args], { cwd, env, maxBuffer: 2e6 }), code: 0 } }
+  try { result = { ...await exec(process.execPath, [cli, ...args], { cwd, env, maxBuffer: childOutputLimit }), code: 0 } }
   catch (error) { result = error }
   console.log('Archive CLI '+args[0]+' completed in '+Math.round(performance.now()-started)+' ms')
   assert.equal(result.code, expected, `${args[0]}: ${result.stdout ?? ''} ${result.stderr ?? ''}`)
@@ -40,7 +43,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
   let h
   try {
     for (const path of [source,restored,erased]) await checkout(path)
-    await exec(process.execPath, [resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'], { cwd:source, env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'}, maxBuffer:2e6 })
+    await exec(process.execPath, [resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'], { cwd:source, env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'}, maxBuffer:childOutputLimit })
     h=await harness({root:source,assetsDirectory:'public',outboundService:()=>new Response(null,{status:204})})
     const p=await h.cmd('client.save',{name:'Temporary joiner',email:'temporary@studio.example'})
     const key=await h.cmd('agent.create',{label:'Excluded secret'})
@@ -370,7 +373,7 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
  const temporary=await mkdtemp(join(tmpdir(),'platter-erasure-')),source=join(temporary,'source'),erased=join(temporary,'erased');let h
  try{
   for(const path of [source,erased])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:childOutputLimit})
   h=await harness({root:source})
   const p=await h.cmd('client.save',{name:'Temporary joiner',email:'synthetic-platter-8200@example.com'}),client=await h.cmd('client.save',{name:'Retained client',email:'synthetic-platter-8201@example.com'})
   const sourceKey=await h.cmd('agent.create',{label:'Synthetic erased citation key'})
@@ -490,7 +493,7 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:childOutputLimit})
   const events=resendEvents();let submitted=0
   h=await harness({root:source,origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'network-edge-key',MAIL_WEBHOOK_KEY:events.key},outboundService:()=>Response.json({id:'archive-provider-'+(++submitted)})})
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
@@ -524,7 +527,7 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:childOutputLimit})
   const options={alias:{'cloudflare:sockets':'./tests/catalog-socket-edge.ts'},outboundService:r=>fileHost(r)}
   h=await harness({root:source,...options})
   const contacts=await applyBusiness(h,{kind:'contacts',format:'platter',csv:await businessCsv('platter-contacts.csv')})
@@ -574,7 +577,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:childOutputLimit})
   h=await harness({root:source,assetsDirectory:'public'})
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Email rehearsal',scope:'A photography session',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
@@ -694,7 +697,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:childOutputLimit})
   h=await harness({root:source,origin:'https://platter.example',assetsDirectory:'public',auth:{...inbound.settings,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5600',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5601',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5602'},outboundService:async request=>{const url=new URL(request.url);if(url.hostname==='oauth2.googleapis.com')return Response.json({access_token:'synthetic-platter-5603',refresh_token:'synthetic-platter-5604',scope:'openid email https://www.googleapis.com/auth/gmail.send'});if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-5605',email:'archive-mailbox@synthetic-platter.example',email_verified:true});if(url.hostname==='gmail.googleapis.com'){mailboxWires.push(Buffer.from((await request.json()).raw,'base64url').toString('utf8'));return Response.json({id:'synthetic-platter-'+(8000+mailboxWires.length)})}if(url.hostname==='api.resend.com'&&request.method==='GET')return Response.json(inbound.messages.get(url.pathname.split('/').at(-1)));if(url.hostname==='api.resend.com')return Response.json({id:'synthetic-platter-5607'});if(url.hostname==='files.stripe.com'){const upload=await request.formData();assert.equal(upload.get('purpose'),'dispute_evidence');return Response.json({id:'synthetic-platter-3700'})}if(url.hostname==='api.hubapi.com'){if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-4120'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9961',stages:[{id:'synthetic-platter-9962',metadata:{isClosed:'true',probability:'1'}},{id:'synthetic-platter-9963',metadata:{isClosed:'true',probability:'0'}}]}]});const id=url.pathname.split('/').at(-1);return Response.json({id,properties:request.method==='PATCH'?(await request.json()).properties:{pipeline:'synthetic-platter-9961'}})};if(url.hostname==='quickbooks.api.intuit.com')return Response.json({CompanyInfo:{CompanyName:'Synthetic company'}});assert.equal(url.hostname,'api.stripe.com');if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2800'});if(url.pathname.includes('/disputes/')){const id=url.pathname.split('/').at(-1);if(request.method==='POST')return Response.json({id,status:'under_review'});const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id,charge:'synthetic-platter-2801',amount:accepted.deposit_cents,currency:accepted.currency.toLowerCase(),status:'needs_response',evidence_details:{due_by:disputeDeadline}})}if(request.method==='GET'){const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id:'synthetic-platter-2801',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:0,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}})}const amount=Number(new URLSearchParams(await request.text()).get('amount'));return Response.json({id:'synthetic-platter-2802',charge:'synthetic-platter-2801',amount,status:'succeeded'})}})
   const people={}
   for(const role of ['sales','manager','other']){
@@ -834,7 +837,7 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
  try{
   for(const path of [source,restored])await checkout(path)
   // Prepare both independent empty schemas together; import still runs through the public CLI.
-  await Promise.all([source,restored].map(cwd=>exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})))
+  await Promise.all([source,restored].map(cwd=>exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:childOutputLimit})))
   h=await harness({root:source,assetsDirectory:'public',auth:{AUTH_LOCAL:'true',TWILIO_ACCOUNT_SID:'synthetic-platter-7110',TWILIO_AUTH_TOKEN:'synthetic-platter-7111',TWILIO_FROM:'+15005550006'},outboundService:sourceEdge})
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(fixed),cron:'*/15 * * * *'})
   const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
@@ -934,7 +937,7 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
  const temporary=await mkdtemp(join(tmpdir(),'platter-doc-archive-')),source=join(temporary,'source'),target=join(temporary,'target');let h
  try{
   await checkout(source);await checkout(target)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:childOutputLimit})
   const {hubspotSyncFixture}=await import('./hubspot-sync-fixture.mjs'),crm=hubspotSyncFixture()
   h=await harness({root:source,assetsDirectory:'public',outboundService:crm.request})
   await h.cmd('provider.connect',{provider:'hubspot',version:0,token:'synthetic-platter-4607',consent:true})
@@ -1016,7 +1019,7 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
  let h
  try{
   for(const root of [source,restored])await checkout(root)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:childOutputLimit})
   h=await harness({root:source,assetsDirectory:'public'})
   const {configureTaxes,taxRequest,taxPackages,taxTables}=await import('./taxes-fixture.mjs')
   const version=await configureTaxes(h.cmd),client=await h.cmd('client.save',{name:'Synthetic tax client',email:h.auth.OWNER_EMAIL})
@@ -1065,7 +1068,7 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
  const temporary=await mkdtemp(join(tmpdir(),'platter-drive-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=driveFixture();let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:childOutputLimit})
   h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectDrive(h)
   const completed=await completeDriveAgreement(h)
   await h.cmd('archive.dispatch',{})

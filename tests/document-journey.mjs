@@ -192,6 +192,8 @@ export async function documentJourney(){
     const downloaded=await clientContext.request.get(app.origin+path+'/client-files/'+file.id)
     if(width===1440){assert.equal(downloaded.status(),200);assert.deepEqual(new Uint8Array(await downloaded.body()),original);assert.equal(file.sha256,createHash('sha256').update(original).digest('hex'));const facts=await (await clientContext.request.get(app.origin+path+'/certificate.json')).json();assert.deepEqual(facts.clientFiles,[file])}
     await client.getByRole('link',{name:'Download synthetic-platter-9801.pdf',exact:true}).scrollIntoViewIfNeeded()
+    const [browserDownload]=await Promise.all([client.waitForEvent('download'),client.getByRole('link',{name:'Download synthetic-platter-9801.pdf',exact:true}).click()])
+    if(width===1440){assert.equal(browserDownload.suggestedFilename(),'synthetic-platter-9801.pdf');assert.deepEqual(new Uint8Array(await readFile(await browserDownload.path())),original)}
     if(screenshots)await client.screenshot({path:join(screenshots,`SIGN-007-complete-${width}.png`)})
     assert.deepEqual(errors,[])
    }finally{await clientContext?.close();await context.close();await app.close();app=undefined}

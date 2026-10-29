@@ -1,5 +1,9 @@
 # Changes
 
+## Company-agent preparation door
+
+Adopt the shared core door on rer 0.2.91 for native proposal preparation, search, template starts, status and send-review requests. Signed Business subjects and current native rights govern calls; complete policy, Pause, consent, replay and audit apply to both MCP and the HTTP preparation bridge. Preserve newer main contract judgments and all broader target gaps. Pin trusted delivery to ff70d729948753ffdcceeca94aad063af2dcd979.
+
 ## 2026-10-16
 
 - Built the picked porcelain-and-glaze Platter homepage, with Run Platter opening `/run` and repository Markdown guides served at `/docs`.

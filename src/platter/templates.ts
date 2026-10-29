@@ -103,12 +103,13 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  need(!templateLocks.includes('title')||title===content.title,'The template title is locked',403)
  const attachments = copyAttachments(content.attachments ?? [])
  const row = { ...content, options:withoutTaxAddresses(content.options), document:bindDocument(content.document,clientId), id, client_id: clientId, title, revision: 1, attachments }
- const preparer = a.role === 'agent' ? `agent:${a.keyId}` : a.email
+ const preparer = a.agent?`agent:${a.agent.id}`:a.role === 'agent' ? `agent:${a.keyId}` : a.email
  await commit(db, a, [
   db.prepare(`INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,
    prepared_by,created_at,currency,sales_owner_id,sales_owner_name,attachments)
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
    .bind(id, clientId, title, row.scope, row.terms ?? '', row.deposit_bps, JSON.stringify(row.options), preparer, at, 'USD', a.id, a.email, JSON.stringify(attachments)),
+  ...(a.agent?[db.prepare('INSERT INTO p_agent_preparations(proposal_id,revision,agent_id,agent_name,sponsor_id,sponsor_name,label,operation_id) VALUES(?,1,?,?,?,?,?,?)').bind(id,a.agent.id,a.agent.name,a.id,a.agent.sponsorName,a.agent.label,a.agent.operationId)]:[]),
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) VALUES(?,?,?)').bind(id,template.id,template.version),
   ...(!starter?[db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_template_locks WHERE template_id=?').bind(id,template.id),db.prepare('INSERT INTO p_proposal_block_locks(proposal_id,section) SELECT ?,section FROM p_template_block_locks WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_template_document_media WHERE template_id=?').bind(id,template.id)]:[]),

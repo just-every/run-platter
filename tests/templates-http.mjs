@@ -135,29 +135,31 @@ export async function templatesHttp(h) {
  assert.equal(downloaded.status, 200); assert.equal(await downloaded.text(), '%PDF Northstar vendor W9')
  const key = await h.cmd('agent.create', { label: 'Template drafter' })
  const rpc = async (name, args) => {
-  const r = await h.send('/api/platter/agent/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, '', { authorization: 'Bearer ' + key.token })
+  const r = await h.send('/api/platter/agent/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: {...args,idempotency_key:crypto.randomUUID()} } }, '', { authorization: 'Bearer ' + key.token, 'mcp-protocol-version':'2025-11-25' })
   assert.equal(r.status, 200); return r.value.result
  }
- const listed = await rpc('search_templates', { query: 'campaign' })
+ const listed = await rpc('platter.templates.search', { query: 'campaign' })
  assert.deepEqual(JSON.parse(listed.content[0].text).templates, [{ id: template.id, name: 'Campaign template', version: 2 }])
- const starterSearch = await rpc('search_templates', { query: 'IT managed' })
+ const starterSearch = await rpc('platter.templates.search', { query: 'IT managed' })
  assert.deepEqual(JSON.parse(starterSearch.content[0].text).templates, [{ id: 'starter:it-managed-services', name: 'IT managed services', version: 1 }])
- const starterPrepared = await rpc('prepare_from_template', { templateId: 'starter:it-managed-services', templateVersion: 1, clientId: other.id })
+ const starterPrepared = await rpc('platter.templates.start', { templateId: 'starter:it-managed-services', templateVersion: 1, clientId: other.id })
  assert.ok(!starterPrepared.isError, JSON.stringify(starterPrepared))
  const starterAgentId = JSON.parse(starterPrepared.content[0].text).id
  const starterAgent = (await h.state()).proposals.find(p => p.id === starterAgentId)
  assert.equal(starterAgent.prepared_by, 'agent:' + key.id); assert.match(starterAgent.scope, /Juniper Studio/)
  await h.cmd('proposal.send', { id: starterAgentId, version: 1 }, h.owner, 409)
- const prepared = await rpc('prepare_from_template', { templateId: template.id, templateVersion: 2, clientId: other.id })
+ const prepared = await rpc('platter.templates.start', { templateId: template.id, templateVersion: 2, clientId: other.id })
  assert.ok(!prepared.isError, JSON.stringify(prepared)); const agentDraft = JSON.parse(prepared.content[0].text)
  const agentProposal = (await h.state()).proposals.find(p => p.id === agentDraft.id)
  assert.equal(agentProposal.prepared_by, 'agent:' + key.id); assert.equal(agentProposal.scope, 'Expanded campaign with interviews.')
  await h.cmd('proposal.send', { id: agentDraft.id, version: 1 }, h.owner, 409)
- assert.equal((await rpc('prepare_from_template', { templateId: personal.id, templateVersion: 1, clientId: other.id })).isError, true)
+ assert.equal((await rpc('platter.templates.start', { templateId: personal.id, templateVersion: 1, clientId: other.id })).isError, true)
  const audit = (await h.send('/api/platter/audit', undefined, h.owner)).value.rows
- for (const action of ['template.save', 'template.start', 'mcp.search_templates', 'mcp.prepare_from_template']) assert.ok(audit.some(r => r.action === action && r.subject), action)
+ for (const action of ['template.save', 'template.start', 'mcp.templates.start']) assert.ok(audit.some(r => r.action === action && r.subject), action)
+ const doorAudit=(await h.send('/agents/api/audit',undefined,h.owner)).value.rows
+ assert.ok(doorAudit.some(r=>r.tool==='platter.templates.search'&&r.agent.id===key.id))
  await h.cmd('agent.revoke', { id: key.id })
- assert.equal((await h.send('/api/platter/agent/context', undefined, '', { authorization: 'Bearer ' + key.token })).status, 401)
+ assert.equal((await h.send('/api/platter/agent/context', undefined, '', { authorization: 'Bearer ' + key.token, 'mcp-protocol-version':'2025-11-25' })).status, 401)
  // Template payment choices and terms copy independently, without collection authority.
  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date("2030-03-01T18:00:00Z"),cron:"*/15 * * * *"})
  const paymentSource=await h.cmd('proposal.prepare',{clientId:client.id,title:'Scheduled template',scope:'Reviewed service',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:30,paymentTerms:{netDays:15,milestones:[{label:'Delivery',event:'Delivery approved',percent:100}]}})

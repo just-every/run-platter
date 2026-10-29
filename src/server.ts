@@ -1,3 +1,4 @@
+import { sharedAgentResponse } from './platter/agent/index'
 import { runCompletionMail } from './platter/mail'
 import { runArchives } from './platter/archiving/jobs'
 import { runWebhooks } from './platter/api/webhooks'
@@ -37,6 +38,8 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
   async fetch(request, env, execution) {
     const asset = await staticAssetResponse(request, env)
     if (asset) return asset
+    const door = await sharedAgentResponse(request,runtimeBindings(env))
+    if (door) return door
     const auth = await authResponse(request, env)
     if (auth) return auth
     const platter = await platterResponse(request, env)

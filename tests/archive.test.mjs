@@ -42,8 +42,12 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
-    for (const path of [source,restored,erased]) await checkout(path)
-    await exec(process.execPath, [resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'], { cwd:source, env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'}, maxBuffer:childOutputLimit })
+    // Provision each empty installation together; every export, restore and refusal
+    // still runs through the public CLI with the unchanged journey timeout.
+    const installations=[source,restored,erased]
+    await Promise.all(installations.map(checkout))
+    const schemas=await Promise.allSettled(installations.map(cwd=>exec(process.execPath, [resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'], { cwd, env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'}, maxBuffer:childOutputLimit })))
+    for(const schema of schemas)assert.equal(schema.status,'fulfilled',schema.reason?.message)
     h=await harness({root:source,assetsDirectory:'public',outboundService:()=>new Response(null,{status:204})})
     const p=await h.cmd('client.save',{name:'Temporary joiner',email:'temporary@studio.example'})
     const key=await h.cmd('agent.create',{label:'Excluded secret'})

@@ -1057,6 +1057,44 @@ test('AUTO-003 signed events reach Slack channels and approval requests reach ve
   await h.tick(Date.now()+2*86400000)
   assert.equal(h.providerReads.length,afterDemotion,'a demoted authorizer cannot execute a retained route')
   assert.equal(h.chats.length,beforeRevoke)
+
+  const old=await h.prepare('synthetic-platter-private-before-consent')
+  const lifecycleEvents=['proposal.created','proposal.revised','proposal.approved','proposal.sent','proposal.withdrawn','proposal.declined','proposal.lost','proposal.won','proposal.expired']
+  await refuse('notification.route',{...route,lifecycleEvents},colleague,403)
+  await refuse('notification.route',{...route,lifecycleEvents:['proposal.view']},h.owner,400)
+  await refuse('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-7006',operatorId:actor.id,consent:true,lifecycleEvents},h.owner,400)
+  const lifecycleRoute=await h.cmd('notification.route',{...route,lifecycleEvents})
+  const directRoute=await h.cmd('notification.route',{provider:'teams',event:'followup',kind:'direct',destination:'synthetic-platter-7006',operatorId:actor.id,consent:true,lifecycleEvents:['proposal.sent']})
+  assert.deepEqual(JSON.parse((await h.state()).notificationSettings.routes.find(r=>r.id===lifecycleRoute.id).lifecycle_events),lifecycleEvents)
+  const first=h.chats.length,created=await h.prepare('synthetic-platter-private-lifecycle')
+  await h.cmd('proposal.revise',{...offer,id:created.id,clientId:h.client.id,version:1,scope:'synthetic-platter-private-revised'})
+  await h.cmd('proposal.approve',{id:created.id,version:2,revision:2});await h.cmd('proposal.send',{id:created.id,version:3})
+  await h.cmd('proposal.withdraw',{id:created.id,version:4,reason:'synthetic-platter-private-withdrawal',notice:false})
+  const send=async title=>{const p=await h.prepare(title);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});return {id:p.id,path:new URL((await h.cmd('proposal.send',{id:p.id,version:2})).shareUrl).pathname}}
+  const lost=await send('synthetic-platter-private-lost');await h.cmd('proposal.lose',{id:lost.id,version:3,reason:'synthetic-platter-private-reason',notice:false})
+  const won=await send('synthetic-platter-private-won');await h.cmd('proposal.win',{id:won.id,version:3,reason:'synthetic-platter-private-reason'})
+  const declined=await send('synthetic-platter-private-declined')
+  await h.send(declined.path+'/action?name=code.request',{})
+  const declineCode=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(declined.id).first()).body.match(/\b\d{6}\b/)[0]
+  const declineCookie=(await h.send(declined.path+'/action?name=code.verify',{code:declineCode})).cookie
+  assert.equal((await h.send(declined.path+'/action?name=decline',{revision:1,reason:'synthetic-platter-private-client-reason'},declineCookie)).status,410)
+  const expiring=await send('synthetic-platter-private-expired');await h.cmd('expiry.set',{id:expiring.id,version:3,mode:'days',days:1})
+  const deadline=(await h.state()).proposals.find(p=>p.id===expiring.id).expiry.deadlineAt
+  await h.tick(deadline+1);await Promise.all([h.tick(deadline+2),h.tick(deadline+2)])
+  const notices=h.chats.slice(first),channelNotices=notices.filter(c=>c.value.channel==='synthetic-platter-7003')
+  const expected=[['Proposal created',created.id],['Proposal revised',created.id],['Proposal approved',created.id],['Proposal sent',created.id],['Proposal withdrawn',created.id]]
+  for(const id of [lost.id,won.id,declined.id,expiring.id])expected.push(['Proposal created',id],['Proposal approved',id],['Proposal sent',id])
+  expected.push(['Proposal marked lost',lost.id],['Proposal marked won',won.id],['Proposal declined',declined.id],['Proposal expired',expiring.id])
+  assert.deepEqual(channelNotices.map(c=>c.value.text).sort(),expected.map(([label,id])=>label+'\n'+h.origin+'/app/proposal?id='+id).sort(),'each selected lifecycle outcome reaches the channel once with only its generic event and protected link')
+  const directNotices=notices.filter(c=>c.url.includes('graph.microsoft.com'))
+  assert.deepEqual(directNotices.map(c=>c.value.body.content).sort(),[created.id,lost.id,won.id,declined.id,expiring.id].map(id=>'Proposal sent\n'+h.origin+'/app/proposal?id='+id).sort())
+  assert.ok(notices.every(c=>!JSON.stringify(c.value).includes(old.id)))
+  assert.doesNotMatch(JSON.stringify(notices),/synthetic-platter-private|Northstar|2400|@/)
+  const readsBeforeRepeat=h.providerReads.length;await h.tick(deadline+3);assert.equal(h.providerReads.length,readsBeforeRepeat,'replayed source events cannot make another request')
+  const queued=await h.prepare('synthetic-platter-private-revoked')
+  await h.cmd('notification.route.remove',{id:lifecycleRoute.id});await h.cmd('notification.route.remove',{id:directRoute.id})
+  await h.tick(deadline+4);assert.equal(h.providerReads.length,readsBeforeRepeat,'revocation also suppresses additional queued lifecycle events')
+  assert.ok(!h.chats.some(c=>JSON.stringify(c.value).includes(queued.id)))
  }finally{await h.close()}
 })
 

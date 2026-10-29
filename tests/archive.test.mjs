@@ -842,10 +842,11 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   await h.cmd('sms.send',{id:expiry.id,message:'Review the archived proposal',requestId:'synthetic-platter-7104'})
   await h.cmd('provider.connect',{provider:'teams',version:0,token:'synthetic-platter-7107',consent:true})
   await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-7106',operatorId:person.id,consent:true})
-  const revokedRoute=await h.cmd('notification.route',{provider:'slack',event:'followup',kind:'channel',destination:'synthetic-platter-7101',consent:true})
+  const revokedRoute=await h.cmd('notification.route',{provider:'slack',event:'followup',kind:'channel',destination:'synthetic-platter-7101',consent:true,lifecycleEvents:['proposal.sent','proposal.withdrawn']})
   await h.cmd('notification.route.remove',{id:revokedRoute.id})
   const routesBefore=(await h.state()).notificationSettings.routes
   assert.equal(routesBefore.length,3);assert.equal(routesBefore.filter(r=>r.available).length,2)
+  assert.deepEqual(JSON.parse(routesBefore.find(r=>r.id===revokedRoute.id).lifecycle_events),['proposal.sent','proposal.withdrawn'])
   const tables=['p_connections','p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
   assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,7)
   await h.close();h=undefined

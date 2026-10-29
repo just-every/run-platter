@@ -37,6 +37,10 @@ export async function flushNotifications(env:Bindings) {
  const db=env.DB,rows=(await db.prepare("SELECT * FROM p_notification_outbox WHERE status='pending' ORDER BY created_at,id LIMIT 100").all<any>()).results
  for(const row of rows){
   const allowed=async()=>{
+   if(row.event_key.startsWith('lifecycle:')){
+    const source=await db.prepare('SELECT e.type FROM p_webhook_events e JOIN p_proposals p ON p.id=e.proposal_id JOIN p_notification_routes r ON r.id=? WHERE e.id=? AND e.proposal_id=? AND e.rowid>r.lifecycle_cursor AND e.type IN (SELECT value FROM json_each(r.lifecycle_events))').bind(row.route_id,row.event_key.slice(10),row.proposal_id).first()
+    if(!source)return false
+   }
    if(row.event_key.startsWith('collab:')){const { activeCollaboration }=await import('../collaboration');if(!await activeCollaboration(env,row))return false}
    if(row.watcher_id&&!await activeWatcher(env,row))return false
    if(row.event_key.startsWith('expiry:')){const { activeExpiryNotice }=await import('./expiry');if(!await activeExpiryNotice(env,row))return false}

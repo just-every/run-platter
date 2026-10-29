@@ -915,8 +915,10 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
   const channel=panel.locator('form').filter({has:page.getByRole('button',{name:'Verify and authorize channel',exact:true})})
   await channel.getByLabel('Notification event',{exact:true}).selectOption('signed')
   await channel.getByLabel('Provider destination id',{exact:true}).fill('synthetic-platter-9031')
-  assert.equal(await channel.getByRole('checkbox').isChecked(),false)
-  await channel.getByRole('checkbox').check();await channel.getByRole('button',{name:'Verify and authorize channel',exact:true}).click()
+  assert.equal(await channel.getByLabel('I authorize notices to this destination after provider verification.',{exact:true}).isChecked(),false)
+  await channel.getByLabel('Proposal sent',{exact:true}).check()
+  await channel.getByLabel('Proposal declined',{exact:true}).check()
+  await channel.getByLabel('I authorize notices to this destination after provider verification.',{exact:true}).check();await channel.getByRole('button',{name:'Verify and authorize channel',exact:true}).click()
   assert.equal(await page.getByRole('alert').count(),0)
   assert.equal(checks.at(-1),'/api/conversations.info')
   await panel.getByText('Authorize a direct message',{exact:true}).click()
@@ -935,12 +937,15 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
    ['signed','slack','channel','synthetic-platter-9031',null,true,true],
    ['approval','teams','direct','synthetic-platter-9033',person.id,true,true]
   ].sort())
+  assert.deepEqual(JSON.parse(configured.find(r=>r.provider==='slack').lifecycle_events),['proposal.sent','proposal.declined'])
+  assert.deepEqual(JSON.parse(configured.find(r=>r.provider==='teams').lifecycle_events),[])
   await page.reload()
   assert.deepEqual((await state()).notificationSettings.routes,configured)
   assert.equal(checks.length,4,'inspection never contacts the providers')
   const history=panel.getByRole('list',{name:'Chat notification routes',exact:true})
   assert.match(await history.innerText(),/Proposal signed/);assert.match(await history.innerText(),/Approval requested/)
   assert.equal(await history.getByRole('button',{name:'Revoke route authorization',exact:true}).count(),2)
+  assert.match(await history.innerText(),/Additional events: Proposal sent, Proposal declined/)
   assert.ok(await panel.locator('p,label,summary,button,input,select').evaluateAll(nodes=>nodes.every(n=>parseFloat(getComputedStyle(n).fontSize)>=13)))
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
   if(screenshots){

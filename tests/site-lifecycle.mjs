@@ -1,3 +1,4 @@
+import { watcherBrowser } from './watchers-browser.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
 import { documentJourney } from './document-journey.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
@@ -780,3 +781,5 @@ test('AUTO-004 compiled public API reference exposes scoped operations and signe
 
 
 test('SIGN-004 and SEND-003 owner recipient controls, own-field previews, ordered signing and viewer revocation', {timeout:180000},async()=>{const {recipientsBrowser}=await import('./recipients-browser.mjs');await recipientsBrowser(1440)})
+
+test('SEND-005 personal proposal settings configure email and verified Slack, isolate people and revoke revision consent', {timeout:120000},()=>watcherBrowser())

@@ -805,7 +805,7 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source,assetsDirectory:'public',outboundService:()=>Response.json({ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})})
+  h=await harness({root:source,assetsDirectory:'public',outboundService:request=>Response.json(new URL(request.url).pathname==='/api/users.info'?{ok:true,user:{team_id:'synthetic-platter-7100',profile:{email:h.auth.OWNER_EMAIL}}}:{ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})})
   const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archive notification',scope:'Exact retained scope',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
   await h.cmd('provider.connect',{provider:'slack',version:0,token:'synthetic-platter-7102',consent:true})
@@ -831,7 +831,13 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const completionRefs=(await h.db.prepare('SELECT * FROM p_completion_mail WHERE proposal_id=? ORDER BY party').bind(signed.id).all()).results
   assert.equal(completionRefs.length,2)
   for(const ref of completionRefs)assert.equal((await h.db.prepare('SELECT status FROM p_mail WHERE id=?').bind(ref.mail_id).first()).status,'local')
-  await h.cmd('notification.watch',{id:expiry.id,email:true,events:['comment','signed','paid'],consent:true})
+  const personalRoute=await h.cmd('notification.route',{provider:'slack',event:'approval',kind:'direct',destination:'synthetic-platter-7110',operatorId:person.id,consent:true})
+  await h.cmd('notification.watch',{id:expiry.id,revision:1,email:true,slackRoute:personalRoute.id,events:['view','comment','signed','paid'],consent:true})
+  await h.cmd('notification.watch',{id:p.id,revision:1,email:false,slackRoute:personalRoute.id,events:['comment','signed'],consent:true})
+  await h.cmd('notification.unwatch',{id:p.id,version:1,revision:1})
+  const preferences=(await h.send('/api/platter/watch?id='+expiry.id,undefined,h.owner)).value.watcher
+  const revokedPreferences=(await h.send('/api/platter/watch?id='+p.id,undefined,h.owner)).value.watcher
+  assert.equal(preferences.authorized,1);assert.equal(revokedPreferences.authorized,0)
   const smsRow=(await h.state()).proposals.find(row=>row.id===expiry.id)
   await h.cmd('sms.configure',{id:expiry.id,version:smsRow.version,consent:true,phone:'+12025550127',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-7103'})
   await h.cmd('sms.send',{id:expiry.id,message:'Review the archived proposal',requestId:'synthetic-platter-7104'})
@@ -847,6 +853,9 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   for(const table of ['p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+10*86400000),cron:'*/15 * * * *'})
   const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
+  const restoredPreferences=(await h.send('/api/platter/watch?id='+expiry.id,undefined,restoredOwner)).value.watcher
+  assert.deepEqual(restoredPreferences,{...preferences,authorized:0},'exact event and carrier choices return without consent authority')
+  assert.deepEqual((await h.send('/api/platter/watch?id='+p.id,undefined,restoredOwner)).value.watcher,revokedPreferences,'revoked choices retain their exact history')
   const restoredCertificate=await h.send('/api/platter/certificate.json?id='+signed.id,undefined,restoredOwner);assert.equal(restoredCertificate.status,200,restoredCertificate.text);assert.deepEqual(restoredCertificate.value,certificate.value)
   assert.deepEqual(await download('/api/platter/agreement.pdf?id='+signed.id,restoredOwner),documentBytes)
   assert.deepEqual(await download('/api/platter/certificate.pdf?id='+signed.id,restoredOwner),certificateBytes)

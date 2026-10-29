@@ -581,6 +581,14 @@
       "sha256": "506fde3072a56b95791a93e3d29c149430a38771d531e5e5932b7bf5ef5193cf",
       "executable": false
     },
+    "migrations/core/0096_agent_produced_revisions.sql": {
+      "sha256": "f3815783c0f7a8f600d03b07381dad72db431d2223552d111ab7bf8db290828d",
+      "executable": false
+    },
+    "migrations/core/0097_agent_model_budget.sql": {
+      "sha256": "4d3565c59af2798cd61607035310235b0b37a863d2ec7f7b00c09c6234d1ade0",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -3482,7 +3490,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "ca4e6cfb5f48d4a5a555444c7283621f7c7fb83dd33a1a0e4546a069ac3b8850",
+      "sha256": "4fa6d058417cbc7e30843d4dca1e6fedd7f62cafdde1082daa1ec80383f65259",
       "executable": false
     },
     "tests/site.test.mjs": {

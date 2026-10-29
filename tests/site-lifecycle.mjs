@@ -263,7 +263,7 @@ test('AI-003 desktop and phone owners review MCP requests, approve and send expl
     if(width===1440){
      const data=await (await context.request.get(app.origin+'/api/platter/agent-ledger')).json(),record=data.receipts.find(r=>r.action==='mcp.read_proposal')
      assert.match(await receipt.innerText(),new RegExp(record.input_digest));assert.match(await receipt.innerText(),new RegExp(record.output_digest));assert.match(await receipt.innerText(),/not recorded/)
-     const source=record.sources.find(s=>s.kind==='proposal'&&s.source_id===p.id);assert.ok(source);assert.match(await receipt.locator('[data-agent-source=proposal]').first().innerText(),new RegExp(source.digest))
+     const source=record.sources.find(s=>s.kind==='proposal'&&s.source_id===p.id);assert.ok(source);assert.match(await receipt.locator('[data-agent-source=proposal]').filter({hasText:p.id}).first().innerText(),new RegExp(source.digest))
      const link=receipt.getByRole('link',{name:'Human approved record',exact:true}).first(),approvalResponse=await context.request.get(app.origin+await link.getAttribute('href'))
      assert.equal(approvalResponse.status(),200);assert.equal((await approvalResponse.json()).approval.proposal_id,p.id)
     }

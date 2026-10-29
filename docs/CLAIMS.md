@@ -674,11 +674,11 @@ Evidence: None recorded.
 
 ## CRM-001 — HubSpot two-way deal sync
 
-Status: **missing**.
+Status: **partial**.
 
-Gap: No HubSpot connection.
+Gap: CRM-card launch, broader member and delegated access, two-way amount and line-item updates, proposal-link and timeline writes, broader lifecycle synchronization and live-provider qualification remain. The conservative owner or admin connected-deal-read floor is unchanged; existing stage-only writes retain FOLLOW-005 consent and uncertainty riders. FOLLOW-007 requires ct consent, scope and public-door assertions before standing-grant execution.
 
-Evidence: None recorded.
+Evidence: `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 
 ## CRM-002 — Salesforce two-way opportunity sync
 

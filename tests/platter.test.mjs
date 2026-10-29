@@ -3567,3 +3567,91 @@ test('MIG-007 exported document move-in resumes across sessions, holds ambiguous
  assert.deepEqual(await snapshot(),afterDemotion,'revoked owner authority cannot expose source bytes or mutate imports')
  assert.equal(frozen[3].length,5)
 }))
+
+test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance and refuse changed source or authority without writes', async () => {
+ const { hubspotFixture } = await import('./hubspot-fixture.mjs'), edge = hubspotFixture(), h = await harness({ outboundService: edge.request })
+ try {
+  const connect = () => h.cmd('provider.connect', { provider: 'hubspot', version: 0, token: 'synthetic-platter-4607', consent: true })
+  await connect()
+  const counts = async () => Promise.all(['p_clients', 'p_proposals', 'p_revisions', 'p_crm_draft_sources'].map(async table => (await h.db.prepare('SELECT COUNT(*) AS n FROM ' + table).first()).n))
+  const review = (cookie = h.owner) => h.cmd('crm.deal.review', edge.selected, cookie)
+  const apply = (r, cookie = h.owner, status = 200, extra = {}) => h.cmd('crm.deal.apply', { id: r.id, digest: r.digest, consent: true, ...extra }, cookie, status)
+  const baseline = await counts()
+  const choices = await h.cmd('crm.deal.review', { dealId: edge.selected.dealId })
+  assert.equal(choices.companies.length, 2); assert.equal(choices.contacts.length, 2); assert.ok(choices.held); assert.equal(choices.id, undefined)
+  assert.deepEqual(await counts(), baseline, 'ambiguous records need explicit selection and create nothing')
+  const checked = await review()
+  assert.equal(checked.content.options[0].cents, 36122)
+  assert.deepEqual(checked.content.options[0].tables[0].lines.map(r => [r.name, r.quantity, r.unitPrice, r.lineTotalCents]), [['Campaign strategy', '2.5', '120.50', 30125], ['Asset licence', '3', '19.99', 5997]])
+  await apply(checked, h.owner, 409, { digest: 'synthetic-platter-wrong-bytes' })
+  await apply(checked, h.owner, 400, { consent: false })
+  assert.deepEqual(await counts(), baseline)
+  edge.state.line_items[0].properties.price = '999.00'
+  await apply(checked, h.owner, 409)
+  assert.deepEqual(await counts(), baseline)
+  edge.state.line_items[0].properties.price = '120.50'
+  edge.state.contacts[0].properties.jobtitle = 'Changed after review'
+  await apply(checked, h.owner, 409)
+  assert.deepEqual(await counts(), baseline)
+  edge.state.contacts[0].properties.jobtitle = 'Director'
+  const made = await apply(checked)
+  const get = async () => (await h.state()).proposals.find(row => row.id === made.id)
+  let p = await get()
+  assert.equal(p.status, 'draft'); assert.equal(p.approved_by, null); assert.equal(p.collection.enabled, false); assert.deepEqual(p.recipientPlan ?? [], [])
+  assert.equal(p.clientName, 'Synthetic reviewed company'); assert.equal(p.clientEmail, ['synthetic-platter-4601', 'example.test'].join('@'))
+  assert.equal(p.options.length, 1); assert.equal(p.options[0].cents, 36122)
+  const provenance = await h.send('/api/platter/crm/source?id=' + made.id, undefined, h.owner)
+  assert.equal(provenance.status, 200); assert.equal(provenance.value.deal_id, edge.selected.dealId); assert.equal(provenance.value.company_id, edge.selected.companyId); assert.equal(provenance.value.contact_id, edge.selected.contactId)
+  assert.deepEqual(provenance.value.source.lines.map(r => r.id), ['synthetic-platter-4605', 'synthetic-platter-4606']); assert.ok(!provenance.text.includes('synthetic-platter-4607'))
+  assert.equal((await h.send('/api/platter/audit?action=crm.deal.apply&subject=' + made.id, undefined, h.owner)).value.rows.length, 1)
+  await apply(checked, h.owner, 409)
+  await h.cmd('proposal.send', { id: made.id, version: 1 }, h.owner, 409)
+  await h.cmd('proposal.approve', { id: made.id, version: 1, revision: 1 })
+  const path = new URL((await h.cmd('proposal.send', { id: made.id, version: 2 })).shareUrl).pathname, cookie = await verified(h, path)
+  const before = (await h.send(path + '/data.json', undefined, cookie)).value
+  assert.equal(before.options[0].cents, 36122)
+  edge.state.deal.properties.dealname = 'Later provider title'; edge.state.line_items[1].properties.price = '900.00'; edge.state.companies[0].properties.name = 'Later provider company'
+  assert.deepEqual((await h.send(path + '/data.json', undefined, cookie)).value, before, 'later provider edits never change the sent revision')
+  const accepted = await h.send(path + '/action?name=accept', { name: 'Taylor Reed', optionId: 'one', consent: true }, cookie)
+  assert.equal(accepted.status, 200, accepted.text); p = await get(); assert.equal(p.acceptance.totalCents, 36122)
+  edge.state.deal.properties.dealname = 'Synthetic launch engagement'; edge.state.line_items[1].properties.price = '19.99'; edge.state.companies[0].properties.name = 'Synthetic reviewed company'
+  const heldBaseline = await counts()
+  for (const [target, key, value] of [[edge.state.deal.properties, 'deal_currency_code', 'EUR'], [edge.state.contacts[0].properties, 'email', ''], [edge.state.line_items[0].properties, 'quantity', ''], [edge.state.line_items[0].properties, 'price', '1.001'], [edge.state.line_items[0].properties, 'recurringbillingfrequency', 'monthly'], [edge.state.line_items[0].properties, 'discount', '5']]) {
+   const old = target[key]; target[key] = value; await h.cmd('crm.deal.review', edge.selected, h.owner, key === 'email' ? 400 : 409); if (old === undefined) delete target[key]; else target[key] = old
+  }
+  await h.cmd('crm.deal.review', { ...edge.selected, companyId: 'synthetic-platter-not-associated' }, h.owner, 409)
+  assert.deepEqual(await counts(), heldBaseline)
+  const memberEmail = ['synthetic-platter-4610', 'example.test'].join('@')
+  await h.send('/auth/invite', { email: memberEmail, displayName: 'Synthetic CRM administrator', role: 'member', returnTo: '/app' }, h.owner)
+  const member = await h.signIn(memberEmail), person = (await h.state()).teamPeople.find(row => row.email === memberEmail)
+  const noCall = edge.calls.length
+  await h.cmd('crm.deal.review', edge.selected, member, 403)
+  assert.equal((await h.send('/api/platter/crm/source?id=' + made.id, undefined, member)).status, 403); assert.equal(edge.calls.length, noCall)
+  assert.deepEqual((await h.state(member)).crmDraftSources, [])
+  await h.cmd('member.set', { operatorId: person.id, version: 0, role: 'admin', teams: [] })
+  const adminReview = await review(member)
+  let demoted = false
+  edge.beforeReply(async request => { if (!demoted && request.url.includes('/line_items/')) { demoted = true; const current = (await h.state()).teamPeople.find(row => row.id === person.id); await h.cmd('member.set', { operatorId: person.id, version: current.version, role: 'sales', teams: [] }) } })
+  await apply(adminReview, member, 409); edge.beforeReply(undefined)
+  assert.deepEqual(await counts(), heldBaseline, 'transaction-time demotion creates no client, proposal or source record')
+  const disconnected = await review()
+  let revoked = false
+  edge.beforeReply(async request => { if (!revoked && request.url.includes('/line_items/')) { revoked = true; await h.cmd('provider.disconnect', { provider: 'hubspot', version: 1 }) } })
+  await apply(disconnected, h.owner, 409); edge.beforeReply(undefined)
+  assert.deepEqual(await counts(), heldBaseline, 'disconnect during the source re-read creates nothing')
+  await h.cmd('provider.connect', { provider: 'hubspot', version: 2, token: 'synthetic-platter-4607', consent: true })
+  const reconnectCalls = edge.calls.length
+  await apply(disconnected, h.owner, 409); assert.equal(edge.calls.length, reconnectCalls, 'reconnection requires a fresh review before provider I/O')
+  const parallel = await review(), results = await Promise.all([1, 2].map(() => h.send('/api/platter/command', { name: 'crm.deal.apply', input: { id: parallel.id, digest: parallel.digest, consent: true } }, h.owner)))
+  assert.deepEqual(results.map(r => r.status).sort(), [200, 409], JSON.stringify(results.map(r => r.value)))
+  assert.deepEqual(await counts(), heldBaseline.map((n, index) => n + (index === 0 ? 0 : 1)), 'concurrent replay creates exactly one independent draft')
+  const alternate = { ...edge.selected, companyId: edge.state.companies[1].id, contactId: edge.state.contacts[1].id }
+  const erasedClient = await h.cmd('client.save', { name: 'Synthetic alternate company', email: edge.state.contacts[1].properties.email, variableFields: { contactName: 'Casey Lane', firstName: 'Casey', lastName: 'Lane', title: '', address: '' } })
+  const eraseReview = await h.cmd('crm.deal.review', alternate)
+  await h.cmd('client.erase', { id: erasedClient.id, confirmName: 'Synthetic alternate company' })
+  const erasedBaseline = await counts()
+  await apply(eraseReview, h.owner, 409)
+  assert.deepEqual(await counts(), erasedBaseline, 'a captured review cannot recreate a client erased after review')
+  const expired = await review(); await h.mf.getWorker().then(w => w.scheduled({ scheduledTime: new Date(Date.now() + 901000), cron: '*/15 * * * *' })); await apply(expired, h.owner, 409)
+ } finally { await h.close() }
+})

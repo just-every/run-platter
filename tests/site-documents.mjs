@@ -879,3 +879,53 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
   await context.close()
  }finally{await browser?.close();await app?.close()}
 })
+
+test('CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows', { timeout: 120000 }, async () => {
+ const { harness } = await import('./harness.mjs'), { browserEdge } = await import('./browser-edge.mjs'), { hubspotFixture } = await import('./hubspot-fixture.mjs')
+ const edge = await browserEdge(), provider = hubspotFixture()
+ let h, browser
+ try {
+  h = await harness({ entry: 'dist/server/index.js', assetsDirectory: 'dist/client', origin: edge.origin, outboundService: provider.request }); edge.attach(h)
+  browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ignoreHTTPSErrors: true })
+  try {
+   const [name, value] = h.owner.split('='); await context.addCookies([{ name, value, url: h.origin }])
+   const page = await context.newPage()
+   await page.goto(h.origin + '/setup'); await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Finish setup' }).click()
+   await h.cmd('provider.connect', { provider: 'hubspot', version: 0, token: 'synthetic-platter-4607', consent: true })
+   await page.goto(h.origin + '/app')
+   const panel = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Start from HubSpot', exact: true }) })
+   await panel.getByLabel('HubSpot deal ID', { exact: true }).fill(provider.selected.dealId); await panel.getByRole('button', { name: 'Read HubSpot deal', exact: true }).click()
+   assert.equal(await panel.getByLabel('Company from deal').inputValue(), ''); assert.equal(await panel.getByLabel('Contact from deal').inputValue(), '')
+   assert.equal((await h.state()).proposals.length, 0)
+   await panel.getByLabel('Company from deal').selectOption(provider.selected.companyId); await panel.getByLabel('Contact from deal').selectOption(provider.selected.contactId)
+   await panel.getByRole('button', { name: 'Review selected deal', exact: true }).click()
+   const review = panel.getByRole('article', { name: 'Reviewed HubSpot draft' })
+   assert.match(await review.innerText(), /Synthetic reviewed company/); assert.match(await review.innerText(), /Taylor Reed/)
+   assert.match(await review.innerText(), /2\.5 × \$120\.50 USD/); assert.match(await review.innerText(), /3 × \$19\.99 USD/); assert.match(await review.innerText(), /\$361\.22 USD/)
+   assert.equal((await h.state()).proposals.length, 0, 'review alone creates no draft or approval')
+   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+   const shots = process.env.PLATTER_SCREENSHOTS
+   const capture = async (locator, label) => {
+    if (!shots) return
+    await mkdir(shots, { recursive: true })
+    for (const width of [1440, 390]) { await page.setViewportSize({ width, height: 900 }); await locator.scrollIntoViewIfNeeded(); await locator.screenshot({ path: join(shots, `CRM-001-${label}-${width}.png`) }) }
+    await page.setViewportSize({ width: 1440, height: 900 })
+   }
+   await capture(panel, 'review')
+   await review.getByRole('checkbox').check(); await review.getByRole('button', { name: 'Create reviewed draft', exact: true }).click()
+   await page.waitForURL(/\/app\/proposal\?id=/)
+   const current = (await h.state()).proposals[0]
+   assert.equal(current.title, 'Synthetic launch engagement'); assert.equal(current.options[0].cents, 36122); assert.equal(current.collection.enabled, false)
+   assert.equal(current.status, 'draft'); assert.equal(current.approved_by, null)
+   assert.equal(await page.getByRole('button', { name: 'Approve this revision', exact: true }).count(), 1); assert.equal(await page.getByRole('button', { name: 'Send approved proposal', exact: true }).count(), 0)
+   const source = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Copied HubSpot source', exact: true }) })
+   assert.match(await source.innerText(), /synthetic-platter-4605/); assert.match(await source.innerText(), /no synchronization or sending authority/)
+   await capture(source, 'copied-source')
+   const calls = provider.calls.length
+   provider.state.line_items[0].properties.price = '999.00'; await page.reload()
+   assert.equal(provider.calls.length, calls, 'opening a copied draft never synchronizes provider data')
+   assert.equal((await h.state()).proposals[0].options[0].cents, 36122)
+  } finally { await context.close() }
+ } finally { await browser?.close(); await h?.close(); await edge.close() }
+})

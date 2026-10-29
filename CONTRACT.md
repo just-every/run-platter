@@ -889,7 +889,7 @@ The owner or an admin connects HubSpot. A member starts a proposal from a deal (
 
 *Acceptance:* With a HubSpot API fake: create a proposal from a deal with two line items, send, view and sign; see the deal's line items, amount, stage Closed won and four timeline events. Open the Platter CRM card on another deal in the fake, start a proposal from it, and see the proposal linked to that deal with its company, contacts and line items filled, and the card listing the proposal with its status.
 
-*Status:* missing. No HubSpot connection.
+*Status:* partial. Owner and admins connect a verified HubSpot account and explicitly review a selected associated company, contact and USD priced rows before creating an independent single-client draft with collection off. The review binds the source snapshot, exact copied values, current connection and current authority; changed, missing, ambiguous or unsupported data is refused without creating a client or draft. Source IDs and reviewed values remain as business provenance without synchronization authority. Fresh human approval and sending use the ordinary proposal doors. Existing stage-only outcome writes retain the exact-revision, destination, field-map, uncertainty and restore riders of FOLLOW-005. Gap: CRM-card launch, broader member and delegated access, two-way amount and line-item updates, proposal-link and timeline writes, broader lifecycle synchronization and live-provider qualification remain unimplemented or unproved. The conservative owner/admin connected-deal-read floor remains unchanged; FOLLOW-007 still requires ct consent, scope and public-door assertions before standing-grant execution.
 
 #### CRM-002 — Salesforce two-way opportunity sync.
 
@@ -1423,8 +1423,8 @@ PRICE-006 is judged from the code and tests at commit `411c20d8a3dbb3cf7fecfbd1a
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 0 | 0 | 12 |
-| Target and push further | 43 | 41 | 45 | 129 |
-| All | 55 | 41 | 45 | 141 |
+| Target and push further | 43 | 42 | 44 | 129 |
+| All | 55 | 42 | 44 | 141 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1521,7 +1521,7 @@ PRICE-006 is judged from the code and tests at commit `411c20d8a3dbb3cf7fecfbd1a
 | `ACCT-005` | Invoice and payment export files | target | partial | `src/platter/invoices.ts`, `tests/platter.test.mjs` | A currency-tagged Xero deposit CSV only; no QuickBooks files, sandbox-verified USD imports, payment or schedule export. |
 | `ACCT-006` | Stripe payouts, fees and clearing in accounting | target | missing |  | No payment or accounting connection, so no payout or fee posting. |
 | `ACCT-007` | Invoices created on their issue day, never ahead | target | missing |  | No invoices are created for scheduled amounts; the only invoice is the owner's deposit CSV export after acceptance. |
-| `CRM-001` | HubSpot two-way deal sync | target | missing |  | No HubSpot connection. |
+| `CRM-001` | HubSpot two-way deal sync | target | partial | `tests/platter.test.mjs` — “CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance and refuse changed source or authority without writes”; `tests/site.test.mjs` loads `tests/site-documents.mjs` — “CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows”; `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority” includes exact CRM provenance and inactive review restoration. | CRM-card launch, broader member and delegated access, two-way amount and line-item updates, proposal-link and timeline writes, broader lifecycle synchronization and live-provider qualification remain. The conservative owner/admin connected-deal-read floor is unchanged; existing stage-only writes retain FOLLOW-005 consent and uncertainty riders. FOLLOW-007 requires ct consent, scope and public-door assertions before standing-grant execution. |
 | `CRM-002` | Salesforce two-way opportunity sync | target | missing |  | No Salesforce connection. |
 | `CRM-003` | Orbit two-way deal sync | target | missing |  | No Orbit connection. |
 | `CRM-004` | Pipedrive and Zoho CRM sync | target | missing |  | No Pipedrive or Zoho connection. |

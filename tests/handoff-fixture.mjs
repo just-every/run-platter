@@ -4,9 +4,11 @@ export const asanaAccount='synthetic-platter-9400',asanaWorkspace='synthetic-pla
 export const handoffStripeToken='synthetic-platter-9420'
 export const handoffSettings={version:0,accountId:asanaAccount,connectionVersion:1,workspaceId:asanaWorkspace,teamId:asanaTeam,consent:true}
 export function handoffFixture(){
- const calls=[],projects=[],tasks=[],paymentCalls=[],intents=new Map();let sequence=0,uncertain,hook
+ const calls=[],projects=[],tasks=[],paymentCalls=[],intents=new Map(),messages=[],sms=[];let sequence=0,uncertain,hook
  const outboundService=async request=>{
   const url=new URL(request.url)
+  if(url.hostname==='api.resend.com'){messages.push(await request.json());return Response.json({id:'synthetic-platter-9460'})}
+  if(url.hostname==='api.twilio.com'){sms.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-9461',status:'queued'})}
   if(url.hostname==='api.stripe.com'){
    assert.equal(request.headers.get('authorization'),'Bearer '+handoffStripeToken)
    paymentCalls.push({path:url.pathname,method:request.method})
@@ -29,7 +31,7 @@ export function handoffFixture(){
   if(uncertain===kind)return new Response('synthetic-platter-acknowledgement-lost',{status:503})
   return Response.json({data:{gid:row.gid}})
  }
- return {calls,projects,tasks,paymentCalls,intents,outboundService,setUncertain:value=>{uncertain=value},setHook:value=>{hook=value}}
+ return {calls,projects,tasks,paymentCalls,intents,messages,sms,outboundService,setUncertain:value=>{uncertain=value},setHook:value=>{hook=value}}
 }
 export async function connectAsana(h,cookie=h.owner){
  await h.cmd('provider.connect',{provider:'asana',version:0,token:asanaToken,consent:true},cookie)

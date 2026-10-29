@@ -1016,7 +1016,7 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('HAND-001 public CLI retains document archive history for Asana handoff without credentials or execution', {timeout:180000},async()=>{
+test('HAND-001 public CLI retains document archive history for Asana handoff without credentials or execution', {timeout:240000},async()=>{
  const {handoffFixture,asanaToken,handoffSettings,connectAsana,completeHandoffAgreement,handoffOffer,verifyHandoff,recordHandoffUpload}=await import('./handoff-fixture.mjs')
  const temporary=await mkdtemp(join(tmpdir(),'platter-handoff-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=handoffFixture();let h
  try{

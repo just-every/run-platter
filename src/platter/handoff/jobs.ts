@@ -26,7 +26,7 @@ export function handoffCompletion(db:D1Database,id:string){return [
  SELECT a.proposal_id,a.revision,s.version,s.account_id,s.workspace_id,s.team_id,json_extract(a.snapshot,'$.title'),a.accepted_at,'queued'
  FROM p_acceptances a LEFT JOIN p_signature_facts f ON f.proposal_id=a.proposal_id AND f.revision=a.revision
  CROSS JOIN p_handoff_settings s WHERE a.proposal_id=?
- AND ((f.method='mailbox code' AND f.verified_at IS NOT NULL
+ AND ((f.method IN ('mailbox code','SMS code') AND f.verified_at IS NOT NULL
  AND NOT EXISTS(SELECT 1 FROM p_recipient_signatures r WHERE r.proposal_id=a.proposal_id AND r.revision=a.revision
  AND (r.method!='mailbox code' OR r.verified_at IS NULL)))
  OR EXISTS(SELECT 1 FROM p_paper_acceptances paper WHERE paper.proposal_id=a.proposal_id))

@@ -3274,7 +3274,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "fd7d8454941fe41063a134f4f52495921ec454f4a3c60ea33b993ac6901ff86f",
+      "sha256": "d73385de5fd0f6d8c6e35efd55e8df533d887e9341bc165586da2b93aac94f43",
       "executable": false
     },
     "tests/browser-edge.mjs": {

@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `62719e07ad2fcacd48b51f2bc1bdcba4d95f75ee` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. IMPORT-001 is a builder completion claim from this same code and test tree; its final candidate SHA and exact-SHA Verify receipt are in the handoff, pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -118,7 +118,7 @@ Core · published · **partial**
 
 #### IMPORT-001 — Reviewed client CSV move-in with undo
 
-Core · published · **partial** · Cites BASE-DATA-001
+Core · published · **done** · Cites BASE-DATA-001
 
 **Requirement.** A reviewed client CSV becomes native clients through the Base import door. Client dependencies prevent unsafe undo. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#import-001).
 
@@ -128,8 +128,8 @@ Core · published · **partial** · Cites BASE-DATA-001
 3. Apply the reviewed bytes, read their original and journal, and replay: the same import job is returned.
 4. Undo restores the previous clients; a changed imported client or one with dependent proposals prevents undo.
 
-**Evidence.** `tests/platter.test.mjs` — “Client CSV dry run, fingerprint custody, journal, replay and undo through HTTP”; “import undo preserves clients with dependent proposals; owner erasure fences unused client”; `src/platter/movein/index.ts`
-**Gap.** Delivered: Preview writes nothing, a changed fingerprint is refused, original bytes and replayed job identity are retained, and dependent proposals prevent undo. Missing “IMPORT-001 complete reviewed client csv move-in with undo journey”: Undo is also exercised after an imported client is independently edited, retaining the intervening edit and dependent records.
+**Evidence.** `tests/platter.test.mjs` — “Client CSV dry run, fingerprint custody, journal, replay and undo through HTTP” proves preview without client writes, changed-byte refusal, original and journal custody, replay, successful unchanged undo and independent native-edit conflicts; “import undo preserves clients with dependent proposals; owner erasure fences unused client” proves dependent-record refusal. `tests/site.test.mjs` — “IMPORT-001 reviewed CSV, independent client edit and refused undo retain originals in the compiled app” (registered through `tests/site-lifecycle.mjs`) proves the existing client and import controls. `tests/archive.test.mjs` — “MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody” proves exact edited clients, import bindings, original bytes and conflict custody after public CLI restore, plus working unchanged-import replay and undo.
+**Gap.** None.
 
 #### ERASE-001 — Bounded client erasure
 

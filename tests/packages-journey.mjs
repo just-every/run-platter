@@ -90,7 +90,7 @@ export async function packagesJourney() {
    await upload.getByLabel('Signer full name').fill('Morgan Lee');await upload.getByLabel('Signed date').fill('2026-10-15')
    await upload.getByLabel('Client-signed copy').setInputFiles({name:'packages-signed.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF Growth with Rush delivery quantity four')});await upload.getByRole('checkbox').check();await capture(page,'upload-form')
    await upload.getByRole('button',{name:'Record accepted by upload',exact:true}).click()
-   assert.equal(await page.getByRole('alert').count(),0);assert.match(await page.locator('p[role=status]').innerText(),/Accepted by upload/);assert.match(await page.getByLabel('Selected total').innerText(),/2,301\.00/);assert.match(await page.getByLabel('Selected deposit').innerText(),/575\.25/)
+   assert.equal(await page.getByRole('alert').count(),0);assert.match(await page.locator('p.notice[role=status]').innerText(),/Accepted by upload/);assert.match(await page.getByLabel('Selected total').innerText(),/2,301\.00/);assert.match(await page.getByLabel('Selected deposit').innerText(),/575\.25/)
    const paperState=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals.find(x=>x.id===paper.id)
    assert.equal(paperState.acceptance.method,'upload');assert.equal(paperState.acceptance.selection.items[0].quantity,4);assert.equal(paperState.acceptance.totalCents,230100);assert.equal(paperState.acceptance.depositCents,57525)
    await capture(page,'upload-accepted');await page.getByRole('button',{name:'Export invoice CSV',exact:true}).click()

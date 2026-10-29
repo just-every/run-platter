@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { approvalRequestInput } from './approval-request.mjs'
 
 // Compare populated business history, including every installed lifecycle table.
 export async function previewBusiness(h) {
@@ -17,7 +18,7 @@ export async function managerApprovalPreview(h,input) {
  await h.cmd('approval.policy',{version:policy.version,required:true,defaultRole:'manager'})
  const proposal=await h.cmd('proposal.prepare',input)
  await h.cmd('proposal.share',{id:proposal.id,operatorId:person.id})
- const requested=await h.cmd('notification.request',{id:proposal.id,version:1,consent:true})
+ const requested=await h.cmd('notification.request',await approvalRequestInput(h,{id:proposal.id,version:1,consent:true}))
  assert.equal(requested.requests.length,1)
  const request=(await h.cmd('notification.requests',{id:proposal.id})).requests[0]
  assert.equal(request.id,requested.requests[0]);assert.equal(request.approver_id,person.id);assert.equal(request.revision,1)

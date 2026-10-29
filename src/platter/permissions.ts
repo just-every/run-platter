@@ -82,6 +82,7 @@ export async function teamCommand(db:D1Database,a:Actor,name:string,p:Record<str
 }
 export async function authorizeCommand(db:D1Database,a:Actor,name:string,p:Record<string,unknown>) {
  if(name.startsWith('member.')||name.startsWith('team.')||name==='proposal.share')return
+ if(name.startsWith('renewal.')){need(a.role==='owner','Only the current owner authorizes renewal drafting',403);if(p.id)await permitted(db,a,p.id);return}
  const id=p.id
  if(name.startsWith('expiry.')){await permitted(db,a,id,'send');return}
  const edit=['proposal.variables','proposal.autosave','proposal.quantity','proposal.document','proposal.revise','proposal.negotiate','proposal.restore','attachments.refresh','suggestions.allow','suggestion.resolve','pdf.downloads']

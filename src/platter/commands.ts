@@ -1,6 +1,7 @@
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
+import { renewalCommand } from './renewals'
 import { archiveCommand } from './archiving/jobs'
 import { clientLocale, saveClientLocale } from './locales'
 import { hasTaxable, taxRequest, optionTax, resolveTax, saveTaxRate, validateTaxOptions, type TaxSnapshot } from './taxes'
@@ -134,6 +135,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='payment.surcharge')return surchargeCommand(db,a,p)
  if(name==='payment.collection')return collectionPolicyCommand(env,a,name,p)
  if(name.startsWith('payment.'))return paymentCommand(env,a,name,p)
+ if(name.startsWith('renewal.'))return renewalCommand(env,a,name,p)
  if(name.startsWith('archive.'))return archiveCommand(env,a,name,p)
  if(name.startsWith('provider.'))return connectionCommand(env,a,name,p)
  if(name==='workspace.defaults')return workspaceCommand(db,a,p)

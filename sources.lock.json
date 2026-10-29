@@ -633,6 +633,10 @@
       "sha256": "d8c135d814044dc9fc72e53b16e6ad5bf0875138cbb5e19fcba5e49a048342b7",
       "executable": false
     },
+    "migrations/core/0096_renewal_drafts.sql": {
+      "sha256": "5a6c602b2a7e04dcce2d5a9bae4eb92b24a206df49c7896c3dcb81e0474b9652",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -2462,7 +2466,7 @@
       "executable": false
     },
     "src/platter/archive-policy.mjs": {
-      "sha256": "01fa7543852713222b59ae48928cf638fe24a3668f707e7d0ba674b06f4295a8",
+      "sha256": "bda8e09dafcdb8a87824c3b731107d95e00b9be7a28a30b728f7062c2a3eb752",
       "executable": false
     },
     "src/platter/archiving/google-drive.ts": {
@@ -2526,7 +2530,7 @@
       "executable": false
     },
     "src/platter/commands.ts": {
-      "sha256": "decdaeb167e3396143252615a2bd7f62bbc73d2b3cff88d6d78a49d1925d0a5b",
+      "sha256": "539aa5bd9d8115a3c4a7d765c7b90d1fd675966df46e2062866addeef5f69cf7",
       "executable": false
     },
     "src/platter/completion-mail.ts": {
@@ -2858,7 +2862,7 @@
       "executable": false
     },
     "src/platter/permissions.ts": {
-      "sha256": "88926f84794aafb114ceb6af8a520218ec804aa5524c48a61351b6af380c9a8c",
+      "sha256": "853ca779475f60a5aac274559bb16d9fbbb48872fa31c307425e1bcf175a6577",
       "executable": false
     },
     "src/platter/pipeline.ts": {
@@ -2907,6 +2911,10 @@
     },
     "src/platter/reminders.ts": {
       "sha256": "ece390c8c6166b9b1092181628646f88603d3fc98151edfa9231e2d196c37aeb",
+      "executable": false
+    },
+    "src/platter/renewals.ts": {
+      "sha256": "d8a326e02d4bc67481c2d243d891d57bc2998044b233ca4d5f903faeb3d07d2a",
       "executable": false
     },
     "src/platter/reports/pipeline-csv.ts": {
@@ -2970,7 +2978,7 @@
       "executable": false
     },
     "src/platter/state.ts": {
-      "sha256": "dc68f8b99387d29da519614669101064ae8c65c0ded277b4f3124587ce5ef2eb",
+      "sha256": "cd7627f73174259c4e0faf91253cd150b3efe04252d4465cd727a4d583da8306",
       "executable": false
     },
     "src/platter/suggestions.ts": {
@@ -3126,7 +3134,7 @@
       "executable": false
     },
     "src/platter/ui/index.ts": {
-      "sha256": "6f950c186eea90d1516c87452e9cdbd5ec578c01157e73f8e1be220ac93e779e",
+      "sha256": "24abc8224ec6775302dba88c2c2578a8f40a3d27ea747e2df61f25eb8e0a8d8d",
       "executable": false
     },
     "src/platter/ui/internal-pricing.ts": {
@@ -3191,6 +3199,10 @@
     },
     "src/platter/ui/reminders.ts": {
       "sha256": "cbe640e1106878f8cd29a2c2914a294cc3d1ae6188ca6262b023bce9ce138120",
+      "executable": false
+    },
+    "src/platter/ui/renewals.ts": {
+      "sha256": "185b55863507d1b99d8412bce39bd83cb1446caa0dda114a96c5e680393e71c0",
       "executable": false
     },
     "src/platter/ui/report-schedules.ts": {
@@ -3274,7 +3286,7 @@
       "executable": false
     },
     "src/server.ts": {
-      "sha256": "023a72ac87953503f38bc9ddd7679588b8092d8960f4a14ee1731ee875f2b8c0",
+      "sha256": "0508219ffdebb7862b963bcea111e6c4c27ae89cc80e626080e5b5db834ec78c",
       "executable": false
     },
     "src/site/docs.ts": {
@@ -3510,7 +3522,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "0ed1809cf02e1f604e15828a7604e3ce8008f7362c6f7835bfdc17848f13cb73",
+      "sha256": "eb441cc721f3d2d8b5d0a757bbfc1014526b58dc38023d007eb46aad8c999726",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3547,6 +3559,10 @@
     },
     "tests/reminders-journey.mjs": {
       "sha256": "3fcc357679d6bb6c867046f9e8d127ee7f7847e6e49ec73cd609a140e12fbe30",
+      "executable": false
+    },
+    "tests/renewal-journey.mjs": {
+      "sha256": "67c2434426efa01deebd622f074a8c13ea60df7cab449979a4d7bb07e7827bb6",
       "executable": false
     },
     "tests/revenue-fixture.mjs": {
@@ -3602,7 +3618,7 @@
       "executable": false
     },
     "tests/worker.ts": {
-      "sha256": "d6be2235616cae0687c98f148895f2d085831480c8870512019bace6f91ddcd6",
+      "sha256": "1bc1f5c1dab8d788945bbeb301731ae40dbc2cf5e7776fa0d404c58bf59a0fd7",
       "executable": false
     },
     "tsconfig.json": {

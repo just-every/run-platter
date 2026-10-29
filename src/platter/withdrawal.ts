@@ -66,5 +66,5 @@ export async function signingWithdrawal(env:Bindings,c:any,input:Record<string,u
  try{await db.batch([db.prepare("INSERT INTO p_guard(ok) VALUES(EXISTS(SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id WHERE s.token=? AND s.session_hash=? AND s.session_expires>? AND s.revision=p.revision AND p.revision=? AND p.status IN ('sent','accepted')))").bind(c.token,share.session_hash,at,row.revision),...writes,db.prepare('DELETE FROM p_guard')])}
  catch(error){if(/CHECK constraint|UNIQUE constraint/.test(String(error)))need(false,'The invitation or request changed. Reload before continuing.',409);throw error}
  await dispatchMail(env,row.id)
- return {message:'Your electronic-record consent withdrawal and request for paper are recorded. Signing on this offer is stopped. The firm has been notified; any signed agreement stays unchanged.'}
+ return {message:'Your electronic-record consent withdrawal and request for paper are recorded. Signing on this offer is stopped. One notice is recorded for the firm; any signed agreement stays unchanged.'}
 }

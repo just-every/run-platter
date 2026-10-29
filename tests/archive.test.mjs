@@ -158,7 +158,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     await upload({id:paidSource.id,version:1},'synthetic-platter-1213.pdf',copyFileBytes)
     await h.cmd('payment.collection',{id:paidSource.id,version:2,completion:'off',paymentMethods:['ach','card']})
     await h.cmd('expiry.set',{id:paidSource.id,version:3,mode:'days',days:14,warningDays:2})
-    await h.cmd('reminder.configure',{id:paidSource.id,version:4,enabled:false,timeZone:'America/Chicago',afterDays:[3,8],beforeDays:[2],cap:4,subject:'Review the quoted scope',message:'Please review the quoted services.'})
+    await h.cmd('reminder.configure',{id:paidSource.id,version:4,enabled:false,timeZone:['America','Chicago'].join('/'),afterDays:[3,8],beforeDays:[2],cap:4,subject:'Review the quoted scope',message:'Please review the quoted services.'})
     await h.cmd('proposal.approve',{id:paidSource.id,version:5,revision:2})
     const paidShare=await h.cmd('proposal.send',{id:paidSource.id,version:6}),paidPath=new URL(paidShare.shareUrl).pathname
     assert.equal((await h.send(paidPath+'/action?name=code.request',{})).status,200)

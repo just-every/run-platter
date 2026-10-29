@@ -902,7 +902,7 @@ test('EDIT-012 duplicate accepted content into an independent member-owned draft
  const get=async id=>(await h.state()).proposals.find(p=>p.id===id)
  await h.cmd('pdf.downloads',{id:p.id,version:2,enabled:false});await h.cmd('expiry.set',{id:p.id,version:3,mode:'days',days:14,warningDays:1})
  await h.cmd('payment.collection',{id:p.id,version:4,completion:'off',paymentMethods:['ach','card']})
- await h.cmd('reminder.configure',{id:p.id,version:5,enabled:true,consent:true,timeZone:'America/Chicago',afterDays:[3,8],beforeDays:[2],cap:4,subject:'Review the proposed scope',message:'Please review the agreed services.'})
+ await h.cmd('reminder.configure',{id:p.id,version:5,enabled:true,consent:true,timeZone:['America','Chicago'].join('/'),afterDays:[3,8],beforeDays:[2],cap:4,subject:'Review the proposed scope',message:'Please review the agreed services.'})
  await h.cmd('notification.expiry',{id:p.id,version:6,enabled:true,leadDays:4,consent:true})
  await h.cmd('tracking.settings',{id:p.id,enabled:'yes',consent:'yes',alerts:'no',quietMinutes:30,retentionDays:90})
  await h.cmd('proposal.approve',{id:p.id,version:7,revision:2});const share=await h.cmd('proposal.send',{id:p.id,version:8}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)

@@ -1686,3 +1686,77 @@ test('SIGN-005 completion mail attaches the retained PDFs to both parties once, 
   }finally{release();await h.close()}
  }
 })
+
+
+test('REPORT-006 current filtered recovery reaches two receivers once, holds uncertain mail and stops revoked authority', {timeout:60000}, async()=>{
+ const received=[];let loseResponse=false,revokeDuringSend=false,h
+ h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-10401'},outboundService:async request=>{
+  assert.equal(new URL(request.url).origin,'https://api.resend.com')
+  const message=await request.json();received.push(message)
+  if(revokeDuringSend){revokeDuringSend=false;await h.db.prepare('UPDATE oa_operators SET version=version+1 WHERE email=?').bind(h.auth.OWNER_EMAIL).run()}
+  if(loseResponse)throw new Error('Synthetic receiver stored the message but its response was lost')
+  return Response.json({id:'synthetic-platter-'+(10402+received.length)})
+ }})
+ try{
+  await finishSetup(h)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2040-01-01T12:00:00Z'),cron:'*/15 * * * *'})
+  await h.send('/auth/invite',{email:recipient,displayName:'Synthetic report colleague',role:'member',returnTo:'/app'},h.owner)
+  const member=await h.signIn(recipient)
+  const client=await h.cmd('client.save',{name:'Synthetic report client',email:recipient})
+  const fixture=[]
+  for(const [title,price,cents] of [['Synthetic report first','3234.56',323456],['Synthetic report second','4200',420000]]){
+   const made=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title,priceTwo:price,scope:'Synthetic report scope'})
+   fixture.push({id:made.id,title,cents,createdAt:(await h.state()).proposals.find(p=>p.id===made.id).created_at})
+  }
+  await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Excluded draft',scope:'Unrelated scope'})
+  const filters='q=Synthetic+report+scope&status=awaiting-approval&sort=value&direction=desc'
+  const input={filters,cadence:'weekly',weekday:1,hour:8,recipients:[h.auth.OWNER_EMAIL,recipient]}
+  const before=(await h.state()).reportSchedules
+  await h.cmd('report.schedule',input,member,403)
+  assert.deepEqual((await h.state()).reportSchedules,before);assert.equal(received.length,0)
+  await h.cmd('report.time-zone',{timeZone:'America/New_York'})
+  const schedule=await h.cmd('report.schedule',input)
+  let saved=(await h.state()).reportSchedules.find(s=>s.id===schedule.id)
+  const worker=await h.mf.getWorker(),fire=at=>worker.scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+  const recoveredAt=saved.nextRunAt+22*86400000
+  // New data arriving while the scheduler is down belongs to the current report.
+  const extra=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Synthetic report latest',priceTwo:'6500',scope:'Synthetic report scope'})
+  fixture.push({id:extra.id,title:'Synthetic report latest',cents:650000,createdAt:(await h.state()).proposals.find(p=>p.id===extra.id).created_at})
+  await Promise.all([fire(recoveredAt),fire(recoveredAt)])
+  const expected=fixture.toSorted((a,b)=>b.cents-a.cents),total=1393456
+  const report=await h.send('/api/platter/pipeline?'+filters,undefined,h.owner)
+  assert.equal(report.status,200);assert.deepEqual(report.value.rows.map(r=>[r.id,r.valueCents]),expected.map(r=>[r.id,r.cents]))
+  assert.deepEqual(report.value.totals,[{currency:'USD',count:3,valueCents:total}])
+  const page=await h.send('/app?'+filters,undefined,h.owner);assert.match(page.text,/\$13,934\.56 USD/)
+  const csv=['Title,Client,Owner,Status,Next action,Currency,Value,Age in days,Follow-up due',...expected.map(r=>[r.title,'Synthetic report client',h.auth.OWNER_EMAIL,'awaiting-approval','Approve revision','USD',(r.cents/100).toFixed(2),Math.floor((recoveredAt-r.createdAt)/86400000),'2040-01-01'].join(',')),'Total (3 proposals),,,,,USD,13934.56,,'].join('\r\n')+'\r\n'
+  const exported=await h.send('/api/platter/pipeline.csv?'+filters,undefined,h.owner);assert.equal(exported.status,200);assert.equal(exported.text,csv)
+  assert.equal(received.length,2);assert.deepEqual(received.flatMap(m=>m.to).sort(),[h.auth.OWNER_EMAIL,recipient].sort())
+  for(const message of received){assert.equal(message.text.split('CSV:\n')[1],csv);assert.match(message.text,/3 proposals match\./);assert.match(message.text,/USD total · 3 proposals: \$13,934\.56 USD/);for(const row of expected)assert.ok(message.text.includes(row.title+' · awaiting-approval · $'+(row.cents/100).toLocaleString('en-US',{minimumFractionDigits:2})+' USD'))}
+  assert.equal(received[0].text,received[1].text)
+  saved=(await h.state()).reportSchedules.find(s=>s.id===schedule.id)
+  assert.equal(saved.runs.length,1);assert.equal(saved.runs[0].ranAt,recoveredAt);assert.ok(saved.nextRunAt>recoveredAt)
+  await fire(recoveredAt+15*60000);assert.equal(received.length,2)
+  loseResponse=true
+  await fire(saved.nextRunAt)
+  saved=(await h.state()).reportSchedules.find(s=>s.id===schedule.id)
+  assert.equal(received.length,4);assert.ok(saved.runs[0].mail.every(m=>m.status==='uncertain'))
+  const uncertainIds=saved.runs[0].mail.map(m=>m.id)
+  for(const at of [saved.lastRunAt,saved.lastRunAt+15*60000,saved.nextRunAt-1])await fire(at)
+  assert.equal(received.length,4,'a receiver that lost its response is never contacted again for that attempt')
+  assert.deepEqual((await h.db.prepare("SELECT id FROM p_report_mail WHERE status='uncertain' ORDER BY id").all()).results.map(m=>m.id),uncertainIds.sort())
+  assert.match((await h.send('/app?'+filters,undefined,h.owner)).text,/Provider result uncertain; not resent/)
+  await h.db.prepare("UPDATE oa_operators SET status='inactive' WHERE email=?").bind(recipient).run()
+  loseResponse=false;await fire(saved.nextRunAt)
+  saved=(await h.state()).reportSchedules.find(s=>s.id===schedule.id)
+  assert.equal(received.length,5);assert.deepEqual(received.at(-1).to,[h.auth.OWNER_EMAIL]);assert.deepEqual(saved.runs[0].skipped,['no longer active'])
+  assert.match((await h.send('/app?'+filters,undefined,h.owner)).text,/skipped: no longer active/)
+  // Revoke the authorizing identity after the first receiver but before the second.
+  await h.db.prepare("UPDATE oa_operators SET status='active' WHERE email=?").bind(recipient).run()
+  revokeDuringSend=true;await fire(saved.nextRunAt)
+  assert.equal(received.length,6,'current authority is checked again before each recipient')
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_report_mail WHERE stopped_reason IS NOT NULL').first()).n,1)
+  const runCount=(await h.db.prepare('SELECT count(*) AS n FROM p_report_runs').first()).n
+  await fire(saved.nextRunAt+22*86400000)
+  assert.equal(received.length,6);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_report_runs').first()).n,runCount,'revoked authority never initiates a later run')
+ }finally{await h.close()}
+})

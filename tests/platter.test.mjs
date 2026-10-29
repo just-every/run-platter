@@ -690,7 +690,7 @@ test('FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pi
  assert.deepEqual(s.recipients,schedule.recipients);assert.equal(s.filters,filters)
  const worker=await h.mf.getWorker(),fire=at=>worker.scheduled({scheduledTime:new Date(at),cron:'0 * * * *'})
  await fire(s.nextRunAt-3600000);assert.equal((await h.state()).reportOutbox.length,0,'nothing runs before its time')
- await fire(s.nextRunAt);await fire(s.nextRunAt);const outbox=(await h.state()).reportOutbox
+ await Promise.all([fire(s.nextRunAt),fire(s.nextRunAt)]);await fire(s.nextRunAt);const outbox=(await h.state()).reportOutbox
  assert.deepEqual(outbox.map(m=>m.recipient).sort(),['colleague@studio.example','owner@studio.example'],'one email each, never twice for the same run');assert.ok(outbox.every(m=>m.status==='local'))
  const page=(await h.send('/app?'+filters,undefined,h.owner)).text,shown=page.match(/data-pipeline-total="USD">([^<]+)</)[1].replaceAll('&#39;',"'")
  assert.equal(shown,'$7,434.56 USD')

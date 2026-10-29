@@ -3480,6 +3480,7 @@ test('AUTO-002 completed agreements archive exact PDFs once under explicit curre
   let revoked=false;fake.setHook(async request=>{if(!revoked&&new URL(request.url).pathname.endsWith('/generateIds')){revoked=true;await h.cmd('archive.revoke',{version:3})}})
   const preRevokePosts=posts();await tick();assert.equal(revoked,true);assert.equal(posts(),preRevokePosts)
   const audit=await h.send('/api/platter/audit?action=archive.configure',undefined,h.owner);assert.ok(audit.value.rows.length>=3)
+  const {driveCredentialJourney}=await import('./drive-credential-journey.mjs');await driveCredentialJourney(h,fake)
  }finally{await h.close()}
 })
 

@@ -1,10 +1,10 @@
 import type { Bindings } from '../../auth.server'
 import { agreementArtifact } from '../documents/agreement'
-import { providerCredential } from '../connections'
+import { markConnectionBroken, providerCredential } from '../connections'
 import { commit, need, text, type Actor } from '../model'
 import { administrators } from '../permissions'
 import { recordAudit } from '../audit'
-import { checkDrivePdf, createDriveFolder, driveFolder, driveId, sha256, uploadDrivePdf } from './google-drive'
+import { checkDrivePdf, createDriveFolder, driveFolder, driveId, sha256, uploadDrivePdf, type DriveAuthority } from './google-drive'
 
 const live=`SELECT s.*,o.email,o.role AS native_role,COALESCE(m.role,'sales') AS member_role,COALESCE(m.version,0) AS member_version
  FROM p_archive_settings s JOIN p_archive_authority g ON g.singleton=s.singleton AND g.version=s.version
@@ -49,7 +49,7 @@ export async function archiveCommand(env:Bindings,a:Actor,name:string,p:Record<s
   const operator=await db.prepare('SELECT version FROM oa_operators WHERE id=?').bind(a.id).first<any>(),version=(old?.version??0)+1
   const guard={sql:"COALESCE((SELECT version FROM p_archive_settings WHERE singleton=1),0)=? AND EXISTS(SELECT 1 FROM p_connections WHERE id='workspace:google_drive' AND version=? AND account_id=? AND status='connected')",values:[old?.version??0,connection.version,connection.account_id]}
   // Validate the chosen folder using the same current connection that will be granted.
-  await driveFolder(async()=>{await commit(db,a,[],false,guard);const current=await providerCredential(env,'workspace:google_drive');need(current.connection.version===connection.version,'Connection changed',409);return current.secret.token},root)
+  await driveFolder(async()=>{await commit(db,a,[],false,guard);const current=await providerCredential(env,'workspace:google_drive');need(current.connection.version===connection.version,'Connection changed',409);return driveAccess(env,current)},root)
   await commit(db,a,[db.prepare('INSERT INTO p_archive_settings VALUES(1,?,?,?,?,?,?,?) ON CONFLICT(singleton) DO UPDATE SET version=excluded.version,account_id=excluded.account_id,connection_version=excluded.connection_version,root_folder=excluded.root_folder,pattern=excluded.pattern,authorized_by=excluded.authorized_by,authorized_at=excluded.authorized_at').bind(version,connection.account_id,connection.version,root,pattern,a.id,Date.now()),db.prepare('INSERT INTO p_archive_authority VALUES(1,?,?,?) ON CONFLICT(singleton) DO UPDATE SET version=excluded.version,operator_version=excluded.operator_version,member_version=excluded.member_version').bind(version,operator.version,a.memberVersion??0)],false,guard)
   return {version}
  }
@@ -61,15 +61,19 @@ export async function archiveCommand(env:Bindings,a:Actor,name:string,p:Record<s
  need(name==='archive.reconcile','Unknown archive action',404)
  await commit(db,a,[]);await reconcileArchive(env,text(p.id,'an archive job'));await recordAudit(db,a,'archive.reconciled',String(p.id));return {saved:true}
 }
+function driveAccess(env:Bindings,credential:Awaited<ReturnType<typeof providerCredential>>){
+ const {id,version}=credential.connection
+ return {token:credential.secret.token,credentialRejected:()=>markConnectionBroken(env,id,version)}
+}
 async function execution(env:Bindings,job:any){
  const config=await env.DB.prepare(live).first<any>()
  need(config&&config.version===job.settings_version&&config.account_id===job.account_id&&config.root_folder===job.root_folder,'Archive authorization or connection changed; fresh configuration applies only to future completions',409)
  need(await env.DB.prepare("SELECT 1 FROM p_archive_job_authority g JOIN p_acceptances a ON a.proposal_id=g.proposal_id JOIN p_proposals p ON p.id=a.proposal_id JOIN p_clients c ON c.id=p.client_id WHERE g.proposal_id=? AND a.revision=? AND p.status='accepted'").bind(job.proposal_id,job.revision).first(),'This job has no current completion authority; restored history never executes',409)
  const credential=await providerCredential(env,'workspace:google_drive')
  need(credential.connection.version===config.connection_version&&credential.connection.account_id===job.account_id,'Drive connection changed',409)
- return {token:credential.secret.token,actor:{id:config.authorized_by,email:config.email,role:config.native_role==='owner'?'owner':'admin',memberVersion:config.member_version} as Actor}
+ return {...driveAccess(env,credential),actor:{id:config.authorized_by,email:config.email,role:config.native_role==='owner'?'owner':'admin',memberVersion:config.member_version} as Actor}
 }
-async function folderFor(env:Bindings,job:any,authorize:()=>Promise<string>,reconcile=false){
+async function folderFor(env:Bindings,job:any,authorize:DriveAuthority,reconcile=false){
  const db=env.DB,key=[job.account_id,job.root_folder,job.client_id],where='account_id=? AND root_folder=? AND client_id=?'
  let folder=await db.prepare('SELECT * FROM p_archive_folders WHERE '+where).bind(...key).first<any>()
  if(!folder){
@@ -92,7 +96,7 @@ async function folderFor(env:Bindings,job:any,authorize:()=>Promise<string>,reco
  return folder.provider_id as string
 }
 async function processArchive(env:Bindings,job:any,reconcile=false){
- const db=env.DB,authorize=async()=>(await execution(env,job)).token
+ const db=env.DB,authorize=async()=>await execution(env,job)
  const {actor}=await execution(env,job)
  // Both consumers use the same immutable artifact row and never render a second PDF.
  await agreementArtifact(env,job.proposal_id,'certificate.json',{actor})

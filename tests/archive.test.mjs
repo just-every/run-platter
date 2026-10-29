@@ -1074,3 +1074,37 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('HAND-001 public CLI retains document archive history for Asana handoff without credentials or execution', {timeout:180000},async()=>{
+ const {handoffFixture,asanaToken,handoffSettings,connectAsana,completeHandoffAgreement}=await import('./handoff-fixture.mjs')
+ const temporary=await mkdtemp(join(tmpdir(),'platter-handoff-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=handoffFixture();let h
+ try{
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectAsana(h)
+  const completed=await completeHandoffAgreement(h);await h.cmd('handoff.dispatch',{})
+  const queued=await completeHandoffAgreement(h,'Queued delivery history',completed.client.id)
+  const tables=['p_handoff_settings','p_handoff_jobs','p_handoff_writes'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
+  assert.deepEqual(before.p_handoff_jobs.map(j=>j.status).sort(),['complete','queued'])
+  assert.equal(before.p_handoff_writes.length,5);assert.ok(before.p_handoff_writes.every(w=>w.provider_id&&w.status==='complete'))
+  const artifact=await h.mf.dispatchFetch(h.origin+completed.path+'/agreement.pdf',{headers:{cookie:completed.cookie}});assert.equal(artifact.status,200);const document=Buffer.from(await artifact.arrayBuffer())
+  await h.close();h=undefined
+  const archive=join(temporary,'handoff.rer');await command(source,['export','--output',archive])
+  const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(asanaToken))
+  const records=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
+  for(const table of ['p_handoff_authority','p_handoff_job_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0)
+  await command(restored,['import','--input',archive,'--yes'])
+  const receiver=handoffFixture();h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:receiver.outboundService})
+  for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table],table+' retains exact history')
+  for(const table of ['p_handoff_authority','p_handoff_job_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'});assert.equal(receiver.calls.length,0)
+  const owner=await h.signIn(h.auth.OWNER_EMAIL),history=(await h.send('/api/platter/handoffs',undefined,owner)).value
+  assert.equal(history.settings.active,false);assert.ok(history.jobs.every(j=>!j.executable))
+  const download=await h.mf.dispatchFetch(h.origin+'/api/platter/agreement.pdf?id='+completed.proposal.id,{headers:{cookie:owner}});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),document)
+  assert.equal((await h.send(completed.path+'/agreement.pdf',undefined,completed.cookie)).status,404)
+  await h.cmd('provider.connect',{provider:'asana',version:1,token:asanaToken,consent:true},owner)
+  await h.cmd('handoff.configure',{...handoffSettings,version:1,connectionVersion:2},owner)
+  const calls=receiver.calls.length;await h.cmd('handoff.dispatch',{},owner);assert.equal(receiver.calls.length,calls)
+  assert.equal((await h.send('/api/platter/handoffs',undefined,owner)).value.jobs.find(j=>j.proposal_id===queued.proposal.id).status,'queued')
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

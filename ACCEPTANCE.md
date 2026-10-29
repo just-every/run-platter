@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 14 | 101 | 44 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 14 | 101 | 48 | 163 |
 
 Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -1617,15 +1617,15 @@ Core · target · **missing**
 
 #### HAND-001 — Accepted-scope handoff to delivery tools
 
-Core · target · **missing**
+Core · target · **partial**
 
 **Requirement.** On acceptance, Platter creates a project in Asana, Trello, monday.com, ClickUp, Jira or [Vector](https://github.com/just-every/run-vector) from the accepted scope: one task or section per accepted line item, with dates from the schedule and the agreement linked. The handoff records the external project ID and never runs twice. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#hand-001).
 
 **Acceptance.**
 1. Accept a proposal with four line items and an Asana fake connected; see one project with four tasks and the agreement link; replay the event and see no second project.
 
-**Evidence.** None.
-**Gap.** No delivery handoff.
+**Evidence.** `tests/platter.test.mjs` — “HAND-001 Asana handoff uses immutable selected scope once and holds uncertain or revoked writes” proves explicit verified-account and destination authorization, selected accepted line fidelity, four tasks, recorded dates, session-protected agreement links, retained project and task ids, durable claims, replay and concurrent dispatch exclusion, current authority refusals and uncertain writes without retry through an Asana network-edge fake. `tests/site-documents.mjs` — “HAND-001 Settings authorizes Asana delivery and displays completed and uncertain handoffs” covers native Settings and history. `tests/archive.test.mjs` — “HAND-001 public CLI retains document archive history for Asana handoff without credentials or execution” covers exact restored history and agreement bytes without credentials, execution grants or replay, including after fresh authorization for future agreements.
+**Gap.** Trello, monday.com, ClickUp, Jira, Vector, configured multi-recipient and payment-gated completion, accepted-by-upload execution and live-provider qualification remain. Conservative owner and admin authorization default: explicit verified Asana account, workspace and destination team; configuration, connection and authorizing role versions checked before every request; uncertain writes held for provider review without automatic retry. Matching dated schedule milestone labels supply task due dates; other recorded dates remain in project notes. Restores confer no credentials or execution authority. SEND-003 and SIGN-004 retain their recorded authority holds; scoped delegation and broader provider boundaries remain unapproved.
 
 #### HAND-002 — Handoff to Gauge with budget and rates
 

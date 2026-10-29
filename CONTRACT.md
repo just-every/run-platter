@@ -2177,8 +2177,8 @@ Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d3
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 1 | 11 | 0 | 12 |
-| Target and push further | 13 | 89 | 49 | 151 |
-| All | 14 | 100 | 49 | 163 |
+| Target and push further | 13 | 90 | 48 | 151 |
+| All | 14 | 101 | 48 | 163 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -2299,7 +2299,7 @@ Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d3
 | `AUTO-003` | Team chat notifications | target | partial | `tests/mail.test.mjs` | Nook, broader proposal events, channel settings screens and chat-native approval interactions remain. Conservative default adopted  Restored routes require explicit reconnection and new consent. Future Nook and COLLAB-002 event sources inherit these obligations. |
 | `AUTO-004` | Public REST API and webhooks | target | partial | `src/platter/api/index.ts`, `src/platter/api/webhooks.ts`, `tests/platter.test.mjs`, `tests/site-lifecycle.mjs`, `tests/archive.test.mjs` | The ct demotion remains in force pending fresh acceptance of the corrected public status and analytics, negotiated revision events, all ten receiver deliveries and independently expected documented scopes. Exact-candidate Verify and guarded landing receipts remain pending; AUTO-004 must remain partial until ct accepts. |
 | `AUTO-005` | Zapier, Make and Crank apps | target | missing |  | No automation-platform apps. |
-| `HAND-001` | Accepted-scope handoff to delivery tools | target | missing |  | No delivery handoff. |
+| `HAND-001` | Accepted-scope handoff to delivery tools | target | partial | `tests/platter.test.mjs` — “HAND-001 Asana handoff uses immutable selected scope once and holds uncertain or revoked writes” proves explicit verified-account and destination authorization, selected accepted line fidelity, four tasks, recorded dates, session-protected agreement links, retained project and task ids, durable claims, replay and concurrent dispatch exclusion, current authority refusals and uncertain writes without retry through an Asana network-edge fake. `tests/site-documents.mjs` — “HAND-001 Settings authorizes Asana delivery and displays completed and uncertain handoffs” covers native Settings and history. `tests/archive.test.mjs` — “HAND-001 public CLI retains document archive history for Asana handoff without credentials or execution” covers exact restored history and agreement bytes without credentials, execution grants or replay, including after fresh authorization for future agreements. | Trello, monday.com, ClickUp, Jira, Vector, configured multi-recipient and payment-gated completion, accepted-by-upload execution and live-provider qualification remain. Conservative owner and admin authorization default: explicit verified Asana account, workspace and destination team; configuration, connection and authorizing role versions checked before every request; uncertain writes held for provider review without automatic retry. Matching dated schedule milestone labels supply task due dates; other recorded dates remain in project notes. Restores confer no credentials or execution authority. SEND-003 and SIGN-004 retain their recorded authority holds; scoped delegation and broader provider boundaries remain unapproved. |
 | `HAND-002` | Handoff to Gauge with budget and rates | target | missing |  | No Gauge handoff. |
 | `RENEW-001` | Bulk proposal creation and sending | target | missing |  | No bulk sending. |
 | `RENEW-002` | Renewal proposals from accepted agreements | target | missing |  | No renewals. |

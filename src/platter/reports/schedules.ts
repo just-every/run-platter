@@ -1,4 +1,3 @@
-import { currentTime } from '../expiry-time'
 import { actorById } from '../credentials'
 import type { Bindings } from '../../auth.server'
 import { operatorMail } from '../../mail.server.mjs'
@@ -35,7 +34,7 @@ export async function reportCommand(env: Bindings, a: Actor, name: string, p: Re
  if (name === 'report.time-zone') {
   const zone = text(p.timeZone, 'an IANA time zone such as America/New_York', 64)
   need(validZone(zone), 'Enter an IANA time zone such as America/New_York')
-  const at = await currentTime(db), schedules = (await db.prepare('SELECT * FROM p_report_schedules').all<any>()).results
+  const at = Date.now(), schedules = (await db.prepare('SELECT * FROM p_report_schedules').all<any>()).results
   await commit(db, a, [db.prepare('INSERT INTO p_installation_settings(singleton,time_zone) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET time_zone=excluded.time_zone').bind(zone),
    ...schedules.map(s => db.prepare('UPDATE p_report_schedules SET next_run_at=? WHERE id=?').bind(nextRun(s.cadence, s.weekday, s.hour, at, zone), s.id))], true)
   return { timeZone: zone }
@@ -53,7 +52,7 @@ export async function reportCommand(env: Bindings, a: Actor, name: string, p: Re
  need(Number.isInteger(hour) && hour >= 0 && hour <= 23, 'Choose an hour from 0 to 23')
  need(weekday === null || (Number.isInteger(weekday) && weekday >= 0 && weekday <= 6), 'Choose a weekday')
  const people = await activePeople(db), recipients = recipientEmails(p).map(email => people.find(person => person.email === email)?.id ?? fail(`${email} is not an active person in this installation`))
- const id = crypto.randomUUID(), at = await currentTime(db), filters = savedFilters(p.filters)
+ const id = crypto.randomUUID(), at = Date.now(), filters = savedFilters(p.filters)
  const operator = await db.prepare('SELECT version FROM oa_operators WHERE id=?').bind(a.id).first<any>()
  await commit(db, a, [db.prepare('INSERT INTO p_report_schedules(id,report,filters,cadence,weekday,hour,recipients,owner_id,created_at,next_run_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
   .bind(id, 'pipeline', filters, cadence, weekday, hour, JSON.stringify(recipients), a.id, at, nextRun(cadence, weekday, hour, at, await installationZone(db))),

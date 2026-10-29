@@ -1,6 +1,6 @@
 import { date, escape, field, form, hidden, panel } from './shared'
 
-// REPORT-005/REPORT-006: export the filtered pipeline and email it to named people in the installation time zone.
+// REPORT-005 and REPORT-006: export the filtered pipeline and email it to named people in the installation time zone.
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const filterKeys = ['view','currency','bookedFrom','bookedTo','receivedFrom','receivedTo','q', 'owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
 const statusLabel: Record<string, string> = { local: 'Captured locally; no email was sent', pending: 'Queued', sending: 'Sending', accepted: 'Accepted by provider', uncertain: 'Provider result uncertain; not resent' }

@@ -2978,7 +2978,7 @@
       "executable": false
     },
     "src/platter/reports/schedules.ts": {
-      "sha256": "d147a647fc1dc0d1242218a0ecf43ec990ea56fb415db5f667ad93cd16e361b9",
+      "sha256": "52894ca7e98fd199066b766dc96ae58b29c02ab65c48af13b4fa332f01bf2774",
       "executable": false
     },
     "src/platter/reports/zone.ts": {
@@ -3262,7 +3262,7 @@
       "executable": false
     },
     "src/platter/ui/report-schedules.ts": {
-      "sha256": "350fbe410b8fc7a766ec3837fe59d10530859b33645c54df2fa2522ff2911895",
+      "sha256": "588a49558477621b5032df2c0a65207ef3007becaa3d0bca1e743b4897ddd0ec",
       "executable": false
     },
     "src/platter/ui/section-locks.ts": {
@@ -3590,7 +3590,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "d710827ebc7b689d9774254eca63a46267d9bc83a4fc8c33e98789007c7ab103",
+      "sha256": "6a76b38f9a5dc15c46b82132c5505a7edc518f4969d26f6ed9c9eba498c1ba3a",
       "executable": false
     },
     "tests/mcp-discovery-worker.ts": {
@@ -3674,7 +3674,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "b72d41cbc3f29120e8e500a845235d8ff7ccf6fe843240ba1229be364fb11212",
+      "sha256": "21c25e8cd6e77b3b98861cc0285e43df1a67bda4eaa146467d01505cbfd5545c",
       "executable": false
     },
     "tests/site.test.mjs": {

@@ -4,7 +4,7 @@ import { firmOutcomeReason, synchronizeOutcome } from './outcomes'
 import type { Bindings } from '../auth.server'
 import { commit, exact, need, proposal, text, type Actor } from './model'
 import { currentTime } from './expiry-time'
-import { dispatchMail, queueMail } from './mail'
+import { signingRequestMail, dispatchMail, queueMail } from './mail'
 
 export function outcomeStatement(db:D1Database,row:any,actor:{id:string,email:string,role:string},kind:'declined'|'lost'|'won',reason:string,at:number) {
  return db.prepare('INSERT INTO p_outcome_records(proposal_id,revision,kind,actor_id,actor_role,actor_email,occurred_at,reason) VALUES(?,?,?,?,?,?,?,?)').bind(row.id,row.revision,kind,actor.id,actor.role,actor.email,at,reason)
@@ -48,4 +48,23 @@ export async function withdraw(env:Bindings,a:Actor,input:Record<string,unknown>
  if(lost||won)await synchronizeOutcome(env,row.id)
  await dispatchMail(env,row.id)
  return {id:row.id,withdrawn:true}
+}
+
+/** A verified client's request stops this revision, including replacement invitations.
+ * It never rewrites an acceptance or creates an automatic paper-delivery action. */
+export async function signingWithdrawal(env:Bindings,c:any,input:Record<string,unknown>){
+ const {row,share}=c,db=env.DB,at=await currentTime(db)
+ need(c.verified,'Verify your email before requesting paper or withdrawing consent',401)
+ need(c.signingConsent,'Electronic-record requests are not available on this invitation',409)
+ need(Number(input.revision)===row.revision&&input.disclosureVersion===c.signingConsent.version,'This revision or disclosure changed. Reload before requesting paper.',409)
+ need(input.confirm===true||input.confirm==='yes','Confirm that signing stops and the firm will receive your paper request')
+ if(c.signingConsent.request)return {message:'Your consent withdrawal and paper request are already recorded. Signing on this offer is stopped.'}
+ const owner=await db.prepare("SELECT email FROM oa_operators WHERE role='owner' AND status='active' ORDER BY id LIMIT 1").first<{email:string}>()
+ need(owner,'Contact the firm to request paper',409)
+ const writes=[db.prepare('INSERT INTO p_signing_requests(proposal_id,revision,disclosure_version,requested_at,recipient,contact,paper_requested) VALUES(?,?,?,?,?,?,1)').bind(row.id,row.revision,c.signingConsent.version,at,row.clientEmail,owner.email),
+  ...signingRequestMail(env,row,owner.email,at)]
+ try{await db.batch([db.prepare("INSERT INTO p_guard(ok) VALUES(EXISTS(SELECT 1 FROM p_shares s JOIN p_proposals p ON p.id=s.proposal_id WHERE s.token=? AND s.session_hash=? AND s.session_expires>? AND s.revision=p.revision AND p.revision=? AND p.status IN ('sent','accepted')))").bind(c.token,share.session_hash,at,row.revision),...writes,db.prepare('DELETE FROM p_guard')])}
+ catch(error){if(/CHECK constraint|UNIQUE constraint/.test(String(error)))need(false,'The invitation or request changed. Reload before continuing.',409);throw error}
+ await dispatchMail(env,row.id)
+ return {message:'Your electronic-record consent withdrawal and request for paper are recorded. Signing on this offer is stopped. The firm has been notified; any signed agreement stays unchanged.'}
 }

@@ -138,7 +138,7 @@ export async function mobileClientJourney() {
     assert.equal(await extra.isChecked(), true)
     await inspect('commented')
     await type(page, 'Your full name', 'Avery Chen')
-    await activate(page, 'checkbox', 'I accept the scope of work, chosen option, total price, and deposit shown above.')
+    await activate(page, 'checkbox', await page.locator('#platter-acceptance label').filter({has:page.locator('[name=consent]')}).innerText())
     await activate(page, 'button', 'Accept proposal')
     assert.equal(await page.getByRole('heading', { name: 'Proposal accepted', exact: true }).count(), 1)
     assert.equal(await page.getByRole('button', { name: 'Accept proposal', exact: true }).count(), 0)

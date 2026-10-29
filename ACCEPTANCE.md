@@ -1165,8 +1165,8 @@ Core · target · **partial** · Rules D-1
 **Acceptance.**
 1. Sign as a client who reads the disclosure and consents, draws a signature and initials three fields; a second client withdraws consent and the firm is told; a third client uploads a PNG of their signature and adopts it; the signed record reproduces the same document and each adopted signature.
 
-**Evidence.** `src/platter/signing.ts`, `tests/platter.test.mjs`
-**Gap.** Typed Client signature blocks retain explicit adoption with the accepted name and consent. Gap: consumer disclosure, withdrawal, drawn/uploaded signatures, initials and additional signer roles remain.
+**Evidence.** `migrations/core/0096_signing_consent.sql`; `tests/platter.test.mjs` — “SIGN-003 verified typed acceptance retains exact electronic records and paper requests stop signing without changing agreements”; `tests/mail.test.mjs` — “MAIL-001 local proposal and verification mail are captured without provider contact”; `tests/site-lifecycle.mjs` — “SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the compiled client at desktop and phone widths”; `tests/archive.test.mjs` — “APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority”.
+**Gap.** New English-language, mailbox-verified single-client offers with collection off retain exact revision-bound electronic-record consent and typed adoption. Verified withdrawal and paper requests stop future signing on that revision and notify the firm once without changing accepted agreements. Gap: drawn and uploaded signatures, initials, additional signer roles, other-language consumer disclosures, configured multi-recipient and payment-gated execution, full agreement packaging and legal or provider qualification remain. Conservative consent and human paper-delivery default adopted under the standing scope policy, pending ct approval; no automatic paper delivery, inferred fee or legal qualification.
 
 #### SIGN-004 — Multiple signers, signing order and countersignature
 

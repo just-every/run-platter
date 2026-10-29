@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `dd45d0c65c3f8bbb98e228de2850ac082b5d5e1e` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. FOLLOW-010 is a builder completion claim pending guarded landing and ct judgment. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -1028,7 +1028,7 @@ Core · target · **partial** · From FOLLOW-002
 
 #### FOLLOW-010 — Follow-up reporting and team visibility
 
-Core · target · **partial** · From FOLLOW-002 · Cites BASE-ROLE-001
+Core · target · **done** · From FOLLOW-002 · Cites BASE-ROLE-001
 
 **Requirement.** Follow-ups extend the pipeline with due-date filters and sorts, exact visible counts and totals. Legacy sales ownership stays “Not recorded” where absent.
 
@@ -1037,8 +1037,8 @@ Core · target · **partial** · From FOLLOW-002 · Cites BASE-ROLE-001
 2. Owner filters and team/own scopes match the current sales owner and manager team.
 3. Desktop and phone screens show the same queue and totals.
 
-**Evidence.** `src/platter/followup/queue.ts`; `src/platter/followup/commands.ts`; `tests/followup-journey.mjs`; `tests/platter.test.mjs` — “FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership”; `tests/site.test.mjs` — “MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs`
-**Gap.** Delivered: Due filters, sorting and totals have populated pipeline and compiled queue journeys. Missing “FOLLOW-010 complete follow-up reporting and team visibility journey”: The same thirty-proposal due fixture is reconciled under current sales-owner and manager/team scopes after ownership and membership changes at both browser widths.
+**Evidence.** `tests/platter.test.mjs` — “FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership”, calling `tests/followup-reporting-journey.mjs` — followupReportingJourney (exact due periods, next actions, sorted rows, currency totals, owner filters, live team scopes, fresh native ownership handoff, revoked sessions and unchanged business records); `tests/site.test.mjs` — “MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting”, registered through `tests/site-lifecycle.mjs` and calling `tests/followup-reporting-browser.mjs` — followupReportingBrowser (the same thirty-proposal fixture, owner controls, queue and totals at 1440 with 1440 and 390 browser proof).
+**Gap.** None.
 
 #### FOLLOW-003 — Expiry and renewal notifications
 

@@ -16,6 +16,7 @@ type Purpose = 'invitation'|'reminder'|'identity'
 const purposes:Purpose[]=['invitation','reminder','identity']
 export const smsDisclosure='I agree to receive the selected proposal texts from the named firm at my US mobile number. Message and data rates may apply. Reply STOP to stop all texts or HELP for help. SMS assent does not consent to electronic signatures.'
 const purposeFor=(kind:string):Purpose=>kind==='invitation'?'invitation':'reminder'
+function withoutInvitation(value:string,token:string){need(!value.toLowerCase().includes(token.toLowerCase())&&!/\/p\/[a-f0-9]{64}\b/i.test(value),'Keep invitation credentials out of SMS business history')}
 function phoneNumber(value:unknown){
  const input=text(value,'a US mobile number',40)
  need(/^[+\d(). -]+$/.test(input),'Use a US mobile number')
@@ -84,6 +85,7 @@ export async function smsCommand(env:Bindings,a:Actor,name:string,p:Record<strin
   need(selected.length>0&&selected.length<=purposes.length&&new Set(selected).size===selected.length&&selected.every(purpose=>purposes.includes(purpose as Purpose)),'Choose the SMS purposes the recipient permitted')
   need(!await db.prepare('SELECT 1 FROM p_sms_optouts WHERE phone=?').bind(phone).first(),'STOP remains in force; sending cannot be reactivated here',409)
   const share=await db.prepare('SELECT * FROM p_shares WHERE proposal_id=? AND revision=?').bind(row.id,row.revision).first<any>();need(share,'Send a current invitation first',409)
+  for(const value of [firm,disclosure,method,evidence])withoutInvitation(value,share.token)
   const client=await db.prepare('SELECT email FROM p_clients WHERE id=?').bind(row.client_id).first<any>(),recipient=text(p.recipient,'the assenting recipient',254)
   need(recipient===(share.recipient||client?.email),'Record assent from this invitation recipient')
   const assentId=crypto.randomUUID(),invitationHash=await hash(share.token),operator=await db.prepare('SELECT version FROM oa_operators WHERE id=?').bind(a.id).first<any>()
@@ -94,6 +96,7 @@ export async function smsCommand(env:Bindings,a:Actor,name:string,p:Record<strin
  const kind=p.kind===undefined?'invitation':String(p.kind);need(['invitation','manual'].includes(kind),'Choose invitation or manual reminder')
  const context=await live(env,row.id,kind);need(context.a.id===a.id,'Only the consenting sender can send this SMS',403)
  const message=text(p.message,'the SMS message',1000);need(!/https?:|\{[^}]+\}/i.test(message),'SMS links are added by Platter; fill all variables first')
+ withoutInvitation(message,context.share.token)
  const requestId=text(p.requestId,'an SMS request id',100),prior=await db.prepare('SELECT * FROM p_sms_runs WHERE request_id=?').bind(requestId).first<any>()
  if(prior){need(prior.proposal_id===row.id&&prior.revision===row.revision&&prior.actor_id===a.id&&prior.kind===kind&&prior.message===message,'SMS request id was already used',409);return {id:row.id,smsId:prior.id,replayed:true}}
  const slot=kind==='manual'?localDate(at,context.c.time_zone):crypto.randomUUID()

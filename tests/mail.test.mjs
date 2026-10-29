@@ -1060,7 +1060,7 @@ test('SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP pr
   const sent=await h.cmd('proposal.send',{id,version:3}),row=(await h.state()).proposals.find(p=>p.id===id)
   const input={...smsAssent,disclosure:'  '+smsAssent.disclosure+'\n',id,version:row.version,consent:true,phone:'+12025550123',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-8104'}
   await h.cmd('sms.send',{id,message:'Review your proposal',requestId:'synthetic-platter-8105'},h.owner,409)
-  for(const change of [{consent:false},{timeZone:''},{timeZone:'Inferred'},{phone:'+442025550123'},{evidence:''},{recipient:''},{firm:''},{purposes:[]},{purposes:['completion']},{disclosure:''},{assentedAt:''},{assentedAt:'2031-01-01T00:00:00Z'},{method:''},{version:1}])await h.cmd('sms.configure',{...input,...change},h.owner,change.version?409:400)
+  for(const change of [{consent:false},{timeZone:''},{timeZone:'Inferred'},{phone:'+442025550123'},{evidence:''},{recipient:''},{firm:''},{purposes:[]},{purposes:['completion']},{disclosure:''},{assentedAt:''},{assentedAt:'2031-01-01T00:00:00Z'},{method:''},{evidence:sent.shareUrl},{disclosure:sent.shareUrl},{firm:sent.shareUrl},{method:new URL(sent.shareUrl).pathname.split('/').at(-1)},{version:1}])await h.cmd('sms.configure',{...input,...change},h.owner,change.version?409:400)
   assert.equal(sms.length,0)
   // A migrated installation has only the legacy facts; these confer no transport authority.
   const actor=(await h.state()).actor,invitationHash=(await import('node:crypto')).createHash('sha256').update(new URL(sent.shareUrl).pathname.split('/').at(-1)).digest('hex')
@@ -1081,6 +1081,7 @@ test('SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP pr
   for(const [key,value] of Object.entries({proposal_id:id,revision:row.revision,invitation_hash:invitationHash,recipient,phone:input.phone,firm:input.firm,disclosure:input.disclosure,assented_at:Date.parse(input.assentedAt),method:input.method,evidence:input.evidence,time_zone:input.timeZone,recorded_by:actor.id,recorded_at:Date.parse('2030-03-08T18:00:00Z')}))assert.equal(newest[key],value,key)
   assert.deepEqual(JSON.parse(newest.purposes),['invitation','reminder','identity']);assert.equal(original.phone,input.phone,'formatted US input is normalized before binding')
   const send={id,message:'Review your proposal',requestId:'synthetic-platter-8105'}
+  await h.cmd('sms.send',{...send,message:new URL(sent.shareUrl).pathname},h.owner,400)
   const first=await h.cmd('sms.send',send)
   await h.cmd('sms.send',send)
   assert.equal(sms.length,1);assert.equal(sms[0].To,input.phone);assert.ok(sms[0].Body.includes(sent.shareUrl));assert.match(sms[0].Body,/Reply STOP/)

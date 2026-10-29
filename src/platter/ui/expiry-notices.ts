@@ -12,7 +12,7 @@ export function expiryNoticeDefaults(state:any){
 export function expiryNoticePanel(state:any,p:any){
  if(!p.canSend||!state.expiryNoticeDefaults)return ''
  const rows=state.expiryNotices,s=rows.settings.find((r:any)=>r.proposal_id===p.id),d=s??state.expiryNoticeDefaults
- const active=rows.active.includes(p.id)&&['draft','approved','sent','accepted'].includes(p.status),path=proposalPath(p.id),base=hidden('id',p.id)+hidden('version',p.version)
+ const active=rows.active.includes(p.id)&&['draft','approved','sent','accepted'].includes(p.status),path=proposalPath(p.id),base=hidden('id',p.id)+hidden('version',p.version)+hidden('settingsVersion',s?.version??0)
  const events=rows.events.filter((r:any)=>r.proposal_id===p.id)
  const owner=rows.recipients.find((r:any)=>r.proposal_id===p.id)
  return panel('Sender expiry notice','<p>Recipient: '+escape(owner?.name??'Recorded sales owner')+(owner?.email?' · '+escape(owner.email):'')+'. Email opens a dated follow-up; your existing manual follow-up stays unchanged.</p>'+

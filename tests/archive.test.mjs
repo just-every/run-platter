@@ -879,10 +879,21 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   await h.cmd('expiry.set',{id:future.id,version:1,mode:'days',days:30,warningDays:1})
   await h.cmd('notification.expiry',{id:future.id,version:2,consent:true})
   await h.cmd('proposal.approve',{id:future.id,version:3,revision:1});await h.cmd('proposal.send',{id:future.id,version:4})
+  const signedVersion=(await h.state()).proposals.find(p=>p.id===signed.id).version
+  const noticeTemplate=await h.cmd('template.save',{id:signed.id,version:signedVersion,name:'Retained sender notices'})
+  await h.cmd('template.delivery',{id:noticeTemplate.id,version:1,noticeSource:'override',noticeEnabled:true,noticeDays:8,renewalEnabled:true,renewalDays:50})
+  const futureRenewal=await h.cmd('proposal.prepare',{clientId:client.id,title:'Inactive restored renewal',scope:'Future accepted term',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25',pricingTables:[{optionId:'one',name:'Care',lines:[{name:'Care',quantity:'1',unit:'month',unitPrice:'100',interval:'monthly',term:12,startsOn:'2030-03-01'}]}]})
+  await h.cmd('notification.expiry',{id:futureRenewal.id,version:1,consent:true,renewalEnabled:true,renewalDays:30})
+  await h.cmd('proposal.approve',{id:futureRenewal.id,version:2,revision:1})
+  const futureRenewalPath=new URL((await h.cmd('proposal.send',{id:futureRenewal.id,version:3})).shareUrl).pathname
+  await h.send(futureRenewalPath+'/action?name=code.request',{})
+  const futureCode=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(futureRenewal.id).first()).body.match(/\b\d{6}\b/)[0]
+  const futureSession=await h.send(futureRenewalPath+'/action?name=code.verify',{code:futureCode})
+  assert.equal((await h.send(futureRenewalPath+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},futureSession.cookie)).status,200)
   const tables=['p_sms_provider_optins','p_sms_reenable_history','p_sms_assents','p_sms_revocations','p_sms_code_runs','p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_sender_notice_events','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings','p_template_sender_notices'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
   assert.equal(before.p_sms_assents.length,3);assert.equal(before.p_sms_provider_optins.length,1);assert.equal(before.p_sms_reenable_history.length,1);assert.equal(before.p_sms_runs.filter(r=>r.kind==='completion').length,1)
   for(const table of ['p_sms_revocations','p_sms_code_runs','p_sms_optouts'])assert.equal(before[table].length,1,table+' has real history')
-  assert.equal(before.p_sender_notice_events.length,6);assert.ok(before.p_sender_notice_events.some(e=>e.action==='revoked'));assert.equal(before.p_sender_notice_runs.length,2);assert.equal(before.p_followups.find(f=>f.proposal_id===expiry.id).action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,9,'the added scheduler tick retains the newly observed signature notice')
+  assert.equal(before.p_template_sender_notices.length,1);assert.equal(before.p_template_sender_notices[0].renewal_days,50);assert.equal(before.p_sender_notice_events.length,7);assert.ok(before.p_sender_notice_events.some(e=>e.action==='revoked'));assert.equal(before.p_sender_notice_runs.length,2);assert.equal(before.p_followups.find(f=>f.proposal_id===expiry.id).action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,9,'the added scheduler tick retains the newly observed signature notice')
   await h.close();h=undefined
   const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'))
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
@@ -897,6 +908,8 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(fixed+30*86400000),cron:'*/15 * * * *'})
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sender_notice_runs WHERE proposal_id=?').bind(future.id).first()).n,0,'a due but still unexpired restored notice has no execution authority')
   assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_sender_notice_runs WHERE kind='renewal'").first()).n,1,'restored renewal history remains exact without replay')
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2031-01-29T00:00:00Z'),cron:'*/15 * * * *'})
+  assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_sender_notice_runs WHERE proposal_id=?").bind(futureRenewal.id).first()).n,0,'a restored accepted term cannot execute its due renewal notice')
   const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
   const setupResponse=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})
   assert.equal(setupResponse.status,303);await setupResponse.text()

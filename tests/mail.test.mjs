@@ -902,9 +902,9 @@ test('FOLLOW-001 / FOLLOW-006 / FOLLOW-011 template and workspace delivery snaps
 test('FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority', {timeout:120000}, async()=>{const {reminderMessagesHttp}=await import('./reminders-http.mjs');await reminderMessagesHttp()})
 
 
-async function notificationFixture(beforeMail=async()=>{}) {
+async function notificationFixture(beforeMail=async()=>{},clock) {
  const messages=[],chats=[];let uncertain=false
- const h=await harness({assetsDirectory:'public',origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7000'},outboundService:async request=>{
+ const h=await harness({assetsDirectory:'public',origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7000',...(clock?{PLATTER_TEST_CLOCK:String(Date.parse(clock))}:{})},outboundService:async request=>{
   const url=new URL(request.url)
   if(url.hostname==='api.resend.com'){const message=await request.json();await beforeMail(message);messages.push(message);return Response.json({id:'synthetic-platter-7001'})}
   if(url.pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-7002'})
@@ -1042,7 +1042,7 @@ test('FOLLOW-003 sender expiry notices create dated follow-ups independently of 
   const runs=(await h.db.prepare('SELECT * FROM p_sender_notice_runs ORDER BY notice_date').all()).results;assert.deepEqual(runs.map(r=>r.notice_date),['2030-03-12','2030-03-12','2030-03-19'])
   await h.send('/auth/invite',{email:'sales@synthetic-platter.example',role:'member',displayName:'Sales'},h.owner);const cookie=await h.signIn('sales@synthetic-platter.example')
   await h.cmd('notification.defaults',{version:1,enabled:true,leadDays:2,renewalEnabled:true,renewalDays:20},cookie,403)
-  const renewal=await notificationFixture();try{await renewalNoticeJourney(renewal)}finally{await renewal.close()}
+  const renewal=await notificationFixture(undefined,'2026-03-01T12:00:00Z');try{await renewalNoticeJourney(renewal)}finally{await renewal.close()}
 
  }finally{await h.close()}
 })
@@ -1112,6 +1112,7 @@ test('FOLLOW-003 saved settings stay inactive and queued expiry email rechecks r
   await h.cmd('notification.expiry',{id:saved.id,version:1,consent:true},h.owner,409)
   await h.cmd('notification.expiry',{id:saved.id,version:5,action:'authorize'},h.owner,400)
   assert.deepEqual(await h.state(),baseline,'refused authority changes nothing')
+  await renewalRevocationJourney()
  }finally{await h.close()}
 })
 
@@ -1785,6 +1786,7 @@ async function renewalNoticeJourney(h){
  const due=await setup('Renewal due'),manual=await setup('Renewal manual',{manual:true}),off=await setup('Renewal off',{renewalEnabled:false}),inactive=await setup('Renewal inactive',{authorize:false}),late=await setup('Renewal edited lead',{lead:20})
  const manualBefore=await h.db.prepare('SELECT * FROM p_followups WHERE proposal_id=?').bind(manual.id).first()
  const immutable=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(due.id).first()
+ assert.equal(new Date(immutable.accepted_at).toISOString(),'2026-03-01T12:00:00.000Z')
  assert.equal(JSON.parse(immutable.snapshot).selection.fees.recurring[0].renewalOn,'2027-03-01')
  const notices=()=>h.messages.filter(m=>m.subject==='Agreement renewal approaching')
  await h.tick('2027-01-28T23:59:59Z');assert.equal(notices().length,0)
@@ -1817,7 +1819,55 @@ async function renewalNoticeJourney(h){
  const inherited=await h.cmd('template.start',{id:template.id,version:3,clientId:h.client.id})
  assert.equal((await settings(inherited.id)).renewal_days,30)
  for(const id of [start.id,copy.id,next.id,inherited.id])assert.equal(await h.db.prepare('SELECT 1 FROM p_sender_notice_authority WHERE proposal_id=?').bind(id).first(),null)
+ const acceptedBefore=await h.db.prepare('SELECT * FROM p_proposals WHERE id=?').bind(due.id).first()
+ const currentSettings=await settings(due.id)
+ await h.cmd('notification.expiry',{id:due.id,version:acceptedBefore.version,settingsVersion:currentSettings.version,action:'save',renewalEnabled:true,renewalDays:40})
+ const afterEdit=await h.state()
+ await h.cmd('notification.expiry',{id:due.id,version:acceptedBefore.version,settingsVersion:currentSettings.version,action:'authorize',consent:true},h.owner,409)
+ assert.deepEqual(await h.state(),afterEdit,'stale accepted-agreement settings cannot authorize new delivery')
+ assert.deepEqual(await h.db.prepare('SELECT * FROM p_proposals WHERE id=?').bind(due.id).first(),acceptedBefore,'notice edits preserve the frozen agreement and its version')
  const before=await h.state()
  await h.cmd('notification.expiry',{id:original.id,version:1,consent:true},h.owner,409)
  assert.deepEqual(await h.state(),before)
+}
+
+async function renewalRevocationJourney(){
+ let invalidate
+ const h=await notificationFixture(async message=>{if(message.subject==='Agreement renewal approaching'&&invalidate){const next=invalidate;invalidate=null;await next(message)}},'2026-03-01T12:00:00Z')
+ try{
+  await h.tick('2026-03-01T12:00:00Z')
+  const email=['renewal-sales','synthetic-platter.example'].join(String.fromCharCode(64)),adminEmail=['renewal-admin','synthetic-platter.example'].join(String.fromCharCode(64))
+  await h.send('/auth/invite',{email,role:'member',displayName:'Renewal sales'},h.owner)
+  const salesCookie=await h.signIn(email),sales=(await h.state(salesCookie)).actor
+  await h.send('/auth/invite',{email:adminEmail,role:'member',displayName:'Renewal admin'},h.owner)
+  const adminCookie=await h.signIn(adminEmail),admin=(await h.state(adminCookie)).actor
+  await h.cmd('member.set',{operatorId:admin.id,version:0,role:'admin',teams:[]})
+  const rows=[]
+  for(const kind of ['revoke','revoke','settings','settings','demotion','demotion','authorizer','authorizer']){
+   const person=kind==='demotion'?salesCookie:h.owner,p=await h.cmd('proposal.prepare',{...offer,clientId:h.client.id,title:'Renewal '+kind,packages:[{id:'one',label:'Annual care',price:'1'}],pricingTables:[{optionId:'one',name:'Care',lines:[{name:'Care',quantity:'1',unit:'month',unitPrice:'1200',interval:'monthly',term:12,startsOn:'2026-03-01'}]}]},person)
+   await h.cmd('notification.expiry',{id:p.id,version:1,enabled:false,renewalEnabled:true,consent:true},kind==='authorizer'?adminCookie:person)
+   await h.cmd('proposal.approve',{id:p.id,version:2,revision:1})
+   const path=new URL((await h.cmd('proposal.send',{id:p.id,version:3},person)).shareUrl).pathname
+   await h.send(path+'/action?name=code.request',{})
+   const code=h.messages.findLast(m=>m.subject==='Your Platter verification code').text.match(/\b\d{6}\b/)[0],session=await h.send(path+'/action?name=code.verify',{code})
+   assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},session.cookie)).status,200)
+   rows.push({...p,kind})
+  }
+  let demoted=false,adminDemoted=false
+  invalidate=async message=>{
+   const first=rows.find(p=>message.text.includes(p.id));assert.ok(first)
+   for(const p of rows.filter(p=>p.id!==first.id)){
+    if(p.kind==='revoke')await h.cmd('notification.expiry',{id:p.id,version:5,settingsVersion:2,action:'revoke'})
+    if(p.kind==='settings')await h.cmd('notification.expiry',{id:p.id,version:5,settingsVersion:2,action:'save',renewalEnabled:false})
+    if(p.kind==='demotion'&&!demoted){await h.cmd('member.set',{operatorId:sales.id,version:0,role:'content_editor',teams:[]});demoted=true}
+    if(p.kind==='authorizer'&&!adminDemoted){await h.cmd('member.set',{operatorId:admin.id,version:1,role:'content_editor',teams:[]});adminDemoted=true}
+   }
+  }
+  await h.tick('2027-01-29T00:00:00Z')
+  assert.equal(h.messages.filter(m=>m.subject==='Agreement renewal approaching').length,1)
+  const out=(await h.db.prepare("SELECT * FROM p_notification_outbox WHERE event_key LIKE 'renewal:%'").all()).results
+  assert.equal(out.length,8);assert.equal(out.filter(r=>r.status==='sent').length,1);assert.equal(out.filter(r=>r.status==='withheld').length,7)
+  await h.tick('2027-01-29T01:00:00Z')
+  assert.equal(h.messages.filter(m=>m.subject==='Agreement renewal approaching').length,1,'invalidated renewal work cannot replay')
+ }finally{await h.close()}
 }

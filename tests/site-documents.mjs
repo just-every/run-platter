@@ -935,7 +935,7 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
 test('FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke expiry email without activation on inspection', {timeout:120000},async()=>{
  let app,browser
  try{
-  app=await installedApp()
+  app=await installedApp({scheduled:true})
   browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   const context=await browser.newContext({viewport:{width:1440,height:1000}})
   try{
@@ -971,7 +971,7 @@ test('FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke exp
    assert.equal((await state()).expiryNotices.settings.find(s=>s.proposal_id===p.id).renewal_days,30)
    await notice.getByText('Expiry notice Settings',{exact:true}).click()
    await notice.getByLabel('Proposal expiry lead days').fill('4')
-   await notice.getByLabel('Proposal renewal notices',{exact:true}).selectOption('no')
+   await notice.getByLabel('Proposal renewal notices').selectOption('no')
    await notice.getByRole('button',{name:'Save expiry settings'}).click()
    assert.deepEqual((await state()).expiryNotices.active,[],'editing needs new authorization')
    await consent.check();await notice.getByRole('button',{name:'Authorize expiry email',exact:true}).click()
@@ -982,6 +982,42 @@ test('FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke exp
    assert.equal(snapshot.expiryNotices.events.filter(e=>e.action==='revoked').length,1)
    const fields=await notice.locator('input,select,button,summary,p,label').evaluateAll(nodes=>nodes.filter(n=>getComputedStyle(n).display!=='none').every(n=>parseFloat(getComputedStyle(n).fontSize)>=13))
    assert.equal(fields,true)
+   const template=await cmd('template.save',{id:p.id,version:snapshot.proposals.find(row=>row.id===p.id).version,name:'Sender notice template'})
+   await page.goto(app.origin+'/app')
+   const templatePanel=page.locator('article').filter({has:page.getByRole('heading',{name:'Sender notice template',exact:true})})
+   await templatePanel.getByText('Reminder and expiry defaults for Sender notice template',{exact:true}).click()
+   await templatePanel.getByLabel('Sender notice source').selectOption('override')
+   await templatePanel.getByLabel('Template sender expiry lead days').fill('6')
+   await templatePanel.getByLabel('Template renewal lead days').fill('45')
+   await templatePanel.getByRole('button',{name:'Save template delivery defaults',exact:true}).click()
+   const templateSaved=(await state()).templates.find(t=>t.id===template.id)
+   assert.deepEqual([templateSaved.senderNotices.source,templateSaved.senderNotices.lead_days,templateSaved.senderNotices.renewal_days],['override',6,45])
+   assert.deepEqual((await state()).expiryNotices.active,[],'template edits do not authorize the source proposal')
+   const agreement=await cmd('proposal.prepare',{clientId:client.id,title:'Accepted renewal controls',scope:'Retained care agreement',optionOne:'Care',priceOne:'100',optionTwo:'Extra',priceTwo:'200',depositPercent:'25',pricingTables:[{optionId:'one',name:'Care',lines:[{name:'Care',quantity:'1',unit:'month',unitPrice:'100',interval:'monthly',term:12,startsOn:'2035-03-01'}]}]})
+   await cmd('proposal.approve',{id:agreement.id,version:1,revision:1})
+   const sent=await cmd('proposal.send',{id:agreement.id,version:2}),clientPath=new URL(sent.shareUrl).pathname
+   const clientContext=await browser.newContext({viewport:{width:1440,height:1000}})
+   try{
+    const post=async(name,data)=>clientContext.request.post(app.origin+clientPath+'/action?name='+name,{headers:{origin:app.origin},data})
+    assert.equal((await post('code.request',{})).status(),200)
+    const code=(await app.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(agreement.id).first()).body.match(/\b\d{6}\b/)[0]
+    assert.equal((await post('code.verify',{code})).status(),200)
+    assert.equal((await post('accept',{name:'Synthetic client',optionId:'one',consent:true})).status(),200)
+   }finally{await clientContext.close()}
+   const accepted=(await state()).proposals.find(p=>p.id===agreement.id)
+   await page.goto(app.origin+'/app/proposal?id='+agreement.id)
+   assert.ok((await notice.innerText()).includes('2036-02-29'))
+   await notice.getByText('Expiry notice Settings',{exact:true}).click()
+   await notice.getByLabel('Proposal renewal lead days').fill('45')
+   await notice.getByRole('button',{name:'Save expiry settings'}).click()
+   await notice.getByRole('checkbox').check()
+   await notice.getByRole('button',{name:'Authorize expiry email',exact:true}).click()
+   assert.deepEqual((await state()).expiryNotices.active,[agreement.id])
+   await notice.getByRole('button',{name:'Revoke expiry email',exact:true}).click()
+   const retained=(await state()).proposals.find(p=>p.id===agreement.id)
+   assert.equal(retained.version,accepted.version)
+   assert.deepEqual(retained.acceptance,accepted.acceptance,'sender controls preserve the accepted agreement')
+   assert.deepEqual((await state()).expiryNotices.active,[])
    const screenshots=process.env.PLATTER_SCREENSHOTS
    if(screenshots){
     await mkdir(screenshots,{recursive:true})
@@ -989,10 +1025,13 @@ test('FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke exp
      await page.setViewportSize({width,height:1000})
      await page.goto(app.origin+'/app/settings')
      await defaults.screenshot({path:join(screenshots,'FOLLOW-003-defaults-'+width+'.png')})
-     await page.goto(app.origin+'/app/proposal?id='+p.id)
+     await page.goto(app.origin+'/app/proposal?id='+agreement.id)
      await notice.getByText('Expiry notice Settings',{exact:true}).click()
      await notice.getByText('Expiry notice history',{exact:true}).click()
      await notice.screenshot({path:join(screenshots,'FOLLOW-003-controls-'+width+'.png')})
+     await page.goto(app.origin+'/app')
+     await templatePanel.getByText('Reminder and expiry defaults for Sender notice template',{exact:true}).click()
+     await templatePanel.screenshot({path:join(screenshots,'FOLLOW-003-template-'+width+'.png')})
     }
    }
   }finally{await context.close()}

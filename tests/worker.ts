@@ -15,10 +15,20 @@ import { runReminders } from '../src/platter/reminders'
 import { runExpiry } from '../src/platter/expiry'
 import { runDueReports } from '../src/platter/reports/schedules'
 import { runtimeBindings } from '../src/auth.server'
+// Timing journeys can pin the Worker's wall clock without adding a production clock door.
+const wallNow=Date.now
+let fixedNow:number|undefined
+Date.now=()=>fixedNow??wallNow()
+function testClock(env:Bindings){
+ const initial=Number((env as any).PLATTER_TEST_CLOCK)
+ if(Number.isFinite(initial)&&initial>0)fixedNow=initial
+}
 export default {async fetch(request:Request,env:Bindings){
+ testClock(env)
+
  if(new URL(request.url).pathname.startsWith('/auth/')){
   const auth=createOperatorAuth({...memberAuthOptions(env),db:env.DB,config:authConfig(env),clientIp:()=>'127.0.0.1',mailSender:{async send(message:any){await createD1DevelopmentOutbox({db:env.DB}).put(message);return{provider:'development',mode:'development',providerMessageId:null,status:env.AUTH_LOCAL==='true'?'development':'accepted'}}}})
   return withAuthAudit(request,env,async()=>await memberAuthHandler(request,env,auth),auth)
  }
  return await authResponse(request,env)??await platterResponse(request,env)??new Response('Not found',{status:404})
-},async scheduled(controller:ScheduledController,env:Bindings){await runExpiry(runtimeBindings(env),controller.scheduledTime);await runReminders(runtimeBindings(env),controller.scheduledTime);await runSms(runtimeBindings(env));await runDueReports(runtimeBindings(env),controller.scheduledTime);await runNotifications(runtimeBindings(env));await runWebhooks(runtimeBindings(env),controller.scheduledTime);await runArchives(runtimeBindings(env));await runCompletionMail(runtimeBindings(env))}}
+},async scheduled(controller:ScheduledController,env:Bindings){testClock(env);await runExpiry(runtimeBindings(env),controller.scheduledTime);await runReminders(runtimeBindings(env),controller.scheduledTime);await runSms(runtimeBindings(env));await runDueReports(runtimeBindings(env),controller.scheduledTime);await runNotifications(runtimeBindings(env));await runWebhooks(runtimeBindings(env),controller.scheduledTime);await runArchives(runtimeBindings(env));await runCompletionMail(runtimeBindings(env))}}

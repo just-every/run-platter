@@ -1,7 +1,7 @@
 import { permitted } from '../permissions'
 import { negotiatedView, pendingNegotiation } from '../negotiation'
 import type { Bindings } from '../../auth.server'
-import { commit, need, proposal, text, type Actor } from '../model'
+import { commit, need, text, type Actor } from '../model'
 import { calendarDate, currentTime } from '../expiry-time'
 import { queueMail, dispatchMail } from '../mail'
 import { state } from '../state'

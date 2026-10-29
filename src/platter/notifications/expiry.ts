@@ -21,6 +21,7 @@ export async function senderNoticeCommand(env:Bindings,a:Actor,name:string,p:Rec
  const row=await permitted(db,a,p.id,'send');need(senders.includes(a.role),'Only proposal senders configure notices',403);exact(row,p)
  const defaults=await db.prepare('SELECT * FROM p_sender_notice_defaults WHERE singleton=1').first<any>()
  const old=await db.prepare('SELECT * FROM p_sender_notice_settings WHERE proposal_id=?').bind(row.id).first<any>()
+ if(row.status==='accepted')need(Number(p.settingsVersion)===(old?.version??0),'Notice settings changed. Reload.',409)
  const action=String(p.action??'authorize');need(['save','authorize','revoke'].includes(action),'Choose a notice action')
  const on=action==='revoke'?(old?.enabled??defaults.enabled):p.enabled===undefined?(old?.enabled??defaults.enabled):enabled(p.enabled)
  const lead=action==='revoke'?(old?.lead_days??defaults.lead_days):p.leadDays===undefined?(old?.lead_days??defaults.lead_days):days(p.leadDays)
@@ -38,11 +39,11 @@ export async function senderNoticeCommand(env:Bindings,a:Actor,name:string,p:Rec
   db.prepare('INSERT INTO p_sender_notice_settings(proposal_id,enabled,lead_days,version,renewal_enabled,renewal_days) VALUES(?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET enabled=excluded.enabled,lead_days=excluded.lead_days,version=excluded.version,renewal_enabled=excluded.renewal_enabled,renewal_days=excluded.renewal_days').bind(row.id,on,lead,version,renewalOn,renewalLead),
   db.prepare('DELETE FROM p_sender_notice_authority WHERE proposal_id=?').bind(row.id),
   db.prepare('INSERT INTO p_sender_notice_events(id,proposal_id,revision,settings_version,actor_id,actor_role,actor_version,member_version,owner_id,enabled,lead_days,action,occurred_at,renewal_enabled,renewal_days) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,version,a.id,a.role,operator.version,a.memberVersion??0,row.sales_owner_id,on,lead,action==='authorize'&&(on||renewalOn)?'authorized':action==='revoke'?'revoked':'saved',at,renewalOn,renewalLead),
-  db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id)
+  ...(row.status==='accepted'?[]:[db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id)])
  ]
  if(action==='authorize'&&(on||renewalOn))writes.push(db.prepare('INSERT INTO p_sender_notice_authority(proposal_id,consent_id) VALUES(?,?)').bind(row.id,id))
  await commit(db,a,writes,false,{sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND COALESCE((SELECT version FROM p_sender_notice_settings WHERE proposal_id=?),0)=?',values:[row.id,row.version,row.id,old?.version??0]})
- return {id:row.id,enabled:Boolean(on),leadDays:lead,version:row.version+1}
+ return {id:row.id,enabled:Boolean(on),leadDays:lead,settingsVersion:version,version:row.version+(row.status==='accepted'?0:1)}
 }
 
 // The historical consent is portable; this local join is the execution grant.

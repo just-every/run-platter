@@ -1,5 +1,6 @@
 import { hubspotCardData, hubspotCardResponse } from './crm/hubspot-card'
 import { crmDraftSources } from './crm/hubspot-draft'
+import { agentRequest, agentLedger, agentApproval } from './agent-ledger'
 import { archiveState } from './archiving/jobs'
 import { clientLocale } from './locales'
 import { fixedPagePreview, importDocument, exportDocument } from './documents/import-export'
@@ -62,7 +63,7 @@ const headers={'cache-control':'no-store','x-content-type-options':'nosniff','re
 const json=(v:unknown,status=200)=>Response.json(v,{status,headers})
 const pages=new Set(['/app/crm-card','/app','/app/proposal','/app/clients','/app/import','/app/access','/app/audit','/app/settings','/app/team','/app/approvals','/app/library','/app/catalog'])
 async function body(request:Request,maxBytes=150000){const raw=await request.text();need(new TextEncoder().encode(raw).length<=maxBytes,'Request too large',413);if(request.headers.get('content-type')?.includes('application/json')){let v;try{v=JSON.parse(raw)}catch{fail('Invalid JSON')}need(v&&typeof v==='object'&&!Array.isArray(v),'Expected an object');return v as Record<string,unknown>}need(request.headers.get('content-type')?.includes('application/x-www-form-urlencoded'),'Use JSON or a form',415);return Object.fromEntries(new URLSearchParams(raw))}
-export async function platterResponse(request:Request,original:Bindings):Promise<Response|null>{const env=runtimeBindings(original),url=new URL(request.url),path=url.pathname,isClient=path.startsWith('/p/'),isAgent=path.startsWith('/api/platter/agent/');if(!isClient&&!path.startsWith('/api/platter/')&&path!=='/app'&&!path.startsWith('/app/'))return null
+async function respond(request:Request,original:Bindings):Promise<Response|null>{const env=runtimeBindings(original),url=new URL(request.url),path=url.pathname,isClient=path.startsWith('/p/'),isAgent=path.startsWith('/api/platter/agent/');if(!isClient&&!path.startsWith('/api/platter/')&&path!=='/app'&&!path.startsWith('/app/'))return null
  let actor:Actor|undefined;const requestedBack=new URL(url.searchParams.get('returnTo')||'/app',env.AUTH_ORIGIN);const back=requestedBack.origin===env.AUTH_ORIGIN&&pages.has(requestedBack.pathname)?requestedBack.pathname+requestedBack.search:'/app';let context:any,submitted:Record<string,unknown>|undefined
  try{
   const api=await publicApi(request,env);if(api)return api
@@ -109,6 +110,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    const media=path.match(/^\/api\/platter\/document-media\/([\w-]+)\/([\w-]+)$/);if(media){const row=await permitted(env.DB,actor,media[1]);return await documentMedia(env.DB,negotiatedView(row,await pendingNegotiation(env.DB,row.id)),media[2])}
    const dispute=path.match(/^\/api\/platter\/disputes\/([^/]+)\/evidence\.pdf$/);if(dispute){const response=await disputePdf(env,actor,decodeURIComponent(dispute[1]),url.searchParams.get('submission'),url.searchParams.get('packet'));await recordAudit(env.DB,actor,'dispute.evidence',decodeURIComponent(dispute[1]));return response}
    if(path==='/api/platter/agreement.pdf'||path==='/api/platter/certificate.pdf'||path==='/api/platter/certificate.json')return await agreementArtifact(env,String(url.searchParams.get('id')),path.split('/').at(-1)!,{actor})
+   if(path==='/api/platter/agent-ledger')return json(url.searchParams.has('approval')?{approval:await agentApproval(env.DB,actor,url.searchParams.get('approval')!)}:{receipts:await agentLedger(env.DB,actor)})
    if(path==='/api/platter/archives'){need(administrators.includes(actor.role),'Only owner and admins read archive history',403);return json(await archiveState(env,actor))}
    if(path==='/api/platter/engagement')return json(await engagement(env,actor,String(url.searchParams.get('id')??'')))
    if(path==='/api/platter/tracking-alerts'){need(senders.includes(actor.role),'Only current proposal senders read open notices',403);return json({alerts:await senderAlerts(env.DB,actor)})}
@@ -149,4 +151,11 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   if(pages.has(path)&&status===401)return new Response(null,{status:303,headers:{...headers,location:'/signin?returnTo='+encodeURIComponent(path+url.search)}})
   return json({error:message},status)
  }
+}
+
+export async function platterResponse(request:Request,original:Bindings):Promise<Response|null>{
+ const path=new URL(request.url).pathname
+ if(path.startsWith('/api/platter/agent/')||(path.startsWith('/api/platter/v1/')&&request.headers.has('authorization')))
+  return agentRequest(request,runtimeBindings(original),()=>respond(request,original))
+ return respond(request,original)
 }

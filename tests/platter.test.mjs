@@ -3663,3 +3663,83 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
  } finally { await h.close() }
  await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
 })
+
+test('AGENT-009 consented receipts, human records and pause protect every existing key transport through public doors',async()=>{
+ const {createHash}=await import('node:crypto'),digest=value=>createHash('sha256').update(value).digest('hex')
+ let release,arrived,barrier,gate
+ const arm=()=>{barrier=new Promise(resolve=>arrived=resolve);gate=new Promise(resolve=>release=resolve)}
+ arm()
+ const h=await harness({entry:'tests/agent-commit-worker.ts',outboundService:async request=>{assert.equal(new URL(request.url).hostname,'agent-barrier.example.test');arrived();await gate;return new Response(null,{status:204})}})
+ try{
+  const client=await h.cmd('client.save',{name:'Synthetic receipt client',email:'synthetic-platter-9801'+String.fromCharCode(64)+'example.test'})
+  const key=await h.cmd('agent.create',{label:'Synthetic receipt assistant'}),auth={authorization:'Bearer '+key.token},ledger=async()=>(await h.send('/api/platter/agent-ledger',undefined,h.owner)).value.receipts
+  const input={name:'proposal.prepare',input:{...offer,clientId:client.id,scope:'synthetic-platter-raw-source-9802'}},legacy=(value,extra={})=>h.send('/api/platter/agent/command',value,'',{...auth,...extra})
+  const first=await legacy(input);assert.equal(first.status,200,first.text);assert.deepEqual(await ledger(),[],'receipt collection requires explicit per-key consent')
+  await h.cmd('agent.receipts',{id:key.id,version:0,consent:true})
+  const before=Date.now(),created=await legacy(input);assert.equal(created.status,200,created.text)
+  let receipts=await ledger(),receipt=receipts.find(r=>r.input_digest===digest(JSON.stringify(input)))
+  assert.ok(receipt);assert.equal(receipt.output_digest,digest(created.text));assert.equal(receipt.status,'succeeded');assert.equal(receipt.key_id,key.id);assert.equal(receipt.action,'proposal.prepare');assert.equal(receipt.transport,'legacy');assert.ok(receipt.started_at>=before&&receipt.completed_at>=receipt.started_at);assert.equal(receipt.http_status,200);assert.equal(receipt.model,'not recorded');assert.deepEqual(receipt.records.map(r=>[r.proposal_id,r.revision,r.approvals.length]),[[created.value.id,1,0]])
+  await h.cmd('proposal.approve',{id:created.value.id,revision:1,version:1})
+  receipt=(await ledger()).find(r=>r.id===receipt.id)
+  assert.ok(receipt.records[0].approvals.some(a=>a.decision==='approved'));assert.ok(receipt.records[0].legacyApprovals.length)
+  for(const approval of [...receipt.records[0].approvals,...receipt.records[0].legacyApprovals]){
+   const actual=(await h.send('/api/platter/agent-ledger?approval='+approval.id,undefined,h.owner)).value.approval
+   assert.equal(actual.id,approval.id);assert.equal(actual.proposal_id,created.value.id);assert.equal(actual.revision,1);assert.equal(actual.actor_id,(await h.state()).actor.id)
+  }
+  const unchanged=await h.state()
+  for(const name of ['proposal.approve','proposal.send','proposal.sign','payment.refund','invoice.write-off'])assert.equal((await legacy({name,input:{id:created.value.id}})).status,403)
+  assert.deepEqual((await h.state()).proposals,unchanged.proposals);assert.deepEqual((await h.state()).outbox,unchanged.outbox)
+  let seq=0
+  const rpc=(name,args={},headers={})=>h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:++seq,method:'tools/call',params:{name,arguments:args}},'',{...auth,...headers})
+  const read=await rpc('read_proposal',{id:created.value.id});assert.ok(!read.value.result.isError)
+  const mcpReceipt=(await ledger()).find(r=>r.transport==='mcp');assert.equal(mcpReceipt.output_digest,digest(read.text));assert.equal(mcpReceipt.status,'succeeded');assert.equal(mcpReceipt.records[0].proposal_id,created.value.id)
+  for(const name of ['approve','send','sign','refund','write_off']){const refused=await rpc(name,{id:created.value.id});assert.ok(refused.value.result?.isError||refused.value.error)}
+  assert.ok((await ledger()).filter(r=>r.transport==='mcp'&&r.status==='refused').length>=5)
+  const rest=(await h.send('/api/platter/v1/keys',{label:'Synthetic scoped receipt key',scopes:['proposals.read']},h.owner)).value
+  const restAuth={authorization:'Bearer '+rest.token},api=(path,body)=>h.send('/api/platter/v1'+path,body,'',restAuth)
+  await h.cmd('agent.receipts',{id:rest.id,version:0,consent:'yes'})
+  const listed=await api('/proposals');assert.equal(listed.status,200);assert.ok(listed.value.length>=2)
+  const restReceipt=(await ledger()).find(r=>r.key_id===rest.id);assert.equal(restReceipt.transport,'rest');assert.equal(restReceipt.input_digest,digest(''));assert.equal(restReceipt.output_digest,digest(listed.text));assert.equal(restReceipt.records.length,listed.value.length)
+  assert.equal((await api('/templates')).status,403)
+  for(const verb of ['approve','send','sign','refund','write-off'])assert.equal((await api('/proposals/'+created.value.id+'/'+verb,{})).status,404)
+  await h.send('/auth/invite',{email:'synthetic-platter-9803'+String.fromCharCode(64)+'example.test',displayName:'Receipt member',role:'admin',returnTo:'/app'},h.owner)
+  const admin=await h.signIn('synthetic-platter-9803'+String.fromCharCode(64)+'example.test')
+  assert.equal((await h.send('/api/platter/agent-ledger',undefined,admin)).status,403)
+  const approvalId=receipt.records[0].approvals[0].id
+  assert.equal((await h.send('/api/platter/agent-ledger?approval='+approvalId,undefined,admin)).status,403)
+  for(const name of ['agent.pause','agent.resume','agent.receipts'])await h.cmd(name,{id:key.id,version:1,consent:true},admin,403)
+  assert.ok(!(await h.state(admin)).agentLedger)
+  assert.equal((await h.send('/api/platter/agent-ledger',undefined,'',auth)).status,401)
+  assert.equal((await api('/agent-ledger')).status,404)
+  await h.cmd('agent.pause',{id:key.id,version:1});await h.cmd('agent.pause',{id:rest.id,version:1})
+  assert.equal((await legacy(input)).status,403);assert.equal((await rpc('read_proposal',{id:created.value.id})).status,403);assert.equal((await h.send('/api/platter/agent/context',undefined,'',auth)).status,403);assert.equal((await api('/proposals')).status,403)
+  assert.equal((await ledger()).find(r=>r.key_id===rest.id&&r.status==='refused'&&r.action==='rest.get.proposals').http_status,403)
+  await h.cmd('agent.resume',{id:key.id,version:1},h.owner,409)
+  await h.cmd('agent.resume',{id:key.id,version:2})
+  assert.equal((await rpc('read_proposal',{id:created.value.id})).status,200)
+  const beforeRace=(await h.state()).proposals
+  const pending=legacy({...input,input:{...input.input,title:'Synthetic in-flight draft'}},{'x-test-agent-commit':'hold'})
+  await Promise.race([barrier,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('Agent never reached commit barrier')),10000);timer.unref()})])
+  await h.cmd('agent.pause',{id:key.id,version:3});release()
+  const refused=await pending;assert.equal(refused.status,409,refused.text);assert.deepEqual((await h.state()).proposals,beforeRace,'owner pause prevents authenticated in-flight mutation at commit')
+  assert.ok((await ledger()).some(r=>r.output_digest===digest(refused.text)&&r.status==='refused'))
+  // Repeat the transaction-time pause through the other mutation transports.
+  await h.cmd('agent.resume',{id:key.id,version:4})
+  arm()
+  const mcpPending=rpc('prepare_proposal',{...offer,depositPercent:25,clientId:client.id},{'x-test-agent-commit':'hold'})
+  await barrier;await h.cmd('agent.pause',{id:key.id,version:5});release()
+  const mcpRefused=await mcpPending;assert.equal(mcpRefused.value.result.isError,true);assert.match(mcpRefused.value.result.content[0].text,/409/);assert.deepEqual((await h.state()).proposals,beforeRace)
+  const restWrite=(await h.send('/api/platter/v1/keys',{label:'Synthetic REST mutation key',scopes:['proposals.write']},h.owner)).value
+  await h.cmd('agent.receipts',{id:restWrite.id,version:0,consent:true})
+  const template=await h.cmd('template.save',{id:first.value.id,version:1,name:'Synthetic race template'})
+  arm()
+  const restPending=h.send('/api/platter/v1/proposals',{templateId:template.id,templateVersion:1,clientId:client.id},'',{authorization:'Bearer '+restWrite.token,'x-test-agent-commit':'hold'})
+  await barrier;await h.cmd('agent.pause',{id:restWrite.id,version:1});release()
+  const restRefused=await restPending;assert.equal(restRefused.status,409,restRefused.text);assert.deepEqual((await h.state()).proposals,beforeRace)
+  const stored=JSON.stringify((await h.db.prepare('SELECT * FROM p_agent_receipts').all()).results)
+  for(const sentinel of [key.token,rest.token,'synthetic-platter-raw-source-9802','Synthetic receipt client'])assert.ok(!stored.includes(sentinel),'receipts retain no raw input, output or credentials')
+  await h.cmd('agent.receipts',{id:key.id,version:6,consent:false});const count=(await ledger()).length
+  assert.equal((await legacy(input)).status,403);assert.equal((await ledger()).length,count,'revoked collection consent prevents subsequent receipts')
+  await h.cmd('agent.revoke',{id:key.id});assert.equal((await legacy(input)).status,401)
+ }finally{release?.();await h.close()}
+})

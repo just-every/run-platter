@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `3724c1fca4b3a9a81a12145e3206d37f4fa26696` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 and APPROVE-003 are builder completion claims pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -659,7 +659,7 @@ Core · target · **partial**
 
 #### APPROVE-003 — Who approves, who sends and what needs approval
 
-Core · target · **partial** · Cites BASE-AGENT-007, BASE-AGENT-008
+Core · target · **done** · Cites BASE-AGENT-007, BASE-AGENT-008
 
 **Requirement.** One proposal approval policy applies to originals, negotiations, copies, drafted proposals, import reissues, public-link templates and phone decisions. The TEAM-001 matrix defines eligible people and proposal scope. Agent binding decisions carry commitment, while sending carries external and commitment; the company’s policy decides their calls. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#approve-003).
 
@@ -670,8 +670,8 @@ Core · target · **partial** · Cites BASE-AGENT-007, BASE-AGENT-008
 4. Turn no-rule approval on: the unruled proposal waits for the selected owner, admin or manager role; changing that role changes who may decide.
 5. Only owner/admin change the proposal policy; the change retains actor and time.
 
-**Evidence.** `tests/platter.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP”; `tests/site.test.mjs` — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
-**Gap.** Delivered: Sales and manager flows exercise scoped send/approve decisions and policy-controlled proposal approval. Missing “APPROVE-003 complete who approves, who sends and what needs approval journey”: The full no-rule owner/admin/manager decision matrix and authorized policy-edit history run together, including out-of-team no-change refusals and unruled sending without a fabricated approval.
+**Evidence.** `tests/platter.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP” (unruled $3,000 send, $30,000 manager route, complete unchanged refusal records, all three default roles and audited owner and admin changes); `tests/site.test.mjs` — “MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths” (registered through `tests/site-documents.mjs`; native policy controls and decisions at 1440 and 390 pixels); `tests/archive.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” (exact policy, original audit and decision custody without restored sessions)
+**Gap.** None.
 
 #### APPROVE-004 — Approval reevaluation on the exact revision
 

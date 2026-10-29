@@ -9,7 +9,8 @@ export async function legacyAgentResponse(request:Request,env:Bindings):Promise<
  if(!['/api/platter/agent/context','/api/platter/agent/command'].includes(path))return null
  const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'cache-control':'no-store'}})
  if(request.headers.has('origin')&&request.headers.get('origin')!==env.AUTH_ORIGIN)return json({code:'origin_refused'},403)
- const who=await localAgent(request,env)
+ let who
+ try { who=await localAgent(request,env,true) } catch { return json({code:'insufficient_scope'},403) }
  if(!who)return json({code:'unauthenticated'},401)
  let name='platter.workspace.snapshot',args:Record<string,any>={}
  if(path.endsWith('/command')) {

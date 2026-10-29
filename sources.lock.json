@@ -2870,11 +2870,11 @@
       "executable": false
     },
     "src/platter/agent/index.ts": {
-      "sha256": "286d980e164ea90e3841735079d13afe7e2ffaa2bf67a53cbceee51743573dee",
+      "sha256": "2a2a4b12d39ff5a2dd7cd9c6a2b48d51b5de22e4e5df9e3e66158fde90a9ee0a",
       "executable": false
     },
     "src/platter/agent/legacy.ts": {
-      "sha256": "eed079c002156fe3e2bf749d217a2a05f707c41cfd5a546d50dcdb0b3af0d8fa",
+      "sha256": "fbc4d64959ec9ad6ab0518a0247d2e263b5f6b2608049a4ba18a41b7d72fb6b7",
       "executable": false
     },
     "src/platter/agent/people.ts": {

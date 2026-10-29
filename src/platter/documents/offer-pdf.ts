@@ -94,6 +94,8 @@ export async function offerPdf(view: any, optionId: string, fontBytes: (Uint8Arr
   if(option.tables?.length)pdf.text(`Package grand total: ${amount(option.cents,currency)}`,13)
  }
 
+ if(signer&&view.fieldValues){pdf.heading('Collected Client values');for(const block of doc.blocks.filter(b=>['field','signature'].includes(b.type)&&b.fieldKind!=='file')){const value=view.fieldValues[block.id];if(value!==undefined)pdf.text(block.title+': '+String(value))}}
+ if(signer&&view.clientFiles?.length){pdf.heading('Client files');for(const file of view.clientFiles){pdf.text(file.filename);pdf.text('SHA-256: '+file.sha256)}}
  pdf.heading('Proposal attachments')
  const attachments = typeof view.attachments === 'string' ? JSON.parse(view.attachments) : view.attachments ?? []
  need(Array.isArray(attachments), 'Invalid proposal attachments')

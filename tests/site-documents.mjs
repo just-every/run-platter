@@ -885,7 +885,7 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
  const edge = await browserEdge(), provider = hubspotFixture()
  let h, browser
  try {
-  h = await harness({ entry: 'dist/server/index.js', assetsDirectory: 'dist/client', origin: edge.origin, outboundService: provider.request }); edge.attach(h)
+  h = await harness({ entry: './dist/server/index.js', assetsDirectory: './dist/client', origin: edge.origin, outboundService: provider.request }); edge.attach(h)
   browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ignoreHTTPSErrors: true })
   try {
@@ -901,6 +901,7 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
    await panel.getByLabel('Company from deal').selectOption(provider.selected.companyId); await panel.getByLabel('Contact from deal').selectOption(provider.selected.contactId)
    await panel.getByRole('button', { name: 'Review selected deal', exact: true }).click()
    const review = panel.getByRole('article', { name: 'Reviewed HubSpot draft' })
+   assert.equal(await panel.getByLabel('Company from deal').inputValue(), provider.selected.companyId); assert.equal(await panel.getByLabel('Contact from deal').inputValue(), provider.selected.contactId)
    assert.match(await review.innerText(), /Synthetic reviewed company/); assert.match(await review.innerText(), /Taylor Reed/)
    assert.match(await review.innerText(), /2\.5 × \$120\.50 USD/); assert.match(await review.innerText(), /3 × \$19\.99 USD/); assert.match(await review.innerText(), /\$361\.22 USD/)
    assert.equal((await h.state()).proposals.length, 0, 'review alone creates no draft or approval')

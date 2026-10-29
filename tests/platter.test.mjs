@@ -3629,6 +3629,12 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
   assert.equal((await h.send('/api/platter/crm/source?id=' + made.id, undefined, member)).status, 403); assert.equal(edge.calls.length, noCall)
   assert.deepEqual((await h.state(member)).crmDraftSources, [])
   await h.cmd('member.set', { operatorId: person.id, version: 0, role: 'admin', teams: [] })
+  let readDemoted = false
+  edge.beforeReply(async request => { if (!readDemoted && request.url.includes('/contacts/')) { readDemoted = true; const current = (await h.state()).teamPeople.find(row => row.id === person.id); await h.cmd('member.set', { operatorId: person.id, version: current.version, role: 'sales', teams: [] }) } })
+  await h.cmd('crm.deal.review', { dealId: edge.selected.dealId }, member, 409); edge.beforeReply(undefined)
+  assert.deepEqual(await counts(), heldBaseline, 'source choices are refused if read authority is lost during the provider request')
+  const readDemotion = (await h.state()).teamPeople.find(row => row.id === person.id)
+  await h.cmd('member.set', { operatorId: person.id, version: readDemotion.version, role: 'admin', teams: [] })
   const adminReview = await review(member)
   let demoted = false
   edge.beforeReply(async request => { if (!demoted && request.url.includes('/line_items/')) { demoted = true; const current = (await h.state()).teamPeople.find(row => row.id === person.id); await h.cmd('member.set', { operatorId: person.id, version: current.version, role: 'sales', teams: [] }) } })

@@ -74,7 +74,10 @@ export async function hubspotDraftCommand(env: Bindings, actor: Actor, name: str
  const db = env.DB, at = await currentTime(db)
  if (name === 'crm.deal.review') {
   const read = await readDeal(env, input)
-  if (!read.source) return { crmReview: true, ...read.choices, draftScope: String(input.scope ?? ''), held: 'Explicitly select the company and contact to review.' }
+  if (!read.source) {
+   await commit(db, actor, [], true, connectionGuard(read.connection))
+   return { crmReview: true, ...read.choices, draftScope: String(input.scope ?? ''), held: 'Explicitly select the company and contact to review.' }
+  }
   const content = read.content!, fields = JSON.stringify(copiedContactFields(read.source.contact, read.source.company.address))
   const client = await db.prepare('SELECT * FROM p_clients WHERE email=?').bind(read.source.contact.email).first<any>()
   need(!client || client.name === read.source.company.name && canonical(JSON.parse(client.variable_fields)) === canonical(JSON.parse(fields)), 'This contact already belongs to different client details; reconcile the client before review', 409)

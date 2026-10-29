@@ -676,7 +676,7 @@ Evidence: None recorded.
 
 Status: **partial**.
 
-Gap: CRM-card launch, broader member and delegated access, two-way amount and line-item updates, proposal-link and timeline writes, broader lifecycle synchronization and live-provider qualification remain. The conservative owner or admin connected-deal-read floor is unchanged; existing stage-only writes retain FOLLOW-005 consent and uncertainty riders. FOLLOW-007 requires ct consent, scope and public-door assertions before standing-grant execution.
+Gap: CRM-card launch, broader member and delegated access, two-way amount and line-item updates, proposal-link and timeline writes, broader lifecycle synchronization and live-provider qualification remain. The conservative owner and admin connected-deal-read floor is unchanged; existing stage-only writes retain FOLLOW-005 consent and uncertainty riders. FOLLOW-007 requires ct consent, scope and public-door assertions before standing-grant execution.
 
 Evidence: `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 

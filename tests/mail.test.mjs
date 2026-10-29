@@ -1042,6 +1042,8 @@ test('FOLLOW-003 sender expiry notices create dated follow-ups independently of 
   const runs=(await h.db.prepare('SELECT * FROM p_sender_notice_runs ORDER BY notice_date').all()).results;assert.deepEqual(runs.map(r=>r.notice_date),['2030-03-12','2030-03-12','2030-03-19'])
   await h.send('/auth/invite',{email:'sales@synthetic-platter.example',role:'member',displayName:'Sales'},h.owner);const cookie=await h.signIn('sales@synthetic-platter.example')
   await h.cmd('notification.defaults',{version:1,enabled:true,leadDays:2,renewalEnabled:true,renewalDays:20},cookie,403)
+  const renewal=await notificationFixture();try{await renewalNoticeJourney(renewal)}finally{await renewal.close()}
+
  }finally{await h.close()}
 })
 
@@ -1761,3 +1763,61 @@ test('SIGN-005 completion mail attaches the retained PDFs to both parties once, 
   }finally{release();await h.close()}
  }
 })
+
+async function renewalNoticeJourney(h){
+ // A fixed clock advances monotonically through actual public send and acceptance doors.
+ await h.tick('2026-03-01T12:00:00Z')
+ await h.cmd('notification.defaults',{version:0,enabled:true,leadDays:3,renewalEnabled:true,renewalDays:30})
+ const input={...offer,clientId:h.client.id,depositPercent:'1',packages:[{id:'one',label:'Annual care',price:'1'}],pricingTables:[{optionId:'one',name:'Care',lines:[{name:'Care',quantity:'1',unit:'month',unitPrice:'1200',interval:'monthly',term:12,startsOn:'2026-03-01'}]}]}
+ const setup=async(title,{renewalEnabled=true,lead=30,authorize=true,manual=false}={})=>{
+  const p=await h.cmd('proposal.prepare',{...input,title})
+  await h.cmd('expiry.set',{id:p.id,version:1,mode:'days',days:14,warningDays:1})
+  await h.cmd('notification.expiry',{id:p.id,version:2,action:authorize?'authorize':'save',enabled:false,leadDays:3,renewalEnabled,renewalDays:lead,...(authorize?{consent:true}:{})})
+  if(manual)await h.cmd('followup.schedule',{id:p.id,action:'Discuss the existing relationship',dueDate:'2027-02-02'})
+  await h.cmd('proposal.approve',{id:p.id,version:3,revision:1})
+  const path=new URL((await h.cmd('proposal.send',{id:p.id,version:4})).shareUrl).pathname
+  await h.send(path+'/action?name=code.request',{})
+  const message=h.messages.findLast(m=>m.subject==='Your Platter verification code'),code=message.text.match(/\b\d{6}\b/)[0]
+  const session=await h.send(path+'/action?name=code.verify',{code})
+  assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},session.cookie)).status,200)
+  return {...p,path}
+ }
+ const due=await setup('Renewal due'),manual=await setup('Renewal manual',{manual:true}),off=await setup('Renewal off',{renewalEnabled:false}),inactive=await setup('Renewal inactive',{authorize:false}),late=await setup('Renewal edited lead',{lead:20})
+ const manualBefore=await h.db.prepare('SELECT * FROM p_followups WHERE proposal_id=?').bind(manual.id).first()
+ const immutable=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(due.id).first()
+ assert.equal(JSON.parse(immutable.snapshot).selection.fees.recurring[0].renewalOn,'2027-03-01')
+ const notices=()=>h.messages.filter(m=>m.subject==='Agreement renewal approaching')
+ await h.tick('2027-01-28T23:59:59Z');assert.equal(notices().length,0)
+ await Promise.all([h.tick('2027-01-29T00:00:00Z'),h.tick('2027-01-29T00:00:00Z')])
+ assert.equal(notices().length,2)
+ for(const message of notices()){assert.deepEqual(message.to,[h.auth.OWNER_EMAIL]);assert.ok(message.text.includes('2027-02-28'));assert.ok(message.text.includes('2027-01-29'));assert.ok(message.text.includes('#renewal-offer'))}
+ assert.deepEqual(await h.db.prepare('SELECT * FROM p_followups WHERE proposal_id=?').bind(manual.id).first(),manualBefore)
+ const queue=(await h.send('/api/platter/followups',undefined,h.owner)).value
+ assert.equal(queue.rows.find(p=>p.id===due.id).dueDate,'2027-01-29')
+ assert.equal(queue.rows.find(p=>p.id===due.id).action,'Review renewal offer')
+ assert.equal(queue.rows.find(p=>p.id===manual.id).action,'Discuss the existing relationship')
+ assert.ok(!queue.rows.some(p=>[off.id,inactive.id,late.id].includes(p.id)))
+ const page=await h.send('/app/proposal?id='+due.id,undefined,h.owner);assert.equal(page.status,200);assert.ok(page.text.includes('id="renewal-offer"'));assert.ok(page.text.includes('2027-02-28'))
+ await h.cmd('followup.complete',{id:due.id,action:'Reviewed the next agreement'})
+ assert.ok(!(await h.state()).followups.rows.some(p=>p.id===due.id),'a renewal follow-up can be completed through the ordinary door')
+ await h.tick('2027-02-08T00:00:00Z');assert.equal(notices().length,3)
+ assert.deepEqual(await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(due.id).first(),immutable)
+ // Template and duplicate starts copy settings, never the sender's grant.
+ const original=await h.prepare('Notice template source')
+ await h.cmd('notification.expiry',{id:original.id,version:1,enabled:true,leadDays:7,renewalEnabled:true,renewalDays:45,consent:true})
+ const template=await h.cmd('template.save',{id:original.id,version:2,name:'Notice snapshot'})
+ const start=await h.cmd('template.start',{id:template.id,version:1,clientId:h.client.id})
+ const copy=await h.cmd('proposal.duplicate',{id:original.id,version:2})
+ const settings=async id=>h.db.prepare('SELECT * FROM p_sender_notice_settings WHERE proposal_id=?').bind(id).first()
+ assert.deepEqual([...(await Promise.all([start.id,copy.id].map(async id=>{const r=await settings(id);return [r.lead_days,r.renewal_days]})))],[[7,45],[7,45]])
+ await h.cmd('template.delivery',{id:template.id,version:1,noticeSource:'override',noticeEnabled:true,noticeDays:5,renewalEnabled:true,renewalDays:60})
+ const next=await h.cmd('template.start',{id:template.id,version:2,clientId:h.client.id})
+ assert.equal((await settings(next.id)).renewal_days,60);assert.equal((await settings(start.id)).renewal_days,45)
+ await h.cmd('template.delivery',{id:template.id,version:2,noticeSource:'inherit'})
+ const inherited=await h.cmd('template.start',{id:template.id,version:3,clientId:h.client.id})
+ assert.equal((await settings(inherited.id)).renewal_days,30)
+ for(const id of [start.id,copy.id,next.id,inherited.id])assert.equal(await h.db.prepare('SELECT 1 FROM p_sender_notice_authority WHERE proposal_id=?').bind(id).first(),null)
+ const before=await h.state()
+ await h.cmd('notification.expiry',{id:original.id,version:1,consent:true},h.owner,409)
+ assert.deepEqual(await h.state(),before)
+}

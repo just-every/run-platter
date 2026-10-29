@@ -24,8 +24,9 @@ export async function templateState(db: D1Database, a: Actor) {
  const search=(await db.prepare('SELECT file_id,content FROM p_attachment_search').all<any>()).results
  const locks=(await db.prepare('SELECT * FROM p_template_locks UNION ALL SELECT * FROM p_template_block_locks ORDER BY section').all<any>()).results
  const delivery=(await db.prepare('SELECT * FROM p_template_defaults').all<any>()).results
+ const notices=(await db.prepare('SELECT * FROM p_template_sender_notices').all<any>()).results
  const messages=(await db.prepare('SELECT * FROM p_template_reminder_messages').all<any>()).results
- return rows.map(row => ({reminderTemplateId:messages.some(m=>m.template_id===row.id)?messages.find(m=>m.template_id===row.id).message_id:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}').reminderTemplateId??null,deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:a.role==='agent'?agentDeliveryDefaults(JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}')):JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, attachmentText:(JSON.parse(row.snapshot).attachments??[]).map((f:any)=>search.find(s=>s.file_id===f.id)?.content??'').join('\n'),snapshot:JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
+ return rows.map(row => ({senderNotices:notices.find(n=>n.template_id===row.id),reminderTemplateId:messages.some(m=>m.template_id===row.id)?messages.find(m=>m.template_id===row.id).message_id:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}').reminderTemplateId??null,deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:a.role==='agent'?agentDeliveryDefaults(JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}')):JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, attachmentText:(JSON.parse(row.snapshot).attachments??[]).map((f:any)=>search.find(s=>s.file_id===f.id)?.content??'').join('\n'),snapshot:JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
 }
 
 async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false) {
@@ -77,6 +78,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   writes.push(db.prepare('INSERT OR IGNORE INTO p_template_block_locks(template_id,section) SELECT ?,section FROM p_proposal_block_locks WHERE proposal_id=?').bind(id,source.id))
   const mediaIds=documentMediaIds(documentOf(displayed))
   writes.push(db.prepare('DELETE FROM p_template_document_media WHERE template_id=?').bind(id),db.prepare('INSERT INTO p_template_document_media(template_id,file_id) SELECT ?,file_id FROM p_document_media WHERE proposal_id=? AND file_id IN ('+(mediaIds.map(()=>'?').join(',')||'NULL')+')').bind(id,source.id,...mediaIds))
+  writes.push(db.prepare('DELETE FROM p_template_sender_notices WHERE template_id=?').bind(id),db.prepare('INSERT INTO p_template_sender_notices(template_id,enabled,lead_days,renewal_enabled,renewal_days) SELECT ?,enabled,lead_days,renewal_enabled,renewal_days FROM p_sender_notice_settings WHERE proposal_id=?').bind(id,source.id))
   writes.push(...saveTemplateCosts(db,source.id,displayed.revision,id),...templateDefaults(db,source.id,id))
   await commit(db, a, writes, false, {
    sql: 'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND '+folder.sql+' AND '+previous.sql+(existing?' AND EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?)':''),
@@ -96,6 +98,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  let content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
  if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...editableVariableFields(content),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan}}
  const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry
+ const savedNotice=personal?await db.prepare("SELECT * FROM p_template_sender_notices WHERE template_id=? AND source='override'").bind(personal.id).first<any>():null
+ const notice=savedNotice??await db.prepare('SELECT * FROM p_sender_notice_defaults WHERE singleton=1').first<any>()
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)
  need(content.currency === 'USD', 'Personal templates require USD content', 409)
  const id = crypto.randomUUID(), title = input.title === undefined || input.title === '' ? content.title : text(input.title, 'a title')
@@ -109,6 +113,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
    prepared_by,created_at,currency,sales_owner_id,sales_owner_name,attachments)
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
    .bind(id, clientId, title, row.scope, row.terms ?? '', row.deposit_bps, JSON.stringify(row.options), preparer, at, 'USD', a.id, a.email, JSON.stringify(attachments)),
+  db.prepare('INSERT INTO p_sender_notice_settings(proposal_id,enabled,lead_days,renewal_enabled,renewal_days) VALUES(?,?,?,?,?)').bind(id,notice.enabled,notice.lead_days,notice.renewal_enabled,notice.renewal_days),
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) VALUES(?,?,?)').bind(id,template.id,template.version),
   ...(!starter?[db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_template_locks WHERE template_id=?').bind(id,template.id),db.prepare('INSERT INTO p_proposal_block_locks(proposal_id,section) SELECT ?,section FROM p_template_block_locks WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_template_document_media WHERE template_id=?').bind(id,template.id)]:[]),
@@ -141,7 +146,12 @@ async function templateDeliveryCommand(db:D1Database,a:Actor,p:Record<string,unk
  const settings={...old,paymentMethods,remindersEnabled:p.remindersEnabled===undefined?old.remindersEnabled:p.remindersEnabled===true||p.remindersEnabled==='yes',reminderDays:dayList(p.reminderDays,old.reminderDays),beforeExpiryDays:dayList(p.beforeExpiryDays,old.beforeExpiryDays),reminderCap:cap}
  const messageId=p.reminderTemplateId===undefined?undefined:String(p.reminderTemplateId)||null
  if(messageId)need(await db.prepare('SELECT 1 FROM p_reminder_templates WHERE id=?').bind(messageId).first(),'Reminder template not found',404)
+ const oldNotice=await db.prepare('SELECT * FROM p_template_sender_notices WHERE template_id=?').bind(row.id).first<any>()??await db.prepare('SELECT * FROM p_sender_notice_defaults WHERE singleton=1').first<any>()
+ const noticeSource=p.noticeSource??oldNotice.source??'inherit';need(['inherit','override'].includes(String(noticeSource)),'Choose a sender notice source')
+ const noticeFlag=(v:unknown,fallback:number)=>{need(v===undefined||[true,false,'yes','no'].includes(v as any),'Choose whether the sender notice is on');return v===undefined?fallback:v===true||v==='yes'?1:0}
+ const noticeDays=(v:unknown,fallback:number)=>{const n=v===undefined?fallback:Number(v);need(v!==''&&Number.isInteger(n)&&n>=1&&n<=365,'Choose notice lead days from 1 to 365');return n}
+ const notice=[row.id,String(noticeSource),noticeFlag(p.noticeEnabled,oldNotice.enabled),noticeDays(p.noticeDays,oldNotice.lead_days),noticeFlag(p.renewalEnabled,oldNotice.renewal_enabled),noticeDays(p.renewalDays,oldNotice.renewal_days)]
  const nextExpiry={...expiry,...(p.expiryDays!==undefined?{mode:expiryDays===null?'never':'days',period_days:expiryDays,expires_on:null}:{}),warning_days:warningDays}
- await commit(db,a,[...(messageId===undefined?[]:[db.prepare('INSERT INTO p_template_reminder_messages(template_id,message_id) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET message_id=excluded.message_id').bind(row.id,messageId)]),db.prepare('UPDATE p_personal_templates SET delivery_sources=?,expiry=?,version=version+1,updated_at=? WHERE id=?').bind(JSON.stringify(sources),JSON.stringify(nextExpiry),at,row.id),db.prepare('INSERT INTO p_template_defaults(template_id,settings) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET settings=excluded.settings').bind(row.id,JSON.stringify(settings))],false,{sql:'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?) AND '+access.sql,values:[row.id,row.version,...access.values]})
+ await commit(db,a,[db.prepare('INSERT INTO p_template_sender_notices(template_id,source,enabled,lead_days,renewal_enabled,renewal_days) VALUES(?,?,?,?,?,?) ON CONFLICT(template_id) DO UPDATE SET source=excluded.source,enabled=excluded.enabled,lead_days=excluded.lead_days,renewal_enabled=excluded.renewal_enabled,renewal_days=excluded.renewal_days').bind(...notice),...(messageId===undefined?[]:[db.prepare('INSERT INTO p_template_reminder_messages(template_id,message_id) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET message_id=excluded.message_id').bind(row.id,messageId)]),db.prepare('UPDATE p_personal_templates SET delivery_sources=?,expiry=?,version=version+1,updated_at=? WHERE id=?').bind(JSON.stringify(sources),JSON.stringify(nextExpiry),at,row.id),db.prepare('INSERT INTO p_template_defaults(template_id,settings) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET settings=excluded.settings').bind(row.id,JSON.stringify(settings))],false,{sql:'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?) AND '+access.sql,values:[row.id,row.version,...access.values]})
  return {id:row.id,version:row.version+1}
 }

@@ -3,6 +3,7 @@ import { actorById } from '../credentials'
 import { addDays, currentTime, startOfDate } from '../expiry-time'
 import { commit, exact, need, type Actor } from '../model'
 import { administrators, permitted, senders } from '../permissions'
+import { renewalDates } from './renewal'
 import { notificationWrite } from './dispatch'
 
 function days(value:unknown){const n=Number(value);need(value!==''&&Number.isInteger(n)&&n>=1&&n<=365,'Choose notice lead days from 1 to 365');return n}
@@ -29,29 +30,31 @@ export async function senderNoticeCommand(env:Bindings,a:Actor,name:string,p:Rec
   need(owner&&senders.includes(owner.role),'The recorded sales owner must have current sending authority',409)
   await permitted(db,owner,row.id,'send')
  }
+ const renewalOn=action==='revoke'?(old?.renewal_enabled??defaults.renewal_enabled):p.renewalEnabled===undefined?(old?.renewal_enabled??defaults.renewal_enabled):enabled(p.renewalEnabled)
+ const renewalLead=action==='revoke'?(old?.renewal_days??defaults.renewal_days):p.renewalDays===undefined?(old?.renewal_days??defaults.renewal_days):days(p.renewalDays)
  const operator=await db.prepare('SELECT version FROM oa_operators WHERE id=?').bind(a.id).first<any>()
  const id=crypto.randomUUID(),version=(old?.version??0)+1,at=await currentTime(db)
  const writes=[
-  db.prepare('INSERT INTO p_sender_notice_settings(proposal_id,enabled,lead_days,version) VALUES(?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET enabled=excluded.enabled,lead_days=excluded.lead_days,version=excluded.version').bind(row.id,on,lead,version),
+  db.prepare('INSERT INTO p_sender_notice_settings(proposal_id,enabled,lead_days,version,renewal_enabled,renewal_days) VALUES(?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET enabled=excluded.enabled,lead_days=excluded.lead_days,version=excluded.version,renewal_enabled=excluded.renewal_enabled,renewal_days=excluded.renewal_days').bind(row.id,on,lead,version,renewalOn,renewalLead),
   db.prepare('DELETE FROM p_sender_notice_authority WHERE proposal_id=?').bind(row.id),
-  db.prepare('INSERT INTO p_sender_notice_events(id,proposal_id,revision,settings_version,actor_id,actor_role,actor_version,member_version,owner_id,enabled,lead_days,action,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,version,a.id,a.role,operator.version,a.memberVersion??0,row.sales_owner_id,on,lead,action==='authorize'&&on?'authorized':action==='revoke'?'revoked':'saved',at),
+  db.prepare('INSERT INTO p_sender_notice_events(id,proposal_id,revision,settings_version,actor_id,actor_role,actor_version,member_version,owner_id,enabled,lead_days,action,occurred_at,renewal_enabled,renewal_days) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,version,a.id,a.role,operator.version,a.memberVersion??0,row.sales_owner_id,on,lead,action==='authorize'&&(on||renewalOn)?'authorized':action==='revoke'?'revoked':'saved',at,renewalOn,renewalLead),
   db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id)
  ]
- if(action==='authorize'&&on)writes.push(db.prepare('INSERT INTO p_sender_notice_authority(proposal_id,consent_id) VALUES(?,?)').bind(row.id,id))
+ if(action==='authorize'&&(on||renewalOn))writes.push(db.prepare('INSERT INTO p_sender_notice_authority(proposal_id,consent_id) VALUES(?,?)').bind(row.id,id))
  await commit(db,a,writes,false,{sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND COALESCE((SELECT version FROM p_sender_notice_settings WHERE proposal_id=?),0)=?',values:[row.id,row.version,row.id,old?.version??0]})
  return {id:row.id,enabled:Boolean(on),leadDays:lead,version:row.version+1}
 }
 
 // The historical consent is portable; this local join is the execution grant.
-const consentJoin=`JOIN p_sender_notice_authority a ON a.proposal_id=p.id
+export const consentJoin=`JOIN p_sender_notice_authority a ON a.proposal_id=p.id
  JOIN p_sender_notice_events c ON c.id=a.consent_id AND c.action='authorized'
  AND c.revision=p.revision AND c.settings_version=s.version AND c.owner_id=p.sales_owner_id
  JOIN oa_operators sender ON sender.id=c.actor_id AND sender.status='active' AND sender.version=c.actor_version
  LEFT JOIN p_members member ON member.operator_id=sender.id`
-const consentCurrent=`COALESCE(member.version,0)=c.member_version
+export const consentCurrent=`COALESCE(member.version,0)=c.member_version
  AND CASE WHEN sender.role IN ('owner','admin') THEN sender.role ELSE COALESCE(member.role,'sales') END=c.actor_role`
 
-async function currentSender(db:D1Database,consentId:string,proposalId:string){
+export async function currentSender(db:D1Database,consentId:string,proposalId:string){
  const c=await db.prepare('SELECT actor_id FROM p_sender_notice_events WHERE id=?').bind(consentId).first<any>()
  const sender=c?await actorById(db,c.actor_id):undefined
  if(!sender||!senders.includes(sender.role))return false
@@ -76,7 +79,7 @@ export async function expiryNoticeState(env:Bindings,a:Actor,ids:Set<unknown>){
  const db=env.DB,defaults=await db.prepare('SELECT * FROM p_sender_notice_defaults WHERE singleton=1').first<any>()
  const settings=(await db.prepare('SELECT * FROM p_sender_notice_settings').all<any>()).results.filter(r=>ids.has(r.proposal_id))
  const events=(await db.prepare('SELECT * FROM p_sender_notice_events ORDER BY occurred_at,id').all<any>()).results.filter(r=>ids.has(r.proposal_id))
- const grants=(await db.prepare(`SELECT p.id,c.id AS consent_id FROM p_proposals p JOIN p_sender_notice_settings s ON s.proposal_id=p.id ${consentJoin} WHERE ${consentCurrent} AND s.enabled=1`).all<any>()).results
+ const grants=(await db.prepare(`SELECT p.id,c.id AS consent_id FROM p_proposals p JOIN p_sender_notice_settings s ON s.proposal_id=p.id ${consentJoin} WHERE ${consentCurrent} AND (s.enabled=1 OR s.renewal_enabled=1)`).all<any>()).results
  const active=[]
  for(const grant of grants.filter(r=>ids.has(r.id))){
   const row=await db.prepare('SELECT sales_owner_id FROM p_proposals WHERE id=?').bind(grant.id).first<any>()
@@ -85,7 +88,8 @@ export async function expiryNoticeState(env:Bindings,a:Actor,ids:Set<unknown>){
   try{await permitted(db,owner,grant.id,'send');if(await currentSender(db,grant.consent_id,grant.id))active.push(grant.id)}catch{}
  }
  const recipients=(await db.prepare('SELECT p.id AS proposal_id,o.display_name AS name,o.email FROM p_proposals p LEFT JOIN oa_operators o ON o.id=p.sales_owner_id').all<any>()).results.filter(r=>ids.has(r.proposal_id))
- return {expiryNoticeDefaults:defaults,expiryNotices:{settings,events,active,recipients}}
+ const terms=(await db.prepare('SELECT proposal_id,snapshot FROM p_acceptances').all<any>()).results.filter(r=>ids.has(r.proposal_id)).map(r=>({proposal_id:r.proposal_id,endsOn:renewalDates(r.snapshot)}))
+ return {expiryNoticeDefaults:defaults,expiryNotices:{settings,events,active,recipients,terms}}
 }
 
 export async function queueExpiryNotices(env:Bindings){

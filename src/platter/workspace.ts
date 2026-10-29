@@ -35,7 +35,7 @@ export async function workspaceCommand(db:D1Database,a:Actor,p:Record<string,unk
  return {id:'workspace'}
 }
 export async function defaultStatements(db:D1Database,id:string,expiry=true){
- const defaults=await workspaceDefaults(db),writes=[db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify({...delivery(defaults),...await reminderMessageDefaults(db)}))]
+ const defaults=await workspaceDefaults(db),writes=[db.prepare('INSERT INTO p_sender_notice_settings(proposal_id,enabled,lead_days,renewal_enabled,renewal_days) SELECT ?,enabled,lead_days,renewal_enabled,renewal_days FROM p_sender_notice_defaults WHERE singleton=1').bind(id),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify({...delivery(defaults),...await reminderMessageDefaults(db)}))]
  if(expiry&&defaults.expiryDays!==null)writes.push(db.prepare("INSERT INTO p_expiry(proposal_id,mode,period_days,time_zone,warning_days) VALUES(?,'days',?,?,?)").bind(id,defaults.expiryDays,await installationZone(db),defaults.warningDays))
  return writes
 }

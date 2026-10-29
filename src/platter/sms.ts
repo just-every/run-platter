@@ -52,7 +52,7 @@ export function smsGuard(ctx:Awaited<ReturnType<typeof smsContext>>){
    AND NOT EXISTS(SELECT 1 FROM p_sms_optouts o WHERE o.phone=c.phone)
    ${completed?'':'AND NOT EXISTS(SELECT 1 FROM p_acceptances x WHERE x.proposal_id=p.id)'}
    AND NOT EXISTS(SELECT 1 FROM p_withdrawals w WHERE w.proposal_id=p.id AND w.revision=p.revision)
-   AND ${expiryOpenSql('p')})`,values:[row.id,row.revision,share.token,c.phone,c.time_zone,c.consented_at,a.id,c.share_hash,c.member_version,c.assent_id,c.operator_version,purpose,at]}
+   AND (${completed?"p.status='accepted' OR ":''}${expiryOpenSql('p')}))`,values:[row.id,row.revision,share.token,c.phone,c.time_zone,c.consented_at,a.id,c.share_hash,c.member_version,c.assent_id,c.operator_version,purpose,at]}
 }
 
 const live=(env:Bindings,id:string,kind='invitation')=>smsContext(env,id,purposeFor(kind))

@@ -1468,6 +1468,21 @@ test('SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates ret
   const mailVerification=await h.send(mailPath+'/action?name=code.verify',{code:mailboxCode});assert.equal(mailVerification.status,200)
   await h.send(mailPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},mailVerification.cookie)
   const mailCertificate=await h.send(mailPath+'/certificate.json',undefined,mailVerification.cookie);assert.equal(mailCertificate.status,200,mailCertificate.text);assert.equal(mailCertificate.value.signers[0].method,'mailbox code')
+  const retainedId=await approved(h)
+  await h.cmd('expiry.set',{id:retainedId,version:2,mode:'days',days:1})
+  const retainedSent=await h.cmd('proposal.send',{id:retainedId,version:3}),retainedPath=new URL(retainedSent.shareUrl).pathname,retainedRow=(await h.state()).proposals.find(p=>p.id===retainedId)
+  await h.cmd('sms.configure',{...smsAssent,id:retainedId,version:retainedRow.version,consent:true,phone:'+12025550137',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-9210'})
+  await h.cmd('signer.method',{id:retainedId,version:retainedRow.version,method:'SMS code'})
+  assert.equal((await h.send(retainedPath+'/action?name=code.request',{})).status,200)
+  const retainedVerification=await h.send(retainedPath+'/action?name=code.verify',{code:texts.at(-1).Body.match(/\b\d{6}\b/)[0]});assert.equal(retainedVerification.status,200)
+  assert.equal((await h.send(retainedPath+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},retainedVerification.cookie)).status,200)
+  const retainedCertificate=await h.send(retainedPath+'/certificate.json',undefined,retainedVerification.cookie);assert.equal(retainedCertificate.status,200)
+  await tick('2030-06-03T15:20:00Z')
+  assert.equal((await h.send(retainedPath+'/certificate.json',undefined,retainedVerification.cookie)).status,401,'the original verification session has expired')
+  const renewedRequest=await h.send(retainedPath+'/action?name=code.request',{});assert.equal(renewedRequest.status,200,renewedRequest.text+'; accepted agreements never expire')
+  const renewedVerification=await h.send(retainedPath+'/action?name=code.verify',{code:texts.at(-1).Body.match(/\b\d{6}\b/)[0]});assert.equal(renewedVerification.status,200)
+  const renewedCertificate=await h.send(retainedPath+'/certificate.json',undefined,renewedVerification.cookie);assert.equal(renewedCertificate.status,200);assert.deepEqual(renewedCertificate.value,retainedCertificate.value,'fresh SMS verification reads the unchanged accepted agreement after the offer deadline')
+
  }finally{await h.close()}
 })
 

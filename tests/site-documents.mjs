@@ -336,7 +336,7 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
  let app,browser
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
    const inbound=inboundMailFixture(),edge=await browserEdge(),mailCalls=[],disputeStatuses=new Map(),disputeUploads=[],disputeDeadline=Math.floor(Date.now()/1000)+86400
@@ -530,6 +530,67 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
     await page.goto(app.origin+'/app/proposal?id='+fallbackDraft.id);await page.getByRole('button',{name:'Send proposal',exact:true}).click()
     assert.match(await page.locator('main').innerText(),/Mailbox unavailable; sent through the installation sender/);assert.equal(mailboxSends.length,4);await capture(page,'mailbox-fallback')
     await mailboxPage.goto(app.origin+'/app/team');assert.match(await mailboxPage.locator('main').innerText(),/broken/);await capture(mailboxPage,'mailbox-broken')
+    // Exercise the existing Settings and exact-revision approval controls.
+    await settingsPage.goto(app.origin+'/app/approvals')
+    await settingsPage.locator('article').filter({has:settingsPage.getByRole('heading',{name:'Legal changes',exact:true})}).getByRole('button',{name:'Remove rule',exact:true}).click()
+    await settingsPage.getByLabel('Rule name',{exact:true}).fill('Counsel and finance legal review')
+    await settingsPage.getByLabel('Sequence order',{exact:true}).fill('3')
+    await settingsPage.getByLabel('Condition',{exact:true}).selectOption('termsEdited')
+    await settingsPage.getByLabel('First approver',{exact:true}).selectOption('person:'+ap.id)
+    await settingsPage.getByLabel('Second approver (parallel)',{exact:true}).selectOption('person:'+bp.id)
+    await settingsPage.getByRole('button',{name:'Add approval rule',exact:true}).click()
+    const savedApprovals=(await state(owner)).approvalSettings,legalRule=savedApprovals.rules.find(r=>r.name==='Counsel and finance legal review')
+    if(width===1440){
+     assert.equal(await settingsPage.getByRole('alert').count(),0)
+     assert.deepEqual(legalRule,{id:legalRule.id,name:'Counsel and finance legal review',position:3,condition:{kind:'termsEdited'},approvers:['person:'+ap.id,'person:'+bp.id],templates:[]})
+     assert.match(await settingsPage.locator('main').innerText(),new RegExp('admin.*billing','s'))
+    }
+    await capture(settingsPage,'approval-parallel-settings')
+    const approvalFields={clientId:client.id,title:'Synthetic parallel approval',scope:'Public delivery',depositPercent:'25',terms:'Original legal terms',packages:[{id:'main',label:'Delivery',price:'30000',discountPercent:'20'}]}
+    const parallel=await command(sales,'proposal.prepare',approvalFields)
+    await command(sales,'proposal.revise',{...approvalFields,id:parallel.id,version:1,terms:'Edited legal terms'})
+    let parallelRow=(await state(sales)).proposals.find(p=>p.id===parallel.id)
+    await command(manager,'proposal.approve',{id:parallel.id,version:parallelRow.version,revision:2})
+    await command(owner,'proposal.approve',{id:parallel.id,version:parallelRow.version+1,revision:2})
+    await settingsPage.goto(app.origin+'/app/proposal?id='+parallel.id)
+    await billingPage.goto(app.origin+'/app/proposal?id='+parallel.id)
+    if(width===1440){
+     assert.equal(await settingsPage.getByRole('button',{name:'Approve this revision',exact:true}).count(),1)
+     assert.equal(await billingPage.getByRole('button',{name:'Approve this revision',exact:true}).count(),1)
+    }
+    await capture(settingsPage,'approval-parallel-awaiting')
+    await settingsPage.getByRole('button',{name:'Approve this revision',exact:true}).click()
+    await billingPage.reload()
+    if(width===1440){
+     parallelRow=(await state(sales)).proposals.find(p=>p.id===parallel.id)
+     assert.equal(parallelRow.approval.complete,false)
+     assert.match(await billingPage.locator('main').innerText(),/Awaiting approval of this exact revision/)
+    }
+    await capture(billingPage,'approval-parallel-one-decision')
+    await billingPage.getByRole('button',{name:'Approve this revision',exact:true}).click()
+    if(width===1440){
+     assert.match(await billingPage.locator('main').innerText(),/All required approvals complete/)
+     assert.equal((await state(sales)).proposals.find(p=>p.id===parallel.id).approval.complete,true)
+    }
+    await capture(billingPage,'approval-parallel-complete')
+    await page.goto(app.origin+'/app/proposal?id='+parallel.id)
+    await page.getByRole('button',{name:'Send approved proposal',exact:true}).click()
+    const rejected=await command(sales,'proposal.prepare',{...approvalFields,title:'Synthetic rejected parallel approval'})
+    await command(sales,'proposal.revise',{...approvalFields,id:rejected.id,version:1,terms:'Edited legal terms'})
+    await command(manager,'proposal.approve',{id:rejected.id,version:2,revision:2})
+    await command(owner,'proposal.approve',{id:rejected.id,version:3,revision:2})
+    await billingPage.goto(app.origin+'/app/proposal?id='+rejected.id)
+    await billingPage.getByLabel('Rejection note',{exact:true}).fill('Synthetic legal changes refused')
+    await billingPage.getByRole('button',{name:'Reject revision',exact:true}).click()
+    await page.goto(app.origin+'/app/proposal?id='+rejected.id)
+    if(width===1440){
+     assert.match(await page.locator('main').innerText(),/Rejected. Save a new revision/)
+     assert.equal((await state(sales)).proposals.find(p=>p.id===rejected.id).approval.rejected,true)
+     await command(sales,'proposal.send',{id:rejected.id,version:5},409)
+     assert.deepEqual((await state(owner)).approvalSettings,savedApprovals)
+    }
+    await capture(page,'approval-parallel-rejected')
+
    }finally{await owner.close();await sales.close();await manager.close();await admin.close();await editor.close();await clientContext.close();await newMember.close();await billing.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}

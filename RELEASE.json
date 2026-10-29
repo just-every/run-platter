@@ -269,6 +269,10 @@
     {
       "id": "0090_client_locale.sql",
       "buyerSteps": "None. Adds owner-selected English or Spanish client language while retaining historical agreement language without inference."
+    },
+    {
+      "id": "0099_approval_request_details.sql",
+      "buyerSteps": "None. Retains exact-revision approval request trigger summaries and revocation details without restoring outbound authority."
     }
   ],
   "breaking": false,

@@ -1310,7 +1310,7 @@
       "executable": false
     },
     "RELEASE.json": {
-      "sha256": "4286f4934438784369a2cf4be3217a18a5b93968edf44841f32105aa1ca8cece",
+      "sha256": "f624e3b97c72a439372038b731518c8529c3f0e8c25ac55a1d541fa2bc6b12a3",
       "executable": false
     },
     "rer-project.json": {
@@ -3398,7 +3398,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "baf52f46ebf7e20913c1e71d718d9b5205b426cf020c485c07221d90498948c8",
+      "sha256": "0e71c8d73ee4d0265ea08f103fc90fec010122451df73e57f2e7c4698456f19c",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3594,7 +3594,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "210d70859a715ecc3d1fe5ff5aebdf39a80369a2ab8f39ef8eb47069f62fc511",
+      "sha256": "885f721516f5d28c945bab2d8467f808f7aca61eb2cbdb128eb6b489ccc2d2fd",
       "executable": false
     },
     "tests/site-harness.mjs": {

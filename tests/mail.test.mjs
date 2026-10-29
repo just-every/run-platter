@@ -1819,6 +1819,19 @@ async function renewalNoticeJourney(h){
  const inherited=await h.cmd('template.start',{id:template.id,version:3,clientId:h.client.id})
  assert.equal((await settings(inherited.id)).renewal_days,30)
  for(const id of [start.id,copy.id,next.id,inherited.id])assert.equal(await h.db.prepare('SELECT 1 FROM p_sender_notice_authority WHERE proposal_id=?').bind(id).first(),null)
+ // A pre-notice installation has no per-proposal settings row. New copies still
+ // snapshot current values, without inheriting any execution authority.
+ const legacy=await h.prepare('Legacy notice source')
+ await h.db.prepare('DELETE FROM p_sender_notice_settings WHERE proposal_id=?').bind(legacy.id).run()
+ const legacyCopy=await h.cmd('proposal.duplicate',{id:legacy.id,version:1})
+ const legacyTemplate=await h.cmd('template.save',{id:legacy.id,version:1,name:'Legacy notice snapshot'})
+ const legacyStart=await h.cmd('template.start',{id:legacyTemplate.id,version:1,clientId:h.client.id})
+ await h.cmd('notification.defaults',{version:1,enabled:false,leadDays:9,renewalEnabled:false,renewalDays:60})
+ for(const id of [legacyCopy.id,legacyStart.id]){
+  const row=await settings(id)
+  assert.deepEqual([row.enabled,row.lead_days,row.renewal_enabled,row.renewal_days],[1,3,1,30],'legacy starts retain their creation-time defaults')
+  assert.equal(await h.db.prepare('SELECT 1 FROM p_sender_notice_authority WHERE proposal_id=?').bind(id).first(),null)
+ }
  const acceptedBefore=await h.db.prepare('SELECT * FROM p_proposals WHERE id=?').bind(due.id).first()
  const currentSettings=await settings(due.id)
  await h.cmd('notification.expiry',{id:due.id,version:acceptedBefore.version,settingsVersion:currentSettings.version,action:'save',renewalEnabled:true,renewalDays:40})

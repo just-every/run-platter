@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "15be013d23bb806d0a4022903f9b130c98d89091314023eef5b4bbf3fdbbde8a",
+      "sha256": "836fdede282134fb942d2f18e622c6c9c589c7d9767139fbbf03e5d32b8a8775",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "0135519d1e05f6e662e4d95ed5fccf4787030ee0d87d654783f53bd9cbbead5d",
+      "sha256": "abc58638b629b0835dd4c946cd6e6cb6b2ce53b88ce3a4d16bb5abeef25e7990",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2670,7 +2670,7 @@
       "executable": false
     },
     "src/platter/duplicate.ts": {
-      "sha256": "49254a16f124396f2fab00df8afc03114f78937ff8a75983d55d405c12c0b203",
+      "sha256": "2935dede630e7af21b5fad8a4f305d9e1bc3e699cbe6c6fa045c1d576c062c16",
       "executable": false
     },
     "src/platter/expiry-time.ts": {
@@ -3014,7 +3014,7 @@
       "executable": false
     },
     "src/platter/templates.ts": {
-      "sha256": "1033f9e00cd2e43288b65f00e36d6e35e823b9c91a1e0d862c2a794a9ea2e505",
+      "sha256": "9ad3dad8193ff2362bc34bcb6a907b02aca915b4691d604d78e6a6b255592d7b",
       "executable": false
     },
     "src/platter/test-mail.ts": {
@@ -3530,7 +3530,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "58b4d63982b58d504af8f8d977a775de29dbacaf77132ca637fe359efab36c39",
+      "sha256": "b9ee15d9b05b2c7a42b07e7ca06825146a2811d18d0531dd53f25430892e8a07",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {

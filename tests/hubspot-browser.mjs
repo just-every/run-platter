@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { syncMapping } from './hubspot-sync-fixture.mjs'
+import { changedMapping, reviseHubspotRows } from './hubspot-rows-journey.mjs'
 import { signedCard } from './hubspot-sync-journey.mjs'
 
 export async function hubspotBrowser({ h, page, provider, current, capture }) {
@@ -51,4 +52,31 @@ export async function hubspotBrowser({ h, page, provider, current, capture }) {
   const undersized = await page.locator('main').evaluate(main => [...main.querySelectorAll('p,label,button,a,dt,dd')].filter(e => e.getClientRects().length && parseFloat(getComputedStyle(e).fontSize) < 13).map(e => e.tagName))
   assert.deepEqual(undersized, [], 'card controls and text are at least 13 pixels')
  }
+ const revisedId = linked.proposals[0].id
+ await reviseHubspotRows(h, revisedId)
+ await h.cmd('proposal.approve', { id: revisedId, version: 2, revision: 2 })
+ await h.cmd('proposal.send', { id: revisedId, version: 3 })
+ await page.setViewportSize({ width: 1440, height: 900 }); await page.goto(h.origin + '/app/settings')
+ const rowsSettings = page.locator('section').filter({ has: page.getByRole('heading', { name: 'HubSpot proposal synchronization', exact: true }) })
+ await rowsSettings.getByLabel('Proposal to synchronize').selectOption(revisedId + ':4')
+ for (const [name, value] of Object.entries(changedMapping)) await rowsSettings.locator('[name="' + name + '"]').fill(Array.isArray(value) ? value.join('\n') : value)
+ await rowsSettings.getByRole('button', { name: 'Review CRM writes', exact: true }).click()
+ const rowsReview = rowsSettings.getByRole('article', { name: 'Reviewed HubSpot writes' })
+ assert.match(await rowsReview.innerText(), /549\.30/); assert.match(await rowsReview.innerText(), /Revised strategy/); assert.match(await rowsReview.innerText(), /New production work/)
+ assert.match(await rowsReview.innerText(), /Unlink priced row synthetic-platter-4606/); assert.match(await rowsReview.innerText(), /retain the provider record/)
+ const beforeRows = provider.writes.length
+ await capture(rowsSettings, 'row-reconciliation-review')
+ assert.equal(provider.writes.length, beforeRows, 'the screen only plans row creation and unlinking until consent')
+ await rowsReview.getByRole('checkbox').check(); await rowsReview.getByRole('button', { name: 'Apply reviewed CRM writes', exact: true }).click()
+ assert.equal(await page.getByRole('alert').count(), 0)
+ assert.equal(provider.state.deal.properties.amount, '549.30')
+ assert.equal(provider.state.deal.associations.line_items.results.length, 2)
+ assert.ok(!provider.state.deal.associations.line_items.results.some(row => row.id === 'synthetic-platter-4606'))
+ assert.ok(provider.state.line_items.some(row => row.id === 'synthetic-platter-4606'))
+ assert.ok((await h.state()).crmSyncHistory.filter(r => r.proposal_id === revisedId).every(r => r.status === 'confirmed'))
+ await capture(rowsSettings, 'row-reconciliation-receipts')
+ assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'reconciliation controls fit the viewport')
+ const smallText = await rowsSettings.evaluate(section => [...section.querySelectorAll('p,label,button,a,dt,dd')].filter(e => e.getClientRects().length && parseFloat(getComputedStyle(e).fontSize) < 13).map(e => e.tagName))
+ assert.deepEqual(smallText, [], 'reconciliation text remains at least 13 pixels')
+
 }

@@ -8,7 +8,7 @@ import { canonical, readDeal } from './hubspot-draft'
 
 const base = 'https://api.hubapi.com/crm/v3'
 const identifier = (v: unknown) => { const id = text(v, 'a HubSpot identifier', 100); need(/^[A-Za-z0-9_-]+$/.test(id), 'Use a HubSpot identifier'); return id }
-export type SyncOperation = { key: string; method: 'PATCH' | 'POST'; path: string; body: any; label: string; expectedTotalCents?: number }
+export type SyncOperation = { key: string; method: 'PATCH' | 'POST' | 'DELETE'; path: string; body: any; label: string; expectedTotalCents?: number }
 export async function syncProposal(env: Bindings, actor: Actor, id: unknown) {
  need(administrators.includes(actor.role), 'Only owner and admins review CRM writes', 403)
  const row = await permitted(env.DB, actor, id, 'send')
@@ -63,17 +63,27 @@ export async function buildSyncPlan(env: Bindings, actor: Actor, input: Record<s
  const content = facts.accepted ? JSON.parse(facts.accepted.snapshot) : snapshot(row)
  const options = content.options, option = options?.length === 1 ? options[0] : null
  need(option && option.tables?.length === 1 && !option.discount && !option.tax && !option.recurring && !(option.optionalItems?.length), 'CRM writes require one fixed-price table without optional, recurring, tax or discount adjustments', 409)
- const original = await env.DB.prepare('SELECT snapshot FROM p_revisions WHERE proposal_id=? AND revision=1').bind(row.id).first<any>()
- const originalLines = JSON.parse(original.snapshot).options[0].tables[0].lines, originalSource = JSON.parse(source.source_json).lines
+ const originalSource = JSON.parse(source.source_json).lines
  const lines = option.tables[0].lines
- need(lines.length === originalLines.length && lines.length === originalSource.length, 'Added or removed source rows need separate CRM reconciliation', 409)
+ const created = (await env.DB.prepare("SELECT provider_id,request_json FROM p_crm_sync_attempts WHERE proposal_id=? AND account_id=? AND deal_id=? AND status='confirmed' AND json_extract(request_json,'$.path')='/objects/line_items'").bind(row.id, source.account_id, source.deal_id).all<any>()).results
+ const retained = [...originalSource.map((line: any) => ({ id: line.id, name: line.name })), ...created.map(receipt => ({ id: receipt.provider_id, name: JSON.parse(receipt.request_json).body.properties.name }))]
+ const remoteLines = read.source!.lines
+ need(remoteLines.every((line: any) => retained.some(known => known.id === line.id)), 'HubSpot has unrelated added rows; reconcile them before writing', 409)
  const explicitIds = Array.isArray(input.lineIds) ? input.lineIds : typeof input.lineIds === 'string' && input.lineIds.trim() ? input.lineIds.trim().split(/\s+/) : undefined
  const lineIds = explicitIds ?? lines.map((line: any) => {
-  const matches = originalLines.map((o: any, index: number) => ({ o, index })).filter(({ o }: any) => o.name === line.name)
-  need(matches.length === 1, 'Enter one explicit source line ID for each row when names changed or are ambiguous', 409)
-  return originalSource[matches[0].index].id
+  const matches = retained.filter(known => remoteLines.some((remote: any) => remote.id === known.id && (known.name === line.name || remote.name === line.name)))
+  need(matches.length === 1, 'Enter a retained source ID or new for each row when names changed or rows were added', 409)
+  return matches[0].id
  })
- need(lineIds.length === lines.length && new Set(lineIds).size === lineIds.length && lineIds.every((id: any) => typeof id === 'string' && originalSource.some((s: any) => s.id === id)), 'Explicitly map each row to a different retained source line ID', 409)
+ for (const [index, id] of lineIds.entries()) if (id === 'new') {
+  const receipt = created.find(receipt => JSON.parse(receipt.request_json).key === 'create:' + row.id + ':' + row.revision + ':' + index)
+  if (receipt) {
+   need(remoteLines.some((line: any) => line.id === receipt.provider_id), 'The previously created row is no longer associated; reconcile it before writing', 409)
+   lineIds[index] = receipt.provider_id
+  }
+ }
+ const mappedIds = lineIds.filter((id: any) => id !== 'new')
+ need(lineIds.length === lines.length && new Set(mappedIds).size === mappedIds.length && mappedIds.every((id: any) => typeof id === 'string' && retained.some(known => known.id === id) && remoteLines.some((remote: any) => remote.id === id)), 'Explicitly map each row to a different associated source ID, or use new', 409)
  need(lines.every((line: any) => !line.recurrence && !line.discountBps && !line.discountFixedCents && !line.groupDiscountBps && !line.groupDiscountFixedCents), 'Recurring or discounted rows need separate CRM preparation', 409)
  need(option.cents === option.tables[0].subtotalCents && (!facts.accepted || facts.accepted.total_cents === option.cents), 'The CRM amount must equal the exact copied rows', 409)
  const link = env.AUTH_ORIGIN + '/app/proposal?id=' + encodeURIComponent(row.id)
@@ -82,10 +92,12 @@ export async function buildSyncPlan(env: Bindings, actor: Actor, input: Record<s
  if (facts.status === 'declined' || facts.status === 'lost' || facts.status === 'withdrawn') properties.dealstage = lostStage
  const operations: SyncOperation[] = []
  for (const [index, line] of lines.entries()) {
-  const id = lineIds[index]
-  need(read.source!.lines.some((s: any) => s.id === id), 'A source line is no longer associated with the deal', 409)
-  operations.push({ key: '', method: 'PATCH', path: '/objects/line_items/' + id, label: 'Priced row ' + id, expectedTotalCents: line.lineTotalCents, body: { properties: { name: line.name, description: line.description ?? '', quantity: line.quantity, price: line.unitPrice } } })
+  const id = lineIds[index], properties = { name: line.name, description: line.description ?? '', quantity: line.quantity, price: line.unitPrice }
+  if (id === 'new') {
+   operations.push({ key: 'create:' + row.id + ':' + row.revision + ':' + index, method: 'POST', path: '/objects/line_items', label: 'Create priced row ' + (index + 1) + ' on this deal', expectedTotalCents: line.lineTotalCents, body: { properties, associations: [{ to: { id: source.deal_id }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 20 }] }] } })
+  } else operations.push({ key: '', method: 'PATCH', path: '/objects/line_items/' + id, label: 'Priced row ' + id, expectedTotalCents: line.lineTotalCents, body: { properties } })
  }
+ for (const line of remoteLines) if (!mappedIds.includes(line.id)) operations.push({ key: '', method: 'DELETE', path: '/objects/line_items/' + line.id + '/associations/deals/' + source.deal_id, label: 'Unlink priced row ' + line.id + ' from this deal; retain the provider record', body: { properties: {} } })
  operations.push({ key: '', method: 'PATCH', path: '/objects/deals/' + source.deal_id, label: 'Deal amount, status, protected link and stage', body: { properties } })
  for (const event of facts.events) operations.push({ key: 'event:' + row.id + ':' + row.revision + ':' + event.kind, method: 'POST', path: '/objects/notes', label: event.kind + ' timeline note', body: { properties: { hs_timestamp: new Date(event.at).toISOString(), hs_note_body: 'Platter proposal ' + row.id + ', revision ' + row.revision + ': ' + event.kind + '. ' + link }, associations: [{ to: { id: source.deal_id }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 214 }] }] } })
  for (const op of operations) if (!op.key) op.key = 'write:' + row.id + ':' + row.revision + ':' + await hash(canonical({ method: op.method, path: op.path, body: op.body }))

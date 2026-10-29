@@ -93,6 +93,7 @@ export async function reviewedSyncJourney(verified) {
   await h.cmd('crm.card.configure', { enabled: 'no' }); assert.equal((await signedCard(h)).status, 401)
  } finally { await h.close() }
  await credentialFailureJourney()
+ await (await import('./hubspot-rows-journey.mjs')).hubspotRowsJourney()
 }
 
 async function credentialFailureJourney() {

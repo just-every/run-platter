@@ -6,7 +6,7 @@ export function hubspotSyncFixture() {
  const edge = hubspotFixture(), writes = [], notes = [], state = edge.state
  Object.assign(state.deal.properties, { pipeline: syncMapping.pipelineId, dealstage: 'synthetic-platter-open', synthetic_status: '', synthetic_link: '' })
  const metadata = { synthetic_status: { name: 'synthetic_status', type: 'enumeration', hubspotDefined: false, options: ['sent', 'viewed', 'signed', 'paid', 'declined', 'lost', 'won', 'withdrawn'].map(value => ({ value })), modificationMetadata: { readOnlyDefinition: true, readOnlyValue: false } }, synthetic_link: { name: 'synthetic_link', type: 'string', hubspotDefined: false, modificationMetadata: { readOnlyValue: false } } }
- let hook, loseResponse = false
+ let hook, loseResponse = false, loseLineResponse = false, loseUnlinkResponse = false
  const request = async req => {
   const url = new URL(req.url)
   assert.equal(url.hostname, 'api.hubapi.com'); assert.equal(req.headers.get('authorization'), 'Bearer synthetic-platter-4607')
@@ -16,6 +16,14 @@ export function hubspotSyncFixture() {
    if (property) return metadata[property[1]] ? Response.json(structuredClone(metadata[property[1]])) : new Response(null, { status: 404 })
    if (url.pathname === '/crm/v3/pipelines/deals') return Response.json({ results: [{ id: syncMapping.pipelineId, stages: [{ id: syncMapping.wonStage, metadata: { isClosed: 'true', probability: '1.0' } }, { id: syncMapping.lostStage, metadata: { isClosed: 'true', probability: '0.0' } }] }] })
    return edge.request(req)
+  }
+  if (req.method === 'DELETE') {
+   const match = url.pathname.match(/^\/crm\/v3\/objects\/line_items\/([^/]+)\/associations\/deals\/([^/]+)$/)
+   assert.ok(match); assert.equal(match[2], state.deal.id)
+   writes.push({ method: req.method, path: url.pathname })
+   state.deal.associations.line_items.results = state.deal.associations.line_items.results.filter(line => line.id !== match[1])
+   if (loseUnlinkResponse) { loseUnlinkResponse = false; return new Response(null, { status: 503 }) }
+   return new Response(null, { status: 204 })
   }
   const payload = await req.json(); writes.push({ method: req.method, path: url.pathname, body: structuredClone(payload) })
   if (req.method === 'PATCH') {
@@ -27,11 +35,19 @@ export function hubspotSyncFixture() {
    for (const key of ['quantity', 'price', 'amount']) if (receipt.properties[key]?.includes('.')) receipt.properties[key] += '00'
    return Response.json(receipt)
   }
-  assert.equal(req.method, 'POST'); assert.equal(url.pathname, '/crm/v3/objects/notes')
+  assert.equal(req.method, 'POST')
+  if (url.pathname === '/crm/v3/objects/line_items') {
+   assert.deepEqual(payload.associations, [{ to: { id: state.deal.id }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 20 }] }])
+   const row = { id: 'synthetic-platter-created-' + (state.line_items.length + 1), properties: { ...payload.properties, amount: (Math.round(Number(payload.properties.quantity) * Number(payload.properties.price) * 100) / 100).toFixed(2) } }
+   state.line_items.push(row); state.deal.associations.line_items.results.push({ id: row.id })
+   if (loseLineResponse) { loseLineResponse = false; return new Response(null, { status: 503 }) }
+   return Response.json(structuredClone(row), { status: 201 })
+  }
+  assert.equal(url.pathname, '/crm/v3/objects/notes')
   assert.deepEqual(payload.associations, [{ to: { id: state.deal.id }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 214 }] }])
   const row = { id: 'synthetic-platter-note-' + (notes.length + 1), ...payload }; notes.push(row)
   if (loseResponse) { loseResponse = false; return new Response(null, { status: 503 }) }
   return Response.json(row, { status: 201 })
  }
- return { ...edge, request, writes, notes, metadata, beforeReply(fn) { hook = fn }, loseNextNoteResponse() { loseResponse = true } }
+ return { ...edge, request, writes, notes, metadata, beforeReply(fn) { hook = fn }, loseNextNoteResponse() { loseResponse = true }, loseNextLineResponse() { loseLineResponse = true }, loseNextUnlinkResponse() { loseUnlinkResponse = true } }
 }

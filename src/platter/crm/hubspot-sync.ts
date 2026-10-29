@@ -27,12 +27,22 @@ function guard(review: any) {
 }
 async function writeOperation(env: Bindings, connection: any, operation: SyncOperation, token: string) {
  return demoEffect(async () => {
-  const receipt = await hubspotJson(env, connection, token, endpoint + operation.path, { method: operation.method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(operation.body) })
+  const receipt = await hubspotJson(env, connection, token, endpoint + operation.path, { method: operation.method, headers: { 'content-type': 'application/json' }, ...(operation.method === 'DELETE' ? {} : { body: JSON.stringify(operation.body) }) }, operation.method === 'DELETE')
+  if (operation.method === 'DELETE') {
+   const parts = operation.path.split('/'), deal = await hubspotJson(env, connection, token, endpoint + '/objects/deals/' + parts.at(-1) + '?associations=line_items')
+   need(!deal.archived && String(deal.id) === parts.at(-1) && Array.isArray(deal.associations?.line_items?.results) && !deal.associations.line_items.paging?.next && !deal.associations.line_items.results.some((line: any) => String(line.id) === parts[3]), 'HubSpot did not confirm removal of the deal association', 409)
+   return parts[3]
+  }
   need(typeof receipt.id === 'string' && receipt.id.length > 0 && !receipt.archived, 'HubSpot did not identify the written record', 409)
   if (operation.method === 'PATCH') need(receipt.id === operation.path.split('/').at(-1), 'HubSpot wrote another record', 409)
   need(Object.entries(operation.body.properties).every(([k, v]) => matchesProperty(k, receipt.properties?.[k], v)), 'HubSpot returned different values', 409)
   if (operation.expectedTotalCents !== undefined) {
    need(decimalEqual(receipt.properties?.amount, (operation.expectedTotalCents / 100).toFixed(2)), 'HubSpot returned a different row total', 409)
+  }
+  if (operation.path === '/objects/line_items' && operation.method === 'POST') {
+   const dealId = operation.body.associations[0].to.id
+   const deal = await hubspotJson(env, connection, token, endpoint + '/objects/deals/' + dealId + '?associations=line_items')
+   need(!deal.archived && String(deal.id) === dealId && Array.isArray(deal.associations?.line_items?.results) && !deal.associations.line_items.paging?.next && deal.associations.line_items.results.some((line: any) => String(line.id) === receipt.id), 'HubSpot did not confirm the new row on this deal', 409)
   }
   return receipt.id as string
  }, () => operation.path.split('/').at(-1)!)
@@ -62,6 +72,11 @@ export async function hubspotSyncCommand(env: Bindings, actor: Actor, name: stri
  executionGuard.values.push(review.id)
  await commit(db, actor, [db.prepare('UPDATE p_crm_sync_reviews SET consumed_at=? WHERE id=?').bind(at, review.id), db.prepare('INSERT INTO p_crm_sync_consents(id,proposal_id,revision,account_id,deal_id,actor_id,actor_role,connection_version,source_json,plan_json,digest,authorized_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(review.id, review.proposal_id, review.revision, review.account_id, plan.dealId, actor.id, actor.role, review.connection_version, review.source_json, review.plan_json, review.digest, at)], true, executionGuard)
  let confirmed = 0, held = 0
+ // A lost response may have changed the association set. Fresh review never
+ // bypasses an unresolved earlier request just because its operation vanished.
+ if (await db.prepare("SELECT 1 FROM p_crm_sync_attempts WHERE account_id=? AND deal_id=? AND status!='confirmed'").bind(review.account_id, plan.dealId).first()) {
+  return { crmSyncResult: true, proposalId: review.proposal_id, confirmed: 0, held: 1, message: 'Synchronization held. Reconcile the unresolved HubSpot write before continuing.' }
+ }
  for (const operation of plan.operations as SyncOperation[]) {
   const previous = await db.prepare("SELECT status FROM p_crm_sync_attempts WHERE account_id=? AND deal_id=? AND json_extract(request_json,'$.key')=? ORDER BY attempted_at DESC,id DESC LIMIT 1").bind(review.account_id, plan.dealId, operation.key).first<any>()
   if (previous && previous.status !== 'confirmed') { held++; break }

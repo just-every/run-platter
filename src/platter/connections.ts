@@ -45,6 +45,7 @@ export async function credentialRefused(response:Response,provider?:string){
   const raw=await response.clone().text();if(raw.length>262144)return false
   const value=JSON.parse(raw),error=value?.error
   if(provider==='slack'&&value?.ok===false)return ['invalid_auth','not_authed','token_revoked','token_expired','account_inactive','missing_scope'].includes(error)
+  if(provider==='hubspot'&&value?.category==='MISSING_SCOPES')return true
   return error?.errors?.some((item:any)=>item.reason==='insufficientPermissions')===true||error?.details?.some((item:any)=>item.reason==='ACCESS_TOKEN_SCOPE_INSUFFICIENT')===true
  }catch{return false}
 }

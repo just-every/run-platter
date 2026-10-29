@@ -2478,7 +2478,7 @@
       "executable": false
     },
     "src/platter/connections.ts": {
-      "sha256": "6afac910ef11ff21350b97abcbcb8798f118411937744d22a6b2136ba018bbd3",
+      "sha256": "8fdf5e49e6a0b12808f6ddb3150c33cddeefdf6f7252be24817a0c241f8f2aec",
       "executable": false
     },
     "src/platter/credentials.ts": {
@@ -3330,7 +3330,7 @@
       "executable": false
     },
     "tests/crm-credential-journey.mjs": {
-      "sha256": "145d39bf8e9ae5d05701da7870f5d012bc9ffc66a931fe2f4245a63d89e8adb0",
+      "sha256": "2a7864b79a29ca4ee66d0b82086aa38048da4d1c6579860255a07703a492f659",
       "executable": false
     },
     "tests/delivery-provider.mjs": {

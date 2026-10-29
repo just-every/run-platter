@@ -4,15 +4,15 @@ export async function crmCredentialJourney(h,{make,bind,crm,requests,patches}){
  const connection=async()=>(await h.state()).connections.find(c=>c.provider==='hubspot')
  const reconnect=async()=>{crm.hook=undefined;const c=await connection();await h.cmd('provider.connect',{provider:'hubspot',version:c.version,token:'synthetic-platter-credential-1',consent:true})}
  const privateValue='synthetic-platter-private-provider-diagnostic'
- const failure=(status,headers={})=>Response.json({error:{message:privateValue}},{status,headers})
+ const failure=(status,headers={},body={error:{message:privateValue}})=>Response.json(body,{status,headers})
  const sanitized=async()=>{
   for(const value of [await h.state(),(await h.send('/api/platter/audit',undefined,h.owner)).value,(await h.send('/app/settings',undefined,h.owner)).text])assert.ok(!JSON.stringify(value).includes(privateValue))
  }
- for(const scenario of [{status:401,broken:true},{status:403,headers:{'www-authenticate':'Bearer error="insufficient_scope"'},broken:true,write:true},{status:403,broken:false},{status:429,broken:false},{status:503,broken:false}]){
+ for(const scenario of [{status:401,broken:true},{status:403,headers:{'www-authenticate':'Bearer error="insufficient_scope"'},broken:true,write:true},{status:403,broken:true,body:{status:'error',category:'MISSING_SCOPES',message:privateValue}},{status:403,broken:false},{status:429,broken:false},{status:503,broken:false}]){
   await reconnect()
   const first=await make('Credential-bound CRM outcome'),later=await make('Queued CRM successor')
   await bind(first.id,3);await bind(later.id,3)
-  crm.hook=request=>{if(!scenario.write||request.method==='PATCH')return failure(scenario.status,scenario.headers)}
+  crm.hook=request=>{if(!scenario.write||request.method==='PATCH')return failure(scenario.status,scenario.headers,scenario.body)}
   const start=requests.length,beforeWrites=patches.length
   await h.cmd('proposal.lose',{id:first.id,version:3,reason:'Budget'})
   assert.equal(requests.length,start+(scenario.write?2:1),'the refusal stops this operation at its read or write boundary')

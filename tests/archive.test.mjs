@@ -212,7 +212,12 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal(acceptedThread[0].answers[0].text,'Yes, delivery is included in the campaign price.')
     assert.equal(openThread.length,1)
     assert.equal(openThread[0].answers.length,0)
+    const staleAgent=await h.send('/api/platter/agent/command',{name:'proposal.revise',input:{...offer,id:work.id,version:0}},'',{authorization:'Bearer '+key.token})
+    assert.equal(staleAgent.status,409,staleAgent.text)
     const agentHistory=(await h.send('/api/platter/agent-ledger',undefined,h.owner)).value.receipts
+    const sourceRefusal=agentHistory.find(receipt=>receipt.output_digest===createHash('sha256').update(staleAgent.text).digest('hex')&&receipt.records.some(ref=>ref.proposal_id===work.id&&ref.relation==='read'))
+    assert.ok(sourceRefusal,'a refused stale edit retains its actual source revision for archive custody')
+    assert.ok(sourceRefusal.sources.some(source=>source.kind==='attachment'&&source.source_id===frozenAttachments[0].id)||sourceRefusal.sources.some(source=>source.kind==='attachment'),'the archived receipt identifies actual attached source documents without raw bytes')
     assert.ok(agentHistory.length>=3);assert.ok(agentHistory.some(r=>r.records.some(ref=>ref.proposal_id===work.id)))
     await h.cmd('agent.pause',{id:key.id,version:1})
     assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,403)

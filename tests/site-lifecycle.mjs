@@ -272,6 +272,7 @@ test('AI-003 desktop and phone owners review MCP requests, approve and send expl
      const data=await (await context.request.get(app.origin+'/api/platter/agent-ledger')).json(),record=data.receipts.find(r=>r.action==='mcp.read_proposal')
      assert.match(await receipt.innerText(),new RegExp(record.input_digest));assert.match(await receipt.innerText(),new RegExp(record.output_digest));assert.match(await receipt.innerText(),/not recorded/)
      const source=record.sources.find(s=>s.kind==='proposal'&&s.source_id===p.id);assert.ok(source);assert.match(await receipt.locator('[data-agent-source=proposal]').filter({hasText:p.id}).first().innerText(),new RegExp(source.digest))
+     assert.ok(record.records.some(ref=>ref.proposal_id===other.id&&ref.revision===2&&ref.relation==='read'));assert.match(await receipt.innerText(),/Read source revision/,'the owner can distinguish a source read from an output revision')
      const link=receipt.getByRole('link',{name:'Human approved record',exact:true}).first(),approvalResponse=await context.request.get(app.origin+await link.getAttribute('href'))
      assert.equal(approvalResponse.status(),200);assert.equal((await approvalResponse.json()).approval.proposal_id,p.id)
     }
@@ -285,6 +286,7 @@ test('AI-003 desktop and phone owners review MCP requests, approve and send expl
      const saved=ownerState.revisions.find(row=>row.proposal_id===produced.id&&row.revision===1).snapshot
      assert.match(await producedReceipt.innerText(),/Produced revision/)
      assert.match(await producedReceipt.innerText(),new RegExp(createHash('sha256').update(JSON.stringify(saved)).digest('hex')))
+     assert.match(await producedReceipt.locator('[data-agent-source=client]').innerText(),new RegExp(createHash('sha256').update(JSON.stringify({id:client.id})).digest('hex')),'the receipt screen exposes the direct draft client citation without raw client content')
     }
     await capture('agent-receipt')
     await page.goto(app.origin+'/app/settings#agent-controls');await controls().getByRole('button',{name:'Pause key',exact:true}).click()

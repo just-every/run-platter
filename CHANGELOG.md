@@ -1,5 +1,11 @@
 # Changes
 
+## 2026-10-29 — Observed agent sources
+
+- Agent receipts now identify client checks and copied vendor files, preserve read revisions and actual human approval links even after a stale edit is refused, and distinguish source reads from produced revisions.
+- Scoped analytics counts retain the exact contributing proposal citations from the same database read. Historical receipts survive the additive migration and archive restoration without restoring keys or execution authority.
+- Unknown model identity remains not recorded. No machine approval, sending, signing, refund or write-off authority is added; model-provider and Base conformance gaps remain.
+
 ## 2026-10-16
 
 - Built the picked porcelain-and-glaze Platter homepage, with Run Platter opening `/run` and repository Markdown guides served at `/docs`.

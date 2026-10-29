@@ -1,4 +1,5 @@
 import { commit, need, text, type Actor } from './model'
+import { citeAgentSource } from './agent-sources'
 
 export type AttachmentKind = 'w9' | 'insurance'
 export interface AttachmentRef {
@@ -50,9 +51,11 @@ export async function prepareAttachment(db: D1Database, upload: AttachmentUpload
 }
 
 /** Current defaults are copied into new revision snapshots, never read by client downloads. */
-export async function vendorDocuments(db: D1Database): Promise<AttachmentRef[]> {
+export async function vendorDocuments(db: D1Database, actor?: Actor): Promise<AttachmentRef[]> {
  const rows = (await db.prepare('SELECT f.*,v.kind FROM p_vendor_documents v JOIN p_attachment_files f ON f.id=v.file_id ORDER BY v.kind').all<any>()).results
- return rows.map(row => ({ ...reference(row), kind: row.kind }))
+ const documents = rows.map(row => ({ ...reference(row), kind: row.kind }))
+ if (actor) for (const file of documents) await citeAgentSource(actor,'attachment',file.id,file.sha256,file)
+ return documents
 }
 
 /** Settings replacement retains all prior file versions, including their original bytes. */

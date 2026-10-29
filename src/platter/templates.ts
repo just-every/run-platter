@@ -96,7 +96,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  await citeAgentSource(a,starter?'starter-template':'template',template.id,template.version,starter??template)
  const personal = starter ? null : template as any
  const access=starter?{sql:'1',values:[]}:await folderGuard(db,a,personal.folder_id,'template')
- let content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
+ let content = starter ? { ...starter.content, attachments: await vendorDocuments(db,a) } : JSON.parse(personal.snapshot)
  if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...editableVariableFields(content),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan}}
  const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)

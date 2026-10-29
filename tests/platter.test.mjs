@@ -3669,7 +3669,7 @@ test('AGENT-009 consented receipts, human records and pause protect every existi
  let release,arrived,barrier,gate
  const arm=()=>{barrier=new Promise(resolve=>arrived=resolve);gate=new Promise(resolve=>release=resolve)}
  arm()
- const h=await harness({entry:'tests/agent-commit-worker.ts',outboundService:async request=>{assert.equal(new URL(request.url).hostname,'agent-barrier.example.test');arrived();await gate;return new Response(null,{status:204})}})
+ const h=await harness({entry:'tests/agent-commit-worker.ts',migrateThrough:'0102_agent_model_budget.sql',outboundService:async request=>{assert.equal(new URL(request.url).hostname,'agent-barrier.example.test');arrived();await gate;return new Response(null,{status:204})}})
  try{
   const client=await h.cmd('client.save',{name:'Synthetic receipt client',email:'synthetic-platter-9801'+String.fromCharCode(64)+'example.test'})
   const key=await h.cmd('agent.create',{label:'Synthetic receipt assistant'}),auth={authorization:'Bearer '+key.token},ledger=async()=>(await h.send('/api/platter/agent-ledger',undefined,h.owner)).value.receipts
@@ -3679,6 +3679,7 @@ test('AGENT-009 consented receipts, human records and pause protect every existi
   const before=Date.now(),created=await legacy(input);assert.equal(created.status,200,created.text)
   let receipts=await ledger(),receipt=receipts.find(r=>r.input_digest===digest(JSON.stringify(input)))
   assert.ok(receipt);assert.equal(receipt.output_digest,digest(created.text));assert.equal(receipt.status,'succeeded');assert.equal(receipt.key_id,key.id);assert.equal(receipt.action,'proposal.prepare');assert.equal(receipt.transport,'legacy');assert.ok(receipt.started_at>=before&&receipt.completed_at>=receipt.started_at);assert.equal(receipt.http_status,200);assert.equal(receipt.model,'not recorded');assert.deepEqual(receipt.records.map(r=>[r.proposal_id,r.revision,r.approvals.length]),[[created.value.id,1,0]])
+  assert.ok(receipt.sources.some(source=>source.kind==='client'&&source.source_id===client.id&&source.digest===digest(JSON.stringify({id:client.id}))),'a direct draft cites the client record it actually checked even without merge variables')
   const produced=(await h.state()).revisions.find(row=>row.proposal_id===created.value.id&&row.revision===1).snapshot
   assert.equal(receipt.records[0].relation,'produced');assert.equal(receipt.records[0].snapshot_digest,digest(JSON.stringify(produced)),'the produced revision digest covers the saved business outcome, independently of the response id')
   await h.cmd('proposal.approve',{id:created.value.id,revision:1,version:1})
@@ -3688,13 +3689,26 @@ test('AGENT-009 consented receipts, human records and pause protect every existi
    const actual=(await h.send('/api/platter/agent-ledger?approval='+approval.id,undefined,h.owner)).value.approval
    assert.equal(actual.id,approval.id);assert.equal(actual.proposal_id,created.value.id);assert.equal(actual.revision,1);assert.equal(actual.actor_id,(await h.state()).actor.id)
   }
+  const historicalTables=['p_agent_receipts','p_agent_receipt_records','p_agent_receipt_sources'],historical=[]
+  for(const table of historicalTables)historical.push((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2,3').all()).results)
+  await h.db.batch(unstable_splitSqlQuery(await readFile('migrations/core/0103_agent_read_sources.sql','utf8')).map(sql=>h.db.prepare(sql)))
+  for(const [i,table]of historicalTables.entries())assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2,3').all()).results,historical[i],'upgrading the ledger preserves its consented receipt and source history')
+  assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
+  const fileBytes='%PDF synthetic-platter-private-file-9806',upload=new FormData()
+  upload.set('kind','w9');upload.set('file',new File([fileBytes],'synthetic-platter-9806.pdf',{type:'application/pdf'}))
+  const uploadRequest=new Request(h.origin+'/app/attachment',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:upload}),uploaded=await h.mf.dispatchFetch(uploadRequest.url,{method:'POST',headers:uploadRequest.headers,body:await uploadRequest.arrayBuffer()})
+  assert.equal(uploaded.status,200,await uploaded.text())
+  const attachment=(await h.state()).vendorDocuments.find(file=>file.kind==='w9'),attached=await legacy({...input,input:{...input.input,title:'Synthetic cited attachment draft'}})
+  assert.equal(attached.status,200,attached.text)
+  const attachedReceipt=(await ledger()).find(row=>row.output_digest===digest(attached.text))
+  assert.deepEqual(attachedReceipt.sources.find(source=>source.kind==='attachment'),{kind:'attachment',source_id:attachment.id,source_version:digest(fileBytes),digest:digest(JSON.stringify(attachment))},'a copied vendor document identifies its immutable file and the exact metadata read, without storing its raw bytes')
   const unchanged=await h.state()
   for(const name of ['proposal.approve','proposal.send','proposal.sign','payment.refund','invoice.write-off'])assert.equal((await legacy({name,input:{id:created.value.id}})).status,403)
   assert.deepEqual((await h.state()).proposals,unchanged.proposals);assert.deepEqual((await h.state()).outbox,unchanged.outbox)
   let seq=0
   const rpc=(name,args={},headers={})=>h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:++seq,method:'tools'+'/call',params:{name,arguments:args}},'',{...auth,...headers})
   const read=await rpc('read_proposal',{id:created.value.id});assert.ok(!read.value.result.isError)
-  const mcpReceipt=(await ledger()).find(r=>r.transport==='mcp');assert.equal(mcpReceipt.output_digest,digest(read.text));assert.equal(mcpReceipt.status,'succeeded');assert.equal(mcpReceipt.records[0].proposal_id,created.value.id)
+  const mcpReceipt=(await ledger()).find(r=>r.transport==='mcp');assert.equal(mcpReceipt.output_digest,digest(read.text));assert.equal(mcpReceipt.status,'succeeded');assert.deepEqual(mcpReceipt.records.map(row=>[row.proposal_id,row.revision,row.relation]).sort(),mcpReceipt.sources.filter(source=>source.kind==='proposal').map(source=>[source.source_id,Number(source.source_version),source.source_id===created.value.id?'returned':'read']).sort(),'the receipt distinguishes the returned proposal from other proposal revisions actually read')
   const readValue=JSON.parse(read.value.result.content[0].text)
   assert.ok(mcpReceipt.sources.some(source=>source.kind==='proposal'&&source.source_id===created.value.id&&source.source_version==='1'&&source.digest===digest(JSON.stringify(readValue))),'the recorded proposal source is independently matched to the actual public tool result')
   const context=await h.send('/api/platter/agent/context',undefined,'',auth)
@@ -3703,8 +3717,15 @@ test('AGENT-009 consented receipts, human records and pause protect every existi
   assert.ok(contextReceipt.sources.some(source=>source.kind==='context'&&source.digest===digest(context.text)))
   assert.ok(contextReceipt.sources.some(source=>source.kind==='client'&&source.source_id===client.id&&source.digest===digest(JSON.stringify(context.value.clients.find(row=>row.id===client.id)))))
   const sourceBefore=contextReceipt.sources
+  assert.ok(contextReceipt.records.some(record=>record.proposal_id===first.value.id&&record.revision===1),'context source records are bound to the revision actually read')
   await h.cmd('proposal.revise',{...input.input,id:first.value.id,version:1,title:'Synthetic changed citation'})
   assert.deepEqual((await ledger()).find(row=>row.id===contextReceipt.id).sources,sourceBefore,'source references and digests stay at the actual read version after a later edit')
+  const stale=await legacy({...input,input:{...input.input,id:first.value.id,version:1},name:'proposal.revise'})
+  assert.equal(stale.status,409,stale.text)
+  const staleReceipt=(await ledger()).find(row=>row.input_digest===digest(JSON.stringify({...input,input:{...input.input,id:first.value.id,version:1},name:'proposal.revise'})))
+  const actualRead=await h.db.prepare('SELECT p.*,lang.locale AS client_locale FROM p_proposals p LEFT JOIN p_client_locales lang ON lang.proposal_id=p.id WHERE p.id=?').bind(first.value.id).first()
+  assert.equal(staleReceipt.status,'refused');assert.ok(staleReceipt.sources.some(source=>source.kind==='proposal'&&source.source_id===first.value.id&&source.source_version==='2'&&source.digest===digest(JSON.stringify(actualRead))))
+  assert.deepEqual(staleReceipt.records.map(record=>[record.proposal_id,record.revision,record.relation]),[[first.value.id,2,'read']],'a refused stale edit still identifies its observed source revision without inventing an output')
   for(const name of ['approve','send','sign','refund','write_off']){const refused=await rpc(name,{id:created.value.id});assert.ok(refused.value.result?.isError||refused.value.error)}
   assert.ok((await ledger()).filter(r=>r.transport==='mcp'&&r.status==='refused').length>=5)
   const rest=(await h.send('/api/platter/v1/keys',{label:'Synthetic scoped receipt key',scopes:['proposals.read']},h.owner)).value
@@ -3712,6 +3733,31 @@ test('AGENT-009 consented receipts, human records and pause protect every existi
   await h.cmd('agent.receipts',{id:rest.id,version:0,consent:'yes'})
   const listed=await api('/proposals');assert.equal(listed.status,200);assert.ok(listed.value.length>=2)
   const restReceipt=(await ledger()).find(r=>r.key_id===rest.id);assert.equal(restReceipt.transport,'rest');assert.equal(restReceipt.input_digest,digest(''));assert.equal(restReceipt.output_digest,digest(listed.text));assert.equal(restReceipt.records.length,listed.value.length);assert.deepEqual(restReceipt.sources,listed.value.map(row=>({kind:'proposal',source_id:row.id,source_version:String(row.revision),digest:digest(JSON.stringify(row))})).sort((a,b)=>a.source_id.localeCompare(b.source_id)))
+  const reportKey=(await h.send('/api/platter/v1/keys',{label:'Synthetic source report key',scopes:['analytics.read','agreements.read','payments.read','templates.read']},h.owner)).value,reportAuth={authorization:'Bearer '+reportKey.token}
+  await h.cmd('agent.receipts',{id:reportKey.id,version:0,consent:true})
+  const approved=(await h.state()).proposals.find(row=>row.id===created.value.id),share=await h.cmd('proposal.send',{id:approved.id,version:approved.version}),clientPath=new URL(share.shareUrl).pathname,clientCookie=await verified(h,clientPath)
+  assert.equal((await h.send(clientPath+'/action?name=accept',{name:'Synthetic receipt signer',optionId:'one',consent:true},clientCookie)).status,200)
+  await h.cmd('payment.record',{id:created.value.id,amount:'125',receivedOn:'2026-10-29',method:'wire',reference:'synthetic-platter-9807',consent:true})
+  const listedForCounts=await api('/proposals'),counts=new Map()
+  for(const row of listedForCounts.value)counts.set(row.status,(counts.get(row.status)??0)+1)
+  const report=await h.send('/api/platter/v1/analytics',undefined,'',reportAuth)
+  assert.equal(report.status,200);assert.deepEqual(report.value,[...counts].sort(([a],[b])=>a<b?-1:a>b?1:0).map(([status,count])=>({status,count})))
+  const aggregateReceipt=(await ledger()).find(row=>row.key_id===reportKey.id&&row.action==='rest.get.analytics')
+  assert.equal(aggregateReceipt.output_digest,digest(report.text))
+  assert.deepEqual(aggregateReceipt.sources.filter(source=>source.kind==='proposal'),listedForCounts.value.map(row=>({kind:'proposal',source_id:row.id,source_version:String(row.revision),digest:digest(JSON.stringify(row))})).sort((a,b)=>a.source_id.localeCompare(b.source_id)),'analytics cites every proposal contributing to its counts with independently checked source digests')
+  assert.deepEqual(aggregateReceipt.records.map(row=>[row.proposal_id,row.revision,row.relation]),listedForCounts.value.map(row=>[row.id,row.revision,'read']).sort((a,b)=>a[0].localeCompare(b[0])))
+  assert.ok(aggregateReceipt.records.find(row=>row.proposal_id===created.value.id).approvals.some(approval=>approval.id===receipt.records[0].approvals[0].id),'read source references link the real human approval history')
+  for(const path of ['/agreements','/payments']){
+   const projection=await h.send('/api/platter/v1'+path,undefined,'',reportAuth);assert.equal(projection.status,200);assert.ok(projection.value.length>0)
+   const retained=(await ledger()).find(row=>row.key_id===reportKey.id&&row.action==='rest.get.'+path.slice(1))
+   assert.equal(retained.output_digest,digest(projection.text))
+   assert.deepEqual(retained.sources,projection.value.map(row=>({kind:path==='/agreements'?'agreement':'payment',source_id:row.id,source_version:String(row.revision??'not recorded'),digest:digest(JSON.stringify(row))})).sort((a,b)=>a.source_id.localeCompare(b.source_id)))
+   assert.ok(retained.records.some(row=>row.proposal_id===created.value.id&&row.revision===1))
+  }
+  const personal=await h.cmd('template.save',{id:attached.value.id,version:1,name:'Synthetic cited personal template'})
+  const templateRead=await h.send('/api/platter/v1/templates',undefined,'',reportAuth);assert.equal(templateRead.status,200);assert.ok(templateRead.value.some(row=>row.id===personal.id))
+  const templateReceipt=(await ledger()).find(row=>row.key_id===reportKey.id&&row.action==='rest.get.templates')
+  assert.deepEqual(templateReceipt.sources,templateRead.value.map(row=>({kind:'template',source_id:row.id,source_version:String(row.version),digest:digest(JSON.stringify(row))})).sort((a,b)=>a.source_id.localeCompare(b.source_id)))
   assert.equal((await api('/templates')).status,403)
   for(const verb of ['approve','send','sign','refund','write-off'])assert.equal((await api('/proposals/'+created.value.id+'/'+verb,{})).status,404)
   await h.send('/auth/invite',{email:'synthetic-platter-9803'+String.fromCharCode(64)+'example.test',displayName:'Receipt member',role:'admin',returnTo:'/app'},h.owner)
@@ -3751,7 +3797,7 @@ test('AGENT-009 consented receipts, human records and pause protect every existi
   await barrier;await h.cmd('agent.pause',{id:restWrite.id,version:1});release()
   const restRefused=await restPending;assert.equal(restRefused.status,409,restRefused.text);assert.deepEqual((await h.state()).proposals,beforeRace)
   const stored=JSON.stringify([(await h.db.prepare('SELECT * FROM p_agent_receipts').all()).results,(await h.db.prepare('SELECT * FROM p_agent_receipt_sources').all()).results])
-  for(const sentinel of [key.token,rest.token,'synthetic-platter-raw-source-9802','Synthetic receipt client'])assert.ok(!stored.includes(sentinel),'receipts retain no raw input, output or credentials')
+  for(const sentinel of [key.token,rest.token,'synthetic-platter-raw-source-9802','Synthetic receipt client',fileBytes,'Synthetic receipt signer'])assert.ok(!stored.includes(sentinel),'receipts retain no raw input, output or credentials')
   await h.cmd('agent.resume',{id:key.id,version:6})
   const temporary=await h.cmd('client.save',{name:'Synthetic erasable source',email:'synthetic-platter-9805'+String.fromCharCode(64)+'example.test'})
   const erasableContext=await h.send('/api/platter/agent/context',undefined,'',auth)

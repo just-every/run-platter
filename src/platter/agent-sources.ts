@@ -7,6 +7,11 @@ export async function citeAgentSource(actor: Actor, kind: string, id: string, ve
  if (!actor.agentSources) return
  const source = { kind, id, version: String(version ?? 'not recorded'), digest: await hash(JSON.stringify(value)) }
  if (!actor.agentSources.some(s => s.kind === kind && s.id === id && s.version === source.version && s.digest === source.digest)) actor.agentSources.push(source)
+ if(kind==='proposal'){
+  const attachments=(value as any)?.attachments
+  const files=typeof attachments==='string'?JSON.parse(attachments):attachments??[]
+  for(const file of files)await citeAgentSource(actor,'attachment',file.id,file.sha256,file)
+ }
 }
 
 export async function citeAgentContext(actor: Actor, value: any) {

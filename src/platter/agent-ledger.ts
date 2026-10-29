@@ -57,14 +57,20 @@ export async function agentRequest(request: Request, env: Bindings, run: (actor:
   JOIN p_proposals p ON p.id=json_extract(supplied.value,'$.id')
   JOIN p_revisions r ON r.proposal_id=p.id AND r.revision=json_extract(supplied.value,'$.revision') WHERE (${visible.sql})`).bind(JSON.stringify(returned),...visible.values).all<any>()).results : []
  const outputs = await Promise.all(snapshots.map(async row=>({id:row.proposal_id,revision:row.revision,digest:await hash(row.snapshot)})))
- const references = returned.map(row=>({...row,snapshotDigest:outputs.find(output=>output.id===row.id&&output.revision===row.revision)?.digest??null}))
+ const references = returned.map(row=>({...row,relation:produced?'produced':'returned',snapshotDigest:outputs.find(output=>output.id===row.id&&output.revision===row.revision)?.digest??null}))
+ // A refusal can still have read a source. Link only server-observed proposal
+ // revisions, never caller-supplied ids; returned or produced references win.
+ for(const source of actor.agentSources??[]){
+  const revision=Number(source.version)
+  if(source.kind==='proposal'&&Number.isSafeInteger(revision)&&revision>0&&!references.some(row=>row.id===source.id&&row.revision===revision))references.push({id:source.id,revision,relation:'read',snapshotDigest:null})
+ }
  await db.batch([
   db.prepare('UPDATE p_agent_receipts SET completed_at=?,status=?,http_status=?,output_digest=? WHERE id=?').bind(Date.now(),status,response.status,await hash(output),id),
   db.prepare(`INSERT OR IGNORE INTO p_agent_receipt_records(receipt_id,proposal_id,revision,relation,snapshot_digest)
-   SELECT ?,p.id,r.revision,?,json_extract(supplied.value,'$.snapshotDigest') FROM json_each(?) supplied
+   SELECT ?,p.id,r.revision,json_extract(supplied.value,'$.relation'),json_extract(supplied.value,'$.snapshotDigest') FROM json_each(?) supplied
    JOIN p_proposals p ON p.id=json_extract(supplied.value,'$.id')
    JOIN p_revisions r ON r.proposal_id=p.id AND r.revision=COALESCE(json_extract(supplied.value,'$.revision'),p.revision)
-   WHERE (${visible.sql})`).bind(id,produced?'produced':'returned',JSON.stringify(references),...visible.values),
+   WHERE (${visible.sql})`).bind(id,JSON.stringify(references),...visible.values),
   db.prepare(`INSERT OR IGNORE INTO p_agent_receipt_sources(receipt_id,kind,source_id,source_version,digest,client_id)
    SELECT ?,json_extract(value,'$.kind'),json_extract(value,'$.id'),json_extract(value,'$.version'),json_extract(value,'$.digest'),
    CASE WHEN json_extract(value,'$.kind')='client' THEN (SELECT id FROM p_clients WHERE id=json_extract(value,'$.id')) ELSE NULL END

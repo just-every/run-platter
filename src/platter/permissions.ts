@@ -1,3 +1,4 @@
+import { citeAgentSource } from './agent-sources'
 import { proposalFolderScope } from './folders'
 import { commit, need, proposal, text, type Actor } from './model'
 export const roles = ['admin','manager','sales','content_editor','viewer','billing'] as const
@@ -23,6 +24,7 @@ export function scope(a:Actor,right:Right,alias='p'){const base=baseScope(a,righ
 export async function permitted(db:D1Database,a:Actor,id:unknown,right:Right='view') {
  const s=scope(a,right);need(s.sql!=='0','Your role cannot perform this action',403);const row=await proposal(db,id)
  need(await db.prepare(`SELECT id FROM p_proposals p WHERE id=? AND (${s.sql})`).bind(row.id,...s.values).first(),'This proposal is outside your permissions',403)
+ await citeAgentSource(a,'proposal',row.id,row.revision,row)
  // Keep the scope live inside the eventual write transaction as well.
  a.permission={sql:`EXISTS(SELECT 1 FROM p_proposals p WHERE id=? AND (${s.sql}))`,values:[row.id,...s.values]}
  return row

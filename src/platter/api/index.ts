@@ -26,7 +26,17 @@ const proposalQuery=`SELECT p.id,p.title,p.revision,p.version,
  CASE WHEN EXISTS(SELECT 1 FROM p_withdrawals w WHERE w.proposal_id=p.id AND w.revision=p.revision) THEN 'withdrawn'
  WHEN p.status='sent' AND EXISTS(SELECT 1 FROM p_expiry ex WHERE ex.proposal_id=p.id AND ex.deadline_at<=?) THEN 'expired'
  ELSE p.status END AS status,p.currency FROM p_proposals p`
-const proposals=async(env:Bindings)=> (await env.DB.prepare(proposalQuery+' ORDER BY p.created_at,p.id').bind(await currentTime(env.DB)).all()).results
+async function proposals(env:Bindings,actor:Actor){
+ const rows=(await env.DB.prepare(proposalQuery+' ORDER BY p.created_at,p.id').bind(await currentTime(env.DB)).all<any>()).results
+ for(const row of rows)await citeAgentSource(actor,'proposal',row.id,row.revision,row)
+ return rows
+}
+async function analytics(env:Bindings,actor:Actor){
+ // Counts and their proposal citations come from the same read snapshot.
+ const rows=await proposals(env,actor),counts=new Map<string,number>()
+ for(const row of rows)counts.set(row.status,(counts.get(row.status)??0)+1)
+ return [...counts].sort(([a],[b])=>a<b?-1:a>b?1:0).map(([status,count])=>({status,count}))
+}
 export const routes:Route[]=[
  {method:'GET',path:'/openapi.json',scope:'public',summary:'OpenAPI description',handle:async()=>description()},
  {method:'GET',path:'/reference',scope:'public',summary:'API reference',handle:async()=>null},
@@ -36,8 +46,8 @@ export const routes:Route[]=[
  {method:'GET',path:'/templates',scope:'templates.read',summary:'List available templates',handle:async c=>(await templateState(c.env.DB,c.actor)).map((t:any)=>({id:t.id,name:t.name,version:t.version}))},
  {method:'POST',path:'/proposals',scope:'proposals.write',summary:'Create a draft from a template; a person approves and sends',handle:async c=>{need(c.p.templateId!==undefined,'Choose a template');const result=await command(c.env,c.actor,'proposal.prepare',c.p);await recordAudit(c.env.DB,c.actor,'api.proposal.prepare',result.id);return result}},
  {method:'POST',path:'/proposals/{id}/variables',scope:'proposals.write',summary:'Fill draft template variables in a new revision',handle:async c=>{const result=await fillVariables(c.env,c.actor,c.id,c.p);await recordAudit(c.env.DB,c.actor,'api.proposal.variables',c.id);return result}},
- {method:'GET',path:'/proposals',scope:'proposals.read',summary:'Read proposal status',handle:async c=>proposals(c.env)},
- {method:'GET',path:'/analytics',scope:'analytics.read',summary:'Read counts by proposal status',handle:async c=>(await c.env.DB.prepare('SELECT status,count(*) AS count FROM ('+proposalQuery+') GROUP BY status ORDER BY status').bind(await currentTime(c.env.DB)).all()).results},
+ {method:'GET',path:'/proposals',scope:'proposals.read',summary:'Read proposal status',handle:async c=>proposals(c.env,c.actor)},
+ {method:'GET',path:'/analytics',scope:'analytics.read',summary:'Read counts by proposal status',handle:async c=>analytics(c.env,c.actor)},
  {method:'GET',path:'/payments',scope:'payments.read',summary:'Read recorded payment status',handle:async c=>(await c.env.DB.prepare('SELECT id,proposal_id AS proposalId,cents AS amountCents,currency,method,received_on AS receivedOn FROM p_payment_records ORDER BY id').all()).results},
  {method:'GET',path:'/agreements',scope:'agreements.read',summary:'List retained agreements',handle:async c=>(await c.env.DB.prepare('SELECT proposal_id AS id,revision,total_cents AS totalCents,currency,accepted_at AS acceptedAt FROM p_acceptances ORDER BY accepted_at,proposal_id').all()).results},
  {method:'POST',path:'/webhooks',scope:'session:owner',summary:'Authorize a destination and receive its signing secret once',handle:async c=>webhookCreate(c.env,c.actor,c.p)},

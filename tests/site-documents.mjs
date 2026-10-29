@@ -879,3 +879,82 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
   await context.close()
  }finally{await browser?.close();await app?.close()}
 })
+
+test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct approvals, inspects history and revokes consent', {timeout:120000},async()=>{
+ const checks=[],screenshots=process.env.PLATTER_SCREENSHOTS
+ let app,browser,context,ownerEmail
+ try{
+  app=await installedApp({scheduled:true,outboundService:async request=>{
+   const url=new URL(request.url);checks.push(url.pathname)
+   if(url.pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-9030'})
+   if(url.pathname==='/api/conversations.info')return Response.json({ok:true,channel:{id:'synthetic-platter-9031',is_member:true}})
+   if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-9032'})
+   if(url.pathname==='/v1.0/chats/synthetic-platter-9033')return Response.json({chatType:'oneOnOne',members:[{email:ownerEmail},{userId:'synthetic-platter-9032'}]})
+   throw Error('Unexpected provider request')
+  }})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  context=await browser.newContext({viewport:{width:1440,height:1000}})
+  const page=await context.newPage()
+  const claimed=await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic administrator'},maxRedirects:0});assert.equal(claimed.status(),303)
+  await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  const state=async()=>{const response=await context.request.get(app.origin+'/api/platter/state');assert.equal(response.status(),200);return response.json()}
+  const person=(await state()).actor;ownerEmail=person.email
+  await page.goto(app.origin+'/app/settings')
+  const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Chat notifications',exact:true})})
+  assert.match(await panel.innerText(),/No chat routes have been authorized/)
+  assert.deepEqual(checks,[])
+  for(const [provider,label] of [['slack','Slack'],['teams','Microsoft Teams']]){
+   const connection=page.locator('article').filter({has:page.getByRole('heading',{name:label,exact:true})})
+   await connection.getByLabel(label+' access token').fill('synthetic-platter-9034')
+   await connection.getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect '+label,exact:true}).click()
+   assert.equal(await page.getByRole('alert').count(),0)
+  }
+  assert.deepEqual(checks,['/api/auth.test','/v1.0/me'])
+  await page.goto(app.origin+'/app/settings');assert.equal((await state()).notificationSettings.routes.length,0);assert.equal(checks.length,2)
+  await panel.getByText('Authorize a Slack channel',{exact:true}).click()
+  const channel=panel.locator('form').filter({has:page.getByRole('button',{name:'Verify and authorize channel',exact:true})})
+  await channel.getByLabel('Notification event',{exact:true}).selectOption('signed')
+  await channel.getByLabel('Provider destination id',{exact:true}).fill('synthetic-platter-9031')
+  assert.equal(await channel.getByRole('checkbox').isChecked(),false)
+  await channel.getByRole('checkbox').check();await channel.getByRole('button',{name:'Verify and authorize channel',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0)
+  assert.equal(checks.at(-1),'/api/conversations.info')
+  await panel.getByText('Authorize a direct message',{exact:true}).click()
+  const direct=panel.locator('form').filter({has:page.getByRole('button',{name:'Verify and authorize direct message',exact:true})})
+  await direct.getByLabel('Chat provider',{exact:true}).selectOption('teams')
+  await direct.getByLabel('Notification event',{exact:true}).selectOption('approval')
+  await direct.getByLabel('Direct recipient',{exact:true}).selectOption(person.id)
+  await direct.getByLabel('Provider destination id',{exact:true}).fill('synthetic-platter-9033')
+  assert.equal(await direct.getByRole('checkbox').isChecked(),false)
+  await direct.getByRole('checkbox').check();await direct.getByRole('button',{name:'Verify and authorize direct message',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0)
+  assert.equal(checks.at(-1),'/v1.0/chats/synthetic-platter-9033')
+  const configured=(await state()).notificationSettings.routes
+  assert.equal(configured.length,2)
+  assert.deepEqual(configured.map(r=>[r.event,r.provider,r.kind,r.destination,r.operator_id,r.available,r.consented]).sort(),[
+   ['signed','slack','channel','synthetic-platter-9031',null,true,true],
+   ['approval','teams','direct','synthetic-platter-9033',person.id,true,true]
+  ].sort())
+  await page.reload()
+  assert.deepEqual((await state()).notificationSettings.routes,configured)
+  assert.equal(checks.length,4,'inspection never contacts the providers')
+  const history=panel.getByRole('list',{name:'Chat notification routes',exact:true})
+  assert.match(await history.innerText(),/Proposal signed/);assert.match(await history.innerText(),/Approval requested/)
+  assert.equal(await history.getByRole('button',{name:'Revoke route authorization',exact:true}).count(),2)
+  assert.ok(await panel.locator('p,label,summary,button,input,select').evaluateAll(nodes=>nodes.every(n=>parseFloat(getComputedStyle(n).fontSize)>=13)))
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+  if(screenshots){
+   await mkdir(screenshots,{recursive:true});await panel.getByText('Authorize a Slack channel',{exact:true}).click();await panel.getByText('Authorize a direct message',{exact:true}).click();await documentFonts(page)
+   await panel.screenshot({path:join(screenshots,'AUTO-003-settings-1440.png')})
+   await page.setViewportSize({width:390,height:1000});await documentFonts(page)
+   await panel.screenshot({path:join(screenshots,'AUTO-003-settings-390.png')})
+   await page.setViewportSize({width:1440,height:1000})
+  }
+  for(const route of configured)await panel.locator('[data-notification-route="'+route.id+'"]').getByRole('button',{name:'Revoke route authorization',exact:true}).click()
+  const revoked=(await state()).notificationSettings.routes
+  assert.deepEqual(revoked.map(({available,consented,...r})=>r),configured.map(({available,consented,...r})=>r))
+  assert.ok(revoked.every(r=>!r.available&&!r.consented));assert.equal(checks.length,4)
+  await page.reload();assert.match(await history.innerText(),/Inactive — new consent required/)
+  assert.equal(await history.getByRole('button').count(),0)
+ }finally{await context?.close();await browser?.close();await app?.close()}
+})

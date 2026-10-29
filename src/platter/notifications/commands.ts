@@ -8,7 +8,13 @@ import { currentTime } from '../expiry-time'
 import { commit, exact, need, text, type Actor } from '../model'
 import { negotiatedView, pendingNegotiation } from '../negotiation'
 import { administrators, permitted, senders } from '../permissions'
-import { activeRequest, chatJson, flushNotifications, notificationWrite } from './dispatch'
+import { activeRequest, chatJson, flushNotifications, notificationWrite, routeAvailable } from './dispatch'
+
+export async function notificationSettingsState(env:Bindings,a:Actor){
+ if(!administrators.includes(a.role))return undefined
+ const routes=(await env.DB.prepare('SELECT r.*,o.display_name AS recipient_name,EXISTS(SELECT 1 FROM p_notification_route_authority auth WHERE auth.route_id=r.id) AS consented FROM p_notification_routes r LEFT JOIN oa_operators o ON o.id=r.operator_id ORDER BY r.created_at,r.id').all<any>()).results
+ return {routes:await Promise.all(routes.map(async r=>({...r,consented:Boolean(r.consented),available:await routeAvailable(env,r)})))}
+}
 
 export async function requestRows(env:Bindings,a:Actor,id:string){
  await permitted(env.DB,a,id)
@@ -27,6 +33,7 @@ export async function notificationCommand(env:Bindings,a:Actor,name:string,p:Rec
   need(event!=='approval'||kind==='direct','Approval requests require a verified direct recipient')
   const destination=text(p.destination,'a provider destination',200);need(/^[A-Za-z0-9_:@.\-]+$/.test(destination),'Use a provider destination identifier')
   const {connection,secret}=await providerCredential(env,'workspace:'+provider)
+  need(!connection.broken_at,'Reconnect this provider before authorizing a destination',409)
   let operatorId:string|null=null,recipientEmail:string|null=null
   if(kind==='direct'){
    const person=await actorById(db,text(p.operatorId,'a notification recipient'));need(person,'Choose an active person');operatorId=person.id;recipientEmail=person.email
@@ -34,12 +41,13 @@ export async function notificationCommand(env:Bindings,a:Actor,name:string,p:Rec
    else {const result=await chatJson('https://graph.microsoft.com/v1.0/chats/'+encodeURIComponent(destination)+'?$expand=members',secret.token);need(result.chatType==='oneOnOne'&&result.members?.some((m:any)=>m.email?.toLowerCase()===person.email.toLowerCase())&&result.members?.some((m:any)=>m.userId===connection.account_id),'The Teams chat must include the connected user and active member')}
   }else {const result=await chatJson('https://slack.com/api/conversations.info?channel='+encodeURIComponent(destination),secret.token);need(result.channel?.id===destination&&result.channel?.is_member===true&&!result.channel?.is_archived,'Connect a joined active Slack channel')}
   const id=crypto.randomUUID()
-  await commit(db,a,[db.prepare('INSERT INTO p_notification_routes(id,event,provider,kind,destination,operator_id,recipient_email,connection_version,configured_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,event,provider,kind,destination,operatorId,recipientEmail,connection.version,a.id,at),db.prepare('INSERT INTO p_notification_route_authority(route_id) VALUES(?)').bind(id)],false,{sql:"EXISTS(SELECT 1 FROM p_connections WHERE id=? AND version=? AND status='connected')",values:[connection.id,connection.version]})
+  await commit(db,a,[db.prepare('INSERT INTO p_notification_routes(id,event,provider,kind,destination,operator_id,recipient_email,connection_version,configured_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,event,provider,kind,destination,operatorId,recipientEmail,connection.version,a.id,at),db.prepare('INSERT INTO p_notification_route_authority(route_id) VALUES(?)').bind(id)],false,{sql:"EXISTS(SELECT 1 FROM p_connections WHERE id=? AND version=? AND status='connected' AND broken_at IS NULL)"+(operatorId?" AND EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND email=? AND status='active')":''),values:[connection.id,connection.version,...(operatorId?[operatorId,recipientEmail]:[])]})
   return {id}
  }
  if(name==='notification.route.remove'){
   need(administrators.includes(a.role),'Only owner and admins remove notification routes',403)
-  const id=text(p.id,'a notification route');await commit(db,a,[db.prepare('DELETE FROM p_notification_route_authority WHERE route_id=?').bind(id)]);return {id}
+  const id=text(p.id,'a notification route');need(await db.prepare('SELECT id FROM p_notification_routes WHERE id=?').bind(id).first(),'Notification route not found',404)
+  await commit(db,a,[db.prepare('DELETE FROM p_notification_route_authority WHERE route_id=?').bind(id)]);return {id}
  }
  if(name==='notification.requests')return {requests:await requestRows(env,a,text(p.id,'a proposal'))}
  if(name==='notification.decide'){

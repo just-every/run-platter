@@ -724,9 +724,9 @@ Evidence: `tests/platter.test.mjs`, `tests/site-documents.mjs`, `tests/archive.t
 
 Status: **partial**.
 
-Gap: Nook, broader proposal events, channel settings screens and chat-native approval interactions remain. Conservative default adopted pending ct approval: only owner and admins authorize destinations; channel events contain generic event text and a session-protected link, never proposal content; approval details use a verified direct recipient. Restored routes require explicit reconnection and new consent. Future Nook and COLLAB-002 event sources inherit these obligations.
+Gap: Nook, broader proposal events, chat-native approval interactions and live-provider qualification remain. The 23 October ct-approved notification boundary applies: only owner and admins authorize verified destinations; channel events contain generic event text and a session-protected link, never proposal content; approval details use a verified direct recipient. Restored routes require explicit reconnection and new consent. Future Nook and COLLAB-002 event sources inherit these obligations.
 
-Evidence: `tests/mail.test.mjs`
+Evidence: `tests/mail.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 
 ## AUTO-004 — Public REST API and webhooks
 

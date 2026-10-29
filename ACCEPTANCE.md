@@ -87,8 +87,8 @@ Core · published · **partial** · Rules D-1
 5. Requests are limited to one per minute and ten per invitation; codes expire after ten minutes.
 6. The verification cookie is private to its invitation, HttpOnly and SameSite Strict; another revision gains no authority.
 
-**Evidence.** `tests/platter.test.mjs` — “email verification precedes acceptance, code is single-use, immutable option and deposit exported once”; “code attempt limits, resend throttling and revision-bound sessions”; `src/platter/signing.ts`
-**Gap.** Delivered: Verification precedes acceptance, a used or exhausted code is refused and resend throttling is exercised. Missing “SIGN-001 complete verified-mailbox acceptance journey”: An unconsumed valid code expires independently of attempt exhaustion; the invitation ceiling and revision-bound cookie security are exercised through a complete verification journey.
+**Evidence.** `tests/platter.test.mjs` — “email verification precedes acceptance, code is single-use, immutable option and deposit exported once”; “SIGN-001 complete verified-mailbox acceptance journey” proves unverified refusal, six-digit delivered codes, single use, five wrong attempts followed by correct-code refusal, independent scheduled-clock expiry at ten minutes, one-minute request boundaries, ten generations without an eleventh queued or delivered mail, complete invitation-specific HTTPS cookie attributes, cross-invitation refusal and fresh verified acceptance of a negotiated revision with unchanged business records on refusals; `src/platter/signing.ts`
+**Gap.** The ordinary nonembedded, collection-off single-client mailbox journey is proven through public HTTP and the mail provider edge fake. Configured and embedded recipient execution, additional identity methods and provider and legal qualification remain. SIGN-004’s owner-only authority default still requires ct approval before DONE; SIGN-006’s recorded real Stripe and Twilio key hold remains unchanged. No policy or provider hold is released.
 
 #### SIGN-002 — Immutable acceptance with an integer-cent deposit
 

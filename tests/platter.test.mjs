@@ -132,11 +132,113 @@ test('email verification precedes acceptance, code is single-use, immutable opti
  const exports=await Promise.all([h.cmd('invoice.export',{id:p.id}),h.cmd('invoice.export',{id:p.id})]);assert.equal(exports[0].id,exports[1].id);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_invoices').first()).n,1)
  r=await h.send('/api/platter/invoices/'+exports[0].id+'.csv',undefined,h.owner);assert.equal(r.status,200);assert.match(r.text,/1050\.00/);assert.match(r.text,/No Tax,USD/);assert.match(r.text,/Northstar Coffee/)
 }))
-test('code attempt limits, resend throttling and revision-bound sessions',()=>run(async h=>{
- const{path}=await sent(h);await h.send(path+'/action?name=code.request',{});assert.equal((await h.send(path+'/action?name=code.request',{})).status,429)
- const code=(await h.state()).outbox.find(x=>x.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0];const wrong=code==='000000'?'111111':'000000';for(let n=0;n<5;n++)assert.equal((await h.send(path+'/action?name=code.verify',{code:wrong})).status,401);assert.equal((await h.send(path+'/action?name=code.verify',{code})).status,401)
- const token=path.split('/').at(-1);await h.db.prepare('UPDATE p_shares SET code_expires=? WHERE token=?').bind(Date.now()-1,token).run();assert.equal((await h.send(path+'/action?name=code.verify',{code:'123456'})).status,401)
-}))
+test('SIGN-001 complete verified-mailbox acceptance journey',async()=>{
+ const delivered=[]
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-10002'},outboundService:async request=>{
+  assert.equal(new URL(request.url).hostname,'api.resend.com')
+  delivered.push(await request.json());return Response.json({id:'synthetic-platter-'+(10003+delivered.length)})
+ }})
+ try{
+  let now=Date.parse('2090-06-01T15:00:00Z')
+  const tick=async at=>{now=at;await(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})}
+  await tick(now)
+  const client=await h.cmd('client.save',{name:'Synthetic Platter client',email:'synthetic-platter-10001'+String.fromCharCode(64)+'example.test'})
+  const prepare=async title=>{
+   const p=await h.cmd('proposal.prepare',{...offer,title,clientId:client.id})
+   await h.cmd('proposal.approve',{id:p.id,version:1,revision:1})
+   return{id:p.id,path:new URL((await h.cmd('proposal.send',{id:p.id,version:2})).shareUrl).pathname}
+  }
+  const business=async()=>{const{clients,proposals,revisions}=await h.state();return{clients,proposals,revisions}}
+  const current=async id=>(await h.state()).proposals.find(p=>p.id===id)
+  const rotate=async id=>new URL((await h.cmd('proposal.send',{id,version:(await current(id)).version})).shareUrl).pathname
+  const codeMail=async id=>{const{title}=await current(id);return delivered.filter(m=>m.subject==='Your Platter verification code'&&m.text.endsWith('Proposal: '+title))}
+  const mailRows=async()=>(await h.db.prepare('SELECT * FROM p_mail ORDER BY id').all()).results
+  const requestCode=async(id,path)=>{
+   const before=(await codeMail(id)).length
+   const r=await h.send(path+'/action?name=code.request',{});assert.equal(r.status,200,r.text)
+   const added=(await codeMail(id)).slice(before);assert.equal(added.length,1,'one delivered mailbox message per permitted request')
+   const code=added[0].text.match(/\b\d{6}\b/)?.[0];assert.match(code??'',/^\d{6}$/)
+   return code
+  }
+  const refuse=async(path,name,input,cookie='',status=401)=>{
+   const before=await business(),mail=await mailRows(),deliveryCount=delivered.length
+   const r=await h.send(path+'/action?name='+name,input,cookie);assert.equal(r.status,status,r.text)
+   assert.equal(r.headers.get('set-cookie'),null,'a refusal grants no client session')
+   assert.deepEqual(await business(),before,'refusal leaves complete client, proposal, acceptance, invoice and revision records unchanged')
+   assert.deepEqual(await mailRows(),mail,'refusal queues no mail')
+   assert.equal(delivered.length,deliveryCount,'refusal sends no mail')
+  }
+  const verify=async(path,code)=>{
+   const r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,200,r.text)
+   const cookies=r.headers.getSetCookie();assert.equal(cookies.length,1)
+   const[value,...attributes]=cookies[0].split(';').map(part=>part.trim())
+   assert.match(value,/^platter_client=[a-f0-9]{64}$/)
+   assert.deepEqual(attributes,['Path='+path,'HttpOnly','SameSite=Strict','Max-Age=86400','Secure'],'the complete HTTPS cookie is host-only and private to this invitation')
+   return value
+  }
+  const acceptance={name:'Synthetic Platter signer',optionId:'one',consent:true}
+  const first=await prepare('Synthetic Platter verification boundaries')
+  await refuse(first.path,'accept',acceptance)
+  const attempted=await requestCode(first.id,first.path)
+  await refuse(first.path,'code.request',{},'',429)
+  const wrong=attempted==='000000'?'111111':'000000'
+  for(let n=0;n<5;n++)assert.equal((await h.send(first.path+'/action?name=code.verify',{code:wrong})).status,401)
+  await refuse(first.path,'code.verify',{code:attempted})
+  await refuse(first.path,'accept',acceptance)
+  const firstRequestAt=now
+  await tick(firstRequestAt+59999);await refuse(first.path,'code.request',{},'',429)
+  await tick(firstRequestAt+60000);await requestCode(first.id,first.path)
+
+  // Expire a separate, unconsumed code through the scheduler, with no row edits.
+  const expiring=await rotate(first.id),priorCodes=(await codeMail(first.id)).length
+  const expiresCode=await requestCode(first.id,expiring),issuedAt=now
+  const verification=()=>h.db.prepare('SELECT code_attempts,code_generation,code_expires,session_hash FROM p_shares WHERE token=?').bind(expiring.split('/').at(-1)).first()
+  assert.deepEqual(await verification(),{code_attempts:0,code_generation:1,code_expires:issuedAt+600000,session_hash:null})
+  await tick(issuedAt+599999)
+  await refuse(expiring,'accept',acceptance)
+  assert.equal((await verification()).code_attempts,0)
+  await tick(issuedAt+600000)
+  await refuse(expiring,'code.verify',{code:expiresCode})
+  assert.deepEqual(await verification(),{code_attempts:0,code_generation:1,code_expires:issuedAt+600000,session_hash:null},'expiry is independent of attempts or consumption')
+
+  // The minute boundary permits each next generation, but never an eleventh mail.
+  for(let generation=2;generation<=10;generation++){
+   if(generation>2){const previous=now;await tick(previous+59999);await refuse(expiring,'code.request',{},'',429);await tick(previous+60000)}
+   await requestCode(first.id,expiring)
+  }
+  assert.equal((await codeMail(first.id)).length-priorCodes,10)
+  await tick(now+60000);await refuse(expiring,'code.request',{},'',429)
+  assert.equal((await codeMail(first.id)).length-priorCodes,10,'the ceiling sends no eleventh code')
+  await refuse(expiring,'accept',acceptance)
+
+  const fresh=await rotate(first.id),freshCode=await requestCode(first.id,fresh),freshAt=now
+  await refuse(expiring,'code.verify',{code:expiresCode},'',404)
+  await tick(freshAt+599999)
+  const cookie=await verify(fresh,freshCode)
+  await refuse(fresh,'code.verify',{code:freshCode})
+  const other=await prepare('Synthetic Platter unrelated invitation')
+  await refuse(other.path,'accept',acceptance,cookie)
+  assert.equal((await current(other.id)).acceptance,undefined)
+
+  const originalRevision=(await h.state()).revisions.find(r=>r.proposal_id===first.id&&r.revision===1)
+  const negotiated=await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:first.id,version:(await current(first.id)).version,scope:'Two synthetic studio shoots.',priceOne:'2800'})
+  assert.equal(negotiated.revision,2)
+  const pending=await current(first.id)
+  await h.cmd('proposal.approve',{id:first.id,version:pending.version,revision:2})
+  const revisionPath=await rotate(first.id)
+  await refuse(fresh,'accept',acceptance,cookie,404)
+  await refuse(revisionPath,'accept',acceptance,cookie)
+  const revisionCode=await requestCode(first.id,revisionPath),revisionCookie=await verify(revisionPath,revisionCode)
+  const accepted=await h.send(revisionPath+'/action?name=accept',acceptance,revisionCookie);assert.equal(accepted.status,200,accepted.text)
+  const result=await current(first.id)
+  assert.equal(result.status,'accepted');assert.equal(result.acceptance.revision,2);assert.equal(result.acceptance.name,acceptance.name)
+  assert.equal(result.acceptance.totalCents,280000);assert.equal(result.acceptance.depositCents,70000)
+  assert.equal(result.acceptance.acceptedAt,now);assert.equal(result.acceptance.verificationMethod,'mailbox code')
+  assert.equal(result.scope,'Two synthetic studio shoots.')
+  assert.deepEqual((await h.state()).revisions.find(r=>r.proposal_id===first.id&&r.revision===1),originalRevision)
+  assert.equal((await current(other.id)).acceptance,undefined)
+ }finally{await h.close()}
+})
 test('money rejects malformed or unsafe prices and cannot export an unaccepted proposal',()=>run(async h=>{
  const{client,p}=await draft(h);for(const price of ['0','1.234','-4','NaN','10000001'])await h.cmd('proposal.prepare',{...offer,clientId:client.id,priceOne:price},h.owner,400);await h.cmd('invoice.export',{id:p.id},h.owner,409)
 }))

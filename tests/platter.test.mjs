@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import { clientFileBlocks, clientPdfBytes, uploadClientOriginal } from './client-files-fixture.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { collectionLifecycle, collectionFees, collectionMethodInheritance } from './collection-journey.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
@@ -2560,9 +2562,9 @@ test('EDIT-001 display media requires consent and live edit scope, stays private
  }finally{await h.close()}
 })
 
-test('EDIT-001 Client-assigned required fields and typed signature blocks validate at signing and freeze exact values with the selected agreement',()=>run(async h=>{
+test('EDIT-001 Client-assigned required fields and typed signature blocks validate at signing and freeze exact values with the selected agreement',async()=>{const h=await harness({assetsDirectory:'public'});try{
  const {client,p}=await draft(h),document=documentFixture()
- document.blocks.push({id:'po',type:'field',title:'Purchase order',text:'Use the approved PO.',recipientRole:'client',fieldKind:'text',required:true},{id:'start',type:'field',title:'Project start',text:'',recipientRole:'client',fieldKind:'date',required:true},{id:'confirm',type:'field',title:'Confirm delivery address',text:'',recipientRole:'client',fieldKind:'checkbox',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
+ document.blocks.push(...clientFileBlocks(),{id:'po',type:'field',title:'Purchase order',text:'Use the approved PO.',recipientRole:'client',fieldKind:'text',required:true},{id:'start',type:'field',title:'Project start',text:'',recipientRole:'client',fieldKind:'date',required:true},{id:'confirm',type:'field',title:'Confirm delivery address',text:'',recipientRole:'client',fieldKind:'checkbox',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
  await h.cmd('proposal.document',{id:p.id,version:1,document})
  const bound=(await h.state()).proposals.find(v=>v.id===p.id).document
  assert.ok(bound.blocks.filter(b=>['field','signature'].includes(b.type)).every(b=>b.recipientId===client.id))
@@ -2571,20 +2573,76 @@ test('EDIT-001 Client-assigned required fields and typed signature blocks valida
  const template=await h.cmd('template.save',{id:p.id,version:2,name:'Client-assigned fields'}),started=await h.cmd('template.start',{id:template.id,version:1,clientId:other.id})
  assert.ok((await h.state()).proposals.find(v=>v.id===started.id).document.blocks.filter(b=>['field','signature'].includes(b.type)).every(b=>b.recipientId===other.id))
  await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const invitation=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(invitation.shareUrl).pathname,cookie=await verified(h,path)
- const input={optionId:'two',name:'Synthetic Platter signer',consent:true,'field:po':'synthetic-platter-4','field:start':'2026-11-01','field:confirm':true,'signature:signature':'Synthetic Platter signer'}
- for(const name of ['field:po','field:start','field:confirm','signature:signature']){const incomplete={...input};delete incomplete[name];const r=await h.send(path+'/action?name=accept',incomplete,cookie);assert.equal(r.status,400,r.text)}
+ const original=await clientPdfBytes(),digest=createHash('sha256').update(original).digest('hex')
+ const count=async()=>{const rows=await h.db.prepare('SELECT count(*) AS n FROM p_attachment_files').first();return rows.n}
+ const baseline=await count()
+ for(const options of [{cookie:''},{cookie,revision:1},{cookie,fieldId:'po'},{cookie,bytes:new Uint8Array(30*1024*1024)},{cookie,bytes:new TextEncoder().encode('MZ synthetic-platter-9804')},{cookie,filename:'synthetic-platter-9801.exe',type:'application/octet-stream'},{cookie,filename:'synthetic-platter-9801.png',type:'image/png'}]){const {cookie:session,...upload}=options;const refused=await uploadClientOriginal(h,path,session,{bytes:original,...upload});assert.ok([400,401,409,413,415].includes(refused.status),await refused.text());assert.equal(await count(),baseline,'refused upload writes no file bytes')}
+ let uploaded=await uploadClientOriginal(h,path,cookie,{bytes:original});assert.equal(uploaded.status,200,await uploaded.clone().text());const file=await uploaded.json();assert.equal(file.sha256,digest)
+ const jpegBytes=await readFile('fixtures/editor/synthetic-platter-9803.jpg'),jpegResponse=await uploadClientOriginal(h,path,cookie,{bytes:jpegBytes,filename:'synthetic-platter-9803.jpg',type:'image/jpeg',fieldId:'insurance-file'});assert.equal(jpegResponse.status,200,await jpegResponse.clone().text());const jpeg=await jpegResponse.json();const jpegOriginal=await h.mf.dispatchFetch(h.origin+path+'/client-files/'+jpeg.id,{headers:{cookie}});assert.deepEqual(Buffer.from(await jpegOriginal.arrayBuffer()),jpegBytes)
+ const imageBytes=await readFile('public/brand/apple-touch-icon.png'),imageResponse=await uploadClientOriginal(h,path,cookie,{bytes:imageBytes,filename:'synthetic-platter-9802.png',type:'image/png',fieldId:'insurance-file'});assert.equal(imageResponse.status,200,await imageResponse.clone().text());const image=await imageResponse.json()
+ const input={optionId:'two',name:'Synthetic Platter signer',consent:true,'field:billing':'50 Synthetic Street','field:purchase-file':file.id,'field:insurance-file':image.id,'field:po':'synthetic-platter-4','field:start':'2026-11-01','field:confirm':true,'signature:signature':'Synthetic Platter signer'}
+ for(const name of ['field:billing','field:purchase-file','field:po','field:start','field:confirm','signature:signature']){const incomplete={...input};delete incomplete[name];const r=await h.send(path+'/action?name=accept',incomplete,cookie);assert.equal(r.status,400,r.text)}
  assert.equal((await h.send(path+'/action?name=accept',{...input,'field:start':'2026-02-30'},cookie)).status,400)
  assert.equal((await h.send(path+'/action?name=accept',{...input,'signature:signature':'A different name'},cookie)).status,400)
  assert.equal((await h.send(path+'/action?name=accept',{...input,'field:other':'Not assigned'},cookie)).status,400)
+ assert.equal((await h.send(path+'/action?name=accept',{...input,'field:purchase-file':image.id},cookie)).status,409)
  assert.equal((await h.state()).proposals.find(v=>v.id===p.id).status,'sent')
  assert.equal((await h.send(path+'/action?name=accept',input,cookie)).status,200)
- const expected={po:'synthetic-platter-4',start:'2026-11-01',confirm:true,signature:'Synthetic Platter signer'}
+ // A second invitation cannot consume another invitation's original.
+ let copied=(await h.state()).proposals.find(v=>v.id===copy.id)
+ await h.cmd('proposal.approve',{id:copy.id,version:copied.version,revision:copied.revision})
+ copied=(await h.state()).proposals.find(v=>v.id===copy.id)
+ const copyPath=new URL((await h.cmd('proposal.send',{id:copy.id,version:copied.version})).shareUrl).pathname,copyCookie=await verified(h,copyPath)
+ assert.equal((await h.send(copyPath+'/client-files/'+file.id,undefined,copyCookie)).status,404)
+ assert.equal((await h.send(copyPath+'/action?name=accept',input,copyCookie)).status,409)
+ assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_acceptances WHERE proposal_id=?').bind(copy.id).first()).n,0)
+ // The inclusive file limit uses the same immutable chunk store as small files.
+ const large=new Uint8Array(25*1024*1024);large.set(original)
+ const largeUpload=await uploadClientOriginal(h,copyPath,copyCookie,{revision:copied.revision,bytes:large});assert.equal(largeUpload.status,200,await largeUpload.clone().text());const largeFile=await largeUpload.json()
+ const largeDownload=await h.mf.dispatchFetch(h.origin+copyPath+'/client-files/'+largeFile.id,{headers:{cookie:copyCookie}});assert.equal(largeDownload.status,200);assert.equal(createHash('sha256').update(new Uint8Array(await largeDownload.arrayBuffer())).digest('hex'),largeFile.sha256)
+ // Race a replacement upload with acceptance: either operation serializes first.
+ const copyInput={...input,'field:purchase-file':largeFile.id};delete copyInput['field:insurance-file']
+ const fileCountBeforeRace=await count()
+ const race=await Promise.all([uploadClientOriginal(h,copyPath,copyCookie,{revision:copied.revision,bytes:original}),h.send(copyPath+'/action?name=accept',copyInput,copyCookie)])
+ assert.ok([200,409].includes(race[0].status),'upload race status '+race[0].status);assert.ok([200,409].includes(race[1].status),race[1].text)
+ if(race[1].status===409)assert.equal((await h.send(copyPath+'/action?name=accept',copyInput,copyCookie)).status,200)
+ const copyFrozen=JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(copy.id).first()).snapshot);assert.deepEqual(copyFrozen.clientFiles,[largeFile]);assert.equal(await count(),fileCountBeforeRace+(race[0].status===200?1:0))
+ assert.equal((await uploadClientOriginal(h,copyPath,copyCookie,{revision:copied.revision,bytes:original})).status,409)
+ // A replacement invitation cannot adopt previously uploaded file authority.
+ let stale=(await h.state()).proposals.find(v=>v.id===started.id)
+ await h.cmd('proposal.approve',{id:started.id,version:stale.version,revision:stale.revision});stale=(await h.state()).proposals.find(v=>v.id===started.id)
+ const stalePath=new URL((await h.cmd('proposal.send',{id:started.id,version:stale.version})).shareUrl).pathname,staleCookie=await verified(h,stalePath)
+ const staleUpload=await uploadClientOriginal(h,stalePath,staleCookie,{bytes:original,revision:stale.revision});assert.equal(staleUpload.status,200);const staleFile=await staleUpload.json()
+ stale=(await h.state()).proposals.find(v=>v.id===started.id)
+ const freshPath=new URL((await h.cmd('proposal.send',{id:started.id,version:stale.version})).shareUrl).pathname
+ const countBeforeRevocation=await count()
+ assert.equal((await uploadClientOriginal(h,stalePath,staleCookie,{bytes:original,revision:stale.revision})).status,404)
+ assert.equal((await uploadClientOriginal(h,freshPath,staleCookie,{bytes:original,revision:stale.revision})).status,401)
+ const freshCookie=await verified(h,freshPath)
+ assert.equal((await h.send(freshPath+'/action?name=accept',{...copyInput,'field:purchase-file':staleFile.id},freshCookie)).status,409)
+ assert.equal(await count(),countBeforeRevocation);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_acceptances WHERE proposal_id=?').bind(started.id).first()).n,0)
+ const mailbox=(await h.state()).clients.find(v=>v.id===client.id).email
+ const configured=await h.cmd('proposal.prepare',{...offer,clientId:client.id,recipientPlan:[{id:'synthetic-platter-file-client',name:'Assigned Client',email:mailbox,role:'signer',group:1}]})
+ await h.cmd('proposal.document',{id:configured.id,version:1,document:{version:1,blocks:clientFileBlocks()}})
+ await h.cmd('proposal.approve',{id:configured.id,version:2,revision:2})
+ const configuredPath=new URL((await h.cmd('proposal.send',{id:configured.id,version:3})).shareUrl).pathname,configuredCookie=await verified(h,configuredPath),configuredBefore=await count()
+ assert.equal((await uploadClientOriginal(h,configuredPath,configuredCookie,{bytes:original})).status,409)
+ assert.equal((await h.send(configuredPath+'/action?name=accept',input,configuredCookie)).status,409)
+ assert.equal(await count(),configuredBefore);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_recipient_signatures WHERE proposal_id=?').bind(configured.id).first()).n,0)
+ const expected={billing:'50 Synthetic Street',po:'synthetic-platter-4',start:'2026-11-01',confirm:true,signature:'Synthetic Platter signer'}
+ const frozen=JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot);assert.deepEqual(frozen.clientFiles,[file,image]);assert.equal(frozen.fieldValues.billing,'50 Synthetic Street')
+ const originalResponse=await h.mf.dispatchFetch(h.origin+path+'/client-files/'+file.id,{headers:{cookie}});assert.equal(originalResponse.status,200);assert.deepEqual(new Uint8Array(await originalResponse.arrayBuffer()),original);assert.match(originalResponse.headers.get('content-disposition'),/^attachment/);assert.equal(originalResponse.headers.get('x-content-type-options'),'nosniff')
+ assert.equal((await h.send(path+'/client-files/'+file.id)).status,401)
+ const ownerDownload=await h.mf.dispatchFetch(h.origin+'/api/platter/client-files/'+p.id+'/'+file.id,{headers:{cookie:h.owner}});assert.deepEqual(new Uint8Array(await ownerDownload.arrayBuffer()),original)
+ const certificate=(await h.send(path+'/certificate.json',undefined,cookie)).value;assert.deepEqual(certificate.clientFiles,[file,image]);const certificatePdf=await h.mf.dispatchFetch(h.origin+path+'/certificate.pdf',{headers:{cookie}}),certificateText=(await pdfPages(await certificatePdf.arrayBuffer())).join(' ');assert.ok(certificateText.includes(file.filename));assert.ok(certificateText.replace(/\s/g,'').includes(digest))
+ const signedPdf=await h.mf.dispatchFetch(h.origin+path+'/agreement.pdf',{headers:{cookie}}),signedText=(await pdfPages(await signedPdf.arrayBuffer())).join(' ');assert.ok(signedText.includes('50 Synthetic Street'));assert.ok(signedText.includes('synthetic-platter-4'))
+ assert.equal((await uploadClientOriginal(h,path,cookie,{bytes:original})).status,409)
  const data=(await h.send(path+'/data.json',undefined,cookie)).value;assert.deepEqual(data.acceptance.fieldValues,expected)
  assert.deepEqual((await h.state()).proposals.find(v=>v.id===p.id).acceptance.fieldValues,expected)
  const agreement=(await h.send(path,undefined,cookie)).text;assert.match(agreement,/synthetic-platter-4/);assert.match(agreement,/2026-11-01/)
  await h.send(path+'/action?name=accept',{...input,'field:po':'Changed'},cookie)
  assert.deepEqual((await h.send(path+'/data.json',undefined,cookie)).value.acceptance.fieldValues,expected,'replay cannot rewrite accepted fields')
-}))
+}finally{await h.close()}})
 
 test('EDIT-001 new sections inherit verified questions and opt-in tracked edits without changing the sent document or bypassing review',()=>run(async h=>{
  const {client,p}=await draft(h),document=documentFixture();await h.cmd('proposal.document',{id:p.id,version:1,document});await h.cmd('proposal.approve',{id:p.id,version:2,revision:2})

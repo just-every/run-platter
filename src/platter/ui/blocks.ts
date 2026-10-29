@@ -20,7 +20,14 @@ export function documentBlocks(view:any,mediaBase='',suffix=''){
    if(view.recipientProgress&&view.status!=='accepted'&&fieldSlot(b,view.recipientProgress.clientSlot)!==view.recipientProgress.recipient.id)return ''
    const value=view.acceptance?.fieldValues?.[b.id]??view.recipientProgress?.ownFields?.[b.id],disabled=view.preview||!view.verified||view.status==='accepted'||view.recipientProgress?.signed||view.recipientProgress&&!view.recipientProgress.ready,name=(b.type==='signature'?'signature:':'field:')+b.id
    body+='<p class="muted">'+(b.recipientRole==='slot'?ui('Assigned to ')+escape(recipientPlan(view).find(r=>r.id===b.recipientId)?.name??'this recipient')+ui(' recipient role.'):ui('Assigned to the Client recipient')+(b.recipientId?'':ui(' role'))+'.')+'</p>'
-   if(view.status==='accepted'||view.recipientProgress?.signed)body+='<p>'+escape(value===undefined?ui('Not collected'):value===true?ui('Yes'):value===false?ui('No'):value)+'</p>'
+   if(b.fieldKind==='file'){
+    const file=(view.acceptance?.clientFiles??view.clientFiles??[]).find((f:any)=>f.fieldId===b.id),base=view.clientFileBase
+    body+='<div id="client-file-'+escape(b.id)+'">'+(file?'<p data-client-file-result><a href="'+escape(base+'/'+encodeURIComponent(file.id))+'">Download '+escape(file.filename)+'</a></p>':'<p data-client-file-result>No file collected.</p>')
+    if(!disabled&&base&&view.clientLocale==='en'&&!view.recipientProgress&&view.verificationMethod==='mailbox code'&&!view.collection?.enabled)body+='<input form="platter-acceptance" type="hidden" name="'+escape(name)+'" value="'+escape(file?.id??'')+'"><form method="post" enctype="multipart/form-data" action="'+escape(base)+'?optionId='+escape(view.selectedOptionId)+'" data-client-file-upload>'+hidden('revision',view.revision)+hidden('fieldId',b.id)+'<label>'+escape(b.title)+'<input type="file" name="file" accept="application/pdf,image/png,image/jpeg" required></label><p>PDF, PNG or JPEG, up to 25 MB. Upload before accepting.</p><button>Upload '+escape(b.title)+'</button><p role="status" data-client-file-status></p></form>'
+    else if(!file&&view.status!=='accepted')body+='<p>File collection requires a verified English single-client offer with collection off.</p>'
+    body+='</div>'
+   }
+   else if(view.status==='accepted'||view.recipientProgress?.signed)body+='<p>'+escape(value===undefined?ui('Not collected'):value===true?ui('Yes'):value===false?ui('No'):value)+'</p>'
    else {const kind=b.type==='signature'?'text':b.fieldKind,required=b.type==='signature'||b.required;body+='<label>'+escape(b.type==='signature'?ui('Type your full name for ')+b.title:b.title)+'<input form="platter-acceptance" name="'+escape(name)+'" type="'+escape(kind)+'"'+(kind==='checkbox'?' value="yes"':' maxlength="1000"')+(required?' required':'')+(disabled?' disabled':'')+'></label>'+(b.type==='signature'?ui('<p>By accepting below, you adopt this typed name as your signature for this block. It must match your acceptance name.</p>'):'')}
    if(b.text)body+=richText(b.text)
   }

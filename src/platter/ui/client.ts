@@ -27,6 +27,7 @@ export function renderClient(view: any, token: string, feedback?: Feedback): Res
   return response
 }
 function clientDocument(view: any, token: string, feedback?: Feedback): Response {
+  view={...view,clientFileBase:view.preview?undefined:'/p/'+encodeURIComponent(token)+'/client-files'}
   const selectedId = view.acceptance?.optionId ?? view.preview?.selection.option.id ?? view.selectedOptionId ?? 'one'
   const endpoint = view.preview ? '/app/preview/client/action?name=' : `/p/${encodeURIComponent(token)}/action?name=`
   const items=selectionChoices(view.selection),embedQuery=view.embedded?'&amp;embed=1':'',itemsQuery=items.length?'&amp;items='+encodeURIComponent(JSON.stringify(items)):''
@@ -71,6 +72,7 @@ function clientDocument(view: any, token: string, feedback?: Feedback): Response
   if(!view.recipientProgress||['signer','countersigner'].includes(view.recipientProgress.recipient.role))html+=collectionPanel(view,token)
   if(view.status!=='accepted'&&view.verified&&maySign)html+=panel(ui('Decline this proposal'),ui('<p>Declining closes this offer and revokes its client links. The firm can send a new revision for a fresh decision.</p>')+publicForm('decline',hidden('revision',view.revision)+field(ui('Decline reason'),'reason','','required maxlength="1000"')+ui('<button class="secondary">Decline proposal</button>')))
   for(const [heading,key] of [[ui('Scope of work'),'scope'],[ui('Offer options'),'pricing'],[ui('Terms'),'terms'],[view.status==='accepted'?ui('Signed agreement package attachments'):ui('Proposal attachments'),'attachments']])html=html.replace('<h2>'+heading+'</h2>','<h2 data-engagement-section="'+key+'">'+heading+'</h2>')
+  if(view.document?.blocks?.some((b:any)=>b.fieldKind==='file'))html+='<script src="/client-files.js" defer></script>'
   return document(view.title, html, { client: true, collection:Boolean(view.collection?.enabled&&view.verified), styles:documentBrandCss(view)+(view.collection?.enabled?'[data-stripe-payment][hidden],[data-collection][hidden]{display:none}':''), feedback, eyebrow: ui`<p class="eyebrow">Proposal · Revision ${escape(view.revision)}${view.status === 'accepted' ? view.collection?.enabled&&!view.collection.complete?' · signed · payment pending':ui(' · accepted') : ''}</p>` })
 }
 

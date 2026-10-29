@@ -1,3 +1,5 @@
+import { clientFileBlocks, clientPdfBytes } from './client-files-fixture.mjs'
+import { createHash } from 'node:crypto'
 import assert from 'node:assert/strict'
 import { mkdir,readFile,writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -50,7 +52,7 @@ export async function documentJourney(){
     fixture.blocks.splice(4,0,{id:'photo',type:'image',title:'Studio image',text:'A retained image.',assetId:image.id,alt:'Synthetic Platter studio mark'},{id:'film',type:'video',title:'Studio film',text:'An uploaded introduction.',assetId:video.id,posterId:image.id,alt:'Synthetic Platter introduction'},{id:'pricing',type:'pricing',title:'Investment detail',text:'',optionId:'one',tableIndex:0})
     fixture.blocks.push({id:'gallery',type:'gallery',title:'Studio gallery',text:'A gallery caption.',images:[{assetId:image.id,alt:'Gallery studio mark'},{assetId:secondImage.id,alt:'Second gallery mark'}]},{id:'loom',type:'embed',title:'External introduction',text:'Click to load.',url:'https://www.loom.com/share/'+'a'.repeat(32),posterId:image.id,alt:'Loom introduction',consent:true})
     fixture.blocks.push({id:'booking',type:'embed',title:'Book a review',text:'Choose when to connect.',url:'https://calendly.com/synthetic-platter-1/review',posterId:image.id,alt:'Review booking',consent:true},{id:'pdf-preview',type:'embed',title:'PDF preview',text:'Choose when to connect.',url:'https://drive.google.com/file/d/synthetic-platter-1/preview',posterId:image.id,alt:'PDF supporting document',consent:true})
-    fixture.blocks.push({id:'po',type:'field',title:'Purchase order',text:'Use the approved PO.',recipientRole:'client',fieldKind:'text',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
+    fixture.blocks.push(...clientFileBlocks(),{id:'po',type:'field',title:'Purchase order',text:'Use the approved PO.',recipientRole:'client',fieldKind:'text',required:true},{id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'client'})
     await editor.locator('.document-brand-kit summary').click()
     for(const [key,value] of Object.entries(fixture.brand)){const node=editor.locator(`[data-brand=${key}]`);if(key==='font'||key==='logoId')await node.selectOption(value);else await node.fill(value)}
     await editor.getByRole('button',{name:'Apply brand kit'}).click()
@@ -172,12 +174,27 @@ export async function documentJourney(){
     const pending=(await state()).proposals.find(p=>p.id===id);assert.equal(pending.approved_by,null);assert.ok(pending.document.blocks.find(b=>b.title==='Our approach').text.includes('weekly'))
     const stillSent=await clientContext.request.get(app.origin+path+'/data.json?optionId=two');assert.deepEqual((await stillSent.json()).document,savedDocument,'suggestions do not rewrite the live client document')
     await client.getByLabel('Purchase order',{exact:true}).fill('synthetic-platter-3')
+    await client.getByLabel('Billing address',{exact:true}).fill('50 Synthetic Street')
+    const original=await clientPdfBytes(),fileBlock=savedDocument.blocks.find(b=>b.title==='Purchase order PDF'),clientUploadForm=client.locator('[data-client-file-upload]').filter({has:client.getByLabel('Purchase order PDF',{exact:true})})
+    await clientUploadForm.getByLabel('Purchase order PDF',{exact:true}).setInputFiles({name:'synthetic-platter-9801.pdf',mimeType:'application/pdf',buffer:Buffer.from(original)})
+    await clientUploadForm.getByRole('button',{name:'Upload Purchase order PDF',exact:true}).click()
+    await clientUploadForm.getByRole('status').filter({hasText:'Upload complete.'}).waitFor()
+    if(width===1440){assert.equal(await client.getByLabel('Purchase order',{exact:true}).inputValue(),'synthetic-platter-3','upload preserves typed acceptance values');const response=await clientContext.request.get(app.origin+path+'/data.json?optionId=two');assert.equal((await response.json()).status,'sent')}
+    if(screenshots){await clientUploadForm.scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`SIGN-007-upload-${width}.png`)})}
+
     await client.getByLabel('Type your full name for Client signature',{exact:true}).fill('Synthetic Platter signer')
     await client.getByLabel('Your full name',{exact:true}).fill('Synthetic Platter signer');await client.locator('input[name=consent]').check();await client.getByRole('button',{name:'Accept proposal',exact:true}).click()
     assert.equal(await client.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1)
-    const accepted=(await state()).proposals.find(p=>p.id===id).acceptance,po=savedDocument.blocks.find(b=>b.type==='field').id,signature=savedDocument.blocks.find(b=>b.type==='signature').id
-    assert.deepEqual(accepted.fieldValues,{[po]:'synthetic-platter-3',[signature]:'Synthetic Platter signer'})
+    const accepted=(await state()).proposals.find(p=>p.id===id).acceptance,po=savedDocument.blocks.find(b=>b.title==='Purchase order').id,signature=savedDocument.blocks.find(b=>b.type==='signature').id
+    assert.deepEqual(accepted.fieldValues,{[savedDocument.blocks.find(b=>b.title==='Billing address').id]:'50 Synthetic Street',[po]:'synthetic-platter-3',[signature]:'Synthetic Platter signer'})
     if(screenshots){await client.locator('.document-signature').scrollIntoViewIfNeeded();await client.screenshot({path:join(screenshots,`EDIT-001-signed-fields-${width}.png`)})}
+    const file=accepted.clientFiles.find(f=>f.fieldId===fileBlock.id)
+    const downloaded=await clientContext.request.get(app.origin+path+'/client-files/'+file.id)
+    if(width===1440){assert.equal(downloaded.status(),200);assert.deepEqual(new Uint8Array(await downloaded.body()),original);assert.equal(file.sha256,createHash('sha256').update(original).digest('hex'));const facts=await (await clientContext.request.get(app.origin+path+'/certificate.json')).json();assert.deepEqual(facts.clientFiles,[file])}
+    await client.getByRole('link',{name:'Download synthetic-platter-9801.pdf',exact:true}).scrollIntoViewIfNeeded()
+    const [browserDownload]=await Promise.all([client.waitForEvent('download'),client.getByRole('link',{name:'Download synthetic-platter-9801.pdf',exact:true}).click()])
+    if(width===1440){assert.equal(browserDownload.suggestedFilename(),'synthetic-platter-9801.pdf');assert.deepEqual(new Uint8Array(await readFile(await browserDownload.path())),original)}
+    if(screenshots)await client.screenshot({path:join(screenshots,`SIGN-007-complete-${width}.png`)})
     assert.deepEqual(errors,[])
    }finally{await clientContext?.close();await context.close();await app.close();app=undefined}
   }

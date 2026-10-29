@@ -85,6 +85,7 @@ async function processHandoff(env:Bindings,job:any){
  const accepted=await db.prepare('SELECT a.snapshot,a.option_id,paper.file_id FROM p_acceptances a LEFT JOIN p_paper_acceptances paper ON paper.proposal_id=a.proposal_id WHERE a.proposal_id=? AND a.revision=?').bind(job.proposal_id,job.revision).first<any>();need(accepted,'Accepted scope is unavailable',409)
  const snapshot=JSON.parse(accepted.snapshot),{lines,schedule}=scopeTasks(snapshot,accepted.option_id)
  const link=env.AUTH_ORIGIN+agreementPath(job.proposal_id,accepted.file_id)
+ const acceptanceNote=accepted.file_id?'\nAccepted by upload: signed outside Platter. Platter did not verify this signature.':''
  const write=async(position:number,kind:'project'|'task',data:any)=>{
   // Save the exact attempted request before I/O. No path retries a reserved write.
   await db.prepare("INSERT INTO p_handoff_writes VALUES(?,?,?,?,'writing',NULL)").bind(job.proposal_id,position,kind,JSON.stringify(data)).run()
@@ -94,9 +95,9 @@ async function processHandoff(env:Bindings,job:any){
    return id
   }catch(error){await db.prepare("UPDATE p_handoff_writes SET status='uncertain' WHERE proposal_id=? AND position=?").bind(job.proposal_id,position).run();throw error}
  }
- const project=await write(0,'project',{workspace:job.workspace_id,team:job.team_id,name:snapshot.title,notes:snapshot.scope+(accepted.file_id?'\nAccepted by upload: signed outside Platter. Platter did not verify this signature.':'')+'\nAgreement (sign in required): '+link+(schedule.length?'\nRecorded schedule:\n'+schedule.map((r:any)=>r.label+': '+r.date).join('\n'):'')})
+ const project=await write(0,'project',{workspace:job.workspace_id,team:job.team_id,name:snapshot.title,notes:snapshot.scope+acceptanceNote+'\nAgreement (sign in required): '+link+(schedule.length?'\nRecorded schedule:\n'+schedule.map((r:any)=>r.label+': '+r.date).join('\n'):'')})
  await db.prepare('UPDATE p_handoff_jobs SET project_id=? WHERE proposal_id=?').bind(project,job.proposal_id).run()
- for(const [i,line] of lines.entries())await write(i+1,'task',{projects:[project],name:line.name,notes:line.notes+'\nAgreement (sign in required): '+link,...(line.date?{due_on:line.date}:{})})
+ for(const [i,line] of lines.entries())await write(i+1,'task',{projects:[project],name:line.name,notes:line.notes+acceptanceNote+'\nAgreement (sign in required): '+link,...(line.date?{due_on:line.date}:{})})
  await authorize()
  await db.prepare("UPDATE p_handoff_jobs SET status='complete',reason=NULL,completed_at=? WHERE proposal_id=? AND status='running'").bind(Date.now(),job.proposal_id).run()
 }

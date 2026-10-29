@@ -3758,7 +3758,7 @@ test('HAND-001 Asana handoff uses immutable selected scope once and holds uncert
   assert.deepEqual(tasks.map(t=>t.projects),Array.from({length:4},()=>[project.gid]))
   assert.match(project.notes,/Accepted by upload: signed outside Platter\. Platter did not verify this signature\./)
   const filePath=job.agreementPath;assert.ok(filePath.startsWith('/api/platter/attachments/'+upload.proposal.id+'/'))
-  for(const resource of [project,...tasks])assert.ok(resource.notes.includes(h.origin+filePath))
+  for(const resource of [project,...tasks]){assert.ok(resource.notes.includes(h.origin+filePath));assert.match(resource.notes,/Accepted by upload: signed outside Platter\. Platter did not verify this signature\./)}
   const original=await h.mf.dispatchFetch(h.origin+filePath,{headers:{cookie:h.owner}})
   assert.equal(original.status,200);assert.deepEqual(Buffer.from(await original.arrayBuffer()),bytes)
   assert.equal((await h.send(filePath,undefined,'')).status,401)
@@ -3768,5 +3768,13 @@ test('HAND-001 Asana handoff uses immutable selected scope once and holds uncert
   await recordHandoffUpload(h,upload,h.owner,409)
   await tick();await h.cmd('handoff.dispatch',{});assert.equal(fake.calls.length,callsBeforeReplay)
   assert.ok(!(await read()).jobs.some(j=>j.proposal_id===excludedUpload.proposal.id),'fresh authorization never backfills earlier uploads')
+  const revokedUpload=await completeHandoffAgreement(h,'Signed upload authorization revoked',signed.client.id,false)
+  await recordHandoffUpload(h,revokedUpload)
+  await h.cmd('handoff.revoke',{version:5})
+  const beforeRevocationCalls=fake.calls.length;await tick();assert.equal(fake.calls.length,beforeRevocationCalls)
+  assert.equal((await read()).jobs.find(j=>j.proposal_id===revokedUpload.proposal.id).status,'held')
+  await h.cmd('handoff.configure',{...handoffSettings,version:5,connectionVersion:3,includeUploads:true})
+  const afterFreshGrant=fake.calls.length;await tick();assert.equal(fake.calls.length,afterFreshGrant)
+  assert.equal((await read()).jobs.find(j=>j.proposal_id===revokedUpload.proposal.id).status,'held','a new grant never reactivates a revoked signed upload')
  }finally{await h.close()}
 })

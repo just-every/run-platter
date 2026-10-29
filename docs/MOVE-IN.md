@@ -6,7 +6,7 @@ Bring an existing client list into Platter with a reviewed CSV import. Open
 ## Exported documents and report CSVs (`MIG-007`)
 
 Use **Move in exported documents** on Import. Name a move-in, then add PDF files,
-bulk ZIP downloads and report CSVs to it. You can return after signing in again:
+Word downloads, bulk ZIP downloads and CSVs to it. You can return after signing in again:
 select an interrupted file and **Upload or resume files** continues from its
 saved byte offset. Repeated uploads of the same bytes are reused. Files are
 limited to 5 MiB each and 20 MiB per move-in; ZIPs retain their original paths as
@@ -26,21 +26,41 @@ are retained as read-only agreements. PDFs without that evidence remain
 read-only open documents held for review. Every original download is
 byte-identical, with its SHA-256 available under source evidence.
 
-**Apply reviewed document move-in** binds all uploaded bytes and report choices.
+Open **Choose native file destinations** to review additional mappings. An
+unsigned PDF becomes a fresh fixed-page draft after you select an existing
+client and a positive USD offer price. It still needs ordinary approval and a
+new send; the old file is never represented as newly signed. Word downloads can
+become editable personal templates or library sections split at Heading 1.
+Library sharing requires explicit authorization to the current library audience.
+Word tokens remain variables, quote rows retain their prices and quantities,
+and SKU or name matches link imported catalog records; unmatched rows and
+unknown variables stay visible. PDF-only templates retain fixed pages and are
+listed as needing a Word download for editing.
+
+Catalog and contact CSV destinations use the same published presets or reviewed
+column mappings as the business importer. Imported catalog values remain review
+metadata until explicitly promoted through Catalog. Image URLs block apply
+unless you explicitly choose to apply that exact CSV without unfetched images.
+No image request bypasses the held Base egress requirement. ZIP folder paths
+become native folders, retaining their parent relationships and original-file
+associations. Counts distinguish retained agreements, new drafts, other native
+records, folders, held items, unmapped items and skipped duplicate PDFs.
+
+**Apply reviewed document move-in** binds all uploaded bytes, report choices,
+file destinations, prices, clients, sharing authorizations and CSV mappings.
 Adding a file or changing a choice needs a fresh preview. After apply, the
 move-in is frozen; use another move-in for more files. A later import holds
 already retained documents rather than replacing them. The journal retains
-original ZIPs, PDFs, report files, reviewed choices and each native change.
-**Undo document move-in** removes unchanged imported documents and refuses while
-a dependent proposal uses an original. Completed imports, exact originals,
+original ZIPs, PDFs, Word files, CSVs, reviewed choices and every native change.
+**Undo document move-in** removes unchanged imported resources in bounded
+passes. Later edits, reused templates or library items, dependent proposals and
+shared original files prevent destructive undo; completed passes stay undone. Completed imports, exact originals,
 reports, journals and working undo survive RER archives; staged upload transport
 is local and is not restored.
 
-This slice creates no client invitations, editable templates, native folders,
-catalog items, contacts, payments or provider actions. Open-document reissue,
-combined template and library conversion, catalog and contact integration,
-provider enrichment and qualification of every incumbent's exports remain
-unfinished. CSV image handling keeps the existing explicit failure and owner
+Import creates no invitation, payment or outbound provider authority. Sending a
+new draft remains a separate reviewed action. Provider enrichment and complete
+qualification of every incumbent export remain unfinished. CSV image handling keeps the existing explicit failure and owner
 choice to apply without images.
 
 ## Companies, contacts and catalog (`MIG-006`)

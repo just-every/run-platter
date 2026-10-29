@@ -524,6 +524,8 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   let nativeUndo=await h.cmd('document-import.undo',{id:native.id},cookie)
   for(let i=0;nativeUndo.job.state!=='undone'&&i<60;i++)nativeUndo=await h.cmd('document-import.undo',{id:native.id},cookie)
   assert.equal(nativeUndo.job.state,'undone')
+  await h.cmd('document-import.continue',{id:native.id},cookie,409)
+  await h.cmd('document-import.apply',{id:native.id,choices:native.choices,mapping:native.fixture.mapping,fingerprint:native.reviewed.fingerprint},cookie,409)
   assert.ok((await h.cmd('document-import.journal',{id:native.id},cookie)).provenance.every(p=>p.reversed))
   assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments)
   assert.ok(!(await h.state(cookie)).proposals.some(p=>p.id===nativeProof.draft.id))

@@ -983,9 +983,14 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectDrive(h)
   const completed=await completeDriveAgreement(h)
   await h.cmd('archive.dispatch',{})
+  const broken=await completeDriveAgreement(h,'Broken credential archive history',completed.client.id)
+  fake.setHook(()=>Response.json({error:{message:driveToken}},{status:401}));await h.cmd('archive.dispatch',{});fake.setHook(undefined)
+  assert.equal((await h.state()).connections.find(c=>c.provider==='google_drive').status,'broken')
+  await h.cmd('provider.connect',{provider:'google_drive',version:1,token:driveToken,consent:true})
+  await h.cmd('archive.configure',{...driveSettings,version:1,connectionVersion:2})
   const queued=await completeDriveAgreement(h,'Queued archive history',completed.client.id)
-  const tables=['p_archive_settings','p_archive_jobs','p_archive_files','p_archive_folders','p_agreement_artifacts'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
-  assert.deepEqual(before.p_archive_jobs.map(j=>j.status).sort(),['complete','queued'])
+  const tables=['p_connections','p_archive_settings','p_archive_jobs','p_archive_files','p_archive_folders','p_agreement_artifacts'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
+  assert.deepEqual(before.p_archive_jobs.map(j=>j.status).sort(),['complete','held','queued'])
   const artifacts={}
   for(const kind of ['agreement','certificate']){
    const response=await h.mf.dispatchFetch(h.origin+completed.path+'/'+kind+'.pdf',{headers:{cookie:completed.cookie}});assert.equal(response.status,200);artifacts[kind]=Buffer.from(await response.arrayBuffer())
@@ -1009,9 +1014,11 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   const history=(await h.send('/api/platter/archives',undefined,owner)).value;assert.equal(history.settings.active,false);assert.ok(history.jobs.every(j=>!j.executable))
   assert.equal((await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).status,404)
   // Even reconnecting and explicitly authorizing future agreements cannot replay imported jobs.
-  await h.cmd('provider.connect',{provider:'google_drive',version:1,token:driveToken,consent:true},owner)
-  await h.cmd('archive.configure',{...driveSettings,version:1,connectionVersion:2},owner)
+  await h.cmd('provider.connect',{provider:'google_drive',version:2,token:driveToken,consent:true},owner)
+  await h.cmd('archive.configure',{...driveSettings,version:2,connectionVersion:3},owner)
   const calls=restoredFake.calls.length;await h.cmd('archive.dispatch',{},owner);assert.equal(restoredFake.calls.length,calls)
   await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
+  await h.cmd('archive.reconcile',{id:broken.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
+  assert.equal((await h.send('/api/platter/archives',undefined,owner)).value.jobs.find(j=>j.proposal_id===broken.proposal.id).status,'held')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

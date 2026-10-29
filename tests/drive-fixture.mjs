@@ -11,7 +11,7 @@ export function driveFixture(){
  const outboundService=async request=>{
   const url=new URL(request.url);calls.push({url:url.href,method:request.method})
   assert.equal(url.hostname,'www.googleapis.com');assert.equal(request.headers.get('authorization'),'Bearer '+driveToken)
-  if(hook)await hook(request)
+  if(hook){const response=await hook(request);if(response)return response}
   if(url.pathname.endsWith('/about'))return Response.json({user:{permissionId:driveAccount,emailAddress:['synthetic-platter-drive','example.test'].join('@')}})
   if(url.pathname.endsWith('/generateIds'))return Response.json({ids:['synthetic-platter-archive-'+(++sequence)]})
   if(request.method==='POST'){

@@ -809,6 +809,30 @@ test('AUTO-002 Settings authorizes Drive archiving and shows completed and held 
    await panel.screenshot({path:join(screenshots,'AUTO-002-settings-390.png')})
   }
   await page.setViewportSize({width:1440,height:1000})
+  const stopped=await completeDriveAgreement(h,'Credential rejected archive',signed.client.id)
+  fake.setUncertain(false);fake.setHook(()=>Response.json({error:{message:driveToken}},{status:401}))
+  await fire();await page.reload()
+  assert.match(await connection.innerText(),/broken/)
+  assert.match(await connection.innerText(),/Reconnect to restore access/)
+  assert.match(await panel.innerText(),/Archiving is inactive/)
+  assert.match(await panel.getByRole('list',{name:'Document archive history'}).innerText(),/Credential rejected archive[\s\S]*held/)
+  const blockedCalls=fake.calls.length;await fire();assert.equal(fake.calls.length,blockedCalls)
+  assert.ok(!(await page.content()).includes(driveToken))
+  assert.ok(await connection.locator('p,button,label,input').evaluateAll(nodes=>nodes.every(node=>parseFloat(getComputedStyle(node).fontSize)>=13)))
+  if(screenshots){
+   for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000});await documentFonts(page)
+    await connection.screenshot({path:join(screenshots,'SEC-001-broken-connection-'+width+'.png')})
+    await panel.screenshot({path:join(screenshots,'SEC-001-held-archives-'+width+'.png')})
+   }
+  }
+  await page.setViewportSize({width:1440,height:1000});fake.setHook(undefined)
+  await connection.getByLabel('Google Drive access token').fill(driveToken);await connection.getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect Google Drive',exact:true}).click()
+  assert.doesNotMatch(await connection.innerText(),/broken/)
+  assert.match(await panel.innerText(),/Archiving is inactive/)
+  await panel.getByRole('checkbox').check();await panel.getByRole('button',{name:'Authorize Drive archiving',exact:true}).click()
+  const reconnectedCalls=fake.calls.length;await fire();assert.equal(fake.calls.length,reconnectedCalls)
+  assert.equal((await h.send('/api/platter/archives',undefined,h.owner)).value.jobs.find(j=>j.proposal_id===stopped.proposal.id).status,'held')
   await panel.getByRole('button',{name:'Revoke archiving authorization',exact:true}).click()
   assert.match(await panel.innerText(),/Archiving is inactive/)
  }finally{await context?.close();await browser?.close();await edge.close();await h.close()}

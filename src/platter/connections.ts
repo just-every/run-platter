@@ -20,13 +20,18 @@ export async function openCredential(env:Bindings,id:string,sealed:string){
  return JSON.parse(new TextDecoder().decode(plaintext))
 }
 export async function providerCredential(env:Bindings,id:string){
- const row=await env.DB.prepare("SELECT c.*,s.sealed FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.status='connected'").bind(id).first<any>()
+ const row=await env.DB.prepare("SELECT c.*,s.sealed FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.status='connected' AND c.broken_at IS NULL").bind(id).first<any>()
  need(row,'Connect this provider again before using it',409)
  try{
   const secret=await openCredential(env,id,row.sealed)
   need(secret.accountId===row.account_id&&secret.provider===row.provider,'Provider credential binding changed',409)
   return {connection:row,secret}
  }catch{return fail('Connect this provider again before using it',409)}
+}
+// A provider response belongs to the credential version used for that request.
+// A delayed refusal must never break a replacement connection.
+export async function markConnectionBroken(env:Bindings,id:string,version:number){
+ await env.DB.prepare("UPDATE p_connections SET broken_at=? WHERE id=? AND version=? AND status='connected' AND broken_at IS NULL").bind(Date.now(),id,version).run()
 }
 export async function providerJson(url:string,token:string){
  try{

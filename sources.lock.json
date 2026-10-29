@@ -2470,7 +2470,7 @@
       "executable": false
     },
     "src/platter/approvals.ts": {
-      "sha256": "45139123119f6d17aa7b8d3f331eaa10b49082384e67b6ef71e70d890fbdbf0e",
+      "sha256": "a8c01f62f64052bad4bc001e4694af68d11367772902cd73968272720d05105b",
       "executable": false
     },
     "src/platter/archive-policy.d.mts": {
@@ -3030,7 +3030,7 @@
       "executable": false
     },
     "src/platter/ui/approvals.ts": {
-      "sha256": "9b703eff0e1507e9ce7ebc7ea8d5a282bbbe11623ab56ddcaada396a3e75f01a",
+      "sha256": "f8f7230f7fea9ddfd2ab576e00942c8c590b417723a1d0d0093aceed6537f1e9",
       "executable": false
     },
     "src/platter/ui/archiving.ts": {
@@ -3522,7 +3522,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "4feef85304ae45f238f37f2040c78572f02a4e7de251d30b99467de8855c2f31",
+      "sha256": "b18f0b0947e62235557c35cf0b856f57439bb71224dab556f14827dadcea7bc5",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {

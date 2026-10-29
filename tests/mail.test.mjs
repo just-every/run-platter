@@ -980,7 +980,7 @@ test('APPROVE-002 explicit requests deliver exact revision previews by email and
   const sourceEdit={id:source.id,clientId:h.client.id,version:1,title:sourceRow.title,scope:sourceRow.scope,terms:'Synthetic edited legal terms',depositPercent:'25',packages:sourceRow.options.map(o=>({id:o.id,label:o.label,price:(o.cents/100).toFixed(2)}))}
   await h.cmd('proposal.revise',sourceEdit)
   const cases=[
-   [{kind:'marginBelow',bps:5000},'Offered margin requires 50.00%: Studio: costs not recorded; Campaign: costs not recorded. Optional items also require review when their costs are missing or their margin is below the threshold.',null],
+   [{kind:'marginBelow',bps:5000},'Offered margin requires 50.00%: Studio: costs not recorded; Campaign: costs not recorded; Studio optional Rush: costs not recorded.',null],
    [{kind:'paymentTerms',minimumDepositBps:5000,standardTerms:'Synthetic standard'},'Deposit 25.00%; required minimum 50.00%. Legal terms differ from the configured standard.',null],
    [{kind:'termsEdited'},'Legal terms changed from revision 1.',source.id],
    [{kind:'template'},'Proposal started from template “Consultancy”.',source.id]
@@ -988,7 +988,7 @@ test('APPROVE-002 explicit requests deliver exact revision previews by email and
   let policyVersion=4
   for(const [condition,expected,proposalId] of cases){
    const rule=await h.cmd('approval.rule',{version:policyVersion++,name:'Synthetic trigger review',position:0,condition,approvers:['role:owner']})
-   const target=proposalId??(await h.prepare('Recorded trigger')).id,targetRow=(await h.state()).proposals.find(row=>row.id===target)
+   const target=proposalId??(condition.kind==='marginBelow'?await h.cmd('proposal.prepare',{...offer,clientId:h.client.id,packages:[{id:'one',label:'Studio',price:'2400',optionalItems:[{id:'rush',label:'Rush',unitPrice:'100',min:1,max:1,quantity:1,editable:false}]},{id:'two',label:'Campaign',price:'4200'}]}):await h.prepare('Recorded trigger')).id,targetRow=(await h.state()).proposals.find(row=>row.id===target)
    const result=await h.cmd('notification.request',await approvalRequestInput(h,{id:target,version:targetRow.version,consent:true}))
    const recorded=(await h.cmd('notification.requests',{id:target})).requests.find(row=>row.id===result.requests[0])
    assert.equal(recorded.trigger.detail,expected);assert.ok(h.messages.at(-1).text.includes('Triggered by: '+expected));assert.ok(h.chats.at(-1).value.text.includes('Triggered by: '+expected))

@@ -1,3 +1,4 @@
+// Agent digest history is business custody; keys, receipt consent and pause controls stay local.
 // Auth identities retain approval authors. Credentials, invitations and messages stay local.
 export default {
  product: 'proposals/platter',

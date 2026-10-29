@@ -1,3 +1,5 @@
+import { configureHubspotCard } from './crm/hubspot-card'
+import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
 import { archiveCommand } from './archiving/jobs'
 import { clientLocale, saveClientLocale } from './locales'
@@ -73,6 +75,8 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
+ if(name==='crm.card.configure')return configureHubspotCard(env,a,p)
+ if(name.startsWith('crm.sync.'))return hubspotSyncCommand(env,a,name,p)
  if(name.startsWith('crm.deal.'))return hubspotDraftCommand(env,a,name,p)
  if(name==='proposal.locale')return saveClientLocale(db,a,p)
  if(name==='tax.rate')return saveTaxRate(db,a,p)

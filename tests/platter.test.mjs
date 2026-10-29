@@ -3661,4 +3661,5 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
   assert.deepEqual(await counts(), erasedBaseline, 'a captured review cannot recreate a client erased after review')
   const expired = await review(); await h.mf.getWorker().then(w => w.scheduled({ scheduledTime: new Date(Date.now() + 901000), cron: '*/15 * * * *' })); await apply(expired, h.owner, 409)
  } finally { await h.close() }
+ await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
 })

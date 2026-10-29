@@ -1,0 +1,1 @@
+{"uid":"platter_deal_card","type":"card","config":{"name":"Platter proposals","location":"crm.record.sidebar","entrypoint":"/app/cards/PlatterCard.tsx","objectTypes":["DEALS"]}}

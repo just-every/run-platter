@@ -12,7 +12,7 @@ const base = 'https://api.hubapi.com/crm/v3/objects/'
 const identifier = (value: unknown) => { const id = text(value, 'a HubSpot record id', 100); need(/^[A-Za-z0-9_-]+$/.test(id), 'Use a HubSpot record id'); return id }
 const string = (value: unknown, label: string, max = 200) => text(value, label, max)
 const optional = (value: unknown, max = 1000) => value == null || value === '' ? '' : text(value, 'plain source text', max)
-const canonical = (value: any): string => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item)
+export const canonical = (value: any): string => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item)
 function associations(deal: any, kind: string) {
  const value = deal.associations?.[kind]
  need(value && Array.isArray(value.results) && value.results.length > 0, 'The deal needs associated ' + kind + ' before review', 409)
@@ -26,9 +26,10 @@ async function sourceRecord(kind: string, id: string, properties: string, token:
  need(String(row.id) === id && !row.archived && row.properties && !Array.isArray(row.properties), 'The provider did not confirm the selected record', 409)
  return row
 }
-async function readDeal(env: Bindings, input: Record<string, unknown>) {
+export async function readDeal(env: Bindings, input: Record<string, unknown>) {
  const { connection, secret } = await providerCredential(env, connectionId)
  need(!connection.broken_at, 'Reconnect HubSpot before reading deals', 409)
+ need(input.accountId === undefined || input.accountId === connection.account_id, 'This card belongs to another HubSpot account', 409)
  const dealId = identifier(input.dealId)
  const deal = await providerJson(base + 'deals/' + encodeURIComponent(dealId) + '?properties=dealname,description,amount,deal_currency_code&associations=companies,contacts,line_items', secret.token)
  need(String(deal.id) === dealId && !deal.archived && deal.properties, 'The provider did not confirm this deal', 409)

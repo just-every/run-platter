@@ -881,8 +881,8 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
 })
 
 test('CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows', { timeout: 120000 }, async () => {
- const { harness } = await import('./harness.mjs'), { browserEdge } = await import('./browser-edge.mjs'), { hubspotFixture } = await import('./hubspot-fixture.mjs')
- const edge = await browserEdge(), provider = hubspotFixture()
+ const { harness } = await import('./harness.mjs'), { browserEdge } = await import('./browser-edge.mjs'), { hubspotSyncFixture } = await import('./hubspot-sync-fixture.mjs')
+ const edge = await browserEdge(), provider = hubspotSyncFixture()
  let h, browser
  try {
   h = await harness({ entry: './dist/server/index.js', assetsDirectory: './dist/client', origin: edge.origin, outboundService: provider.request }); edge.attach(h)
@@ -927,6 +927,7 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
    provider.state.line_items[0].properties.price = '999.00'; await page.reload()
    assert.equal(provider.calls.length, calls, 'opening a copied draft never synchronizes provider data')
    assert.equal((await h.state()).proposals[0].options[0].cents, 36122)
+   await (await import('./hubspot-browser.mjs')).hubspotBrowser({h,page,provider,current,capture})
   } finally { await context.close() }
  } finally { await browser?.close(); await h?.close(); await edge.close() }
 })

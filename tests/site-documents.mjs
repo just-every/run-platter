@@ -705,7 +705,7 @@ test('APPROVE-002 owner requests, revokes and re-requests approval through nativ
  try{
   browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--use-mock-keychain','--password-store=basic','--no-sandbox']})
   const screenshots=process.env.PLATTER_SCREENSHOTS;if(screenshots)await mkdir(screenshots,{recursive:true})
-  for(const width of [Number(process.env.PLATTER_APPROVAL_WIDTH??1440)]){
+  for(const width of [1440,390]){
    app=await installedApp({scheduled:true});const context=await browser.newContext({viewport:{width,height:900}})
    try{
     const page=await context.newPage()

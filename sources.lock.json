@@ -573,6 +573,10 @@
       "sha256": "e97f7cddd16317fc7e47a6f96a5912f03668d1112d91d05a56611f2034d89b70",
       "executable": false
     },
+    "migrations/core/0094_agent_receipts.sql": {
+      "sha256": "65101982df5d4bd01245e83669bc52024f5fac6b9f9ebb805d68bd125032b14c",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -2373,8 +2377,12 @@
       "sha256": "ce31b0bae06aca21b3350c86344c981d53022e4fa502f1423e0027cd6bc1bc3c",
       "executable": false
     },
+    "src/platter/agent-ledger.ts": {
+      "sha256": "03244de6c1bcfff117c43eaade7f584c897ebd2a76eb0cd91eeb16abf8a0ce17",
+      "executable": false
+    },
     "src/platter/api/index.ts": {
-      "sha256": "ec1522844efda9de4efa405258fc24e7c2f4cf33f767d21259928101707f48a9",
+      "sha256": "a29746a80052a01e0dfd19c207ac191075b1d4198685633132ba971b729e28b5",
       "executable": false
     },
     "src/platter/api/schema.ts": {
@@ -3277,6 +3285,10 @@
       "sha256": "951def8c6b83614a7fc749bc4ab3b6b16323fbfe6de3f354eed154b9d3e7d3ed",
       "executable": false
     },
+    "tests/agent-commit-worker.ts": {
+      "sha256": "0f2ce8f19d9f7e8e2e41f0856868a67dafc96229419572d28cf958c333705517",
+      "executable": false
+    },
     "tests/archive.test.mjs": {
       "sha256": "78922852efe4f231406b1168557332a2158325d4808a7024cd62ab5a03cd3b65",
       "executable": false
@@ -3402,7 +3414,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "87eb86013f50b485cad1a8b8b1c33f6e013ea712d5797b7aecea34cdd8fb2b59",
+      "sha256": "0386250cc58200a5863c040ede866fb7028d9f5d9849637c7112363387f3555a",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

@@ -3616,6 +3616,8 @@ test('AGENT-009 consented receipts, human records and pause protect every existi
   assert.equal((await h.send('/api/platter/agent-ledger',undefined,'',auth)).status,401)
   assert.equal((await api('/agent-ledger')).status,404)
   await h.cmd('agent.pause',{id:key.id,version:1});await h.cmd('agent.pause',{id:rest.id,version:1})
+  const restControls=(await h.send('/api/platter/v1/keys',undefined,h.owner)).value.find(k=>k.id===rest.id)
+  assert.ok(restControls.pausedAt&&restControls.ledgerConsentAt);assert.equal(restControls.controlVersion,2);assert.deepEqual(JSON.parse(restControls.scopes),['proposals.read']);assert.ok(!JSON.stringify(restControls).includes(rest.token))
   assert.equal((await legacy(input)).status,403);assert.equal((await rpc('read_proposal',{id:created.value.id})).status,403);assert.equal((await h.send('/api/platter/agent/context',undefined,'',auth)).status,403);assert.equal((await api('/proposals')).status,403)
   assert.equal((await ledger()).find(r=>r.key_id===rest.id&&r.status==='refused'&&r.action==='rest.get.proposals').http_status,403)
   await h.cmd('agent.resume',{id:key.id,version:1},h.owner,409)

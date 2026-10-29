@@ -68,6 +68,11 @@ export async function clientCollection(env:Bindings,c:any,input:Record<string,un
  need(intent.id===saved.provider_intent&&intent.amount===saved.cents&&intent.currency===saved.currency.toLowerCase()&&intent.metadata?.platter_proposal_id===accepted.proposal_id&&intent.metadata?.platter_revision===String(accepted.revision),'Stripe deposit binding changed. Contact the firm.',409)
  await boundClient(env,c)
  const mandate=intent.latest_charge?.payment_method_details?.us_bank_account?.mandate
+ const failed=intent.latest_charge
+ if(saved.status!=='succeeded'&&intent.status==='requires_payment_method'&&failed?.status==='failed'&&failed.paid===false){
+  need(typeof failed.id==='string'&&failed.id.length>0&&failed.amount===saved.cents&&failed.currency===saved.currency.toLowerCase(),'Stripe has not confirmed the failed deposit charge',409)
+  await db.prepare('INSERT INTO p_collection_failures(id,proposal_id,revision,collection_id,provider_charge,observed_at) VALUES(?,?,?,?,?,?) ON CONFLICT(collection_id,provider_charge) DO NOTHING').bind(crypto.randomUUID(),accepted.proposal_id,accepted.revision,saved.id,failed.id,await currentTime(db)).run()
+ }
  if(intent.status==='succeeded'){
   const charge=intent.latest_charge
   need(charge&&charge.paid===true&&charge.status==='succeeded'&&charge.amount===saved.cents&&charge.currency===saved.currency.toLowerCase(),'Stripe has not confirmed the deposit charge',409)

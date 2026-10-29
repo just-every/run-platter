@@ -342,9 +342,9 @@ Evidence: `src/platter/expiry.ts`, `src/platter/expiry-time.ts`, `tests/platter.
 
 Status: **partial**.
 
-Gap: Decline and failed-payment events, personal Teams, Nook and push carriers, configured multi-recipient execution and live-provider qualification remain. Only explicitly consenting current scoped people receive generic events and protected links; view alerts additionally require current owner opt-in for that revision; preferences bind the exact proposal revision, direct Slack destinations must be verified for that person, and restoration does not activate sending. Existing APPROVE-002 and AUTO-003 consent and custody obligations remain.
+Gap: Nook personal delivery and native push remain unimplemented and unproved. Nook integration tokens only post to selected channels; its supported door cannot verify a personal destination or post to a direct message. Native push remains dependent on MOB-002 signed iOS and Android builds, test devices, Apple developer and APNs credentials, and an Android push project and key. Live-provider qualification remains unproved; this round uses network-edge fakes. Only explicitly consenting current scoped people receive generic events and protected links; view alerts additionally require current owner opt-in for that revision; preferences bind the exact proposal revision, direct chat destinations must be verified for that person, and restoration does not activate sending. Existing APPROVE-002 and AUTO-003 consent and custody obligations remain.
 
-Evidence: `tests/mail.test.mjs`, `tests/archive.test.mjs`, `tests/site.test.mjs`, `tests/site-lifecycle.mjs`, `tests/watchers-browser.mjs`, `tests/archive.test.mjs`
+Evidence: `tests/mail.test.mjs`, `tests/archive.test.mjs`, `tests/site.test.mjs`, `tests/site-lifecycle.mjs`, `tests/watchers-browser.mjs`, `tests/archive.test.mjs`, `tests/watcher-activity.mjs`
 
 ## SEND-006 — Editable subject, message and shared email templates
 

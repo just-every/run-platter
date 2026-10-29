@@ -137,7 +137,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    if(isAgent)need(['proposal.prepare','proposal.revise'].includes(name),'Agents only prepare proposal drafts',403)
    if(path==='/app/action'&&name==='notification.watch'){
     input.email=input.email==='yes';input.consent=input.consent==='yes'
-    input.events=['view','comment','signed','paid'].filter(event=>input['event:'+event]==='yes')
+    input.events=['view','comment','signed','paid','declined','payment_failed'].filter(event=>input['event:'+event]==='yes')
    }
    let result=name==='member.invite'?await inviteMember(env,actor,input,request):name==='send-request.resolve'?await resolveSendRequest(env.DB,actor,input):name.startsWith('agent.')?await credentialCommand(env.DB,actor,name,input):name.startsWith('document-import.')?await documentImportCommand(env.DB,actor,name,input):name.startsWith('import.')?await importCommand(env.DB,actor,name,input):await command(env,actor,name,input)
    const subject=String(name==='member.zone'?actor.id:name==='workspace.defaults'?'installation':(result as any)?.job?.id??(result as any)?.id??input.id??'clients');if(name!=='dispute.authorize'&&!name.startsWith('question.')&&name!=='proposal.withdraw'&&name!=='proposal.lose'&&name!=='proposal.test-mail')await recordAudit(env.DB,actor,name,subject)

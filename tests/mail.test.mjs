@@ -1184,7 +1184,7 @@ test('SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes
 })
 
 test('SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links', {timeout:120000}, async()=>{
- const messages=[],chats=[],intents=new Map();let h
+ const messages=[],chats=[],teams=[],intents=new Map(),faults={payment:false,teams:false};let h
  h=await harness({cf:false,assetsDirectory:'public',origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9000'},outboundService:async request=>{
   const url=new URL(request.url)
   if(url.hostname==='api.resend.com'){messages.push(await request.json());return Response.json({id:'synthetic-platter-'+(9100+messages.length)})}
@@ -1194,11 +1194,18 @@ test('SEND-005 personal Slack and email preferences deliver client open, comment
    if(url.pathname==='/api/conversations.open')return Response.json({ok:true,channel:{id:'synthetic-platter-9002'}})
    assert.equal(url.pathname,'/api/chat.postMessage');chats.push(await request.json());return Response.json({ok:true})
   }
+  if(url.hostname==='graph.microsoft.com'){
+   if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-9900'})
+   if(request.method==='GET')return Response.json({chatType:'oneOnOne',members:[{email:url.pathname.endsWith('9912')?'watcher'+String.fromCharCode(64)+'synthetic-platter.example':h.auth.OWNER_EMAIL},{userId:'synthetic-platter-9900'}]})
+   teams.push(await request.json());if(faults.teams)throw Error('Synthetic lost Teams receipt')
+   return Response.json({id:'synthetic-platter-'+teams.length})
+  }
   assert.equal(url.hostname,'api.stripe.com')
   if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-9003',default_currency:'usd'})
   if(url.pathname==='/v1/payment_intents'&&request.method==='POST'){
-   const f=new URLSearchParams(await request.text()),id='synthetic-platter-9004',intent={id,amount:Number(f.get('amount')),currency:f.get('currency'),status:'requires_payment_method',client_secret:'synthetic-platter-9005',payment_method_types:['card'],metadata:{platter_proposal_id:f.get('metadata[platter_proposal_id]'),platter_revision:f.get('metadata[platter_revision]')}};intents.set(id,intent);return Response.json(intent)
+   const f=new URLSearchParams(await request.text()),id='synthetic-platter-'+(9004+intents.size*20),intent={id,amount:Number(f.get('amount')),currency:f.get('currency'),status:'requires_payment_method',client_secret:'synthetic-platter-9005',payment_method_types:['card'],metadata:{platter_proposal_id:f.get('metadata[platter_proposal_id]'),platter_revision:f.get('metadata[platter_revision]')}};intents.set(id,intent);return Response.json(intent)
   }
+  if(faults.payment)return new Response('Synthetic provider unavailable',{status:503})
   assert.ok(intents.has(url.pathname.split('/').at(-1)));return Response.json(intents.get(url.pathname.split('/').at(-1)))
  }})
  try{
@@ -1259,6 +1266,8 @@ test('SEND-005 personal Slack and email preferences deliver client open, comment
   await h.send(path+'/payment-status.json',{},cookie);await tick();assert.equal(notices().length,7,'reconciliation never creates another paid notification')
   assert.equal(completions().length,2,'payment refresh and concurrent workers cannot repeat completion attachments')
   await h.send(path,undefined,cookie);await tick();assert.equal(notices().length,7,'only the first client view notifies watchers')
+  const {watcherActivity}=await import('./watcher-activity.mjs')
+  await watcherActivity(h,{messages,chats,teams,intents,faults,tick,route,member,person})
  }finally{await h.close()}
 })
 

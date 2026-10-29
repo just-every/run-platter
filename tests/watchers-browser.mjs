@@ -15,6 +15,10 @@ export async function watcherBrowser(width=1440) {
   h=await harness({origin:edge.origin,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9807'},entry:'dist/server/index.js',assetsDirectory:'dist/client',outboundService:async request=>{
    const url=new URL(request.url)
    if(url.hostname==='api.resend.com'){messages.push(await request.json());return Response.json({id:'synthetic-platter-'+messages.length})}
+   if(url.hostname==='graph.microsoft.com'){
+    if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-9810'})
+    return Response.json({chatType:'oneOnOne',members:[{email:url.pathname.endsWith('9812')?address('synthetic-platter-9804'):h.auth.OWNER_EMAIL},{userId:'synthetic-platter-9810'}]})
+   }
    if(url.pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-9800'})
    if(url.pathname==='/api/users.info')return Response.json({ok:true,user:{team_id:'synthetic-platter-9800',profile:{email:url.searchParams.get('user')===destinations.member?address('synthetic-platter-9804'):h.auth.OWNER_EMAIL}}})
    throw Error('Unexpected provider request')
@@ -41,6 +45,11 @@ export async function watcherBrowser(width=1440) {
   const other=await h.cmd('notification.route',{provider:'slack',event:'approval',kind:'direct',destination:destinations.member,operatorId:person.id,consent:true})
   const inactive=await h.cmd('notification.route',{provider:'slack',event:'approval',kind:'direct',destination:destinations.inactive,operatorId:ownerPerson.id,consent:true})
   await h.cmd('notification.route.remove',{id:inactive.id})
+  await h.cmd('provider.connect',{provider:'teams',version:0,token:'synthetic-platter-9811',consent:true})
+  const teams=await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-9813',operatorId:ownerPerson.id,consent:true})
+  const otherTeams=await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-9812',operatorId:person.id,consent:true})
+  const inactiveTeams=await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-9814',operatorId:ownerPerson.id,consent:true})
+  await h.cmd('notification.route.remove',{id:inactiveTeams.id})
   const settingsPath='/app/settings/notifications?id='+proposal.id
   const screenshots=process.env.PLATTER_SCREENSHOTS
   if(screenshots)await mkdir(screenshots,{recursive:true})
@@ -64,15 +73,18 @@ export async function watcherBrowser(width=1440) {
   assert.equal(await page.getByLabel('Personal Slack destination').locator('option').count(),2,'only the current person’s active verified destination is offered')
   assert.equal(await page.getByLabel('Personal Slack destination').locator('option[value="'+other.id+'"]').count(),0)
   assert.equal(await page.getByLabel('Personal Slack destination').locator('option[value="'+inactive.id+'"]').count(),0)
-  for(const label of ['First client view','Client comment','Client signature','Recorded payment','Email to my sign-in address'])await page.getByLabel(label,{exact:true}).check()
+  for(const label of ['First client view','Client comment','Client signature','Recorded payment','Client decline','Failed payment','Email to my sign-in address'])await page.getByLabel(label,{exact:true}).check()
+  assert.equal(await page.getByLabel('Personal Teams destination').locator('option').count(),2)
+  for(const hidden of [otherTeams,inactiveTeams])assert.equal(await page.getByLabel('Personal Teams destination').locator('option[value="'+hidden.id+'"]').count(),0)
   await page.getByLabel('Personal Slack destination').selectOption(route.id)
+  await page.getByLabel('Personal Teams destination').selectOption(teams.id)
   const consent=()=>page.getByRole('checkbox',{name:'I authorize these events and channels for revision 1.',exact:true})
   assert.equal(await consent().isChecked(),false)
   await consent().check();await page.getByRole('button',{name:'Save notification preferences',exact:true}).click()
   assert.match(await page.locator('main').innerText(),/Consent active for this revision/)
   assert.equal(await consent().isChecked(),false,'saving never preselects fresh consent')
   const first=await read()
-  assert.equal(first.authorized,1);assert.equal(first.revision,1);assert.equal(first.slack_route,route.id);assert.deepEqual(JSON.parse(first.events),['view','comment','signed','paid'])
+  assert.equal(first.authorized,1);assert.equal(first.revision,1);assert.equal(first.slack_route,route.id);assert.deepEqual(JSON.parse(first.events),['view','comment','signed','paid','declined','payment_failed']);assert.equal(first.teams_route,teams.id)
   await capture(page,'owner-consented')
 
   member=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true});await cookie(member,memberCookie)
@@ -81,12 +93,14 @@ export async function watcherBrowser(width=1440) {
   assert.equal(await second.getByLabel('First client view').isChecked(),false,'another person’s saved choices are never displayed')
   assert.equal(await second.getByLabel('Personal Slack destination').locator('option[value="'+route.id+'"]').count(),0)
   assert.equal(await second.getByLabel('Personal Slack destination').locator('option[value="'+other.id+'"]').count(),1)
+  assert.equal(await second.getByLabel('Personal Teams destination').locator('option[value="'+teams.id+'"]').count(),0)
+  assert.equal(await second.getByLabel('Personal Teams destination').locator('option[value="'+otherTeams.id+'"]').count(),1)
   for(const label of ['Client comment','Client signature','Recorded payment','Email to my sign-in address'])await second.getByLabel(label,{exact:true}).check()
   await second.getByRole('checkbox',{name:'I authorize these events and channels for revision 1.',exact:true}).check()
   await second.getByRole('button',{name:'Save notification preferences',exact:true}).click()
   await second.reload()
   const secondPreferences=await read(memberCookie)
-  assert.equal(secondPreferences.authorized,1);assert.equal(secondPreferences.email_enabled,1);assert.equal(secondPreferences.slack_route,null);assert.deepEqual(JSON.parse(secondPreferences.events),['comment','signed','paid'])
+  assert.equal(secondPreferences.authorized,1);assert.equal(secondPreferences.email_enabled,1);assert.equal(secondPreferences.slack_route,null);assert.equal(secondPreferences.teams_route,null);assert.deepEqual(JSON.parse(secondPreferences.events),['comment','signed','paid'])
   await capture(second,'email-only')
   assert.deepEqual(await read(),first,'one person’s save leaves the other preferences exact')
 
@@ -101,7 +115,7 @@ export async function watcherBrowser(width=1440) {
   await stale.close()
   await page.getByRole('button',{name:'Revoke notification consent',exact:true}).click()
   const revoked=await read()
-  assert.equal(revoked.authorized,0);assert.equal(revoked.email_enabled,1);assert.equal(revoked.slack_route,route.id);assert.deepEqual(JSON.parse(revoked.events),['view','comment','signed'])
+  assert.equal(revoked.authorized,0);assert.equal(revoked.email_enabled,1);assert.equal(revoked.slack_route,route.id);assert.deepEqual(JSON.parse(revoked.events),['view','comment','signed','declined','payment_failed']);assert.equal(revoked.teams_route,teams.id)
   assert.equal((await read(memberCookie)).authorized,1,'personal revocation does not revoke somebody else')
   await capture(page,'revoked')
   await second.reload();assert.equal(await second.getByLabel('First client view').isDisabled(),true,'view events require the current owner’s consent')

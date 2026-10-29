@@ -1,6 +1,6 @@
 # Internal notifications
 
-Notifications use the existing signed-in command endpoint at `/api/platter/command`. Each request has a `name` and an `input` object. These commands do not grant a new session or create a client invitation. Settings screens and Nook are still pending.
+Notifications use the existing signed-in command endpoint at `/api/platter/command`. Each request has a `name` and an `input` object. These commands do not grant a new session or create a client invitation. Personal proposal preferences are under Settings; broader approval settings and Nook remain pending.
 
 - `provider.connect` accepts the existing Slack connection or the `teams` provider, which verifies the connected Microsoft Graph user. Tokens stay encrypted and never enter notification history or archives.
 - `notification.route` requires an owner or admin, `consent: true`, an `event` of `approval`, `signed` or `followup`, a `provider` of `slack` or `teams`, a `kind` of `channel` or `direct`, and the provider `destination` identifier. Direct routes also name an active `operatorId`. Slack verifies that user's email and workspace. Teams currently accepts only a verified one-to-one chat containing the connected user and the named member. Slack channels must be active and joined. Approval routes are always direct.
@@ -16,6 +16,18 @@ The existing scheduled Worker processes notifications. Channel events contain ge
 Archives preserve requests, settings, route metadata and completed sender notice facts. They exclude provider secrets, queued notification bodies and all activation authority. Restoring history never sends notifications. Historical approval requests are retained for custody; they do not automatically reactivate.
 
 The explicit-consent default and limited channel disclosure await ct approval. The contract remains partial. Future Nook, mobile push, watcher, template and renewal work must extend these same public-door proofs before claiming completion.
+
+## Personal proposal preferences
+
+Open **Notification settings** from the proposal. Only your choices appear. Choose first view, comment, completed signature, decline, recorded payment or failed payment, then email and your already verified personal Slack and Teams destinations. An owner or admin first verifies direct chat destinations against the active member. A colleague cannot select your destination.
+
+Each save requires fresh consent to the displayed proposal revision. View alerts additionally require the current owner's opt-in for that revision. **Revoke notification consent** stops queued and future delivery while preserving your choices. A changed proposal revision, lost proposal scope, member authority change or disconnected provider cannot confer sending authority. Copies and restored preferences are inactive.
+
+The `notification.watch` command takes the proposal `id`, preference `version` (zero initially), proposal `revision`, `email`, optional `slackRoute` and `teamsRoute`, `events` selected from `view`, `comment`, `signed`, `declined`, `paid` and `payment_failed`, and `consent: true`. The `notification.unwatch` command takes the same proposal, preference version and revision. `GET /api/platter/watch?id=...` reads only the signed-in person's preferences.
+
+A completed signature follows the full configured recipient plan. Payment failure notices follow a provider-confirmed failed charge for the current deposit; an unattempted payment, network outage or mismatched charge creates no failure notice. Repeated reconciliation of the same failed charge creates no second notice. A later distinct failed charge or a confirmed payment has its own event. Messages contain only generic activity and a link protected by current proposal access, never client questions, decline reasons or payment details. Uncertain chat delivery remains held.
+
+Nook's integration token currently posts only into selected channels and cannot verify a personal destination or send a direct message. Native push still depends on the MOB-002 signed builds, devices and platform credentials. Neither boundary is reported as delivered.
 
 ## Internal collaboration
 

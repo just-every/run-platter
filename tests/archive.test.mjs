@@ -806,7 +806,21 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source,assetsDirectory:'public',outboundService:request=>Response.json(new URL(request.url).pathname==='/api/users.info'?{ok:true,user:{team_id:'synthetic-platter-7100',profile:{email:h.auth.OWNER_EMAIL}}}:{ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})})
+  const intents=new Map()
+  h=await harness({root:source,assetsDirectory:'public',outboundService:async request=>{
+   const url=new URL(request.url)
+   if(url.hostname==='graph.microsoft.com')return Response.json(url.pathname==='/v1.0/me'?{id:'synthetic-platter-7120'}:{chatType:'oneOnOne',members:[{email:h.auth.OWNER_EMAIL},{userId:'synthetic-platter-7120'}]})
+   if(url.hostname==='api.stripe.com'){
+    if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-7121'})
+    if(request.method==='POST'){
+     const body=new URLSearchParams(await request.text()),id='synthetic-platter-7122'
+     const intent={id,amount:Number(body.get('amount')),currency:body.get('currency'),status:'requires_payment_method',client_secret:'synthetic-platter-7123',payment_method_types:['card'],metadata:{platter_proposal_id:body.get('metadata[platter_proposal_id]'),platter_revision:body.get('metadata[platter_revision]')}}
+     intents.set(id,intent);return Response.json(intent)
+    }
+    return Response.json(intents.get(url.pathname.split('/').at(-1)))
+   }
+   return Response.json(url.pathname==='/api/users.info'?{ok:true,user:{team_id:'synthetic-platter-7100',profile:{email:h.auth.OWNER_EMAIL}}}:{ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})
+  }})
   const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archive notification',scope:'Exact retained scope',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
   await h.cmd('provider.connect',{provider:'slack',version:0,token:'synthetic-platter-7102',consent:true})
@@ -833,8 +847,10 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.equal(completionRefs.length,2)
   for(const ref of completionRefs)assert.equal((await h.db.prepare('SELECT status FROM p_mail WHERE id=?').bind(ref.mail_id).first()).status,'local')
   const personalRoute=await h.cmd('notification.route',{provider:'slack',event:'approval',kind:'direct',destination:'synthetic-platter-7110',operatorId:person.id,consent:true})
-  await h.cmd('notification.watch',{id:expiry.id,revision:1,email:true,slackRoute:personalRoute.id,events:['view','comment','signed','paid'],consent:true})
-  await h.cmd('notification.watch',{id:p.id,revision:1,email:false,slackRoute:personalRoute.id,events:['comment','signed'],consent:true})
+  await h.cmd('provider.connect',{provider:'teams',version:0,token:'synthetic-platter-7124',consent:true})
+  const personalTeams=await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-7125',operatorId:person.id,consent:true})
+  await h.cmd('notification.watch',{id:expiry.id,revision:1,email:true,slackRoute:personalRoute.id,teamsRoute:personalTeams.id,events:['view','comment','signed','paid','declined','payment_failed'],consent:true})
+  await h.cmd('notification.watch',{id:p.id,revision:1,email:false,slackRoute:personalRoute.id,teamsRoute:personalTeams.id,events:['comment','signed','declined','payment_failed'],consent:true})
   await h.cmd('notification.unwatch',{id:p.id,version:1,revision:1})
   const preferences=(await h.send('/api/platter/watch?id='+expiry.id,undefined,h.owner)).value.watcher
   const revokedPreferences=(await h.send('/api/platter/watch?id='+p.id,undefined,h.owner)).value.watcher
@@ -842,10 +858,24 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const smsRow=(await h.state()).proposals.find(row=>row.id===expiry.id)
   await h.cmd('sms.configure',{id:expiry.id,version:smsRow.version,consent:true,phone:'+12025550127',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-7103'})
   await h.cmd('sms.send',{id:expiry.id,message:'Review the archived proposal',requestId:'synthetic-platter-7104'})
-  const tables=['p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
+  await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-7126',publishableKey:'synthetic-platter-7127',consent:true})
+  const failed=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archived failed charge',scope:'Retained generic failure history',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+  await h.cmd('payment.collection',{id:failed.id,version:1,completion:'required',paymentMethods:['card']})
+  await h.cmd('proposal.approve',{id:failed.id,version:2,revision:1});const failedSend=await h.cmd('proposal.send',{id:failed.id,version:3}),failedPath=new URL(failedSend.shareUrl).pathname
+  assert.equal((await h.send(failedPath+'/action?name=code.request',{})).status,200)
+  const failureCode=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(failed.id).first()).body.match(/\b\d{6}\b/)[0]
+  const failureSession=await h.send(failedPath+'/action?name=code.verify',{code:failureCode});assert.equal(failureSession.status,200)
+  assert.equal((await h.send(failedPath+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},failureSession.cookie)).status,200)
+  await h.cmd('notification.watch',{id:failed.id,revision:1,email:true,teamsRoute:personalTeams.id,events:['payment_failed'],consent:true})
+  assert.equal((await h.send(failedPath+'/payment.json',{method:'card',consent:true},failureSession.cookie)).status,200)
+  const intent=intents.get('synthetic-platter-7122')
+  intent.latest_charge={id:'synthetic-platter-7128',paid:false,status:'failed',amount:intent.amount,currency:intent.currency}
+  assert.equal((await h.send(failedPath+'/payment-status.json',{},failureSession.cookie)).status,200)
+  const tables=['p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_collection_failures','p_collection_intents','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
+  assert.equal(before.p_collection_failures.length,1);assert.equal(before.p_collection_failures[0].provider_charge,'synthetic-platter-7128')
   assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,7)
   await h.close();h=undefined
-  const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'))
+  const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'));for(const secret of ['synthetic-platter-7124','synthetic-platter-7126','synthetic-platter-7127','synthetic-platter-7123'])assert.ok(!bytes.includes(secret))
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
   for(const table of ['p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0,table+' stays local')
   await command(restored,['import','--input',archive,'--yes'])

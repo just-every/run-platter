@@ -1385,6 +1385,7 @@ test('SEND-005 personal notification revocation and lost proposal scope suppress
   const p=await h.prepare('Scoped watcher'),watch={id:p.id,version:0,email:true,events:['view'],consent:true}
   await h.cmd('notification.watch',{...watch,consent:false},h.owner,400)
   await h.cmd('notification.watch',{...watch,events:['unknown']},h.owner,400)
+  await h.cmd('notification.watch',{...watch,revision:2},h.owner,409)
   await h.cmd('notification.watch',watch)
   await h.cmd('notification.watch',watch,h.owner,409)
   await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const sent=await h.cmd('proposal.send',{id:p.id,version:2}),path=new URL(sent.shareUrl).pathname
@@ -1404,6 +1405,17 @@ test('SEND-005 personal notification revocation and lost proposal scope suppress
   await h.cmd('proposal.share',{id:scoped.id,operatorId:person.id,shared:false})
   await h.send(new URL(scopedSent.shareUrl).pathname);await h.tick(Date.now());assert.equal(h.messages.filter(m=>m.subject==='Proposal opened').length,0,'lost scope suppresses a genuinely new client event')
   assert.equal((await h.send('/api/platter/watch?id='+scoped.id,undefined,cookie)).status,403)
+  const revoked=await h.prepare('Revoked personal consent')
+  await h.cmd('proposal.approve',{id:revoked.id,version:1,revision:1});const revokedSent=await h.cmd('proposal.send',{id:revoked.id,version:2})
+  await h.cmd('notification.watch',{...watch,id:revoked.id})
+  await h.cmd('notification.unwatch',{id:revoked.id,version:1,revision:1})
+  const retained=(await h.send('/api/platter/watch?id='+revoked.id,undefined,h.owner)).value.watcher
+  assert.equal(retained.authorized,0);assert.equal(retained.email_enabled,1);assert.deepEqual(JSON.parse(retained.events),['view'])
+  await h.cmd('notification.unwatch',{id:revoked.id,version:1},h.owner,409)
+  await h.send(new URL(revokedSent.shareUrl).pathname);await h.tick(Date.now())
+  assert.equal(h.messages.filter(m=>m.subject==='Proposal opened').length,0,'revocation stops future notifications without discarding choices')
+  await h.cmd('notification.watch',{...watch,id:revoked.id,version:2})
+  await h.tick(Date.now());assert.equal(h.messages.filter(m=>m.subject==='Proposal opened').length,0,'fresh consent cannot replay activity from the revoked interval')
  }finally{await h.close()}
 })
 

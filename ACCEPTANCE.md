@@ -806,7 +806,7 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-MAIL-001 · Rules D-1
 1. Watch a proposal with Slack and email on; open, comment, sign and pay as the client; see four notifications in each channel fake with links back to the proposal.
 2. A second watcher who turned view notifications off and chose email only gets three emails and no Slack message.
 
-**Evidence.** `tests/mail.test.mjs`, `tests/archive.test.mjs`
+**Evidence.** `tests/mail.test.mjs`, `tests/archive.test.mjs`  Additional implementation evidence: `tests/site.test.mjs` loads `tests/site-lifecycle.mjs` and `tests/watchers-browser.mjs` — “SEND-005 personal proposal settings configure email and verified Slack, isolate people and revoke revision consent”. Personal settings retain separate event/channel choices, require fresh exact-revision consent and allow personal revocation; stale saves and lost scope are refused. `tests/archive.test.mjs` retains those choices without outbound authority.
 **Gap.** Decline and failed-payment events, personal Teams, Nook and push carriers, and settings controls with desktop and phone proof remain. Only explicitly consenting current scoped people receive generic events and protected links; view alerts additionally require current owner opt-in for that revision; preferences bind the exact proposal revision, direct Slack destinations must be verified for that person, and restoration does not activate sending. Existing APPROVE-002 and AUTO-003 consent and custody obligations remain.
 
 #### SEND-006 — Editable subject, message and shared email templates

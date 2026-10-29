@@ -16,7 +16,7 @@ export function expiryNoticePanel(state:any,p:any){
  const events=rows.events.filter((r:any)=>r.proposal_id===p.id)
  const owner=rows.recipients.find((r:any)=>r.proposal_id===p.id)
  return panel('Sender expiry notice','<p>Recipient: '+escape(owner?.name??'Recorded sales owner')+(owner?.email?' · '+escape(owner.email):'')+'. Email opens a dated follow-up; your existing manual follow-up stays unchanged.</p>'+
- '<p role="status">'+(active?'Authorized for this revision':'Inactive · explicit authorization required')+'</p>'+
+ '<p data-expiry-consent>'+(active?'Authorized for this revision':'Inactive · explicit authorization required')+'</p>'+
  '<details><summary>Expiry notice Settings</summary><p>Save changes first, then authorize this revision. Settings changes cancel previous authorization.</p>'+
  form('notification.expiry',path,base+hidden('action','save')+'<label>Sender expiry email<select name="enabled"><option value="yes"'+(d.enabled?' selected':'')+'>On</option><option value="no"'+(!d.enabled?' selected':'')+'>Off</option></select></label>'+
  field('Proposal expiry lead days','leadDays',d.lead_days,'type="number" min="1" max="365" required')+'<button>Save expiry settings</button>')+'</details>'+

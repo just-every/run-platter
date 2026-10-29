@@ -3022,7 +3022,7 @@
       "executable": false
     },
     "src/platter/ui/expiry-notices.ts": {
-      "sha256": "84b0ae41e946663fecc1db153aa2b8c19cba02b694bd96902a7db3bd634b9af7",
+      "sha256": "cba00bea319d585cb79c0fed098f49b4e3cdb55c5b47af3495a11c7a806f2084",
       "executable": false
     },
     "src/platter/ui/expiry.ts": {

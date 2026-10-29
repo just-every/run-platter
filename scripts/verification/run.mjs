@@ -8,7 +8,7 @@ const businessFiles='tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.
 const authoringPattern='^(EDIT|PRICE|TEAM)-'
 const businessCommand=filter=>`node --test --test-concurrency=1 ${filter}='${authoringPattern}' ${businessFiles}`
 const tasks={
- runtime:['node scripts/contract-docs.mjs check','pnpm build','pnpm exec rer build --site','pnpm typecheck','PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs'],
+ runtime:['node src/base/contract-docs.mjs check','pnpm build','pnpm exec rer build --site','pnpm typecheck','PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs'],
  browser_documents:['pnpm build','PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 tests/site.test.mjs'],
  business:['pnpm test:platter'],
  business_authoring:[businessCommand('--test-name-pattern')],

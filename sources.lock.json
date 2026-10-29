@@ -3494,7 +3494,7 @@
       "executable": false
     },
     "tests/hubspot-rows-journey.mjs": {
-      "sha256": "0ec2b135288394d99c335d146afb79c366f75f4eb34e520128816e24033e66fb",
+      "sha256": "1bf09992a5ef33781bf0dce6351fcc28ee4e6478cfbebc5611f612650a5fd6b4",
       "executable": false
     },
     "tests/hubspot-sync-fixture.mjs": {

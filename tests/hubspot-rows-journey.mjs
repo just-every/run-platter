@@ -29,6 +29,11 @@ export async function hubspotRowsJourney() {
   await fresh({ ...changedMapping, lineIds: ['synthetic-platter-4605', 'synthetic-platter-4605'] }, 409)
   await fresh({ ...changedMapping, lineIds: ['synthetic-platter-unrelated', 'new'] }, 409)
   assert.equal(edge.writes.length, 0); assert.deepEqual(edge.state, original)
+  const unrelated = { id: 'synthetic-platter-external-row', properties: { name: 'Added in HubSpot', quantity: '1', price: '1.00', amount: '1.00' } }
+  edge.state.line_items.push(unrelated); edge.state.deal.associations.line_items.results.push({ id: unrelated.id }); edge.state.deal.properties.amount = '362.22'
+  await fresh(changedMapping, 409)
+  assert.equal(edge.writes.length, 0, 'review cannot silently unlink a row added independently in HubSpot')
+  edge.state.line_items.pop(); edge.state.deal.associations.line_items.results.pop(); edge.state.deal.properties.amount = '361.22'
   const checked = await fresh()
   assert.equal(checked.plan.totalCents, 54930)
   assert.deepEqual(checked.plan.operations.map(o => [o.method, o.label]), [
@@ -63,6 +68,7 @@ export async function hubspotRowsJourney() {
  } finally { await h.close() }
  await uncertainRemovalJourney()
  await uncertainCreationJourney()
+ await associationReceiptJourney()
 }
 async function uncertainRemovalJourney() {
  const edge = hubspotSyncFixture(), h = await harness({ outboundService: edge.request })
@@ -113,4 +119,44 @@ async function uncertainCreationJourney() {
   assert.equal(edge.notes.length, 0)
   assert.ok((await h.state()).crmSyncHistory.some(r => r.status === 'uncertain'))
  } finally { await h.close() }
+}
+
+async function associationReceiptJourney() {
+ for (const method of ['POST', 'DELETE']) {
+  const edge = hubspotSyncFixture()
+  let unconfirmed = true
+  const h = await harness({ outboundService: async request => {
+   const url = new URL(request.url)
+   if (unconfirmed && method === 'DELETE' && request.method === 'DELETE') {
+    unconfirmed = false
+    // A success status alone is insufficient: the association is still present.
+    return new Response(null, { status: 204 })
+   }
+   const response = await edge.request(request)
+   if (unconfirmed && method === 'POST' && request.method === 'POST' && url.pathname.endsWith('/line_items')) {
+    unconfirmed = false
+    // Return a valid created record, but without the requested deal association.
+    edge.state.deal.associations.line_items.results.pop()
+   }
+   return response
+  } })
+  try {
+   await h.cmd('provider.connect', { provider: 'hubspot', version: 0, token: 'synthetic-platter-4607', consent: true })
+   const review = await h.cmd('crm.deal.review', edge.selected)
+   const draft = await h.cmd('crm.deal.apply', { id: review.id, digest: review.digest, consent: true })
+   await reviseHubspotRows(h, draft.id)
+   await h.cmd('proposal.approve', { id: draft.id, version: 2, revision: 2 }); await h.cmd('proposal.send', { id: draft.id, version: 3 })
+   const input = { proposalId: draft.id, version: 4, ...changedMapping }
+   const checked = await h.cmd('crm.sync.review', input)
+   const applied = await h.cmd('crm.sync.apply', { id: checked.id, digest: checked.digest, consent: true })
+   assert.equal(applied.held, 1); assert.equal(applied.confirmed, method === 'POST' ? 1 : 2)
+   assert.equal(edge.notes.length, 0); assert.equal(edge.state.deal.properties.amount, '361.22', 'unconfirmed associations stop the later amount and timeline writes')
+   assert.ok((await h.state()).crmSyncHistory.some(r => r.status === 'uncertain'))
+   edge.state.deal.properties.amount = method === 'POST' ? '553.77' : '609.27'
+   const writes = edge.writes.length
+   const fresh = await h.cmd('crm.sync.review', input)
+   const held = await h.cmd('crm.sync.apply', { id: fresh.id, digest: fresh.digest, consent: true })
+   assert.equal(held.held, 1); assert.equal(held.confirmed, 0); assert.equal(edge.writes.length, writes)
+  } finally { await h.close() }
+ }
 }

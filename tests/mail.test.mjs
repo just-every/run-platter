@@ -903,9 +903,10 @@ test('FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, en
 
 
 async function notificationFixture(options={}) {
- const messages=[],chats=[];let uncertain=false
+ const messages=[],chats=[],providerReads=[];let uncertain=false
  const h=await harness({assetsDirectory:'public',origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7000'},outboundService:async request=>{
   const url=new URL(request.url)
+  providerReads.push(request.url)
   if(url.hostname==='api.resend.com'){messages.push(await request.json());return Response.json({id:'synthetic-platter-7001'})}
   if(url.pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-7002'})
   if(url.pathname==='/api/users.info')return Response.json({ok:true,user:{team_id:'synthetic-platter-7002',profile:{email:h.auth.OWNER_EMAIL}}})
@@ -921,7 +922,7 @@ async function notificationFixture(options={}) {
  const prepare=async title=>h.cmd('proposal.prepare',{...offer,title,clientId:client.id})
  const tick=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
  const connect=async provider=>h.cmd('provider.connect',{provider,version:0,token:'synthetic-platter-7008',consent:true})
- return {...h,messages,chats,prepare,tick,connect,client,uncertain:value=>{uncertain=value}}
+ return {...h,messages,chats,providerReads,prepare,tick,connect,client,uncertain:value=>{uncertain=value}}
 }
 
 test('APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once', {timeout:120000},async()=>{
@@ -982,10 +983,40 @@ test('AUTO-003 signed events reach Slack channels and approval requests reach ve
  const h=await notificationFixture()
  try{
   await h.connect('slack');await h.connect('teams');const actor=(await h.state()).actor
-  await h.cmd('notification.route',{provider:'slack',event:'signed',kind:'channel',destination:'synthetic-platter-7003',consent:true})
-  await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-7006',operatorId:actor.id,consent:true})
+  const signedRoute=await h.cmd('notification.route',{provider:'slack',event:'signed',kind:'channel',destination:'synthetic-platter-7003',consent:true})
+  const approvalRoute=await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-7006',operatorId:actor.id,consent:true})
+  const initial=(await h.state()).notificationSettings.routes
+  assert.deepEqual(initial.map(r=>({id:r.id,available:r.available,consented:r.consented})).sort((a,b)=>a.id.localeCompare(b.id)),[signedRoute,approvalRoute].map(r=>({id:r.id,available:true,consented:true})).sort((a,b)=>a.id.localeCompare(b.id)))
+  const reads=h.providerReads.length
+  assert.equal((await h.send('/app/settings',undefined,h.owner)).status,200)
+  assert.deepEqual((await h.state()).notificationSettings.routes,initial)
+  assert.equal(h.providerReads.length,reads,'reading settings never verifies, authorizes or sends')
+  const address=h.auth.OWNER_EMAIL.replace('owner','synthetic-platter-7020')
+  assert.equal((await h.send('/auth/invite',{email:address,role:'member',displayName:'Synthetic colleague'},h.owner)).status,202)
+  const colleague=await h.signIn(address),person=(await h.state(colleague)).actor
+  assert.equal((await h.state(colleague)).notificationSettings,undefined)
+  const business=async()=>Object.fromEntries(await Promise.all((await h.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB 'p_*' ORDER BY name").all()).results.map(async({name})=>[name,(await h.db.prepare('SELECT * FROM '+name+' ORDER BY rowid').all()).results])))
+  const refuse=async(name,input,cookie,status,noCall=true)=>{
+   const before=await business(),calls=h.providerReads.length
+   await h.cmd(name,input,cookie,status)
+   assert.deepEqual(await business(),before,name+' refusal retains all product rows and audit history')
+   if(noCall)assert.equal(h.providerReads.length,calls,name+' refusal makes no provider request')
+  }
+  const route={provider:'slack',event:'signed',kind:'channel',destination:'synthetic-platter-7003',consent:true}
+  await refuse('notification.route',route,colleague,403)
+  await refuse('notification.route.remove',{id:signedRoute.id},colleague,403)
+  await refuse('notification.route',{...route,consent:false},h.owner,400)
+  await refuse('notification.route',{...route,event:'approval'},h.owner,400)
+  await refuse('notification.route',{...route,destination:'synthetic-platter-7021'},h.owner,400,false)
+  await refuse('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-7006',operatorId:person.id,consent:true},h.owner,400,false)
   const p=await h.prepare('Signed event'),request=await h.cmd('notification.request',{id:p.id,version:1,consent:true})
-  assert.equal(h.chats.length,1);assert.match(h.chats[0].url,/graph.microsoft.com/);assert.match(h.chats[0].value.body.content,/app\/preview/)
+  assert.equal(h.chats.length,1)
+  assert.equal(h.chats[0].url,'https://graph.microsoft.com/v1.0/chats/synthetic-platter-7006/messages')
+  assert.deepEqual(h.chats[0].value,{body:{contentType:'text',content:'Approval requested\nApproval required: Default approval\nRevision 1\nPreview: '+h.origin+'/app/preview?id='+p.id+'&revision=1\nReview and decide: '+h.origin+'/app/proposal?id='+p.id+'\nA signed-in approver must explicitly approve or reject with a note. Request id: '+request.requests[0]}})
+  const preview='/app/preview?id='+p.id+'&revision=1'
+  assert.equal((await h.send(preview)).status,401)
+  assert.equal((await h.send(preview,undefined,h.owner)).status,200)
+  assert.equal((await h.send(preview,undefined,colleague)).status,403)
   await h.cmd('notification.decide',{requestId:request.requests[0],version:1,decision:'approved',note:'Approved in Teams'})
   const sent=await h.cmd('proposal.send',{id:p.id,version:2}),path=new URL(sent.shareUrl).pathname
   await h.send(path+'/action?name=code.request',{})
@@ -997,12 +1028,38 @@ test('AUTO-003 signed events reach Slack channels and approval requests reach ve
   const link=signed[0].value.text.match(/https:\/\/[^\s]+/)[0],url=new URL(link)
   assert.equal((await h.send(url.pathname+url.search,undefined,h.owner)).status,200)
   assert.equal((await h.send(url.pathname+url.search)).status,303)
+  assert.deepEqual(signed[0].value,{channel:'synthetic-platter-7003',text:'Proposal signed\n'+h.origin+'/app/proposal?id='+p.id,unfurl_links:false,unfurl_media:false})
   assert.doesNotMatch(signed[0].value.text,/Synthetic client|Northstar|2400|@/)
-  await h.cmd('notification.route',{provider:'slack',event:'followup',kind:'channel',destination:'synthetic-platter-7003',consent:true})
+  assert.equal((await h.send(url.pathname+url.search,undefined,colleague)).status,403)
+  const followupRoute=await h.cmd('notification.route',{provider:'slack',event:'followup',kind:'channel',destination:'synthetic-platter-7003',consent:true})
   const follow=await h.prepare('Private follow-up title');await h.cmd('followup.schedule',{id:follow.id,dueDate:'2030-03-01',action:'Private next action'})
   await h.tick(Date.now());const updates=h.chats.filter(c=>c.value.text?.startsWith('Follow-up updated'));assert.equal(updates.length,1);assert.doesNotMatch(updates[0].value.text,/Private/)
+  const beforeRevoke=h.chats.length
+  await h.cmd('followup.schedule',{id:follow.id,dueDate:'2030-03-02',action:'synthetic-platter-private-revoked'})
+  await h.cmd('notification.route.remove',{id:followupRoute.id})
+  await h.cmd('notification.route.remove',{id:signedRoute.id})
+  await h.cmd('notification.route.remove',{id:approvalRoute.id})
+  const revoked=(await h.state()).notificationSettings.routes
+  assert.equal(revoked.length,3);assert.ok(revoked.every(r=>!r.available&&!r.consented))
+  const calls=h.providerReads.length
+  await Promise.all([h.tick(Date.now()+86400000),h.tick(Date.now()+86400000)])
+  assert.equal(h.chats.length,beforeRevoke,'revoked routes cannot deliver queued events or approval reminders')
+  assert.equal(h.providerReads.length,calls,'revocation before dispatch makes no provider requests')
   await h.cmd('provider.disconnect',{provider:'slack',version:1})
+  await h.cmd('provider.connect',{provider:'slack',version:2,token:'synthetic-platter-7008',consent:true})
+  assert.ok((await h.state()).notificationSettings.routes.every(r=>!r.available),'reconnection cannot restore revoked authority')
+
   assert.equal((await h.db.prepare("SELECT count(*) AS n FROM p_notification_outbox WHERE status='sent'").first()).n,4)
+  await h.cmd('member.set',{operatorId:person.id,version:0,role:'admin',teams:[]})
+  const adminRoute=await h.cmd('notification.route',{...route,event:'followup'},colleague)
+  assert.equal((await h.state(colleague)).notificationSettings.routes.find(r=>r.id===adminRoute.id).available,true)
+  await h.cmd('followup.schedule',{id:follow.id,dueDate:'2030-03-03',action:'synthetic-platter-private-demoted'})
+  await h.cmd('member.set',{operatorId:person.id,version:1,role:'sales',teams:[]})
+  assert.equal((await h.state()).notificationSettings.routes.find(r=>r.id===adminRoute.id).available,false)
+  const afterDemotion=h.providerReads.length
+  await h.tick(Date.now()+2*86400000)
+  assert.equal(h.providerReads.length,afterDemotion,'a demoted authorizer cannot execute a retained route')
+  assert.equal(h.chats.length,beforeRevoke)
  }finally{await h.close()}
 })
 

@@ -879,3 +879,45 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
   await context.close()
  }finally{await browser?.close();await app?.close()}
 })
+
+test('HAND-001 Settings authorizes Asana delivery and displays completed and uncertain handoffs', {timeout:120000},async()=>{
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{handoffFixture,asanaToken,asanaWorkspace,asanaTeam,completeHandoffAgreement}=await import('./handoff-fixture.mjs')
+ const fake=handoffFixture(),edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,outboundService:fake.outboundService});edge.attach(h)
+ let browser,context
+ try{
+  browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  context=await browser.newContext({viewport:{width:1440,height:1000},ignoreHTTPSErrors:true})
+  const [name,value]=h.owner.split('=');await context.addCookies([{name,value,url:h.origin}])
+  const page=await context.newPage();await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  await page.goto(h.origin+'/app/settings')
+  const connection=page.locator('article').filter({has:page.getByRole('heading',{name:'Asana',exact:true})})
+  await connection.getByLabel('Asana access token').fill(asanaToken);await connection.getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect Asana',exact:true}).click()
+  const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Delivery handoff',exact:true})})
+  await panel.getByLabel('Asana workspace id').fill(asanaWorkspace);await panel.getByLabel('Asana destination team id').fill(asanaTeam);await panel.getByRole('checkbox').check();await panel.getByRole('button',{name:'Authorize Asana handoff',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0);assert.match(await panel.innerText(),/Asana handoff is authorized/)
+  const signed=await completeHandoffAgreement(h)
+  await page.reload();await panel.getByRole('button',{name:'Process queued handoffs',exact:true}).click()
+  const history=panel.getByRole('list',{name:'Delivery handoff history'})
+  assert.match(await history.innerText(),/Synthetic handoff agreement[\s\S]*complete/)
+  assert.equal(fake.projects.length,1);assert.equal(fake.tasks.length,4)
+  await history.getByText('Provider write history',{exact:true}).click()
+  assert.match(await history.innerText(),new RegExp(fake.tasks[3].gid));assert.equal((await context.request.get(h.origin+'/api/platter/agreement.pdf?id='+signed.proposal.id)).status(),200)
+  fake.setUncertain('project');await completeHandoffAgreement(h,'Uncertain delivery handoff',signed.client.id)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'});await page.reload()
+  assert.match(await history.innerText(),/Uncertain delivery handoff[\s\S]*held/)
+  assert.equal(await panel.getByRole('button',{name:/retry/i}).count(),0)
+  const posts=fake.calls.filter(c=>c.method==='POST').length
+  await page.reload();assert.equal(fake.calls.filter(c=>c.method==='POST').length,posts)
+  assert.equal(await panel.getByLabel('Asana workspace id').inputValue(),asanaWorkspace)
+  assert.ok(await panel.locator('button,input,p,summary').evaluateAll(nodes=>nodes.every(node=>parseFloat(getComputedStyle(node).fontSize)>=13)))
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+  if(process.env.PLATTER_SCREENSHOTS){
+   await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true});await documentFonts(page)
+   await panel.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,'HAND-001-settings-1440.png')})
+   await page.setViewportSize({width:390,height:900});await documentFonts(page)
+   await panel.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,'HAND-001-settings-390.png')})
+   await page.setViewportSize({width:1440,height:1000})
+  }
+  await panel.getByRole('button',{name:'Revoke handoff authorization',exact:true}).click();assert.match(await panel.innerText(),/Asana handoff is inactive/)
+ }finally{await context?.close();await browser?.close();await edge.close();await h.close()}
+})

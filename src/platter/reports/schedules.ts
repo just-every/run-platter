@@ -77,7 +77,7 @@ export async function runDueReports(env: Bindings, at: number) {
   const contentReport=owner?.role==='owner'&&content?filterContentReport(await contentPerformance(db,owner),new URLSearchParams(s.filters)):null
   const report = contentReport ?? (snapshot && !content ? pipeline(snapshot.proposals,new URLSearchParams(s.filters),at,snapshot.followups) : { rows: [], count: 0 })
   const writes = [db.prepare('INSERT INTO p_report_runs(id,schedule_id,ran_at,row_count,skipped) VALUES(?,?,?,?,?)').bind(runId, s.id, at, report.count, JSON.stringify(skipped))]
-  if (owner) {
+  if (owner && (!content || contentReport)) {
    const [subject, body] = contentReport?contentMail(contentReport):pipelineMail(report as any, s.filters)
    for (const person of to) writes.push(db.prepare('INSERT INTO p_report_mail(id,run_id,recipient,subject,body,status,created_at) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(), runId, person.email, subject, body, capturesMail(env) ? 'local' : 'pending', at))
   }

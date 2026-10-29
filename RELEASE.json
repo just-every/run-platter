@@ -273,6 +273,10 @@
     {
       "id": "0099_content_performance.sql",
       "buyerSteps": "None. Adds prospective frozen content offers and template/library provenance without backfilling historical decisions."
+    },
+    {
+      "id": "0100_content_origin_sources.sql",
+      "buyerSteps": "None. Retains copied library analytics lineage independently of library edit and usage authority."
     }
   ],
   "breaking": false,

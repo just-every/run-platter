@@ -1,4 +1,4 @@
-import { placedLibrarySources } from './reports/content-performance'
+import { placedLibrarySources } from './library-links'
 import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields } from './variables'
 import { proposalFields } from './commands'
@@ -115,8 +115,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
    .bind(id, clientId, title, row.scope, row.terms ?? '', row.deposit_bps, JSON.stringify(row.options), preparer, at, 'USD', a.id, a.email, JSON.stringify(attachments)),
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version,template_name) VALUES(?,?,?,?)').bind(id,template.id,template.version,sourceName),
-  db.prepare('INSERT INTO p_content_origins(proposal_id,library_known) VALUES(?,?)').bind(id,provenance?.library_known??0),
-  ...JSON.parse(provenance?.library_uses??'[]').map((u:any)=>db.prepare('INSERT INTO p_library_uses(proposal_id,block_id,item_id,linked,item_version,title,content,kind) VALUES(?,?,?,0,?,?,?,?)').bind(id,u.block_id,u.item_id,u.item_version,u.title,u.content,u.kind)),
+  db.prepare('INSERT INTO p_content_origins(proposal_id,library_known,library_uses) VALUES(?,?,?)').bind(id,provenance?.library_known??0,provenance?.library_uses??'[]'),
   ...(!starter?[db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_template_locks WHERE template_id=?').bind(id,template.id),db.prepare('INSERT INTO p_proposal_block_locks(proposal_id,section) SELECT ?,section FROM p_template_block_locks WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_template_document_media WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify(resolved.settings)),

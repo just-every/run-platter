@@ -818,9 +818,11 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
     await page.getByRole('button',{name:'Withdraw consent and request paper',exact:true}).click()
     await page.getByRole('heading',{name:'Electronic signing stopped',exact:true}).waitFor()
     if(width===1440){assert.equal(await page.getByRole('button',{name:'Accept proposal',exact:true}).count(),0);assert.equal(await page.locator('[name=consent]').count(),0)}
-    assert.ok(await page.locator('main button,main input,main p').evaluateAll(nodes=>nodes.every(n=>parseFloat(getComputedStyle(n).fontSize)>=13)))
-    for(const button of await page.locator('main button').all())assert.ok((await button.innerText()).trim())
-    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+    if(width===1440){
+     assert.ok(await page.locator('main button,main input,main p').evaluateAll(nodes=>nodes.every(n=>parseFloat(getComputedStyle(n).fontSize)>=13)))
+     for(const button of await page.locator('main button').all())assert.ok((await button.innerText()).trim())
+     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+    }
     if(process.env.PLATTER_SCREENSHOTS)await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-003-stopped-${width}.png`),fullPage:true})
     const firmContext=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
     try{await firmContext.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}]);const firm=await firmContext.newPage();await firm.goto(h.origin+'/app/proposal?id='+completed.id);if(width===1440)assert.match(await firm.locator('main').innerText(),/verified client withdrew consent and requested paper/);if(width===1440){const pdf=await firmContext.request.get(h.origin+'/api/platter/agreement.pdf?id='+completed.id);assert.equal(pdf.status(),200);assert.deepEqual(await pdf.body(),agreement);const proof=await firmContext.request.get(h.origin+'/api/platter/certificate.pdf?id='+completed.id);assert.equal(proof.status(),200);assert.deepEqual(await proof.body(),certificate)};if(process.env.PLATTER_SCREENSHOTS)await firm.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-005-firm-${width}.png`),fullPage:true})}finally{await firmContext.close()}

@@ -3282,7 +3282,7 @@
       "executable": false
     },
     "src/platter/withdrawal.ts": {
-      "sha256": "9eb6712066bca689ed51f512d9a9c94c8d999cf6d98a5a02075deff2d2c74116",
+      "sha256": "92d06d1a4eb28130d93ae7e2d633dcdeea5f8ab68c9619f6576c6bc5a06e2f4b",
       "executable": false
     },
     "src/platter/workspace.ts": {
@@ -3522,7 +3522,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "fc449dcf605aa2ba838aa3d21c7f04ec366d393c002df15bfd8d2f7cec5f8573",
+      "sha256": "0f8b85665c7d7b14f5cbc4b91d562501d45af550a39ba508d1e875a291bb9060",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {
@@ -3542,7 +3542,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "51dd94589afe1b3563d133272b1b6203755efeaa2e24d6db24a0a25ad0b4bd93",
+      "sha256": "f279169ed5706e496369f51e7d7ee2cf619ee244e4d6e67be320d5608e0d3a7a",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3602,7 +3602,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "335171898f979b98e64136714fc341b888c1734d707a15ba1e8ea1869b729303",
+      "sha256": "23f76cb128164f38f2a49abdf8b6169dc860b9ec79330e7f71b2a469399d9895",
       "executable": false
     },
     "tests/site.test.mjs": {

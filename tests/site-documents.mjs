@@ -544,7 +544,7 @@ test('APPROVE-002 email preview and decision links work under a member session a
   for(const width of [1440,390]){
    const edge=await browserEdge(),mailCalls=[]
    let h
-   try{h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,unclaimed:true,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7223'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mailCalls.push(await request.json());return Response.json({id:'synthetic-platter-'+(7230+mailCalls.length)})}});edge.attach(h)}catch(error){await edge.close();throw error}
+   try{h=await harness({entry:'dist/server/index.js',assetsDirectory:'./dist/client',origin:edge.origin,unclaimed:true,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7223'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mailCalls.push(await request.json());return Response.json({id:'synthetic-platter-'+(7230+mailCalls.length)})}});edge.attach(h)}catch(error){await edge.close();throw error}
    app={...h,token:h.auth.SETUP_TOKEN,close:async()=>{await edge.close();await h.close()}}
    const context=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),manager=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
    try{

@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `2a0d0c5e5c92b7d85f938ea3e51fd0c3a64de39b` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. FOLLOW-009 is a builder completion claim pending guarded landing and ct judgment. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -1012,7 +1012,7 @@ Core · target · **partial**
 
 #### FOLLOW-009 — Follow-up lifecycle and action history
 
-Core · target · **partial** · From FOLLOW-002
+Core · target · **done** · From FOLLOW-002
 
 **Requirement.** Each open proposal has a stable sales owner, next action and due date. Completion records an action; dismissal records a reason. A notice alone never resolves work.
 
@@ -1023,8 +1023,8 @@ Core · target · **partial** · From FOLLOW-002
 4. Acceptance, decline and withdrawal close the action; unanswered question threads remain until answered.
 5. History retains actor, time, action and reason through archive; notification transport and invitations do not return.
 
-**Evidence.** `src/platter/followup/queue.ts`; `src/platter/followup/commands.ts`; `tests/followup-journey.mjs`; `tests/platter.test.mjs` — “FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal”; `tests/site.test.mjs` — “MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
-**Gap.** Delivered: Notify leaves work open, logged completion preserves separate bounce correction, reason-free dismissal fails, and explicit rescheduling reopens an action. Missing “FOLLOW-009 complete follow-up lifecycle and action history journey”: A complete lifecycle-and-custody journey reconciles creation/revision, acceptance/decline/withdrawal, unanswered questions and exact action/reason/actor/time history after restore without transport authority.
+**Evidence.** `tests/platter.test.mjs` — “FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal”, calling `tests/followup-journey.mjs` — followupLifecycle for default and revised actions, Notify, required dismissal reasons, reopening, mailbox-verified acceptance, decline, withdrawal and independent question and correction work; `tests/site.test.mjs` — “MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting” (registered through `tests/site-lifecycle.mjs`); `tests/archive.test.mjs` — “SEND-002 public CLI preserves bounce follow-ups and logged action without provider events or invitation credentials” for independently expected complete action and revision history, retained unanswered threads, separate resolution and inactive restored transport
+**Gap.** None.
 
 #### FOLLOW-010 — Follow-up reporting and team visibility
 

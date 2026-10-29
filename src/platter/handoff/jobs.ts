@@ -4,6 +4,8 @@ import { commit, need, type Actor } from '../model'
 import { administrators } from '../permissions'
 import { asanaCreate, asanaDestination, asanaId } from './asana'
 
+const agreementPath=(id:string,fileId?:string)=>fileId?'/api/platter/attachments/'+encodeURIComponent(id)+'/'+encodeURIComponent(fileId):'/api/platter/agreement.pdf?id='+encodeURIComponent(id)
+
 const live=`SELECT s.*,o.version AS operator_version,COALESCE(m.version,0) AS member_version
  FROM p_handoff_settings s JOIN p_handoff_authority g ON g.singleton=s.singleton AND g.version=s.version
  JOIN oa_operators o ON o.id=s.authorized_by AND o.status='active' AND o.version=g.operator_version
@@ -17,8 +19,10 @@ const live=`SELECT s.*,o.version AS operator_version,COALESCE(m.version,0) AS me
 export function handoffCompletion(db:D1Database,id:string){return [
  db.prepare(`INSERT INTO p_handoff_jobs(proposal_id,revision,settings_version,account_id,workspace_id,team_id,title,accepted_at,status)
  SELECT a.proposal_id,a.revision,s.version,s.account_id,s.workspace_id,s.team_id,json_extract(a.snapshot,'$.title'),a.accepted_at,'queued'
- FROM p_acceptances a JOIN p_signature_facts f ON f.proposal_id=a.proposal_id AND f.revision=a.revision
- CROSS JOIN p_handoff_settings s WHERE a.proposal_id=? AND f.method='mailbox code'
+ FROM p_acceptances a LEFT JOIN p_signature_facts f ON f.proposal_id=a.proposal_id AND f.revision=a.revision
+ LEFT JOIN p_paper_acceptances paper ON paper.proposal_id=a.proposal_id
+ CROSS JOIN p_handoff_settings s WHERE a.proposal_id=?
+ AND ((paper.proposal_id IS NULL AND f.method='mailbox code') OR (paper.proposal_id IS NOT NULL AND s.include_uploads=1))
  AND json_array_length(COALESCE(json_extract(a.snapshot,'$.recipient_plan'),'[]'))=0
  AND COALESCE(json_extract(a.snapshot,'$.collectionPolicy.enabled'),0)=0
  AND EXISTS(SELECT 1 FROM (${live}) eligible WHERE eligible.version=s.version)
@@ -28,9 +32,9 @@ export function handoffCompletion(db:D1Database,id:string){return [
 export async function handoffState(env:Bindings,a:Actor){
  if(!administrators.includes(a.role))return undefined
  const db=env.DB,settings=await db.prepare('SELECT * FROM p_handoff_settings WHERE singleton=1').first<any>()
- const jobs=(await db.prepare('SELECT j.*,EXISTS(SELECT 1 FROM p_handoff_job_authority g WHERE g.proposal_id=j.proposal_id) AS executable FROM p_handoff_jobs j ORDER BY accepted_at DESC LIMIT 100').all<any>()).results
+ const jobs=(await db.prepare('SELECT j.*,paper.file_id AS signed_file_id,EXISTS(SELECT 1 FROM p_handoff_job_authority g WHERE g.proposal_id=j.proposal_id) AS executable FROM p_handoff_jobs j LEFT JOIN p_paper_acceptances paper ON paper.proposal_id=j.proposal_id ORDER BY j.accepted_at DESC LIMIT 100').all<any>()).results
  const writes=(await db.prepare('SELECT proposal_id,position,kind,status,provider_id FROM p_handoff_writes ORDER BY proposal_id,position').all<any>()).results
- return {settings:settings?{...settings,active:Boolean(await db.prepare(live).first())}:null,jobs:jobs.map(j=>({...j,writes:writes.filter(w=>w.proposal_id===j.proposal_id)}))}
+ return {settings:settings?{...settings,active:Boolean(await db.prepare(live).first())}:null,jobs:jobs.map(j=>({...j,agreementPath:agreementPath(j.proposal_id,j.signed_file_id),writes:writes.filter(w=>w.proposal_id===j.proposal_id)}))}
 }
 export async function handoffCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  need(administrators.includes(a.role),'Only owner and admins authorize delivery handoff',403)
@@ -41,10 +45,11 @@ export async function handoffCommand(env:Bindings,a:Actor,name:string,p:Record<s
   const {connection}=await providerCredential(env,'workspace:asana')
   need(p.accountId===connection.account_id&&Number(p.connectionVersion)===connection.version,'Review the current verified Asana account',409)
   const workspace=asanaId(p.workspaceId),team=asanaId(p.teamId),version=(old?.version??0)+1
+  const includeUploads=p.includeUploads===true||p.includeUploads==='yes'
   const guard={sql:"COALESCE((SELECT version FROM p_handoff_settings WHERE singleton=1),0)=? AND EXISTS(SELECT 1 FROM p_connections WHERE id='workspace:asana' AND version=? AND account_id=? AND status='connected' AND broken_at IS NULL)",values:[old?.version??0,connection.version,connection.account_id]}
   await asanaDestination(async()=>{await commit(db,a,[],false,guard);const current=await providerCredential(env,'workspace:asana');need(current.connection.version===connection.version,'Asana connection changed',409);return current.secret.token},workspace,team)
   const operator=await db.prepare('SELECT version FROM oa_operators WHERE id=?').bind(a.id).first<any>()
-  await commit(db,a,[db.prepare('INSERT INTO p_handoff_settings VALUES(1,?,?,?,?,?,?,?) ON CONFLICT(singleton) DO UPDATE SET version=excluded.version,account_id=excluded.account_id,connection_version=excluded.connection_version,workspace_id=excluded.workspace_id,team_id=excluded.team_id,authorized_by=excluded.authorized_by,authorized_at=excluded.authorized_at').bind(version,connection.account_id,connection.version,workspace,team,a.id,Date.now()),db.prepare('INSERT INTO p_handoff_authority VALUES(1,?,?,?) ON CONFLICT(singleton) DO UPDATE SET version=excluded.version,operator_version=excluded.operator_version,member_version=excluded.member_version').bind(version,operator.version,a.memberVersion??0)],false,guard)
+  await commit(db,a,[db.prepare('INSERT INTO p_handoff_settings(singleton,version,account_id,connection_version,workspace_id,team_id,authorized_by,authorized_at,include_uploads) VALUES(1,?,?,?,?,?,?,?,?) ON CONFLICT(singleton) DO UPDATE SET version=excluded.version,account_id=excluded.account_id,connection_version=excluded.connection_version,workspace_id=excluded.workspace_id,team_id=excluded.team_id,authorized_by=excluded.authorized_by,authorized_at=excluded.authorized_at,include_uploads=excluded.include_uploads').bind(version,connection.account_id,connection.version,workspace,team,a.id,Date.now(),includeUploads?1:0),db.prepare('INSERT INTO p_handoff_authority VALUES(1,?,?,?) ON CONFLICT(singleton) DO UPDATE SET version=excluded.version,operator_version=excluded.operator_version,member_version=excluded.member_version').bind(version,operator.version,a.memberVersion??0)],false,guard)
   return {version}
  }
  if(name==='handoff.revoke'){
@@ -77,9 +82,9 @@ function scopeTasks(snapshot:any,optionId:string){
 async function processHandoff(env:Bindings,job:any){
  const db=env.DB,authorize=()=>execution(env,job)
  await authorize()
- const accepted=await db.prepare('SELECT snapshot,option_id FROM p_acceptances WHERE proposal_id=? AND revision=?').bind(job.proposal_id,job.revision).first<any>();need(accepted,'Accepted scope is unavailable',409)
+ const accepted=await db.prepare('SELECT a.snapshot,a.option_id,paper.file_id FROM p_acceptances a LEFT JOIN p_paper_acceptances paper ON paper.proposal_id=a.proposal_id WHERE a.proposal_id=? AND a.revision=?').bind(job.proposal_id,job.revision).first<any>();need(accepted,'Accepted scope is unavailable',409)
  const snapshot=JSON.parse(accepted.snapshot),{lines,schedule}=scopeTasks(snapshot,accepted.option_id)
- const link=env.AUTH_ORIGIN+'/api/platter/agreement.pdf?id='+encodeURIComponent(job.proposal_id)
+ const link=env.AUTH_ORIGIN+agreementPath(job.proposal_id,accepted.file_id)
  const write=async(position:number,kind:'project'|'task',data:any)=>{
   // Save the exact attempted request before I/O. No path retries a reserved write.
   await db.prepare("INSERT INTO p_handoff_writes VALUES(?,?,?,?,'writing',NULL)").bind(job.proposal_id,position,kind,JSON.stringify(data)).run()
@@ -89,7 +94,7 @@ async function processHandoff(env:Bindings,job:any){
    return id
   }catch(error){await db.prepare("UPDATE p_handoff_writes SET status='uncertain' WHERE proposal_id=? AND position=?").bind(job.proposal_id,position).run();throw error}
  }
- const project=await write(0,'project',{workspace:job.workspace_id,team:job.team_id,name:snapshot.title,notes:snapshot.scope+'\nAgreement (sign in required): '+link+(schedule.length?'\nRecorded schedule:\n'+schedule.map((r:any)=>r.label+': '+r.date).join('\n'):'')})
+ const project=await write(0,'project',{workspace:job.workspace_id,team:job.team_id,name:snapshot.title,notes:snapshot.scope+(accepted.file_id?'\nAccepted by upload: signed outside Platter. Platter did not verify this signature.':'')+'\nAgreement (sign in required): '+link+(schedule.length?'\nRecorded schedule:\n'+schedule.map((r:any)=>r.label+': '+r.date).join('\n'):'')})
  await db.prepare('UPDATE p_handoff_jobs SET project_id=? WHERE proposal_id=?').bind(project,job.proposal_id).run()
  for(const [i,line] of lines.entries())await write(i+1,'task',{projects:[project],name:line.name,notes:line.notes+'\nAgreement (sign in required): '+link,...(line.date?{due_on:line.date}:{})})
  await authorize()

@@ -1076,17 +1076,22 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
 })
 
 test('HAND-001 public CLI retains document archive history for Asana handoff without credentials or execution', {timeout:180000},async()=>{
- const {handoffFixture,asanaToken,handoffSettings,connectAsana,completeHandoffAgreement}=await import('./handoff-fixture.mjs')
+ const {handoffFixture,asanaToken,handoffSettings,connectAsana,completeHandoffAgreement,recordHandoffUpload}=await import('./handoff-fixture.mjs')
  const temporary=await mkdtemp(join(tmpdir(),'platter-handoff-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=handoffFixture();let h
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectAsana(h)
+  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService})
+  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303);await setup.text()
+  await connectAsana(h)
+  await h.cmd('handoff.configure',{...handoffSettings,version:1,includeUploads:true})
+  const paper=await completeHandoffAgreement(h,'Retained signed upload',undefined,false),paperBytes=await recordHandoffUpload(h,paper);await h.cmd('handoff.dispatch',{})
+  const paperPath=(await h.send('/api/platter/handoffs',undefined,h.owner)).value.jobs.find(j=>j.proposal_id===paper.proposal.id).agreementPath
   const completed=await completeHandoffAgreement(h);await h.cmd('handoff.dispatch',{})
   const queued=await completeHandoffAgreement(h,'Queued delivery history',completed.client.id)
   const tables=['p_handoff_settings','p_handoff_jobs','p_handoff_writes'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
-  assert.deepEqual(before.p_handoff_jobs.map(j=>j.status).sort(),['complete','queued'])
-  assert.equal(before.p_handoff_writes.length,5);assert.ok(before.p_handoff_writes.every(w=>w.provider_id&&w.status==='complete'))
+  assert.deepEqual(before.p_handoff_jobs.map(j=>j.status).sort(),['complete','complete','queued'])
+  assert.equal(before.p_handoff_writes.length,10);assert.ok(before.p_handoff_writes.every(w=>w.provider_id&&w.status==='complete'))
   const artifact=await h.mf.dispatchFetch(h.origin+completed.path+'/agreement.pdf',{headers:{cookie:completed.cookie}});assert.equal(artifact.status,200);const document=Buffer.from(await artifact.arrayBuffer())
   await h.close();h=undefined
   const archive=join(temporary,'handoff.rer');await command(source,['export','--output',archive])
@@ -1102,8 +1107,10 @@ test('HAND-001 public CLI retains document archive history for Asana handoff wit
   assert.equal(history.settings.active,false);assert.ok(history.jobs.every(j=>!j.executable))
   const download=await h.mf.dispatchFetch(h.origin+'/api/platter/agreement.pdf?id='+completed.proposal.id,{headers:{cookie:owner}});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),document)
   assert.equal((await h.send(completed.path+'/agreement.pdf',undefined,completed.cookie)).status,404)
+  const paperDownload=await h.mf.dispatchFetch(h.origin+paperPath,{headers:{cookie:owner}});assert.equal(paperDownload.status,200);assert.deepEqual(Buffer.from(await paperDownload.arrayBuffer()),paperBytes)
+  assert.equal((await h.send('/api/platter/handoffs',undefined,owner)).value.jobs.find(j=>j.proposal_id===paper.proposal.id).agreementPath,paperPath)
   await h.cmd('provider.connect',{provider:'asana',version:1,token:asanaToken,consent:true},owner)
-  await h.cmd('handoff.configure',{...handoffSettings,version:1,connectionVersion:2},owner)
+  await h.cmd('handoff.configure',{...handoffSettings,version:2,connectionVersion:2,includeUploads:true},owner)
   const calls=receiver.calls.length;await h.cmd('handoff.dispatch',{},owner);assert.equal(receiver.calls.length,calls)
   assert.equal((await h.send('/api/platter/handoffs',undefined,owner)).value.jobs.find(j=>j.proposal_id===queued.proposal.id).status,'queued')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}

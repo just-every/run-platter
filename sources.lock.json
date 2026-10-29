@@ -2830,7 +2830,7 @@
       "executable": false
     },
     "src/platter/recipients.ts": {
-      "sha256": "fa2d673017ad09559cd8e2b7a6e8fdefe762bb725419f303ac8cea829832a0ce",
+      "sha256": "3404e0824780e6f01a9a0fb4a61af530d3ccd34687c877a1c37e338435312c65",
       "executable": false
     },
     "src/platter/recurring.ts": {
@@ -3070,7 +3070,7 @@
       "executable": false
     },
     "src/platter/ui/invitation-mail.ts": {
-      "sha256": "9ddb4d0974daaf36f0478d2eba04e6c39f8577d74d00d9d3c21ca74203849322",
+      "sha256": "2876292b862f973fc5c31b8781f54474952e8d8faa15d0df748f0bf4dc896df9",
       "executable": false
     },
     "src/platter/ui/library.ts": {
@@ -3398,7 +3398,7 @@
       "executable": false
     },
     "tests/locale-browser.mjs": {
-      "sha256": "af27f56e1b262d5d36abefd2ed50f02306ef6debeffdf664c4eb3a224a3469af",
+      "sha256": "04d672510ef9008edb839634641ca9060d36c0bf4a5f1e9225b94f49e46b5885",
       "executable": false
     },
     "tests/locale-providers.mjs": {

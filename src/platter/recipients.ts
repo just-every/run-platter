@@ -6,7 +6,7 @@ import { commit, email, exact, need, secret, snapshot, text, type Actor } from '
 import { permitted } from './permissions'
 import { currentTime } from './expiry-time'
 import { invitationMail } from './invitation-mail'
-import { queueMail } from './mail'
+import { proposalMail, queueMail } from './mail'
 
 export type Recipient = {id:string;name:string;email:string|null;role:'signer'|'approver'|'viewer'|'cc'|'countersigner';group:number}
 export function recipientPlan(row:any):Recipient[]{return typeof row.recipient_plan==='string'?JSON.parse(row.recipient_plan):row.recipient_plan??[]}
@@ -96,6 +96,10 @@ export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record
 export async function recipientInvitations(env:Bindings,a:Actor,input:Record<string,unknown>,row:any,at:number){
  const plan=recipientPlan(row)
  if(!plan.length)return null
+ // Untouched composer text is a system default, resolved for each recipient.
+ // Editing either field preserves both submitted fields as authored mail.
+ const defaults=proposalMail(row.title,'',clientLocale(row))
+ if(input.defaultInvitation==='yes'&&input.mailSubject===defaults[0].slice(0,200)&&input.mailMessage===defaults[1].trimEnd())input={...input,localizedDefaults:'yes'}
  need(a.role==='owner','Only the current owner sends configured recipient invitations',403)
  need(plan.some(r=>r.role==='signer'),'Include a client signer before sending',409)
  need(plan.every(r=>!requiredRecipient(r)||r.email),'Fill every required recipient slot before sending: '+plan.filter(r=>requiredRecipient(r)&&!r.email).map(r=>r.name).join(', '),409)

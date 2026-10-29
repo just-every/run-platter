@@ -178,6 +178,37 @@ export async function localeBrowser(width=1440) {
   for(const [index,[id,locale]] of [['ceo','es'],['cfo','fr'],['approver','pt'],['viewer','de']].entries())await cmd('proposal.locale',{id:multi.id,version:index+2,recipientId:id,locale})
   await cmd('proposal.approve',{id:multi.id,version:6,revision:2})
   await page.goto(app.origin+'/app/proposal?id='+multi.id)
+  await capture('recipient-invitation-defaults')
+  await page.getByRole('button',{name:'Send this invitation',exact:true}).click()
+  let defaultState=await (await request.get(app.origin+'/api/platter/state')).json()
+  for(const [id,prefix,message] of [
+   ['ceo','Su propuesta: ','Revise su propuesta y verifique su correo electrónico antes de aceptarla:'],
+   ['cfo','Votre proposition : ','Consultez votre proposition et vérifiez votre adresse e-mail avant de l’accepter :'],
+   ['approver','Sua proposta: ','Revise sua proposta e verifique seu e-mail antes de aceitar:'],
+   ['viewer','Ihr Angebot: ','Prüfen Sie Ihr Angebot und bestätigen Sie Ihre E-Mail-Adresse, bevor Sie es annehmen:'],
+   ['owner','Your proposal: ','Review your proposal and verify your email before accepting:'],
+  ]){
+   const recipient=recipients.find(r=>r.id===id).email
+   const mail=defaultState.outbox.find(m=>m.proposal_id===multi.id&&m.recipient===recipient)
+   const history=defaultState.proposals.find(r=>r.id===multi.id).invitationMessages.find(m=>m.recipient===recipient)
+   assert.equal(mail.subject,prefix+authored.title,'ordinary send uses '+id+' recipient language')
+   assert.ok(mail.body.startsWith(message+'\n'),'ordinary send localizes the '+id+' message')
+   assert.equal(history.subject,mail.subject);assert.equal(history.message.trimEnd(),message)
+  }
+  await capture('recipient-invitation-sent')
+  for(const [field,value] of [['Invitation subject','Your proposal: firm-authored subject'],['Invitation message','Review your proposal — firm-authored message.']]){
+   await page.goto(app.origin+'/app/proposal?id='+multi.id)
+   await page.getByLabel(field,{exact:true}).fill(value)
+   const subject=await page.getByLabel('Invitation subject',{exact:true}).inputValue(),message=await page.getByLabel('Invitation message',{exact:true}).inputValue()
+   await page.getByRole('button',{name:'Send this invitation',exact:true}).click()
+   defaultState=await (await request.get(app.origin+'/api/platter/state')).json()
+   const history=defaultState.proposals.find(r=>r.id===multi.id).invitationMessages
+   for(const recipient of recipients){
+    assert.ok(history.some(m=>m.recipient===recipient.email&&m.subject===subject&&m.message===message),'editing either field retains the authored invitation for '+recipient.id)
+    assert.ok(defaultState.outbox.some(m=>m.proposal_id===multi.id&&m.recipient===recipient.email&&m.subject===subject&&m.body.startsWith(message+'\n\n')))
+   }
+  }
+  await page.goto(app.origin+'/app/proposal?id='+multi.id)
   await page.getByRole('button',{name:'Send recipient-language defaults',exact:true}).click()
   const stateAfterSend=await (await request.get(app.origin+'/api/platter/state')).json(),issued=stateAfterSend.proposals.find(r=>r.id===multi.id)
   assert.equal(issued.status,'sent')

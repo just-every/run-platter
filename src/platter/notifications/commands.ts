@@ -1,18 +1,23 @@
 import { watchCommand } from './watchers'
 import { senderNoticeCommand } from './expiry'
 import type { Bindings } from '../../auth.server'
-import { approvalCommand, approvalPlan } from '../approvals'
+import { approvalCommand, approvalPlan, approvalTrigger } from '../approvals'
 import { actorById } from '../credentials'
 import { providerCredential } from '../connections'
 import { currentTime } from '../expiry-time'
 import { commit, exact, need, text, type Actor } from '../model'
 import { negotiatedView, pendingNegotiation } from '../negotiation'
 import { administrators, permitted, senders } from '../permissions'
-import { activeRequest, chatJson, flushNotifications, notificationWrite } from './dispatch'
+import { activeRequest, chatJson, flushNotifications, notificationWrite, requestBody } from './dispatch'
 
+export async function requestStates(env:Bindings,a:Actor,ids:string[]){
+ const rows=a.role==='agent'?[]:(await env.DB.prepare('SELECT r.*,o.display_name AS approver_name,o.email AS approver_email,auth.request_id AS authorized FROM p_approval_requests r JOIN oa_operators o ON o.id=r.approver_id LEFT JOIN p_notification_authority auth ON auth.request_id=r.id WHERE r.proposal_id IN (SELECT value FROM json_each(?)) AND (r.requester_id=? OR r.approver_id=? OR ?=1) ORDER BY r.requested_at,r.id').bind(JSON.stringify(ids),a.id,a.id,administrators.includes(a.role)?1:0).all<any>()).results
+ const projected=await Promise.all(rows.map(async({trigger_snapshot,...r})=>({...r,trigger:approvalTrigger(trigger_snapshot?JSON.parse(trigger_snapshot):null,a),current:await activeRequest(env,r),canRevoke:!r.revoked_at&&Boolean(r.authorized)&&(r.requester_id===a.id||administrators.includes(a.role))})))
+ return new Map(ids.map(id=>[id,projected.filter(r=>r.proposal_id===id)]))
+}
 export async function requestRows(env:Bindings,a:Actor,id:string){
  await permitted(env.DB,a,id)
- return (await env.DB.prepare('SELECT r.*,o.display_name AS approver_name,o.email AS approver_email FROM p_approval_requests r JOIN oa_operators o ON o.id=r.approver_id WHERE r.proposal_id=? AND (r.requester_id=? OR r.approver_id=? OR ?=1) ORDER BY r.requested_at,r.id').bind(id,a.id,a.id,administrators.includes(a.role)?1:0).all<any>()).results
+ return (await requestStates(env,a,[id])).get(id)??[]
 }
 export async function notificationCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  const db=env.DB,at=await currentTime(db)
@@ -42,6 +47,16 @@ export async function notificationCommand(env:Bindings,a:Actor,name:string,p:Rec
   const id=text(p.id,'a notification route');await commit(db,a,[db.prepare('DELETE FROM p_notification_route_authority WHERE route_id=?').bind(id)]);return {id}
  }
  if(name==='notification.requests')return {requests:await requestRows(env,a,text(p.id,'a proposal'))}
+ if(name==='notification.revoke'){
+  need(senders.includes(a.role),'Only proposal senders revoke approval requests',403)
+  const r=await db.prepare('SELECT * FROM p_approval_requests WHERE id=?').bind(text(p.requestId,'an approval request')).first<any>()
+  need(r&&(r.requester_id===a.id||administrators.includes(a.role)),'Only the requester or an administrator revokes this request',403)
+  const original=await permitted(db,a,r.proposal_id,'send');exact(original,p)
+  const row=negotiatedView(original,await pendingNegotiation(db,original.id)),plan=await approvalPlan(db,row,a)
+  need(row.revision===Number(p.revision)&&row.revision===r.revision&&p.plan===plan.plan&&r.plan===plan.plan,'This approval request is no longer current',409)
+  await commit(db,a,[db.prepare('DELETE FROM p_notification_authority WHERE request_id=?').bind(r.id),db.prepare('UPDATE p_approval_requests SET revoked_at=?,revoked_by=? WHERE id=? AND revoked_at IS NULL').bind(at,a.id,r.id),db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE request_id=? AND status='pending'").bind(r.id)],false,{sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?',values:[original.id,original.version,plan.policyVersion]})
+  return {id:r.proposal_id}
+ }
  if(name==='notification.decide'){
   const r=await db.prepare('SELECT * FROM p_approval_requests WHERE id=?').bind(text(p.requestId,'an approval request')).first<any>()
   need(r&&r.approver_id===a.id,'This approval request does not name you',403)
@@ -57,7 +72,7 @@ export async function notificationCommand(env:Bindings,a:Actor,name:string,p:Rec
  const row=negotiatedView(original,await pendingNegotiation(db,original.id))
  need(['draft','approved'].includes(row.status)||Boolean(row.negotiating),'Request approval of an unsent revision',409)
  const delay=Number(p.reminderDays??1);need(Number.isInteger(delay)&&delay>=1&&delay<=30,'Choose a reminder delay from 1 to 30 days')
- const plan=await approvalPlan(db,row,a);need(plan.required&&!plan.complete&&!plan.rejected,'No approval is awaiting a request',409)
+ const plan=await approvalPlan(db,row,a);need(row.revision===Number(p.revision)&&p.plan===plan.plan,'The approval revision or plan changed. Reload before authorizing.',409);need(plan.required&&!plan.complete&&!plan.rejected,'No approval is awaiting a request',409)
  const people=(await db.prepare("SELECT id FROM oa_operators WHERE status='active'").all<any>()).results,writes:D1PreparedStatement[]=[],requests:string[]=[]
  for(const person of people){
   const approver=await actorById(db,person.id);if(!approver)continue
@@ -65,10 +80,9 @@ export async function notificationCommand(env:Bindings,a:Actor,name:string,p:Rec
   for(const step of eligible.steps.filter(s=>s.canApprove)){
    const prior=await db.prepare('SELECT id FROM p_approval_requests WHERE proposal_id=? AND revision=? AND plan=? AND step=? AND approver_id=?').bind(row.id,row.revision,plan.plan,step.id,approver.id).first<any>()
    if(prior){requests.push(prior.id);continue}
-   const id=crypto.randomUUID(),preview=env.AUTH_ORIGIN+'/app/preview?id='+encodeURIComponent(row.id)+'&revision='+row.revision
-   const body='Approval required: '+step.name+'\nRevision '+row.revision+'\nPreview: '+preview+'\nReview and decide: '+env.AUTH_ORIGIN+'/app/proposal?id='+encodeURIComponent(row.id)+'\nA signed-in approver must explicitly approve or reject with a note. Request id: '+id
+   const id=crypto.randomUUID(),snapshot=JSON.stringify(step.trigger),r={id,proposal_id:row.id,revision:row.revision,trigger_snapshot:snapshot},body=requestBody(env,r,approver)
    requests.push(id)
-   writes.push(db.prepare('INSERT INTO p_approval_requests(id,proposal_id,revision,plan,step,approver_id,requester_id,requested_at,remind_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,plan.plan,step.id,approver.id,a.id,at,at+delay*86400000),db.prepare('INSERT INTO p_notification_authority(request_id) VALUES(?)').bind(id),notificationWrite(env,id,row.id,'Approval requested',body,at,approver.email,id))
+   writes.push(db.prepare('INSERT INTO p_approval_requests(id,proposal_id,revision,plan,step,approver_id,requester_id,requested_at,remind_at,trigger_snapshot) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,plan.plan,step.id,approver.id,a.id,at,at+delay*86400000,snapshot),db.prepare('INSERT INTO p_notification_authority(request_id) VALUES(?)').bind(id),notificationWrite(env,id,row.id,'Approval requested',body,at,approver.email,id))
    const routes=(await db.prepare("SELECT r.* FROM p_notification_routes r JOIN p_notification_route_authority a ON a.route_id=r.id WHERE r.event='approval' AND r.operator_id=?").bind(approver.id).all<any>()).results
    for(const route of routes)writes.push(notificationWrite(env,id,row.id,'Approval requested',body,at,null,id,route.id))
   }

@@ -13,6 +13,11 @@ export async function approvalSettings(db:D1Database){
  const rules=(await db.prepare('SELECT * FROM p_approval_rules ORDER BY position,id').all<any>()).results.map(r=>({...r,condition:JSON.parse(r.condition),approvers:JSON.parse(r.approvers),templates:JSON.parse(r.templates??'[]')}))
  return {policy,rules}
 }
+export function approvalTrigger(snapshot:any,a:Actor){
+ if(!snapshot)return {name:'Approval review',kind:'legacy',detail:'Trigger details were not recorded for this request.'}
+ if(snapshot.kind==='marginBelow'&&!costReaders.includes(a.role))return {name:'Internal approval review',kind:snapshot.kind,detail:'Private pricing requires an eligible approver’s review.'}
+ return snapshot
+}
 function matches(a:Actor,approver:string){return approver==='person:'+a.id||approver==='role:'+a.role}
 export async function approvalPlan(db:D1Database,row:any,a?:Actor){
  const {policy,rules}=await approvalSettings(db),options=typeof row.options==='string'?JSON.parse(row.options):row.options
@@ -34,10 +39,23 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
   return true // Unknown restored rule types require review rather than silently skipping.
  }
  const selected:any[]=[];for(const rule of rules)if(await holds(rule))selected.push(rule)
+ const decimal=(value:number|bigint)=>{const signed=BigInt(value),n=signed<0n?-signed:signed;return (signed<0n?'-':'')+(n/100n).toString()+'.'+(n%100n).toString().padStart(2,'0')}
+ const templateName=origin?(starterTemplates().find(t=>t.id===origin.template_id)?.name??(await db.prepare('SELECT name FROM p_personal_templates WHERE id=?').bind(origin.template_id).first<any>())?.name??'Recorded template'):null
+ const trigger=(rule:any)=>{
+  const c=rule.condition
+  let detail=c.kind==='totalOver'?'Highest offered gross total '+row.currency+' '+decimal(total)+' exceeds '+c.currency+' '+decimal(c.cents)+'.'
+   :c.kind==='discountOver'?'Offered discount '+decimal(Math.max(...options.map((o:any)=>discountThreshold(o))))+'% exceeds '+decimal(c.bps)+'%.'
+   :c.kind==='marginBelow'?'Offered margin requires '+decimal(c.bps)+'%: '+costing.packages.map((p:any)=>p.label+': '+(p.marginBps===null?'costs not recorded':decimal(p.marginBps)+'%')).join('; ')+'. Optional items also require review when their costs are missing or their margin is below the threshold.'
+   :c.kind==='paymentTerms'?'Deposit '+decimal(row.deposit_bps)+'%; required minimum '+decimal(c.minimumDepositBps)+'%.'+(c.standardTerms!==null&&String(row.terms??'')!==c.standardTerms?' Legal terms differ from the configured standard.':'')+(paymentTerms(row)?' A payment schedule or net terms is configured.':'')+(options.some((o:any)=>o.tables?.some((t:any)=>t.lines.some((l:any)=>l.recurrence))||o.optionalItems?.some((i:any)=>i.recurrence))?' Recurring fees require review.':'')
+   :c.kind==='template'?'Proposal started from template “'+templateName+'”.'
+   :c.kind==='termsEdited'?'Legal terms changed from revision 1.':'The recorded rule requires review.'
+  if(rule.templates.length)detail+=' Limited to template “'+templateName+'”.'
+  return {name:rule.name,kind:c.kind,detail}
+ }
  const agent=String(row.prepared_by).startsWith('agent:')||String(first?.prepared_by).startsWith('agent:')
- const steps=selected.map(r=>({id:r.id,name:r.name,approvers:r.approvers as string[],any:false}))
- if(!steps.length&&(policy.required||agent))steps.push({id:'default',name:agent&&!policy.required?'Person approval for agent draft':'Default approval',approvers:agent&&!policy.required?['role:owner','role:admin','role:manager']:['role:'+policy.default_role],any:agent&&!policy.required})
- const plan=await hash(JSON.stringify({version:policy.version,steps,revision:row.revision})),history=(await db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=? AND revision=? ORDER BY occurred_at,id').bind(row.id,row.revision).all<any>()).results,decisions=history.filter(d=>d.plan===plan)
+ const steps=selected.map(r=>({id:r.id,name:r.name,approvers:r.approvers as string[],any:false,trigger:trigger(r)}))
+ if(!steps.length&&(policy.required||agent))steps.push({id:'default',name:agent&&!policy.required?'Person approval for agent draft':'Default approval',approvers:agent&&!policy.required?['role:owner','role:admin','role:manager']:['role:'+policy.default_role],any:agent&&!policy.required,trigger:{name:agent&&!policy.required?'Person approval for agent draft':'Default approval',kind:'default',detail:agent?'A person must approve this agent-prepared proposal.':'Approval is required for every proposal.'}})
+ const plan=await hash(JSON.stringify({version:policy.version,steps:steps.map(({trigger,...step})=>step),revision:row.revision})),history=(await db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=? AND revision=? ORDER BY occurred_at,id').bind(row.id,row.revision).all<any>()).results,decisions=history.filter(d=>d.plan===plan)
  const legacy=policy.version===0&&row.approved_by&&steps.length===1&&steps[0].id==='default'
  let prior=true,rejected=history.some(d=>d.decision==='rejected')
  const access=a?scope(a,'approve'):null,mayApprove=Boolean(a&&access&&await db.prepare('SELECT p.id FROM p_proposals p WHERE p.id=? AND ('+access.sql+')').bind(row.id,...access.values).first())
@@ -45,7 +63,7 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
   const approvals=decisions.filter(d=>d.step===step.id&&d.decision==='approved'),done=Boolean(legacy)||(step.any?approvals.length>0:step.approvers.every((_:string,i:number)=>approvals.some(d=>d.approver_index===i)))
   const eligible=mayApprove&&a&&['owner','admin','manager','billing'].includes(a.role)?step.approvers.map((v:string,i:number)=>matches(a,v)?i:-1).filter((i:number)=>i>=0):[]
   const privateName=selected.find(r=>r.id===step.id)?.condition.kind==='marginBelow'&&a&&!costReaders.includes(a.role)
-  const result={...step,...(privateName?{name:'Internal approval review'}:{}),done,active:prior&&!done&&!rejected,canApprove:prior&&!done&&!rejected&&eligible.some((i:number)=>!approvals.some(d=>d.approver_index===i)),decisions:decisions.filter(d=>d.step===step.id)}
+  const result={...step,trigger:a?approvalTrigger(step.trigger,a):step.trigger,...(privateName?{name:'Internal approval review'}:{}),done,active:prior&&!done&&!rejected,canApprove:prior&&!done&&!rejected&&eligible.some((i:number)=>!approvals.some(d=>d.approver_index===i)),decisions:decisions.filter(d=>d.step===step.id)}
   prior=prior&&done;return result
  })
  return {policyVersion:policy.version,plan,steps:evaluated,required:steps.length>0,complete:prior&&!rejected,rejected}

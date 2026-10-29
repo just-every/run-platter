@@ -654,8 +654,8 @@ Core · target · **partial**
 1. Submit a proposal that needs approval: the Slack fake's request and the email each carry a link that opens the `EDIT-018` preview of the revision awaiting approval, under the approver's session.
 2. Approve it from the Slack fake's action, reject another from email with a note, and see an overdue reminder after the set delay.
 
-**Evidence.** `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
-**Gap.** Nook and mobile push, automatic next-step request creation, integrated notification settings and request controls, complete trigger details and a chat-native decision interaction remain. Conservative default adopted  Uncertain delivery is held without automatic retry. Future Nook, MOB-002, COLLAB-002 and SEND-005 carriers inherit these authority and custody obligations.
+**Evidence.** `tests/mail.test.mjs` — exact-revision requests, trigger summaries, scoped recipients, noted decisions, audited revocation and once-only reminders; `tests/site-documents.mjs`, loaded by `tests/site.test.mjs` — native request controls, persisted holders and timing, revoke, preview and noted decisions at desktop and phone widths; `tests/archive.test.mjs` — retained request, trigger and revocation history without restored authority.
+**Gap.** Nook and mobile push, automatic next-step request creation, workspace notification settings, a chat-native decision interaction and live-provider qualification remain. Explicit audited consent, verified direct approver destinations, existing member sessions and current revision and plan remain required; uncertain delivery is held without automatic retry. Future Nook, MOB-002, COLLAB-002 and SEND-005 carriers inherit these authority and custody obligations. MOB-002 requires signed native builds, iOS and Android devices and provider credentials.
 
 #### APPROVE-003 — Who approves, who sends and what needs approval
 

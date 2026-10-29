@@ -7,10 +7,11 @@ export async function verifyRenewalClient(h,path){
  const response=await h.send(path+'/action?name=code.verify',{code:mail.body.match(/\b\d{6}\b/)[0]})
  assert.equal(response.status,200,response.text);return response.cookie
 }
-export async function acceptedRenewal(h,{title=renewalOffer.title,items=[],paymentTerms,setup=false}={}){
+export async function acceptedRenewal(h,{title=renewalOffer.title,items=[],paymentTerms,setup=false,flatPackage=false}={}){
  const sequence=(await h.db.prepare('SELECT count(*) AS n FROM p_clients').first()).n
  const fixture=structuredClone(renewalOffer)
  if(setup)fixture.pricingTables[0].lines.unshift({name:'Setup',quantity:'1',unit:'project',unitPrice:'500'})
+ if(flatPackage){fixture.packages[1].price='2500';fixture.packages[1].optionalItems[0].unitPrice='1200';fixture.pricingTables=[]}
  const client=await h.cmd('client.save',{name:'Synthetic renewal client '+sequence,email:['synthetic-platter-'+sequence,'example.invalid'].join('@')}),p=await h.cmd('proposal.prepare',{...fixture,clientId:client.id,title,...(paymentTerms?{paymentTerms}:{})})
  await h.cmd('proposal.approve',{id:p.id,version:1,revision:1})
  const path=new URL((await h.cmd('proposal.send',{id:p.id,version:2})).shareUrl).pathname,cookie=await verifyRenewalClient(h,path)
@@ -84,6 +85,22 @@ export async function renewalJourney(h){
  await h.cmd('approval.policy',{version:3,required:true,defaultRole:'owner'})
  await h.cmd('proposal.revise',{id:fixedDraft.id,version:1,title:'Independent renewal edit',clientId:fixed.client.id,scope:'Independently edited',packages:[{id:'care',label:'New',price:'1'}],pricingTables:[],depositPercent:'1'})
  assert.equal((await get(fixed.id)).scope,'Selected care scope')
+ // A flat package remains a one-off fee when a selected recurring add-on is renewed.
+ const flat=await acceptedRenewal(h,{title:'Flat package with recurring add-on',flatPackage:true,items:[{id:'extra',quantity:1}]}),flatAccepted=(await get(flat.id)).acceptance
+ assert.equal(flatAccepted.totalCents,1690000);assert.equal(flatAccepted.selection.fees.oneOffCents,250000)
+ await h.cmd('renewal.configure',{...input,id:flat.id})
+ await h.cmd('renewal.run',{})
+ const flatRow=(await h.state()).renewals.rows.find(r=>r.proposal_id===flat.id),flatDraft=await get(flatRow.draft_id)
+ assert.equal(flatDraft.options[0].cents,1762000,'The renewal retains the $2,500 flat fee alongside twelve $1,260 installments')
+ assert.deepEqual(flatDraft.options[0].tables.flatMap(t=>t.lines).map(l=>[l.name,l.quantity,l.unitPrice]),[['Agreed care','1','2500.00'],['Selected extra','1','1260.00']])
+ await h.cmd('proposal.approve',{id:flatDraft.id,version:1,revision:1})
+ const flatPath=new URL((await h.cmd('proposal.send',{id:flatDraft.id,version:2})).shareUrl).pathname,flatCookie=await verifyRenewalClient(h,flatPath)
+ assert.equal((await h.send(flatPath+'/action?name=accept',{name:'Synthetic signer',optionId:'care',consent:true},flatCookie)).status,200)
+ const flatRenewed=(await get(flatDraft.id)).acceptance
+ assert.equal(flatRenewed.totalCents,1762000);assert.equal(flatRenewed.selection.fees.oneOffCents,250000)
+ assert.equal(flatRenewed.selection.fees.recurring[0].amountCents,126000)
+ assert.equal(flatRenewed.paymentSchedule.rows.reduce((sum,row)=>sum+row.amountCents,0),1762000)
+ assert.deepEqual((await get(flat.id)).acceptance,flatAccepted,'Renewal reconstruction leaves the original accepted fees unchanged')
  // Revocation and an owner credential revision invalidate dormant execution.
  const revoked=await acceptedRenewal(h,{title:'Revoked renewal'}),stale=await acceptedRenewal(h,{title:'Stale owner renewal'})
  for(const p of [revoked,stale])await h.cmd('renewal.configure',{...input,id:p.id})

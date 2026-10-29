@@ -206,6 +206,22 @@ export async function duplicatePackagesJourney(){
     await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();await capture('sent-copy')
     const final=await(await context.request.get(app.origin+'/api/platter/state')).json();assert.equal(final.proposals.find(p=>p.id===source.id).status,'accepted');assert.equal(final.proposals.find(p=>p.id===copyId).status,'sent');assert.equal(final.proposals.find(p=>p.id===source.id).acceptance.name,'Avery Chen')
     assert.deepEqual(final.proposals.find(p=>p.id===source.id),sourceState);assert.equal(final.paymentRecords.filter(r=>r.proposal_id===source.id)[0].cents,60000)
+    const ownerEmail=final.actor.email,roles=[{id:'client',name:'Client signer',email:address(1221),role:'signer',group:1},{id:'cfo',name:'Client CFO',email:address(1224),role:'approver',group:2},{id:'owner',name:'Firm owner',email:ownerEmail,role:'countersigner',group:3}]
+    const roleSource=await cmd('proposal.prepare',{clientId:client.id,title:'Template recipient custody',scope:'Independent role snapshots.',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25',recipientPlan:roles,document:{version:1,blocks:[{id:'po',type:'field',title:'Purchase order',text:'',fieldKind:'text',required:true,recipientRole:'slot',recipientId:'client'}]}})
+    await page.goto(app.origin+'/app/proposal?id='+roleSource.id)
+    const templateForm=page.locator('form').filter({has:page.getByRole('button',{name:'Save personal template',exact:true})})
+    await templateForm.getByLabel('Template name',{exact:true}).fill('Leadership template')
+    await templateForm.getByRole('checkbox',{name:'Keep Firm owner preassigned in this template',exact:true}).check();await capture('template-preassignment')
+    await templateForm.getByRole('button',{name:'Save personal template',exact:true}).click();assert.equal(await page.getByRole('alert').count(),0)
+    const template=(await getState()).templates.find(t=>t.name==='Leadership template'),started=await cmd('template.start',{id:template.id,version:1,clientId:client.id})
+    await cmd('recipient.save',{id:started.id,version:1,recipients:roles});await cmd('proposal.approve',{id:started.id,version:2,revision:2});await cmd('proposal.send',{id:started.id,version:3})
+    await page.goto(app.origin+'/app/proposal?id='+started.id);await page.getByLabel('Copy for client').selectOption(beta.id);await page.getByRole('button',{name:'Duplicate proposal',exact:true}).click()
+    const roleCopyId=new URL(page.url()).searchParams.get('id'),roleCopy=(await getState()).proposals.find(p=>p.id===roleCopyId)
+    assert.deepEqual(JSON.parse(roleCopy.recipient_plan).map(r=>[r.id,r.email,r.group]),[['client',null,1],['cfo',null,2],['owner',ownerEmail,3]])
+    assert.equal(roleCopy.document.blocks[0].recipientId,'client');assert.deepEqual(roleCopy.recipientLinks,[]);assert.deepEqual(roleCopy.recipientSignatures,[])
+    const recipientPanel=page.locator('section').filter({has:page.getByRole('heading',{name:'Recipients and signing',exact:true})})
+    assert.equal(await recipientPanel.getByText('Mailbox not assigned',{exact:true}).count(),2);assert.equal(await recipientPanel.getByText(ownerEmail,{exact:true}).count(),1);await capture('recipient-copy')
+
     const repeatedPdf=await context.request.get(app.origin+'/api/platter/agreement.pdf?id='+source.id);assert.equal(repeatedPdf.status(),200);assert.deepEqual(await repeatedPdf.body(),sourcePdf)
 
    }finally{await context.close();await app.close();app=undefined}

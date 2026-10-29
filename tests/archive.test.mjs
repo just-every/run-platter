@@ -175,6 +175,11 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.deepEqual((await h.state()).paymentRecords.filter(p=>p.proposal_id===paidCopy.id),[])
     assert.deepEqual(await paidRead(paidSource.id,'agreement.pdf'),paidPdf)
 
+    const roleSeed=await h.cmd('proposal.prepare',{...offer,clientId:acme.id,title:'Archived recipient snapshot',document:{version:1,blocks:[{id:'po',type:'field',title:'Purchase order',text:'',fieldKind:'text',required:true,recipientRole:'slot',recipientId:'client'}]},recipientPlan:[{id:'client',name:'Client signer',email:address(1211),role:'signer',group:1},{id:'cfo',name:'Client CFO',email:address(1215),role:'approver',group:2},{id:'owner',name:'Firm owner',email:h.auth.OWNER_EMAIL,role:'countersigner',group:3}]})
+    const roleTemplate=await h.cmd('template.save',{id:roleSeed.id,version:1,name:'Archived recipient template',preassignedRecipientIds:['owner']}),roleStarted=await h.cmd('template.start',{id:roleTemplate.id,version:1,clientId:acme.id})
+    const roleSourceBefore=(await h.state()).proposals.find(p=>p.id===roleStarted.id),roleCopy=await h.cmd('proposal.duplicate',{id:roleStarted.id,version:1,clientId:beta.id}),roleCopyBefore=(await h.state()).proposals.find(p=>p.id===roleCopy.id)
+    assert.deepEqual(JSON.parse(roleCopyBefore.recipient_plan).map(r=>[r.id,r.email,r.group]),[['client',null,1],['cfo',null,2],['owner',h.auth.OWNER_EMAIL,3]])
+
     assert.deepEqual(JSON.parse(duplicateBefore.section_conditions),{terms:'two'},'EDIT-009 duplicate preserves conditional sections')
     const clientPreview=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=two`,undefined,h.owner);assert.equal(clientPreview.status,200);assert.match(clientPreview.text,/Preview only/)
     await h.cmd('followup.schedule',{id:pending.id,action:'Call Avery about scope',dueDate:'2027-03-10'})
@@ -297,7 +302,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).document,documentFixture(),'EDIT-001 ordered document and brand survive the public CLI archive exactly')
     const completedRestoreSetup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(completedRestoreSetup.status,303)
     const restoredDocumentPage=await h.send('/app/proposal?id='+proposal.id,undefined,restoredOwner);assert.equal(restoredDocumentPage.status,200);assert.match(restoredDocumentPage.text,/Two perspectives/)
-    assert.equal(archived.filter(item=>item.table==='p_personal_templates').length,1,'EDIT-002 personal template snapshot and defaults survive CLI restore')
+    assert.equal(archived.filter(item=>item.table==='p_personal_templates').length,2,'EDIT-002 personal template snapshot and defaults survive CLI restore')
     assert.deepEqual(restoredState.followupActions,actionsBefore,'FOLLOW-002 logged actions survive public CLI restore exactly')
     assert.deepEqual(restoredState.followups.rows.map(({sentAt,...r})=>r),followupsBefore,'FOLLOW-002 open and completed actions survive public CLI restore')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).questions,acceptedThread,'FOLLOW-004 agreement thread survives public CLI restore exactly')
@@ -316,6 +321,11 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.deepEqual(restoredState.proposals.find(p=>p.id===duplicate.id),duplicateBefore,'EDIT-012 copied content, files and delivery configuration survive CLI restore exactly')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===paidSource.id).acceptance,paidBefore.acceptance)
     assert.deepEqual(restoredState.proposals.find(p=>p.id===paidCopy.id),paidCopyBefore,'paid-source destination bindings and inactive delivery settings survive exactly')
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===roleStarted.id),roleSourceBefore,'template role and field snapshot survives exactly')
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===roleCopy.id),roleCopyBefore,'copied slots and preassignment survive without invitation authority')
+    const restoredRoleCopy=await h.cmd('proposal.duplicate',{id:roleCopy.id,version:1,clientId:acme.id},restoredOwner),restoredRole=(await h.state(restoredOwner)).proposals.find(p=>p.id===restoredRoleCopy.id)
+    assert.deepEqual(restoredRole.recipient_plan,roleCopyBefore.recipient_plan);assert.deepEqual(restoredRole.recipientLinks,[]);assert.deepEqual(restoredRole.invitationMessages,[])
+
     assert.deepEqual(restoredState.paymentRecords.filter(p=>p.proposal_id===paidSource.id),paidRecords,'the real source receipt remains with Acme')
     assert.deepEqual(restoredState.paymentRecords.filter(p=>p.proposal_id===paidCopy.id),[])
     assert.equal((await h.send('/api/platter/invoices/'+paidInvoice.id+'.csv',undefined,restoredOwner)).text,paidCsv)

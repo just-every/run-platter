@@ -12,7 +12,7 @@ export function mergeFields(value:any):MergeFields|undefined{
  if(!value)return undefined
  need(value&&typeof value==='object'&&!Array.isArray(value)&&value.patterns&&value.values,'Invalid variable bindings')
  const patterns:Record<string,string>={},values:Record<string,string>={}
- for(const [key,v]of Object.entries(value.patterns)){need(!key.split('/').some(k=>['__proto__','constructor','prototype'].includes(k))&&/^\/(title|scope|terms|optionOne|optionTwo|priceOne|priceTwo|packages|pricingTables|document|recipientPlan)(?:\/[A-Za-z0-9_-]+)*$/.test(key)&&typeof v==='string'&&v.length<=10000&&variableNames(v).length,'Invalid variable field');patterns[key]=v}
+ for(const [key,v]of Object.entries(value.patterns)){need(!key.split('/').some(k=>['__proto__','constructor','prototype','preassignedEmail'].includes(k))&&/^\/(title|scope|terms|optionOne|optionTwo|priceOne|priceTwo|packages|pricingTables|document|recipientPlan)(?:\/[A-Za-z0-9_-]+)*$/.test(key)&&typeof v==='string'&&v.length<=10000&&variableNames(v).length,'Invalid variable field');patterns[key]=v}
  for(const [key,v]of Object.entries(value.values)){need(/^[A-Za-z][A-Za-z0-9_.]{0,99}$/.test(key)&&typeof v==='string'&&v.length<=10000&&!variableNames(v).length,'Use plain text variable values');values[key]=v}
  need(Object.keys(patterns).length<=500,'Use at most 500 variable fields')
  const deal=value.deal;if(deal)need(['hubspot','salesforce','orbit'].includes(deal.provider)&&typeof deal.id==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(deal.id),'Choose a valid linked deal')

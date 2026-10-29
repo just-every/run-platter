@@ -1,3 +1,4 @@
+import { recipientPlan } from '../recipients'
 import { lockChoices } from '../section-locks'
 import { searchTemplates } from '../pipeline'
 import { reminderMessageChoice } from './reminder-messages'
@@ -27,7 +28,8 @@ export function personalTemplates(state: any,query='',params=new URLSearchParams
 
 export function savePersonalTemplate(state: any, p: any): string {
  if (!['owner','admin','manager','sales','content_editor'].includes(state.actor?.role) || p.currency !== 'USD') return ''
- const source = hidden('id', p.id) + hidden('version', p.version)
+ const preassign=state.actor.role==='owner'?hidden('preassignmentsProvided','yes')+recipientPlan(p).filter(r=>r.role==='countersigner'&&r.email===state.actor.email.toLowerCase()).map(r=>'<label><input type="checkbox" name="preassign:'+escape(r.id)+'" value="yes"'+(r.preassignedEmail===r.email?' checked':'')+'>Keep '+escape(r.name)+' preassigned in this template</label>').join(''):''
+ const source = hidden('id', p.id) + hidden('version', p.version)+preassign
  const replace = (state.templates ?? []).filter((t:any)=>!t.shared||resourceEditors.includes(state.actor.role)).map((t: any) => form('template.save', proposalPath(p.id), source
   + hidden('templateId', t.id) + hidden('templateVersion', t.version) + hidden('name', t.name)
   + (t.shared?folderSelect(state,'template',t.folder_id)+'<label><input type="checkbox" name="shareConsent" value="yes">I authorize sharing with the selected folder audience if it widens access.</label>':'')

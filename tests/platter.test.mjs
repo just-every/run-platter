@@ -966,6 +966,7 @@ test('EDIT-012 duplicate accepted content into an independent member-owned draft
  assert.equal((await get(optional.id)).status,'sent');assert.equal((await get(optional.id)).approved_by,null)
  assert.deepEqual((await h.state()).paymentRecords.filter(r=>r.proposal_id===p.id),sourcePayments)
  assert.deepEqual(await artifact('agreement.pdf'),sourcePdf)
+ await (await import('./duplicate-recipients.mjs')).duplicateTemplateRecipients(h,{client,beta,member,actor})
  await h.cmd('proposal.share',{id:p.id,operatorId:actor.id,shared:false})
  const revokedState=await h.state();await h.cmd('proposal.duplicate',{id:p.id,version:before.version,clientId:beta.id},member,403);assert.deepEqual(await h.state(),revokedState,'revoked source access cannot copy content or resurrect authority')
  const key=await h.cmd('agent.create',{label:'Draft only'});assert.equal((await h.send('/api/platter/agent/command',{name:'proposal.duplicate',input:{id:p.id,version:before.version}},'',{authorization:'Bearer '+key.token})).status,403)

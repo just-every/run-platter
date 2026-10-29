@@ -1,7 +1,7 @@
 import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields } from './variables'
 import { proposalFields } from './commands'
-import { recipientPlan } from './recipients'
+import { duplicateRecipients } from './recipients'
 import { paymentTerms } from './payment-terms'
 import { copyDocumentMedia } from './documents/media'
 import { documentOf, bindDocument } from './documents/blocks'
@@ -32,8 +32,10 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
  const sourceOptions = typeof displayed.options === 'string' ? JSON.parse(displayed.options) : displayed.options
  const options=clientId===displayed.client_id?sourceOptions:withoutTaxAddresses(sourceOptions)
  const copiedDocument=bindDocument(displayed.document,clientId)
+ // Destination variables refill content, but recipient mailboxes need fresh assignment.
+ if(copiedDocument.merge)for(const path of Object.keys(copiedDocument.merge.patterns))if(/^\/recipientPlan\/\d+\/(email|preassignedEmail)$/.test(path))delete copiedDocument.merge.patterns[path]
  if(input.title===undefined&&!titleLocked&&copiedDocument.merge?.patterns['/title'])copiedDocument.merge.patterns['/title']+=' (copy)'
- const row = { recipient_plan:recipientPlan(displayed).map((r,i)=>({...r,email:documentOf(displayed).merge?.patterns['/recipientPlan/'+i+'/email']?r.email:null})), document:copiedDocument, id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '', section_conditions: displayed.section_conditions??{},
+ const row = { recipient_plan:duplicateRecipients(source,displayed), document:copiedDocument, id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '', section_conditions: displayed.section_conditions??{},
   payment_terms:paymentTerms(displayed), revision: 1, deposit_bps: displayed.deposit_bps, options, currency: displayed.currency, attachments }
  await commit(db, a, [
   db.prepare(`INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,

@@ -6,13 +6,13 @@ import { permitted } from './permissions'
 import { currentTime } from './expiry-time'
 import { invitationMail } from './invitation-mail'
 
-export type Recipient = {id:string;name:string;email:string|null;role:'signer'|'approver'|'viewer'|'cc'|'countersigner';group:number}
+export type Recipient = {id:string;name:string;email:string|null;role:'signer'|'approver'|'viewer'|'cc'|'countersigner';group:number;preassignedEmail?:string}
 export function recipientPlan(row:any):Recipient[]{return typeof row.recipient_plan==='string'?JSON.parse(row.recipient_plan):row.recipient_plan??[]}
 export const requiredRecipient=(r:Recipient)=>['signer','approver','countersigner'].includes(r.role)
 export async function recipientSignatures(db:D1Database,id:string,revision:number){
  return (await db.prepare('SELECT s.*,v.voided_at,v.reason AS void_reason FROM p_recipient_signatures s LEFT JOIN p_void_signatures v ON v.proposal_id=s.proposal_id AND v.revision=s.revision WHERE s.proposal_id=? AND s.revision=? ORDER BY s.signed_at,s.slot_id').bind(id,revision).all<any>()).results
 }
-export function recipientInput(input:any,a:Actor):Recipient[]{
+export function recipientInput(input:any,a:Actor,previous:Recipient[]=[]):Recipient[]{
  need(Array.isArray(input)&&input.length>0,'Add at least one signer')
  const next:Recipient[]=input.map((r:any)=>{
   need(r&&typeof r==='object','Enter a recipient')
@@ -20,13 +20,38 @@ export function recipientInput(input:any,a:Actor):Recipient[]{
   need(/^[a-zA-Z0-9_-]+$/.test(id),'Use a simple recipient id')
   need(['signer','approver','viewer','cc','countersigner'].includes(r.role),'Choose a recipient role')
   const group=Number(r.group??1);need(Number.isSafeInteger(group)&&group>=1&&group<=10000,'Choose a signing group from 1 to 10000')
-  return {id,name:text(r.name,'a recipient name',200),email:r.email?email(r.email):null,role:r.role,group}
+  const prior=previous.find(old=>old.id===id&&old.role===r.role)
+  return {id,name:text(r.name,'a recipient name',200),email:r.email?email(r.email):null,role:r.role,group,...(prior?.preassignedEmail?{preassignedEmail:prior.preassignedEmail}:{})}
  })
  need(new Set(next.map(r=>r.id)).size===next.length,'Recipient ids must be distinct')
  need(new Set(next.filter(r=>r.email).map(r=>r.email)).size===next.filter(r=>r.email).length,'Each recipient needs their own mailbox')
  need(next.some(r=>r.role==='signer'),'Include a client signer')
  for(const r of next.filter(r=>r.role==='countersigner'&&r.email))need(r.email===a.email.toLowerCase(),'The countersigner must be the current owner',403)
  return next
+}
+
+/** Preassignment is recorded by template saving, never by recipient input. */
+export function templateRecipients(row:any,a:Actor,input:Record<string,unknown>):Recipient[]{
+ const plan=recipientPlan(row),formKeys=Object.keys(input).filter(k=>k.startsWith('preassign:'))
+ const supplied=input.preassignedRecipientIds!==undefined||input.preassignmentsProvided==='yes'||formKeys.length>0
+ const selected=input.preassignedRecipientIds??formKeys.filter(k=>input[k]==='yes').map(k=>k.slice(10))
+ need(Array.isArray(selected)&&selected.every(id=>typeof id==='string'&&plan.some(r=>r.id===id)),'Choose existing template recipient slots')
+ if(supplied&&selected.length)need(a.role==='owner','Only the current owner preassigns a template countersigner',403)
+ return plan.map(r=>{
+  const {preassignedEmail,...slot}=r
+  const assigned=supplied?selected.includes(r.id)?r.email:undefined:preassignedEmail
+  if(assigned)need(r.role==='countersigner'&&(!supplied||assigned===a.email.toLowerCase()),'Only the current owner countersigner can be preassigned',403)
+  return {...slot,email:assigned??null,...(assigned?{preassignedEmail:assigned}:{})}
+ })
+}
+
+/** Role and field snapshots survive; ordinary addresses never authorize a copy. */
+export function duplicateRecipients(source:any,displayed:any):Recipient[]{
+ return recipientPlan(displayed).map(r=>{
+  const assigned=recipientPlan(source).find(old=>old.id===r.id&&old.role===r.role)?.preassignedEmail
+  const {preassignedEmail,...slot}=r
+  return {...slot,email:assigned??null,...(assigned?{preassignedEmail:assigned}:{})}
+ })
 }
 export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  need(a.role==='owner','Only the current owner manages proposal recipients',403)
@@ -77,7 +102,7 @@ export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record
   const id=p.recipientId?text(p.recipientId,'a recipient id',100):crypto.randomUUID()
   input=[...plan.filter(r=>r.id!==id),{id,name:p.recipientName,email:p.recipientEmail,role:p.recipientRole,group:p.recipientGroup}]
  }
- const next=recipientInput(input,a)
+ const next=recipientInput(input,a,plan)
  const revision=row.revision+1,updated={...row,recipient_plan:JSON.stringify(next),revision}
  await commit(db,a,[
   db.prepare("UPDATE p_proposals SET recipient_plan=?,revision=?,version=version+1,status='draft',approved_by=NULL,approved_at=NULL WHERE id=?").bind(JSON.stringify(next),revision,row.id),

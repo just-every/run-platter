@@ -269,6 +269,10 @@
     {
       "id": "0090_client_locale.sql",
       "buyerSteps": "None. Adds owner-selected English or Spanish client language while retaining historical agreement language without inference."
+    },
+    {
+      "id": "0092_document_native_imports.sql",
+      "buyerSteps": "None. Adds reviewed native file move-in provenance and dependency-safe undo; retained originals remain unchanged."
     }
   ],
   "breaking": false,

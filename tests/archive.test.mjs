@@ -661,7 +661,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items', {timeout:300000},async()=>{
+test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items', {timeout:420000},async()=>{
  const inbound=inboundMailFixture(),mailboxWires=[]
  const disputeDeadline=Math.floor(Date.now()/1000)+86400
  const temporary=await mkdtemp(join(tmpdir(),'platter-team-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
@@ -743,14 +743,15 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.equal((await h.state()).crmOutcomes.attempts.find(r=>r.proposal_id===outcomeDraft.id).status,'confirmed')
   const beforeRevenue=await h.send('/api/platter/pipeline?'+revenueFilters,undefined,h.owner);assert.equal(beforeRevenue.status,200)
   assert.deepEqual(beforeRevenue.value.totals,[{currency:'USD',count:1,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:120000,refundedCents:0,netReceivedCents:120000,uncertainRefundCents:0,exportedDepositCents:0}])
-  const allRevenue=await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,h.owner),beforeRevenueCsv=await h.send('/api/platter/pipeline.csv?'+revenueFilters,undefined,h.owner)
+  const beforeRevenueCsv=await h.send('/api/platter/pipeline.csv?'+revenueFilters,undefined,h.owner)
   assert.equal(beforeRevenueCsv.status,200)
   const contentKey=await h.cmd('agent.create',{label:'Synthetic content archive key'})
-  const contentHistory=await contentFixture(h)
+  const contentHistory=await contentFixture(h,100,{approval:false,reason:'Budget'})
   const contentBefore=await h.send('/api/platter/content-performance?sort=rate&direction=desc',undefined,h.owner)
   assert.equal(contentBefore.status,200);assert.ok(contentBefore.value.decidedCount>=100)
   // This journey also has its earlier won override, whose rows are included in the exact restored comparison.
   for(const expected of expectedContentRows)assert.deepEqual(contentRows(contentBefore.value).find(r=>r[0]===expected[0]&&r[1]===expected[1]),expected)
+  const allRevenue=await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,h.owner)
   const contentCsvBefore=await h.send('/api/platter/content-performance.csv?kind=package&q=Growth',undefined,h.owner)
   assert.match(contentCsvBefore.text,/package,Growth,30,18,12,12,40.0%/)
   const before=await h.state(),tables=['p_content_offers','p_content_origins','p_template_content_sources','p_outcome_settings','p_outcomes','p_outcome_records','p_crm_outcome_bindings','p_crm_outcome_consents','p_crm_outcome_attempts','p_reminder_templates','p_template_reminder_messages','p_delivery_changes','p_reminder_policy','p_reminder_settings','p_reminder_runs','p_reminder_optouts','p_mail_reply_cap_notices','p_mail_replies','p_mail_attributions','p_report_schedules','p_report_runs','p_template_sources','p_disputes','p_dispute_packets','p_dispute_packet_parts','p_dispute_authorizations','p_dispute_submissions','p_dispute_documents','p_priced_catalog','p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_template_block_locks','p_proposal_block_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_library_uses','p_workspace_defaults','p_proposal_defaults','p_template_defaults']

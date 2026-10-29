@@ -885,7 +885,7 @@ test('REPORT-003 owner filters content performance, exports matching rows and ma
  let browser,h,context
  try{
   browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
-  h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client'})
+  h=await harness({entry:'dist/server/index.js',assetsDirectory:'./dist/client'})
   await contentFixture(h,2)
   context=await browser.newContext({viewport:{width:1440,height:900}})
   await context.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}])

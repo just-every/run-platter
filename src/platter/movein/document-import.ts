@@ -103,7 +103,7 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    const prepared=await documentSource(await uploaded(db,id),selected,id,reviewedMapping)
    const resources=await nativeDocumentSource(db,actor,movein,prepared.source,prepared.files,prepared.documents,reviewedMapping)
    const drafts=resources.filter(r=>r.kind==='draft').length
-   const report=Object.assign(prepared.report,{resources,arrivedDrafts:drafts,arrivedResources:resources.filter(r=>r.kind!=='draft').reduce((n,r)=>n+(r.count??1),0),held:prepared.report.held-drafts})
+   const report=Object.assign(prepared.report,{resources,arrivedDrafts:drafts,arrivedFolders:resources.filter(r=>r.kind==='folder').length,arrivedResources:resources.filter(r=>!['draft','folder'].includes(r.kind)).reduce((n,r)=>n+(r.count??1),0),held:prepared.report.held-drafts})
    if(resources.length)report.notes=report.notes.filter(n=>!n.startsWith('Open documents are retained'))
    if(Object.keys(reviewedMapping).length)prepared.source.artifacts.push({name:'reviewed-file-destinations.json',sha256:sha256(canonicalJson(reviewedMapping)),size:Buffer.byteLength(canonicalJson(reviewedMapping)),original:{status:'available',base64:Buffer.from(canonicalJson(reviewedMapping)).toString('base64')}})
    const contactEmails=new Set<string>()

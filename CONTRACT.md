@@ -2172,7 +2172,7 @@ Platter is one product. Where the market sells a neighboring product separately,
 
 ## Status
 
-Judged from the code and tests at commit `dd45d0c65c3f8bbb98e228de2850ac082b5d5e1e` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. FOLLOW-010 is a builder completion claim pending guarded landing and ct judgment. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold.
+Judged from the code and tests at commit `0bb17438a04b11f9803d2229893387f0f0fc69fb` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. FOLLOW-010 is a builder completion claim pending guarded landing and ct judgment. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |

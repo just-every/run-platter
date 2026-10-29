@@ -221,6 +221,10 @@
       "sha256": "bb54c08d0020dbd487fa6708a37dc4fd484eec8c48fe1576233959e6b8075d84",
       "executable": false
     },
+    "integrations/hubspot/project/src/app/cards/package-lock.json": {
+      "sha256": "7f62dafecbb83abfed67d241c57d434b5b07f0b996e2d0540114d09f9058095f",
+      "executable": false
+    },
     "integrations/hubspot/project/src/app/cards/package.json": {
       "sha256": "bd3696f1838be04f389cef24133ac3517b6ecbd98c9f50470b007405e6b04cba",
       "executable": false

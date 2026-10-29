@@ -48,6 +48,7 @@ import { expiryCommand, expirySendStatements, currentTime } from './expiry'
 import { pdfCommand } from './documents/client-pdf'
 import { businessCommand } from './business-records'
 import { deliveryCommand } from './delivery'
+import { freezeContentOffer } from './reports/content-performance'
 import { reportCommand } from './reports/schedules'
 import { vendorDocuments } from './attachments'
 import { refreshVendorDocuments } from './attachment-commands'
@@ -197,7 +198,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   writes.push(db.prepare('UPDATE p_proposals SET recipient_plan=? WHERE id=?').bind(row.recipient_plan,id))
   writes.push(db.prepare('UPDATE p_proposals SET section_conditions=?,document=?,payment_terms=? WHERE id=?').bind(JSON.stringify(f.section_conditions),JSON.stringify(f.document),f.payment_terms?JSON.stringify(f.payment_terms):null,id))
   writes.push(db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,?,?,?,?,?)').bind(id,revision,JSON.stringify(snapshot(row)),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency))
-  if(!old)writes.push(...await defaultStatements(db,id))
+  if(!old)writes.push(db.prepare('INSERT INTO p_content_origins(proposal_id,library_known) VALUES(?,1)').bind(id),...await defaultStatements(db,id))
   if(old)writes.push(copyCosts(db,id,costSourceRevision??old.revision,id,revision),...await detachChangedLibraryCopies(db,id,f.document,f.options))
   if(internalCosts)writes.push(...patchCosts(db,id,revision,internalCosts))
   await commit(db,a,writes,false,old?{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))",values:[id,old.version]}:undefined);return{id,revision,version:(old?.version??0)+1}
@@ -211,7 +212,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   if(pending)return negotiationCommand(env,a,name,p,old)
   need(['draft','approved','sent'].includes(old.status),'Only an open proposal can be sent',409);const approval=await approvalPlan(db,old,a);need(approval.complete,'Approve this revision before sending',409);const token=secret(),client=await db.prepare('SELECT c.*,COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(old.id,old.client_id).first<any>(),shareUrl=env.AUTH_ORIGIN+'/p/'+token
   const invitations=await recipientInvitations(env,a,p,old,at)
-  await commit(db,a,[db.prepare("UPDATE p_proposals SET status='sent',version=version+1 WHERE id=?").bind(old.id),...(invitations?invitations.writes:[db.prepare('INSERT INTO p_shares(proposal_id,revision,token) VALUES(?,?,?) ON CONFLICT(proposal_id,slot_id) DO UPDATE SET token=excluded.token,revision=excluded.revision,code_hash=NULL,code_expires=NULL,code_attempts=0,code_generation=0,code_sent_at=NULL,session_hash=NULL,session_expires=NULL').bind(old.id,old.revision,token),...invitationMail(env,a,p,old,client.email,shareUrl,at,smsOnly)]),...await expirySendStatements(db,old.id,a.id,at)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved','sent')) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=? AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))",values:[old.id,old.version,approval.policyVersion,discountDeadline(snapshot(old).options),at]});await dispatchMail(env,old.id);return{shareUrl:invitations?.links[0]?.shareUrl??shareUrl,...(invitations?{recipients:invitations.links}:{})}
+  await commit(db,a,[...(old.status==='sent'?[]:[await freezeContentOffer(db,old)]),db.prepare("UPDATE p_proposals SET status='sent',version=version+1 WHERE id=?").bind(old.id),...(invitations?invitations.writes:[db.prepare('INSERT INTO p_shares(proposal_id,revision,token) VALUES(?,?,?) ON CONFLICT(proposal_id,slot_id) DO UPDATE SET token=excluded.token,revision=excluded.revision,code_hash=NULL,code_expires=NULL,code_attempts=0,code_generation=0,code_sent_at=NULL,session_hash=NULL,session_expires=NULL').bind(old.id,old.revision,token),...invitationMail(env,a,p,old,client.email,shareUrl,at,smsOnly)]),...await expirySendStatements(db,old.id,a.id,at)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved','sent')) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=? AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))",values:[old.id,old.version,approval.policyVersion,discountDeadline(snapshot(old).options),at]});await dispatchMail(env,old.id);return{shareUrl:invitations?.links[0]?.shareUrl??shareUrl,...(invitations?{recipients:invitations.links}:{})}
  }
  fail('Unknown command',404)
 }

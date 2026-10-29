@@ -1,3 +1,4 @@
+import { contentFixture, contentRows, expectedContentRows } from './content-performance-fixture.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { collectionLifecycle, collectionFees, collectionMethodInheritance } from './collection-journey.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
@@ -3663,3 +3664,52 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
  } finally { await h.close() }
  await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
 })
+test('REPORT-003 content performance counts 100 public decisions once with frozen attribution, owner-only exports and email', {timeout:240000},()=>run(async h=>{
+ const fixture=await contentFixture(h)
+ const read=async(query='',cookie=h.owner)=>{const r=await h.send('/api/platter/content-performance'+(query?'?'+query:''),undefined,cookie);assert.equal(r.status,200,r.text);return r.value}
+ const before=await read();assert.equal(before.decidedCount,100);assert.equal(before.unavailableHistory,0);assert.equal(before.unavailableTemplate,0);assert.equal(before.unavailableLibrary,0)
+ assert.deepEqual(contentRows(before),expectedContentRows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))))
+ assert.ok(before.rows.every(r=>r.readingTime===null))
+ const agency=fixture.templates[0],source=await h.cmd('proposal.prepare',{...offer,clientId:fixture.client.id})
+ await h.cmd('template.save',{id:source.id,version:1,templateId:agency.id,templateVersion:1,name:'Renamed agency'})
+ await h.cmd('library.save',{id:fixture.library.id,version:1,title:'Renamed case study',kind:'case_study',content:'Later source content.'})
+ // Edit and send another revision of an already-lost proposal. The old decision remains attributed to its own revision.
+ const lost=fixture.proposals[18],edited=await h.cmd('proposal.negotiate',{...offer,clientId:fixture.client.id,id:lost.id,version:lost.version+3,title:'Later draft',optionOne:'Renamed Growth'})
+ assert.deepEqual(await read(),before)
+ await h.cmd('proposal.approve',{id:edited.id,version:edited.version,revision:edited.revision})
+ await h.cmd('proposal.send',{id:edited.id,version:edited.version+1})
+ assert.deepEqual(await read(),before)
+ const filtered=await read('kind=package&q=Growth&sort=rate&direction=desc');assert.equal(filtered.rows.length,1);assert.equal(filtered.rows[0].rate,'40.0%')
+ const csv=await h.send('/api/platter/content-performance.csv?kind=package&q=Growth&sort=rate&direction=desc',undefined,h.owner)
+ assert.equal(csv.status,200);assert.equal(csv.text,'Type,Name,Offered,Won,Lost,Chosen,Rate,Reading time\r\npackage,Growth,30,18,12,12,40.0%,Unavailable\r\n')
+ for(const query of ['kind=unknown','sort=total','direction=up'])assert.equal((await h.send('/api/platter/content-performance?'+query,undefined,h.owner)).status,400)
+ const people={}
+ for(const role of ['admin','manager','sales','content_editor','viewer','billing']){
+  const address='synthetic-platter-9832-'+role+String.fromCharCode(64)+'example.test'
+  await h.send('/auth/invite',{email:address,displayName:role,role:role==='admin'?'admin':'member',returnTo:'/app'},h.owner)
+  const cookie=await h.signIn(address),person=(await h.state(cookie)).actor
+  if(role!=='admin')await h.cmd('member.set',{operatorId:person.id,version:0,role,teams:[]})
+  people[role]={cookie,email:address}
+  for(const route of ['/api/platter/content-performance','/api/platter/content-performance.csv','/app?view=content-performance'])assert.equal((await h.send(route,undefined,cookie)).status,403,role+' '+route)
+  assert.equal((await h.state(cookie)).contentPerformance,undefined)
+ }
+ const key=await h.cmd('agent.create',{label:'Synthetic content reader'})
+ for(const route of ['/api/platter/content-performance','/api/platter/content-performance.csv'])assert.equal((await h.send(route,undefined,'',{authorization:'Bearer '+key.token})).status,401)
+ assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).value.contentPerformance,undefined)
+ const filters='view=content-performance&kind=package&q=Growth&sort=rate&direction=desc',schedule={filters,cadence:'daily',hour:9,recipients:[h.auth.OWNER_EMAIL]}
+ await h.cmd('report.schedule',schedule,people.admin.cookie,403)
+ await h.cmd('report.schedule',{...schedule,recipients:[people.sales.email]},h.owner,403)
+ const created=await h.cmd('report.schedule',schedule),saved=(await h.state()).reportSchedules.find(s=>s.id===created.id)
+ assert.equal((await h.state(people.admin.cookie)).reportSchedules.some(s=>s.id===created.id),false)
+ const fire=async()=> (await h.mf.getWorker()).scheduled({scheduledTime:new Date(saved.nextRunAt),cron:'*/15 * * * *'})
+ await Promise.all([fire(),fire()]);const outbox=(await h.state()).reportOutbox.filter(m=>m.subject==='Platter content performance report')
+ assert.equal(outbox.length,1);assert.ok(outbox[0].body.includes(csv.text));assert.equal((await h.state(people.admin.cookie)).reportOutbox.some(m=>m.subject==='Platter content performance report'),false)
+ await h.cmd('report.unschedule',{id:created.id},people.admin.cookie,403)
+ // A retained pre-feature decision is explicitly unavailable and is never reconstructed from current content.
+ await h.db.prepare('DELETE FROM p_content_offers WHERE proposal_id=?').bind(fixture.proposals[99].id).run()
+ const historical=await read();assert.equal(historical.decidedCount,100);assert.equal(historical.unavailableHistory,1)
+ assert.equal(historical.rows.find(r=>r.name==='Advisory engagement').offered,29)
+ await h.cmd('client.erase',{id:fixture.client.id,confirmName:'Content fixture client'},h.owner,409)
+ await h.cmd('agent.revoke',{id:key.id});assert.equal((await h.send('/api/platter/content-performance',undefined,'',{authorization:'Bearer '+key.token})).status,401)
+ assert.deepEqual((await read()).rows,historical.rows)
+}))

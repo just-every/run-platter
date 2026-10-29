@@ -1,4 +1,5 @@
 // SMS assent and suppression are business history; invitation and sender authority stay local.
+// Frozen content offers, origins and template provenance are business records and archive by default.
 // Auth identities retain approval authors. Credentials, invitations and messages stay local.
 export default {
  product: 'proposals/platter',

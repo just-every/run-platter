@@ -146,7 +146,7 @@
       "executable": false
     },
     "docs/MOVE-IN.md": {
-      "sha256": "e2f031f40463bf1b88918d1df1e22f6efab602a9ca348dd9fa11656c056b091c",
+      "sha256": "126f3387a39d6968736149bb9b2e9ee628baef828f277fb315b75e819ee11ab5",
       "executable": false
     },
     "docs/notifications.md": {
@@ -3594,7 +3594,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "91836f8996f77c88101991f7ae2b09093b1923fed95f2fe7623d311524cd4224",
+      "sha256": "7b440ae8a538991ae1c176a16467f54b1685a32a4271f39941e130af8e3caf73",
       "executable": false
     },
     "tests/site.test.mjs": {

@@ -2682,7 +2682,7 @@
       "executable": false
     },
     "src/platter/handoff/jobs.ts": {
-      "sha256": "e42263d7296d54f3e00449d55e9425cbd28c7375829cb66e290ce6db688e6f47",
+      "sha256": "aa59123c9f4cb2ef62f175727f8fd31008d946b0357e56c5fde3b813374c002d",
       "executable": false
     },
     "src/platter/history.ts": {
@@ -3530,7 +3530,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "d81c795842d0ea53e2dbea9c6431c684d10fcd84002c73592f0d40ae4c0b71d3",
+      "sha256": "a0a4c1922528d6efd8bb31f7b43d91ecbcb1cae0a0a4d707fb34db9e620e8a56",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

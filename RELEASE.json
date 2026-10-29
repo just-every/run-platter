@@ -269,6 +269,14 @@
     {
       "id": "0090_client_locale.sql",
       "buyerSteps": "None. Adds owner-selected English or Spanish client language while retaining historical agreement language without inference."
+    },
+    {
+      "id": "0096_asana_handoff.sql",
+      "buyerSteps": "None for existing agreements. Owner or admin must connect and explicitly authorize a verified Asana account, workspace and destination team before future collection-off accepted scope is handed off; historical agreements are not backfilled."
+    },
+    {
+      "id": "0097_handoff_uploads.sql",
+      "buyerSteps": "Existing handoff grants remain mailbox-verified only. Separately opt in to future owner-recorded signed uploads with collection off; restored archives carry no execution authority."
     }
   ],
   "breaking": false,

@@ -3776,5 +3776,14 @@ test('HAND-001 Asana handoff uses immutable selected scope once and holds uncert
   await h.cmd('handoff.configure',{...handoffSettings,version:5,connectionVersion:3,includeUploads:true})
   const afterFreshGrant=fake.calls.length;await tick();assert.equal(fake.calls.length,afterFreshGrant)
   assert.equal((await read()).jobs.find(j=>j.proposal_id===revokedUpload.proposal.id).status,'held','a new grant never reactivates a revoked signed upload')
+  // Both saved collection policies stay outside this explicitly collection-off handoff.
+  for(const completion of ['required','due'])for(const method of ['mailbox','upload']){
+   const unsupported=await completeHandoffAgreement(h,'Collection '+completion+' '+method,signed.client.id,false,completion)
+   if(method==='upload')await recordHandoffUpload(h,unsupported)
+   else assert.equal((await h.send(unsupported.path+'/action?name=accept',unsupported.input,unsupported.cookie)).status,200)
+   const beforeUnsupportedCalls=fake.calls.length;await tick()
+   assert.equal(fake.calls.length,beforeUnsupportedCalls,'collection-enabled '+method+' must not trigger a handoff')
+   assert.ok(!(await read()).jobs.some(j=>j.proposal_id===unsupported.proposal.id))
+  }
  }finally{await h.close()}
 })

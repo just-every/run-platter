@@ -25,6 +25,7 @@ export function handoffCompletion(db:D1Database,id:string){return [
  AND ((paper.proposal_id IS NULL AND f.method='mailbox code') OR (paper.proposal_id IS NOT NULL AND s.include_uploads=1))
  AND json_array_length(COALESCE(json_extract(a.snapshot,'$.recipient_plan'),'[]'))=0
  AND COALESCE(json_extract(a.snapshot,'$.collectionPolicy.enabled'),0)=0
+ AND NOT EXISTS(SELECT 1 FROM p_collection_policy policy WHERE policy.proposal_id=a.proposal_id)
  AND EXISTS(SELECT 1 FROM (${live}) eligible WHERE eligible.version=s.version)
  ON CONFLICT DO NOTHING`).bind(id),
  db.prepare('INSERT INTO p_handoff_job_authority SELECT proposal_id FROM p_handoff_jobs WHERE proposal_id=? ON CONFLICT DO NOTHING').bind(id)
@@ -62,7 +63,7 @@ export async function handoffCommand(env:Bindings,a:Actor,name:string,p:Record<s
 async function execution(env:Bindings,job:any){
  const config=await env.DB.prepare(live).first<any>()
  need(config&&config.version===job.settings_version&&config.account_id===job.account_id&&config.workspace_id===job.workspace_id&&config.team_id===job.team_id,'Handoff authority or connection changed. Fresh authorization applies only to future completions.',409)
- need(await env.DB.prepare("SELECT 1 FROM p_handoff_job_authority g JOIN p_handoff_jobs j ON j.proposal_id=g.proposal_id JOIN p_acceptances a ON a.proposal_id=j.proposal_id JOIN p_proposals p ON p.id=a.proposal_id JOIN p_clients c ON c.id=p.client_id WHERE j.proposal_id=? AND j.status='running' AND a.revision=? AND p.status='accepted'").bind(job.proposal_id,job.revision).first(),'This handoff has no current completion authority. Restored history never executes.',409)
+ need(await env.DB.prepare("SELECT 1 FROM p_handoff_job_authority g JOIN p_handoff_jobs j ON j.proposal_id=g.proposal_id JOIN p_acceptances a ON a.proposal_id=j.proposal_id JOIN p_proposals p ON p.id=a.proposal_id JOIN p_clients c ON c.id=p.client_id WHERE j.proposal_id=? AND j.status='running' AND a.revision=? AND p.status='accepted' AND NOT EXISTS(SELECT 1 FROM p_collection_policy policy WHERE policy.proposal_id=j.proposal_id)").bind(job.proposal_id,job.revision).first(),'This handoff has no current completion authority. Collection-enabled agreements and restored history never execute.',409)
  // Keep a progressing handoff live even when a large selected scope takes several minutes.
  need(await env.DB.prepare("UPDATE p_handoff_jobs SET started_at=? WHERE proposal_id=? AND status='running' RETURNING proposal_id").bind(Date.now(),job.proposal_id).first(),'Handoff execution is no longer active',409)
  const credential=await providerCredential(env,'workspace:asana')

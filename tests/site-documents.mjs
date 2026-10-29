@@ -336,7 +336,7 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
  let app,browser
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
    const inbound=inboundMailFixture(),edge=await browserEdge(),mailCalls=[],disputeStatuses=new Map(),disputeUploads=[],disputeDeadline=Math.floor(Date.now()/1000)+86400
@@ -418,6 +418,27 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
 
 
     const simple=await command(sales,'template.start',{id:'starter:consultancy',version:1,clientId:client.id});await command(sales,'proposal.document',{id:simple.id,version:1,document:{version:1,blocks:[{id:'warranty',type:'columns',title:'Warranty',text:'Our warranty',second:'Warranty limitations'},{id:'legal',type:'terms',title:'Legal terms',text:'Written approval required'},{id:'notes',type:'text',title:'Notes',text:'Editable notes'}]}});await page.goto(app.origin+'/app/proposal?id='+simple.id);assert.equal(await page.getByRole('button',{name:'Send proposal',exact:true}).count(),1);assert.equal(await page.getByRole('button',{name:'Approve this revision',exact:true}).count(),0);await capture(page,'sales-unruled');await page.getByRole('button',{name:'Send proposal',exact:true}).click();assert.equal((await state(sales)).proposals.find(p=>p.id===simple.id).status,'sent')
+    const approvalPages={owner:op,admin:settingsPage,manager:review},approvalContexts={owner,admin,manager}
+    for(const defaultRole of ['owner','admin','manager']){
+     await op.goto(app.origin+'/app/approvals')
+     await op.getByLabel('Require approval for every proposal').selectOption('yes');await op.getByLabel('Default approver',{exact:true}).selectOption(defaultRole);await op.getByRole('button',{name:'Save approval policy',exact:true}).click()
+     if(width===1440){const saved=(await state()).approvalSettings.policy;assert.equal(saved.required,1);assert.equal(saved.default_role,defaultRole);assert.equal(await op.getByRole('alert').count(),0)}
+     await capture(op,'approval-default-'+defaultRole)
+     const draft=await command(sales,'proposal.prepare',{clientId:client.id,title:'Default '+defaultRole+' decision',scope:'Ordinary single-client delivery',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'3000'}]})
+     await page.goto(app.origin+'/app/proposal?id='+draft.id)
+     if(width===1440){assert.equal(await page.getByRole('button',{name:'Send approved proposal',exact:true}).count(),0);await command(sales,'proposal.send',{id:draft.id,version:1},409)}
+     const approverPage=approvalPages[defaultRole];await approverPage.goto(app.origin+'/app/proposal?id='+draft.id)
+     await capture(approverPage,'approval-waiting-'+defaultRole)
+     await approverPage.getByRole('button',{name:'Approve this revision',exact:true}).click()
+     if(width===1440){const approved=(await state(approvalContexts[defaultRole])).proposals.find(p=>p.id===draft.id);assert.equal(approved.approval.complete,true);assert.equal(approved.approval.steps[0].decisions[0].actor_id,(await state(approvalContexts[defaultRole])).actor.id)}
+     await page.reload();await page.getByRole('button',{name:'Send approved proposal',exact:true}).click()
+     if(width===1440)assert.equal((await state(sales)).proposals.find(p=>p.id===draft.id).status,'sent')
+     await capture(page,'approval-sent-'+defaultRole)
+    }
+    await settingsPage.goto(app.origin+'/app/approvals')
+    await settingsPage.getByLabel('Require approval for every proposal').selectOption('no');await settingsPage.getByRole('button',{name:'Save approval policy',exact:true}).click()
+    if(width===1440){const saved=(await state()).approvalSettings.policy;assert.equal(saved.required,0);assert.equal(saved.default_role,'manager');assert.equal(await settingsPage.getByRole('alert').count(),0)}
+    await capture(settingsPage,'admin-approval-policy')
     await op.goto(app.origin+'/app/team');const folderForm=op.locator('form').filter({has:op.getByRole('button',{name:'Create shared folder',exact:true})});await folderForm.getByLabel('Folder name',{exact:true}).fill('East templates');await folderForm.getByRole('checkbox',{name:'East team',exact:true}).check();await folderForm.getByRole('checkbox',{name:'I authorize this folder’s visibility for its contents.',exact:true}).check();await folderForm.getByRole('button').click();assert.equal(await op.getByRole('alert').count(),0);const folder=(await state(owner)).resourceFolders.find(f=>f.name==='East templates');await capture(op,'team-folders')
     await review.goto(app.origin+'/app/team');const inviteForm=review.locator('form').filter({has:review.getByRole('button',{name:'Send member invitation',exact:true})});await inviteForm.getByLabel('New member name',{exact:true}).fill('New salesperson');await inviteForm.getByLabel('New member email',{exact:true}).fill('delegated@synthetic-platter.example');await inviteForm.getByLabel('New member role',{exact:true}).selectOption('sales');await inviteForm.getByRole('checkbox',{name:'East team',exact:true}).check();await inviteForm.getByRole('button').click();assert.equal(await review.getByRole('alert').count(),0);await capture(review,'manager-invitation');const delegatedMail=mailCalls.findLast(m=>m.to.includes('delegated@synthetic-platter.example')),delegatedToken=new URL(delegatedMail.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get('token');const admission=await post(newMember,'/auth/confirm',{token:delegatedToken});assert.equal(admission.status(),303,await admission.text());const joined=await state(newMember);assert.equal(joined.actor.role,'sales');assert.deepEqual(joined.teams.map(t=>t.id),[team.id]);const joinedPage=await newMember.newPage();await joinedPage.goto(app.origin+'/app/team');await capture(joinedPage,'invited-sales-member')
     await command(owner,'proposal.share',{id:simple.id,operatorId:ep.id});await editorPage.goto(app.origin+'/app/proposal?id='+simple.id);const sharedForm=editorPage.locator('form').filter({has:editorPage.getByRole('button',{name:'Save shared template',exact:true})});await sharedForm.getByLabel('Shared template name',{exact:true}).fill('Shared legal');await sharedForm.getByLabel('Resource folder',{exact:true}).selectOption(folder.id);await sharedForm.getByRole('checkbox').check();await sharedForm.getByRole('button').click();assert.equal(await editorPage.getByRole('alert').count(),0)

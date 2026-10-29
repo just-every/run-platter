@@ -670,7 +670,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
   h=await harness({root:source,origin:'https://platter.example',assetsDirectory:'public',auth:{...inbound.settings,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5600',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5601',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5602'},outboundService:async request=>{const url=new URL(request.url);if(url.hostname==='oauth2.googleapis.com')return Response.json({access_token:'synthetic-platter-5603',refresh_token:'synthetic-platter-5604',scope:'openid email https://www.googleapis.com/auth/gmail.send'});if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-5605',email:'archive-mailbox@synthetic-platter.example',email_verified:true});if(url.hostname==='gmail.googleapis.com'){mailboxWires.push(Buffer.from((await request.json()).raw,'base64url').toString('utf8'));return Response.json({id:'synthetic-platter-'+(8000+mailboxWires.length)})}if(url.hostname==='api.resend.com'&&request.method==='GET')return Response.json(inbound.messages.get(url.pathname.split('/').at(-1)));if(url.hostname==='api.resend.com')return Response.json({id:'synthetic-platter-5607'});if(url.hostname==='files.stripe.com'){const upload=await request.formData();assert.equal(upload.get('purpose'),'dispute_evidence');return Response.json({id:'synthetic-platter-3700'})}if(url.hostname==='api.hubapi.com'){if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-4120'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9961',stages:[{id:'synthetic-platter-9962',metadata:{isClosed:'true',probability:'1'}},{id:'synthetic-platter-9963',metadata:{isClosed:'true',probability:'0'}}]}]});const id=url.pathname.split('/').at(-1);return Response.json({id,properties:request.method==='PATCH'?(await request.json()).properties:{pipeline:'synthetic-platter-9961'}})};if(url.hostname==='quickbooks.api.intuit.com')return Response.json({CompanyInfo:{CompanyName:'Synthetic company'}});assert.equal(url.hostname,'api.stripe.com');if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2800'});if(url.pathname.includes('/disputes/')){const id=url.pathname.split('/').at(-1);if(request.method==='POST')return Response.json({id,status:'under_review'});const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id,charge:'synthetic-platter-2801',amount:accepted.deposit_cents,currency:accepted.currency.toLowerCase(),status:'needs_response',evidence_details:{due_by:disputeDeadline}})}if(request.method==='GET'){const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id:'synthetic-platter-2801',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:0,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}})}const amount=Number(new URLSearchParams(await request.text()).get('amount'));return Response.json({id:'synthetic-platter-2802',charge:'synthetic-platter-2801',amount,status:'succeeded'})}})
   const people={}
-  for(const role of ['sales','manager','other']){
+  for(const role of ['sales','manager','other','admin']){
    const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)
    const cookie=await h.signIn(email);people[role]={cookie,...(await h.state(cookie)).actor}
   }
@@ -679,10 +679,39 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   await h.cmd('workspace.defaults',{version:0,reminderDays:[2,5],expiryDays:30,paymentMethods:['card']})
   const team=await h.cmd('team.create',{name:'Archive team'})
   for(const role of ['sales','manager'])await h.cmd('member.set',{operatorId:people[role].id,version:0,role,teams:[team.id]})
+  await h.cmd('member.set',{operatorId:people.admin.id,version:0,role:'admin',teams:[]})
   await h.cmd('member.zone',{timeZone:'America/New_York'},people.sales.cookie)
   await h.cmd('approval.policy',{version:0,required:false,defaultRole:'manager'})
   await h.cmd('approval.rule',{version:1,name:'High value manager',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager']})
   const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
+  const nativeApprovals=[],policyAudit=async(cookie=h.owner)=>{const r=await h.send('/api/platter/audit?action=approval.policy',undefined,cookie);assert.equal(r.status,200);return r.value.rows}
+  const setPolicy=async(required,defaultRole,cookie=h.owner)=>{
+   const prior=(await h.state()).approvalSettings
+   await h.cmd('approval.policy',{version:prior.policy.version,required,defaultRole},cookie)
+   assert.deepEqual((await h.state()).approvalSettings,{policy:{singleton:1,required:required?1:0,default_role:defaultRole,version:prior.policy.version+1},rules:prior.rules})
+  }
+  const nativeOffer={clientId:client.id,scope:'Ordinary single-client delivery',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'3000'}]}
+  const unruled=await h.cmd('proposal.prepare',{...nativeOffer,title:'Unruled archive offer'},people.sales.cookie)
+  await h.cmd('proposal.send',{id:unruled.id,version:1},people.sales.cookie)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_approvals WHERE proposal_id=?').bind(unruled.id).first()).n,0)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_approval_decisions WHERE proposal_id=?').bind(unruled.id).first()).n,0)
+  for(const defaultRole of ['owner','admin','manager']){
+   await setPolicy(true,defaultRole)
+   await setPolicy(false,defaultRole,people.admin.cookie);await setPolicy(true,defaultRole,people.admin.cookie)
+   const draft=await h.cmd('proposal.prepare',{...nativeOffer,title:'Archived '+defaultRole+' decision'},people.sales.cookie)
+   const cookie=defaultRole==='owner'?h.owner:people[defaultRole].cookie
+   await h.cmd('proposal.approve',{id:draft.id,version:1,revision:1},cookie)
+   const approved=(await h.state()).proposals.find(r=>r.id===draft.id),decision=approved.approval.steps[0].decisions[0]
+   assert.deepEqual(approved.approval.steps[0].approvers,['role:'+defaultRole])
+   assert.equal(decision.actor_id,defaultRole==='owner'?(await h.state()).actor.id:people[defaultRole].id)
+   assert.equal(decision.plan,approved.approval.plan);assert.equal(decision.decision,'approved');assert.equal(decision.revision,1)
+   await h.cmd('proposal.send',{id:draft.id,version:2},people.sales.cookie)
+   nativeApprovals.push({id:draft.id,decision})
+  }
+  await setPolicy(false,'manager')
+  const nativePolicyAudit=await policyAudit()
+  assert.equal(nativePolicyAudit.filter(r=>r.actor_id===people.admin.id&&r.actor_role==='admin').length,6)
+  assert.ok(nativePolicyAudit.every(r=>r.occurred_at>0))
   const p=await h.cmd('proposal.prepare',{clientId:client.id,document:documentFixture(),title:'Archive routed offer',scope:'An audited scope',optionOne:'First',priceOne:'28000',optionTwo:'Second',priceTwo:'30000',depositPercent:'25',pricingTables:[{optionId:'one',name:'Services',lines:[{name:'Delivery',description:'Public scope',unit:'project',quantity:'1',unitPrice:'28000'}]}]},people.sales.cookie)
   await h.cmd('proposal.share',{id:p.id,operatorId:people.other.id},people.sales.cookie)
   const line=(await h.state()).proposals.find(r=>r.id===p.id).internalPricing.lines[0];await h.cmd('pricing.cost',{id:p.id,version:1,lineKey:line.key,unitCost:'7000'},people.manager.cookie)
@@ -744,7 +773,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.deepEqual(beforeRevenue.value.totals,[{currency:'USD',count:1,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:120000,refundedCents:0,netReceivedCents:120000,uncertainRefundCents:0,exportedDepositCents:0}])
   const allRevenue=await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,h.owner),beforeRevenueCsv=await h.send('/api/platter/pipeline.csv?'+revenueFilters,undefined,h.owner)
   assert.equal(beforeRevenueCsv.status,200)
-  const before=await h.state(),tables=['p_outcome_settings','p_outcomes','p_outcome_records','p_crm_outcome_bindings','p_crm_outcome_consents','p_crm_outcome_attempts','p_reminder_templates','p_template_reminder_messages','p_delivery_changes','p_reminder_policy','p_reminder_settings','p_reminder_runs','p_reminder_optouts','p_mail_reply_cap_notices','p_mail_replies','p_mail_attributions','p_report_schedules','p_report_runs','p_template_sources','p_disputes','p_dispute_packets','p_dispute_packet_parts','p_dispute_authorizations','p_dispute_submissions','p_dispute_documents','p_priced_catalog','p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_template_block_locks','p_proposal_block_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_library_uses','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
+  const before=await h.state(),tables=['p_audit','p_approvals','p_outcome_settings','p_outcomes','p_outcome_records','p_crm_outcome_bindings','p_crm_outcome_consents','p_crm_outcome_attempts','p_reminder_templates','p_template_reminder_messages','p_delivery_changes','p_reminder_policy','p_reminder_settings','p_reminder_runs','p_reminder_optouts','p_mail_reply_cap_notices','p_mail_replies','p_mail_attributions','p_report_schedules','p_report_runs','p_template_sources','p_disputes','p_dispute_packets','p_dispute_packet_parts','p_dispute_authorizations','p_dispute_submissions','p_dispute_documents','p_priced_catalog','p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_template_block_locks','p_proposal_block_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_library_uses','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
   const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
   await h.close();h=undefined
@@ -753,6 +782,15 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   h=await harness({root:restored,unclaimed:true,outboundService:async request=>{restoredCalls.push(new URL(request.url).hostname);throw new Error('Restore must not call a provider')}})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_member_invitations').first()).n,0,'pending delegated authority is excluded from archives');assert.equal((await h.db.prepare('SELECT status FROM oa_operators WHERE email=?').bind('unjoined@synthetic-platter.example').first()).status,'invited');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_connection_secrets').first()).n,0);assert.ok(after.connections.every(c=>c.status==='needs_reconnection'));assert.deepEqual(after.paymentRecords,before.paymentRecords);assert.equal((await h.cmd('payment.refund',refund,owner)).status,'succeeded','restored historical refund retries never issue another provider call');assert.doesNotMatch(JSON.stringify(after),/synthetic-platter-(2301|4121|2803|2804)/);assert.equal(after.connections.find(c=>c.provider==='hubspot').status,'needs_reconnection')
+  assert.deepEqual(await policyAudit(owner),nativePolicyAudit,'policy changes retain exact actors and times through the CLI archive')
+  const unruledAfter=after.proposals.find(r=>r.id===unruled.id)
+  assert.equal(unruledAfter.status,'sent');assert.equal(unruledAfter.approved_by,null)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_approval_decisions WHERE proposal_id=?').bind(unruled.id).first()).n,0)
+  for(const retained of nativeApprovals){
+   const row=after.proposals.find(r=>r.id===retained.id)
+   assert.equal(row.status,'sent');assert.equal(row.approved_by,before.proposals.find(r=>r.id===retained.id).approved_by)
+   assert.deepEqual(await h.db.prepare('SELECT * FROM p_approval_decisions WHERE id=?').bind(retained.decision.id).first(),retained.decision,'restore preserves the exact original decision instead of fabricating a new approval')
+  }
   assert.deepEqual(after.outcomeSettings,before.outcomeSettings);assert.deepEqual(after.proposals.find(r=>r.id===outcomeDraft.id).outcomes,before.proposals.find(r=>r.id===outcomeDraft.id).outcomes)
   assert.equal(after.proposals.find(r=>r.id===outcomeDraft.id).pipelineStatus,'won');assert.equal(after.proposals.find(r=>r.id===outcomeDraft.id).acceptance,undefined)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_crm_outcome_authority').first()).n,0);assert.ok(after.crmOutcomes.bindings.every(b=>b.authorized===0));assert.deepEqual(after.crmOutcomes.attempts,before.crmOutcomes.attempts)

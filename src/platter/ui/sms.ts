@@ -7,7 +7,7 @@ export function smsPanel(p:any){
  const sms=p.sms,path=proposalPath(p.id),identity=hidden('id',p.id)+hidden('version',p.version)
  const current=sms.assents.find((a:any)=>a.id===sms.activeAssentId)
  let html='<p>'+escape(sms.suppression?'This number is suppressed for every SMS purpose. START and sender edits cannot reactivate it.':sms.authorized?'SMS is authorized for the recorded purposes on this invitation.':'SMS is inactive. Record complete recipient assent and explicitly authorize this invitation before sending.')+'</p>'
- html+='<p>SMS assent does not approve the offer or consent to electronic signatures. A new invitation, a changed revision or a restore needs fresh authorization. Quiet hours use the supplied recipient time zone.</p>'
+ html+='<p>SMS assent does not approve the offer or consent to electronic signatures. A new invitation, a changed revision or a restore needs fresh authorization. Quiet hours use the supplied recipient time zone. Completion texts are sent once after the agreement and any required deposit are complete, only when that purpose was permitted.</p>'
  html+='<h3>Recorded assent</h3>'+(sms.assents.length?sms.assents.map((a:any)=>'<details><summary>'+escape(a.firm)+' · '+escape(a.phone)+' · revision '+escape(a.revision)+(a.id===current?.id?' · active':' · history')+'</summary><dl><dt>Recipient</dt><dd>'+escape(a.recipient)+'</dd><dt>Permitted purposes</dt><dd>'+escape(JSON.parse(a.purposes).join(', '))+'</dd><dt>Disclosure shown</dt><dd class="preserve">'+escape(a.disclosure)+'</dd><dt>Assented at</dt><dd>'+date(a.assented_at)+'</dd><dt>Collection method</dt><dd>'+escape(a.method)+'</dd><dt>Recipient evidence</dt><dd class="preserve">'+escape(a.evidence)+'</dd><dt>Recipient time zone</dt><dd>'+escape(a.time_zone)+'</dd><dt>Recorded at</dt><dd>'+date(a.recorded_at)+'</dd></dl></details>').join(''):'<p>No complete recipient assent has been recorded.</p>')
  html+=sms.revocations.map((r:any)=>'<p>SMS authorization revoked '+date(r.revoked_at)+'.</p>').join('')
  if(sms.assents.length||sms.consent)html+=form('sms.revoke',path,identity+'<button class="secondary">Revoke SMS authorization</button>')
@@ -16,7 +16,7 @@ export function smsPanel(p:any){
    +field('Assenting recipient','recipient',p.clientEmail,'required maxlength="254"')
    +field('US mobile number','phone','','required type="tel" autocomplete="tel" maxlength="40"')
    +field('Sending firm','firm','','required maxlength="200"')
-   +'<fieldset><legend>Purposes permitted by the recipient</legend>'+[['invitation','Proposal invitations'],['reminder','Proposal reminders'],['identity','Identity verification codes']].map(([value,label])=>'<label><input type="checkbox" name="purpose:'+value+'" value="yes">'+label+'</label>').join('')+'</fieldset>'
+   +'<fieldset><legend>Purposes permitted by the recipient</legend>'+[['invitation','Proposal invitations'],['reminder','Proposal reminders'],['identity','Identity verification codes'],['completion','Agreement completion notices']].map(([value,label])=>'<label><input type="checkbox" name="purpose:'+value+'" value="yes">'+label+'</label>').join('')+'</fieldset>'
    +area('Exact disclosure shown','disclosure',sms.disclosure,'required maxlength="4000"')
    +field('Recipient assent time with UTC offset','assentedAt','','required placeholder="2026-10-29T10:00:00Z"')
    +field('Assent collection method','method','','required maxlength="200"')

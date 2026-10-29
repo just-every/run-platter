@@ -9,13 +9,15 @@ import { permitted, senders } from './permissions'
 import { reminderPolicy } from './reminders'
 import { afterQuietHours, reminderSlots } from './reminder-schedule'
 import { validZone } from './reports/zone'
+import { completionSmsReadySql, queueCompletionSms } from './sms-completion'
 
 const audit=(db:D1Database,a:Actor,action:string,id:string,at:number)=>db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),a.id,a.role,action,id,at)
 
-type Purpose = 'invitation'|'reminder'|'identity'
-const purposes:Purpose[]=['invitation','reminder','identity']
+type Purpose = 'invitation'|'reminder'|'identity'|'completion'
+const purposes:Purpose[]=['invitation','reminder','identity','completion']
 export const smsDisclosure='I agree to receive the selected proposal texts from the named firm at my US mobile number. Message and data rates may apply. Reply STOP to stop all texts or HELP for help. SMS assent does not consent to electronic signatures.'
-const purposeFor=(kind:string):Purpose=>kind==='invitation'?'invitation':'reminder'
+const purposeFor=(kind:string):Purpose=>kind==='completion'?'completion':kind==='invitation'?'invitation':'reminder'
+const isReminder=(kind:string)=>kind==='manual'||kind==='scheduled'
 function withoutInvitation(value:string,token:string){need(!value.toLowerCase().includes(token.toLowerCase())&&!/\/p\/[a-f0-9]{64}\b/i.test(value),'Keep invitation credentials out of SMS business history')}
 function phoneNumber(value:unknown){
  const input=text(value,'a US mobile number',40)
@@ -33,6 +35,7 @@ export async function smsContext(env:Bindings,id:string,purpose:Purpose,complete
  const recipient=await db.prepare('SELECT email FROM p_clients WHERE id=?').bind(row.client_id).first<any>()
  need((row.status==='sent'||completed&&row.status==='accepted')&&row.revision===c.revision&&!(await expiryFor(db,row,at)).expired&&share&&share.revision===row.revision&&await hash(share.token)===c.share_hash&&c.recipient===(share.recipient||recipient?.email),'SMS invitation is no longer current',409)
  need(!await db.prepare('SELECT 1 FROM p_sms_optouts WHERE phone=?').bind(c.phone).first(),'This number is suppressed for all SMS',409)
+ if(purpose==='completion')need(await db.prepare(`SELECT 1 FROM p_proposals p JOIN p_sms_authority a ON a.proposal_id=p.id WHERE p.id=? AND ${completionSmsReadySql()}`).bind(id).first(),'The agreement is not ready for its authorized completion text',409)
  return {a,c,row,share,at,purpose,completed}
 }
 export function smsGuard(ctx:Awaited<ReturnType<typeof smsContext>>){
@@ -52,10 +55,11 @@ export function smsGuard(ctx:Awaited<ReturnType<typeof smsContext>>){
    AND NOT EXISTS(SELECT 1 FROM p_sms_optouts o WHERE o.phone=c.phone)
    ${completed?'':'AND NOT EXISTS(SELECT 1 FROM p_acceptances x WHERE x.proposal_id=p.id)'}
    AND NOT EXISTS(SELECT 1 FROM p_withdrawals w WHERE w.proposal_id=p.id AND w.revision=p.revision)
+   ${purpose==='completion'?'AND '+completionSmsReadySql():''}
    AND (${completed?"p.status='accepted' OR ":''}${expiryOpenSql('p')}))`,values:[row.id,row.revision,share.token,c.phone,c.time_zone,c.consented_at,a.id,c.share_hash,c.member_version,c.assent_id,c.operator_version,purpose,at]}
 }
 
-const live=(env:Bindings,id:string,kind='invitation')=>smsContext(env,id,purposeFor(kind))
+const live=(env:Bindings,id:string,kind='invitation')=>smsContext(env,id,purposeFor(kind),kind==='completion')
 function clearVerification(db:D1Database,id:string){return db.prepare("UPDATE p_shares SET code_hash=NULL,session_hash=NULL,session_expires=NULL WHERE proposal_id=? AND (code_method='SMS code' OR session_method='SMS code')").bind(id)}
 async function suppress(env:Bindings,phone:string,source:string){
  const db=env.DB,at=await currentTime(db)
@@ -101,11 +105,11 @@ export async function smsCommand(env:Bindings,a:Actor,name:string,p:Record<strin
  if(prior){need(prior.proposal_id===row.id&&prior.revision===row.revision&&prior.actor_id===a.id&&prior.kind===kind&&prior.message===message,'SMS request id was already used',409);return {id:row.id,smsId:prior.id,replayed:true}}
  const slot=kind==='manual'?localDate(at,context.c.time_zone):crypto.randomUUID()
  if(kind==='manual')need(!await db.prepare("SELECT 1 FROM p_sms_runs WHERE proposal_id=? AND phone=? AND kind='manual' AND slot=?").bind(row.id,context.c.phone,slot).first(),'One manual SMS reminder per recipient calendar day is allowed',429)
- const id=await enqueue(env,context,kind,slot,message,requestId)
+ const id=await enqueueSms(env,context,kind,slot,message,requestId)
  await flushSms(env)
  return {id:row.id,smsId:id}
 }
-async function enqueue(env:Bindings,ctx:Awaited<ReturnType<typeof live>>,kind:string,slot:string,message:string,requestId:string,extra?:{sql:string;values:any[];settingsVersion?:number}){
+export async function enqueueSms(env:Bindings,ctx:Awaited<ReturnType<typeof live>>,kind:string,slot:string,message:string,requestId:string,extra?:{sql:string;values:any[];settingsVersion?:number}){
  const {a,c,row,at}=ctx,db=env.DB,id=crypto.randomUUID(),due=afterQuietHours(at,c.time_zone,await reminderPolicy(db))
  const guard=smsGuard(ctx)
  await commit(db,a,[db.prepare('INSERT INTO p_sms_runs(id,proposal_id,revision,phone,time_zone,actor_id,kind,slot,settings_version,message,queued_at,due_at,status,request_id,assent_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,\'queued\',?,?)').bind(id,row.id,row.revision,c.phone,c.time_zone,a.id,kind,slot,extra?.settingsVersion??null,message,at,due,requestId,c.assent_id),audit(db,a,'sms.'+kind,row.id,at)],false,{sql:guard.sql+(extra?' AND '+extra.sql:''),values:[...guard.values,...(extra?.values??[])]})
@@ -119,7 +123,7 @@ export async function smsState(env:Bindings,a:Actor,id:string){
  const suppression=consent?await db.prepare('SELECT * FROM p_sms_optouts WHERE phone=?').bind(consent.phone).first():null
  const authorization=await db.prepare('SELECT assent_id FROM p_sms_authority WHERE proposal_id=?').bind(id).first<any>()
  let authorized=false
- if(authorization?.assent_id)for(const purpose of purposes){try{const ctx=await smsContext(env,id,purpose);authorized=ctx.a.id===a.id;if(authorized)break}catch(error){if(![400,403,409].includes((error as any).status))throw error}}
+ if(authorization?.assent_id)for(const purpose of purposes){try{const ctx=await smsContext(env,id,purpose,purpose==='completion');authorized=ctx.a.id===a.id;if(authorized)break}catch(error){if(![400,403,409].includes((error as any).status))throw error}}
  return {consent,assents,revocations,suppression,authorized,activeAssentId:authorized?authorization.assent_id:null,disclosure:smsDisclosure,messages:(await db.prepare('SELECT id,revision,phone,kind,message,queued_at,due_at,status,assent_id FROM p_sms_runs WHERE proposal_id=? ORDER BY queued_at,id').bind(id).all()).results,codes:(await db.prepare('SELECT id,revision,generation,queued_at,status,assent_id FROM p_sms_code_runs WHERE proposal_id=? ORDER BY queued_at,id').bind(id).all()).results}
 }
 export async function smsHistory(env:Bindings,a:Actor,id:unknown){
@@ -131,10 +135,10 @@ export async function flushSms(env:Bindings){
  const db=env.DB,at=await currentTime(db),rows=(await db.prepare("SELECT * FROM p_sms_runs WHERE status='queued' AND due_at<=? ORDER BY queued_at,id LIMIT 100").bind(at).all<any>()).results
  for(const r of rows){
   let ctx:Awaited<ReturnType<typeof live>>
-  try{ctx=await live(env,r.proposal_id,r.kind);need(ctx.row.revision===r.revision&&ctx.c.phone===r.phone&&ctx.a.id===r.actor_id&&ctx.c.assent_id===r.assent_id,'SMS consent changed',409);if(r.kind==='scheduled')need(await db.prepare('SELECT 1 FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version WHERE s.proposal_id=? AND s.revision=? AND s.version=? AND s.enabled=1').bind(r.proposal_id,r.revision,r.settings_version).first(),'SMS reminder schedule changed',409);if(r.kind!=='invitation')need(!await db.prepare('SELECT 1 FROM p_reminder_optouts WHERE proposal_id=? AND revision=?').bind(r.proposal_id,r.revision).first(),'The recipient opted out of reminders',409)}catch(error){if(![400,403,409].includes((error as any).status))throw error;await db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE id=? AND status='queued'").bind(r.id).run();continue}
+  try{ctx=await live(env,r.proposal_id,r.kind);need(ctx.row.revision===r.revision&&ctx.c.phone===r.phone&&ctx.a.id===r.actor_id&&ctx.c.assent_id===r.assent_id,'SMS consent changed',409);if(r.kind==='scheduled')need(await db.prepare('SELECT 1 FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version WHERE s.proposal_id=? AND s.revision=? AND s.version=? AND s.enabled=1').bind(r.proposal_id,r.revision,r.settings_version).first(),'SMS reminder schedule changed',409);if(isReminder(r.kind))need(!await db.prepare('SELECT 1 FROM p_reminder_optouts WHERE proposal_id=? AND revision=?').bind(r.proposal_id,r.revision).first(),'The recipient opted out of reminders',409)}catch(error){if(![400,403,409].includes((error as any).status))throw error;await db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE id=? AND status='queued'").bind(r.id).run();continue}
   const due=afterQuietHours(at,r.time_zone,await reminderPolicy(db));if(due>at){await db.prepare("UPDATE p_sms_runs SET due_at=? WHERE id=? AND status='queued'").bind(due,r.id).run();continue}
   if(!env.TWILIO_ACCOUNT_SID||!env.TWILIO_AUTH_TOKEN||!env.TWILIO_FROM||env.AUTH_LOCAL==='true')continue
-  const reminderGuard=r.kind==='invitation'?{sql:'',values:[] as any[]}:{sql:' AND NOT EXISTS(SELECT 1 FROM p_reminder_optouts WHERE proposal_id=? AND revision=?)'+(r.kind==='scheduled'?' AND EXISTS(SELECT 1 FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version WHERE s.proposal_id=? AND s.revision=? AND s.version=? AND s.enabled=1)':''),values:[r.proposal_id,r.revision,...(r.kind==='scheduled'?[r.proposal_id,r.revision,r.settings_version]:[])]}
+  const reminderGuard=!isReminder(r.kind)?{sql:'',values:[] as any[]}:{sql:' AND NOT EXISTS(SELECT 1 FROM p_reminder_optouts WHERE proposal_id=? AND revision=?)'+(r.kind==='scheduled'?' AND EXISTS(SELECT 1 FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version WHERE s.proposal_id=? AND s.revision=? AND s.version=? AND s.enabled=1)':''),values:[r.proposal_id,r.revision,...(r.kind==='scheduled'?[r.proposal_id,r.revision,r.settings_version]:[])]}
   try{await commit(db,ctx.a,[db.prepare("UPDATE p_sms_runs SET status='sending' WHERE id=? AND status='queued'").bind(r.id)],false,{sql:smsGuard(ctx).sql+" AND EXISTS(SELECT 1 FROM p_sms_runs WHERE id=? AND status='queued')"+reminderGuard.sql,values:[...smsGuard(ctx).values,r.id,...reminderGuard.values]})}catch(error){if((error as any).status===409)continue;throw error}
   try{
    const ready=await live(env,r.proposal_id,r.kind)
@@ -149,6 +153,7 @@ export async function flushSms(env:Bindings){
  }
 }
 export async function runSms(env:Bindings){
+ await queueCompletionSms(env)
  const db=env.DB,now=await currentTime(db),settings=(await db.prepare("SELECT s.*,e.sent_at,e.expires_on,e.deadline_at FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version JOIN p_expiry e ON e.proposal_id=s.proposal_id WHERE s.enabled=1 AND e.sent_at IS NOT NULL").all<any>()).results
  for(const s of settings){
   try{
@@ -156,7 +161,7 @@ export async function runSms(env:Bindings){
    const slots=reminderSlots(config,s.sent_at,s.time_zone,{date:s.expires_on,deadlineAt:s.deadline_at},await reminderPolicy(db))
    for(const slot of slots.filter(slot=>slot.at<=now)){
     if(await db.prepare("SELECT 1 FROM p_sms_runs WHERE proposal_id=? AND revision=? AND kind='scheduled' AND slot=?").bind(s.proposal_id,s.revision,slot.id).first())continue
-    await enqueue(env,ctx,'scheduled',slot.id,'Reminder: '+ctx.row.title,crypto.randomUUID(),{settingsVersion:s.version,sql:"EXISTS(SELECT 1 FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version WHERE s.proposal_id=? AND s.revision=? AND s.version=? AND s.enabled=1) AND (SELECT count(*) FROM p_sms_runs WHERE proposal_id=? AND revision=? AND kind='scheduled')<?",values:[s.proposal_id,s.revision,s.version,s.proposal_id,s.revision,config.cap]})
+    await enqueueSms(env,ctx,'scheduled',slot.id,'Reminder: '+ctx.row.title,crypto.randomUUID(),{settingsVersion:s.version,sql:"EXISTS(SELECT 1 FROM p_reminder_settings s JOIN p_reminder_authority a ON a.proposal_id=s.proposal_id AND a.revision=s.revision AND a.settings_version=s.version WHERE s.proposal_id=? AND s.revision=? AND s.version=? AND s.enabled=1) AND (SELECT count(*) FROM p_sms_runs WHERE proposal_id=? AND revision=? AND kind='scheduled')<?",values:[s.proposal_id,s.revision,s.version,s.proposal_id,s.revision,config.cap]})
     break
    }
   }catch(error){if(![400,403,409].includes((error as any).status))throw error}

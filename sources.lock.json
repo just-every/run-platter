@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "5b022e7c6604d61399f656f1da24a4e21530507c711026807df726bc6d3b7692",
+      "sha256": "b192777e91739a3dbc8cafa0aeebf9d5fb04c40502086475cf5bae50d371beea",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "ab0722763c47e03d3b784279a36928bba8d7a41991fb8ee674f720cd2a796d5e",
+      "sha256": "16c49c8d0eba0270010aa83d8f3512038605785f5293b452267ac718226b89e4",
       "executable": false
     },
     "deploy-demo.json": {
@@ -110,7 +110,7 @@
       "executable": false
     },
     "deploy.json": {
-      "sha256": "2b566b3369ce43fb188259c43f67deced43bd7e1951047cbf665c177779290fd",
+      "sha256": "282fda9676e4b7cd31161d3307f70f2a9e4f7afc403092b61ca9d35a235f0ebf",
       "executable": false
     },
     "docs/AGENT-ACCESS.md": {
@@ -162,7 +162,7 @@
       "executable": false
     },
     "docs/SMS-AND-NOTIFICATIONS.md": {
-      "sha256": "a42f48d00df7f788593b51f803555b9e35d3523922a51f53a811a2dd4cba2eb3",
+      "sha256": "68e1736271200f143889cddca04070a3494b740605ab75c3b0e7052b02c36d17",
       "executable": false
     },
     "docs/SOURCE.md": {
@@ -214,7 +214,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "f93af271c49ae0a2e32449ca925e481566cbbad72bdee8aee99b58f41db37e84",
+      "sha256": "6f6e8a505e84b4f67cdaeececcbb7b12814616d58d4339ad7bbe5c213e7eb094",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -610,7 +610,7 @@
       "executable": false
     },
     "packaging.json": {
-      "sha256": "d1a081ee2b806d49154a75f93336347044098752b228d5f0772a53724e3dbe06",
+      "sha256": "ead9e77bbc552f6cfce05f911220845257d2a26c56c3aeb8e97ad9430a49d201",
       "executable": false
     },
     "pnpm-lock.yaml": {
@@ -1262,7 +1262,7 @@
       "executable": false
     },
     "rer-setup.json": {
-      "sha256": "b42f939665afc4d08d08662b44d0650abf74d80034198c1977b8ddd250c44185",
+      "sha256": "f4c3c9b4f0adae487c0f5870d80d1260abcf397d2ea1c2b955829620ddc81173",
       "executable": false
     },
     "RULINGS.md": {
@@ -2422,7 +2422,7 @@
       "executable": false
     },
     "src/platter/archive-policy.mjs": {
-      "sha256": "65704a16a3e7c0d89b9f4e1b97a76d08d76ee9f535df8f9e6aa154a3490e7c11",
+      "sha256": "579d8be6a86e7c19817bba8d01a7da785391b35c73efb62d5a847af4b8869a04",
       "executable": false
     },
     "src/platter/archiving/google-drive.ts": {
@@ -2902,11 +2902,11 @@
       "executable": false
     },
     "src/platter/signing.ts": {
-      "sha256": "25ea25decf1c85e22a1ce6143c098bf2e004495cb0c1b7b179fb60d5cd4a438a",
+      "sha256": "65d5ca7a1caf8440ec27d51d9ab376a32f7a56fdf3704967a855a03be63b073b",
       "executable": false
     },
     "src/platter/sms.ts": {
-      "sha256": "b5345e8020f91fde2468a61fe1699f5b7319da71ce62489b7bb7e4e7c0239303",
+      "sha256": "41fe139ec359c8c7cfb19094a746f2fcbd4f69941bf8c94f42b693e4181e2d38",
       "executable": false
     },
     "src/platter/starter-templates.ts": {
@@ -3146,7 +3146,7 @@
       "executable": false
     },
     "src/platter/ui/sms.ts": {
-      "sha256": "03e8e0bf9f9ddb69e47bda6d8a89c2a80025789a3cc6ab4ac259f71c97e36c96",
+      "sha256": "75e2b0bc7e591d6fb9cbea64c64c6dde0f00b79cbfcfe1fa5e97b81b881d8382",
       "executable": false
     },
     "src/platter/ui/suggestions.ts": {
@@ -3306,7 +3306,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "bf788d00bdf4dde2b43cbc70b39d8ae1592097ed0f761eb424afb871c3dc2a7c",
+      "sha256": "9b80f63a4f72cb871ef3595d3de16d03a6bea4f969a83bc009a6bc3bbdf87453",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3410,7 +3410,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "f85526de743c82ba95a80bb7c0e4a3ec3bd15157c12f5827c405ab21ab9b8092",
+      "sha256": "e504839cfb293657884e9e8e96c41aeaa510859430722516349a8bc54f6ac91f",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {
@@ -3490,7 +3490,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "772e796addb600f25322cd5f4b57f09f16a965dec09665f8899141d698561b32",
+      "sha256": "d93245a711fb25e19b09f67d5847ea281e07dd619e1c3d795901c76863c24fb3",
       "executable": false
     },
     "tests/site.test.mjs": {

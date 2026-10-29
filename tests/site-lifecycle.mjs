@@ -1,3 +1,4 @@
+import {smsInstallerJourney} from './sms-installer-journey.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
 import { documentJourney } from './document-journey.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
@@ -687,13 +688,14 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
  try{
   browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(process.env.PLATTER_SCREENSHOTS)await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true})
+  await smsInstallerJourney(browser)
   for(const width of [1440,390]){
    let h,edge,context
    const texts=[],mail=[]
    try{
     edge=await browserEdge()
     h=await harness({entry:'dist/server/index.js',origin:edge.origin,assetsDirectory:'dist/client',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9400',TWILIO_ACCOUNT_SID:'synthetic-platter-9401',TWILIO_AUTH_TOKEN:'synthetic-platter-9402',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
-     if(new URL(request.url).hostname==='api.twilio.com'){texts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-9403'},{status:201})}
+     if(new URL(request.url).hostname==='api.twilio.com'){texts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(9403+texts.length)},{status:201})}
      mail.push(await request.json());return Response.json({id:'synthetic-platter-'+(9404+mail.length)})
     }})
     edge.attach(h)
@@ -715,7 +717,7 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
       const form=smsPanel.locator('form').filter({has:sender.getByRole('button',{name:'Record assent and authorize SMS',exact:true})})
       await form.getByLabel('US mobile number',{exact:true}).fill('(202) 555-0129')
       await form.getByLabel('Sending firm',{exact:true}).fill('Synthetic Platter firm')
-      for(const label of ['Proposal invitations','Proposal reminders','Identity verification codes'])await form.getByLabel(label,{exact:true}).check()
+      for(const label of ['Proposal invitations','Proposal reminders','Identity verification codes','Agreement completion notices'])await form.getByLabel(label,{exact:true}).check()
       await form.getByLabel('Recipient assent time with UTC offset',{exact:true}).fill('2030-06-01T11:55:00Z')
       await form.getByLabel('Assent collection method',{exact:true}).fill('Recipient signed instruction')
       await form.getByLabel('Recipient evidence supporting the entry',{exact:true}).fill('synthetic-platter-9405')
@@ -755,6 +757,8 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
     await page.locator('input[name="consent"]').check()
     await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
     await page.getByRole('heading',{name:'Agreement downloads',exact:true}).waitFor()
+    assert.equal(texts.length,2,'the explicitly consented completion follows SMS signing once')
+    assert.ok(texts[1].Body.includes(sent.shareUrl))
     assert.ok((await page.locator('main').innerText()).includes('Platter e-signature after text-code verification'))
     const download=page.waitForEvent('download');await page.getByRole('link',{name:'Signed agreement PDF',exact:true}).click();const file=await download;assert.equal(file.suggestedFilename(),'agreement.pdf')
     const certificateDownload=page.waitForEvent('download');await page.getByRole('link',{name:'Certificate of completion',exact:true}).click();assert.equal((await certificateDownload).suggestedFilename(),'certificate.pdf')
@@ -763,7 +767,7 @@ test('SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the c
     for(const button of await page.locator('button').all())assert.ok((await button.innerText()).trim(),'client controls have visible labels')
     if(process.env.PLATTER_SCREENSHOTS)await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-006-complete-${width}.png`),fullPage:true})
     const ownerContext=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
-    try{await ownerContext.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}]);const ownerPage=await ownerContext.newPage();await ownerPage.goto(h.origin+'/app/proposal?id='+p.id);assert.ok((await ownerPage.locator('main').innerText()).includes('Platter e-signature after text-code verification'));assert.equal(await ownerPage.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);if(process.env.PLATTER_SCREENSHOTS)await ownerPage.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-006-owner-${width}.png`),fullPage:true})}finally{await ownerContext.close()}
+    try{await ownerContext.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}]);const ownerPage=await ownerContext.newPage();await ownerPage.goto(h.origin+'/app/proposal?id='+p.id);await ownerPage.getByText('Inspect SMS consent and texts',{exact:true}).click();assert.match(await ownerPage.locator('main').innerText(),/completion · accepted/);assert.ok((await ownerPage.locator('main').innerText()).includes('Platter e-signature after text-code verification'));assert.equal(await ownerPage.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);if(process.env.PLATTER_SCREENSHOTS)await ownerPage.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`SIGN-006-owner-${width}.png`),fullPage:true})}finally{await ownerContext.close()}
     const completed=await h.cmd('proposal.prepare',{clientId:client.id,title:'Mailbox completion attachments',scope:'Exact retained scope',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
     await h.cmd('proposal.approve',{id:completed.id,version:1,revision:1})
     const completionShare=await h.cmd('proposal.send',{id:completed.id,version:2})

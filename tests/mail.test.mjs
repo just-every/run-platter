@@ -1,3 +1,4 @@
+import {completionSmsJourney} from './sms-completion-journey.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -1060,7 +1061,7 @@ test('SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP pr
   const sent=await h.cmd('proposal.send',{id,version:3}),row=(await h.state()).proposals.find(p=>p.id===id)
   const input={...smsAssent,disclosure:'  '+smsAssent.disclosure+'\n',id,version:row.version,consent:true,phone:'+12025550123',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-8104'}
   await h.cmd('sms.send',{id,message:'Review your proposal',requestId:'synthetic-platter-8105'},h.owner,409)
-  for(const change of [{consent:false},{timeZone:''},{timeZone:'Inferred'},{phone:'+442025550123'},{evidence:''},{recipient:''},{firm:''},{purposes:[]},{purposes:['completion']},{disclosure:''},{assentedAt:''},{assentedAt:'2031-01-01T00:00:00Z'},{method:''},{evidence:sent.shareUrl},{disclosure:sent.shareUrl},{firm:sent.shareUrl},{method:new URL(sent.shareUrl).pathname.split('/').at(-1)},{version:1}])await h.cmd('sms.configure',{...input,...change},h.owner,change.version?409:400)
+  for(const change of [{consent:false},{timeZone:''},{timeZone:'Inferred'},{phone:'+442025550123'},{evidence:''},{recipient:''},{firm:''},{purposes:[]},{purposes:['marketing']},{disclosure:''},{assentedAt:''},{assentedAt:'2031-01-01T00:00:00Z'},{method:''},{evidence:sent.shareUrl},{disclosure:sent.shareUrl},{firm:sent.shareUrl},{method:new URL(sent.shareUrl).pathname.split('/').at(-1)},{version:1}])await h.cmd('sms.configure',{...input,...change},h.owner,change.version?409:400)
   assert.equal(sms.length,0)
   // A migrated installation has only the legacy facts; these confer no transport authority.
   const actor=(await h.state()).actor,invitationHash=(await import('node:crypto')).createHash('sha256').update(new URL(sent.shareUrl).pathname.split('/').at(-1)).digest('hex')
@@ -1130,6 +1131,7 @@ test('SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP pr
   assert.equal(sms.length,providerCalls)
   assert.ok(first.smsId)
  }finally{await h.close()}
+ await completionSmsJourney()
 })
 
 test('SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically cancels queued texts without duplicate transport', {timeout:120000}, async()=>{
@@ -1292,9 +1294,10 @@ test('SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes
 })
 
 test('SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links', {timeout:120000}, async()=>{
- const messages=[],chats=[],intents=new Map();let h
- h=await harness({cf:false,assetsDirectory:'public',origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9000'},outboundService:async request=>{
+ const messages=[],chats=[],intents=new Map(),completionTexts=[];let h
+ h=await harness({cf:false,assetsDirectory:'public',origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9000',TWILIO_ACCOUNT_SID:'synthetic-platter-9791',TWILIO_AUTH_TOKEN:'synthetic-platter-9792',TWILIO_FROM:'+15005550006'},outboundService:async request=>{
   const url=new URL(request.url)
+  if(url.hostname==='api.twilio.com'){completionTexts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-9790'},{status:201})}
   if(url.hostname==='api.resend.com'){messages.push(await request.json());return Response.json({id:'synthetic-platter-'+(9100+messages.length)})}
   if(url.hostname==='slack.com'){
    if(url.pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-9001'})
@@ -1311,6 +1314,7 @@ test('SEND-005 personal Slack and email preferences deliver client open, comment
  }})
  try{
   await finishSetup(h)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T12:00:00Z'),cron:'*/15 * * * *'})
   await h.cmd('provider.connect',{provider:'slack',version:0,token:'synthetic-platter-9006',consent:true})
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-9007',publishableKey:'synthetic-platter-9008',consent:true})
   const owner=(await h.state()).actor,route=await h.cmd('notification.route',{provider:'slack',event:'approval',kind:'direct',destination:'synthetic-platter-9009',operatorId:owner.id,consent:true})
@@ -1320,6 +1324,7 @@ test('SEND-005 personal Slack and email preferences deliver client open, comment
   await h.cmd('payment.collection',{id:p.id,version:1,completion:'required',paymentMethods:['card']})
   await h.cmd('proposal.approve',{id:p.id,version:2,revision:1})
   const share=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(share.shareUrl).pathname
+  await h.cmd('sms.configure',{...smsAssent,id:p.id,version:4,purposes:['completion'],consent:true,phone:'+12025550146',timeZone:'Etc/UTC',evidence:'synthetic-platter-9793'})
   const watch={id:p.id,version:0,email:true,slackRoute:route.id,events:['view','comment','signed','paid'],consent:true}
   await h.cmd('notification.watch',watch,member,403)
   await h.cmd('proposal.share',{id:p.id,operatorId:person.id,shared:true})
@@ -1330,7 +1335,8 @@ test('SEND-005 personal Slack and email preferences deliver client open, comment
   const preferences=await h.send('/api/platter/watch?id='+p.id,undefined,member)
   assert.equal(preferences.value.watcher.email_enabled,1);assert.equal(preferences.value.watcher.slack_route,null);assert.deepEqual(JSON.parse(preferences.value.watcher.events),['comment','signed','paid'])
   assert.equal((await h.send('/api/platter/watch?id='+p.id)).status,401)
-  const tick=async()=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  const tick=async()=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T12:00:00Z'),cron:'*/15 * * * *'})
+  await tick()
   const completions=()=>messages.filter(m=>m.subject==='Agreement complete: '+offer.title)
   const notices=()=>messages.filter(m=>['Proposal opened','Proposal comment','Proposal signed','Proposal payment recorded'].includes(m.subject))
   assert.equal((await h.send(path)).status,200);await tick()
@@ -1340,7 +1346,7 @@ test('SEND-005 personal Slack and email preferences deliver client open, comment
   const verification=await h.send(path+'/action?name=code.verify',{code}),cookie=verification.cookie;assert.equal(verification.status,200,verification.text)
   assert.equal((await h.send(path+'/action?name=question.create',{revision:1,section:'scope',text:'Synthetic private question'},cookie)).status,200);await tick()
   assert.equal((await h.send(path+'/action?name=accept',{optionId:'one',name:'Avery Chen',consent:true},cookie)).status,200);await tick()
-  assert.equal(completions().length,0,'required payment gates completion mail after signing')
+  assert.equal(completions().length,0,'required payment gates completion mail after signing');assert.equal(completionTexts.length,0)
   assert.equal((await h.send(path+'/certificate.json',undefined,cookie)).status,409,'required payment gates completion downloads')
   const payment=await h.send(path+'/payment.json',{method:'card',consent:true},cookie);assert.equal(payment.status,200,payment.text)
   const saved=await h.db.prepare('SELECT * FROM p_collection_intents WHERE proposal_id=?').bind(p.id).first()
@@ -1349,11 +1355,11 @@ test('SEND-005 personal Slack and email preferences deliver client open, comment
   assert.equal(completions().length,0,'unverified and mismatched payment authorization send nothing')
   const intent=intents.get(saved.provider_intent);intent.status='succeeded';intent.latest_charge={id:'synthetic-platter-9010',paid:true,status:'succeeded',amount:intent.amount,currency:intent.currency}
   const unauthorizedReceipt=await h.send(path+'/payment-status.json',{},cookie);assert.equal(unauthorizedReceipt.status,200,unauthorizedReceipt.text);assert.equal(unauthorizedReceipt.value.complete,false)
-  await tick();assert.equal(completions().length,0,'provider success without the client’s exact authorization cannot release completion')
+  await tick();assert.equal(completions().length,0,'provider success without the client’s exact authorization cannot release completion');assert.equal(completionTexts.length,0)
   assert.equal((await h.send(path+'/certificate.json',undefined,cookie)).status,409)
   assert.equal((await h.send(path+'/payment-consent.json',{consent:true,cents:saved.cents},cookie)).status,200)
   const receipt=await h.send(path+'/payment-status.json',{},cookie);assert.equal(receipt.status,200,receipt.text);await tick()
-  assert.equal(completions().length,2,'a confirmed and authorized deposit releases completion once')
+  assert.equal(completions().length,2,'a confirmed and authorized deposit releases completion once');assert.equal(completionTexts.length,1);assert.ok(completionTexts[0].Body.includes(share.shareUrl))
   const agreementResponse=await h.mf.dispatchFetch(h.origin+path+'/agreement.pdf',{headers:{cookie}}),certificateResponse=await h.mf.dispatchFetch(h.origin+path+'/certificate.pdf',{headers:{cookie}})
   assert.equal(agreementResponse.status,200);assert.equal(certificateResponse.status,200)
   const agreement=Buffer.from(await agreementResponse.arrayBuffer()),certificate=Buffer.from(await certificateResponse.arrayBuffer())
@@ -1365,7 +1371,7 @@ test('SEND-005 personal Slack and email preferences deliver client open, comment
   const link=new URL(ownerMail[0].text.match(/https:\/\/[^\s]+/)[0]);const signedOut=await h.send(link.pathname+link.search);assert.equal(signedOut.status,303);assert.match(signedOut.headers.get('location'),/^\/signin\?/);assert.equal((await h.send(link.pathname+link.search,undefined,h.owner)).status,200)
   await Promise.all([tick(),tick()]);assert.equal(notices().length,7);assert.equal(chats.length,4)
   await h.send(path+'/payment-status.json',{},cookie);await tick();assert.equal(notices().length,7,'reconciliation never creates another paid notification')
-  assert.equal(completions().length,2,'payment refresh and concurrent workers cannot repeat completion attachments')
+  assert.equal(completions().length,2,'payment refresh and concurrent workers cannot repeat completion attachments');assert.equal(completionTexts.length,1)
   await h.send(path,undefined,cookie);await tick();assert.equal(notices().length,7,'only the first client view notifies watchers')
  }finally{await h.close()}
 })

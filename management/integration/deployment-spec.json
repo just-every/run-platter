@@ -570,6 +570,12 @@
       "name": "0094_sms_assent.sql",
       "sha256": "9a7fed6098e78f6d8c773ca615beb6a63289f62dbb715540bea19068ab98269b",
       "sql": "-- Legacy consent has no complete assent and cannot authorize any text.\nALTER TABLE p_sms_authority ADD COLUMN assent_id TEXT;\nALTER TABLE p_sms_authority ADD COLUMN operator_version INTEGER;\nALTER TABLE p_sms_runs ADD COLUMN assent_id TEXT;\nALTER TABLE p_sms_optouts ADD COLUMN source TEXT NOT NULL DEFAULT 'recipient';\nCREATE TABLE p_sms_assents (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n invitation_hash TEXT NOT NULL, recipient TEXT NOT NULL, phone TEXT NOT NULL, firm TEXT NOT NULL,\n purposes TEXT NOT NULL, disclosure TEXT NOT NULL, assented_at INTEGER NOT NULL,\n method TEXT NOT NULL, evidence TEXT NOT NULL, time_zone TEXT NOT NULL,\n recorded_by TEXT NOT NULL, recorded_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_revocations (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), assent_id TEXT,\n actor_id TEXT NOT NULL, revoked_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_code_runs (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n invitation_hash TEXT NOT NULL, assent_id TEXT NOT NULL REFERENCES p_sms_assents(id),\n generation INTEGER NOT NULL, queued_at INTEGER NOT NULL,\n status TEXT NOT NULL CHECK(status IN ('queued','sending','accepted','held','failed','cancelled')),\n provider_id TEXT, UNIQUE(proposal_id,invitation_hash,generation)\n);\nCREATE TRIGGER p_frozen_sms_assent BEFORE UPDATE ON p_sms_assents BEGIN SELECT RAISE(ABORT,'SMS assent is immutable'); END;\nCREATE TRIGGER p_frozen_sms_revocation BEFORE UPDATE ON p_sms_revocations BEGIN SELECT RAISE(ABORT,'SMS revocation is immutable'); END;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0095_sms_completion.sql",
+      "sha256": "e5095fbd3deaa2c09bfee7efc34bd6afdb1a66efd959a463c559a3562597173e",
+      "sql": "-- Extend the retained text timeline without changing existing attempts.\nCREATE TABLE p_sms_runs_new (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n phone TEXT NOT NULL, time_zone TEXT NOT NULL, actor_id TEXT NOT NULL,\n kind TEXT NOT NULL CHECK(kind IN ('invitation','manual','scheduled','completion')),\n slot TEXT NOT NULL, settings_version INTEGER, message TEXT NOT NULL, queued_at INTEGER NOT NULL, due_at INTEGER NOT NULL,\n status TEXT NOT NULL CHECK(status IN ('queued','sending','accepted','delivered','failed','held','cancelled')),\n provider_id TEXT UNIQUE, request_id TEXT NOT NULL UNIQUE, assent_id TEXT,\n UNIQUE(proposal_id,revision,kind,slot)\n);\nINSERT INTO p_sms_runs_new SELECT * FROM p_sms_runs;\nDROP TABLE p_sms_runs;\nALTER TABLE p_sms_runs_new RENAME TO p_sms_runs;\nCREATE TABLE p_sms_completion_authority (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n assent_id TEXT NOT NULL REFERENCES p_sms_assents(id)\n);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",
@@ -598,7 +604,9 @@
     "MAIL_API_KEY",
     "MAIL_WEBHOOK_KEY",
     "GOOGLE_MAIL_CLIENT_SECRET",
-    "MICROSOFT_MAIL_CLIENT_SECRET"
+    "MICROSOFT_MAIL_CLIENT_SECRET",
+    "TWILIO_ACCOUNT_SID",
+    "TWILIO_AUTH_TOKEN"
   ],
   "schedules": [
     "*/15 * * * *"

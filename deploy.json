@@ -34,6 +34,21 @@
     {
       "binding": "MAIL_API_KEY",
       "environment": "MAIL_API_KEY"
+    },
+    {
+      "binding": "TWILIO_ACCOUNT_SID",
+      "environment": "TWILIO_ACCOUNT_SID",
+      "optional": true
+    },
+    {
+      "binding": "TWILIO_AUTH_TOKEN",
+      "environment": "TWILIO_AUTH_TOKEN",
+      "optional": true
+    },
+    {
+      "binding": "TWILIO_FROM",
+      "environment": "TWILIO_FROM",
+      "optional": true
     }
   ]
 }

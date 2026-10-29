@@ -1,4 +1,4 @@
-import { contentFixture, contentRows, expectedContentRows } from './content-performance-fixture.mjs'
+import { contentFixture, contentRows, expectedContentRows, readingRows, expectedReadingRows } from './content-performance-fixture.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { collectionLifecycle, collectionFees, collectionMethodInheritance } from './collection-journey.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
@@ -3574,7 +3574,8 @@ test('REPORT-003 content performance counts 100 public decisions once with froze
  const read=async(query='',cookie=h.owner)=>{const r=await h.send('/api/platter/content-performance'+(query?'?'+query:''),undefined,cookie);assert.equal(r.status,200,r.text);return r.value}
  const before=await read();assert.equal(before.decidedCount,100);assert.equal(before.unavailableHistory,0);assert.equal(before.unavailableTemplate,0);assert.equal(before.unavailableLibrary,0)
  assert.deepEqual(contentRows(before),expectedContentRows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))))
- assert.ok(before.rows.every(r=>r.readingTime===null))
+ assert.deepEqual(readingRows(before),expectedReadingRows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))))
+ assert.equal((await read('kind=library&q=Acme')).rows[0].readingTime,95000)
  const agency=fixture.templates[0],source=await h.cmd('proposal.prepare',{...offer,clientId:fixture.client.id})
  await h.cmd('template.save',{id:source.id,version:1,templateId:agency.id,templateVersion:1,name:'Renamed agency'})
  await h.cmd('library.save',{id:fixture.library.id,version:1,title:'Renamed case study',kind:'case_study',content:'Later source content.'})
@@ -3586,7 +3587,7 @@ test('REPORT-003 content performance counts 100 public decisions once with froze
  assert.deepEqual(await read(),before)
  const filtered=await read('kind=package&q=Growth&sort=rate&direction=desc');assert.equal(filtered.rows.length,1);assert.equal(filtered.rows[0].rate,'40.0%')
  const csv=await h.send('/api/platter/content-performance.csv?kind=package&q=Growth&sort=rate&direction=desc',undefined,h.owner)
- assert.equal(csv.status,200);assert.equal(csv.text,'Type,Name,Offered,Won,Lost,Chosen,Rate,Reading time\r\npackage,Growth,30,18,12,12,40.0%,Unavailable\r\n')
+ assert.equal(csv.status,200);assert.equal(csv.text,'Type,Name,Offered,Won,Lost,Chosen,Rate,Median reading time,Measured proposals\r\npackage,Growth,30,18,12,12,40.0%,0 min 30 s,30\r\n')
  for(const query of ['kind=unknown','sort=total','direction=up'])assert.equal((await h.send('/api/platter/content-performance?'+query,undefined,h.owner)).status,400)
  const people={}
  for(const role of ['admin','manager','sales','content_editor','viewer','billing']){
@@ -3617,4 +3618,24 @@ test('REPORT-003 content performance counts 100 public decisions once with froze
  await h.cmd('client.erase',{id:fixture.client.id,confirmName:'Content fixture client'},h.owner,409)
  await h.cmd('agent.revoke',{id:key.id});assert.equal((await h.send('/api/platter/content-performance',undefined,'',{authorization:'Bearer '+key.token})).status,401)
  assert.deepEqual((await read()).rows,historical.rows)
+ const erased=fixture.proposals[0].id,stale=fixture.views[0]
+ await h.cmd('tracking.hold',{id:erased,held:'yes',reason:'Retain reviewed content measurements'})
+ await h.cmd('tracking.erase',{id:erased,confirm:'erase'},h.owner,409)
+ assert.equal((await read('kind=library&q=Acme')).rows[0].readingSamples,20)
+ await h.cmd('tracking.hold',{id:erased,held:'no'})
+ await h.cmd('tracking.erase',{id:erased,confirm:'erase'})
+ const afterErase=await read('kind=library&q=Acme')
+ assert.equal(afterErase.rows[0].readingSamples,19);assert.equal(afterErase.rows[0].readingTime,100000)
+ assert.notEqual((await h.send(stale.path+'/engagement',stale.capture)).status,200)
+ assert.deepEqual(await read('kind=library&q=Acme'),afterErase,'an erased capture cannot restore report data')
+ // Old frozen sources without block attribution stay unavailable, even when a matching title exists today.
+ const old=fixture.proposals[1]
+ const frozen=await h.db.prepare('SELECT library_items FROM p_content_offers WHERE proposal_id=? AND revision=?').bind(old.id,old.revision).first()
+ await h.db.prepare('UPDATE p_content_offers SET library_items=? WHERE proposal_id=? AND revision=?').bind(JSON.stringify(JSON.parse(frozen.library_items).map(({section,...item})=>item)),old.id,old.revision).run()
+ assert.equal((await read('kind=library&q=Acme')).rows[0].readingSamples,18)
+ await h.cmd('tracking.settings',{enabled:'no',alerts:'no',quietMinutes:30,retentionDays:1})
+ const cutoff=Date.parse('2027-06-03T12:00:00Z')
+ await h.db.prepare('UPDATE p_expiry_clock SET observed_at=?').bind(cutoff).run()
+ const expired=await read();assert.ok(expired.rows.every(r=>r.readingSamples===0&&r.readingTime===null))
+ assert.deepEqual(contentRows(expired),contentRows(await read()),'retention removes measurements without changing decision counts')
 }))

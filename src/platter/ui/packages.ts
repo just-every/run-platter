@@ -45,7 +45,7 @@ export const selectionChoices = (selection:any) => (selection?.items??[]).map((x
 export function itemChoices(option:any, selection:any): string {
  return (option.optionalItems??[]).map((item:any)=>{
   const chosen=selection?.items?.find((x:any)=>x.id===item.id)
-  return ui`<fieldset><legend>${escape(item.label)}</legend><label class="choice"><input type="checkbox" name="add.${escape(item.id)}" value="yes"${chosen?' checked':''}><span>Add ${escape(item.label)} — ${money(item.unitCents,'USD')}${item.recurrence?ui` per ${escape(clientEnum(item.recurrence.interval))} for ${item.recurrence.term} installments from ${escape(item.recurrence.startsOn)}`:ui(" each")}</span></label>
+  return ui`<fieldset data-engagement-content="optional:${escape(option.id)}:${escape(item.id)}"><legend>${escape(item.label)}</legend><label class="choice"><input type="checkbox" name="add.${escape(item.id)}" value="yes"${chosen?' checked':''}><span>Add ${escape(item.label)} — ${money(item.unitCents,'USD')}${item.recurrence?ui` per ${escape(clientEnum(item.recurrence.interval))} for ${item.recurrence.term} installments from ${escape(item.recurrence.startsOn)}`:ui(" each")}</span></label>
   <label>Quantity for ${escape(item.label)}<input type="number" name="qty.${escape(item.id)}" value="${escape(chosen?.quantity??item.quantity)}" min="${item.min}" max="${item.max}" step="1"${item.editable?'':' readonly'} required></label>
   <p class="muted">${item.editable?ui`Choose ${item.min} to ${item.max}.`:ui`Fixed quantity: ${item.quantity}.`}</p></fieldset>`
  }).join('')

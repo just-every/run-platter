@@ -17,7 +17,7 @@ export async function stakeholderRecipient(env:Bindings,a:Actor,p:Record<string,
 
 /** Section identities come from the frozen revision, never a caller supplied title. */
 function sections(content:any){
- return new Map<string,string>([['scope','Scope of work'],['pricing','Pricing'],['terms','Terms'],['attachments','Attachments'],...documentOf(content).blocks.filter(b=>b.type!=='page_break').map(b=>['block:'+b.id,b.title||b.type.replaceAll('_',' ')] as [string,string])])
+ return new Map<string,string>([['scope','Scope of work'],['pricing','Pricing'],['terms','Terms'],['attachments','Attachments'],...(content.options??[]).flatMap((o:any)=>[['package:'+o.id,o.label] as [string,string],...(o.optionalItems??[]).map((i:any)=>['optional:'+o.id+':'+i.id,i.label] as [string,string])]),...documentOf(content).blocks.filter(b=>b.type!=='page_break').map(b=>['block:'+b.id,b.title||b.type.replaceAll('_',' ')] as [string,string])])
 }
 async function authorizedView(env:Bindings,c:any,id:unknown){
  const db=env.DB,at=await currentTime(db);await purgeTracking(db,at)

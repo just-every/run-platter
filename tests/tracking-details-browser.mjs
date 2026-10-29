@@ -46,6 +46,11 @@ test('TRACK-001 and TRACK-004 client disclosure, first-party measurement and pri
     for(const [key,seconds] of [['pricing',40],['block:case-stable',5]]){const actual=measured.reading.find(r=>r.section===key)?.milliseconds??0;assert.ok(Math.abs(actual-seconds*1000)<=2000,key+' measured '+actual+' ms');}
     assert.deepEqual(measured.choices.map(c=>[c.sequence,c.option_id,c.items]),[[1,'one',[]],[2,'two',[]],[3,'one',[]],[4,'one',[{id:'rush',quantity:1}]],[5,'one',[{id:'rush',quantity:2}]],[6,'two',[]],[7,'one',[{id:'rush',quantity:2}]],[8,'one',[]]])
     console.log('TRACK_TIMING '+JSON.stringify({width,viewId,pricing:measured.reading.find(r=>r.section==='pricing').milliseconds,caseStudy:measured.reading.find(r=>r.section==='block:case-stable').milliseconds,hiddenPause:5000,choices:measured.choices.length}))
+    await visibility('visible');for(const key of ['package:one','package:two']){await viewer.locator('[data-engagement-content="'+key+'"]').scrollIntoViewIfNeeded();await viewer.waitForTimeout(2500)}await rush.scrollIntoViewIfNeeded();await viewer.waitForTimeout(2500);await visibility('hidden')
+    await viewer.waitForResponse(r=>r.url().endsWith('/engagement')&&JSON.parse(r.request().postData()).readings?.['optional:one:rush']>=2000)
+    const contentMeasured=(await (await owner.request.get(app.origin+'/api/platter/engagement?id='+p.id)).json()).views.find(v=>v.id===viewId)
+    for(const key of ['package:one','package:two'])assert.ok(contentMeasured.reading.some(r=>r.section===key&&r.milliseconds>=2000),'visible package cards retain independent reading times: '+key)
+    assert.ok(contentMeasured.reading.some(r=>r.section==='optional:one:rush'&&r.milliseconds>=2000),'visible optional-item controls retain their own reading time')
     const [download]=await Promise.all([viewer.waitForEvent('download'),viewer.getByRole('link',{name:/^synthetic-platter-1\.txt · \d+ bytes$/}).click()]);assert.equal(download.suggestedFilename(),'synthetic-platter-1.txt')
     const afterOpen=await (await owner.request.get(app.origin+'/api/platter/engagement?id='+p.id)).json();assert.equal(afterOpen.views.find(v=>v.id===viewId).attachments[0].filename,'synthetic-platter-1.txt');assert.equal(afterOpen.recipients[0].attachments.length,1)
     await visibility('visible')

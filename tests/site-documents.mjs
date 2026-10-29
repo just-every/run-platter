@@ -886,7 +886,7 @@ test('REPORT-003 owner filters content performance, exports matching rows and ma
  try{
   browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   h=await harness({entry:'dist/server/index.js',assetsDirectory:'./dist/client'})
-  await contentFixture(h,2)
+  await contentFixture(h,2,{readingSeconds:[90,100]})
   context=await browser.newContext({viewport:{width:1440,height:900}})
   await context.addCookies([{name:h.owner.split('=')[0],value:h.owner.slice(h.owner.indexOf('=')+1),url:h.origin}])
   const page=await context.newPage()
@@ -895,6 +895,8 @@ test('REPORT-003 owner filters content performance, exports matching rows and ma
   assert.equal(await page.getByRole('heading',{name:'Content performance',exact:true}).count(),2)
   const rows=page.getByRole('list',{name:'Content performance rows'})
   assert.match(await rows.innerText(),/Agency retainer[\s\S]*100.0%/)
+  const acme=rows.locator('li').filter({has:page.getByRole('heading',{name:'Acme case study',exact:true})})
+  assert.match(await acme.innerText(),/Median reading time\s+1 min 35 s[\s\S]*Measured proposals\s+2 of 2/)
   await page.getByLabel('Content type',{exact:true}).selectOption('package')
   await page.getByLabel('Search content',{exact:true}).fill('Growth')
   await page.getByLabel('Sort by',{exact:true}).selectOption('rate')
@@ -902,12 +904,13 @@ test('REPORT-003 owner filters content performance, exports matching rows and ma
   await page.getByRole('button',{name:'Filter content report',exact:true}).click()
   assert.equal(await rows.locator('li').count(),1);assert.match(await rows.innerText(),/Growth[\s\S]*Offered\s+2[\s\S]*Chosen\s+2[\s\S]*100.0%/)
   const link=page.getByRole('link',{name:'Download content performance CSV',exact:true}),csv=await context.request.get(h.origin+await link.getAttribute('href'))
-  assert.equal(csv.status(),200);assert.equal(await csv.text(),'Type,Name,Offered,Won,Lost,Chosen,Rate,Reading time\r\npackage,Growth,2,2,0,2,100.0%,Unavailable\r\n')
+  assert.equal(csv.status(),200);assert.equal(await csv.text(),'Type,Name,Offered,Won,Lost,Chosen,Rate,Median reading time,Measured proposals\r\npackage,Growth,2,2,0,2,100.0%,0 min 30 s,2\r\n')
   const exports=page.locator('section').filter({has:page.getByRole('heading',{name:'Report export and email',exact:true})})
   assert.equal(await exports.getByRole('checkbox').count(),1)
   await exports.getByRole('checkbox').check();await exports.getByRole('button',{name:'Schedule report email',exact:true}).click()
   const schedule=(await h.state()).reportSchedules[0];assert.equal(new URLSearchParams(schedule.filters).get('kind'),'package');assert.equal(new URLSearchParams(schedule.filters).get('q'),'Growth')
   assert.equal(await page.getByRole('button',{name:'Stop this schedule',exact:true}).count(),1)
+  await page.getByRole('link',{name:'Clear filters',exact:true}).click()
   const screenshots=process.env.PLATTER_SCREENSHOTS
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){

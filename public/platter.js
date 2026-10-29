@@ -204,10 +204,11 @@ for(const button of document.querySelectorAll('[data-embed-url]'))button.addEven
 // Measure only disclosed, explicitly enabled client pages, never member previews.
 (() => {
  const view=document.querySelector('[data-engagement-view]');if(!view)return;
- const totals=new Map(),sections=[...document.querySelectorAll('[data-engagement-section]')];
- let previous=performance.now(),visible=document.visibilityState==='visible',active=null,sequence=0,lastChoice='',pending=Promise.resolve();
+ const totals=new Map(),sections=[...document.querySelectorAll('[data-engagement-section]')],content=[...document.querySelectorAll('[data-engagement-content]')];
+ let previous=performance.now(),visible=document.visibilityState==='visible',active=null,visibleContent=[],sequence=0,lastChoice='',pending=Promise.resolve();
  function current(){let best=null,pixels=0;for(const node of sections){const rect=node.closest('section').getBoundingClientRect(),height=Math.max(0,Math.min(innerHeight,rect.bottom)-Math.max(0,rect.top));if(height>pixels){best=node.dataset.engagementSection;pixels=height;}}return best;}
- function tick(){const now=performance.now();if(visible&&active)totals.set(active,(totals.get(active)||0)+now-previous);previous=now;active=current();}
+ function contentInView(){return [...new Set(content.filter(node=>{const r=node.getBoundingClientRect();return r.height>0&&Math.min(innerHeight,r.bottom)-Math.max(0,r.top)>=Math.min(r.height/2,100);}).map(node=>node.dataset.engagementContent))];}
+ function tick(){const now=performance.now();if(visible){if(active)totals.set(active,(totals.get(active)||0)+now-previous);for(const key of visibleContent)totals.set(key,(totals.get(key)||0)+now-previous);}previous=now;active=current();visibleContent=contentInView();}
  function selection(){
   const select=document.querySelector('select[name="optionId"]'),optionId=select?.value||document.querySelector('input[name="optionId"]:checked')?.value||view.dataset.engagementOption;
   const controls=[...document.querySelectorAll('input[name^="add."]')],renderedOption=select?.form?.querySelector('input[name="itemsOptionId"]')?.value,items=select&&optionId!==renderedOption?[]:controls.length?controls.filter(input=>input.checked).map(input=>({id:input.name.slice(4),quantity:Number([...document.querySelectorAll('input[name^="qty."]')].find(q=>q.name==='qty.'+input.name.slice(4))?.value||1)})):JSON.parse(view.dataset.engagementItems);

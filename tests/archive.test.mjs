@@ -1,4 +1,4 @@
-import { contentFixture, contentRows, expectedContentRows } from './content-performance-fixture.mjs'
+import { contentFixture, contentRows, expectedContentRows, readingRows, expectedReadingRows } from './content-performance-fixture.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { documentFixture } from './document-fixture.mjs'
@@ -751,6 +751,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.equal(contentBefore.status,200);assert.ok(contentBefore.value.decidedCount>=100)
   // This journey also has its earlier won override, whose rows are included in the exact restored comparison.
   for(const expected of expectedContentRows)assert.deepEqual(contentRows(contentBefore.value).find(r=>r[0]===expected[0]&&r[1]===expected[1]),expected)
+  for(const expected of expectedReadingRows)assert.deepEqual(readingRows(contentBefore.value).find(r=>r[0]===expected[0]&&r[1]===expected[1]),expected)
   const allRevenue=await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,h.owner)
   const contentCsvBefore=await h.send('/api/platter/content-performance.csv?kind=package&q=Growth',undefined,h.owner)
   assert.match(contentCsvBefore.text,/package,Growth,30,18,12,12,40.0%/)
@@ -779,6 +780,10 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.deepEqual(after.proposals.find(r=>r.id===paid.id).options,before.proposals.find(r=>r.id===paid.id).options);assert.deepEqual(after.proposals.find(r=>r.id===paid.id).internalPricing,before.proposals.find(r=>r.id===paid.id).internalPricing)
   const contentAfter=await h.send('/api/platter/content-performance?sort=rate&direction=desc',undefined,owner)
   assert.equal(contentAfter.status,200);assert.deepEqual(contentAfter.value,contentBefore.value)
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_tracking_authority').first()).n,0,'restored measurements confer no tracking consent')
+  const capture=contentHistory.views[0]
+  assert.notEqual((await h.send(capture.path+'/engagement',capture.capture)).status,200)
+  assert.deepEqual((await h.send('/api/platter/content-performance?sort=rate&direction=desc',undefined,owner)).value,contentAfter.value,'restored capture has no execution authority')
   assert.equal((await h.send('/api/platter/content-performance.csv?kind=package&q=Growth',undefined,owner)).text,contentCsvBefore.text)
   assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+contentKey.token})).status,401)
   const restoredRevenue=await h.send('/api/platter/pipeline?'+revenueFilters,undefined,owner);assert.equal(restoredRevenue.status,200);assert.deepEqual(restoredRevenue.value.rows,beforeRevenue.value.rows);assert.deepEqual(restoredRevenue.value.totals,beforeRevenue.value.totals);assert.deepEqual(after.reportSchedules,before.reportSchedules);assert.deepEqual((await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,owner)).value.rows,allRevenue.value.rows);assert.deepEqual((await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,owner)).value.totals,allRevenue.value.totals);assert.equal((await h.send('/api/platter/pipeline.csv?'+revenueFilters,undefined,owner)).text,beforeRevenueCsv.text)

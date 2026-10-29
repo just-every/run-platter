@@ -124,3 +124,9 @@ CT approval (24 October 2026, 04:45 UTC): a current proposal editor must explici
 - Governs: EDIT-006, EDIT-002, EDIT-003, EDIT-005
 
 CT approval (24 October 2026, 08:09 UTC): owner and admins control the audited external-content setting, off on fresh installs; only those roles change external blocks, and author consent stays in the revision. Viewers opt in on each page load. Before opt-in there are no provider requests, cookies or browser storage; frames use the exact allowlist, a sandbox, no referrer and CSP frame sources. The owner kill switch replaces external content with a plain placeholder naming its provider on the next load.
+
+## FOLLOW-003 — RL-102 internal expiry and renewal notices
+
+Ct adopted the staged notice policy with riders on 28 October 2026: explicit authorized-sender activation per proposal, notices only to its current recorded active sales owner with current proposal scope and channel authority, no activation on upgrade or restore, terminal-state suppression, changed dates moving notices, and preservation of existing manual follow-ups.
+
+This approves the interim policy; it leaves default-on activation, template inheritance, watcher preferences and actual renewal offers unfinished. Sender settings and declined-offer proof are implemented in this round. RENEW-002, SEND-005 and FOLLOW-006 inherit their matching timing, authority and custody duties. No acceptance point is removed or added.

@@ -71,7 +71,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [runtime, browser_documents, business_authoring, business_lifecycle, archive_custody, archive_restore, archive_media]
+        shard: [runtime, browser_documents, browser_commercial, business_authoring, business_lifecycle, archive_custody, archive_restore, archive_media]
     env:
       CI: 'true'
       PLATTER_VERIFY_SHARD: ${{ matrix.shard }}
@@ -89,7 +89,7 @@ jobs:
       - name: Check generated contract documents
         run: node src/base/contract-docs.mjs check
       - name: Install Chromium
-        if: matrix.shard == 'runtime' || matrix.shard == 'browser_documents'
+        if: matrix.shard == 'runtime' || matrix.shard == 'browser_documents' || matrix.shard == 'browser_commercial'
         run: |
           set -euo pipefail
           pnpm exec playwright install chromium

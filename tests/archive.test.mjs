@@ -948,9 +948,12 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
   await uploadDocument(h,fixedDraft.id,1,fixedBytes,'synthetic-platter-8502.pdf')
   const wordDraft=await h.cmd('proposal.prepare',{...fields,title:'Synthetic Word custody'});await uploadDocument(h,wordDraft.id,1,await wordFixture({headings:1,rows:2,images:1,tokens:false}),'synthetic-platter-8503.docx');await uploadDocument(h,wordDraft.id,2,await wordFixture({headings:1,rows:2,images:1,tokens:false,prefix:'Archived rich section'}),'synthetic-platter-8504.docx',{mode:'library'})
   const extraBefore=(await h.state()).proposals.filter(p=>[mergeDraft.id,fixedDraft.id,wordDraft.id].includes(p.id)).map(p=>({id:p.id,document:p.document,options:p.options})),profileBefore=(await h.state()).clients.find(c=>c.id===mergeClient.id).variable_fields,richArchiveItem=(await h.state()).libraryItems.find(i=>i.title==='Archived rich section 1'),libraryBefore=(await h.state()).libraryItems
+  const {regionalConditions,restoredRegionalConditions}=await import('./conditional-journey.mjs')
+  const regional=await regionalConditions(h)
   const identity={auth:h.auth,owner:h.owner};await h.close();h=undefined
   const archive=join(temporary,'document.rer');await command(source,['export','--output',archive,'--no-queue']);await command(target,['import','--input',archive,'--yes','--no-queue'])
   h=await harness({root:target,...identity,assetsDirectory:'public'});const owner=await h.signIn(h.auth.OWNER_EMAIL),after=(await h.state(owner)).proposals.find(p=>p.id===created.id)
+  await restoredRegionalConditions(h,owner,regional)
   for(const key of ['document','documentMedia','acceptance','questions','suggestions','suggestionSections','folderId','folderVersion'])assert.deepEqual(after[key],before[key],'public CLI retains '+key)
   assert.deepEqual((await h.state(owner)).libraryItems,libraryBefore,'rich item payloads, tags, usages and change times survive the public CLI')
   assert.deepEqual((await h.state(owner)).proposals.find(p=>p.id===libraryDraft.id).document,libraryDocBefore.document)

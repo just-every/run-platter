@@ -275,7 +275,7 @@ test('EDIT-009 desktop and phone configure, preview, select, download and accept
  let app,browser
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
    app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
@@ -310,6 +310,7 @@ test('EDIT-009 desktop and phone configure, preview, select, download and accept
      await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
      assert.match(await page.locator('main').innerText(),/This agreement is complete/);assert.equal((await page.locator('main').innerText()).includes(fields.terms),selection==='two');await capture('accepted-'+selection)
     }
+    await (await import('./conditional-browser.mjs')).regionalBrowser({page,context,origin:app.origin,command,width,screenshots})
    }finally{await context.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}

@@ -269,6 +269,10 @@
     {
       "id": "0090_client_locale.sql",
       "buyerSteps": "None. Adds owner-selected English or Spanish client language while retaining historical agreement language without inference."
+    },
+    {
+      "id": "0099_signing_consent.sql",
+      "buyerSteps": "None. Adds exact-revision electronic-record disclosures, retained consent and verified paper-request history without inferring historical consent or restoring signing authority."
     }
   ],
   "breaking": false,

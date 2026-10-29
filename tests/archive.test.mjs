@@ -213,6 +213,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.ok(agentHistory.length>=3);assert.ok(agentHistory.some(r=>r.records.some(ref=>ref.proposal_id===work.id)))
     await h.cmd('agent.pause',{id:key.id,version:1})
     assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,403)
+    await h.cmd('agent.budget',{id:key.id,version:2,budget:'50',consent:true})
     const agentReceipts=(await h.send('/api/platter/agent-ledger',undefined,h.owner)).value.receipts
     assert.ok(agentReceipts.some(r=>r.status==='refused'))
     const beforeAuditView=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
@@ -410,6 +411,7 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
     h=await harness({root:erased,unclaimed:true,auth:identity.auth})
     const restoredOwner=await h.signIn(identity.auth.OWNER_EMAIL),restoredState=await h.state(restoredOwner)
     assert.ok(!restoredState.clients.some(row=>row.id===p.id),'erased clients stay absent through the restored app door')
+    assert.ok(!(await h.send('/api/platter/agent-ledger',undefined,restoredOwner)).value.receipts.flatMap(row=>row.sources).some(source=>source.kind==='client'&&source.source_id===p.id),'restored receipt citations cannot resurrect the erased client')
     const retained=restoredState.proposals.find(row=>row.id===proposal.id)
     assert.equal(retained.acceptance.depositCents,105000)
     const retainedCsv=await h.send('/api/platter/invoices/'+retained.invoice.id+'.csv',undefined,restoredOwner)

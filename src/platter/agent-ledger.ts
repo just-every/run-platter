@@ -21,7 +21,7 @@ const failure = (error: any) => Response.json({error: error.status && error.stat
 export async function agentRequest(request: Request, env: Bindings, run: (actor: Actor) => Promise<Response | null>): Promise<Response | null> {
  let actor: Actor
  try { actor = await principal(request, env, true, true, true) } catch (error) { return failure(error) }
- const db = env.DB, control = await db.prepare('SELECT paused_at,ledger_consent_at FROM p_agent_keys WHERE id=?').bind(actor.keyId!).first<any>()
+ const db = env.DB, control = await db.prepare('SELECT paused_at,ledger_consent_at,monthly_model_budget_cents FROM p_agent_keys WHERE id=?').bind(actor.keyId!).first<any>()
  // Reading a bounded clone leaves the actual transport body available to its existing parser.
  let raw = ''
  if (request.body) {
@@ -34,7 +34,11 @@ export async function agentRequest(request: Request, env: Bindings, run: (actor:
  if (control?.ledger_consent_at) actor.agentSources = []
  if (control?.ledger_consent_at) await db.prepare("INSERT INTO p_agent_receipts(id,owner_id,key_id,transport,action,started_at,status,input_digest) VALUES(?,?,?,?,?,?,'pending',?)").bind(id,actor.id,actor.keyId!,descriptor.transport,descriptor.action,started,await hash(raw)).run()
  let response: Response | null
- try { need(control && control.paused_at === null, 'This agent key is paused', 403); response = await run(actor) } catch (error) { response = failure(error) }
+ try {
+  need(control && control.paused_at === null, 'This agent key is paused', 403)
+  need(control.monthly_model_budget_cents===null,control.monthly_model_budget_cents===0?'The monthly model budget is zero. This agent key is held.':'Model spending is not independently recorded. Requests are held while this monthly model budget is configured.',control.monthly_model_budget_cents===0?429:409)
+  response = await run(actor)
+ } catch (error) { response = failure(error) }
  if (!response || !control?.ledger_consent_at) return response
  const output = await response.clone().text()
  let value: any; try { value = JSON.parse(output) } catch { value = null }
@@ -48,13 +52,19 @@ export async function agentRequest(request: Request, env: Bindings, run: (actor:
  const eligible = descriptor.transport === 'rest' ? descriptor.action.includes('.proposals') || descriptor.action.includes('.agreements') || descriptor.action === 'rest.get.payments' : !descriptor.action.includes('template') || descriptor.action === 'mcp.prepare_from_template'
  const returned = eligible ? candidates.filter(row=>row && typeof row.id==='string').map(row=>({id:row.id,revision:Number.isSafeInteger(row.revision)?row.revision:null})) : []
  const visible = scope(actor,'view')
+ const produced = ['proposal.prepare','proposal.revise','mcp.prepare_proposal','mcp.revise_proposal','mcp.prepare_from_template','rest.post.proposals','rest.post.proposals.variables'].includes(descriptor.action) && !refused
+ const snapshots = produced ? (await db.prepare(`SELECT r.proposal_id,r.revision,r.snapshot FROM json_each(?) supplied
+  JOIN p_proposals p ON p.id=json_extract(supplied.value,'$.id')
+  JOIN p_revisions r ON r.proposal_id=p.id AND r.revision=json_extract(supplied.value,'$.revision') WHERE (${visible.sql})`).bind(JSON.stringify(returned),...visible.values).all<any>()).results : []
+ const outputs = await Promise.all(snapshots.map(async row=>({id:row.proposal_id,revision:row.revision,digest:await hash(row.snapshot)})))
+ const references = returned.map(row=>({...row,snapshotDigest:outputs.find(output=>output.id===row.id&&output.revision===row.revision)?.digest??null}))
  await db.batch([
   db.prepare('UPDATE p_agent_receipts SET completed_at=?,status=?,http_status=?,output_digest=? WHERE id=?').bind(Date.now(),status,response.status,await hash(output),id),
-  db.prepare(`INSERT OR IGNORE INTO p_agent_receipt_records(receipt_id,proposal_id,revision)
-   SELECT ?,p.id,r.revision FROM json_each(?) supplied
+  db.prepare(`INSERT OR IGNORE INTO p_agent_receipt_records(receipt_id,proposal_id,revision,relation,snapshot_digest)
+   SELECT ?,p.id,r.revision,?,json_extract(supplied.value,'$.snapshotDigest') FROM json_each(?) supplied
    JOIN p_proposals p ON p.id=json_extract(supplied.value,'$.id')
    JOIN p_revisions r ON r.proposal_id=p.id AND r.revision=COALESCE(json_extract(supplied.value,'$.revision'),p.revision)
-   WHERE (${visible.sql})`).bind(id,JSON.stringify(returned),...visible.values),
+   WHERE (${visible.sql})`).bind(id,produced?'produced':'returned',JSON.stringify(references),...visible.values),
   db.prepare(`INSERT OR IGNORE INTO p_agent_receipt_sources(receipt_id,kind,source_id,source_version,digest,client_id)
    SELECT ?,json_extract(value,'$.kind'),json_extract(value,'$.id'),json_extract(value,'$.version'),json_extract(value,'$.digest'),
    CASE WHEN json_extract(value,'$.kind')='client' THEN (SELECT id FROM p_clients WHERE id=json_extract(value,'$.id')) ELSE NULL END

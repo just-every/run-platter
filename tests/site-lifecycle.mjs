@@ -274,6 +274,19 @@ test('AI-003 desktop and phone owners review MCP requests, approve and send expl
     await controls().getByRole('button',{name:'Resume key',exact:true}).click();await tool('read_proposal',{id:p.id})
     await controls().getByRole('button',{name:'Stop receipt collection',exact:true}).click()
     if(width===1440)assert.match(await controls().innerText(),/Receipt collection off/)
+    await controls().getByLabel('Monthly model budget (USD)',{exact:true}).fill('25.37')
+    await controls().getByRole('checkbox',{name:'Hold unmetered requests',exact:true}).check()
+    await controls().getByRole('button',{name:'Save model budget',exact:true}).click()
+    if(width===1440){
+     assert.match(await controls().innerText(),/Budget hold.*25.37/)
+     const budgetRefusal=await context.request.post(app.origin+'/api/platter/agent/mcp',{headers:{authorization:'Bearer '+key.token},data:{jsonrpc:'2.0',id:101,method:'ping'}})
+     assert.equal(budgetRefusal.status(),409);assert.match(await budgetRefusal.text(),/not independently recorded/)
+    }
+    await capture('agent-model-budget')
+    await controls().getByLabel('Monthly model budget (USD)',{exact:true}).fill('')
+    await controls().getByRole('button',{name:'Save model budget',exact:true}).click()
+    await rpc('ping')
+
 
    }finally{await context.close();await app.close();app=undefined}
   }

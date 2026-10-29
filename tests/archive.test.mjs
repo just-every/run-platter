@@ -908,13 +908,13 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
  try{
   await checkout(source);await checkout(target)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  const {hubspotSyncFixture}=await import('./hubspot-sync-fixture.mjs'),crm=hubspotSyncFixture()
-  h=await harness({root:source,assetsDirectory:'public',outboundService:crm.request})
+  const {hubspotSyncFixture}=await import('./hubspot-sync-fixture.mjs'),crm=hubspotSyncFixture();let crmRevoked=false
+  h=await harness({root:source,assetsDirectory:'public',outboundService:request=>crmRevoked&&new URL(request.url).pathname.includes('/objects/deals/')?new Response(null,{status:401}):crm.request(request)})
   await h.cmd('provider.connect',{provider:'hubspot',version:0,token:'synthetic-platter-4607',consent:true})
   const crmReview=await h.cmd('crm.deal.review',crm.selected),crmDraft=await h.cmd('crm.deal.apply',{id:crmReview.id,digest:crmReview.digest,consent:true}),unusedCrmReview=await h.cmd('crm.deal.review',crm.selected)
   const crmSourceBefore=(await h.send('/api/platter/crm/source?id='+crmDraft.id,undefined,h.owner)).value,crmDraftBefore=(await h.state()).proposals.find(p=>p.id===crmDraft.id)
   assert.equal(crmSourceBefore.source.lines.length,2);assert.equal(crmDraftBefore.options[0].cents,36122)
-  const crmSyncBefore=await (await import('./hubspot-archive.mjs')).seedHubspotArchive(h,crmDraft.id)
+  const crmSyncBefore=await (await import('./hubspot-archive.mjs')).seedHubspotArchive(h,crmDraft.id,()=>{crmRevoked=true})
   const completedSetup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(completedSetup.status,303)
   const fields={clientId:(await h.cmd('client.save',{name:'Synthetic Platter client',email:'synthetic-platter-1@example.com'})).id,title:'Document custody',scope:'A reviewed project.',optionOne:'Studio',priceOne:'1000',optionTwo:'Campaign',priceTwo:'2000',depositPercent:'25',pricingTables:[{optionId:'one',name:'Library services',lines:[{name:'Workshop',quantity:'2',unit:'hour',unitPrice:'10.01'}]}]},created=await h.cmd('proposal.prepare',fields)
   const bytes=await readFile('public/brand/apple-touch-icon.png'),form=new FormData();form.set('id',created.id);form.set('version','1');form.set('consent','yes');form.set('file',new File([bytes],'synthetic-platter-1.png',{type:'image/png'}))

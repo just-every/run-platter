@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "3faefe8e7e0aa36f2719ed2986e76c1e5f4c7ae4bba262fb956dd100a4e4a4b5",
+      "sha256": "66a8d80957088b4ae861aa24fd53239bd236659b1ce4788fdb88e81b8708901d",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "1211c486785f4025bb0e613c237ee92a242a86e909740fa1195bf2066ca543d5",
+      "sha256": "fcc8a8e70b8b8109708108fdb484f1e24de24e4cedea2db6e59abc1f5520e072",
       "executable": false
     },
     "deploy-demo.json": {
@@ -242,7 +242,7 @@
       "executable": false
     },
     "integrations/hubspot/README.md": {
-      "sha256": "b12a35301e95d9fe18bef05496cc74a2ec174caaa699e140e48a72dcaa528fbb",
+      "sha256": "045b709321d5a7fad368dc3a422d38bd46803f906cb4ddc1d38c59b53f7260f5",
       "executable": false
     },
     "LICENSE": {
@@ -2565,6 +2565,10 @@
       "sha256": "c6f8dfb2011eff14db3bb861ceda84687cb490f099600c2cc5424a67bf069062",
       "executable": false
     },
+    "src/platter/crm/hubspot-request.ts": {
+      "sha256": "638a6c49d0ab481375534f4aa0ef1e08dadec89e0bf27d986c09391c042522cb",
+      "executable": false
+    },
     "src/platter/crm/hubspot-sync-plan.ts": {
       "sha256": "3ac939090d851e2cfe645a8fc733e15d0012cee6803780ca4cfbb81569227682",
       "executable": false
@@ -3390,7 +3394,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "24b59f2313dbd7f32bf45ada3b3fabccfbdfcad646ca0ea0ca4f7bb397d0f91a",
+      "sha256": "9de7227e16f4057bbcf6fe014dfb3de675ad21b87dad9ea8f66618643f2f8f20",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3478,7 +3482,7 @@
       "executable": false
     },
     "tests/hubspot-archive.mjs": {
-      "sha256": "4e7c64fdfabadcefdc09dd0ae28843ea30181fc22cc06825fa82bfcda238fce1",
+      "sha256": "8388fd4ca302113561a700e54360c102aba40497e5b71b173ef667064870952c",
       "executable": false
     },
     "tests/hubspot-browser.mjs": {

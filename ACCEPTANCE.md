@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `8d03f91db1c5b309ee22797450e79107915c7904` (29 October 2026). This landing candidate extends that saved proof with the focused browser journey and saved-rule archive custody; its full SHA and exact Verify receipt are recorded in the handoff. APPROVE-001 is a builder completion claim pending guarded landing and ct judgment. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -632,7 +632,7 @@ Core · target · **partial**
 
 #### APPROVE-001 — Approval rules and routing
 
-Core · target · **partial** · Cites BASE-ROLE-001
+Core · target · **done** · Cites BASE-ROLE-001
 
 **Requirement.** Admins set approval rules by total value, discount, margin, payment terms, edited legal terms or template, and route each to named people or an approver role (owner, admin or manager, as `APPROVE-003` sets), in sequence or in parallel. A named person must hold the owner, admin, manager or billing role; a rule naming a sales member, content editor or viewer is refused when saved (400), and a named billing user approves only the steps that name them (`TEAM-001`). A rule applies to all proposals or to chosen templates, and a step whose condition does not hold for the current revision is skipped, as with the incumbents' conditional approvals. Whether a proposal that matches no rule needs approval at all is the `APPROVE-003` policy setting. `PROP-001`'s exact-revision binding applies to every approver. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#approve-001).
 
@@ -641,8 +641,8 @@ Core · target · **partial** · Cites BASE-ROLE-001
 2. A $30,000 proposal with 20% discount needs both in order; editing after the first approval clears both.
 3. A parallel rule routes edited legal terms to a named admin (counsel) and a named billing user (finance) at once: it completes only when both approve, in either order, and one rejection stops it; a second billing user not named in the rule is refused (403), and saving a rule that names a sales member is refused (400).
 
-**Evidence.** `tests/platter.test.mjs` — “APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied”; “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP”; `tests/site.test.mjs`; `tests/archive.test.mjs`
-**Gap.** Delivered: Value, discount, margin, terms and template rules select sequential/parallel approval steps and invalidate them after edits. Missing “APPROVE-001 complete approval rules and routing journey”: The complete threshold configuration journey covers both parallel completion orders, a rejection and unauthorized approver/rule changes while retaining the exact saved rule configuration.
+**Evidence.** `tests/platter.test.mjs` — “APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied” proves saved threshold and legal configuration, edit invalidation, both parallel decision orders, rejection and complete unchanged readback after authority refusals; “TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP” retains scoped role coverage. `tests/site-documents.mjs` — “APPROVE-002 email preview and decision links work under a member session at desktop and phone widths”, loaded by `tests/site.test.mjs`, proves the existing saved-rule and decision controls at 1440 pixels with the same screens recorded at 390. `tests/archive.test.mjs` — “PRICE-005 public CLI preserves business tax rates and frozen agreements without restoring signing authority” calls savedApprovalArchive to retain the complete policy, named admin and billing rule, exact plan and decisions without restoring member sessions.
+**Gap.** None.
 
 #### APPROVE-002 — Approval requests that reach the approver
 

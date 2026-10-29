@@ -681,7 +681,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   for(const role of ['sales','manager'])await h.cmd('member.set',{operatorId:people[role].id,version:0,role,teams:[team.id]})
   await h.cmd('member.zone',{timeZone:'America/New_York'},people.sales.cookie)
   await h.cmd('approval.policy',{version:0,required:false,defaultRole:'manager'})
-  const archiveAmount=await h.cmd('approval.rule',{version:1,name:'High value manager',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager']})
+  await h.cmd('approval.rule',{version:1,name:'High value manager',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager']})
   const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,document:documentFixture(),title:'Archive routed offer',scope:'An audited scope',optionOne:'First',priceOne:'28000',optionTwo:'Second',priceTwo:'30000',depositPercent:'25',pricingTables:[{optionId:'one',name:'Services',lines:[{name:'Delivery',description:'Public scope',unit:'project',quantity:'1',unitPrice:'28000'}]}]},people.sales.cookie)
   await h.cmd('proposal.share',{id:p.id,operatorId:people.other.id},people.sales.cookie)
@@ -744,30 +744,6 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.deepEqual(beforeRevenue.value.totals,[{currency:'USD',count:1,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:120000,refundedCents:0,netReceivedCents:120000,uncertainRefundCents:0,exportedDepositCents:0}])
   const allRevenue=await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,h.owner),beforeRevenueCsv=await h.send('/api/platter/pipeline.csv?'+revenueFilters,undefined,h.owner)
   assert.equal(beforeRevenueCsv.status,200)
-  for(const role of ['admin','billing']){
-   const email='synthetic-platter-93-archive-'+role+String.fromCharCode(64)+'example.test'
-   assert.equal((await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)).status,202)
-   const cookie=await h.signIn(email),actor=(await h.state(cookie)).actor
-   await h.cmd('member.set',{operatorId:actor.id,version:0,role,teams:[team.id]});people[role]={cookie,...actor}
-  }
-  const archiveDiscount=await h.cmd('approval.rule',{version:(await h.state()).approvalSettings.policy.version,name:'Owner above 15% discount',position:1,condition:{kind:'discountOver',bps:1500},approvers:['role:owner'],templates:[]})
-  const archiveLegal=await h.cmd('approval.rule',{version:(await h.state()).approvalSettings.policy.version,name:'Counsel and finance legal review',position:2,condition:{kind:'termsEdited'},approvers:['person:'+people.admin.id,'person:'+people.billing.id],templates:[]},people.admin.cookie)
-  const archiveExpectedRules=[
-   {id:archiveAmount.id,name:'High value manager',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager'],templates:[]},
-   {id:archiveDiscount.id,name:'Owner above 15% discount',position:1,condition:{kind:'discountOver',bps:1500},approvers:['role:owner'],templates:[]},
-   {id:archiveLegal.id,name:'Counsel and finance legal review',position:2,condition:{kind:'termsEdited'},approvers:['person:'+people.admin.id,'person:'+people.billing.id],templates:[]},
-  ]
-  const archiveApprovalFields={clientId:client.id,title:'Archived parallel approvals',scope:'Public delivery',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'30000',discountPercent:'20'}],terms:'Original legal terms'}
-  const archiveApproval=await h.cmd('proposal.prepare',archiveApprovalFields,people.sales.cookie)
-  await h.cmd('proposal.revise',{...archiveApprovalFields,id:archiveApproval.id,version:1,terms:'Edited legal terms'},people.sales.cookie)
-  const archiveDecisionActors=[people.manager.id,(await h.state()).actor.id,people.billing.id,people.admin.id]
-  for(const [index,cookie] of [people.manager.cookie,h.owner,people.billing.cookie,people.admin.cookie].entries())assert.deepEqual(await h.cmd('proposal.approve',{id:archiveApproval.id,version:index+2,revision:2,note:'Synthetic archived decision '+index},cookie),{approved:index===3,rejected:false})
-  const approvalBefore=(await h.state()).proposals.find(row=>row.id===archiveApproval.id)
-  assert.equal(approvalBefore.approval.complete,true)
-  const archiveDecisionProjection=row=>row.approval.steps.flatMap(step=>step.decisions).map(d=>({revision:d.revision,step:d.step,actor:d.actor_id,index:d.approver_index,decision:d.decision,note:d.note})).sort((a,b)=>a.note.localeCompare(b.note))
-  const archiveExpectedDecisions=archiveDecisionActors.map((actor,index)=>({revision:2,step:[archiveAmount.id,archiveDiscount.id,archiveLegal.id,archiveLegal.id][index],actor,index:[0,0,1,0][index],decision:'approved',note:'Synthetic archived decision '+index}))
-  assert.deepEqual(archiveDecisionProjection(approvalBefore),archiveExpectedDecisions)
-  assert.deepEqual((await h.state()).approvalSettings.rules.filter(r=>archiveExpectedRules.some(e=>e.id===r.id)),archiveExpectedRules)
   const before=await h.state(),tables=['p_outcome_settings','p_outcomes','p_outcome_records','p_crm_outcome_bindings','p_crm_outcome_consents','p_crm_outcome_attempts','p_reminder_templates','p_template_reminder_messages','p_delivery_changes','p_reminder_policy','p_reminder_settings','p_reminder_runs','p_reminder_optouts','p_mail_reply_cap_notices','p_mail_replies','p_mail_attributions','p_report_schedules','p_report_runs','p_template_sources','p_disputes','p_dispute_packets','p_dispute_packet_parts','p_dispute_authorizations','p_dispute_submissions','p_dispute_documents','p_priced_catalog','p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_template_block_locks','p_proposal_block_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_library_uses','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
   const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
@@ -777,13 +753,6 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   h=await harness({root:restored,unclaimed:true,outboundService:async request=>{restoredCalls.push(new URL(request.url).hostname);throw new Error('Restore must not call a provider')}})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_member_invitations').first()).n,0,'pending delegated authority is excluded from archives');assert.equal((await h.db.prepare('SELECT status FROM oa_operators WHERE email=?').bind('unjoined@synthetic-platter.example').first()).status,'invited');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_connection_secrets').first()).n,0);assert.ok(after.connections.every(c=>c.status==='needs_reconnection'));assert.deepEqual(after.paymentRecords,before.paymentRecords);assert.equal((await h.cmd('payment.refund',refund,owner)).status,'succeeded','restored historical refund retries never issue another provider call');assert.doesNotMatch(JSON.stringify(after),/synthetic-platter-(2301|4121|2803|2804)/);assert.equal(after.connections.find(c=>c.provider==='hubspot').status,'needs_reconnection')
-  assert.deepEqual(after.approvalSettings.policy,before.approvalSettings.policy)
-  assert.deepEqual(after.approvalSettings.rules.filter(r=>archiveExpectedRules.some(e=>e.id===r.id)),archiveExpectedRules)
-  const approvalAfter=after.proposals.find(row=>row.id===archiveApproval.id)
-  assert.deepEqual(approvalAfter.approval,approvalBefore.approval,'restored saved rules retain the exact plan, actors, notes, decisions and times')
-  assert.deepEqual(archiveDecisionProjection(approvalAfter),archiveExpectedDecisions)
-  assert.equal((await h.send('/api/platter/state',undefined,people.admin.cookie)).status,401,'restored decision history does not restore a native session')
-  assert.equal((await h.send('/api/platter/state',undefined,people.billing.cookie)).status,401)
   assert.deepEqual(after.outcomeSettings,before.outcomeSettings);assert.deepEqual(after.proposals.find(r=>r.id===outcomeDraft.id).outcomes,before.proposals.find(r=>r.id===outcomeDraft.id).outcomes)
   assert.equal(after.proposals.find(r=>r.id===outcomeDraft.id).pipelineStatus,'won');assert.equal(after.proposals.find(r=>r.id===outcomeDraft.id).acceptance,undefined)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_crm_outcome_authority').first()).n,0);assert.ok(after.crmOutcomes.bindings.every(b=>b.authorized===0));assert.deepEqual(after.crmOutcomes.attempts,before.crmOutcomes.attempts)
@@ -1015,6 +984,37 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
+async function savedApprovalArchive(h,clientId){
+ const people={},team=await h.cmd('team.create',{name:'Synthetic archived approval team'})
+ for(const role of ['manager','sales','admin','billing']){
+  const email='synthetic-platter-93-archive-'+role+String.fromCharCode(64)+'example.test'
+  assert.equal((await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)).status,202)
+  const cookie=await h.signIn(email),actor=(await h.state(cookie)).actor
+  await h.cmd('member.set',{operatorId:actor.id,version:0,role,teams:[team.id]});people[role]={cookie,...actor}
+ }
+ const owner=(await h.state()).actor
+ assert.deepEqual(await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'}),{saved:true,id:'installation'})
+ const amount=await h.cmd('approval.rule',{version:1,name:'Manager over $25,000',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager'],templates:[]})
+ const discount=await h.cmd('approval.rule',{version:2,name:'Owner above 15% discount',position:1,condition:{kind:'discountOver',bps:1500},approvers:['role:owner'],templates:[]})
+ const legal=await h.cmd('approval.rule',{version:3,name:'Counsel and finance legal review',position:2,condition:{kind:'termsEdited'},approvers:['person:'+people.admin.id,'person:'+people.billing.id],templates:[]},people.admin.cookie)
+ const settings={policy:{singleton:1,required:0,default_role:'owner',version:4},rules:[
+  {id:amount.id,name:'Manager over $25,000',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager'],templates:[]},
+  {id:discount.id,name:'Owner above 15% discount',position:1,condition:{kind:'discountOver',bps:1500},approvers:['role:owner'],templates:[]},
+  {id:legal.id,name:'Counsel and finance legal review',position:2,condition:{kind:'termsEdited'},approvers:['person:'+people.admin.id,'person:'+people.billing.id],templates:[]},
+ ]}
+ assert.deepEqual((await h.state()).approvalSettings,settings)
+ const fields={clientId,title:'Archived parallel approvals',scope:'Public delivery',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'30000',discountPercent:'20'}],terms:'Original legal terms'}
+ const draft=await h.cmd('proposal.prepare',fields,people.sales.cookie)
+ await h.cmd('proposal.revise',{...fields,id:draft.id,version:1,terms:'Edited legal terms'},people.sales.cookie)
+ for(const [index,cookie] of [people.manager.cookie,h.owner,people.billing.cookie,people.admin.cookie].entries())assert.deepEqual(await h.cmd('proposal.approve',{id:draft.id,version:index+2,revision:2,note:'Synthetic archived decision '+index},cookie),{approved:index===3,rejected:false})
+ const approval=(await h.state()).proposals.find(row=>row.id===draft.id).approval
+ const plan=createHash('sha256').update(JSON.stringify({version:4,steps:settings.rules.map(r=>({id:r.id,name:r.name,approvers:r.approvers,any:false})),revision:2})).digest('hex')
+ const projection=row=>row.steps.flatMap(step=>step.decisions).map(d=>({proposal:d.proposal_id,revision:d.revision,plan:d.plan,step:d.step,actor:d.actor_id,index:d.approver_index,decision:d.decision,note:d.note})).sort((a,b)=>a.note.localeCompare(b.note))
+ const expected=[people.manager.id,owner.id,people.billing.id,people.admin.id].map((actor,index)=>({proposal:draft.id,revision:2,plan,step:[amount.id,discount.id,legal.id,legal.id][index],actor,index:[0,0,1,0][index],decision:'approved',note:'Synthetic archived decision '+index}))
+ assert.equal(approval.complete,true);assert.equal(approval.plan,plan);assert.deepEqual(projection(approval),expected)
+ return {id:draft.id,settings,approval,projection,expected,cookies:[people.admin.cookie,people.billing.cookie]}
+}
+
 test('PRICE-005 public CLI preserves business tax rates and frozen agreements without restoring signing authority',{timeout:360000},async()=>{
  const temporary=await mkdtemp(join(tmpdir(),'platter-tax-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
  let h
@@ -1038,6 +1038,7 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
   const code=(await h.state()).outbox.find(m=>m.proposal_id===p.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],session=await h.send(path+'/action?name=code.verify',{code})
   assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'two',items:[{id:'extra',quantity:4}],consent:true},session.cookie)).status,200)
   await h.cmd('tax.rate',{version,level:'city',region:'TX',jurisdiction:'Austin',startsOn:'2099-01-01',percent:'2'})
+  const archivedApprovals=await savedApprovalArchive(h,client.id)
   const before=await h.state(),proposalBefore=before.proposals.find(p1=>p1.id===p.id),bytes=(await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot,identity={auth:h.auth,owner:h.owner}
   assert.equal(proposalBefore.acceptance.totalCents,146885);assert.equal(proposalBefore.acceptance.depositCents,73443);assert.equal(proposalBefore.acceptance.selection.tax.taxCents,7885)
   await h.close();h=null
@@ -1045,6 +1046,11 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
   h=await harness({root:restored,...identity})
   await h.state(identity.owner,401);assert.equal((await h.send(path,undefined,session.cookie)).status,404)
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner),agreement=after.proposals.find(p1=>p1.id===p.id)
+  assert.deepEqual(after.approvalSettings,archivedApprovals.settings,'the complete saved policy and all three independently expected rules survive public CLI restore')
+  const restoredApprovals=after.proposals.find(row=>row.id===archivedApprovals.id).approval
+  assert.deepEqual(restoredApprovals,archivedApprovals.approval,'exact plan, actors, notes, decisions and times survive unchanged')
+  assert.deepEqual(archivedApprovals.projection(restoredApprovals),archivedApprovals.expected)
+  for(const cookie of archivedApprovals.cookies)assert.equal((await h.send('/api/platter/state',undefined,cookie)).status,401,'retained approval history restores no member session')
   assert.deepEqual(after.catalogItems,before.catalogItems)
   assert.deepEqual(after.businessRecords,before.businessRecords)
   for(const id of [recurringCatalog.id,catalogTemplateDraft.id]){

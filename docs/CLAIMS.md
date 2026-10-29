@@ -494,7 +494,7 @@ Evidence: `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.m
 
 Status: **partial**.
 
-Gap: Two-signer completion-email attachments, full agreement, vendor and client-upload attachment packaging, IP-derived location and user-agent recording, payment-gated completion mail and live-provider qualification remain. The pinned Managed relay does not support attachments; completion mail on that transport remains held without a send. External-store qualification remains with AUTO-002. Missing historical methods are never inferred; currently unrecorded location and user agent are labelled not recorded. This prerequisite remains PARTIAL.
+Gap: Full agreement, vendor and client-upload attachment packaging, IP-derived location and user-agent recording, payment-gated completion mail and live-provider qualification remain. The pinned Managed relay does not support attachments; completion mail on that transport remains held without a send. External-store qualification remains with AUTO-002. Missing historical methods are never inferred; currently unrecorded location and user agent are labelled not recorded. This prerequisite remains PARTIAL.
 
 Evidence: `tests/mail.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`, `tests/mail.test.mjs`
 

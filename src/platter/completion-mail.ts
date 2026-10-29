@@ -11,21 +11,34 @@ export function completionMailStatements(env:Bindings,id:string){
  JOIN p_proposals p ON p.id=a.proposal_id JOIN p_clients c ON c.id=p.client_id
  JOIN oa_operators o ON o.role='owner' AND o.status='active'
  WHERE a.proposal_id=? AND f.method='mailbox code' AND f.verified_at IS NOT NULL
- AND json_array_length(COALESCE(json_extract(a.snapshot,'$.recipient_plan'),'[]'))=0
+ AND NOT EXISTS(SELECT 1 FROM p_recipient_signatures s WHERE s.proposal_id=a.proposal_id AND s.revision=a.revision
+                AND (s.method!='mailbox code' OR s.verified_at IS NULL))
  AND COALESCE(json_extract(a.snapshot,'$.collectionPolicy.enabled'),0)=0
  ORDER BY o.id LIMIT 1 ON CONFLICT DO NOTHING`).bind(id)]
- for(const party of ['client','firm']){
-  const mailId=crypto.randomUUID()
-  writes.push(db.prepare('INSERT INTO p_completion_mail SELECT ?,proposal_id,revision,? FROM p_completion_authority WHERE proposal_id=? ON CONFLICT DO NOTHING').bind(mailId,party,id))
-  writes.push(db.prepare(`INSERT INTO p_mail(id,proposal_id,recipient,subject,body,status,created_at,sender_id,provider,proposal_revision)
- SELECT m.mail_id,a.proposal_id,CASE m.party WHEN 'client' THEN g.recipient ELSE g.firm_email END,
+ // The accepted plan is the immutable destination list; an owner in that plan receives one copy.
+ writes.push(db.prepare(`INSERT INTO p_completion_mail
+ SELECT lower(hex(randomblob(16))),g.proposal_id,g.revision,'recipient:'||json_extract(r.value,'$.id'),json_extract(r.value,'$.email')
+ FROM p_completion_authority g JOIN p_acceptances a ON a.proposal_id=g.proposal_id,
+ json_each(a.snapshot,'$.recipient_plan') r
+ WHERE g.proposal_id=? AND json_extract(r.value,'$.email') IS NOT NULL ON CONFLICT DO NOTHING`).bind(id))
+ writes.push(db.prepare(`INSERT INTO p_completion_mail
+ SELECT lower(hex(randomblob(16))),g.proposal_id,g.revision,'client',g.recipient
+ FROM p_completion_authority g JOIN p_acceptances a ON a.proposal_id=g.proposal_id
+ WHERE g.proposal_id=? AND json_array_length(COALESCE(json_extract(a.snapshot,'$.recipient_plan'),'[]'))=0
+ ON CONFLICT DO NOTHING`).bind(id))
+ writes.push(db.prepare(`INSERT INTO p_completion_mail
+ SELECT lower(hex(randomblob(16))),g.proposal_id,g.revision,'firm',g.firm_email
+ FROM p_completion_authority g WHERE g.proposal_id=?
+ AND NOT EXISTS(SELECT 1 FROM p_completion_mail m WHERE m.proposal_id=g.proposal_id AND m.recipient=g.firm_email)
+ ON CONFLICT DO NOTHING`).bind(id))
+ writes.push(db.prepare(`INSERT INTO p_mail(id,proposal_id,recipient,subject,body,status,created_at,sender_id,provider,proposal_revision)
+ SELECT m.mail_id,a.proposal_id,m.recipient,
  'Agreement complete: '||json_extract(a.snapshot,'$.title'),
  'The signed agreement PDF and certificate of completion for revision '||a.revision||' are attached.',
  ?,a.accepted_at,g.owner_id,?,a.revision
  FROM p_completion_mail m JOIN p_completion_authority g ON g.proposal_id=m.proposal_id
  JOIN p_acceptances a ON a.proposal_id=m.proposal_id AND a.revision=m.revision
- WHERE m.mail_id=? ON CONFLICT DO NOTHING`).bind(env.AUTH_LOCAL==='true'&&env.RER_DEMO!=='1'?'local':'pending',env.MAIL_PROVIDER??null,mailId))
- }
+ WHERE m.proposal_id=? AND m.recipient IS NOT NULL ON CONFLICT DO NOTHING`).bind(env.AUTH_LOCAL==='true'&&env.RER_DEMO!=='1'?'local':'pending',env.MAIL_PROVIDER??null,id))
  return writes
 }
 
@@ -38,7 +51,7 @@ export async function completionAuthority(env:Bindings,row:any){
  JOIN p_clients c ON c.id=g.client_id AND c.id=p.client_id AND c.email=g.client_email
  JOIN oa_operators o ON o.id=g.owner_id AND o.version=g.owner_version AND o.email=g.firm_email AND o.role='owner' AND o.status='active'
  WHERE g.proposal_id=? AND g.revision=? AND a.email=g.recipient`).bind(ref.proposal_id,ref.revision).first<any>()
- need(grant&&row.proposal_id===ref.proposal_id&&row.proposal_revision===ref.revision&&row.sender_id===grant.owner_id&&row.recipient===(ref.party==='client'?grant.recipient:grant.firm_email),'Completion mail authority changed; restored history never sends',403)
+ need(grant&&row.proposal_id===ref.proposal_id&&row.proposal_revision===ref.revision&&row.sender_id===grant.owner_id&&row.recipient===(ref.recipient??(ref.party==='client'?grant.recipient:grant.firm_email)),'Completion mail authority changed; restored history never sends',403)
  return grant
 }
 

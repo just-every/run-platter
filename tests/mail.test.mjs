@@ -1501,6 +1501,9 @@ test('SIGN-005 completion mail attaches the retained PDFs to both parties once, 
    assert.equal((await h.send(path+'/action?name=accept',accept,verified.cookie)).status,200)
    await Promise.all([cron(),cron()]);assert.equal(sent.filter(m=>m.subject.startsWith('Agreement complete:')).length,completion.length)
    assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_agreement_artifacts WHERE proposal_id=?').bind(id).first()).n,1)
+   stall=false
+   const {completionRecipients}=await import('./completion-recipients.mjs')
+   await completionRecipients(h,sent,provider,cron)
    if(provider==='resend'){
     stall=false;fail=true
     const uncertain=await approved(h),share=await h.cmd('proposal.send',{id:uncertain,version:2}),otherPath=new URL(share.shareUrl).pathname

@@ -2,7 +2,7 @@ import { completionMailStatements } from './completion-mail'
 import { archiveCompletion } from './archiving/jobs'
 import { clientLocale, clientText, type ClientLocale } from './locales'
 import { paymentTerms } from './payment-terms'
-import { recipientContent, recipientPlan, recipientProgress, recipientSignatures, requiredRecipient, completionMail } from './recipients'
+import { recipientContent, recipientPlan, recipientProgress, recipientSignatures, requiredRecipient } from './recipients'
 import { trackingSettings } from './tracking'
 import { signerMethod } from './signer-methods'
 import { deliverSmsCode, smsCodeContext } from './sms'
@@ -122,10 +122,10 @@ async function multiRecipientAccept(env:Bindings,c:Awaited<ReturnType<typeof cli
   const signatures=[...prior.map(s=>({name:s.name,email:s.email,role:s.role,slotId:s.slot_id,signedAt:s.signed_at,method:s.method,verifiedAt:s.verified_at,consent:s.consent})),{name:signer,email:row.clientEmail,role:recipient.role,slotId:recipient.id,signedAt:at,method:share.session_method,verifiedAt:share.session_verified_at,consent}]
   const policy=await collectionPolicy(db,row.id)
   const combinedFields=Object.assign({},...prior.map(s=>JSON.parse(s.snapshot).content.fieldValues??{}),fieldValues??{})
-  const final={...content,...(Object.keys(combinedFields).length?{fieldValues:combinedFields}:{}),signatures,...(policy.enabled?{collectionPolicy:policy}:{})}
+  const final={...content,recipient_plan:plan,...(Object.keys(combinedFields).length?{fieldValues:combinedFields}:{}),signatures,...(policy.enabled?{collectionPolicy:policy}:{})}
   writes.push(db.prepare('INSERT INTO p_acceptances(proposal_id,revision,snapshot,name,email,option_id,total_cents,deposit_cents,accepted_at,consent,currency) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(row.id,row.revision,JSON.stringify(final),first.name,first.email,choice.optionId,choice.totalCents,choice.depositCents,at,first.consent,content.currency),
    db.prepare('INSERT INTO p_signature_facts(proposal_id,revision,method,verified_at) VALUES(?,?,?,?)').bind(row.id,row.revision,first.method,first.verified_at),
-   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),...completionMail(env,row,plan,at))
+   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),...completionMailStatements(env,row.id))
  }
  const ownerGuard=recipient.role==='countersigner'?" AND EXISTS(SELECT 1 FROM oa_operators WHERE lower(email)=? AND role='owner' AND status='active')":''
  await atomic(env,c,writes,'p.version=? AND s.slot_id=? AND s.session_hash=? AND s.session_expires>? AND '+expiryOpenSql('p')+' AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))'+ownerGuard,[row.version,recipient.id,share.session_hash,at,at,discountDeadline([option]),at,...(ownerGuard?[row.clientEmail.toLowerCase()]:[])])

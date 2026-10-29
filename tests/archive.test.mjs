@@ -582,6 +582,9 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const multiCertificate=await h.send(multi.links.owner+'/certificate.json',undefined,sessions.owner)
   assert.equal(multiCertificate.status,200,multiCertificate.text)
   assert.deepEqual(multiCertificate.value.signers.map(s=>s.slotId),['ceo','cfo','owner'])
+  const multiArtifacts=await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(multi.id).first()
+  const multiCompletion=(await h.db.prepare('SELECT * FROM p_completion_mail WHERE proposal_id=? ORDER BY party').bind(multi.id).all()).results
+  assert.equal(multiCompletion.length,3)
   const voided=await recipientFixture(h,'Retained void signatures',roles(h.auth.OWNER_EMAIL)),voidCookie=await verifyRecipient(h,voided.links.ceo)
   assert.equal((await decision(h,voided.links.ceo,voidCookie)).status,200)
   const partial=(await h.state()).proposals.find(r=>r.id===voided.id)
@@ -626,6 +629,14 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(real.id).all()).results,artifacts)
   assert.equal((await h.send('/api/platter/certificate.json?id='+real.id,undefined,owner)).text,certificate.text)
   assert.equal((await h.send('/api/platter/certificate.json?id='+multi.id,undefined,owner)).text,multiCertificate.text)
+  assert.deepEqual(await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(multi.id).first(),multiArtifacts)
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_completion_mail WHERE proposal_id=? ORDER BY party').bind(multi.id).all()).results,multiCompletion)
+  for(const [kind,bytes] of [['agreement',multiArtifacts.document],['certificate',multiArtifacts.certificate]]){
+   const response=await h.mf.dispatchFetch(h.origin+'/api/platter/'+kind+'.pdf?id='+multi.id,{headers:{cookie:owner}})
+   assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),Buffer.from(bytes))
+  }
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_completion_authority').first()).n,0,'restored multi-party history grants no completion execution')
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures ORDER BY proposal_id,revision,slot_id').all()).results,signatures)
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_void_signatures ORDER BY proposal_id,revision').all()).results,voids)
   for(const path of [...Object.values(multi.links),...Object.values(voided.links),new URL(shared.shareUrl).pathname])assert.equal((await h.send(path)).status,404)

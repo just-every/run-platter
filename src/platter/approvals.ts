@@ -41,11 +41,20 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
  const selected:any[]=[];for(const rule of rules)if(await holds(rule))selected.push(rule)
  const decimal=(value:number|bigint)=>{const signed=BigInt(value),n=signed<0n?-signed:signed;return (signed<0n?'-':'')+(n/100n).toString()+'.'+(n%100n).toString().padStart(2,'0')}
  const templateName=origin?(starterTemplates().find(t=>t.id===origin.template_id)?.name??(await db.prepare('SELECT name FROM p_personal_templates WHERE id=?').bind(origin.template_id).first<any>())?.name??'Recorded template'):null
+ const marginSummary=(bps:number)=>{
+  const details=costing.packages.filter((p:any)=>p.marginBps===null||BigInt(p.marginBps)<BigInt(bps)).map((p:any)=>p.label+': '+(p.marginBps===null?'costs not recorded':decimal(p.marginBps)+'%'))
+  for(const line of costing.lines.filter((l:any)=>l.kind==='optional')){
+   const option=options.find((o:any)=>o.id===line.optionId),item=option.optionalItems.find((i:any)=>i.id===line.itemId),net=BigInt(item.unitCents)*BigInt(10000-(option.discount?.bps??0))/10000n-BigInt(option.discount?.fixedCents??0)
+   const reason=line.unitCostCents===null?'costs not recorded':net<=0n?'no positive net price':(net-BigInt(line.unitCostCents))*10000n<BigInt(bps)*net?'conservative unit margin '+decimal((net-BigInt(line.unitCostCents))*10000n/net)+'%':null
+   if(reason)details.push(option.label+' optional '+item.label+': '+reason)
+  }
+  return 'Offered margin requires '+decimal(bps)+'%: '+details.join('; ')+'.'
+ }
  const trigger=(rule:any)=>{
   const c=rule.condition
   let detail=c.kind==='totalOver'?'Highest offered gross total '+row.currency+' '+decimal(total)+' exceeds '+c.currency+' '+decimal(c.cents)+'.'
    :c.kind==='discountOver'?'Offered discount '+decimal(Math.max(...options.map((o:any)=>discountThreshold(o))))+'% exceeds '+decimal(c.bps)+'%.'
-   :c.kind==='marginBelow'?'Offered margin requires '+decimal(c.bps)+'%: '+costing.packages.map((p:any)=>p.label+': '+(p.marginBps===null?'costs not recorded':decimal(p.marginBps)+'%')).join('; ')+'. Optional items also require review when their costs are missing or their margin is below the threshold.'
+   :c.kind==='marginBelow'?marginSummary(c.bps)
    :c.kind==='paymentTerms'?'Deposit '+decimal(row.deposit_bps)+'%; required minimum '+decimal(c.minimumDepositBps)+'%.'+(c.standardTerms!==null&&String(row.terms??'')!==c.standardTerms?' Legal terms differ from the configured standard.':'')+(paymentTerms(row)?' A payment schedule or net terms is configured.':'')+(options.some((o:any)=>o.tables?.some((t:any)=>t.lines.some((l:any)=>l.recurrence))||o.optionalItems?.some((i:any)=>i.recurrence))?' Recurring fees require review.':'')
    :c.kind==='template'?'Proposal started from template “'+templateName+'”.'
    :c.kind==='termsEdited'?'Legal terms changed from revision 1.':'The recorded rule requires review.'

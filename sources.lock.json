@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "70b51b13ccd140b5713eb0421dc203f99de3eef8375bdaaf1618bd1f2202513e",
+      "sha256": "dee686034f6c6b63612a1884ee1f0a2fb306b91fdd2a81869ffaeeabbfdb1587",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "ac24ba0064c93ddd31ffde5863e776e0f74e0cfe9e7c5126e56338051ee2fdf4",
+      "sha256": "8f20c5bbd392cd441010b7b38c8b9346605116a0b3fd76b7fe2de90c5f92b652",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "b12091b2f39ae105fdee89b5a243ee86c9c371c823f96688924f7c72cac84651",
+      "sha256": "996b27646f7f0f7c3c36cd4143f963324337b3a43171f4fdb4fa06d6f41e6d14",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -571,6 +571,10 @@
     },
     "migrations/core/0093_signing_context.sql": {
       "sha256": "e97f7cddd16317fc7e47a6f96a5912f03668d1112d91d05a56611f2034d89b70",
+      "executable": false
+    },
+    "migrations/core/0094_expiry_notice_consent.sql": {
+      "sha256": "fe0d1a84bb8fba39a109d5687ec9323b3f403b3f008daec5e0e6b5b5280dbdff",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -3017,6 +3021,10 @@
       "sha256": "e95e959a0eed7bdd0ff6bce827c6fa288c35186f963a3b64b27ea8a4a13552d1",
       "executable": false
     },
+    "src/platter/ui/expiry-notices.ts": {
+      "sha256": "84b0ae41e946663fecc1db153aa2b8c19cba02b694bd96902a7db3bd634b9af7",
+      "executable": false
+    },
     "src/platter/ui/expiry.ts": {
       "sha256": "571eda731de39b40cdfb1cd73d1f42c7815a6c726fd13cb6ea4b299ed473b2f4",
       "executable": false
@@ -3278,7 +3286,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "c97af6a5345241d49861f7bf0a49c83372468565531ab5965ce5f7037fa28ffe",
+      "sha256": "d712a11c8ad5936b99aa8b8469650aaa347dede8d4e47fc993862d3e1d29be71",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3454,7 +3462,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "bf1d9686181f5bfafcd9d9088edcf7b8959ca61202db66cb9497ca1447eb74e5",
+      "sha256": "f1f6650b81d6b1e464901e56b9d9c33482e0af933b98e88a9577b07493563176",
       "executable": false
     },
     "tests/site-harness.mjs": {

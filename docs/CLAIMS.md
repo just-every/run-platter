@@ -428,9 +428,9 @@ Evidence: `src/platter/followup/queue.ts`, `src/platter/followup/commands.ts`, `
 
 Status: **partial**.
 
-Gap: Renewal execution and the RENEW-002 offer, SEND-005 watchers and their channel preferences, sender settings screens, default-on activation without per-proposal consent, template inheritance and public proof for declined offers remain. The stored renewal defaults do not execute renewal notices. Conservative default adopted pending ct approval: an authorized sender must explicitly consent per proposal; notices go only to the recorded active sales owner; upgrades and restores never activate outbound work. Existing open manual follow-ups are preserved instead of overwritten. RENEW-002, SEND-005 and FOLLOW-006 inherit the matching authority, timing and custody obligations.
+Gap: Renewal execution and the RENEW-002 offer, SEND-005 watchers and their channel preferences, default-on activation without per-proposal consent and template inheritance remain. Stored renewal defaults do not execute renewal notices. The ct-approved staged policy (23 October 12:54 UTC and RL-102 in RULINGS.md) requires explicit current-sender authorization per proposal, bound to its revision, settings and recorded active sales owner; upgrades, copies and restores confer no outbound authority. Existing open manual follow-ups are preserved. RENEW-002, SEND-005 and FOLLOW-006 inherit the matching authority, timing and custody obligations. RENEW-002 retains its recorded continuation hold.
 
-Evidence: `tests/mail.test.mjs`
+Evidence: `tests/mail.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
 
 ## FOLLOW-004 — Client questions and comments
 

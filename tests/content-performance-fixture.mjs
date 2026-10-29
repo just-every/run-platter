@@ -14,10 +14,11 @@ export async function contentFixture(h,count=100,{approval=true,reason='Recorded
  }
  await h.cmd('tracking.settings',{enabled:'yes',consent:'yes',alerts:'no',quietMinutes:30,retentionDays:90})
  const proposals=[],views=[]
+ const baseTime=Math.max(Date.now(),(await h.db.prepare('SELECT observed_at FROM p_expiry_clock WHERE singleton=1').first())?.observed_at??0)+86400000
  let caseIndex=0
  const clock=async at=>h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET observed_at=excluded.observed_at').bind(at).run()
  for(let i=0;i<count;i++){
-  const at=Date.parse('2027-06-01T12:00:00Z')+i*300000;await clock(at)
+  const at=baseTime+i*300000;await clock(at)
   const template=templates[i<40?0:i<70?1:2]
   let p=await h.cmd('template.start',{id:template.id,version:1,clientId:client.id,title:'Content decision '+i})
   p=await h.cmd('proposal.revise',{...contentOffer,id:p.id,version:p.version,clientId:client.id,title:'Content decision '+i,packages:[{id:'one',label:i<30?'Growth':'Essentials',price:'1000',optionalItems:i<25?[rush('rush')]:[]},{id:'two',label:'Premium',price:'2000',optionalItems:[review,...(i<25?[rush('rush-other')]:[])]}]})
@@ -34,6 +35,11 @@ export async function contentFixture(h,count=100,{approval=true,reason='Recorded
   const capture={viewId,optionId:'one',readings}
   assert.equal((await h.send(path+'/engagement',capture)).status,200)
   if(i===0){assert.equal((await h.send(path+'/engagement',capture)).status,200,'cumulative capture replay never adds reading time')}
+  if(i===11){
+   const again=await h.send(path),second=again.text.match(/data-engagement-view="([^"]+)"/)[1]
+   await clock(at+210000)
+   assert.equal((await h.send(path+'/engagement',{viewId:second,optionId:'one',readings:{['block:'+blocks[0]]:5000}})).status,200,'a repeat view adds time to the same proposal sample')
+  }
   views.push({path,viewId,capture})
   const won=i<18||i>=40&&i<55||i>=70&&i<90
   if(won&&i!==89){

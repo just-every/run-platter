@@ -47,8 +47,8 @@ export async function followupJourney(h, {offer, verified}) {
   assert.equal(all.timeZone, 'UTC')
   assert.deepEqual(all.rows.map(row => row.title), ['A', 'C', 'D', 'F', 'E', 'B', 'G'], 'viewed proposals rank before unopened proposals')
   const measured=await h.send(fixture.F.path),viewId=measured.text.match(/data-engagement-view="([^"]+)"/)[1]
-  await h.db.prepare('UPDATE p_expiry_clock SET observed_at=? WHERE singleton=1').bind(at+40000).run()
-  assert.equal((await h.send(fixture.F.path+'/engagement',{viewId,section:'pricing',milliseconds:40000,optionId:'one'})).status,200)
+  await h.db.prepare('UPDATE p_expiry_clock SET observed_at=? WHERE singleton=1').bind(at+45000).run()
+  assert.equal((await h.send(fixture.F.path+'/engagement',{viewId,readings:{pricing:40000,'package:one':45000},optionId:'one'})).status,200)
   const detailed=(await queue()).rows
   assert.deepEqual(detailed.map(r=>r.title),['A','C','D','F','E','B','G'],'section detail preserves the original reason ranks')
   assert.equal(detailed.find(r=>r.title==='F').engagementReason,'Read Pricing for 40.0 seconds')

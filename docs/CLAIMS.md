@@ -792,11 +792,9 @@ Evidence: None recorded.
 
 ## REPORT-003 — Content and pricing performance
 
-Status: **partial**.
+Status: **done**.
 
-Gap: Reading-time aggregation, including the 95-second median, broader content-report role access and configured multi-recipient analytics remain. The recorded tracking ruling still requires explicit owner opt-in, owner-only details, first-party measurement, no cross-proposal profiling or third-party scripts, and fresh consent after restore. TEAM-001 retains its full content-report rights matrix and supported native invitation issuer-version preservation hold; no credential-version rebinding.
-
-Evidence: `tests/platter.test.mjs`, `tests/site-documents.mjs`, `tests/archive.test.mjs`
+Evidence: `tests/platter.test.mjs`, `tests/site-documents.mjs`, `tests/tracking-details-browser.mjs`, `tests/archive.test.mjs`
 
 ## REPORT-004 — Booked, billed and collected revenue
 

@@ -747,6 +747,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.equal(beforeRevenueCsv.status,200)
   const contentKey=await h.cmd('agent.create',{label:'Synthetic content archive key'})
   const contentHistory=await contentFixture(h,100,{approval:false,reason:'Budget'})
+  const contentObservedAt=(await h.db.prepare('SELECT observed_at FROM p_expiry_clock WHERE singleton=1').first()).observed_at
   const contentBefore=await h.send('/api/platter/content-performance?sort=rate&direction=desc',undefined,h.owner)
   assert.equal(contentBefore.status,200);assert.ok(contentBefore.value.decidedCount>=100)
   // This journey also has its earlier won override, whose rows are included in the exact restored comparison.
@@ -762,6 +763,9 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   const archive=join(temporary,'teams.rer');await command(source,['export','--output',archive]);await command(restored,['import','--input',archive,'--yes'])
   const restoredCalls=[]
   h=await harness({root:restored,unclaimed:true,outboundService:async request=>{restoredCalls.push(new URL(request.url).hostname);throw new Error('Restore must not call a provider')}})
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_expiry_clock').first()).n,0,'restore carries no installation clock authority')
+  // Compare both complete reports at the same explicitly pinned observation time.
+  await h.db.prepare('INSERT INTO p_expiry_clock VALUES(1,?)').bind(contentObservedAt).run()
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_member_invitations').first()).n,0,'pending delegated authority is excluded from archives');assert.equal((await h.db.prepare('SELECT status FROM oa_operators WHERE email=?').bind('unjoined@synthetic-platter.example').first()).status,'invited');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_connection_secrets').first()).n,0);assert.ok(after.connections.every(c=>c.status==='needs_reconnection'));assert.deepEqual(after.paymentRecords,before.paymentRecords);assert.equal((await h.cmd('payment.refund',refund,owner)).status,'succeeded','restored historical refund retries never issue another provider call');assert.doesNotMatch(JSON.stringify(after),/synthetic-platter-(2301|4121|2803|2804)/);assert.equal(after.connections.find(c=>c.provider==='hubspot').status,'needs_reconnection')
   assert.deepEqual(after.outcomeSettings,before.outcomeSettings);assert.deepEqual(after.proposals.find(r=>r.id===outcomeDraft.id).outcomes,before.proposals.find(r=>r.id===outcomeDraft.id).outcomes)

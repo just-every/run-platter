@@ -6,6 +6,7 @@ import { recipientCommand, recipientInvitations, recipientInput } from './recipi
 import { unfilledVariables } from './api/variables'
 import { stakeholderRecipient } from './tracking/index'
 import { trackingCommand } from './tracking'
+import { applyPriceFields } from './price-suggestions'
 import { collaborationCommand } from './collaboration'
 import { replaceSigner } from './signer-replacement'
 import { signerMethodCommand } from './signer-methods'
@@ -120,6 +121,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   const current=await proposal(db,p.id);exact(current,p);const displayed=negotiatedView(current,await pendingNegotiation(db,current.id));
   return command(env,a,'proposal.revise',{...editableVariableFields(displayed),id:current.id,version:current.version,...(p.fields as any??{}),variableValues:p.values??Object.fromEntries([...Object.entries(p).filter(([key,value])=>key.startsWith('variable:')&&value!=='').map(([key,value])=>[key.slice(9),value]),...Object.entries(p).filter(([key,value])=>key.startsWith('clear:')&&value==='yes').map(([key])=>[key.slice(6),''])]),...(p.deal!==undefined?{variableDeal:p.deal}:p.dealId?{variableDeal:{provider:p.dealProvider??'hubspot',id:p.dealId}}:{})})
  }
+ if(name==='pricing.suggest.apply')return command(env,a,'proposal.revise',await applyPriceFields(db,a,p))
  if(name==='catalog.save')return saveCatalog(db,a,p)
  if(name==='catalog.insert'){const addition=await catalogInsertion(db,a,p);return command(env,a,'proposal.revise',addition.fields,undefined,addition.costs)}
  if(name==='proposal.unlock'||name==='template.locks')return sectionLockCommand(db,a,name,p)
@@ -152,7 +154,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='suggestions.allow'||name==='suggestion.resolve')return suggestionCommand(env,a,name,p)
  if(name==='proposal.restore'){const fields=await restoreFields(db,a,p);return command(env,a,'proposal.revise',fields,fields.restoredAttachments,undefined,Number(p.revision),fields.restoredTax)}
  if(name==='client.save'){
-  need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email,variable_fields) VALUES(?,?,?,?)').bind(id,text(p.name,'a client name'),email(p.email),JSON.stringify(clientVariableFields(p.variableFields??Object.fromEntries(['contactName','firstName','lastName','title','address'].filter(key=>p[key]!==undefined).map(key=>[key,p[key]])))))]);return{id}
+  need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email,segment,variable_fields) VALUES(?,?,?,?,?)').bind(id,text(p.name,'a client name'),email(p.email),p.segment?text(p.segment,'a client segment',100):'Not recorded',JSON.stringify(clientVariableFields(p.variableFields??Object.fromEntries(['contactName','firstName','lastName','title','address'].filter(key=>p[key]!==undefined).map(key=>[key,p[key]])))))]);return{id}
  }
  if(name==='client.erase'){
   need(a.role==='owner','Only the owner erases clients',403);const id=text(p.id,'a client'),c=await db.prepare('SELECT * FROM p_clients WHERE id=?').bind(id).first<any>();need(c,'Client not found',404);need(p.confirmName===c.name,'Type the exact client name to confirm erasure');

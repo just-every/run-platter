@@ -1690,8 +1690,8 @@ Core · target · **missing**
 **Acceptance.**
 1. From a fixture of 100 decided proposals, see win rate, median time to sign, median time to pay, average deal value and lost-reason counts by owner, template, service, client segment and quarter, each matching the fixture's hand-computed values.
 
-**Evidence.** None.
-**Gap.** No conversion reporting.
+**Evidence.** `src/platter/reports/performance.ts`; `tests/platter.test.mjs`; `tests/site-lifecycle.mjs`; `tests/archive.test.mjs`; `migrations/core/0094_client_segments.sql`
+**Gap.** Current main judgment retained. Replayed segmented performance, CSV, schedules and archive assertions await fresh clause review.
 
 #### REPORT-003 — Content and pricing performance
 
@@ -2096,8 +2096,8 @@ Core · target · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGEN
 1. From fixture history, the suggested range shows its sample size and three linked examples.
 2. Under the held policy, the standard-class price edit remains unchanged until its reviewer applies the suggestion.
 
-**Evidence.** None.
-**Gap.** No price suggestions.
+**Evidence.** `src/platter/price-suggestions.ts`; `tests/platter.test.mjs`; `tests/site-lifecycle.mjs`; `tests/archive.test.mjs`; `migrations/core/0094_client_segments.sql`
+**Gap.** Current main judgment retained. Replayed historical suggestions and explicit revision apply await review against current held-policy acceptance.
 
 ### Privacy, security and portability
 

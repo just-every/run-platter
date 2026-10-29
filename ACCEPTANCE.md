@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `a78175c3c6e7676bd705e2bdaf12f6c633a9a9c3` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -402,15 +402,15 @@ Core · target · **missing** · Rules D-1
 
 #### EDIT-014 — Client PDF download before signing
 
-Core · target · **partial** · Cites BASE-ROLE-001 · Rules D-1
+Core · target · **done** · Cites BASE-ROLE-001 · Rules D-1
 
 **Requirement.** A recipient can download a PDF of the revision they are viewing before signing, so their procurement team can circulate it, unless the firm turns this off per proposal or template. The PDF carries the selection made so far, the revision number and "Not signed" on every page, and each download is on the timeline (`TRACK-001`). The signed agreement PDF remains `SIGN-005`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-014).
 
 **Acceptance.**
 1. As a verified client, choose a package and download the PDF: every page reads "Not signed, revision 2" and shows the chosen package, and the timeline lists the download; turn downloads off on another proposal and see no download action and the PDF route refused (403).
 
-**Evidence.** `src/platter/documents/client-pdf.ts`; `src/platter/documents/offer-pdf.ts`; `tests/platter.test.mjs` — “EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and every page marked; disabling refuses download without a write”; `tests/site.test.mjs` — “PRICE-001 / COLLAB-003 / EDIT-014 / EDIT-018 desktop and phone create grouped line tables, edit and restore, preview, send, download and accept identical server totals” (registered through tests/site-documents.mjs); `tests/archive.test.mjs`
-**Gap.** Delivered: Selected money and current unsigned revision marks reach downloaded bytes; disabling downloads removes the browser action and refuses the route. Missing “EDIT-014 complete client pdf download before signing journey”: A multi-page selected-package download visibly identifies its chosen package on every page while retaining the disabled-download boundary.
+**Evidence.** `src/platter/documents/client-pdf.ts`; `src/platter/documents/offer-pdf.ts`; `src/platter/documents/pdf-text.ts`; `tests/platter.test.mjs` — “EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and every page marked; disabling refuses download without a write” (each independently extracted page names the selected package and revision, exact totals, timeline, disabled and stale no-write refusals); `tests/site.test.mjs` loads `tests/site-documents.mjs` — “EDIT-014 client selects and downloads revision 2 at desktop and phone; owner timeline and per-proposal disable remain authoritative” (compiled multi-page downloads and policy controls at 1440 and 390); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences” (exact client, chosen package, revision and download time, retained policy and no restored invitation authority).
+**Gap.** None.
 
 #### EDIT-015 — Locked template sections
 

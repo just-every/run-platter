@@ -1015,6 +1015,7 @@ test('EDIT-009 conditional sections match selected preview, client, PDF and immu
   assert.ok(!row.snapshot.includes('section_conditions'));assert.equal(row.snapshot.includes(fields.terms),optionId==='two')
   const signed=await h.mf.dispatchFetch(h.origin+path+'/agreement.pdf',{headers:{cookie}});assert.equal(signed.status,200)
   const signedText=(await pdfPages(await signed.arrayBuffer())).join(' ');assert.equal(signedText.includes(fields.terms),optionId==='two');assert.ok(signedText.includes(offer.scope))
+  assert.equal(/\bTerms\b/.test(signedText),optionId==='two','An excluded section has no heading in the signed PDF')
   assert.equal((await h.send(path+'?optionId='+(optionId==='one'?'two':'one'),undefined,cookie)).text.includes(fields.terms),optionId==='two','accepted selection cannot change through a query')
   await h.cmd('proposal.revise',{...fields,id:p.id,version:current.version+3},h.owner,409)
  }

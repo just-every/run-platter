@@ -42,7 +42,7 @@ export async function regionalBrowser({page,context,origin,command,width,screens
   await visible(region);await capture(region+'-client')
   const pending=page.waitForEvent('download');await page.getByRole('button',{name:'Download unsigned proposal PDF',exact:true}).click()
   const unsigned=(await pdfPages(await readFile(await(await pending).path()))).join(' ')
-  assert.equal(unsigned.includes(regionalTerms),region==='West');assert.ok(unsigned.includes(regionalScope))
+  assert.equal(unsigned.includes(regionalTerms),region==='West');assert.ok(unsigned.includes(regionalScope));assert.equal(/\bTerms\b/.test(unsigned),region==='West')
   const draft=await command('proposal.duplicate',{id:p.id,version:sent.version,clientId:client.id}),opposite=region==='West'?'East':'West'
   await page.goto(origin+'/app/proposal?id='+draft.id)
   await page.getByLabel('Custom.Region',{exact:true}).fill(opposite)
@@ -53,7 +53,7 @@ export async function regionalBrowser({page,context,origin,command,width,screens
   await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
   assert.match(await page.locator('main').innerText(),/This agreement is complete/);await visible(region);await capture(region+'-accepted')
   const signed=await download('Signed agreement PDF')
-  const signedText=(await pdfPages(signed)).join(' ');assert.equal(signedText.includes(regionalTerms),region==='West');assert.ok(signedText.includes(regionalScope))
+  const signedText=(await pdfPages(signed)).join(' ');assert.equal(signedText.includes(regionalTerms),region==='West');assert.ok(signedText.includes(regionalScope));assert.equal(/\bTerms\b/.test(signedText),region==='West')
   await page.goto(origin+'/app/proposal?id='+draft.id)
   await page.getByLabel('Custom.Region',{exact:true}).fill(region)
   await page.getByRole('button',{name:'Fill proposal variables',exact:true}).click()

@@ -12,6 +12,10 @@ const showsRegion = (text,region) => {
  assert.equal(text.includes(regionalTerms),region==='West','Only the filled West value shows the conditional timeline')
  assert.ok(text.includes(regionalScope),'Unconditional scope remains visible')
 }
+const showsPdfRegion = (text,region) => {
+ showsRegion(text,region)
+ assert.equal(/\bTerms\b/.test(text),region==='West','PDF sections match the visible client sections, including headings')
+}
 async function download(h,path,cookie){
  const response=await h.mf.dispatchFetch(h.origin+path,{headers:{cookie}})
  assert.equal(response.status,200)
@@ -45,7 +49,7 @@ export async function regionalConditions(h,member=h.owner){
    const page=await h.send(path+'?optionId=two',undefined,cookie);assert.equal(page.status,200);showsRegion(page.text,region)
    const data=await h.send(path+'/data.json',undefined,cookie);assert.equal(data.status,200)
    assert.equal(data.value.terms,region==='West'?regionalTerms:'');assert.equal(data.value.scope,regionalScope)
-   const text=await pdfText(await download(h,path+'/download.pdf?optionId=two',cookie));showsRegion(text,region)
+   const text=await pdfText(await download(h,path+'/download.pdf?optionId=two',cookie));showsPdfRegion(text,region)
    return {terms:data.value.terms,scope:data.value.scope,text}
   }
   const sent=await readSent(),draft=await h.cmd('proposal.duplicate',{id:p.id,version:3,clientId:client.id}),opposite=region==='West'?'East':'West'
@@ -60,7 +64,7 @@ export async function regionalConditions(h,member=h.owner){
   const agreement=JSON.parse(snapshot)
   assert.equal(agreement.terms,region==='West'?regionalTerms:'');assert.equal(agreement.scope,regionalScope)
   assert.equal(Object.hasOwn(agreement,'section_conditions'),false)
-  const signed=await download(h,path+'/agreement.pdf',cookie);showsRegion(await pdfText(signed),region)
+  const signed=await download(h,path+'/agreement.pdf',cookie);showsPdfRegion(await pdfText(signed),region)
   await h.cmd('proposal.variables',{id:draft.id,version:2,values:{'Custom.Region':region}})
   const edited=await h.send(`/app/preview/client?id=${draft.id}&revision=3&optionId=two`,undefined,h.owner)
   assert.equal(edited.status,200);showsRegion(edited.text,region)
@@ -81,7 +85,7 @@ export async function restoredRegionalConditions(h,owner,records){
   const {id,draftId,region,path,cookie,snapshot,signed}=record
   assert.equal((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(id).first()).snapshot,snapshot,'Conditional agreement restores exactly')
   const document=await download(h,'/api/platter/agreement.pdf?id='+id,owner)
-  assert.deepEqual(document,signed,'Conditional signed PDF restores byte for byte');showsRegion(await pdfText(document),region)
+  assert.deepEqual(document,signed,'Conditional signed PDF restores byte for byte');showsPdfRegion(await pdfText(document),region)
   const preview=await h.send(`/app/preview/client?id=${draftId}&revision=3&optionId=two`,undefined,owner)
   assert.equal(preview.status,200);showsRegion(preview.text,region)
   for(const suffix of ['', '/data.json','/agreement.pdf','/action?name=accept']){

@@ -58,10 +58,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   const templateName = text(input.name, 'a template name')
   const { id: _id, client_id: _client, revision: _revision, ...content } = snapshot(displayed)
   if(content.document){content.document=bindDocument(content.document);if(content.document.merge)content.document.merge={patterns:content.document.merge.patterns,values:{}}}
-  if(content.recipient_plan){
-   content.recipient_plan=templateRecipients(displayed,a,input)
-   for(const b of documentOf(content).blocks.filter(b=>b.recipientRole==='slot'))need(content.recipient_plan.some((r:any)=>r.id===b.recipientId&&requiredRecipient(r)),'Assign field '+b.title+' to a required template recipient slot',409)
-  }
+  if(content.recipient_plan)content.recipient_plan=templateRecipients(displayed,a,input)
+  for(const b of documentOf(content).blocks.filter(b=>b.recipientRole==='slot'))need((content.recipient_plan??[]).some((r:any)=>r.id===b.recipientId&&requiredRecipient(r)),'Assign field '+b.title+' to a required template recipient slot',409)
   if(existing)await assertTemplateLocks(db,existing,content)
   const [pdf, savedExpiry, sections] = await Promise.all([
    db.prepare('SELECT enabled FROM p_pdf_settings WHERE proposal_id=?').bind(source.id).first<any>(),

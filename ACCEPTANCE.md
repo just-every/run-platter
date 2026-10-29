@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 101 | 43 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 101 | 47 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `6a4abf8dabe3f29f0a267ac75a4412c4d719374b` (29 October 2026). EDIT-012 completion evidence extends that source checkpoint in this landing candidate; the exact candidate SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. EDIT-012 is a builder completion claim pending guarded landing and ct judgment. SEND-008 retains its existing builder completion claim. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -359,7 +359,7 @@ Core · target · **partial** · Rules D-1
 
 #### EDIT-012 — Duplicate a proposal for another client
 
-Core · target · **partial** · Rules D-1
+Core · target · **done** · Rules D-1
 
 **Requirement.** A person duplicates any draft, sent, accepted or lost proposal for the same or another client. The source remains unchanged; the copy is an independent new draft, with destination variables and recipient slots. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-012).
 
@@ -369,8 +369,8 @@ Core · target · **partial** · Rules D-1
 3. With approval required for all proposals, sending waits for approval; with it off and no matching rule, the owning sales member sends.
 4. Acme’s agreement remains byte-identical.
 
-**Evidence.** `src/platter/duplicate.ts`; `tests/platter.test.mjs` — “EDIT-012 duplicate accepted content into an independent member-owned draft for another client without changing the source”; `tests/site.test.mjs` — “EDIT-012 desktop and phone duplicate an accepted agreement for Beta Co and approve its separate draft” (registered through `tests/site-documents.mjs`); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
-**Gap.** Delivered: A populated mailbox-verified Acme agreement with collection off, a recorded offline receipt and invoice duplicates through a native person command into an independent Beta draft. Local contact and custom variables refill from Beta; exact content, prices, files, payment schedule, payment choices, reminder text and schedule, PDF policy and expiry settings are reconciled. The copied reminder form displays the retained subject and message while requiring a fresh recipient zone and sender authorization. The copy has no approval, acceptance, receipt, invoice, question, view, invitation or outbound authority; ordinary approval and owning-sales sending are exercised both with mandatory approval and with approval off. Acme receipt records and agreement and certificate bytes remain unchanged, and public CLI custody retains both records and exact files without restored execution. Gap: Template-preassigned recipient slots and complete SIGN-011 and SIGN-012 snapshot behavior remain unproved pending their native foundations; configured-recipient execution retains the SEND-003 and SIGN-004 authority-policy Gaps. Provider execution and EDIT-021’s complete source-state and company-policy matrix remain in their owning clauses.
+**Evidence.** `src/platter/duplicate.ts`; `tests/platter.test.mjs` — “EDIT-012 duplicate accepted content into an independent member-owned draft for another client without changing the source”; `tests/site.test.mjs` — “EDIT-012 desktop and phone duplicate an accepted agreement for Beta Co and approve its separate draft” (registered through `tests/site-documents.mjs`); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”; `tests/duplicate-recipients.mjs` — duplicateTemplateRecipients, called by the named HTTP journey (template role and field snapshots, explicit owner preassignment, unchanged accepted source, cleared ordinary recipients, authority refusals and fresh approval and sending)
+**Gap.** None.
 
 #### EDIT-021 — Duplicate lifecycle and file custody
 
@@ -1263,7 +1263,7 @@ Core · target · **missing** · Rules D-1
 
 #### SIGN-011 — Template recipient roles, field assignment and signing order
 
-Core · target · **missing** · Rules D-1
+Core · target · **partial** · Rules D-1
 
 **Requirement.** Templates define named signer, client approver, viewer, CC and firm-countersigner roles, each with assigned fields, order/parallel group and identity check. Every signature, initials, date and required form field has exactly one role; missing assignment prevents publication. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#sign-011).
 
@@ -1274,12 +1274,12 @@ Core · target · **missing** · Rules D-1
 4. Filled recipient fields and signing order match their template role; the CFO cannot act before the signer and the owner cannot countersign before the CFO.
 5. A completed countersignature completes the agreement.
 
-**Evidence.** None.
-**Gap.** No templates, recipient roles or field assignments; one client recipient per proposal.
+**Evidence.** `tests/platter.test.mjs` — “EDIT-012 duplicate accepted content into an independent member-owned draft for another client without changing the source”, through `tests/duplicate-recipients.mjs` — duplicateTemplateRecipients; `tests/packages-journey.mjs` — duplicatePackagesJourney; `tests/archive.test.mjs`
+**Gap.** Delivered: Native templates snapshot signer, client approver and owner countersigner roles, assigned signature and required text and date fields, signing groups and explicit owner preassignment. An unassigned slot field prevents template saving. Current-owner recipient and invitation authority follows RL-21; copying never invites. Remaining acceptance work includes the labelled HubSpot CFO contact suggestion, complete template role and identity-check management, the full field-kind and publication journey, and complete SIGN-012 creation-door coverage. No provider qualification or delegated authority is claimed.
 
 #### SIGN-012 — Recipient-role snapshots across creation
 
-Core · target · **missing** · From SIGN-011 · Rules D-1
+Core · target · **partial** · From SIGN-011 · Rules D-1
 
 **Requirement.** Every template start, duplicate, bulk proposal, public submission and AI draft copies its role/field/order snapshot. A person can edit its roles and order before sending without changing the template or earlier proposals.
 
@@ -1289,8 +1289,8 @@ Core · target · **missing** · From SIGN-011 · Rules D-1
 3. Each other creation door keeps the same role-slot assignment behavior.
 4. A PandaDoc API template with Client/Sender roles imports the same fields, order and preassigned recipients.
 
-**Evidence.** None.
-**Gap.** No templates, recipient roles or field assignments; one client recipient per proposal.
+**Evidence.** `tests/platter.test.mjs` — “EDIT-012 duplicate accepted content into an independent member-owned draft for another client without changing the source”, through `tests/duplicate-recipients.mjs` — duplicateTemplateRecipients; `tests/packages-journey.mjs` — duplicatePackagesJourney; `tests/archive.test.mjs`
+**Gap.** Delivered: Native template starts and duplicates retain independent role, field, order and explicit preassignment snapshots. Later template replacement leaves an accepted source and its copies unchanged; copied ordinary recipients are cleared and fresh approval and invitations are required. Remaining: complete existing-versus-next-start order proof, every bulk, public-submission and AI creation door, PandaDoc API role and field import, and the remaining SIGN-011 obligations. RL-21 authority and existing provider boundaries remain unchanged.
 
 ### Payments
 

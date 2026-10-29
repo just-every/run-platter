@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "daed149aad996740fd3f5f34c2d8fdfdf4f684b9159fa605e75386db93aca209",
+      "sha256": "e37e2538004e4b49d5c901220974880d6dbefcded1f13414673b06cc0b846200",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "b8a654615499f07670fe71b2df892f8d69d4cef8124dd8ff86fc26292a5502f2",
+      "sha256": "cdaa0c9388b6d4defff35dd0859811fc3bfbe48f430142f196cb498dd93f210a",
       "executable": false
     },
     "deploy-demo.json": {
@@ -126,7 +126,7 @@
       "executable": false
     },
     "docs/contract-behavior.md": {
-      "sha256": "574141099f5fedaf485d390d6776c0ce1dd83e73fff46699445178dff4b6be30",
+      "sha256": "f3b4e946e407e2fda0fedb888c273a9ee62b4ded4c078dff5d7e6bac0ab65e24",
       "executable": false
     },
     "docs/contract/COVERAGE.json": {
@@ -3002,7 +3002,7 @@
       "executable": false
     },
     "src/platter/templates.ts": {
-      "sha256": "427353a0fdd9567715e7f7bb45b22337d851d8168d3b51f8415a44ba4b0d7331",
+      "sha256": "edb8db9b5f95372b71cae87de019ada5d77e8a7ac59b215bf175fe5b7c28a93f",
       "executable": false
     },
     "src/platter/test-mail.ts": {
@@ -3390,7 +3390,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "75b89224669bd3438de72f92c33269fcaacdd0c81e597c97a6690dc5c378d70d",
+      "sha256": "b14b9d76712ccce8c86db7ba53aa23c9db0a2afbd39ee43312578fb504dea1ff",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3465,6 +3465,10 @@
       "sha256": "e9ef09944e0ce46ae68f1a3ef43c4d02c004243341f9245004622373a353fe2b",
       "executable": false
     },
+    "tests/duplicate-recipients.mjs": {
+      "sha256": "3cac3cc96dcd04caf0ffdf718cb0d0751dbaa7abc9a0a93c88c402b502c1b5b8",
+      "executable": false
+    },
     "tests/editor-budget.mjs": {
       "sha256": "a83e3a35b856e0d98653e1ec4628f18ebfddeae94c095b76218484dd5947e2f1",
       "executable": false
@@ -3526,7 +3530,7 @@
       "executable": false
     },
     "tests/packages-journey.mjs": {
-      "sha256": "2183b044272cffa4a8fa1d8e73b4dea4a0eeeec3c2e2325b66aa4e6a3ca12188",
+      "sha256": "27e1d57d4976005defa792cf886badd74c389ca2845d4d35e5b90f2023c54a86",
       "executable": false
     },
     "tests/pdf-document.mjs": {

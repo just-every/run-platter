@@ -22,6 +22,11 @@ export async function duplicateTemplateRecipients(h,{client,beta,member,actor}){
  const forged=await h.cmd('proposal.prepare',{clientId:client.id,title:'Untrusted preassignment',scope:'No implicit preassignment.',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25',recipientPlan:plan.map(r=>({...r,email:r.id==='client'?address(1232):r.email,preassignedEmail:r.id==='owner'?h.auth.OWNER_EMAIL:undefined}))})
  const unassigned=await h.cmd('proposal.duplicate',{id:forged.id,version:1})
  assert.ok(JSON.parse((await get(unassigned.id)).recipient_plan).every(r=>r.email===null),'ordinary assigned and caller-forged preassignment addresses are cleared')
+ await h.cmd('proposal.document',{id:forged.id,version:1,document:{version:1,blocks:[{id:'extra',type:'signature',title:'Unassigned signature',text:'',recipientRole:'slot',recipientId:'missing'}]}})
+ const unpublishable=await h.state()
+ await h.cmd('template.save',{id:forged.id,version:2,name:'Unassigned field'},h.owner,409)
+ assert.deepEqual(await h.state(),unpublishable,'an unassigned signature cannot publish a reusable template')
+
  const before=await h.state()
  await h.cmd('template.save',{id:seed.id,version:1,name:'Invalid preassignment',preassignedRecipientIds:['client']},h.owner,403)
  assert.deepEqual(await h.state(),before,'a client cannot become a preassigned firm countersigner')

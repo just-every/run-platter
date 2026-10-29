@@ -42,3 +42,31 @@ export async function applyMovein(h,fixture,cookie=h.owner) {
  while(result.job.state!=='completed')result=await h.cmd('document-import.continue',{id},cookie)
  return {id,reviewed,result}
 }
+
+export async function nativeMoveinFixture(clientId) {
+ const {wordFixture}=await import('./document-import-fixture.mjs')
+ const original=await moveinFixture(),template=Buffer.from(await wordFixture({headings:2,rows:6,images:1})),library=Buffer.from(await wordFixture({headings:10,rows:0,images:0,tokens:false,prefix:'Synthetic library'}))
+ const catalog=Buffer.from('Name,SKU,Type,SKUs_in_bundle,Category,Price,Cost,Currency,Description,Images,Billing_frequency\n'+Array.from({length:5},(_,i)=>'Synthetic product '+(i+1)+',SKU'+(i+1)+',product,,Synthetic,10.00,1.00,USD,Synthetic source,,one-off').join('\n'))
+ const contacts=Buffer.from('First,Last,Email\nSynthetic,Platter,'+['synthetic-platter-9','example.invalid'].join('@'))
+ const zips=[...original.zips.slice(0,2),{filename:'third.zip',bytes:Buffer.from(zipSync({'Open/2026/January/open.pdf':original.originals[4],'report.csv':strToU8(original.csv),'Templates/Editable.docx':template,'Library/Sections.docx':library,'catalog.csv':catalog,'contacts.csv':contacts}))}]
+ const mapping={
+  [hash(original.originals[4])]:{kind:'draft',clientId,price:'2500.00'},
+  [hash(template)]:{kind:'template',price:'1200.00'},
+  [hash(library)]:{kind:'library',shareConsent:true},
+  [hash(catalog)]:{kind:'catalog',format:'pandadoc'},
+  [hash(contacts)]:{kind:'contacts',format:'mapping',mapping:{delimiter:',',columns:{first_name:'First',last_name:'Last',email:'Email'}}},
+ }
+ return {...original,zips,template,library,catalog,contacts,mapping}
+}
+export async function applyNativeMovein(h,cookie=h.owner) {
+ const client=await h.cmd('client.save',{name:'Synthetic move-in destination',email:['synthetic-platter-10','example.invalid'].join('@')},cookie),fixture=await nativeMoveinFixture(client.id)
+ const {id}=await h.cmd('document-import.create',{label:'Synthetic native move-in'},cookie)
+ for(const file of fixture.zips)await uploadMovein(h,id,file,cookie)
+ const unresolved=await h.cmd('document-import.preview',{id},cookie),ambiguous=unresolved.report.rows.find(r=>r.candidates.length===2),choices={[ambiguous.id]:hash(fixture.originals[2])}
+ const reviewed=await h.cmd('document-import.preview',{id,choices,mapping:fixture.mapping},cookie)
+ assert.equal(reviewed.canApply,true,JSON.stringify(reviewed.diagnostics))
+ let result=await h.cmd('document-import.apply',{id,choices,mapping:fixture.mapping,fingerprint:reviewed.fingerprint},cookie)
+ for(let tries=0;result.job.state!=='completed'&&tries<60;tries++)result=await h.cmd('document-import.continue',{id},cookie)
+ assert.equal(result.job.state,'completed')
+ return {id,fixture,client,reviewed,result}
+}

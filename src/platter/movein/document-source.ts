@@ -7,18 +7,22 @@ import { parseBusinessCsv } from './business-csv'
 import { fail } from './errors'
 
 export const documentNamespace = 'platter.exported-documents.v1'
+export type ExportedFile = { filename:string; sha256:string; bytes:Uint8Array; source:string }
 export type UploadedDocument = { filename: string; sha256: string; bytes: Uint8Array }
 const normalized = (text: string) => text.trim().replace(/\s+/g, ' ').toLowerCase()
 type Pdf = { id: string; sha256: string; filename: string; title: string; client: string; date: string; pages: number;
  signatureEvidence: { kind: string; page: number; text: string }[]; sources: string[]; base64: string }
 type ReportRow = { id: string; source: string; line: number; title: string; client: string; date: string; fields: Record<string,string>; candidates: string[]; selected: string | null }
-export async function documentSource(uploads: UploadedDocument[], choices: Record<string,string>, moveinId: string) {
+export async function documentSource(uploads: UploadedDocument[], choices: Record<string,string>, moveinId: string, mapping:Record<string,{kind:string}> = {}) {
  const artifacts: SourceArtifact[] = [], pdfs = new Map<string,Pdf>(), rows: ReportRow[] = [], seenReports = new Set<string>(), unmapped: string[] = []
+ const exportedFiles:ExportedFile[]=[]
  let expanded = 0, duplicateDocuments = 0
  const artifact = (name: string, bytes: Uint8Array) => {
   artifacts.push({ name, sha256: sha256(bytes), size: bytes.length, original: { status: 'available', base64: Buffer.from(bytes).toString('base64') } })
  }
  const read = async (filename: string, bytes: Uint8Array, source: string) => {
+  const fileHash=sha256(bytes)
+  if(!exportedFiles.some(f=>f.sha256===fileHash))exportedFiles.push({filename,bytes,source,sha256:fileHash})
   if (/\.pdf$/i.test(filename)) {
    const hash = sha256(bytes), previous = pdfs.get(hash)
    if (previous) { previous.sources.push(source); duplicateDocuments++; return }
@@ -42,7 +46,10 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
    const date = text.match(/Date:\s*(\d{4}-\d{2}-\d{2})/)?.[1] || pdf.getCreationDate()?.toISOString().slice(0,10) || ''
    pdfs.set(hash,{id:hash,sha256:hash,filename,title,client,date,pages:pdf.getPageCount(),signatureEvidence,sources:[source],base64:Buffer.from(bytes).toString('base64')})
    artifact('documents/'+hash+'.pdf',bytes)
+  } else if (/\.docx$/i.test(filename)&&mapping[fileHash]) {
+   artifact('word/'+fileHash+'.docx',bytes)
   } else if (/\.csv$/i.test(filename)) {
+   if(['catalog','contacts'].includes(mapping[fileHash]?.kind))return
    if (seenReports.has(sha256(bytes))) return
    seenReports.add(sha256(bytes))
    const parsed = parseBusinessCsv(Buffer.from(bytes).toString('utf8'),',')
@@ -92,5 +99,5 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
    const payload={value}
    return {namespace:documentNamespace,kind:'documents',sourceId:p.id,payload:payload as unknown as Json,payloadHash:sha256(canonicalJson(payload)),artifactHash:p.sha256,location:{artifact:'documents/'+p.sha256+'.pdf'}}
   })}
- return {source,documents:documents.map(({base64,...p})=>p),report,canApply:conflicts.length===0}
+ return {source,files:exportedFiles,documents:documents.map(({base64,...p})=>p),report,canApply:conflicts.length===0}
 }

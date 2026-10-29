@@ -3394,7 +3394,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "d431de987696dff480748637c77364399b6921f3253f5363d42966faee94ede4",
+      "sha256": "35eac463f10d62410bc389b849ca3e81af2fc4223d5fac6fd0f0f0485b11d0d1",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3646,7 +3646,7 @@
       "executable": false
     },
     "tests/watchers-browser.mjs": {
-      "sha256": "830a51dcead65b4abdb98cbd13f7529e914be6750343ee8394f3a8e81ce42f77",
+      "sha256": "88ff80c79b1cd7a3034940ed6678f710cce6c96fbdbb12dfac60845f30354e38",
       "executable": false
     },
     "tests/worker.ts": {

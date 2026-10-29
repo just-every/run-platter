@@ -800,7 +800,8 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
 })
 
 
-test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority', {timeout:180000},async()=>{
+// Export and restore run the full installation migrations; keep both CLI operations bounded.
+test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority', {timeout:300000},async()=>{
  const fixed=Date.parse('2030-03-01T12:00:00Z'),sourceTexts=[]
  const sourceEdge=async request=>{if(new URL(request.url).hostname==='api.twilio.com'){sourceTexts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(7112+sourceTexts.length)},{status:201})}if(new URL(request.url).pathname==='/api/users.info')return Response.json({ok:true,user:{team_id:'synthetic-platter-7100',profile:{email:h.auth.OWNER_EMAIL}}});return Response.json({ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})}
  const temporary=await mkdtemp(join(tmpdir(),'platter-notification-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored');let h

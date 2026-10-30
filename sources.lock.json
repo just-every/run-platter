@@ -3602,7 +3602,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "65a4b51f8e4d36f29528c05531bb3c90403fe46883eb0379c9c54daae60d99dc",
+      "sha256": "66f381fb0c3af1e69d554ebeef8e849938c98c60c57c459746a9e153f545fbf3",
       "executable": false
     },
     "tests/site.test.mjs": {

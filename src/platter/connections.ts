@@ -1,3 +1,4 @@
+import { verifyZoho } from './crm/zoho-draft'
 import type { Bindings } from '../auth.server'
 import { administrators, senders } from './permissions'
 import { commit, email, fail, need, text, type Actor } from './model'
@@ -42,7 +43,7 @@ export async function connectionState(env:Bindings,a:Actor){
  return rows.map(r=>({id:r.id,provider:r.provider,operatorId:r.operator_id,accountId:r.account_id,mailboxEmail:r.mailbox_email,status:r.status==='connected'&&!r.has_secret?'needs_reconnection':r.broken_at?'broken':r.status,version:r.version,connectedAt:r.connected_at}))
 }
 export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
- const provider=String(p.provider??'');need(['stripe','quickbooks','gmail','microsoft','hubspot','pipedrive','salesforce','google_drive','slack','teams'].includes(provider),'Choose a supported provider')
+ const provider=String(p.provider??'');need(['stripe','quickbooks','gmail','microsoft','hubspot','pipedrive','zoho','salesforce','google_drive','slack','teams'].includes(provider),'Choose a supported provider')
  need((isMailbox(provider)?mailboxRoles:administrators).includes(a.role),isMailbox(provider)?'Your role cannot connect a mailbox':'Only owner and admins connect workspace providers',403)
  need(p.operatorId===undefined||p.operatorId===a.id,'Connect only your own mailbox',403)
  const db=env.DB,id=connectionId(provider,a)
@@ -74,6 +75,9 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
   const result=await providerJson('https://api.pipedrive.com/v1/users/me',token)
   need(result.success===true&&result.data?.active_flag===true&&String(result.data.company_id)===selected,'Pipedrive did not confirm the selected company',409)
   accountId=selected
+ }else if(provider==='zoho'){
+  const selected=text(p.tenantId,'the selected Zoho organization id',100)
+  await verifyZoho(token,selected);accountId=selected
  }else if(provider==='salesforce'){
   const result=await providerJson('https://login.salesforce.com/services/oauth2/userinfo',token);accountId=text(result.organization_id,'the verified Salesforce organization',200);need(typeof result.user_id==='string'&&result.user_id.length>0,'Salesforce did not confirm the authorized user')
   if(result.urls?.rest){const url=new URL(result.urls.rest);need(url.protocol==='https:'&&/\.(?:salesforce|force)\.com$/.test(url.hostname)&&!url.username&&!url.password,'Salesforce returned an invalid instance');instanceOrigin=url.origin}

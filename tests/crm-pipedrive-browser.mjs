@@ -1,13 +1,15 @@
+import { providerSyncFixture } from './crm-provider-sync-fixture.mjs'
+import { providerSyncControls } from './crm-provider-sync-browser.mjs'
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { harness } from './harness.mjs'
 import { browserEdge } from './browser-edge.mjs'
-import { pipedriveFixture, pipedriveToken } from './crm-pipedrive-http.mjs'
+import { pipedriveToken } from './crm-pipedrive-http.mjs'
 
 export async function pipedriveBrowser() {
- const edge = await browserEdge(), provider = pipedriveFixture()
+ const edge = await browserEdge(), provider = providerSyncFixture('pipedrive')
  let h, browser
  try {
   h = await harness({ entry: './dist/server/index.js', assetsDirectory: './dist/client', origin: edge.origin, outboundService: provider.request }); edge.attach(h)
@@ -61,6 +63,8 @@ export async function pipedriveBrowser() {
    await capture(source, 'copied-source')
    const calls = provider.calls.length; provider.state.attached[0].item_price = 999; await page.reload()
    assert.equal(provider.calls.length, calls); assert.equal((await h.state()).proposals[0].options[0].cents, 36122)
+   provider.state.attached[0].item_price = 120.5
+   await providerSyncControls(page, h, provider, 'pipedrive', capture)
    await page.goto(h.origin + '/app/settings'); await connection.getByRole('button', { name: 'Disconnect Pipedrive', exact: true }).click()
    assert.equal((await h.state()).connections.find(r => r.provider === 'pipedrive').status, 'disconnected')
   } finally { await context.close() }

@@ -98,7 +98,7 @@ export async function reviewedDraftCommand(env: Bindings, actor: Actor, name: st
  const source = JSON.parse(review.source_json), content = JSON.parse(review.content_json)
  const { connection } = await providerCredential(env, 'workspace:' + provider)
  need(connection.version === review.connection_version && connection.account_id === review.account_id, 'The connection changed; review the deal again', 409)
- const fresh = await reader(env, { dealId: source.dealId, companyId: source.company.id, contactId: source.contact.id, scope: content.scope })
+ const fresh = await reader(env, { dealId: source.dealId, companyId: source.company.id, contactId: source.contact.id, quoteId: source.quoteId, scope: content.scope })
  need(canonical(fresh.source) === review.source_json, 'The deal changed after review; read it again', 409)
  const client = review.client_json ? JSON.parse(review.client_json) : null
  const id = crypto.randomUUID(), clientId = client?.id ?? crypto.randomUUID(), row = { ...content, id, client_id: clientId, revision: 1, currency: 'USD' }

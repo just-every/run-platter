@@ -932,6 +932,7 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
  } finally { await browser?.close(); await h?.close(); await edge.close() }
 })
 
-test('CRM-004 Pipedrive Settings and reviewed independent draft through the compiled browser', { timeout: 120000 }, async () => {
+test('CRM-004 Pipedrive and Zoho Settings, reviewed drafts and explicit lifecycle writes through the compiled browser', { timeout: 120000 }, async () => {
  await (await import('./crm-pipedrive-browser.mjs')).pipedriveBrowser()
+ await (await import('./crm-zoho-browser.mjs')).zohoBrowser()
 })

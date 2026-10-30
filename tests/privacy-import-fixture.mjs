@@ -16,17 +16,21 @@ export async function importedPrivacyFixture(h) {
  const makePdf=async(title,signed,personal=true)=>{const pdf=await PDFDocument.create();pdf.setTitle(title);pdf.setSubject(personal?name:'Synthetic peer');pdf.addPage().drawText(title+' '+(personal?address:peerAddress));if(signed)pdf.addPage().drawText('Certificate of completion');return Buffer.from(await pdf.save())}
  const openBytes=await makePdf('Synthetic private open document',false),retainedBytes=await makePdf('Synthetic retained imported agreement',true),peerBytes=await makePdf('Synthetic separate open document',false,false)
  const movein=await h.cmd('document-import.create',{label:'Synthetic private uploaded bundle'})
- await uploadMovein(h,movein.id,{filename:'synthetic-platter-private.zip',bytes:Buffer.from(zipSync({'open.pdf':openBytes,'signed.pdf':retainedBytes,'peer.pdf':peerBytes}))})
+ const uploadedBundle={filename:'synthetic-platter-private.zip',bytes:Buffer.from(zipSync({'open.pdf':openBytes,'signed.pdf':retainedBytes,'peer.pdf':peerBytes}))}
+ await uploadMovein(h,movein.id,uploadedBundle)
  const docReview=await h.cmd('document-import.preview',{id:movein.id})
  assert.equal(docReview.canApply,true)
  const docResult=await h.cmd('document-import.apply',{id:movein.id,fingerprint:docReview.fingerprint})
+ const pending=await h.cmd('document-import.create',{label:'Synthetic pending copy'})
+ await uploadMovein(h,pending.id,uploadedBundle)
+ await uploadMovein(h,pending.id,{filename:'synthetic-platter-peer.pdf',bytes:peerBytes})
  const documentIds=[hash(openBytes),hash(retainedBytes)]
  const proposal=await h.cmd('proposal.prepare',{...privacyOffer,clientId:id,title:'Synthetic imported draft'})
  const peer=(await h.state()).clients.find(c=>c.id===peerId)
  const journal=await h.cmd('import.journal',{id:applied.job.id})
  assert.ok(journal.originals.some(o=>o.original.base64&&Buffer.from(o.original.base64,'base64').toString('utf8').includes(address)),'the before inventory actually contains the personal data')
  assert.ok(journal.originals.some(o=>o.original.status==='retained'),'the raw CSV exists before erasure')
- return {id,name,address,peerId,peer,csv,fingerprint:preview.fingerprint,jobId:applied.job.id,documentIds,openDocumentId:hash(openBytes),retainedDocumentId:hash(retainedBytes),peerDocumentId:hash(peerBytes),retainedBytes,peerBytes,moveinId:movein.id,docFingerprint:docReview.fingerprint,docJobId:docResult.job.id,contactId,companyId,businessPeerId,businessPeer,businessJobId:business.job.id,proposalId:proposal.id}
+ return {id,name,address,peerId,peer,csv,fingerprint:preview.fingerprint,jobId:applied.job.id,pendingMoveinId:pending.id,bundleHash:hash(uploadedBundle.bytes),bundleSize:uploadedBundle.bytes.length,documentIds,openDocumentId:hash(openBytes),retainedDocumentId:hash(retainedBytes),peerDocumentId:hash(peerBytes),retainedBytes,peerBytes,moveinId:movein.id,docFingerprint:docReview.fingerprint,docJobId:docResult.job.id,contactId,companyId,businessPeerId,businessPeer,businessJobId:business.job.id,proposalId:proposal.id}
 }
 export async function assertImportedPrivacyErased(h,fixture,receipt,{undo=false}={}) {
  const state=await h.state(),client=state.clients.find(c=>c.id===fixture.id)
@@ -62,6 +66,7 @@ export async function assertImportedPrivacyErased(h,fixture,receipt,{undo=false}
  assert.ok(!JSON.stringify(journal).includes(fixture.address));assert.ok(!JSON.stringify(journal).includes(fixture.name))
  assert.equal(receipt.importedCustody.originalPolicy,'withdraw-affected-artifacts')
  assert.ok(receipt.importedCustody.jobIds.includes(fixture.jobId))
+ await h.cmd('document-import.upload-start',{id:fixture.pendingMoveinId,sha256:fixture.bundleHash,size:fixture.bundleSize,filename:'synthetic-platter-replay.zip'},h.owner,410)
  const replay=await h.cmd('import.apply',{csv:fixture.csv,fingerprint:fixture.fingerprint})
  assert.equal(replay.job.erasedRecords,1)
  assert.equal((await h.state()).clients.find(c=>c.id===fixture.id).name,'Erased contact','replaying captured CSV cannot restore the erased contact')
@@ -72,4 +77,10 @@ export async function assertImportedPrivacyErased(h,fixture,receipt,{undo=false}
   const result=await h.cmd('import.undo',{id:fixture.jobId});assert.equal(result.job.state,'undone')
   const after=await h.state();assert.ok(!after.clients.some(c=>c.id===fixture.peerId));assert.equal(after.clients.find(c=>c.id===fixture.id).name,'Erased contact')
  }
+}
+
+export async function importPrivacyInventory(h) {
+ const rows={}
+ for(const table of ['p_clients','p_proposals','p_contacts','p_companies','p_import_business_revisions','p_imported_documents','p_document_moveins','p_document_uploads','p_document_upload_chunks','p_privacy_reviews','p_privacy_receipts','p_privacy_erased_uploads','p_erased_clients','rer_portability_state','ik_jobs','ik_originals','ik_d1_original_chunks','ik_provenance','ik_sources','ik_d1_plan_chunks'])rows[table]=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results
+ return rows
 }

@@ -4,7 +4,7 @@ import archivePolicy from './archive-policy.mjs'
 import { commit, hash, need, text, type Actor } from './model'
 import { currentTime } from './expiry-time'
 import { canonical } from './crm/hubspot-draft'
-import { captureSql, eraseClientImport, businessContactErasure, importedDocumentErasure } from './movein/privacy'
+import { captureSql, importTargetIdentity, eraseClientImport, businessContactErasure, importedDocumentErasure } from './movein/privacy'
 
 type Rows = Record<string, any>[]
 type Selection = { sql: string; values: any[] }
@@ -19,6 +19,7 @@ async function inventory(db: D1Database, clientId: string, contactId?:string, do
  need(!await db.prepare('SELECT 1 FROM p_erased_clients WHERE client_id=?').bind(clientId).first(), 'This contact already has an erasure receipt', 409)
  const businessContact=contactId?await db.prepare('SELECT * FROM p_contacts WHERE id=?').bind(contactId).first<any>():null
  need(!contactId||businessContact,'Select an existing imported contact record',404)
+ need(contactId||!await db.prepare("SELECT 1 FROM p_contacts WHERE json_extract(data_json,'$.email')=?").bind(client.email).first(),'Explicitly select the imported contact with this recorded address before reviewing erasure',409)
  if(businessContact){
   need(JSON.parse(businessContact.data_json).email===client.email,'The selected imported contact must have this exact recorded contact address',409)
   need(!await db.prepare('SELECT 1 FROM p_privacy_holds h JOIN p_clients c ON c.id=h.client_id WHERE c.email=?').bind(client.email).first(),'A retention or legal hold prevents erasure',409)
@@ -27,12 +28,11 @@ async function inventory(db: D1Database, clientId: string, contactId?:string, do
  const proposals = (await db.prepare('SELECT * FROM p_proposals WHERE client_id=? ORDER BY id').bind(clientId).all<any>()).results
  const imported = await db.prepare('SELECT * FROM p_import_client_revisions WHERE client_id=?').bind(clientId).first()
  const importJobs = (await db.prepare("SELECT id,fingerprint,state,checkpoint,total,fence FROM ik_jobs WHERE destination IN ('platter:clients','platter:business-records','platter:exported-documents') ORDER BY id").all<any>()).results
- const importedCustody = {businessContactId:businessContact?.id??null,companyId:company?.id??null,imported:Boolean(imported),jobIds:importJobs.map(j=>j.id),originalPolicy:'withdraw-affected-artifacts',exception:'The complete original CSV containing this contact is withdrawn, including raw peer rows. Other normalized contacts and their undo remain available.'}
+ const importedCustody = {businessContactId:businessContact?.id??null,companyId:company?.id??null,imported:Boolean(imported),jobIds:[] as string[],originalPolicy:'withdraw-affected-artifacts',exception:imported||businessContact?'The complete original CSV containing this contact is withdrawn, including raw peer rows. Other normalized contacts and their undo remain available.':'No client CSV is associated with this contact. Selected imported files are handled separately.'}
  need(!await db.prepare('SELECT 1 FROM p_privacy_holds WHERE client_id=?').bind(clientId).first(), 'A retention or legal hold prevents erasure', 409)
  need(!await db.prepare('SELECT 1 FROM p_tracking_holds h JOIN p_proposals p ON p.id=h.proposal_id WHERE p.client_id=?').bind(clientId).first(), 'An engagement hold prevents contact erasure', 409)
  const accepted = (await db.prepare('SELECT a.* FROM p_acceptances a JOIN p_proposals p ON p.id=a.proposal_id WHERE p.client_id=? ORDER BY a.proposal_id').bind(clientId).all<any>()).results
  const retainedIds = new Set(accepted.map(r => r.proposal_id)), drafts = proposals.filter(p => !retainedIds.has(p.id))
- need(drafts.every(p => !JSON.parse(p.recipient_plan ?? '[]').length), 'Configured recipients require separate reviewed erasure; nothing was changed', 409)
  for (const table of ['p_payment_records','p_collection_intents','p_recipient_signatures']) {
   need(!await db.prepare(`SELECT 1 FROM ${table} WHERE proposal_id IN (SELECT value FROM json_each(?)) LIMIT 1`).bind(JSON.stringify(drafts.map(p => p.id))).first(), 'Payment or partial-signature custody requires separate reviewed erasure; nothing was changed', 409)
  }
@@ -45,15 +45,18 @@ async function inventory(db: D1Database, clientId: string, contactId?:string, do
  need(!erasedDocuments.some(d=>links.some(l=>l.document_id===d.id&&l.client_id!==clientId)),'A shared imported document needs review for every linked client; nothing was changed',409)
  const retainedImported=documents.filter(d=>!erasedDocuments.includes(d)).map(d=>({documentId:d.id,sha256:JSON.parse(d.data_json).sha256,exception:'Imported signed agreement and its original PDF are retained business records; the exact original bytes and source facts remain.'}))
  const moveinIds=[...new Set(erasedDocuments.map(d=>JSON.parse(d.data_json).moveinId))].sort()
- const moves=(await db.prepare('SELECT * FROM p_document_moveins WHERE id IN (SELECT value FROM json_each(?)) ORDER BY id').bind(JSON.stringify(moveinIds)).all<any>()).results
  const withdrawnOriginals=(await db.prepare("SELECT o.job_id,o.sha256 FROM ik_originals o JOIN p_document_moveins m ON m.job_id=o.job_id WHERE m.id IN (SELECT value FROM json_each(?)) AND (o.name GLOB 'uploads/*' OR o.name='reviewed-report-choices.json') ORDER BY o.job_id,o.sha256").bind(JSON.stringify(moveinIds)).all<any>()).results
+ const erasedUploadHashes=[...new Set([...erasedDocuments.map(d=>d.id),...(await db.prepare('SELECT sha256 FROM p_document_uploads WHERE movein_id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(moveinIds)).all<{sha256:string}>()).results.map(u=>u.sha256)])].sort()
+ const moves=(await db.prepare('SELECT * FROM p_document_moveins WHERE id IN (SELECT value FROM json_each(?)) OR id IN (SELECT movein_id FROM p_document_uploads WHERE sha256 IN (SELECT value FROM json_each(?))) ORDER BY id').bind(JSON.stringify(moveinIds),JSON.stringify(erasedUploadHashes)).all<any>()).results
 
+ const identities=[importTargetIdentity('platter:clients','clients',clientId),...(businessContact?[importTargetIdentity('platter:business-records','contacts',businessContact.id)]:[]),...(company?[importTargetIdentity('platter:business-records','companies',company.id)]:[]),...erasedDocuments.map(d=>importTargetIdentity('platter:exported-documents','documents',d.id))]
+ importedCustody.jobIds=(await db.prepare('SELECT DISTINCT job_id FROM ik_d1_plan_index WHERE target_identity IN (SELECT value FROM json_each(?)) ORDER BY job_id').bind(JSON.stringify(identities)).all<{job_id:string}>()).results.map(j=>j.job_id)
  const names = (await db.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name GLOB 'p_*' ORDER BY name").all<{name:string}>()).results
  const tables: Table[] = []
  for (const { name } of names) {
   const columns = (await db.prepare(`PRAGMA table_info(${quote(name)})`).all<any>()).results.map(c => c.name)
   const foreign = (await db.prepare(`PRAGMA foreign_key_list(${quote(name)})`).all<any>()).results
-  const selection = name === 'p_imported_documents' ? {sql:'id IN (SELECT value FROM json_each(?))',values:[JSON.stringify(erasedDocuments.map(d=>d.id))]} : name === 'p_document_uploads' ? {sql:'movein_id IN (SELECT value FROM json_each(?))',values:[JSON.stringify(moveinIds)]} : name === 'p_contacts' && businessContact ? {sql:'id=?',values:[businessContact.id]} : name === 'p_import_business_revisions' && businessContact ? {sql:"(kind='contacts' AND target_id=?) OR (kind='companies' AND target_id=?)",values:[businessContact.id,company?.id??'']} : name === 'p_import_client_revisions' ? {sql:'client_id=?',values:[clientId]} : name === 'p_proposals' ? { sql: 'id IN (SELECT value FROM json_each(?))', values: [unretained] } : columns.includes('proposal_id') && !name.startsWith('p_privacy_') ? { sql: 'proposal_id IN (SELECT value FROM json_each(?))', values: [outbound.has(name) ? all : unretained] } : undefined
+  const selection = name === 'p_imported_documents' ? {sql:'id IN (SELECT value FROM json_each(?))',values:[JSON.stringify(erasedDocuments.map(d=>d.id))]} : name === 'p_document_uploads' ? {sql:'movein_id IN (SELECT value FROM json_each(?)) OR sha256 IN (SELECT value FROM json_each(?))',values:[JSON.stringify(moveinIds),JSON.stringify(erasedUploadHashes)]} : name === 'p_contacts' && businessContact ? {sql:'id=?',values:[businessContact.id]} : name === 'p_import_business_revisions' && businessContact ? {sql:"(kind='contacts' AND target_id=?) OR (kind='companies' AND target_id=?)",values:[businessContact.id,company?.id??'']} : name === 'p_import_client_revisions' ? {sql:'client_id=?',values:[clientId]} : name === 'p_proposals' ? { sql: 'id IN (SELECT value FROM json_each(?))', values: [unretained] } : columns.includes('proposal_id') && !name.startsWith('p_privacy_') ? { sql: 'proposal_id IN (SELECT value FROM json_each(?))', values: [outbound.has(name) ? all : unretained] } : undefined
   tables.push({ name, columns, foreign, selection, rows: [] })
  }
  // Delete only files actually referenced by these drafts. A shared original stays with
@@ -102,8 +105,8 @@ async function inventory(db: D1Database, clientId: string, contactId?:string, do
  const remote = [...new Map(sources.map(s => [s.account_id + ':' + s.contact_id, {provider:s.provider,accountId:s.account_id,kind:'contact',recordId:s.contact_id,action:'Review and erase this exact contact in HubSpot, subject to provider retention and legal holds. Platter made no provider deletion request.'}])).values()]
  const files = (await db.prepare('SELECT f.*,j.account_id FROM p_archive_files f JOIN p_archive_jobs j ON j.proposal_id=f.proposal_id WHERE j.client_id=? ORDER BY f.proposal_id,f.kind').bind(clientId).all<any>()).results
  const retained = await Promise.all(accepted.map(async a => ({proposalId:a.proposal_id,revision:a.revision,snapshotSha256:await hash(a.snapshot),exception:'Retained agreement and its original files are business records; contact details in these immutable records are retained.'})))
- const plan = {client,businessContact,company,documents,moves,withdrawnOriginals,links,imported,importJobs,proposals,sources,files,accepted,tables:ordered.filter(t => t.selection).map(t => ({name:t.name,rows:t.rows}))}
- return {client,businessContact,company,selectedIds,documents,erasedDocuments,retainedImported,moves,moveinIds,withdrawnOriginals,importedCustody,importJobs,proposals,drafts,accepted,retained,remote,files,ordered,digest:await hash(canonical(plan))}
+ const plan = {client,businessContact,company,documents,moves,erasedUploadHashes,withdrawnOriginals,links,imported,importJobs,proposals,sources,files,accepted,tables:ordered.filter(t => t.selection).map(t => ({name:t.name,rows:t.rows}))}
+ return {client,businessContact,company,selectedIds,documents,erasedDocuments,retainedImported,moves,moveinIds,erasedUploadHashes,withdrawnOriginals,importedCustody,importJobs,proposals,drafts,accepted,retained,remote,files,ordered,digest:await hash(canonical(plan))}
 }
 
 function unchanged(db: D1Database, table: Table) {
@@ -144,6 +147,8 @@ export async function privacyCommand(env: Bindings, actor: Actor, name: string, 
  const writes=[
   writesDb.prepare('INSERT INTO p_guard(ok) VALUES(EXISTS(SELECT 1 FROM p_clients WHERE id=? AND version=? AND name=? AND email=? AND variable_fields=?))').bind(clientId,plan.client.version,plan.client.name,plan.client.email,plan.client.variable_fields),
   writesDb.prepare('INSERT INTO p_guard(ok) VALUES(NOT EXISTS(SELECT 1 FROM p_privacy_holds WHERE client_id=?) AND NOT EXISTS(SELECT 1 FROM p_tracking_holds h JOIN p_proposals p ON p.id=h.proposal_id WHERE p.client_id=?) AND EXISTS(SELECT 1 FROM p_privacy_reviews WHERE id=? AND digest=?))').bind(clientId,clientId,review.id,review.digest),
+  ...(plan.businessContact?[writesDb.prepare('INSERT INTO p_guard(ok) VALUES(NOT EXISTS(SELECT 1 FROM p_privacy_holds h JOIN p_clients c ON c.id=h.client_id WHERE c.email=?))').bind(plan.client.email)]:[]),
+  unchanged(writesDb,{...plan.ordered.find(t=>t.name==='p_imported_documents')!,selection:{sql:'id IN (SELECT value FROM json_each(?))',values:[JSON.stringify(plan.selectedIds)]},rows:plan.documents}),
   unchanged(writesDb,{name:'ik_jobs',columns:['id','fingerprint','state','checkpoint','total','fence'],foreign:[],selection:{sql:"destination IN ('platter:clients','platter:business-records','platter:exported-documents')",values:[]},rows:plan.importJobs}),
   unchanged(writesDb,{...plan.ordered.find(t=>t.name==='p_proposals')!,selection:{sql:'client_id=?',values:[clientId]},rows:plan.proposals}),
   ...plan.ordered.filter(t=>t.selection).map(t=>unchanged(writesDb,t)),
@@ -157,6 +162,7 @@ export async function privacyCommand(env: Bindings, actor: Actor, name: string, 
   writesDb.prepare("UPDATE p_clients SET name='Erased contact',email=?,variable_fields='{}',version=version+1 WHERE id=?").bind(clientId+'@erased.invalid',clientId),
   writesDb.prepare('INSERT INTO p_privacy_receipts VALUES(?,?,?,?,?)').bind(id,clientId,actor.id,at,JSON.stringify(receipt)),
   writesDb.prepare('INSERT INTO p_erased_clients VALUES(?,?)').bind(clientId,id),
+  writesDb.prepare('INSERT OR IGNORE INTO p_privacy_erased_uploads(sha256,receipt_id) SELECT value,? FROM json_each(?)').bind(id,JSON.stringify(plan.erasedUploadHashes)),
   writesDb.prepare('DELETE FROM p_guard'),
  ].map(captured.query)
  try { await eraseClientImport(db,actor,clientId,plan.client.email,[...business.before,...documents.before,...writes,...business.after,...documents.after],checkpoint) } catch(error) {

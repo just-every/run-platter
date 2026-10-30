@@ -58,11 +58,12 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    if (movein.fingerprint) fail('import_frozen',409,'This reviewed move-in is frozen. Start another move-in for additional files')
    const hash=String(input.sha256),size=Number(input.size),filename=String(input.filename)
    if (!/^[a-f0-9]{64}$/.test(hash)||!Number.isSafeInteger(size)||size<1||size>5*1024*1024||filename.length>200||!/^([^/\\\x00-\x1f]+)\.(zip|pdf|csv)$/i.test(filename)) fail('invalid_upload',400,'Choose a ZIP, PDF or report CSV up to 5 MiB')
+   if(await db.prepare('SELECT 1 FROM p_privacy_erased_uploads WHERE sha256=?').bind(hash).first())fail('erased_original',410,'This exact source file was erased. It cannot be uploaded again.')
    const prior=await db.prepare('SELECT * FROM p_document_uploads WHERE movein_id=? AND sha256=?').bind(id,hash).first<any>()
    if (prior) { if(prior.size!==size)fail('upload_conflict',409);return {sha256:hash,received:prior.received,complete:Boolean(prior.complete)} }
    const total=await db.prepare('SELECT COALESCE(SUM(size),0) AS bytes,COUNT(*) AS count FROM p_document_uploads WHERE movein_id=?').bind(id).first<any>()
    if(total.bytes+size>20*1024*1024||total.count>=30)fail('upload_limit',413,'Use up to 30 files and 20 MiB per move-in')
-   await db.batch([assertion(db,actor,id),db.prepare('INSERT INTO p_document_uploads(movein_id,sha256,filename,size) VALUES(?,?,?,?)').bind(id,hash,filename,size)])
+   await db.batch([assertion(db,actor,id),db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM p_privacy_erased_uploads WHERE sha256=?) THEN 1 ELSE 0 END').bind(hash),db.prepare('INSERT INTO p_document_uploads(movein_id,sha256,filename,size) VALUES(?,?,?,?)').bind(id,hash,filename,size)])
    return {sha256:hash,received:0,complete:false}
   }
   if (name==='document-import.upload-chunk') {

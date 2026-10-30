@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { harness } from './harness.mjs'
 import { driveFixture,connectDrive } from './drive-fixture.mjs'
 import { hubspotFixture } from './hubspot-fixture.mjs'
-import { importedPrivacyFixture,assertImportedPrivacyErased } from './privacy-import-fixture.mjs'
+import { recipientFixture,verifyRecipient,roles } from './recipients-http.mjs'
+import { importedPrivacyFixture,assertImportedPrivacyErased,importPrivacyInventory } from './privacy-import-fixture.mjs'
 import { privacyFixture,privacyInventory,assertPrivacyErased,digest,privacyOffer } from './privacy-fixture.mjs'
 export async function privacyJourney(){
  const edge=hubspotFixture(),drive=driveFixture(),h=await harness({outboundService:request=>new URL(request.url).hostname==='api.hubapi.com'?edge.request(request):drive.outboundService(request),assetsDirectory:'public'})
@@ -54,14 +55,36 @@ export async function privacyJourney(){
   assert.equal(drive.calls.length,driveCalls,'erased archive jobs cannot execute again')
   const imported=await importedPrivacyFixture(h)
   const importedBefore=await h.cmd('import.journal',{id:imported.jobId})
+  await h.cmd('privacy.review',{id:imported.id},h.owner,409)
   const importedReview=await h.cmd('privacy.review',{id:imported.id,contactId:imported.contactId,documentIds:imported.documentIds})
   assert.equal(importedReview.privacyReview.importedCustody.imported,true)
   assert.match(importedReview.privacyReview.importedCustody.exception,/complete original CSV/)
-  await h.cmd('privacy.erase',{id:imported.id,...importedReview.privacyReview,confirmName:imported.name,consent:'yes'},member,403)
+  const importedInventory=await importPrivacyInventory(h)
+  const importedInput={id:imported.id,...importedReview.privacyReview,confirmName:imported.name,consent:'yes'}
+  await h.cmd('privacy.erase',importedInput,member,403)
+  assert.deepEqual(await importPrivacyInventory(h),importedInventory)
+  for(const kind of ['retention','legal']){await h.cmd('privacy.hold',{id:imported.id,kind,held:'yes',reason:'Synthetic imported custody hold'});await h.cmd('privacy.erase',importedInput,h.owner,409);assert.deepEqual(await importPrivacyInventory(h),importedInventory);await h.cmd('privacy.hold',{id:imported.id,kind,held:'no'})}
+  const extraCsv='client_id,name,email\nsynthetic-platter-review-change,Synthetic review change,'+['synthetic-platter-review-change','example.test'].join('@'),extraReview=await h.cmd('import.preview',{csv:extraCsv})
+  await h.cmd('import.apply',{csv:extraCsv,fingerprint:extraReview.fingerprint})
+  const changedImports=await importPrivacyInventory(h)
+  await h.cmd('privacy.erase',importedInput,h.owner,409);assert.deepEqual(await importPrivacyInventory(h),changedImports)
   assert.deepEqual(await h.cmd('import.journal',{id:imported.jobId}),importedBefore)
-  const importReceipt=(await h.cmd('privacy.erase',{id:imported.id,...importedReview.privacyReview,confirmName:imported.name,consent:'yes'})).receipt
+  const freshImportedReview=await h.cmd('privacy.review',{id:imported.id,contactId:imported.contactId,documentIds:imported.documentIds})
+  const importReceipt=(await h.cmd('privacy.erase',{...importedInput,...freshImportedReview.privacyReview})).receipt
   await assertImportedPrivacyErased(h,imported,importReceipt,{undo:true})
+  const pendingUploads=(await h.db.prepare('SELECT sha256 FROM p_document_uploads WHERE movein_id=?').bind(imported.pendingMoveinId).all()).results.map(u=>u.sha256)
+  assert.deepEqual(pendingUploads,[imported.peerDocumentId],'a byte-identical erased bundle is removed while an unrelated pending PDF survives')
+  await h.cmd('document-import.upload-start',{id:imported.pendingMoveinId,sha256:imported.bundleHash,size:imported.bundleSize,filename:'synthetic-platter-replay.zip'},h.owner,410)
+  await h.cmd('document-import.upload-start',{id:imported.pendingMoveinId,sha256:imported.openDocumentId,size:100,filename:'synthetic-platter-replay.pdf'},h.owner,410)
+  const configured=await recipientFixture(h,'Synthetic configured erasure',roles(h.auth.OWNER_EMAIL))
+  const configuredState=await h.state(),configuredClient=configuredState.clients.find(c=>c.id===configuredState.proposals.find(p=>p.id===configured.id).client_id)
+  const sessions={};for(const [slot,path] of Object.entries(configured.links))sessions[slot]=await verifyRecipient(h,path)
+  const configuredReview=await h.cmd('privacy.review',{id:configuredClient.id})
+  const configuredReceipt=(await h.cmd('privacy.erase',{id:configuredClient.id,...configuredReview.privacyReview,confirmName:configuredClient.name,consent:'yes'})).receipt
+  for(const [slot,path] of Object.entries(configured.links)){assert.equal((await h.send(path+'/data.json',undefined,sessions[slot])).status,404);assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic replay',optionId:'one',consent:true},sessions[slot])).status,404)}
+  assert.ok(!(await h.state()).proposals.some(p=>p.id===configured.id))
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_mail WHERE proposal_id=?').bind(configured.id).first()).n,0)
   assert.equal(edge.calls.length,calls+7,'only explicit source review reads HubSpot; scheduled work sends nothing')
-  assert.deepEqual(new Set((await h.state()).privacy.receipts.map(r=>r.id)),new Set([result.receipt.id,importReceipt.id]))
+  assert.deepEqual(new Set((await h.state()).privacy.receipts.map(r=>r.id)),new Set([result.receipt.id,importReceipt.id,configuredReceipt.id]))
  }finally{await h.close()}
 }

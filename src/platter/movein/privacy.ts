@@ -1,4 +1,4 @@
-import { retireD1ImportCustody, type D1Sql, type D1ImportContext } from '../../modules/import-kit/src/d1/index.ts'
+import { canonicalJson, sha256, retireD1ImportCustody, type D1Sql, type D1ImportContext } from '../../modules/import-kit/src/d1/index.ts'
 import { clientTargets, destination, mappingVersion } from './targets'
 import { namespace } from './csv'
 import type { Actor } from '../model'
@@ -68,3 +68,5 @@ export async function importedDocumentErasure(db:D1Database,actor:Actor,ids:stri
  const erasure=await targetErasure({kind:'documents',id:ids[0]},context,{source:record=>record.kind==='documents'&&selected.has(record.sourceId),original:(_bytes,original)=>originals.has(original.sha256)})
  return {before:packGuards(erasure.before),after:[...packGuards(erasure.after),...readonlyChecks(erasure.final)]}
 }
+
+export const importTargetIdentity=(destination:string,kind:string,id:string)=>sha256(canonicalJson([destination,kind,id]))

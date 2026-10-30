@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. PRIV-001 is a builder completion claim on the committed candidate named in the handoff, pending its exact-SHA Verify and guarded landing. Its recorded local proof covers native and imported erasure; field proof R-2 remains not run. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -2103,15 +2103,15 @@ Core · target · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGEN
 
 #### PRIV-001 — Erasure across contacts, tracking and synced systems
 
-Core · target · **partial** · Cites BASE-DATA-003, BASE-DATA-006
+Core · target · **done** · Cites BASE-DATA-003, BASE-DATA-006 · Register R-2
 
 **Requirement.** A US privacy request covers contact details, engagement and draft discussions, while retained agreements identify their business-record exception. The receipt names affected CRM and file-store records the operator must erase there. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#priv-001).
 
 **Acceptance.**
 1. Erase a contact with two draft views and one signed agreement: draft data and views are gone, the agreement has a retention note, and the receipt lists the HubSpot fixture’s record.
 
-**Evidence.** `tests/platter.test.mjs` — “PRIV-001 native reviewed erasure and import undo preserves clients with dependent proposals; owner erasure fences unused client”; `tests/site.test.mjs` — “PRIV-001 / TRACK-001 / TRACK-004 owner consent, private alerts, client disclosure and erasure at desktop and phone widths”; `tests/archive.test.mjs` — “PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal”; `tests/mail.test.mjs` — “SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh”; `src/platter/privacy.ts`
-**Gap.** Delivered: Reviewed owner-only native erasure removes unaccepted offers, their discussions, engagement and exclusive local files, revokes client links and outbound grants, refuses claimed mail erased during mailbox refresh without recreating delivery records, retains exact agreement artifacts with business-record exceptions, names exact HubSpot contact and recorded Drive file IDs for operator review, honors contact and engagement holds, and atomically fences older archives. Missing: Imported contacts, originals and journal erasure; broader provider and file-store coverage; configured-recipient execution. Provider deletion is an explicit operator action, never an automatic request. The existing TRACK-001 and TRACK-004 pending-landing hold and TEAM-001 native issuer-version, SSO, workspace deletion and rights-matrix holds remain unchanged.
+**Evidence.** `tests/platter.test.mjs` — “PRIV-001 native reviewed erasure and import undo preserves clients with dependent proposals; owner erasure fences unused client” (calls `tests/privacy-journey.mjs` and `tests/privacy-import-fixture.mjs`: two populated ordinary offers, retained acceptance and artifact hashes, exact HubSpot and Drive receipt IDs, imported client and business-contact source erasure, selected open imported originals, retained signed imported PDFs, hold and stale-review no-write refusals, configured-link revocation, captured apply and upload replay refusal); `tests/site.test.mjs` — “PRIV-001 / TRACK-001 / TRACK-004 owner consent, private alerts, client disclosure and erasure at desktop and phone widths” (owner review, holds, explicit import selection and durable receipt, with 1440 and 390 browser proof); `tests/archive.test.mjs` — “PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal” (exact restored native and imported agreements, redacted journals, refused pre-erasure checkpoints and no restored execution or erased-file upload); `tests/mail.test.mjs` — “SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh” (claimed mail cannot survive erasure)
+**Gap.** None.
 
 #### PORT-002 — Complete product archive
 
@@ -2337,7 +2337,7 @@ None.
 | ID | Proof | Clauses | State | Date | Receipt |
 | --- | --- | --- | --- | --- | --- |
 | R-1 | Real Google Workspace and Microsoft 365 mailbox qualification | SEND-001 | not run | | |
-| R-2 | Real CRM, accounting, file-store and chat tenant qualification | CRM-001, CRM-002, ACCT-001, ACCT-002, AUTO-002, AUTO-003 | not run | | |
+| R-2 | Real CRM, accounting, file-store and chat tenant qualification | CRM-001, CRM-002, ACCT-001, ACCT-002, AUTO-002, AUTO-003, PRIV-001 | not run | | |
 | R-3 | Carrier acceptance, A2P 10DLC or toll-free verification and SMS legal review | SEND-008, SIGN-006 | not run | | |
 | R-4 | Human screen-reader review | EDIT-007, MOB-001, MOB-002 | not run | | |
 | R-5 | Accessibility VPAT | EDIT-007, MOB-001, MOB-002 | not run | | |

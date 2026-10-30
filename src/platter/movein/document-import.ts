@@ -1,3 +1,4 @@
+import { contentKinds, contentCommand, contentOriginal } from './pandadoc-content'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { planD1Import, createD1ImportJob, applyD1ImportBatches, undoD1Import, readD1ImportJob, readD1ImportOriginals,
@@ -50,14 +51,14 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    const id=randomUUID(),label=String(input.label??'Document move-in').trim()
    if (!label || label.length>150) fail('invalid_input',400,'Name the move-in in 150 characters or fewer')
    await db.batch([db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN '+ownerSql+' THEN 1 ELSE 0 END').bind(actor.id),
-    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label) VALUES(?,?,?)').bind(id,actor.id,label)])
+    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label,kind) VALUES(?,?,?,?)').bind(id,actor.id,label,contentKinds.includes(String(input.kind))?String(input.kind):'documents')])
    return {id}
   }
   const movein=await session(db,actor,input.id),id=movein.id
   if (name==='document-import.upload-start') {
    if (movein.fingerprint) fail('import_frozen',409,'This reviewed move-in is frozen. Start another move-in for additional files')
    const hash=String(input.sha256),size=Number(input.size),filename=String(input.filename)
-   if (!/^[a-f0-9]{64}$/.test(hash)||!Number.isSafeInteger(size)||size<1||size>5*1024*1024||filename.length>200||!/^([^/\\\x00-\x1f]+)\.(zip|pdf|csv)$/i.test(filename)) fail('invalid_upload',400,'Choose a ZIP, PDF or report CSV up to 5 MiB')
+   if (!/^[a-f0-9]{64}$/.test(hash)||!Number.isSafeInteger(size)||size<1||size>5*1024*1024||filename.length>200||!/^([^/\\\x00-\x1f]+)\.(zip|pdf|csv|docx)$/i.test(filename)) fail('invalid_upload',400,'Choose a ZIP, PDF, Word document or report CSV up to 5 MiB')
    const prior=await db.prepare('SELECT * FROM p_document_uploads WHERE movein_id=? AND sha256=?').bind(id,hash).first<any>()
    if (prior) { if(prior.size!==size)fail('upload_conflict',409);return {sha256:hash,received:prior.received,complete:Boolean(prior.complete)} }
    const total=await db.prepare('SELECT COALESCE(SUM(size),0) AS bytes,COUNT(*) AS count FROM p_document_uploads WHERE movein_id=?').bind(id).first<any>()
@@ -92,6 +93,7 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    await db.batch([assertion(db,actor,id),db.prepare('UPDATE p_document_uploads SET complete=1 WHERE movein_id=? AND sha256=?').bind(id,hash)])
    return {received:upload.size,complete:true}
   }
+  if(contentKinds.includes(movein.kind))return await contentCommand(db,actor,name,input,movein,()=>uploaded(db,id))
   const kit=context(db,actor)
   if (name==='document-import.preview'||name==='document-import.apply') {
    const selected=choices(input)
@@ -140,7 +142,7 @@ export async function documentMoveinState(db:D1Database,actor:Actor) {
  if(actor.role!=='owner')return {documentMoveins:[],importedDocuments:[]}
  await documentOwner(db,actor)
  const moves=(await db.prepare('SELECT m.*,j.state,j.checkpoint,j.total FROM p_document_moveins m LEFT JOIN ik_jobs j ON j.id=m.job_id WHERE owner_id=? ORDER BY m.rowid DESC').bind(actor.id).all<any>()).results
- for(const move of moves)move.uploads=(await db.prepare('SELECT sha256,filename,size,received,complete FROM p_document_uploads WHERE movein_id=? ORDER BY rowid').bind(move.id).all()).results
+ for(const move of moves){if(contentKinds.includes(move.kind)&&move.fingerprint){const status=await db.prepare('SELECT undone FROM p_pandadoc_moves WHERE id=?').bind(move.id).first<any>();move.state=status?.undone?'undone':'completed'}move.uploads=(await db.prepare('SELECT sha256,filename,size,received,complete FROM p_document_uploads WHERE movein_id=? ORDER BY rowid').bind(move.id).all()).results}
  const documents=(await db.prepare("SELECT d.data_json FROM p_imported_documents d JOIN p_document_moveins m ON m.id=json_extract(d.data_json,'$.moveinId') WHERE m.owner_id=? ORDER BY d.id").bind(actor.id).all<{data_json:string}>()).results.map(r=>JSON.parse(r.data_json))
  return {documentMoveins:moves,importedDocuments:documents}
 }
@@ -159,6 +161,8 @@ export async function importedOriginal(db:D1Database,actor:Actor,query:URLSearch
   if(sha256(bytes)!==data.sha256)fail('original_integrity',409,'Original file integrity check failed')
   filename='retained-document.pdf'
  }else{
+  const move=await session(db,actor,query.get('id'))
+  if(contentKinds.includes(move.kind))return await contentOriginal(db,move,String(query.get('name')))
   const journal=await documentImportCommand(db,actor,'document-import.journal',{id:query.get('id')}) as any
   const file=journal.originals.find((o:any)=>o.name===query.get('name'))
   if(file?.original.status!=='retained')fail('original_not_found',404)

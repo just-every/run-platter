@@ -20,3 +20,15 @@ export async function uploadDocument(h,id,version,bytes,name,extra={},status=200
  if(response.status!==status)throw Error('Document upload '+response.status+': '+text)
  return JSON.parse(text)
 }
+
+export async function pandadocContentFixture(){
+ const {PDFDocument}=await import('pdf-lib'),pdf=await PDFDocument.create();pdf.addPage()
+ return {quote:{filename:'synthetic-platter-510.docx',bytes:Buffer.from(await wordFixture())},library:{filename:'synthetic-platter-511.docx',bytes:Buffer.from(await wordFixture({headings:10,rows:0,images:0,tokens:false}))},fixed:{filename:'synthetic-platter-512.pdf',bytes:Buffer.from(await pdf.save())}}
+}
+export async function applyPandaContent(h,kind,files,cookie=h.owner){
+ const {uploadMovein}=await import('./document-movein-fixture.mjs'),{id}=await h.cmd('document-import.create',{label:'Synthetic PandaDoc content',kind},cookie)
+ for(const file of files)await uploadMovein(h,id,file,cookie)
+ const preview=await h.cmd('document-import.preview',{id},cookie)
+ const result=await h.cmd('document-import.apply',{id,fingerprint:preview.fingerprint},cookie)
+ return {id,preview,result}
+}

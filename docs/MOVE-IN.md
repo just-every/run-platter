@@ -183,6 +183,13 @@ If the job is `applying`, repeat apply until it is `completed`.
 
 The owner can download the original client CSV from the journal. The download requires an active owner session, just like the journal itself.
 
+On **Clients**, the owner can open **Edit imported client** for an imported
+client with no proposals, change its name and email, and save the current
+version. A stale version or an email already in use is refused. This keeps the
+import binding, original CSV and journal intact; the independent native edit
+prevents undo from replacing or deleting that client. Clients with proposals
+retain their details. Other members and agent keys cannot use this edit door.
+
 The journal retains exact original CSV bytes, source identities, native record
 provenance, and applied/undone batch positions. Undo removes only unchanged
 clients written by that job. Later edits, including edits without a version
@@ -205,6 +212,11 @@ its existing request-origin checks.
 | `import.apply` | `{csv, fingerprint}` | `{job, fingerprint}` |
 | `import.journal` | `{id}` | `{job, originals, batches, provenance}` |
 | `import.undo` | `{id}` | `{job}` |
+
+The authenticated product dispatcher also accepts `client.edit` with
+`{id, version, name, email}` and returns `{id, version}`. It checks current owner
+authority, the version, the import binding and absence of proposals again in the
+write transaction. It changes only the client's name, email and native version.
 
 `importJobs` returns the newest 30 owner-scoped summaries with `id`, `state`,
 `checkpoint`, `total`, `fingerprint`, and `error`. Validation errors have HTTP

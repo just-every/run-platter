@@ -151,6 +151,30 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const duplicate=await h.cmd('proposal.duplicate',{id:work.id,version:4})
     const duplicateBefore=(await h.state()).proposals.find(p=>p.id===duplicate.id)
     assert.deepEqual(JSON.parse(duplicateBefore.section_conditions),{terms:'two'},'EDIT-009 duplicate preserves conditional sections')
+    // EDIT-021: restore independent copies of both relative and absolute expiry
+    // settings with their original bytes, fixed-cent terms and inactive authority.
+    const custodyCopies=[]
+    for(const mode of ['days','date']){
+      const sourceDraft=await h.cmd('proposal.prepare',{...offer,title:'Synthetic duplicate custody '+mode,paymentTerms:{netDays:30,depositFixed:'123.45',milestones:[]}})
+      const bytes=Buffer.from('%PDF synthetic-platter-212 '+mode),form=new FormData()
+      form.set('id',sourceDraft.id);form.set('version','1');form.set('file',new File([bytes],'synthetic-platter-212.pdf',{type:'application/pdf'}))
+      const request=new Request(h.origin+'/app/attachment',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:form}),uploaded=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()})
+      assert.equal(uploaded.status,200);await uploaded.arrayBuffer()
+      await h.cmd('pdf.downloads',{id:sourceDraft.id,version:2,enabled:false})
+      await h.cmd('expiry.set',{id:sourceDraft.id,version:3,...(mode==='days'?{mode,days:14}:{mode,date:'2099-03-19'}),warningDays:1})
+      await h.cmd('reminder.configure',{id:sourceDraft.id,version:4,enabled:true,consent:true,timeZone:'America/Los_Angeles',afterDays:[2,5],beforeDays:[],cap:2})
+      await h.cmd('notification.expiry',{id:sourceDraft.id,version:5,enabled:true,leadDays:1,consent:true})
+      const secondClient=await h.cmd('client.save',{name:'Synthetic custody destination '+mode,email:['synthetic-platter-212-'+mode,'example.test'].join('@')})
+      const copied=await h.cmd('proposal.duplicate',{id:sourceDraft.id,version:6,clientId:secondClient.id}),row=(await h.state()).proposals.find(p=>p.id===copied.id)
+      assert.equal(row.status,'draft');assert.equal(row.revision,1);assert.equal(row.reminderSettings,null);assert.equal(row.expiry.sentAt,null);assert.equal(row.expiry.deadlineAt,null)
+      assert.equal(JSON.parse(row.payment_terms).depositFixedCents,12345);assert.equal(row.pdfDownloadsEnabled,false)
+      const file=row.attachments.find(f=>f.filename==='synthetic-platter-212.pdf');assert.ok(file);assert.equal(file.sha256,createHash('sha256').update(bytes).digest('hex'))
+      custodyCopies.push({row,file,bytes})
+      await h.cmd('reminder.configure',{id:sourceDraft.id,version:6,enabled:false,timeZone:'America/Los_Angeles',afterDays:[2,5],beforeDays:[],cap:2})
+      assert.deepEqual((await h.state()).proposals.find(p=>p.id===copied.id),row,'later source settings remain independent of the archived copy')
+
+    }
+
     const clientPreview=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=two`,undefined,h.owner);assert.equal(clientPreview.status,200);assert.match(clientPreview.text,/Preview only/)
     await h.cmd('followup.schedule',{id:pending.id,action:'Call Avery about scope',dueDate:'2027-03-10'})
     await h.cmd('followup.schedule',{id:duplicate.id,action:'Review new scope',dueDate:'2027-03-11'})
@@ -213,7 +237,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     // audit rows exactly here, then assert the complete joined view on restore.
     const beforeAudit=beforeAuditView.map(({reason,mail_route,sender_address,...row})=>row)
     assert.ok(beforeAudit.some(row=>row.action==='proposal.preview'&&row.subject===duplicate.id&&row.actor_role==='owner'),'EDIT-018 / TEAM-004 preview action is retained without payload or invitation authority')
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','draft','draft','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -289,6 +313,14 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     await h.cmd('proposal.send',{id:withdrawn.id,version:4},restoredOwner,409)
     assert.equal(archived.filter(item=>item.table==='p_withdrawn_links').length,0)
     assert.deepEqual(restoredState.proposals.find(p=>p.id===duplicate.id),duplicateBefore,'EDIT-012 copied content, files and delivery configuration survive CLI restore exactly')
+    for(const {row,file,bytes} of custodyCopies){
+      assert.deepEqual(restoredState.proposals.find(p=>p.id===row.id),row,'EDIT-021 copied content, fixed-cent terms, PDF and expiry settings restore exactly')
+      const download=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+row.id+'/'+file.id,{headers:{cookie:restoredOwner}})
+      assert.equal(download.status,200);const restoredBytes=Buffer.from(await download.arrayBuffer());assert.deepEqual(restoredBytes,bytes);assert.equal(createHash('sha256').update(restoredBytes).digest('hex'),file.sha256)
+      for(const table of ['p_shares','p_reminder_authority','p_sender_notice_authority','p_approvals','p_acceptances','p_mail'])assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM '+table+' WHERE proposal_id=?').bind(row.id).first()).n,0,'restore cannot grant '+table+' authority to a copy')
+      await h.cmd('proposal.send',{id:row.id,version:1},restoredOwner,409)
+    }
+
     assert.equal(restoredState.proposals.find(p=>p.id===work.id).options[0].cents,pricingExpected.grandCents,'PRICE-001 server totals survive public CLI restore')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===work.id).options, before.proposals.find(p=>p.id===work.id).options,'PRICE-001 all table, line, quantity, unit, group and subtotal fields survive public CLI restore exactly')
     assert.equal((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(packages.id).first()).snapshot,scheduleBytes,'Frozen schedule snapshot survives restore byte-identically');assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).acceptance,packagesBefore.acceptance,'PRICE-002 immutable selected quantities and totals survive public CLI restore')

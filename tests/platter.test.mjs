@@ -6,6 +6,7 @@ import { documentFixture } from './document-fixture.mjs'
 import { templatesHttp } from './templates-http.mjs'
 import { followupJourney } from './followup-journey.mjs'
 import { describe, test } from 'node:test'
+import { createHash } from 'node:crypto'
 import assert from 'node:assert/strict'
 import { readFile, readdir } from 'node:fs/promises'
 import { unstable_splitSqlQuery } from 'wrangler'
@@ -896,6 +897,10 @@ test('EDIT-012 duplicate accepted content into an independent member-owned draft
  const get=async id=>(await h.state()).proposals.find(p=>p.id===id)
  await h.cmd('pdf.downloads',{id:p.id,version:2,enabled:false});await h.cmd('expiry.set',{id:p.id,version:3,mode:'days',days:14,warningDays:1})
  await h.cmd('proposal.approve',{id:p.id,version:4,revision:2});const share=await h.cmd('proposal.send',{id:p.id,version:5}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+ await h.cmd('suggestions.allow',{id:p.id,version:6,section:'scope',enabled:true})
+ assert.equal((await h.send(path+'/action?name=suggestion.create',{revision:2,section:'scope',original:'One studio shoot',replacement:'Two studio shoots'},cookie)).status,200)
+ assert.equal((await h.send(path+'/action?name=question.create',{revision:2,section:'scope',text:'When is delivery?'},cookie)).status,200)
+ await h.cmd('collaboration.comment',{id:p.id,version:7,blockId:'scope',text:'Synthetic private preparation note'})
  assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
  await h.cmd('invoice.export',{id:p.id})
  await h.send('/auth/invite',{email:'sales@studio.example',displayName:'Morgan Sales',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('sales@studio.example'),actor=(await h.state(member)).actor
@@ -906,24 +911,112 @@ test('EDIT-012 duplicate accepted content into an independent member-owned draft
  assert.notEqual(copy.id,p.id);assert.equal(after.status,'draft');assert.equal(after.revision,1);assert.equal(after.version,1);assert.equal(after.client_id,beta.id);assert.equal(after.clientName,'Beta Co');assert.equal(after.clientEmail,'contact@beta.example');assert.equal(after.sales_owner_id,actor.id);assert.equal(after.prepared_by,actor.email)
  for(const field of ['scope','terms','options','currency','deposit_bps','attachments','pdfDownloadsEnabled'])assert.deepEqual(after[field],before[field],field+' copied exactly')
  assert.equal(after.expiry.mode,'days');assert.equal(after.expiry.days,14);assert.equal(after.expiry.warningDays,1);assert.equal(after.expiry.sentAt,null);assert.equal(after.expiry.deadlineAt,null);assert.equal(after.expiry.date,null);assert.equal(after.expiry.warningSentAt,null)
- assert.equal(after.approved_by,null);assert.equal(after.approved_at,null);assert.equal(after.acceptance,undefined);assert.equal(after.invoice,undefined);assert.equal(after.shareToken,undefined);assert.deepEqual(after.questions,[]);assert.deepEqual(after.suggestions,[]);assert.deepEqual(after.deliveries,[]);assert.deepEqual(after.pdfDownloads,[]);assert.deepEqual(after.withdrawals,[])
+ assert.equal(after.approved_by,null);assert.equal(after.approved_at,null);assert.equal(after.acceptance,undefined);assert.equal(after.invoice,undefined);assert.equal(after.shareToken,undefined);assert.deepEqual(after.questions,[]);assert.deepEqual(after.suggestions,[]);assert.deepEqual(after.deliveries,[]);assert.deepEqual(after.pdfDownloads,[]);assert.deepEqual(after.withdrawals,[]);assert.deepEqual(after.collaboration.threads,[])
  assert.ok(!(await h.state()).outbox.some(m=>m.proposal_id===copy.id));assert.equal((await h.send('/api/platter/audit?subject='+copy.id,undefined,h.owner)).value.rows.filter(r=>r.action==='proposal.view').length,0)
  const file=await h.send('/api/platter/attachments/'+copy.id+'/'+after.attachments[0].id,undefined,member);assert.equal(file.text,'%PDF exact retained source bytes')
  await h.cmd('proposal.send',{id:copy.id,version:1},h.owner,409);await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1},member,403);await h.cmd('proposal.approve',{id:copy.id,version:1,revision:1});await h.cmd('proposal.send',{id:copy.id,version:2})
  assert.deepEqual(await get(p.id),before);assert.equal((await h.send(path,undefined,cookie)).text,accepted,'source accepted agreement remains byte-identical')
  const same=await h.cmd('proposal.duplicate',{id:p.id,version:before.version});assert.equal((await get(same.id)).client_id,client.id)
- const states=['draft','approved','sent','expired','withdrawn']
- for(const status of states){
-  const source=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Source '+status})
-  if(status!=='draft')await h.cmd('proposal.approve',{id:source.id,version:1,revision:1})
-  if(['sent','expired','withdrawn'].includes(status))await h.cmd('proposal.send',{id:source.id,version:2})
-  if(status==='expired')await h.cmd('expiry.set',{id:source.id,version:3,mode:'date',date:'2020-01-01'})
-  if(status==='withdrawn')await h.cmd('proposal.withdraw',{id:source.id,version:3,reason:'Cancelled',notice:false})
-  const old=await get(source.id);assert.equal(old.status,status)
-  const next=await h.cmd('proposal.duplicate',{id:source.id,version:old.version});const copied=await get(next.id);assert.equal(copied.status,'draft');for(const field of ['mode','days','date','warningDays'])assert.deepEqual(copied.expiry[field],field==='date'&&old.expiry.mode==='days'?null:old.expiry[field],'expiry '+field+' copied from '+status);assert.deepEqual(await get(source.id),old)
+ // EDIT-021: use populated public lifecycle doors, then reconcile the entire
+ // source and the independent copy, including facts not projected by the UI.
+ const clock=Date.parse('2030-04-10T15:00:00Z'),tick=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+ await tick(clock)
+ const tables=[]
+ for(const {name} of (await h.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB 'p_*' ORDER BY name").all()).results){
+  const columns=(await h.db.prepare('PRAGMA table_info("'+name+'")').all()).results
+  if(columns.some(c=>c.name==='proposal_id'))tables.push(name)
  }
- const draftSource=await get(same.id);await h.cmd('proposal.approve',{id:same.id,version:draftSource.version,revision:1});await h.cmd('proposal.send',{id:same.id,version:2});await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:same.id,version:3,scope:'Unsent negotiated scope'})
- const negotiated=await h.cmd('proposal.duplicate',{id:same.id,version:4});assert.equal((await get(negotiated.id)).scope,'Unsent negotiated scope')
+ const records=async id=>Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM "'+table+'" WHERE proposal_id=? ORDER BY rowid').bind(id).all()).results])))
+ const digest=bytes=>createHash('sha256').update(bytes).digest('hex')
+ const bytesOf=async(id,file,cookie=h.owner)=>{const response=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+id+'/'+file.id,{headers:{cookie}});assert.equal(response.status,200);return Buffer.from(await response.arrayBuffer())}
+ const jsonValue=value=>typeof value==='string'?JSON.parse(value):value
+ const contentFields=['scope','terms','options','currency','deposit_bps','payment_terms','attachments','document','section_conditions','pdfDownloadsEnabled','deliveryDefaults','lockedSections']
+ const copiedConfig=new Set(['p_revisions','p_pdf_settings','p_expiry','p_proposal_defaults','p_proposal_locks','p_proposal_block_locks','p_internal_costs','p_template_sources','p_proposal_media'])
+ const copies=[]
+ for(const status of ['draft','approved','sent','accepted','declined','lost','won','expired','withdrawn','negotiation']){
+  const source=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Synthetic source '+status,currency:'USD',terms:'Retain exact delivery terms.',paymentTerms:{netDays:30,depositFixed:'123.45',milestones:[]}})
+  const bytes=Buffer.from('%PDF synthetic-platter-210 '+status),form=new FormData()
+  form.set('id',source.id);form.set('version','1');form.set('file',new File([bytes],'synthetic-platter-210.pdf',{type:'application/pdf'}))
+  const request=new Request(h.origin+'/app/attachment',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:form}),response=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()})
+  assert.equal(response.status,200);await response.arrayBuffer()
+  await h.cmd('pdf.downloads',{id:source.id,version:2,enabled:false})
+  const absolute=['approved','declined','won','expired'].includes(status)
+  await h.cmd('expiry.set',{id:source.id,version:3,...(absolute?{mode:'date',date:'2030-05-30'}:{mode:'days',days:14}),warningDays:1})
+  await h.cmd('reminder.configure',{id:source.id,version:4,enabled:true,consent:true,timeZone:'America/Los_Angeles',afterDays:[2,5],beforeDays:[],cap:2})
+  await h.cmd('notification.expiry',{id:source.id,version:5,enabled:true,leadDays:1,consent:true})
+  if(status!=='draft')await h.cmd('proposal.approve',{id:source.id,version:6,revision:2})
+  let sourcePath,sourceCookie
+  if(!['draft','approved'].includes(status)){
+   sourcePath=new URL((await h.cmd('proposal.send',{id:source.id,version:7})).shareUrl).pathname
+   sourceCookie=await verified(h,sourcePath)
+   assert.equal((await h.send(sourcePath+'/action?name=question.create',{revision:2,section:'scope',text:'Synthetic source question'},sourceCookie)).status,200)
+   if(status==='accepted'){
+    assert.equal((await h.send(sourcePath+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},sourceCookie)).status,200)
+    await h.cmd('invoice.export',{id:source.id})
+   }
+   if(status==='declined')assert.equal((await h.send(sourcePath+'/action?name=decline',{revision:2,reason:'Budget'},sourceCookie)).status,410)
+   if(status==='lost'||status==='won')await h.cmd(status==='lost'?'proposal.lose':'proposal.win',{id:source.id,version:8,reason:'Synthetic business outcome'})
+   if(status==='expired')await h.cmd('expiry.set',{id:source.id,version:8,mode:'date',date:'2030-04-01',warningDays:1})
+   if(status==='withdrawn')await h.cmd('proposal.withdraw',{id:source.id,version:8,reason:'Cancelled',notice:false})
+   if(status==='negotiation')await h.cmd('proposal.negotiate',{...offer,id:source.id,clientId:client.id,version:8,currency:'USD',scope:'Unsent negotiated scope',paymentTerms:{netDays:30,depositFixed:'123.45',milestones:[]}})
+  }
+  const old=await get(source.id)
+  if(['declined','lost','won'].includes(status))assert.equal(old.pipelineStatus,status)
+  else assert.equal(old.status,status==='negotiation'?'draft':status)
+  if(status==='negotiation'){assert.equal(old.negotiating,true);assert.equal(old.scope,'Unsent negotiated scope')}
+  assert.equal(old.currency,'USD');assert.equal(jsonValue(old.payment_terms).depositFixedCents,12345)
+  await h.cmd('proposal.share',{id:source.id,operatorId:actor.id})
+  const sourceRecords=await records(source.id),sourceFile=old.attachments[0],sourceBytes=await bytesOf(source.id,sourceFile)
+  assert.deepEqual(sourceBytes,bytes);assert.equal(sourceFile.sha256,digest(bytes))
+  const agreementHash=status==='accepted'?digest(Buffer.from((await h.send(sourcePath+'/data.json',undefined,sourceCookie)).text)):null
+  for(const destination of [client,beta]){
+   const beforeRefusal=await h.state(),beforeRefusalRows=await records(source.id)
+   await h.cmd('proposal.duplicate',{id:source.id,version:old.version-1,clientId:destination.id},member,409)
+   assert.deepEqual(await h.state(),beforeRefusal,'stale '+status+' copy changes no business state')
+   assert.deepEqual(await records(source.id),beforeRefusalRows,'stale copy changes no retained source records')
+   const next=await h.cmd('proposal.duplicate',{id:source.id,version:old.version,clientId:destination.id},member),copied=await get(next.id)
+   copies.push(next.id)
+   assert.equal(copied.status,'draft');assert.equal(copied.revision,1);assert.equal(copied.version,1)
+   assert.equal(copied.client_id,destination.id);assert.equal(copied.prepared_by,actor.email);assert.equal(copied.sales_owner_id,actor.id);assert.equal(copied.sales_owner_name,actor.email)
+   assert.equal(copied.title,old.title+' (copy)')
+   for(const field of contentFields)assert.deepEqual(['payment_terms','section_conditions'].includes(field)?jsonValue(copied[field]):copied[field],['payment_terms','section_conditions'].includes(field)?jsonValue(old[field]):old[field],status+' copies '+field)
+   for(const field of ['mode','days','date','timeZone','warningDays'])assert.deepEqual(copied.expiry[field],field==='date'&&old.expiry.mode==='days'?null:old.expiry[field],'expiry '+field+' copied from '+status)
+   for(const field of ['sentAt','deadlineAt','warningSentAt'])assert.equal(copied.expiry[field],null)
+   assert.equal(copied.expiry.expired,false);assert.deepEqual(copied.expiry.reopenRequests,[])
+   for(const field of ['approved_by','approved_at','reminderSettings'])assert.equal(copied[field],null)
+   for(const field of ['acceptance','invoice','shareToken'])assert.equal(copied[field],undefined)
+   for(const field of ['questions','suggestions','deliveries','pdfDownloads','withdrawals','outcomes','reminderRuns','reminderOptouts','deliveryChanges','invitationMessages','recipientLinks','recipientSignatures','mailReplies','mailAttributions'])assert.deepEqual(copied[field],[],status+' has no inherited '+field)
+   const copyRecords=await records(next.id)
+   for(const [table,rows] of Object.entries(copyRecords)){
+    if(copiedConfig.has(table))continue
+    if(table==='p_webhook_events'){assert.deepEqual(rows.map(r=>[r.type,r.revision,r.status]),[['proposal.created',1,'draft']]);continue}
+    assert.deepEqual(rows,[],status+' grants no inherited records or execution authority in '+table)
+   }
+   assert.equal(copyRecords.p_expiry[0].owner_id,null,'copy has no expiry sender authority')
+   assert.equal(copyRecords.p_revisions.length,1);assert.equal(copyRecords.p_revisions[0].prepared_by,actor.email)
+   const revision=JSON.parse(copyRecords.p_revisions[0].snapshot)
+   assert.equal(revision.id,next.id);assert.equal(revision.revision,1);assert.equal(revision.client_id,destination.id)
+   assert.equal(revision.scope,old.scope);assert.deepEqual(revision.options,old.options);assert.deepEqual(revision.attachments,old.attachments);assert.equal(revision.payment_terms.depositFixedCents,12345)
+   assert.deepEqual(await bytesOf(next.id,copied.attachments[0],member),bytes)
+   assert.deepEqual(await get(source.id),old);assert.deepEqual(await records(source.id),sourceRecords,'all retained '+status+' source records stay unchanged')
+   assert.equal(digest(await bytesOf(source.id,sourceFile)),digest(sourceBytes))
+   if(agreementHash)assert.equal(digest(Buffer.from((await h.send(sourcePath+'/data.json',undefined,sourceCookie)).text)),agreementHash)
+  }
+  await h.cmd('proposal.share',{id:source.id,operatorId:actor.id,shared:false})
+  const deniedState=await h.state(),deniedRecords=await records(source.id)
+  await h.cmd('proposal.duplicate',{id:source.id,version:old.version,clientId:beta.id},member,403)
+  assert.deepEqual(await h.state(),deniedState,'scope loss refuses a populated '+status+' copy without writes');assert.deepEqual(await records(source.id),deniedRecords)
+ }
+ // A days-based copy gets its own send clock only after fresh human approval.
+ const fresh=await get(copies[0]),sendAt=clock+3600000
+ await tick(sendAt)
+ await h.cmd('proposal.send',{id:fresh.id,version:1},member,409)
+ await h.cmd('proposal.approve',{id:fresh.id,version:1,revision:1})
+ await h.cmd('proposal.send',{id:fresh.id,version:2},member)
+ const freshlySent=await get(fresh.id)
+ assert.equal(freshlySent.expiry.sentAt,sendAt);assert.equal(freshlySent.expiry.date,'2030-04-24');assert.equal(freshlySent.expiry.deadlineAt,Date.parse('2030-04-24T00:00:00Z'))
+ assert.equal(freshlySent.reminderSettings,null)
+ assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_mail WHERE proposal_id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(copies.slice(1))).first()).n,0,'inactive copies queue no mail after the scheduler runs')
  const key=await h.cmd('agent.create',{label:'Draft only'});assert.equal((await h.send('/api/platter/agent/command',{name:'proposal.duplicate',input:{id:p.id,version:before.version}},'',{authorization:'Bearer '+key.token})).status,403)
 }))
 

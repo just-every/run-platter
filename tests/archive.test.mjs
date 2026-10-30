@@ -184,6 +184,14 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal(paperBefore.acceptance.method,'upload');assert.equal(paperBefore.acceptance.totalCents,packageExpected.totalCents);assert.equal(paperBefore.acceptance.depositCents,50000);assert.equal(paperBefore.acceptance.selection.items[0].quantity,4)
     const paperInvoice=await h.cmd('invoice.export',{id:paper.id}),paperInvoicePath='/api/platter/invoices/'+paperInvoice.id+'.csv',paperCsv=(await h.send(paperInvoicePath,undefined,h.owner)).text
     assert.match(paperCsv,/500\.00/)
+    const depositPaper=await h.cmd('proposal.prepare',{...offer,title:'Archived one-off paper deposit'})
+    await h.cmd('proposal.approve',{id:depositPaper.id,version:1,revision:1});const depositShare=await h.cmd('proposal.send',{id:depositPaper.id,version:2})
+    const depositForm=new FormData();for(const [key,value]of Object.entries({id:depositPaper.id,version:3,optionId:'two',signer:'Synthetic paper signer',signedOn:'2026-01-01',attest:'yes'}))depositForm.set(key,String(value));depositForm.set('file',new File([paperBytes],'deposit-signed.pdf',{type:'application/pdf'}))
+    const depositUpload=new Request(h.origin+'/app/paper-acceptance',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner},body:depositForm})
+    const depositResponse=await h.mf.dispatchFetch(depositUpload.url,{method:'POST',headers:depositUpload.headers,body:await depositUpload.arrayBuffer()});assert.equal(depositResponse.status,200,await depositResponse.text())
+    const depositBefore=(await h.state()).proposals.find(p=>p.id===depositPaper.id),depositInput={id:depositPaper.id,version:depositBefore.version,...depositBefore.depositRequestReview,consent:true}
+    const depositRequested=await h.cmd('deposit.request',depositInput),depositHistory=(await h.state()).proposals.find(p=>p.id===depositPaper.id).depositRequests
+    assert.equal(depositHistory[0].id,depositRequested.requestId);assert.equal(depositHistory[0].deposit_cents,105000)
     const templateSource=(await h.state()).proposals.find(p=>p.id===work.id)
     const template=await h.cmd('template.save',{id:work.id,version:templateSource.version,name:'Restorable campaign'})
     const beforeVendorDocuments=(await h.state()).vendorDocuments
@@ -214,7 +222,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     // audit rows exactly here, then assert the complete joined view on restore.
     const beforeAudit=beforeAuditView.map(({reason,mail_route,sender_address,...row})=>row)
     assert.ok(beforeAudit.some(row=>row.action==='proposal.preview'&&row.subject===duplicate.id&&row.actor_role==='owner'),'EDIT-018 / TEAM-004 preview action is retained without payload or invitation authority')
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','accepted','approved','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -301,6 +309,11 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal((await h.send(paperInvoicePath,undefined,restoredOwner)).text,paperCsv,'PRICE-002 selected deposit invoice survives restore byte-identically')
     const paperFile=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+paper.id+'/'+paperBefore.acceptance.signedCopy.id,{headers:{host:new URL(h.origin).host,cookie:restoredOwner}});assert.equal(paperFile.status,200);assert.deepEqual(new Uint8Array(await paperFile.arrayBuffer()),paperBytes,'SIGN-008 original signed copy survives restore byte-identically')
 
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===depositPaper.id).depositRequests,depositHistory,'SIGN-008 request identity, amount, recipient, revision and delivery outcome survive exactly')
+    assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_deposit_request_authority').first()).n,0,'SIGN-008 restore retains no outbound authority')
+    assert.equal((await h.send(new URL(depositShare.shareUrl).pathname)).status,404,'SIGN-008 restored history cannot expose an old client invitation')
+    await h.cmd('deposit.request',depositInput,restoredOwner,409)
+    assert.deepEqual((await h.state(restoredOwner)).proposals.find(p=>p.id===depositPaper.id).depositRequests,depositHistory,'SIGN-008 replay after restore cannot create a new request')
     assert.deepEqual(restoredState.agentKeys,[])
     assert.deepEqual((await h.send('/api/platter/send-requests',undefined,restoredOwner)).value.requests,beforeRequests)
     assert.equal((await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'ping'},'',{authorization:'Bearer '+key.token})).status,401)

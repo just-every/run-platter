@@ -162,7 +162,7 @@ export async function importedOriginal(db:D1Database,actor:Actor,query:URLSearch
   filename='retained-document.pdf'
  }else{
   const move=await session(db,actor,query.get('id'))
-  if(contentKinds.includes(move.kind))return await contentOriginal(db,move,String(query.get('name')))
+  if(contentKinds.includes(move.kind)){const response=await contentOriginal(db,move,String(query.get('name')));await documentOwner(db,actor);return response}
   const journal=await documentImportCommand(db,actor,'document-import.journal',{id:query.get('id')}) as any
   const file=journal.originals.find((o:any)=>o.name===query.get('name'))
   if(file?.original.status!=='retained')fail('original_not_found',404)

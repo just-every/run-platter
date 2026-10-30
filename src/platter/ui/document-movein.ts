@@ -3,14 +3,14 @@ import { importStatus } from './import-journal'
 
 const command=(name:string,id:string,body:string)=>form('document-import.'+name,'/app/import',hidden('id',id)+body)
 function reportSummary(report:any) {
- return '<dl>'+[['Arrived outputs',report.arrived],['Held for review',report.held],['Unmapped items',report.unmapped],['Duplicate PDFs skipped',report.duplicateDocuments]].map(([label,value])=>'<dt>'+label+'</dt><dd>'+escape(value)+'</dd>').join('')+'</dl>'
+ return '<dl>'+[['Arrived outputs',report.arrived],['Held for review',report.held],['Unmapped items',report.unmapped],['Repeated files skipped',report.duplicateDocuments]].map(([label,value])=>'<dt>'+label+'</dt><dd>'+escape(value)+'</dd>').join('')+'</dl>'
   +'<ul>'+report.notes.map((note:string)=>'<li>'+escape(note)+'</li>').join('')+report.unmappedItems.map((name:string)=>'<li>Unmapped: '+escape(name)+'</li>').join('')+'</ul>'
 }
 export function documentMoveinPage(state:any,feedback?:any) {
  if(state.actor?.role!=='owner')return ''
  const result=feedback?.result?.documentMovein?feedback.result:null
  let html=panel('Move in exported documents','<p>Add PDFs, bulk ZIP downloads and report CSVs to one move-in across sessions. Upload the same file again to resume from its saved byte offset. Originals remain read-only; no invitation, payment or provider action is created.</p>'
-  +form('document-import.create','/app/import',field('Move-in name','label','','required maxlength="150"')+'<label>Source content<select name="kind"><option value="documents">Retained exported documents</option><option value="pandadoc-template">PandaDoc Word or fixed PDF templates</option><option value="pandadoc-library">PandaDoc Word library sections</option></select></label>'+'<button>Start document move-in</button>'))
+  +form('document-import.create','/app/import',field('Move-in name','label','','required maxlength="150"')+'<label for="document-source-kind">Source content</label><select id="document-source-kind" name="kind"><option value="documents">Retained exported documents</option><option value="pandadoc-template">PandaDoc Word or fixed PDF templates</option><option value="pandadoc-library">PandaDoc Word library sections</option></select>'+'<button>Start document move-in</button>'))
  const moves=state.documentMoveins??[]
  for(const move of moves) {
   const frozen=Boolean(move.fingerprint),content=move.kind?.startsWith('pandadoc-')
@@ -24,9 +24,9 @@ export function documentMoveinPage(state:any,feedback?:any) {
   if(result?.id===move.id&&result.report) {
    body+=reportSummary(result.report)
    if(result.kind==='PandaDoc content'){
-    body+='<ul class="records">'+result.report.outputs.map((o:any)=>'<li><article><h3>'+escape(o.title)+'</h3><p>'+escape(o.fixed?'Fixed pages · Word download needed for editing':o.kind==='template'?'Editable template':'Library section')+'</p><p>Output: '+escape(o.id)+'</p>'+(o.needsPrice?'<p>Source price not supplied; choose a new price when starting a draft.</p>':'')+(o.blocks??[]).map((b:any)=>'<p>'+escape(b.title||b.text||b.alt||b.type)+'</p>').join('')+(o.options??[]).map((option:any)=>'<p>Total: $'+escape((option.cents/100).toFixed(2))+'</p><table><thead><tr><th>Quote row</th><th>Quantity</th><th>Unit price</th><th>Catalog match</th></tr></thead><tbody>'+(option.tables??[]).flatMap((t:any)=>t.lines).map((l:any)=>'<tr><td>'+escape(l.name)+'</td><td>'+escape(l.quantity)+'</td><td>$'+escape(l.unitPrice)+'</td><td>'+escape(l.catalogId?'Linked':'Unmatched')+'</td></tr>').join('')+'</tbody></table>').join('')+'</article></li>').join('')+'</ul>'
+    body+='<ul class="records">'+result.report.outputs.map((o:any)=>'<li><article style="min-width:0"><h3>'+escape(o.title)+'</h3><p>'+escape(o.fixed?'Fixed pages · Word download needed for editing':o.kind==='template'?'Editable template':'Library section')+'</p><details><summary>Output reference</summary><p class="wrap">'+escape(o.id)+'</p></details>'+(o.needsPrice?'<p>Source price not supplied; choose a new price when starting a draft.</p>':'')+(o.blocks??[]).map((b:any)=>'<p>'+escape(b.title||b.text||b.alt||b.type)+'</p>').join('')+(o.options??[]).map((option:any)=>'<p>Total: $'+escape((option.cents/100).toFixed(2))+'</p><table style="width:100%;table-layout:fixed"><thead><tr><th>Quote row</th><th>Quantity</th><th>Unit price</th><th>Catalog match</th></tr></thead><tbody>'+(option.tables??[]).flatMap((t:any)=>t.lines).map((l:any)=>'<tr><td>'+escape(l.name)+'</td><td>'+escape(l.quantity)+'</td><td>$'+escape(l.unitPrice)+'</td><td>'+escape(l.catalogId?'Linked':'Unmatched')+'</td></tr>').join('')+'</tbody></table>').join('')+'</article></li>').join('')+'</ul>'
     if(!frozen&&result.canApply)body+=command('apply',move.id,hidden('fingerprint',result.fingerprint)+'<button>Apply reviewed PandaDoc conversion</button>')
-    if(frozen&&result.sources)body+='<h3>Reviewed originals</h3><ul>'+result.sources.map((s:any)=>'<li><a href="/api/platter/imported-original?id='+encodeURIComponent(move.id)+'&amp;name='+encodeURIComponent(s.sha256)+'">Download '+escape(s.filename)+'</a><p class="json">SHA-256: '+escape(s.sha256)+'</p></li>').join('')+'</ul>'
+    if(frozen&&result.sources)body+='<h3>Reviewed originals</h3><ul>'+result.sources.map((s:any)=>'<li><a href="/api/platter/imported-original?id='+encodeURIComponent(move.id)+'&amp;name='+encodeURIComponent(s.sha256)+'">Download '+escape(s.filename)+'</a><p class="wrap">SHA-256: '+escape(s.sha256)+'</p></li>').join('')+'</ul>'
    }
    if(result.kind==='Document move-in'){
     const choices=JSON.stringify(result.choices??{})

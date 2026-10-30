@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 14 | 101 | 44 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 14 | 101 | 48 | 163 |
 
 Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -1924,7 +1924,7 @@ Core · target · **missing** · Register R-7
 
 #### MIG-001 — PandaDoc move-in
 
-Core · target · **missing** · Rules D-1
+Core · target · **partial** · Rules D-1
 
 **Requirement.** A PandaDoc customer on any plan moves in without API access, because PandaDoc gives Business and Starter accounts only its Sandbox API and keeps the Production API for approved Enterprise accounts. The full mapping and custody rules in [proposal behavior](docs/contract-behavior.md#mig-001) apply to every import and resulting record.
 
@@ -1936,8 +1936,8 @@ Core · target · **missing** · Rules D-1
 5. Upload another template only as a PDF and see fixed pages listed as "Word download needed for editing".
 6. Uploading the same zip again adds nothing; undo the import.
 
-**Evidence.** None.
-**Gap.** No PandaDoc import.
+**Evidence.** `tests/platter.test.mjs` — “MIG-001 reviewed PandaDoc Word and fixed PDF content retains exact originals, catalog links and dependency-safe undo” (reviewed uploaded bytes, six exact priced quote rows, five existing catalog links, unmatched sixth row, embedded image, Client.Company variables, ten Heading 1 library items, fixed PDF template, source SHA-256 and exact originals, output references, counts, concurrency and replay exclusion, current-owner refusals and dependent undo); `tests/site.test.mjs` loads `tests/document-import-browser.mjs` through `tests/site-documents.mjs` — “EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads” (compiled PandaDoc conversion, explicit apply, journal, original download and undo at 1440, with browser proof also at 390); `tests/archive.test.mjs` — “MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody” (identical restored PandaDoc originals, templates, ten library outputs and journal, usable media, dependency refusal and library undo).
+**Gap.** The exported Word and fixed PDF content slice uses the conservative current-owner-only import authority floor under the standing scope policy; scoped delegation and provider boundaries remain unqualified. Full bulk PDF and three-level folder migration, open-document reissue, integrated catalog and contact import, bundle mapping, API enrichment and template roles, signing order, pre-assigned recipients and assigned fields remain unproved. No source prices, recipients or signature authority are inferred; unpriced content requires an explicit new draft price and all converted templates require new scope and deposit choices. Complete PandaDoc qualification remains. URL image acquisition remains held on MIG-006’s qualified Base image-GET egress with validated public-address pinning, original-host TLS, no redirects and required 5-MiB image and 20-MiB batch bounds; the recorded POST-only 64-KiB relay is insufficient and no URL images are acquired. EDIT-013 prerequisites and SEND-003 and SIGN-004 authority holds remain unchanged. No full migration or DONE claim.
 
 #### MIG-002 — Proposify move-in
 

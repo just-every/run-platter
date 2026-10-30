@@ -12,7 +12,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 4 | Collects the signature and deposit together | `SIGN-001` partial; `SIGN-003` partial; `PAY-001` partial; `PAY-002` partial | partial |
 | 5 | Good / Better / Best packages, add-ons, Austin sales tax, 50% deposit | `PRICE-001` partial; `PRICE-002` partial; `PRICE-005` partial; `PRICE-007` partial | partial |
 | 6 | HubSpot deal won, QuickBooks invoice paid | `CRM-001` partial; `ACCT-001` missing | partial |
-| 7 | 100% free, open source alternative to PandaDoc, Proposify and Better Proposals; MIT licensed | `MIG-001` missing; `MIG-002` missing; `MIG-003` missing | missing |
+| 7 | 100% free, open source alternative to PandaDoc, Proposify and Better Proposals; MIT licensed | `MIG-001` partial; `MIG-002` missing; `MIG-003` missing | partial |
 | 8 | Run Platter (the one-line start) | `SITE-001` partial | partial |
 | 9 | Sent, read, back and forth, signed, first payment, per proposal | `SEND-001` partial; `SEND-011` partial; `TRACK-001` partial; `NEG-001` done; `SIGN-003` partial; `PAY-001` partial; `PAY-002` partial; `PAY-004` missing | partial |
 | 10 | The agent drafts a priced proposal from a Zoom call, each line cited | `AGENT-001` partial; `AI-001` partial | partial |
@@ -44,8 +44,8 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 36 | Out-of-scope request priced as its own change order; the original agreement unchanged | `AGENT-006` missing; `PROP-002` partial | partial |
 | 37 | Asana project made at signing, one task per accepted line | `HAND-001` missing | missing |
 | 38 | Paid by card that afternoon | `PAY-001` partial | partial |
-| 39 | PandaDoc Word templates become editable pages; tokens become fields; rows matched to the catalog | `MIG-001` missing; `MIG-007` partial; `EDIT-005` done; `EDIT-020` done; `EDIT-019` done; `EDIT-004` partial; `CAT-001` partial | partial |
-| 40 | Catalog CSV with bundles as packages; bulk PDFs kept with their certificates | `MIG-001` missing; `CAT-001` partial | partial |
+| 39 | PandaDoc Word templates become editable pages; tokens become fields; rows matched to the catalog | `MIG-001` partial; `MIG-007` partial; `EDIT-005` done; `EDIT-020` done; `EDIT-019` done; `EDIT-004` partial; `CAT-001` partial | partial |
+| 40 | Catalog CSV with bundles as packages; bulk PDFs kept with their certificates | `MIG-001` partial; `CAT-001` partial | partial |
 | 41 | Planned move-in support for Proposify, Better Proposals, Qwilr and Ignition | `MIG-002` missing; `MIG-003` missing; `MIG-004` missing | missing |
 
-Claims: 41; 1 done, 36 partial, 4 missing.
+Claims: 41; 1 done, 37 partial, 3 missing.

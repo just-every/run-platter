@@ -504,6 +504,9 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   const catalog=await applyBusiness(h,{kind:'catalog',format:'pandadoc',csv:await businessCsv('pandadoc-catalog.csv')})
   const {moveinFixture,applyMovein,hash}=await import('./document-movein-fixture.mjs'),documentFixture=await moveinFixture()
   const movein=await applyMovein(h,documentFixture)
+  const {pandadocContentFixture,applyPandaContent}=await import('./document-import-fixture.mjs'),pandaFiles=await pandadocContentFixture()
+  const panda=await applyPandaContent(h,'pandadoc-template',[pandaFiles.quote,pandaFiles.fixed]),pandaLibrary=await applyPandaContent(h,'pandadoc-library',[pandaFiles.library])
+  const pandaJournal=await h.cmd('document-import.journal',{id:panda.id}),pandaLibraryJournal=await h.cmd('document-import.journal',{id:pandaLibrary.id}),pandaState=await h.state()
   const documentJournal=await h.cmd('document-import.journal',{id:movein.id}),beforeDocuments=(await h.state()).importedDocuments
   const nativeClient=await h.cmd('client.save',{name:'Synthetic retained dependency',email:h.auth.OWNER_EMAIL})
   const dependency=await h.cmd('proposal.prepare',{clientId:nativeClient.id,title:'Synthetic retained dependency',scope:'Synthetic retained dependency',optionOne:'One',priceOne:'100',optionTwo:'Two',priceTwo:'200',depositPercent:'25'})
@@ -515,6 +518,13 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   const cookie=await h.signIn(identity.auth.OWNER_EMAIL)
   assert.deepEqual((await h.state(cookie)).businessRecords,before)
   assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments)
+  assert.deepEqual((await h.state(cookie)).templates,pandaState.templates);assert.deepEqual((await h.state(cookie)).libraryItems,pandaState.libraryItems)
+  assert.deepEqual(await h.cmd('document-import.journal',{id:panda.id},cookie),pandaJournal);assert.deepEqual(await h.cmd('document-import.journal',{id:pandaLibrary.id},cookie),pandaLibraryJournal)
+  for(const source of pandaJournal.sources){const expected=[pandaFiles.quote,pandaFiles.fixed].find(f=>hash(f.bytes)===source.sha256),response=await h.mf.dispatchFetch(h.origin+'/api/platter/imported-original?id='+panda.id+'&name='+source.sha256,{headers:{cookie}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),expected.bytes)}
+  const pandaClient=nativeClient,pandaTemplate=(await h.state(cookie)).templates.find(t=>t.name==='synthetic-platter-510'),pandaDraft=await h.cmd('template.start',{id:pandaTemplate.id,version:1,clientId:pandaClient.id,scope:'Reviewed restored scope',depositPercent:'25'},cookie)
+  const pandaImage=(await h.state(cookie)).proposals.find(p=>p.id===pandaDraft.id).document.blocks.find(b=>b.type==='image'),imageResponse=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+pandaDraft.id+'/'+pandaImage.assetId,{headers:{cookie}});assert.deepEqual(Buffer.from(await imageResponse.arrayBuffer()),await readFile('fixtures/business/brand.png'))
+  await h.cmd('document-import.undo',{id:panda.id},cookie,409);assert.deepEqual((await h.state(cookie)).templates,pandaState.templates)
+  await h.cmd('document-import.undo',{id:pandaLibrary.id},cookie);assert.deepEqual((await h.state(cookie)).libraryItems,[]);assert.equal((await h.cmd('document-import.journal',{id:pandaLibrary.id},cookie)).undone,true)
   const restoredDocumentJournal=await h.cmd('document-import.journal',{id:movein.id},cookie)
   assert.deepEqual(restoredDocumentJournal.originals,documentJournal.originals)
   assert.deepEqual(restoredDocumentJournal.provenance,documentJournal.provenance)

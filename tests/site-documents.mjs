@@ -914,6 +914,7 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
   await section.getByRole('button',{name:'Undo document move-in',exact:true}).click()
   assert.equal(await page.getByRole('heading',{name:'Retained imported originals',exact:true}).count(),0)
   assert.match(await section.innerText(),/Import undone/)
+  await (await import('./document-movein-fixture.mjs')).sourceExportBrowser({page,context,app,capture})
   await context.close()
  }finally{await browser?.close();await app?.close()}
 })

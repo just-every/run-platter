@@ -3678,6 +3678,10 @@ test('ACCT-001 reviewed QuickBooks deposits preserve accepted cents, explicit ma
   assert.equal(writes().length,0,'acceptance alone never authorizes an accounting write')
   await h.cmd('accounting.review',quickbooksReviewInput(agreement,fake),h.owner,409)
   await connectQuickbooks(h,fake)
+  fake.setMalformed(true)
+  const malformed=await h.send('/api/platter/command',{name:'accounting.customers',input:{proposalId:agreement.proposal.id}},h.owner)
+  assert.equal(malformed.status,409);assert.ok(!malformed.text.includes(fake.token));assert.match(malformed.text,/invalid accounting response/)
+  fake.setMalformed(false)
   const email=['synthetic-platter-9105','example.test'].join('@')
   await h.send('/auth/invite',{email,displayName:'Accounting administrator',role:'member',returnTo:'/app'},h.owner)
   const member=await h.signIn(email),memberActor=(await h.state(member)).actor

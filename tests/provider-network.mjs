@@ -14,7 +14,7 @@ export async function forwardProviderRequest(request){
 // A receiver fake stores writes before simulating a lost acknowledgement.
 export function quickbooksFixture() {
  const calls = [], customers = new Map(), invoices = new Map(), payments = new Map(), journals = new Map(), refundReceipts = new Map(), requestIds = new Set()
- let hook, timeoutKind, mappingAccount = 'synthetic-platter-9102'
+ let hook, timeoutKind, malformed = false, mappingAccount = 'synthetic-platter-9102'
  const items=new Map(),accounts=new Map(),taxGroup='synthetic-platter-9400',taxRates=new Map([['synthetic-platter-9401',{Id:'synthetic-platter-9401',Name:'Texas',Active:true,RateValue:6.25}],['synthetic-platter-9402',{Id:'synthetic-platter-9402',Name:'Austin',Active:true,RateValue:1}],['synthetic-platter-9403',{Id:'synthetic-platter-9403',Name:'Metro',Active:true,RateValue:1}]])
  const token = 'synthetic-platter-9100', company = 'synthetic-platter-9101', item = 'synthetic-platter-9103', bank = 'synthetic-platter-9104'
  const outboundService = async request => {
@@ -27,6 +27,7 @@ export function quickbooksFixture() {
   const kind = url.pathname.split('/').at(-1)
   if (url.pathname.includes('/companyinfo/')) return Response.json({ CompanyInfo: { CompanyName: 'Synthetic accounting company' } })
   if (kind === 'query') {
+   if(malformed)return new Response(token)
    const match = url.searchParams.get('query').match(/DisplayName = '((?:\\.|[^'])*)'/)
    const name = match?.[1].replace(/\\(.)/g,'$1')
    return Response.json({ QueryResponse: { Customer: [...customers.values()].filter(c => c.DisplayName === name) } })
@@ -48,7 +49,7 @@ export function quickbooksFixture() {
   if (timeoutKind === kind) return new Response('synthetic-platter-provider-timeout', { status: 504 })
   return Response.json({ [kind === 'customer' ? 'Customer' : kind === 'payment' ? 'Payment' : kind === 'journalentry' ? 'JournalEntry' : kind === 'refundreceipt' ? 'RefundReceipt' : 'Invoice']: value })
  }
- return { calls, customers, invoices, payments, journals, refundReceipts, items, accounts, taxGroup, taxRates, bank, token, company, item, incomeAccount: 'synthetic-platter-9102', outboundService, setHook: value => { hook = value }, setTimeout: value => { timeoutKind = value }, setMapping: value => { mappingAccount = value } }
+ return { calls, customers, invoices, payments, journals, refundReceipts, items, accounts, taxGroup, taxRates, bank, token, company, item, incomeAccount: 'synthetic-platter-9102', outboundService, setHook: value => { hook = value }, setTimeout: value => { timeoutKind = value }, setMapping: value => { mappingAccount = value }, setMalformed:value=>{malformed=value} }
 }
 
 export async function connectQuickbooks(h, fake, version = 0, settingsVersion = 0, cookie = h.owner) {

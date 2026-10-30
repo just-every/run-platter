@@ -15,7 +15,7 @@ export async function quickbooks(authorize: QuickBooksAuthority, path: string, b
  need(response.ok, 'QuickBooks refused the request. Review the retained accounting history before any further write.', 409)
  const raw = await response.text()
  need(raw.length <= 262144, 'QuickBooks returned an oversized response', 409)
- const value = JSON.parse(raw)
+ let value:any;try{value=JSON.parse(raw)}catch{need(false,'QuickBooks returned an invalid accounting response',409)}
  need(value && typeof value === 'object' && !value.Fault, 'QuickBooks returned an invalid accounting response', 409)
  return value
 }

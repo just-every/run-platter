@@ -17,7 +17,7 @@ export async function stripeReader(env:Bindings,actor:Actor,authorize:()=>Promis
   const response=await fetch('https://api.stripe.com/v1'+path,{headers:{authorization:'Bearer '+secret.token,accept:['application','json'].join('/')},redirect:'manual',signal:AbortSignal.timeout(30000)})
   need(response.ok,'Stripe did not confirm this accounting source',409)
   const raw=await response.text();need(raw.length<=262144,'Stripe returned an oversized accounting source',409)
-  const value=JSON.parse(raw);need(value&&typeof value==='object'&&!value.error,'Stripe returned an invalid accounting source',409)
+  let value:any;try{value=JSON.parse(raw)}catch{need(false,'Stripe returned an invalid accounting source',409)};need(value&&typeof value==='object'&&!value.error,'Stripe returned an invalid accounting source',409)
   return value
  }
  return {get,account:current.connection.account_id,version:current.connection.version}

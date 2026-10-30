@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "da77d09cefe1c2bb2995abb86597348f2cc2aa449a17b148f3581b23ed9beb79",
+      "sha256": "f37afda40278b063a144f1f2c38ff6e1e6139e77eb506843d8089eb05253c09d",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "e92a3d6a3a646ac1c28c59c375025f5f002de2f9ae3b5584cfb5d5d7476606b0",
+      "sha256": "4683fb04f2619c25330ec491596a28fed10f5cfc208722b5579473d4a6ed768f",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2474,11 +2474,11 @@
       "executable": false
     },
     "src/platter/accounting/lines.ts": {
-      "sha256": "77b797e797ea7f958aa51e6122922f22b7e3d38339701320a366617897db6c7f",
+      "sha256": "bcd6c481826e581563ffc21191cf006c6cb391b086f4d81ddb15495d0331b867",
       "executable": false
     },
     "src/platter/accounting/quickbooks.ts": {
-      "sha256": "b4024e3c813f7efc46cab2e333280a41a7c646c25a80c0c63a4f9b3b4712f316",
+      "sha256": "b1daaed17056e5fe5804f27902e0080c52d9ef1eb0ca1c8c630653f350011098",
       "executable": false
     },
     "src/platter/accounting/schedule.ts": {
@@ -2486,7 +2486,7 @@
       "executable": false
     },
     "src/platter/accounting/stripe.ts": {
-      "sha256": "18f126b5f8dec242e854fd7d20c7836a6b9d946ddae7761605dbb166bbc2419d",
+      "sha256": "c5c9cc55022f1011d1c3ad83419492cc20aadb901ec6afe1e29daed0e8ff4fa6",
       "executable": false
     },
     "src/platter/api/index.ts": {
@@ -3578,7 +3578,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "e02ce180f362d768ae486bc0a9ea38e486400987187ded05358a08aa9db77abc",
+      "sha256": "11d1b9c9df0194a3376e055186302b7a4472f35c0d3239c035c2bbc0fdb67817",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3590,7 +3590,7 @@
       "executable": false
     },
     "tests/provider-network.mjs": {
-      "sha256": "6322d120867df6535f6b2bc1128a2552aef2d7c29bb99dbed2ac21143c677cb8",
+      "sha256": "bf2453459aaf57231eeeb40a111a05b511545feb6fccb4ec75f153eda448fad0",
       "executable": false
     },
     "tests/quickbooks-browser.mjs": {
@@ -3598,11 +3598,11 @@
       "executable": false
     },
     "tests/quickbooks-lifecycle.mjs": {
-      "sha256": "e5adb95fea036b314c3c205777d45ad230b415ee3983fcb46f406f5166b495b4",
+      "sha256": "ea2983539c69d9617b206d416f5ebb7b3899a7432777a11bd4a90141bbce6d30",
       "executable": false
     },
     "tests/quickbooks-money.mjs": {
-      "sha256": "2797ebc797e50d40441009ef73ac78ba5df4a08ce6b36f3797a3f442ce5e0729",
+      "sha256": "9e9af44cb71a79d9608f79a31fea6ad460a47f6d0bc4dadc468565fce83ce39c",
       "executable": false
     },
     "tests/recipients-browser.mjs": {

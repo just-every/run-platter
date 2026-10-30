@@ -8,7 +8,7 @@ export function quickbooksMoneyFixture(){
  fake.accounts.set(clearing,{Id:clearing,Name:'Stripe clearing',Active:true,AccountType:'Other Current Asset'})
  fake.accounts.set(expense,{Id:expense,Name:'Processor fees',Active:true,AccountType:'Expense'})
  const refunds=new Map(),balances=new Map(),stripeCalls=[],disputeId='synthetic-platter-9900',disputeBalances=[]
- let proposalId,amount,fee=750,refunded=0,refundFee=0
+ let proposalId,amount,fee=750,refunded=0,refundFee=0,malformed=false
  const created=Date.parse('2030-03-02T12:00:00Z')/1000
  const charge=()=>({id:chargeId,paid:true,status:'succeeded',amount,amount_refunded:refunded,currency:'usd',created,balance_transaction:balanceId,metadata:{platter_proposal_id:proposalId,platter_revision:'1'}})
  const balance=()=>({id:balanceId,type:'charge',source:chargeId,amount,fee,net:amount-fee,currency:'usd'})
@@ -19,6 +19,7 @@ export function quickbooksMoneyFixture(){
   stripeCalls.push({method:request.method,path:url.pathname})
   if(url.pathname==='/v1/account')return Response.json({id:stripeAccount})
   if(url.pathname==='/v1/charges/'+chargeId)return Response.json(charge())
+  if(malformed&&url.pathname==='/v1/balance_transactions/'+balanceId)return new Response(stripeToken)
   if(url.pathname==='/v1/balance_transactions/'+balanceId)return Response.json(balance())
   if(url.pathname==='/v1/payouts/'+payoutId)return Response.json({id:payoutId,status:'paid',currency:'usd',amount:amount-fee,arrival_date:created+86400})
   if(url.pathname==='/v1/balance_transactions'){assert.equal(url.searchParams.get('payout'),payoutId);return Response.json({has_more:false,data:[balance()]})}
@@ -35,7 +36,7 @@ export function quickbooksMoneyFixture(){
   if(url.pathname.startsWith('/v1/balance_transactions/'))return Response.json(balances.get(url.pathname.split('/').at(-1)))
   throw Error('Unexpected Stripe accounting source')
  }
- return Object.assign(fake,{stripeAccount,chargeId,balanceId,payoutId,stripeToken,clearing,expense,stripeCalls,sourceRefunds:refunds,setCharge:(id,cents)=>{proposalId=id;amount=cents},setFee:value=>{fee=value},setRefundFee:value=>{refundFee=value},disputeId,disputeBalances})
+ return Object.assign(fake,{stripeAccount,chargeId,balanceId,payoutId,stripeToken,clearing,expense,stripeCalls,sourceRefunds:refunds,setCharge:(id,cents)=>{proposalId=id;amount=cents},setFee:value=>{fee=value},setMalformedStripe:value=>{malformed=value},setRefundFee:value=>{refundFee=value},disputeId,disputeBalances})
 }
 export async function postStripeReceipt(h,fake,agreement){
  fake.setCharge(agreement.proposal.id,25001)
@@ -58,7 +59,12 @@ export async function quickbooksMoney(){
   const gross=[...fake.payments.values()][0]
   assert.equal(gross.TotalAmt,250.01);assert.equal(gross.DepositToAccountRef.value,fake.clearing);assert.equal(gross.TxnDate,'2030-03-02')
   await h.cmd('accounting.adjustment.review',{kind:'payout',paymentId:payment.id,payoutId:fake.payoutId,bankAccountId:fake.bank},h.owner,409)
-  const feeInput={kind:'fee',paymentId:payment.id,expenseAccountId:fake.expense},feeReview=await adjustment(feeInput)
+  const feeInput={kind:'fee',paymentId:payment.id,expenseAccountId:fake.expense}
+  fake.setMalformedStripe(true)
+  const malformed=await h.send('/api/platter/command',{name:'accounting.adjustment.review',input:feeInput},h.owner)
+  assert.equal(malformed.status,409);assert.ok(!malformed.text.includes(fake.stripeToken));assert.match(malformed.text,/invalid accounting source/)
+  fake.setMalformedStripe(false)
+  const feeReview=await adjustment(feeInput)
   fake.setFee(751)
   await h.cmd('accounting.adjustment.apply',{id:feeReview.id,digest:feeReview.digest,consent:true},h.owner,409)
   assert.equal(fake.journals.size,0)

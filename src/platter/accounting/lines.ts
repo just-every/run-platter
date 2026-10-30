@@ -55,16 +55,42 @@ export async function recheckLines(authorize:QuickBooksAuthority,plan:any) {
 export function invoiceLines(plan:any,amountCents:number,amountIndex=0) {
  const details=plan.lineDetails
  if(!details)return {GlobalTaxCalculation:'NotApplicable',Line:[{Amount:amountCents/100,DetailType:'SalesItemLineDetail',Description:amountIndex?plan.schedule[amountIndex].label:'Deposit: '+plan.title,SalesItemLineDetail:{ItemRef:{value:plan.mapping.itemId},Qty:1,UnitPrice:amountCents/100,TaxCodeRef:{value:'NON'}}}]}
- let sources=details.lines
- const row=plan.schedule?.[amountIndex]
- if(row?.kind==='recurring'){sources=sources.filter((l:any)=>l.recurrence&&l.label===row.label);need(sources.length===1,'Repeated recurring line labels require explicit accounting reconciliation',409)}
- else if(row&&['milestone','balance'].includes(row.kind)&&sources.some((l:any)=>l.recurrence))sources=sources.filter((l:any)=>!l.recurrence)
- need(sources.length,'The accepted invoice has no unambiguous source lines',409)
- const amounts=plan.schedule?.map((r:any)=>r.amountCents)??[plan.depositCents,plan.totalCents-plan.depositCents]
+ const sources=details.lines,rows=plan.schedule??[{kind:'deposit',amountCents:plan.depositCents},{kind:'balance',amountCents:plan.totalCents-plan.depositCents}],amounts=rows.map((r:any)=>r.amountCents)
+ need(rows[amountIndex]?.amountCents===amountCents,'The invoice must match its immutable scheduled amount',409)
  if(details.tax)need(amounts.reduce((sum:number,n:number)=>sum+n,0)===plan.totalCents,'Tax allocations require the complete accepted schedule',409)
- const taxParts=(details.tax?.components??[]).map((c:any)=>({...c,cents:allocateNet(amounts,c.taxCents)[amountIndex]})),taxCents=taxParts.reduce((sum:number,c:any)=>sum+c.cents,0)
- const nets=allocateNet(sources.map((l:any)=>l.netCents),amountCents-taxCents)
- need(nets.reduce((sum:number,n:number)=>sum+n,0)+taxCents===amountCents,'The invoice cannot allocate the accepted amount',409)
- const taxable=nets.reduce((sum:number,n:number,index:number)=>sum+(sources[index].taxable?n:0),0)
- return {GlobalTaxCalculation:details.tax?'TaxExcluded':'NotApplicable',Line:sources.map((l:any,index:number)=>({Amount:nets[index]/100,DetailType:'SalesItemLineDetail',Description:(amountIndex?'':'Deposit: ')+l.label,SalesItemLineDetail:{ItemRef:{value:l.mapping.itemId},Qty:1,UnitPrice:nets[index]/100,TaxCodeRef:{value:details.tax&&l.taxable?'TAX':'NON'}}})),...(details.taxMapping?{TxnTaxDetail:{TxnTaxCodeRef:{value:details.taxMapping.id},TotalTax:taxCents/100,TaxLine:details.taxMapping.rates.map((r:any)=>({Amount:taxParts[r.index].cents/100,DetailType:'TaxLineDetail',TaxLineDetail:{TaxRateRef:{value:r.id},PercentBased:true,TaxPercent:r.bps/100,NetAmountTaxable:taxable/100}}))}}:{})}
+ const components=(details.tax?.components??[]).map((c:any)=>({...c,allocations:allocateNet(amounts,c.taxCents)})),hasRecurring=sources.some((l:any)=>l.recurrence),remaining=sources.map((l:any)=>l.netCents)
+ let nets:number[]=[]
+ // Allocate each invoice from the remaining accepted item cents, so rounding
+ // cannot accumulate across milestones or move income between catalog items.
+ for(let index=0;index<=amountIndex;index++){
+  const row=rows[index],tax=components.reduce((n:number,c:any)=>n+c.allocations[index],0),net=row.amountCents-tax
+  need(net>=0,'The accepted tax allocation exceeds this invoice',409)
+  const allocate=(eligible:(line:any)=>boolean,cents:number)=>{
+   const weights=sources.map((l:any,i:number)=>eligible(l)?remaining[i]:0)
+   need(cents>=0&&cents<=weights.reduce((n:number,v:number)=>n+v,0),'Invoice allocations exceed the remaining accepted item cents',409)
+   return allocateNet(weights,cents)
+  }
+  if(index===0&&hasRecurring){
+   need(!details.tax&&plan.schedule,'Recurring deposits need their accepted prepayment schedule',409)
+   const recurringCredit=rows.filter((r:any)=>r.kind==='recurring').reduce((n:number,r:any)=>n+(r.prepaidCents??0),0)
+   nets=allocate((l:any)=>!l.recurrence,net-recurringCredit)
+   for(const scheduled of rows.filter((r:any)=>r.kind==='recurring'&&r.prepaidCents)){
+    const matches=sources.map((l:any,i:number)=>({l,i})).filter(({l}:any)=>l.recurrence&&l.label===scheduled.label)
+    need(matches.length===1,'Repeated recurring line labels require explicit accounting reconciliation',409)
+    nets[matches[0].i]+=scheduled.prepaidCents
+   }
+  }else if(row.kind==='recurring'){
+   const matches=sources.map((l:any,i:number)=>({l,i})).filter(({l}:any)=>l.recurrence&&l.label===row.label)
+   need(matches.length===1,'Repeated recurring line labels require explicit accounting reconciliation',409)
+   nets=sources.map((_l:any,i:number)=>i===matches[0].i?net:0)
+  }else if(row.kind==='retainer'){
+   // Legacy schedule retainers are additional agreed periods, not credits
+   // against the original one-off amount.
+   nets=allocateNet(sources.map((l:any)=>l.netCents),net)
+  }else nets=allocate((l:any)=>!hasRecurring||!l.recurrence,net)
+  need(nets.reduce((n:number,v:number)=>n+v,0)===net,'The invoice cannot allocate the accepted amount',409)
+  if(row.kind!=='retainer')nets.forEach((value:number,i:number)=>{need(value>=0&&value<=remaining[i],'Invoice allocations exceed an accepted item',409);remaining[i]-=value})
+ }
+ const taxParts=components.map((c:any)=>({...c,cents:c.allocations[amountIndex]})),taxCents=taxParts.reduce((sum:number,c:any)=>sum+c.cents,0),taxable=nets.reduce((sum:number,n:number,index:number)=>sum+(sources[index].taxable?n:0),0)
+ return {GlobalTaxCalculation:details.tax?'TaxExcluded':'NotApplicable',Line:sources.map((l:any,index:number)=>({Amount:nets[index]/100,DetailType:'SalesItemLineDetail',Description:(amountIndex?'':'Deposit: ')+l.label,SalesItemLineDetail:{ItemRef:{value:l.mapping.itemId},Qty:1,UnitPrice:nets[index]/100,TaxCodeRef:{value:details.tax&&l.taxable?'TAX':'NON'}}})).filter((l:any)=>l.Amount>0),...(details.taxMapping?{TxnTaxDetail:{TxnTaxCodeRef:{value:details.taxMapping.id},TotalTax:taxCents/100,TaxLine:details.taxMapping.rates.map((r:any)=>({Amount:taxParts[r.index].cents/100,DetailType:'TaxLineDetail',TaxLineDetail:{TaxRateRef:{value:r.id},PercentBased:true,TaxPercent:r.bps/100,NetAmountTaxable:taxable/100}}))}}:{})}
 }

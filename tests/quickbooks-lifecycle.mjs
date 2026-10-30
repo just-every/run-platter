@@ -129,6 +129,34 @@ export async function quickbooksSchedule(){
   assert.equal(fake.invoices.size,delayedBefore+1)
   assert.equal([...fake.invoices.values()].at(-1).TxnDate,'2030-07-01')
   assert.equal([...fake.invoices.values()].at(-1).DueDate,'2030-07-31')
+  const recurringItem='synthetic-platter-9910'
+  fake.items.set(recurringItem,{Id:recurringItem,Name:'Monthly care item',Active:true,Type:'Service',IncomeAccountRef:{value:fake.incomeAccount}})
+  const beforeMixed=new Set(fake.invoices.keys())
+  const mixed=await acceptedQuickbooksAgreement(h,'Mixed one-off and recurring credits',undefined,{packages:[{id:'one',label:'Project and care',price:'1'}],pricingTables:[{optionId:'one',name:'Services',lines:[{name:'One-off project',quantity:'1',unit:'project',unitPrice:'1000'},{name:'Monthly care',quantity:'1',unit:'month',unitPrice:'1200',interval:'monthly',term:2,startsOn:'2031-04-01'}]}],paymentTerms:{netDays:30,milestones:[{label:'Project delivery',percent:100,event:'Project complete'}]}})
+  const mixedReview=await h.cmd('accounting.review-mapped',{...quickbooksReviewInput(mixed,fake),includeSchedule:'yes',lineMappings:[{key:'0',itemId:fake.item,incomeAccountId:fake.incomeAccount},{key:'1',itemId:recurringItem,incomeAccountId:fake.incomeAccount}]})
+  await h.cmd('accounting.apply',{id:mixedReview.id,digest:mixedReview.digest,consent:true});await h.cmd('accounting.dispatch',{})
+  const mixedDeposit=[...fake.invoices.values()].at(-1)
+  assert.deepEqual(mixedDeposit.Line.map(l=>[l.Amount,l.SalesItemLineDetail.ItemRef.value]),[[850,fake.item]],'the deposit credits one-off work first, exactly as the accepted schedule does')
+  await h.cmd('accounting.milestone',{proposalId:mixed.proposal.id,amountIndex:1,event:'Project complete',consent:true});await h.cmd('accounting.dispatch',{})
+  assert.deepEqual([...fake.invoices.values()].at(-1).Line.map(l=>[l.Amount,l.SalesItemLineDetail.ItemRef.value]),[[150,fake.item]])
+  await tick('2031-04-01');await tick('2031-05-01')
+  const mixedInvoices=[...fake.invoices.values()].filter(i=>!beforeMixed.has(i.Id)),itemTotals=new Map()
+  for(const invoice of mixedInvoices)for(const line of invoice.Line)itemTotals.set(line.SalesItemLineDetail.ItemRef.value,(itemTotals.get(line.SalesItemLineDetail.ItemRef.value)??0)+Math.round(line.Amount*100))
+  assert.equal(mixedInvoices.length,4)
+  assert.deepEqual([...itemTotals],[[fake.item,100000],[recurringItem,240000]])
+  const roundItems=[fake.item,'synthetic-platter-9911','synthetic-platter-9912']
+  for(const item of roundItems.slice(1))fake.items.set(item,{Id:item,Name:'Cent allocation '+item,Active:true,Type:'Service',IncomeAccountRef:{value:fake.incomeAccount}})
+  const beforeRounding=new Set(fake.invoices.keys())
+  const rounding=await acceptedQuickbooksAgreement(h,'Cent-conserving invoice allocations',undefined,{depositPercent:'33.33',packages:[{id:'one',label:'Three services',price:'1'}],pricingTables:[{optionId:'one',name:'Services',lines:roundItems.map((item,i)=>({name:'Service '+i,quantity:'1',unit:'project',unitPrice:'1'}))}],paymentTerms:{netDays:30,milestones:[{label:'First half',percent:50,event:'First complete'},{label:'Second half',percent:50,event:'Second complete'}]}})
+  const roundingReview=await h.cmd('accounting.review-mapped',{...quickbooksReviewInput(rounding,fake),includeSchedule:'yes',lineMappings:roundItems.map((itemId,i)=>({key:String(i),itemId,incomeAccountId:fake.incomeAccount}))})
+  await h.cmd('accounting.apply',{id:roundingReview.id,digest:roundingReview.digest,consent:true});await h.cmd('accounting.dispatch',{})
+  for(const [index,event] of [[1,'First complete'],[2,'Second complete']]){await h.cmd('accounting.milestone',{proposalId:rounding.proposal.id,amountIndex:index,event,consent:true});await h.cmd('accounting.dispatch',{})}
+  const roundingInvoices=[...fake.invoices.values()].filter(i=>!beforeRounding.has(i.Id)),roundingTotals=new Map()
+  for(const invoice of roundingInvoices){assert.equal(invoice.TotalAmt,1);for(const line of invoice.Line)roundingTotals.set(line.SalesItemLineDetail.ItemRef.value,(roundingTotals.get(line.SalesItemLineDetail.ItemRef.value)??0)+Math.round(line.Amount*100))}
+  assert.equal(roundingInvoices.length,3)
+  assert.deepEqual([...roundingTotals],roundItems.map(item=>[item,100]),'deposit and milestone rounding must preserve every accepted item cent')
+
+
 
  }finally{await h.close()}
 }

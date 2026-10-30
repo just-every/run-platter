@@ -3696,12 +3696,30 @@ test('PAY-007 received offline money reconciles frozen dated milestones once and
  assert.deepEqual([row.allocatedCents,row.remainingCents,row.status],[70000,0,'paid'])
  assert.deepEqual(state.paymentRecords.filter(x=>x.proposal_id===agreement.id).map(x=>[x.cents,x.allocatedCents,x.unallocatedCents]).sort((a,b)=>a[0]-b[0]),[[30000,30000,0],[40000,40000,0]])
  const ach=await h.cmd('payment.record',receiptInput(agreement.id,'ach_credit','700'),billing.cookie)
+ assert.deepEqual((await h.state(billing.cookie)).paymentRecords.filter(x=>x.proposal_id===agreement.id).map(x=>[x.method,x.reference,x.received_on,x.cents]).sort(),[['ach_credit','synthetic-platter-9901-ach_credit','2030-01-15',70000],['check','synthetic-platter-9901-check','2030-01-15',30000],['wire','synthetic-platter-9901-wire','2030-01-15',40000]])
  await refuse('payment.allocate',await allocationInput(h,agreement.id,ach.id,'1'),billing.cookie)
  const another=await allocationAgreement(h),otherReceipt=await h.cmd('payment.record',receiptInput(another.id,'ach_credit','700'),billing.cookie)
  await refuse('payment.allocate',{...await allocationInput(h,another.id,otherReceipt.id,'700'),paymentId:ach.id},billing.cookie)
  const race=await allocationInput(h,another.id,otherReceipt.id,'700')
  const results=await Promise.all([race,{...race,requestId:crypto.randomUUID()}].map(input=>h.send('/api/platter/command',{name:'payment.allocate',input},billing.cookie)))
  assert.deepEqual(results.map(x=>x.status).sort(),[200,409]);assert.equal((await h.state()).paymentSchedules.find(x=>x.proposalId===another.id).rows[0].remainingCents,0)
+ // Separate receipts compete for the row balance, independently of a receipt version.
+ const shared=await allocationAgreement(h),left=await h.cmd('payment.record',receiptInput(shared.id,'check','500'),billing.cookie),right=await h.cmd('payment.record',receiptInput(shared.id,'wire','500'),billing.cookie)
+ const competing=await Promise.all([left,right].map(r=>allocationInput(h,shared.id,r.id,'500')))
+ const rowRace=await Promise.all(competing.map(input=>h.send('/api/platter/command',{name:'payment.allocate',input},billing.cookie)))
+ assert.deepEqual(rowRace.map(x=>x.status).sort(),[200,409])
+ const sharedState=await h.state();assert.deepEqual(sharedState.paymentSchedules.find(x=>x.proposalId===shared.id).rows.map(x=>[x.allocatedCents,x.remainingCents]),[[50000,20000]])
+ // A single receipt cannot be spent twice across independent dated milestones.
+ const split=await allocationAgreement(h,{paymentTerms:{netDays:15,milestones:[{label:'First delivery',date:'2099-06-01',percent:50},{label:'Final delivery',date:'2099-07-01',percent:50}]}}),splitReceipt=await h.cmd('payment.record',receiptInput(split.id,'ach_credit','500'),billing.cookie)
+ const splitFirst=await allocationInput(h,split.id,splitReceipt.id,'300'),splitRow=(await h.state()).paymentSchedules.find(x=>x.proposalId===split.id).rows[1],splitSecond={...splitFirst,requestId:crypto.randomUUID(),rowIndex:splitRow.index,rowHash:splitRow.rowHash,remainingCents:splitRow.remainingCents}
+ const receiptRace=await Promise.all([splitFirst,splitSecond].map(input=>h.send('/api/platter/command',{name:'payment.allocate',input},billing.cookie)))
+ assert.deepEqual(receiptRace.map(x=>x.status).sort(),[200,409])
+ const splitState=await h.state();assert.equal(splitState.paymentRecords.find(x=>x.id===splitReceipt.id).unallocatedCents,20000)
+ const missed=receiptRace[0].status===409?splitFirst:splitSecond,latest={...missed,requestId:crypto.randomUUID(),paymentVersion:splitState.paymentRecords.find(x=>x.id===splitReceipt.id).version}
+ await refuse('payment.allocate',latest,billing.cookie)
+ const fullRow={kind:'milestone',label:'Dated delivery',date:'2099-06-01',amountCents:70000,netDays:15}
+ const savedAllocations=(await h.state()).paymentAllocations.filter(x=>x.proposal_id===agreement.id)
+ for(const saved of savedAllocations){assert.equal(saved.row_json,JSON.stringify(fullRow));assert.equal(saved.revision,1);assert.equal(saved.currency,'USD');assert.equal(saved.row_index,1);assert.equal(saved.agreement_hash,allocation.agreementHash);assert.equal(saved.row_hash,allocation.rowHash)}
  const duplicate=receiptInput(another.id,'wire','1'),attempts=await Promise.all([1,2].map(()=>h.send('/api/platter/command',{name:'payment.record',input:duplicate},billing.cookie)))
  assert.ok(attempts.every(x=>[200,409].includes(x.status)));assert.equal((await h.db.prepare('SELECT count(*) n FROM p_payment_records WHERE request_id=?').bind(duplicate.requestId).first()).n,1)
  assert.equal((await h.cmd('payment.record',duplicate,billing.cookie)).recorded,true)

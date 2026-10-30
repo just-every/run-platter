@@ -221,6 +221,8 @@ export async function recipientsBrowser(width=1440){
   assert.match(await panel.getByLabel('Signature history').innerText(),new RegExp('Revision '+withdrawnState.revision+' · Client signer'))
   assert.match(await panel.getByLabel('Signature history').innerText(),/Void: Partly signed offer cancelled/)
   await capture('reissued-void-history')
+  assert.ok(await panel.getByLabel('Signature history').evaluate(node=>parseFloat(getComputedStyle(node).fontSize)>=13))
+  if(screenshots)await panel.screenshot({path:join(screenshots,'recipients-reissued-void-panel-'+width+'.png')})
   for(const path of Object.values(secondLinks))assert.equal((await context.request.get(app.origin+path)).status(),410)
   const reissuedLinks=Object.fromEntries(reissued.recipientLinks.map(r=>[r.slot_id,'/p/'+r.token]))
   assert.equal((await secondSigner.request.get(app.origin+reissuedLinks.signer+'/data.json')).status(),401)

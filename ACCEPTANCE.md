@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `4e52a5aaeedf66cd05ff73e54561315122db82b2` (30 October 2026). The SEND-015 landing candidate retains these product bytes, adds a focused custody journey and screen proof assertions, and records its exact full SHA and Verify receipt in the handoff. Existing ct judgments and demotions are retained. SEND-008 and SEND-015 are builder completion claims pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -899,7 +899,7 @@ Core · target · **partial** · Cites BASE-ROLE-001 · Rules D-1
 
 #### SEND-015 — Withdrawal receipt and approved reissue
 
-Core · target · **partial** · From SEND-010 · Cites BASE-AUDIT-001 · Rules D-1
+Core · target · **done** · From SEND-010 · Cites BASE-AUDIT-001 · Rules D-1
 
 **Requirement.** Withdrawal retains who acted, when and why in timeline and audit. Each recipient is notified unless the sender turns notice off. Partial signatures stay in history marked void. Reissue creates an approved new revision, never reactivates old authority.
 
@@ -910,8 +910,8 @@ Core · target · **partial** · From SEND-010 · Cites BASE-AUDIT-001 · Rules 
 4. Prepare revision 2, approve and send: new links work while revision 1 remains refused.
 5. Desktop/phone journeys exercise sender, withdrawn-client, audit, report and reissue screens; archive preserves read-only history without invitation authority.
 
-**Evidence.** `src/platter/withdrawal.ts`; `tests/platter.test.mjs` — “SEND-010 / SEND-015 / FOLLOW-009 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval”; `tests/site.test.mjs` — “FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
-**Gap.** Delivered: Withdrawal history and optional notices retain the old offer while explicit approval creates a new revision. Missing “SEND-015 complete withdrawal receipt and approved reissue journey”: The receipt/reissue journey reconciles partially signed void history, optional per-recipient notices, exact entered reason in timeline/audit, report totals and every old link after reissue and restore.
+**Evidence.** `tests/platter.test.mjs` — “SEND-010 / SEND-015 / FOLLOW-009 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval”; `tests/recipients-http.mjs` — recipientWithdrawalHttp; `tests/mail.test.mjs` — “SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically cancels queued texts without duplicate transport”; `tests/site.test.mjs` — “FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision”; `tests/site.test.mjs` — “SIGN-004 and SEND-003 owner recipient controls, own-field previews, ordered signing and viewer revocation”; `tests/recipients-browser.mjs` — recipientsBrowser; `tests/archive.test.mjs` — “SEND-015 public CLI preserves business withdrawal receipts and approved reissue without restored authority”
+**Gap.** None.
 
 ### Engagement tracking
 

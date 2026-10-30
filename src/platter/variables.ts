@@ -66,6 +66,8 @@ async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFiel
 /** Resolve only requested token fields. Original patterns survive for independent destination refills. */
 export async function resolveVariables(env:Bindings,a:Actor,input:Record<string,any>,rebind=false){
  let p=structuredClone(input);for(const key of ['packages','pricingTables','document','sectionConditions'])if(typeof p[key]==='string'){try{p[key]=JSON.parse(p[key])}catch{}}
+ // Form selections must become conditions before collecting their variable bindings.
+ if(p.sectionConditions===undefined&&(p.scopeOption!==undefined||p.termsOption!==undefined))p.sectionConditions=Object.fromEntries(['scope','terms'].filter(key=>p[key+'Option']).map(key=>[key,p[key+'Option']==='variable'?'variable:'+String(p[key+'Variable']??'')+'='+String(p[key+'VariableValue']??''):p[key+'Option']]))
  if(!p.packages&&[p.optionOne,p.optionTwo,p.priceOne,p.priceTwo].some(v=>variableNames(v).length))p.packages=[{id:'one',label:p.optionOne,price:p.priceOne},{id:'two',label:p.optionTwo,price:p.priceTwo}]
  const old=mergeFields(p.document?.merge),patterns:Record<string,string>={},previous=old?.values??{},deal=p.variableDeal===undefined?(rebind?undefined:old?.deal):p.variableDeal||undefined
  const conditionNames=new Set<string>();walk(p,v=>{const parsed=variableCondition(v);if(parsed)conditionNames.add(parsed[1]);return v})

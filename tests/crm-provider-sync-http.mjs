@@ -5,7 +5,13 @@ import { connectZoho, zohoToken } from './crm-zoho-http.mjs'
 import { providerSyncFixture } from './crm-provider-sync-fixture.mjs'
 
 export async function providerSyncJourney(verified, provider) {
- const edge = providerSyncFixture(provider), h = await harness({ outboundService: edge.request }), prefix = 'crm.' + provider + '.'
+ const edge = providerSyncFixture(provider), h = await harness({ outboundService: req => {
+  if (new URL(req.url).hostname === 'api.hubapi.com') {
+   assert.equal(new URL(req.url).pathname, '/account-info/v3/details'); assert.equal(req.method, 'GET'); assert.equal(req.headers.get('authorization'), 'Bearer synthetic-platter-12433')
+   return Response.json({ portalId: provider === 'pipedrive' ? '12101' : '12401' })
+  }
+  return edge.request(req)
+ } }), prefix = 'crm.' + provider + '.'
  try {
   const business = async () => {
    const result = {}
@@ -14,6 +20,9 @@ export async function providerSyncJourney(verified, provider) {
   }
   await (provider === 'pipedrive' ? connectPipedrive : connectZoho)(h)
   const capture = await h.cmd(prefix + 'review', edge.selected), made = await h.cmd(prefix + 'apply', { id: capture.id, digest: capture.digest, consent: true })
+  await h.cmd('provider.connect', { provider: 'hubspot', version: 0, token: 'synthetic-platter-12433', consent: true })
+  const card = await h.send('/api/platter/crm/card-preview?' + new URLSearchParams({ dealId: edge.selected.dealId, accountId: provider === 'pipedrive' ? '12101' : '12401' }), undefined, h.owner)
+  assert.equal(card.status, 200); assert.deepEqual(card.value.proposals, [], 'coincident account and deal IDs cannot cross provider boundaries')
   const row = async () => (await h.state()).proposals.find(p => p.id === made.id)
   await h.cmd(prefix + 'sync.review', { proposalId: made.id, version: 1, ...edge.mapping }, h.owner, 409)
   await h.cmd('proposal.approve', { id: made.id, version: 1, revision: 1 })

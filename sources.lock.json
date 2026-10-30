@@ -2566,7 +2566,7 @@
       "executable": false
     },
     "src/platter/crm/hubspot-card.ts": {
-      "sha256": "97b96c5341fba846843f004c60df686b51b02ad48d28f4720d834a303465bf40",
+      "sha256": "3acd1f679588070c9adbfc3480ff75a6f9843b3d9a43513547f246921ad564b9",
       "executable": false
     },
     "src/platter/crm/hubspot-draft.ts": {
@@ -3474,7 +3474,7 @@
       "executable": false
     },
     "tests/crm-provider-sync-http.mjs": {
-      "sha256": "42bb8f9117d0ddab557b92f5ada0eb13c9356f88977dc0532024ffac4745aafb",
+      "sha256": "859a07230bd561a73b0ddb926bbc0817b65290da17bc6e4af6f53122d9e2ad65",
       "executable": false
     },
     "tests/crm-zoho-browser.mjs": {

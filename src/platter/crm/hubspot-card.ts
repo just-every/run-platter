@@ -28,7 +28,7 @@ export async function hubspotCardData(env: Bindings, actor: Actor, deal: unknown
  need(/^[A-Za-z0-9_-]+$/.test(dealId), 'Use a HubSpot deal id')
  const { connection } = await providerCredential(env, 'workspace:hubspot')
  need(!connection.broken_at && connection.account_id === accountId, 'This card belongs to another or disconnected HubSpot account', 409)
- const rows = (await env.DB.prepare('SELECT p.id,p.title,p.status,p.revision FROM p_crm_draft_sources s JOIN p_proposals p ON p.id=s.proposal_id WHERE s.account_id=? AND s.deal_id=? ORDER BY p.created_at,p.id').bind(accountId, dealId).all<any>()).results
+ const rows = (await env.DB.prepare("SELECT p.id,p.title,p.status,p.revision FROM p_crm_draft_sources s JOIN p_proposals p ON p.id=s.proposal_id WHERE s.provider='hubspot' AND s.account_id=? AND s.deal_id=? ORDER BY p.created_at,p.id").bind(accountId, dealId).all<any>()).results
  return { dealId, accountId, startUrl: env.AUTH_ORIGIN + '/app/crm-card?' + new URLSearchParams({ dealId, accountId }), proposals: rows.map(p => ({ ...p, url: env.AUTH_ORIGIN + '/app/proposal?id=' + encodeURIComponent(p.id) })) }
 }
 /** Modern app cards use HubSpot's v3 signature. No session or credential is exported. */

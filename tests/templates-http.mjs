@@ -195,11 +195,13 @@ async function generalVariableTemplates(h) {
  for (const input of templateClients) clients.push(await h.cmd('client.save', input))
  const get = async id => (await h.state()).proposals.find(p => p.id === id)
  const fields = variableTemplateFields(clients[0].id)
+ fields.document.blocks.push({id:'synthetic-platter-template-field',type:'field',title:'Optional brief',text:'',fieldKind:'text',recipientRole:'client',required:false})
  const source = await h.cmd('proposal.prepare', fields)
  const template = await h.cmd('template.save', { id: source.id, version: 1, name: 'Synthetic variable campaign' })
  const saved = async () => (await h.state()).templates.find(t => t.id === template.id)
  const noSourceValues = t => {
   const stored = JSON.stringify(t.snapshot)
+  assert.ok(!stored.includes(clients[0].id), 'Template must not retain the source Client field binding')
   for (const value of ['Synthetic source agency', 'Sage Source', '41 Source Street', 'SourceOnly', 'Source service', '97.00', 'Jordan Venue'])
    assert.ok(!stored.includes(value), 'Template must not retain resolved source value: ' + value)
   assert.deepEqual(t.snapshot.document.merge.values, {})
@@ -277,4 +279,9 @@ async function generalVariableTemplates(h) {
  const lockedBefore=(await h.state()).templates.find(t=>t.id===discounted.id)
  await h.cmd('template.save',{id:discountedSource.id,version:2,name:'Synthetic variable discount',templateId:discounted.id,templateVersion:3},h.owner,403)
  assert.deepEqual((await h.state()).templates.find(t=>t.id===discounted.id),lockedBefore)
+ const fixedSource=await h.cmd('proposal.prepare',{clientId:clients[0].id,title:'Fixed fee variable template',scope:'Review for {{Client.Company}}.',terms:'Prepared by {{Sender.Name}}.',optionOne:'Standard',priceOne:'300',optionTwo:'Extended',priceTwo:'450',depositPercent:30,variableValues:{}})
+ const fixed=await h.cmd('template.save',{id:fixedSource.id,version:1,name:'Fixed fee variable template'})
+ assert.deepEqual((await h.state()).templates.find(t=>t.id===fixed.id).snapshot.options.map(o=>o.cents),[30000,45000])
+ assert.ok((await h.send('/app?minValue=400',undefined,h.owner)).text.includes('Start from Fixed fee variable template'))
+ assert.ok(!(await h.send('/app?minValue=500',undefined,h.owner)).text.includes('Start from Fixed fee variable template'))
 }

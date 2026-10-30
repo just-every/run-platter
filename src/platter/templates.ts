@@ -1,5 +1,5 @@
 import { withoutTaxAddresses } from './taxes'
-import { resolveVariables, editableVariableFields } from './variables'
+import { resolveVariables, editableVariableFields, unfilledVariableFields } from './variables'
 import { proposalFields } from './commands'
 import { documentMediaIds } from './documents/media'
 import { methodsInput } from './collection-policy'
@@ -56,7 +56,14 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   if(existing?.shared===1)await requireAudienceConsent(db,existing.folder_id,folderId,input.shareConsent)
   const templateName = text(input.name, 'a template name')
   const { id: _id, client_id: _client, revision: _revision, ...content } = snapshot(displayed)
-  if(content.document){content.document=bindDocument(content.document);if(content.document.merge)content.document.merge={patterns:content.document.merge.patterns,values:{}}}
+  if(content.document?.merge){
+   const fields=unfilledVariableFields({...content,client_id:source.client_id})
+   const {client_id:_sourceClient,...unfilled}=proposalFields(fields)
+   unfilled.options=unfilled.options.map((option:any,index:number)=>({...option,...(content.options[index].tax?{tax:content.options[index].tax}:{})}))
+   Object.assign(content,unfilled)
+   if(content.recipient_plan)content.recipient_plan=fields.recipientPlan
+  }
+  if(content.document)content.document=bindDocument(content.document)
   if(content.recipient_plan)content.recipient_plan=content.recipient_plan.map((r:any)=>({...r,email:null}))
   if(existing)await assertTemplateLocks(db,existing,content)
   const [pdf, savedExpiry, sections] = await Promise.all([

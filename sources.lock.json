@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "3faefe8e7e0aa36f2719ed2986e76c1e5f4c7ae4bba262fb956dd100a4e4a4b5",
+      "sha256": "96c9b45583f31c37dcbfce29d7de9c94cc6068474cb346c31dbecfedc78f5e4c",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "1211c486785f4025bb0e613c237ee92a242a86e909740fa1195bf2066ca543d5",
+      "sha256": "d4253f97feb566dc90569e8c319bfec5a8bb14a126eedb0539e5a473f16e2e58",
       "executable": false
     },
     "deploy-demo.json": {
@@ -3002,7 +3002,7 @@
       "executable": false
     },
     "src/platter/templates.ts": {
-      "sha256": "2a5267fa05c93d1007c88ca798b806c1bb5a98b71b781505d5d490a10dd27de3",
+      "sha256": "19826d88073c348c6dde34e2b07831caa4838bb20fba968660bf2568b12754aa",
       "executable": false
     },
     "src/platter/test-mail.ts": {
@@ -3246,7 +3246,7 @@
       "executable": false
     },
     "src/platter/ui/templates.ts": {
-      "sha256": "e371eb086023f69e53088e43d79e2fe6650ccd24cf02678bbc44a099705a5dcd",
+      "sha256": "dcba081a42b6e3c559aced41298788d20a0981ac500dc585a2ddeed4b2c5658d",
       "executable": false
     },
     "src/platter/ui/test-mail.ts": {
@@ -3270,7 +3270,7 @@
       "executable": false
     },
     "src/platter/variables.ts": {
-      "sha256": "5eea383a8824a64bd8d8dbf619def12d8670410c5991252bd6247f3424a3cd59",
+      "sha256": "a547728ea336affd84eab8793bb93c4ece1ecb5c83042f466d4abd6278965f84",
       "executable": false
     },
     "src/platter/withdrawal.ts": {
@@ -3390,7 +3390,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "24b59f2313dbd7f32bf45ada3b3fabccfbdfcad646ca0ea0ca4f7bb397d0f91a",
+      "sha256": "191a68ae741e5429d3b01b34ee7523844cb9f004f075803ca87fab5dd359960e",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3626,11 +3626,11 @@
       "executable": false
     },
     "tests/templates-http.mjs": {
-      "sha256": "5e805600b32b55f93bc81eac28186fc6c21ff649dabf4de5eef863fd3b42d0f8",
+      "sha256": "1f60b0fc3b0e6ca325e553a3e1937d2e8c33c409d17a3afc0abf8110d5d46b89",
       "executable": false
     },
     "tests/templates-journey.mjs": {
-      "sha256": "e33ae252744331292234ca6a0e256e259faefa041c6c56b7476f590f4a5d2c96",
+      "sha256": "63a00258dc7eb1ada208ef8ba088bbfc9f662230b26f3655271fac0f72cb8124",
       "executable": false
     },
     "tests/tracking-browser.mjs": {

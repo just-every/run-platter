@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { documentFixture } from './document-fixture.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { pricingFixture, pricingExpected } from './pricing-fixture.mjs'
+import { templateClients, variableTemplateFields } from './template-variables-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
@@ -159,6 +160,15 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const starterSnapshot = (await h.state()).proposals.find(p => p.id === starterBefore.id)
     assert.match(starterSnapshot.scope, /Northstar Coffee/)
     assert.ok(starterSnapshot.options.every(o => o.tables[0].lines.length === 2))
+    const variableClients=[]
+    for(const input of templateClients)variableClients.push(await h.cmd('client.save',input))
+    const variableSource=await h.cmd('proposal.prepare',variableTemplateFields(variableClients[0].id))
+    const variableTemplate=await h.cmd('template.save',{id:variableSource.id,version:1,name:'Archived independent variable template'})
+    const variableDrafts=[]
+    for(const client of variableClients.slice(1))variableDrafts.push(await h.cmd('template.start',{id:variableTemplate.id,version:1,clientId:client.id}))
+    const variableSnapshot=(await h.state()).templates.find(t=>t.id===variableTemplate.id).snapshot
+    assert.deepEqual(variableSnapshot.document.merge.values,{})
+    for(const value of ['Synthetic source agency','Sage Source','41 Source Street','SourceOnly','97.00'])assert.ok(!JSON.stringify(variableSnapshot).includes(value),value)
     const followupsBefore=(await h.state()).followups.rows.map(({sentAt,...r})=>r)
     const actionsBefore=(await h.state()).followupActions
     const {packageFixture,packageSelection:packageItems,packageExpected,scheduleFixture}=await import('./packages-fixture.mjs')
@@ -213,7 +223,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     // audit rows exactly here, then assert the complete joined view on restore.
     const beforeAudit=beforeAuditView.map(({reason,mail_route,sender_address,...row})=>row)
     assert.ok(beforeAudit.some(row=>row.action==='proposal.preview'&&row.subject===duplicate.id&&row.actor_role==='owner'),'EDIT-018 / TEAM-004 preview action is retained without payload or invitation authority')
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','draft','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -272,7 +282,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).document,documentFixture(),'EDIT-001 ordered document and brand survive the public CLI archive exactly')
     const completedRestoreSetup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(completedRestoreSetup.status,303)
     const restoredDocumentPage=await h.send('/app/proposal?id='+proposal.id,undefined,restoredOwner);assert.equal(restoredDocumentPage.status,200);assert.match(restoredDocumentPage.text,/Two perspectives/)
-    assert.equal(archived.filter(item=>item.table==='p_personal_templates').length,1,'EDIT-002 personal template snapshot and defaults survive CLI restore')
+    assert.deepEqual(archived.filter(item=>item.table==='p_personal_templates').map(item=>item.row.id).sort(),[template.id,variableTemplate.id].sort(),'EDIT-002 personal template snapshots and defaults survive CLI restore')
     assert.deepEqual(restoredState.followupActions,actionsBefore,'FOLLOW-002 logged actions survive public CLI restore exactly')
     assert.deepEqual(restoredState.followups.rows.map(({sentAt,...r})=>r),followupsBefore,'FOLLOW-002 open and completed actions survive public CLI restore')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).questions,acceptedThread,'FOLLOW-004 agreement thread survives public CLI restore exactly')
@@ -314,6 +324,21 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal((await h.state(restoredOwner)).starterTemplates.length, 5)
     const restarted = await h.cmd('template.start', { id: 'starter:consultancy', version: 1, clientId: client.id }, restoredOwner)
     assert.equal((await h.state(restoredOwner)).proposals.find(p => p.id === restarted.id).scope, starterSnapshot.scope, 'EDIT-002 built-in starter remains usable after CLI restore')
+    assert.deepEqual(restoredState.templates.find(t=>t.id===variableTemplate.id).snapshot,variableSnapshot,'Variable patterns survive without source values')
+    assert.equal(restoredState.proposals.find(p=>p.id===variableDrafts[0].id).scope,'Wren West at 42 West Street; region West.')
+    assert.equal(restoredState.proposals.find(p=>p.id===variableDrafts[1].id).scope,'Eden East at 43 East Street; region East.')
+    const destination=await h.cmd('client.save',{name:'Synthetic restored studio',email:['synthetic-platter-404','example.test'].join('@'),variableFields:{contactName:'River Restored',address:'44 Restored Street',custom:{Region:'Restored',Service:'Restored service',Rate:'310.00'}}},restoredOwner)
+    const refilled=await h.cmd('template.start',{id:variableTemplate.id,version:1,clientId:destination.id},restoredOwner)
+    const independent=(await h.state(restoredOwner)).proposals.find(p=>p.id===refilled.id)
+    assert.equal(independent.scope,'River Restored at 44 Restored Street; region Restored.')
+    assert.equal(independent.title,'Campaign for Synthetic restored studio')
+    assert.equal(independent.terms,'Prepared by Jordan Venue.')
+    assert.deepEqual(independent.options.map(o=>o.cents),[62000,93000])
+    assert.equal(independent.options[0].tables[0].lines[0].name,'Restored service')
+    assert.deepEqual(independent.collectionPolicy,{enabled:false,completion:'off',methods:['card']})
+    assert.equal(independent.approved_by,null);assert.equal(independent.shareToken,undefined)
+    await h.cmd('proposal.send',{id:independent.id,version:1},restoredOwner,409)
+    assert.deepEqual((await h.state(restoredOwner)).templates.find(t=>t.id===variableTemplate.id).snapshot,variableSnapshot)
     assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id},restoredOwner),journal)
     assert.equal((await h.send(invoicePath,undefined,restoredOwner)).text,invoiceCsv)
     for(const file of frozenAttachments){const r=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+proposal.id+'/'+file.id,{headers:{cookie:restoredOwner,host:new URL(h.origin).host}});assert.equal(r.status,200);assert.deepEqual(new Uint8Array(await r.arrayBuffer()),file.kind==='w9'?attachmentBytes:new TextEncoder().encode('%PDF insurance'))}

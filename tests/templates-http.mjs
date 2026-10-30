@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { packageFixture } from './packages-fixture.mjs'
 import { pricingFixture } from './pricing-fixture.mjs'
 import { pdfPages } from './pdf-document.mjs'
+import { templateClients, variableTemplateFields, templateExpected } from './template-variables-fixture.mjs'
 
 export async function templatesHttp(h) {
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
@@ -186,4 +187,81 @@ export async function templatesHttp(h) {
  assert.deepEqual(await paymentDraft(paymentSecond.id),frozen[1])
  await h.cmd('template.delivery',{id:paymentTemplate.id,version:3,methodsProvided:'yes'})
  assert.deepEqual((await paymentDraft((await paymentStart(4)).id)).collectionPolicy,{enabled:false,completion:'off',methods:[]})
+ await generalVariableTemplates(h)
+}
+
+async function generalVariableTemplates(h) {
+ const clients = []
+ for (const input of templateClients) clients.push(await h.cmd('client.save', input))
+ const get = async id => (await h.state()).proposals.find(p => p.id === id)
+ const fields = variableTemplateFields(clients[0].id)
+ const source = await h.cmd('proposal.prepare', fields)
+ const template = await h.cmd('template.save', { id: source.id, version: 1, name: 'Synthetic variable campaign' })
+ const saved = async () => (await h.state()).templates.find(t => t.id === template.id)
+ const noSourceValues = t => {
+  const stored = JSON.stringify(t.snapshot)
+  for (const value of ['Synthetic source agency', 'Sage Source', '41 Source Street', 'SourceOnly', 'Source service', '97.00', 'Jordan Venue'])
+   assert.ok(!stored.includes(value), 'Template must not retain resolved source value: ' + value)
+  assert.deepEqual(t.snapshot.document.merge.values, {})
+  assert.equal(t.snapshot.document.merge.deal, undefined)
+ }
+ noSourceValues(await saved())
+ const drafts = []
+ for (const [index, client] of clients.slice(1).entries()) {
+  const draft = await h.cmd('template.start', { id: template.id, version: 1, clientId: client.id })
+  const p = await get(draft.id), expected = templateExpected[index]
+  assert.equal(p.title, expected.title); assert.equal(p.scope, expected.scope)
+  assert.equal(p.terms, 'Prepared by Jordan Venue.')
+  assert.equal(p.options[0].tables[0].lines[0].name, expected.line)
+  assert.equal(p.options[0].tables[0].lines[0].description, expected.description)
+  assert.deepEqual(p.options.map(o => o.cents), expected.prices)
+  assert.equal(p.document.blocks[0].text, index === 0 ? 'Synthetic West studio works with Jordan Venue in West.' : 'Synthetic East studio works with Jordan Venue in East.')
+  assert.deepEqual(p.collectionPolicy, { enabled: false, completion: 'off', methods: ['card'] })
+  assert.equal(p.approved_by, null); assert.equal(p.acceptance, undefined); assert.equal(p.shareToken, undefined)
+  drafts.push(p)
+ }
+ await h.cmd('proposal.variables', { id: source.id, version: 1, fields: { scope: 'Expanded {{Contact.Name}} at {{Client.Address}}; region {{Custom.Region}}.', terms: 'Prepared by {{Sender.Name}}. Note {{Custom.Note}}.', pricingTables: fields.pricingTables.map((t, i) => ({ ...t, lines: t.lines.map(l => ({ ...l, quantity: i === 0 ? '4' : '3' })) })) } })
+ await h.cmd('template.save', { id: source.id, version: 2, name: 'Synthetic variable campaign', templateId: template.id, templateVersion: 1 })
+ noSourceValues(await saved())
+ const third = await h.cmd('template.start', { id: template.id, version: 2, clientId: clients[1].id })
+ let p = await get(third.id)
+ assert.equal(p.scope, 'Expanded Wren West at 42 West Street; region West.')
+ assert.deepEqual(p.options.map(o => o.cents), [50000, 37500])
+ assert.equal(p.terms, 'Prepared by Jordan Venue. Note {{Custom.Note}}.')
+ assert.deepEqual(await Promise.all(drafts.map(d => get(d.id))), drafts, 'Replacing a template leaves both earlier clients and prices unchanged')
+ await h.cmd('proposal.approve', { id: p.id, version: p.version, revision: p.revision })
+ const before = await get(p.id), refused = await h.send('/api/platter/command', { name: 'proposal.send', input: { id: p.id, version: before.version } }, h.owner)
+ assert.equal(refused.status, 409); assert.match(refused.text, /Custom.Note/)
+ assert.deepEqual(await get(p.id), before, 'Missing-variable refusal writes no proposal or invitation')
+ await h.cmd('proposal.variables', { id: p.id, version: before.version, values: { 'Custom.Note': 'Reviewed West scope' } })
+ p = await get(p.id); assert.equal(p.approved_by, null)
+ await h.cmd('proposal.send', { id: p.id, version: p.version }, h.owner, 409)
+ const preview = await h.send('/app/preview/client?id=' + p.id + '&revision=' + p.revision + '&optionId=one', undefined, h.owner)
+ assert.equal(preview.status, 200); assert.ok(preview.text.includes(p.scope)); assert.match(preview.text, /Reviewed West scope/); assert.match(preview.text, /500.00/)
+ await h.cmd('proposal.approve', { id: p.id, version: p.version, revision: p.revision })
+ const share = await h.cmd('proposal.send', { id: p.id, version: p.version + 1 }), path = new URL(share.shareUrl).pathname
+ await h.send(path + '/action?name=code.request', {})
+ const code = (await h.state()).outbox.find(m => m.proposal_id === p.id && m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+ const verified = await h.send(path + '/action?name=code.verify', { code })
+ const client = await h.send(path + '/data.json?optionId=one', undefined, verified.cookie)
+ assert.equal(client.status, 200); assert.equal(client.value.scope, p.scope); assert.equal(client.value.terms, 'Prepared by Jordan Venue. Note Reviewed West scope.')
+ const page = await h.send(path, undefined, verified.cookie)
+ assert.ok(page.text.includes(p.scope)); assert.ok(page.text.includes(p.document.blocks[0].text))
+ const pdf = await h.mf.dispatchFetch(h.origin + path + '/download.pdf?optionId=one', { headers: { cookie: verified.cookie } })
+ assert.equal(pdf.status, 200)
+ const pdfText = (await pdfPages(await pdf.arrayBuffer())).join(' ').replace(/\s+/g, ' ')
+ for (const text of [p.scope, 'Reviewed West scope', p.document.blocks[0].text, '500.00']) assert.ok(pdfText.includes(text), text)
+ assert.equal((await h.send(path + '/action?name=accept', { name: 'Wren West', optionId: 'one', consent: true }, verified.cookie)).status, 200)
+ const accepted = await get(p.id)
+ assert.equal(accepted.acceptance.totalCents, 50000); assert.equal(accepted.acceptance.depositCents, 15000)
+ const frozen = JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot)
+ assert.equal(frozen.scope, p.scope); assert.equal(frozen.terms, p.terms); assert.deepEqual(frozen.document, client.value.document)
+ const signed = await h.mf.dispatchFetch(h.origin + path + '/agreement.pdf', { headers: { cookie: verified.cookie } })
+ assert.equal(signed.status, 200)
+ const signedText = (await pdfPages(await signed.arrayBuffer())).join(' ').replace(/\s+/g, ' ')
+ for (const text of [p.scope, 'Reviewed West scope', '500.00']) assert.ok(signedText.includes(text), text)
+ await h.cmd('proposal.variables', { id: source.id, version: 2, values: { 'Custom.Note': 'Changed only at source', 'Custom.Rate': '999.00' } })
+ assert.deepEqual(await get(p.id), accepted)
+ assert.deepEqual(await Promise.all(drafts.map(d => get(d.id))), drafts)
+ noSourceValues(await saved())
 }

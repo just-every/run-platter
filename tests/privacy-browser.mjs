@@ -4,6 +4,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { installedApp } from './site-harness.mjs'
 import { hubspotFixture } from './hubspot-fixture.mjs'
+import { importedPrivacyFixture } from './privacy-import-fixture.mjs'
 import { privacyFixture } from './privacy-fixture.mjs'
 export async function privacyBrowser(){
  const edge=hubspotFixture();let app,browser,context
@@ -50,5 +51,18 @@ export async function privacyBrowser(){
   await capture('receipt')
   await page.goto(app.origin+'/app/proposal?id='+fixture.retained.id)
   assert.equal(await page.getByRole('heading',{name:'Business-record retention exception',exact:true}).count(),1);await capture('retained-agreement')
+  const imported=await importedPrivacyFixture(h)
+  await page.goto(app.origin+'/app/clients')
+  const card=page.locator('.client-card').filter({has:page.getByRole('heading',{name:imported.name,exact:true})})
+  await card.getByText('Review privacy erasure',{exact:true}).click();await card.getByLabel('Imported contact to include').selectOption(imported.contactId);await card.getByText('Include imported documents',{exact:true}).click();for(const id of imported.documentIds)await card.locator('input[name="document:'+id+'"]').check();await card.getByRole('button',{name:'Review erasure inventory',exact:true}).click()
+  assert.match(await page.locator('main').innerText(),/complete original CSV/)
+  await capture('import-review')
+  await card.getByLabel('Confirm client name for privacy erasure').fill(imported.name)
+  await card.getByLabel('I authorize this reviewed erasure and the retained business-record exceptions.').check()
+  await card.getByRole('button',{name:'Erase reviewed personal data',exact:true}).click()
+  assert.equal((await h.state()).privacy.receipts.length,2)
+  assert.ok(!(await page.locator('main').innerText()).includes(imported.address))
+  assert.match(await page.locator('main').innerText(),/Other normalized contacts and their undo remain available/)
+  await capture('import-receipt')
  }finally{await context?.close();await browser?.close();await app?.close()}
 }

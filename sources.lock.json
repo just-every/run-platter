@@ -649,6 +649,10 @@
       "sha256": "20640c86d5145dcb4a14d57d66c1d2da61aa89142f4071c7fd36e8b717061ee2",
       "executable": false
     },
+    "migrations/core/0100_privacy_imports.sql": {
+      "sha256": "105a3edd48ece10d1553117ecbc31d0954e3478b27bfaefc240fd3fbe06ed98f",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -2817,6 +2821,10 @@
       "sha256": "5177d49e5e5576d0c62c8d20419092542121c57a48da087f7430eed350d08f0c",
       "executable": false
     },
+    "src/platter/movein/privacy.ts": {
+      "sha256": "b10a5d1ac5dcf76584f12cf284b3623c6bff73514265d9beb58beec5630a6e51",
+      "executable": false
+    },
     "src/platter/movein/schema.sql": {
       "sha256": "9072ff2a76b58e78976c1a56be366bbe5bee36bba85d324c274db425bab0af1f",
       "executable": false
@@ -2890,7 +2898,7 @@
       "executable": false
     },
     "src/platter/privacy.ts": {
-      "sha256": "70f9535c65058b6331a3286f1959b18ed3750d898b44f5e807ef3fd7f18c07c7",
+      "sha256": "426478829fd7cb6cc271ddfc2e88f164765d03dbff4b2331535065ada97f9ed2",
       "executable": false
     },
     "src/platter/question-replies.ts": {
@@ -3078,7 +3086,7 @@
       "executable": false
     },
     "src/platter/ui/clients.ts": {
-      "sha256": "f86cf6ef5b81a44105fcd2a043925db206e0f0d16ee239317de7c4f77a3513a0",
+      "sha256": "3582be70d01bf0dcdf276d9241be26fcafdc967ec8d1d1014f357792184a75b7",
       "executable": false
     },
     "src/platter/ui/collaboration.ts": {
@@ -3398,7 +3406,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "38a233120278f838c219ae9b440279fe6d3ba7f9470fb1e850e1c9270f5aaade",
+      "sha256": "df52a6f9f492bf7a89e49a6cb29b5336274e2245fee3c808057b64e570ff8fb7",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3554,15 +3562,19 @@
       "executable": false
     },
     "tests/privacy-browser.mjs": {
-      "sha256": "a672ad28495c074aca793d9a788988b250acd59c5f94ad215e0e242d9e9cad20",
+      "sha256": "7adb01d4d0d4cab70a2b6832409a1c51a33fe9fc22943c5fc99e2fdb6240f7d6",
       "executable": false
     },
     "tests/privacy-fixture.mjs": {
       "sha256": "ac0272e38f411505fdb035118e2096b9b48c25285c97c14ab1c09f5d0edbe54e",
       "executable": false
     },
+    "tests/privacy-import-fixture.mjs": {
+      "sha256": "a104a6525cde972b187bfc778f8292c2c32556ebac0370e0eb19fba2d79bbec6",
+      "executable": false
+    },
     "tests/privacy-journey.mjs": {
-      "sha256": "5e0b98dcb1974dddafdba3c764a8d41765e2ab9ec8d9dd51b8481fc1173fd41e",
+      "sha256": "870421a4496175fe3d38291562eeff377c43e65289e5699e3425b11ebbf01597",
       "executable": false
     },
     "tests/provider-network.mjs": {

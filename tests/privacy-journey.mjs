@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { harness } from './harness.mjs'
 import { driveFixture,connectDrive } from './drive-fixture.mjs'
 import { hubspotFixture } from './hubspot-fixture.mjs'
+import { importedPrivacyFixture,assertImportedPrivacyErased } from './privacy-import-fixture.mjs'
 import { privacyFixture,privacyInventory,assertPrivacyErased,digest,privacyOffer } from './privacy-fixture.mjs'
 export async function privacyJourney(){
  const edge=hubspotFixture(),drive=driveFixture(),h=await harness({outboundService:request=>new URL(request.url).hostname==='api.hubapi.com'?edge.request(request):drive.outboundService(request),assetsDirectory:'public'})
@@ -51,7 +52,16 @@ export async function privacyJourney(){
   await h.cmd('proposal.prepare',{...privacyOffer,clientId:id,title:'Replay'},h.owner,410)
   const worker=await h.mf.getWorker();await worker.scheduled({scheduledTime:new Date('2030-01-01T15:00:00Z'),cron:'*/15 * * * *'})
   assert.equal(drive.calls.length,driveCalls,'erased archive jobs cannot execute again')
+  const imported=await importedPrivacyFixture(h)
+  const importedBefore=await h.cmd('import.journal',{id:imported.jobId})
+  const importedReview=await h.cmd('privacy.review',{id:imported.id,contactId:imported.contactId,documentIds:imported.documentIds})
+  assert.equal(importedReview.privacyReview.importedCustody.imported,true)
+  assert.match(importedReview.privacyReview.importedCustody.exception,/complete original CSV/)
+  await h.cmd('privacy.erase',{id:imported.id,...importedReview.privacyReview,confirmName:imported.name,consent:'yes'},member,403)
+  assert.deepEqual(await h.cmd('import.journal',{id:imported.jobId}),importedBefore)
+  const importReceipt=(await h.cmd('privacy.erase',{id:imported.id,...importedReview.privacyReview,confirmName:imported.name,consent:'yes'})).receipt
+  await assertImportedPrivacyErased(h,imported,importReceipt,{undo:true})
   assert.equal(edge.calls.length,calls+7,'only explicit source review reads HubSpot; scheduled work sends nothing')
-  assert.deepEqual((await h.state()).privacy.receipts,[result.receipt])
+  assert.deepEqual(new Set((await h.state()).privacy.receipts.map(r=>r.id)),new Set([result.receipt.id,importReceipt.id]))
  }finally{await h.close()}
 }

@@ -1,3 +1,4 @@
+import { importedPrivacyFixture,assertImportedPrivacyErased } from './privacy-import-fixture.mjs'
 import { hubspotFixture } from './hubspot-fixture.mjs'
 import { privacyFixture,assertPrivacyErased,privacyOwner } from './privacy-fixture.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
@@ -385,6 +386,7 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
     h=await harness({root:source,...identity,assetsDirectory:'public',outboundService:edge.request})
     h=privacyOwner(h,await h.signIn(h.auth.OWNER_EMAIL))
     privacy=await privacyFixture(h,edge)
+    const importedPrivacy=await importedPrivacyFixture(h)
     const acceptanceBefore=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(privacy.retained.id).first()
     await h.close();h=null
     const privacyBefore=join(temporary,'privacy-before.rer');await command(source,['export','--output',privacyBefore,'--no-queue'])
@@ -394,6 +396,9 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
      await h.cmd('client.erase',{id:p.id,confirmName:'Temporary joiner'},owner)
      const reviewed=await h.cmd('privacy.review',{id:privacy.client.id},owner)
      privacyReceipt=(await h.cmd('privacy.erase',{id:privacy.client.id,...reviewed.privacyReview,confirmName:privacy.client.name,consent:'yes'},owner)).receipt
+     const importedReview=await h.cmd('privacy.review',{id:importedPrivacy.id,contactId:importedPrivacy.contactId,documentIds:importedPrivacy.documentIds})
+     importedPrivacy.receipt=(await h.cmd('privacy.erase',{id:importedPrivacy.id,...importedReview.privacyReview,confirmName:importedPrivacy.name,consent:'yes'})).receipt
+     await assertImportedPrivacyErased(h,importedPrivacy,importedPrivacy.receipt)
      await assertPrivacyErased(h,privacy,privacyReceipt)
      assert.deepEqual(await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(privacy.retained.id).first(),acceptanceBefore)
     }finally{await h.close();h=null}
@@ -410,7 +415,8 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
     assert.ok(!restoredState.clients.some(row=>row.id===p.id),'erased clients stay absent through the restored app door')
     h=privacyOwner(h,restoredOwner)
     await assertPrivacyErased(h,privacy,privacyReceipt)
-    assert.deepEqual(restoredState.privacy.receipts,[privacyReceipt])
+    assert.deepEqual(new Set(restoredState.privacy.receipts.map(r=>r.id)),new Set([privacyReceipt.id,importedPrivacy.receipt.id]))
+    await assertImportedPrivacyErased(h,importedPrivacy,importedPrivacy.receipt,{undo:true})
     const callCount=edge.calls.length
     await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-01-01T15:00:00Z'),cron:'*/15 * * * *'})
     assert.equal(edge.calls.length,callCount,'restored erasure history grants no outbound execution')

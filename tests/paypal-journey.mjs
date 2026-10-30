@@ -43,7 +43,8 @@ const rejected=r=>assert.ok(r.status>=400&&r.status<500,'Request refused: '+r.st
 export function inspectPaypalReservations(h,fake){
  const inspect=async call=>{
   const path=new URL(call.url).pathname
-  if(call.method!=='POST'||path.includes('verify-webhook-signature'))return
+  if(path.includes('verify-webhook-signature')){const event=await h.db.prepare('SELECT * FROM p_paypal_events WHERE id=?').bind(call.body.webhook_event.id).first();assert.equal(event?.status,'verifying','A notification identity is durably claimed before verification I/O');return}
+  if(call.method!=='POST')return
   const requestId=call.headers['paypal-request-id']
   assert.ok(requestId,'Every money write carries its durable PayPal request identity')
   let row
@@ -235,7 +236,9 @@ async function paypalAuthorityJourney(h,fake,roles,paid){
  fake.setHook(inspect)
 
  const adminId=(await h.state(roles.admin)).actor.id
+ const adminEmail=(await h.state(roles.admin)).actor.email
  let changed=await h.send('/auth/operator/role',{operatorId:adminId,role:'admin'},h.owner);assert.equal(changed.status,200,changed.text)
+ roles.admin=await h.signIn(adminEmail)
  const demoted=await ready(p=>h.cmd('payment.collection',{id:p.id,version:1,completion:'required',provider:'paypal',merchantId:paypalMerchant,connectionVersion:1,paymentMethods:['paypal'],consent:true},roles.admin))
  let demotedDuringRead=false
  fake.setHook(async call=>{

@@ -8,6 +8,8 @@ import { regionalFields, regionalTerms, regionalScope } from './conditional-jour
 export async function regionalBrowser({page,context,origin,command,width,screenshots}){
  const capture=async name=>{
   await page.evaluate(async()=>{await document.fonts.ready})
+  const overflow=await page.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth,nodes:[...document.querySelectorAll('main *')].map(node=>{const box=node.getBoundingClientRect();return {tag:node.tagName,name:node.getAttribute('name'),className:typeof node.className==='string'?node.className:'',x:Math.round(box.x),right:Math.round(box.right),width:Math.round(box.width),panel:node.closest('section.panel')?.querySelector('h2')?.textContent}}).filter(node=>node.width>0&&(node.right>innerWidth+1||node.x<0)).slice(0,30)}))
+  if(overflow.width>overflow.viewport){console.log('Regional editor overflow '+name+' '+width+': '+JSON.stringify(overflow));if(screenshots)await page.screenshot({path:join(screenshots,`EDIT-009-overflow-${name}-${width}.png`),fullPage:true})}
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
   if(screenshots){await mkdir(screenshots,{recursive:true});await page.screenshot({path:join(screenshots,`EDIT-009-variable-${name}-${width}.png`),fullPage:true})}
  }

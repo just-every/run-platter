@@ -646,7 +646,7 @@
       "executable": false
     },
     "migrations/core/0099_paypal_collection.sql": {
-      "sha256": "6c554a10d58c7cbbea3ea4a31e5f09bdbb2d12dec29b1bd41968378c082d8cb6",
+      "sha256": "892a5640e07b61002b1449ff5cd8c2494969ff6c385fa3b60b43215071d61a2a",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -3462,7 +3462,7 @@
       "executable": false
     },
     "tests/conditional-browser.mjs": {
-      "sha256": "4a5a11cc49737b2860471b1a6d0347e17b2d69e6b2996c33fef66c3b53bf9d34",
+      "sha256": "f6ee8547ee665c0ad38a89585dee7db06fa6b318cf2fac69dd4558d95678ad13",
       "executable": false
     },
     "tests/conditional-journey.mjs": {

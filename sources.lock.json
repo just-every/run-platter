@@ -645,6 +645,10 @@
       "sha256": "cbebdc3767ad5463c708c3ddac223639549305289aad9a1f12678d1b2c92d62b",
       "executable": false
     },
+    "migrations/core/0099_salesforce_drafts.sql": {
+      "sha256": "cc811d27185211a1461cb7907c3b87ad2fad272a5558e975b71e80ca6a4dd7d9",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -2573,6 +2577,10 @@
       "sha256": "a8c1e2c5a647daf8979c1e6776257d4e94def539773e5a9fa6f6d8c4e2399d8e",
       "executable": false
     },
+    "src/platter/crm/salesforce-draft.ts": {
+      "sha256": "19a3dd31bcab62d59867e06f84bbea61315e3b015d18462f648cd4dd50e5e4bf",
+      "executable": false
+    },
     "src/platter/delivery-intake.d.mts": {
       "sha256": "f6b143a15ccb424b9b6e1f568e054b33e813907e743ee9a41be9915823475933",
       "executable": false
@@ -3102,7 +3110,7 @@
       "executable": false
     },
     "src/platter/ui/crm-start.ts": {
-      "sha256": "9bdd66d8c7623420f1b1f12506c41672684d648d4f1dc88a03688574d5464541",
+      "sha256": "9470005646d8b3562e176ad528370677ffc21aab863dff771080ff0bd4912f47",
       "executable": false
     },
     "src/platter/ui/delivery.ts": {
@@ -3534,7 +3542,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "39302392840f0a87dcafe81d0fb7b2bbec09d95f99f2d4155ece6b94ed9a1378",
+      "sha256": "4155ccafe25a026a50a077b8dd309d25d853fd4dfaba3860761098ca997f8ef1",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

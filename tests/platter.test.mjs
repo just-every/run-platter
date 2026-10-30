@@ -3579,6 +3579,12 @@ test('CRM-002 reviewed Salesforce opportunity drafts copy exact products and ref
   assert.equal(choices.companies.length, 1); assert.equal(choices.contacts.length, 2); assert.ok(choices.held); assert.equal(choices.id, undefined)
   assert.deepEqual(await business(), baseline, 'selecting an account and contact is explicit and review creates no business records')
   const checked = await review()
+  const key = await h.cmd('agent.create', { label: 'Synthetic Salesforce human-only floor' }), machineCalls = edge.calls.length
+  for (const name of ['crm.opportunity.review', 'crm.opportunity.apply']) {
+   const refused = await h.send('/api/platter/agent/command', { name, input: name.endsWith('review') ? edge.selected : { id: checked.id, digest: checked.digest, consent: true } }, '', { authorization: 'Bearer ' + key.token })
+   assert.equal(refused.status, 403, refused.text)
+  }
+  assert.equal(edge.calls.length, machineCalls, 'machine requests confer no CRM source-read or draft-apply authority'); assert.deepEqual(await business(), baseline)
   assert.deepEqual(checked.content.options[0].tables[0].lines.map(r => [r.name, r.quantity, r.unitPrice, r.lineTotalCents]), [['Campaign strategy', '2.5', '120.50', 30125], ['Asset licence', '3', '19.99', 5997]])
   assert.equal(checked.content.options[0].cents, 36122)
   await apply(checked, h.owner, 409, { digest: 'synthetic-platter-wrong-bytes' }); await apply(checked, h.owner, 400, { consent: false })

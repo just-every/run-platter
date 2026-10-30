@@ -1,7 +1,8 @@
 // Run separately from push Verify: real compiled app, real uploads, 4x browser CPU.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { installedApp } from './site-harness.mjs'
 import { pdfPages } from './pdf-document.mjs'
@@ -35,6 +36,7 @@ try{
  const session=await context.newCDPSession(page);await session.send('Emulation.setCPUThrottlingRate',{rate:4})
  await page.goto(app.origin+'/app/proposal?id='+proposal.id,{waitUntil:'domcontentloaded'})
  const first=page.locator('[data-block-id="page-1"] textarea');await first.waitFor();assert.equal(await first.isEditable(),true)
+ const initialText=await first.inputValue();await first.fill(initialText+'x');assert.equal(await first.inputValue(),initialText+'x','the first block accepts real input')
  report.timeToEditableMs=await page.evaluate(()=>performance.now())
  const target=page.locator('[data-block-id="page-30"] textarea');await target.scrollIntoViewIfNeeded();await target.focus()
  await page.evaluate(()=>{
@@ -52,30 +54,56 @@ try{
  report.keystrokes=200;report.eventTimingEntries=keys.events.length;report.keystrokeP95Ms=latencies[Math.ceil(latencies.length*.95)-1];report.keystrokeMaxMs=latencies.at(-1)
  report.keystrokeMethod='max(Event Timing duration, two-frame paint interval); unreported sub-16ms events bounded at 16ms'
  await page.waitForFunction(()=>document.querySelector('[data-document-editor]').dataset.saveState==='saved')
+ assert.equal((await state()).proposals.find(p=>p.id===proposal.id).document.blocks.find(b=>b.id==='page-30').text,blocks.find(b=>b.id==='page-30').text+'x'.repeat(200),'all real keystrokes persist')
  const source=page.locator('[data-block-id="page-30"]'),previous=source.locator('xpath=preceding-sibling::*[1]'),before=await page.locator('[data-block-id]').evaluateAll(nodes=>nodes.map(n=>n.dataset.blockId)),previousId=await previous.getAttribute('data-block-id')
- await page.evaluate(()=>{window.budgetDrop=null;document.addEventListener('drop',()=>{const start=performance.now();requestAnimationFrame(()=>requestAnimationFrame(()=>window.budgetDrop=performance.now()-start))},{capture:true,once:true})})
- await source.getByRole('button',{name:'Drag block',exact:true}).dragTo(previous.locator('.document-block-bar'))
- await page.waitForFunction(()=>window.budgetDrop!==null);report.dragReorderMs=await page.evaluate(()=>window.budgetDrop)
+ await page.evaluate(()=>{window.budgetDrop=null;window.budgetDragStart=null;document.addEventListener('dragstart',event=>{window.budgetDragStart={trusted:event.isTrusted,id:event.target.closest('[data-block-id]')?.dataset.blockId}},{capture:true,once:true});document.addEventListener('drop',event=>{const start=performance.now();window.budgetDropTrusted=event.isTrusted;requestAnimationFrame(()=>requestAnimationFrame(()=>window.budgetDrop=performance.now()-start))},{capture:true,once:true})})
+ // Begin the native drag while the handle is still under the pressed pointer.
+ // dragTo scrolls the destination before dragstart, moving this long block's
+ // handle away from the pointer and leaving no native drop to measure.
+ const handle=source.getByRole('button',{name:'Drag block',exact:true});await handle.hover();const start=await handle.boundingBox()
+ await page.mouse.down();await page.mouse.move(start.x+start.width/2+8,start.y+start.height/2,{steps:3})
+ await page.waitForFunction(()=>window.budgetDragStart!==null)
+ assert.deepEqual(await page.evaluate(()=>window.budgetDragStart),{trusted:true,id:'page-30'})
+ const destination=previous.locator('.document-block-bar');await destination.scrollIntoViewIfNeeded();const end=await destination.boundingBox()
+ await page.mouse.move(end.x+24,end.y+end.height/2,{steps:8});await page.mouse.up()
+ await page.waitForFunction(()=>window.budgetDrop!==null);report.dragReorderMs=await page.evaluate(()=>window.budgetDrop);assert.equal(await page.evaluate(()=>window.budgetDropTrusted),true,'measure a real browser drop')
  const after=await page.locator('[data-block-id]').evaluateAll(nodes=>nodes.map(n=>n.dataset.blockId)),expected=before.filter(id=>id!=='page-30');expected.splice(expected.indexOf(previousId),0,'page-30');assert.deepEqual(after,expected)
  await page.waitForFunction(()=>document.querySelector('[data-document-editor]').dataset.saveState==='saved')
+ assert.deepEqual((await state()).proposals.find(p=>p.id===proposal.id).document.blocks.map(b=>b.id),expected,'server retains the independently expected drag order')
  const quantity=page.locator('[data-pricing-option="one"] [data-saved-line] [data-pricing-field="quantity"]').first();await quantity.scrollIntoViewIfNeeded()
  await page.evaluate(()=>{window.budgetQuantity=null;document.querySelector('[data-pricing-option="one"] [data-saved-line] [data-pricing-field="quantity"]').addEventListener('input',()=>{const start=performance.now(),output=document.querySelector('[data-pricing-confirmation]');const observer=new MutationObserver(()=>{if(!output.dataset.confirmedVersion)return;observer.disconnect();requestAnimationFrame(()=>requestAnimationFrame(()=>window.budgetQuantity=performance.now()-start))});observer.observe(output,{attributes:true,attributeFilter:['data-confirmed-version']})},{once:true,capture:true})})
  await quantity.fill('2');await page.waitForFunction(()=>window.budgetQuantity!==null);report.quantityServerConfirmedMs=await page.evaluate(()=>window.budgetQuantity)
  assert.match(await page.locator('[data-pricing-confirmation]').innerText(),/server-confirmed total: \$6100\.00 USD/)
- let current=(await state()).proposals.find(p=>p.id===proposal.id);assert.equal(current.options[0].cents,610000)
+ let current=(await state()).proposals.find(p=>p.id===proposal.id);assert.equal(current.options[0].cents,610000);assert.equal(current.options[0].tables[0].lines[0].quantity,'2');assert.deepEqual(current.options[0].tables.map(t=>t.subtotalCents),[160000,150000,150000,150000])
  await post('proposal.approve',{id:current.id,version:current.version,revision:current.revision});current=(await state()).proposals.find(p=>p.id===proposal.id)
  const invitation=await post('proposal.send',{id:current.id,version:current.version}),path=new URL(invitation.shareUrl).pathname
  phoneContext=await browser.newContext({viewport:report.clientViewport});await phoneContext.addInitScript(()=>{window.budgetLcp=[];new PerformanceObserver(list=>window.budgetLcp.push(...list.getEntries().map(e=>e.startTime))).observe({type:'largest-contentful-paint',buffered:true})})
+ const requestedImages=new Set();phoneContext.on('request',request=>requestedImages.add(request.url()))
  const phone=await phoneContext.newPage(),phoneSession=await phoneContext.newCDPSession(phone);await phoneSession.send('Emulation.setCPUThrottlingRate',{rate:4})
  await phone.goto(app.origin+path+'?optionId=one',{waitUntil:'networkidle'});await phone.evaluate(()=>document.fonts.ready);await phone.waitForFunction(()=>window.budgetLcp.length>0)
  report.clientLcpMs=await phone.evaluate(()=>Math.max(...window.budgetLcp));report.lazyImages=await phone.locator('.document-image img').evaluateAll(images=>images.length===30&&images.every(image=>image.loading==='lazy'));assert.equal(report.lazyImages,true)
+ const imageUrls=await phone.locator('.document-image img').evaluateAll(images=>images.map(image=>image.src)),lastImage=phone.locator('.document-image img').last()
+ report.initialImagesRequested=imageUrls.filter(url=>requestedImages.has(url)).length
+ assert.ok(report.initialImagesRequested<30,'offscreen images are not all acquired on navigation');assert.equal(requestedImages.has(imageUrls.at(-1)),false,'the last offscreen image has not been requested')
+ await lastImage.scrollIntoViewIfNeeded();await phone.waitForFunction(()=>Array.from(document.querySelectorAll('.document-image img')).at(-1).naturalWidth===2400)
+ report.lazyImageAcquiredOnScroll=requestedImages.has(imageUrls.at(-1));assert.equal(report.lazyImageAcquiredOnScroll,true,'scrolling acquires the retained full-size image')
  await phone.getByRole('button',{name:'Send verification code',exact:true}).click();const code=(await state()).outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0];await phone.getByLabel('Email verification code').fill(code);await phone.getByRole('button',{name:'Verify email',exact:true}).click()
  const pdf=await phoneContext.request.post(app.origin+path+'/download.pdf',{headers:{origin:app.origin},data:{optionId:'one'}});assert.equal(pdf.status(),200);const pages=await pdfPages(await pdf.body(),true);report.renderedPdfPages=pages.length;report.paper='US Letter';assert.equal(pages.length,40,'reference is forty actual US Letter PDF pages');assert.ok(pages.every(p=>p.width===612&&p.height===792),'every reference page is US Letter');report.pdfImages=pages.reduce((n,p)=>n+p.imageCount,0);assert.equal(report.pdfImages,30,'the PDF retains all thirty images')
- console.log(JSON.stringify(report,null,2))
+ if(process.env.PLATTER_SCREENSHOTS){
+  const directory=process.env.PLATTER_SCREENSHOTS;await mkdir(directory,{recursive:true})
+  for(const width of [1440,390]){
+   await page.setViewportSize({width,height:900});await page.locator('[data-block-id="page-30"] [data-block-drag]').focus();await page.screenshot({path:join(directory,'EDIT-011-editor-'+width+'.png')})
+   await phone.setViewportSize({width,height:900});await phone.locator('.proposal-document').scrollIntoViewIfNeeded();await phone.screenshot({path:join(directory,'EDIT-011-client-'+width+'.png')})
+  }
+ }
  assert.ok(report.timeToEditableMs<=3000,'time to editable exceeds 3 seconds')
  assert.ok(report.keystrokeP95Ms<=100,'keystroke-to-paint p95 exceeds 100ms')
  assert.ok(report.dragReorderMs<=300,'drop-to-repaint exceeds 300ms')
  assert.ok(report.quantityServerConfirmedMs<=500,'server-confirmed quantity exceeds 500ms')
  assert.ok(report.clientLcpMs<=2500,'phone LCP exceeds 2.5 seconds')
+}catch(error){report.failure=error.message;throw error}
+finally{
+ console.log(JSON.stringify(report,null,2))
  if(process.env.PLATTER_BUDGET_REPORT)await writeFile(process.env.PLATTER_BUDGET_REPORT,JSON.stringify(report,null,2)+'\n')
-}finally{await phoneContext?.close();await context?.close();await browser?.close();await app?.close()}
+ await phoneContext?.close();await context?.close();await browser?.close();await app?.close()
+}

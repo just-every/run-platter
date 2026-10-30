@@ -6,3 +6,6 @@
 
 .document-gallery-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:16px}.document-embed iframe{display:block;width:100%;min-height:420px;border:0}.document-embed [data-external-embed]>img{max-height:320px;object-fit:contain}
 .fixed-pdf-page{display:block;width:100%;height:auto;margin:16px 0;border:1px solid var(--pl-rule);border-radius:8px}
+
+/* Keep offscreen native controls searchable and focusable without laying out every block. */
+.document-editor-block{content-visibility:auto;contain-intrinsic-size:auto 560px}

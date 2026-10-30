@@ -552,10 +552,10 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect rev
 })
 
 
-test('MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting', {timeout:120000}, async()=>{
+test('MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting', {timeout:240000}, async()=>{
  let app,browser
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM_PATH,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   const screenshots=process.env.PLATTER_SCREENSHOTS
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
@@ -582,6 +582,8 @@ test('MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss
    }finally{await context.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}
+ const {followupReportingBrowser}=await import('./followup-reporting-browser.mjs')
+ await followupReportingBrowser()
 })
 
 test('SEND-006 desktop and phone rehearse to self, then edit invitations, fresh links and negotiated sends with exact retained history', {timeout:180000},async()=>{

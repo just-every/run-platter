@@ -3538,7 +3538,9 @@ test('AUTO-002 completed agreements archive exact PDFs once under explicit curre
  }finally{await h.close()}
 })
 
-test('MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo', {timeout:120000},()=>run(async h=>{
+test('MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo', {timeout:240000},()=>run(async h=>{
+ const {proposifyJourney}=await import('./document-movein-fixture.mjs')
+ const proof=await harness({assetsDirectory:'public'});try{await proposifyJourney(proof)}finally{await proof.close()}
  const {moveinFixture,hash,uploadMovein}=await import('./document-movein-fixture.mjs'),fixture=await moveinFixture()
  const {id}=await h.cmd('document-import.create',{label:'Synthetic document move-in'})
  const file=fixture.zips[0],sha256=hash(file.bytes),half=Math.floor(file.bytes.length/2),part=file.bytes.subarray(0,half).toString('base64')

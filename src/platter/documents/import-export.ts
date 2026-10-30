@@ -76,6 +76,7 @@ export async function exportDocument(env:Bindings,a:Actor,id:string,format:strin
  const original=await permitted(env.DB,a,id),row=negotiatedView(original,await pendingNegotiation(env.DB,id)),view={...snapshot(row),clientName:(await env.DB.prepare('SELECT name FROM p_clients WHERE id=?').bind(row.client_id).first<any>())?.name}
  need(['pdf','docx'].includes(format),'Choose PDF or Word');need(['letter','a4'].includes(size),'Choose US Letter or A4')
  let bytes:Uint8Array,type:string
+ need(format!=='docx'||documentOf(row).fixedPdf?.source!=='proposify','Proposify fixed pages must be rebuilt in the editor; Word reconstruction is unavailable',409)
  if(format==='docx'){
   const fixed=documentOf(row).fixedPdf,images:Uint8Array[]=[]
   if(fixed){

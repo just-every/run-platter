@@ -2177,8 +2177,8 @@ Judged from the code and tests at commit `8f4ff0320aaafd58b41dabcf9e39bc60db7dc6
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 1 | 11 | 0 | 12 |
-| Target and push further | 14 | 88 | 49 | 151 |
-| All | 15 | 99 | 49 | 163 |
+| Target and push further | 14 | 89 | 48 | 151 |
+| All | 15 | 100 | 48 | 163 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -2317,7 +2317,7 @@ Judged from the code and tests at commit `8f4ff0320aaafd58b41dabcf9e39bc60db7dc6
 | `TEAM-004` | Audit log | target | partial | `src/platter/audit.ts`; `src/platter/auth-audit.ts`; `tests/platter.test.mjs` — “TEAM-004 current person, agent, invitation, signature, native, import and invoice actions have searchable/exportable actors and times”; `tests/site.test.mjs` — “TEAM-004 owner searches audit actions and downloads the same filtered activity at desktop and phone widths” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences” | The named journey covers this descendant through its called helpers. The prior partial floor is retained pending a fresh ct judgment; this fix round does not promote it. |
 | `TEAM-005` | Security review pack for procurement | target | missing |  | No security page, questionnaire answers, DPA, subprocessor list or audit report. |
 | `MIG-001` | PandaDoc move-in | target | missing |  | No PandaDoc import. |
-| `MIG-002` | Proposify move-in | target | missing |  | No Proposify import. |
+| `MIG-002` | Proposify move-in | target | partial | `tests/platter.test.mjs` — “MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo”, extended by proposifyJourney in `tests/document-movein-fixture.mjs`, proves 30 independently expected report matches, exact signed originals, held open documents, fixed-page templates, reviewed choices, replay and dependency-safe undo. | Exported files use the conservative current-owner-only floor under the standing scope policy. Explicit columns preserve title, client, created and signed dates, source status, value and currency as supplied evidence; no source value becomes a price. A separately identified unsigned template PDF applies fixed pages to an owner-selected priced draft and saves an independent template labelled rebuild in the editor, with no Word reconstruction. Gap: API import and enrichment, native library adoption, contact and catalog integration, open-document reissue, billing continuation, recipient roles, signing order and field adoption, scoped delegation and complete incumbent and live-provider qualification remain unproved. MIG-007 and MIG-006 image-egress holds, EDIT-013 prerequisites and SEND-003 and SIGN-004 authority holds remain unchanged. |
 | `MIG-003` | Better Proposals move-in | target | missing |  | No Better Proposals import. |
 | `MIG-004` | Qwilr and Ignition move-in | target | missing |  | No Qwilr or Ignition import. |
 | `MIG-005` | Open proposals and payment schedules continue | target | missing |  | No in-flight migration. |

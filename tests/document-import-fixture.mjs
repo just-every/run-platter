@@ -1,8 +1,8 @@
 import {zipSync,strToU8,strFromU8 as strFrom} from 'fflate'
 import {readFile} from 'node:fs/promises'
-export async function wordFixture({headings=3,rows=6,images=1,tokens=true,prefix='Synthetic section',extras=false}={}){
+export async function wordFixture({headings=3,rows=6,images=1,tokens=true,prefix='Synthetic section',skuPrefix='SKU',extras=false}={}){
  const files={},p=(text,heading=false)=>'<w:p>'+(heading?'<w:pPr><w:pStyle w:val="Heading1"/></w:pPr>':'')+'<w:r><w:t>'+text+'</w:t></w:r></w:p>',cell=text=>'<w:tc>'+p(text)+'</w:tc>'
- const body=Array.from({length:headings},(_,i)=>p(prefix+' '+(i+1),true)+p((i===0&&tokens?'[Client.Company] [Sender.FirstName] [Unmapped.Case] ':'')+'Paragraph '+(i+1))).join('')+(extras?'<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Synthetic list item</w:t></w:r></w:p><w:tbl><w:tr>'+cell('Service area')+cell('West')+'</w:tr></w:tbl><w:p><w:r><w:drawing><a:blip r:embed="missing-source"/></w:drawing></w:r></w:p>':'')+(rows?'<w:tbl>'+['SKU\tName\tQuantity\tPrice',...Array.from({length:rows},(_,i)=>'SKU'+(i+1)+'\tSynthetic product '+(i+1)+'\t'+(i+1)+'\t'+(10+i)+'.00')].map(r=>'<w:tr>'+r.split('\t').map(cell).join('')+'</w:tr>').join('')+'</w:tbl>':'')+Array.from({length:images},(_,i)=>'<w:p><w:r><w:drawing><wp:inline><wp:extent cx="3657600" cy="2057400"/><wp:docPr id="'+(i+1)+'" name="Synthetic image"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="'+(i+1)+'" name="Synthetic image"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="image'+i+'"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="3657600" cy="2057400"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>').join('')
+ const body=Array.from({length:headings},(_,i)=>p(prefix+' '+(i+1),true)+p((i===0&&tokens?'[Client.Company] [Sender.FirstName] [Unmapped.Case] ':'')+'Paragraph '+(i+1))).join('')+(extras?'<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Synthetic list item</w:t></w:r></w:p><w:tbl><w:tr>'+cell('Service area')+cell('West')+'</w:tr></w:tbl><w:p><w:r><w:drawing><a:blip r:embed="missing-source"/></w:drawing></w:r></w:p>':'')+(rows?'<w:tbl>'+['SKU\tName\tQuantity\tPrice',...Array.from({length:rows},(_,i)=>skuPrefix+(i+1)+'\tSynthetic product '+(i+1)+'\t'+(i+1)+'\t'+(10+i)+'.00')].map(r=>'<w:tr>'+r.split('\t').map(cell).join('')+'</w:tr>').join('')+'</w:tbl>':'')+Array.from({length:images},(_,i)=>'<w:p><w:r><w:drawing><wp:inline><wp:extent cx="3657600" cy="2057400"/><wp:docPr id="'+(i+1)+'" name="Synthetic image"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="'+(i+1)+'" name="Synthetic image"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="image'+i+'"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="3657600" cy="2057400"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>').join('')
  files['word/document.xml']=strToU8('<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>'+body+'</w:body></w:document>')
  files['word/_rels/document.xml.rels']=strToU8('<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+Array.from({length:images},(_,i)=>'<Relationship Id="image'+i+'" Target="'+['media','image'+i+'.png'].join('/')+'"/>').join('')+'</Relationships>')
  for(let i=0;i<images;i++)files[['word','media','image'+i+'.png'].join('/')]=new Uint8Array(await readFile('fixtures/business/brand.png'))
@@ -25,10 +25,39 @@ export async function pandadocContentFixture(){
  const {PDFDocument}=await import('pdf-lib'),pdf=await PDFDocument.create();pdf.addPage()
  return {quote:{filename:'synthetic-platter-510.docx',bytes:Buffer.from(await wordFixture())},library:{filename:'synthetic-platter-511.docx',bytes:Buffer.from(await wordFixture({headings:10,rows:0,images:0,tokens:false}))},fixed:{filename:'synthetic-platter-512.pdf',bytes:Buffer.from(await pdf.save())}}
 }
-export async function applyPandaContent(h,kind,files,cookie=h.owner){
+export async function applyPandaContent(h,kind,files,cookie=h.owner,input={}){
  const {uploadMovein}=await import('./document-movein-fixture.mjs'),{id}=await h.cmd('document-import.create',{label:'Synthetic PandaDoc content',kind},cookie)
  for(const file of files)await uploadMovein(h,id,file,cookie)
+ const preview=await h.cmd('document-import.preview',{id,...input},cookie)
+ const result=await h.cmd('document-import.apply',{id,...input,fingerprint:preview.fingerprint},cookie)
+ return {id,preview,result}
+}
+
+export async function integratedPandaFixture(){
+ const headers='Name,SKU,Type,SKUs_in_bundle,Category,Price,Cost,Currency,Description,Images,Billing_frequency,Custom_Review'
+ const rows=Array.from({length:5},(_,i)=>'Synthetic integrated product '+(i+1)+',ISKU'+(i+1)+',Product,,Synthetic,99.00,2.00,USD,Source metadata,,One-time,Keep '+(i+1))
+ rows.push('Synthetic integrated bundle,IBUNDLE,Bundle,"ISKU1:1,ISKU2:2",Synthetic,250.00,3.00,USD,Source bundle,,One-time,Keep bundle')
+ return {catalog:{filename:'synthetic-platter-540.csv',bytes:Buffer.from(headers+'\n'+rows.join('\n'))},quote:{filename:'synthetic-platter-540.docx',bytes:Buffer.from(await wordFixture({skuPrefix:'ISKU',prefix:'Synthetic integrated section'}))}}
+}
+
+export async function bulkPandaFixture(counts=[250,40],start=0){
+ const {PDFDocument,StandardFonts}=await import('pdf-lib'),originals=[],zips=[]
+ let sequence=start
+ for(const count of counts){const files={};for(let i=0;i<count;i++,sequence++){
+  const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica),signed=sequence%10!==0
+  pdf.setTitle('Synthetic bulk proposal '+sequence);pdf.setCreationDate(new Date('2026-01-15T12:00:00Z'));pdf.setModificationDate(new Date('2026-01-15T12:00:00Z'))
+  pdf.addPage().drawText('Synthetic bulk original '+sequence,{font,x:40,y:700})
+  if(signed)pdf.addPage().drawText('Certificate of completion '+sequence,{font,x:40,y:700})
+  const bytes=Buffer.from(await pdf.save()),path=['Synthetic','2026',signed?'Completed':'Open','synthetic-platter-'+sequence+'.pdf'].join('/')
+  files[path]=bytes;originals.push({bytes,path,signed})
+ }zips.push({filename:'synthetic-platter-bulk-'+zips.length+'.zip',bytes:Buffer.from(zipSync(files))})}
+ return {originals,zips}
+}
+export async function applyPandaBulk(h,fixture,cookie=h.owner){
+ const {uploadMovein}=await import('./document-movein-fixture.mjs'),{id}=await h.cmd('document-import.create',{kind:'pandadoc-documents',label:'Synthetic PandaDoc bulk folders'},cookie)
+ for(const file of fixture.zips)await uploadMovein(h,id,file,cookie)
  const preview=await h.cmd('document-import.preview',{id},cookie)
- const result=await h.cmd('document-import.apply',{id,fingerprint:preview.fingerprint},cookie)
+ let result=await h.cmd('document-import.apply',{id,fingerprint:preview.fingerprint},cookie)
+ while(result.job.state!=='completed')result=await h.cmd('document-import.continue',{id},cookie)
  return {id,preview,result}
 }

@@ -548,6 +548,8 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   assert.deepEqual(Buffer.from(original.original.base64,'base64'),await readFile('fixtures/business/brand.png'))
   await undoBusiness(h,catalog.job.id,cookie);await undoBusiness(h,contacts.job.id,cookie)
   assert.deepEqual((await h.state(cookie)).businessRecords,{companies:[],contacts:[],catalog:[]})
+  await h.close();h=null
+  await (await import('./pandadoc-archive.mjs')).pandaReissueArchive({checkout,command,exec})
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 

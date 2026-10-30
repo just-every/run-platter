@@ -1,3 +1,4 @@
+import { documentReissue } from './document-reissue'
 import { contentKinds, contentCommand, contentOriginal } from './pandadoc-content'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
@@ -19,7 +20,7 @@ const context=(db:D1Database,actor:Actor):D1ImportContext=>d1RequestContext({
 })
 const mapping:ImportMapping={version:'exported-documents-v1',map(record){
  const payload=record.payload as any
- return {effects:[{targetKind:'documents',targetId:record.sourceId,value:payload.value}]}
+ return {effects:[{targetKind:record.kind,targetId:record.sourceId,value:payload.value}]}
 }}
 async function session(db:D1Database,actor:Actor,id:unknown) {
  await documentOwner(db,actor)
@@ -51,7 +52,7 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    const id=randomUUID(),label=String(input.label??'Document move-in').trim(),kind=String(input.contentKind??input.kind??'documents')
    if (!label || label.length>150) fail('invalid_input',400,'Name the move-in in 150 characters or fewer')
    await db.batch([db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN '+ownerSql+' THEN 1 ELSE 0 END').bind(actor.id),
-    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label,kind) VALUES(?,?,?,?)').bind(id,actor.id,label,contentKinds.includes(kind)?kind:'documents')])
+    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label,kind) VALUES(?,?,?,?)').bind(id,actor.id,label,[...contentKinds,'pandadoc-documents'].includes(kind)?kind:'documents')])
    return {id}
   }
   const movein=await session(db,actor,input.id),id=movein.id
@@ -95,13 +96,14 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
   }
   if(contentKinds.includes(movein.kind))return await contentCommand(db,actor,name,input,movein,()=>uploaded(db,id))
   const kit=context(db,actor)
+  if(['document-import.reissue-preview','document-import.reissue'].includes(name)){if(!movein.job_id)fail('import_job_not_found',404);return documentReissue(db,actor,name,input,movein,()=>readD1ImportOriginals(movein.job_id,kit))}
   if (name==='document-import.preview'||name==='document-import.apply') {
    const selected=choices(input)
    if(movein.fingerprint) {
     if(name==='document-import.preview'||input.fingerprint!==movein.fingerprint||canonicalJson(selected)!==movein.choices_json)fail('review_fingerprint_mismatch',409,'Continue the exact reviewed import from its history')
     if(movein.job_id)return {id,job:await applyD1ImportBatches(movein.job_id,kit),report:JSON.parse(movein.report_json)}
    }
-   const prepared=await documentSource(await uploaded(db,id),selected,id)
+   const prepared=await documentSource(await uploaded(db,id),selected,id,movein.kind==='pandadoc-documents'?actor.id:undefined)
    const plan=await planD1Import(prepared.source,mapping,kit)
    // A second import never replaces an already retained original or its attribution.
    const prior=await db.prepare('SELECT id FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?').bind(documentDestination,actor.id,id).first<any>()
@@ -123,11 +125,15 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
   }
   if(!movein.job_id)fail('import_job_not_found',404)
   if(name==='document-import.continue')return {id,job:await applyD1ImportBatches(movein.job_id,kit)}
-  if(name==='document-import.undo')return {id,job:await undoD1Import(movein.job_id,kit)}
+  if(name==='document-import.undo'){
+   if(await db.prepare("SELECT 1 FROM p_imported_document_links l JOIN p_imported_documents d ON d.id=l.document_id WHERE json_extract(d.data_json,'$.moveinId')=? UNION ALL SELECT 1 FROM p_proposal_filing f JOIN p_proposal_folders d ON d.id=f.folder_id WHERE d.movein_id=?").bind(id,id).first())fail('import_dependency',409,'A new draft or filed proposal uses this move-in. Its originals and folders are preserved.')
+   return {id,job:await undoD1Import(movein.job_id,kit)}
+  }
   if(name==='document-import.journal'){
    const job=await readD1ImportJob(movein.job_id,kit),originals=await readD1ImportOriginals(job.id,kit)
    const provenance=(await db.prepare('SELECT record_json FROM ik_provenance WHERE job_id=? ORDER BY ordinal,effect_ordinal').bind(job.id).all<{record_json:string}>()).results.map(r=>JSON.parse(r.record_json))
-   return {id,job,originals,provenance,report:JSON.parse(movein.report_json)}
+   const reissues=(await db.prepare("SELECT r.* FROM p_document_reissues r JOIN p_imported_documents d ON d.id=r.document_id WHERE json_extract(d.data_json,'$.moveinId')=?").bind(id).all()).results
+   return {id,job,originals,provenance,reissues,report:JSON.parse(movein.report_json)}
   }
   fail('unknown_import_command',400)
  }catch(error){
@@ -143,7 +149,7 @@ export async function documentMoveinState(db:D1Database,actor:Actor) {
  await documentOwner(db,actor)
  const moves=(await db.prepare('SELECT m.*,j.state,j.checkpoint,j.total FROM p_document_moveins m LEFT JOIN ik_jobs j ON j.id=m.job_id WHERE owner_id=? ORDER BY m.rowid DESC').bind(actor.id).all<any>()).results
  for(const move of moves){if(contentKinds.includes(move.kind)&&move.fingerprint){const status=await db.prepare('SELECT undone FROM p_pandadoc_moves WHERE id=?').bind(move.id).first<any>();move.state=status?.undone?'undone':'completed'}move.uploads=(await db.prepare('SELECT sha256,filename,size,received,complete FROM p_document_uploads WHERE movein_id=? ORDER BY rowid').bind(move.id).all()).results}
- const documents=(await db.prepare("SELECT d.data_json FROM p_imported_documents d JOIN p_document_moveins m ON m.id=json_extract(d.data_json,'$.moveinId') WHERE m.owner_id=? ORDER BY d.id").bind(actor.id).all<{data_json:string}>()).results.map(r=>JSON.parse(r.data_json))
+ const documents=(await db.prepare("SELECT d.data_json,r.proposal_id AS new_draft_id FROM p_imported_documents d LEFT JOIN p_document_reissues r ON r.document_id=d.id JOIN p_document_moveins m ON m.id=json_extract(d.data_json,'$.moveinId') WHERE m.owner_id=? ORDER BY d.id").bind(actor.id).all<{data_json:string;new_draft_id?:string}>()).results.map(r=>({...JSON.parse(r.data_json),...(r.new_draft_id?{newDraftId:r.new_draft_id}:{})}))
  return {documentMoveins:moves,importedDocuments:documents}
 }
 export async function importedOriginal(db:D1Database,actor:Actor,query:URLSearchParams) {

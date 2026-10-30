@@ -3,6 +3,44 @@
 Bring an existing client list into Platter with a reviewed CSV import. Open
 **Import** in your installed app as the owner.
 
+## Reviewed PandaDoc move-in (`MIG-001`)
+
+Choose **PandaDoc Word or fixed PDF templates** or **PandaDoc Word library sections**
+on Import. Word headings become editable blocks, supported tokens become variables,
+and quote rows keep their exact source quantities and prices. A unique matching
+SKU links a row to its catalog record. Duplicate SKUs and unknown explicit SKUs
+stay unmatched; a different item with the same name never substitutes for them.
+Heading 1 sections split a library download into independent items. PDF templates
+remain fixed pages and require a Word download for editing.
+
+You may upload PandaDoc catalog and support-provided contact CSV files in the
+same reviewed content batch. Catalog records are prepared before Word conversion,
+so the preview shows links to those exact records. Supply explicit company IDs
+for named companies in the contact file. The journal retains every original,
+source hash, output reference and unmapped column. Bundle components and custom
+columns remain metadata; native priced bundle promotion remains unavailable.
+Imported metadata never activates prices or collection. URL images are never
+acquired here. Applying without them requires the batch's explicit omission
+choice, and their records remain marked as not fetched.
+
+Choose **PandaDoc bulk PDF documents and folders** to preserve an exported folder
+hierarchy as private native proposal folders. Completed PDFs retain their exact
+certificate pages. Open PDFs remain read-only originals. Under an open original,
+**Prepare a new draft** reviews a newly selected client, scope, price and deposit.
+Confirm that you will void the old offer before creating the independent fixed-page
+draft. Its source link and folder remain recorded. No old recipient, approval,
+signature, payment, reminder or sending authority is copied. Ordinary fresh
+approval and human sending are required. Editable Word reissue is still omitted.
+
+All these commands require the current importing owner. Repeated source files
+create no further outputs. Undo removes unchanged unused outputs and folders;
+new drafts, catalog promotions, later edits or other dependencies preserve their
+sources. Archives retain the exact originals, output records, folder hierarchy
+and journal, with usable undo after a fresh owner sign-in and no restored outbound
+authority. Provider enrichment, source roles and fields, automatic open-document
+draft creation and full PandaDoc qualification remain unfinished. The qualified
+Base image egress boundary and existing recipient-authority holds remain in force.
+
 ## Exported documents and report CSVs (`MIG-007`)
 
 Use **Move in exported documents** on Import. Name a move-in, then add PDF files,

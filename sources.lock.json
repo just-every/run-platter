@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "f4694252e5114356e6b5562f9a9181f7f6a76ef5749934bbeeea7920cdca5305",
+      "sha256": "7bd7ee391ffabc6863757005d565c2289e0c5b0eec14f8346c4ea5f2edabdab8",
       "executable": false
     },
     "AGENTS.md": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "c632fed17e742627441924785af1643d37e95ee84565b23f998e6690366f876c",
+      "sha256": "e754ef5a8c2e2afe6595f46e3dd058979a01090674e81a0e3cbcaf6025f3507b",
       "executable": false
     },
     "docs/contract-behavior.md": {
@@ -2638,7 +2638,7 @@
       "executable": false
     },
     "src/platter/documents/import-export.ts": {
-      "sha256": "d5a408b4fe5b961ebe83e3ce90e8c934d5f403c1986a248be2f214fd52ea29a7",
+      "sha256": "0d9a88286cfd67099363ad4f6777210122e199e2917b9cb7665c3475ca70a670",
       "executable": false
     },
     "src/platter/documents/media.ts": {
@@ -3542,7 +3542,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "eb0e888d98095a13c175cbebb503a7e5e89625cbcf9a51a82a2a384f899147b5",
+      "sha256": "e4a0b6a1db6358a948613a617709e0b45412c736a923b6dabd162687494c11f2",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

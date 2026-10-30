@@ -3693,6 +3693,15 @@ test('MIG-001 reviewed PandaDoc Word and fixed PDF content retains exact origina
  const image=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+draft.id+'/'+doc.blocks.find(b=>b.type==='image').assetId,{headers:{cookie:h.owner}});assert.deepEqual(Buffer.from(await image.arrayBuffer()),await readFile('fixtures/business/brand.png'))
  const before=(await h.state()).templates;await h.cmd('document-import.undo',{id},h.owner,409);assert.deepEqual((await h.state()).templates,before,'a used template preserves the entire move-in on undo refusal')
  const unused=await applyPandaContent(h,'pandadoc-template',[{filename:'synthetic-platter-513.docx',bytes:Buffer.from(await (await import('./document-import-fixture.mjs')).wordFixture({headings:1,rows:1,images:0,tokens:false}))}]);await h.cmd('document-import.undo',{id:unused.id});assert.equal((await h.state()).templates.length,2);assert.equal((await h.cmd('document-import.journal',{id:unused.id})).undone,true)
+ // A duplicate SKU must never select an arbitrary catalog record or substitute a name match.
+ await applyBusiness(h,{kind:'catalog',format:'platter',csv:'id,sku,name,description,price,currency,unit\nsynthetic-platter-530,SKU1,Synthetic duplicate,,500,USD,each\nsynthetic-platter-531,OTHER,Synthetic product 6,,600,USD,each'})
+ const ambiguousFile={filename:'synthetic-platter-530.docx',bytes:Buffer.from(await (await import('./document-import-fixture.mjs')).wordFixture({headings:1,rows:6,images:0,tokens:false}))}
+ const ambiguousImport=await applyPandaContent(h,'pandadoc-template',[ambiguousFile]),ambiguousTemplate=(await h.state()).templates.find(t=>t.name==='synthetic-platter-530'),ambiguousLines=ambiguousTemplate.snapshot.options[0].tables[0].lines
+ assert.equal(ambiguousLines[0].catalogId,undefined,'two SKU matches stay unmatched')
+ assert.equal(ambiguousLines[5].catalogId,undefined,'an unknown explicit SKU never falls back to a different SKU with the same name')
+ assert.deepEqual(ambiguousImport.result.report.unmappedItems.filter(s=>s.includes('unmatched quote row')).map(s=>s.split('unmatched quote row ')[1]),['Synthetic product 1','Synthetic product 6'])
+ assert.equal(ambiguousTemplate.snapshot.options[0].cents,28000,'unmatched rows keep their exact source prices')
+ await h.cmd('document-import.undo',{id:ambiguousImport.id});assert.deepEqual((await h.state()).templates,before)
  const memberAddress=['synthetic-platter-519','example.test'].join('@');await h.send('/auth/invite',{email:memberAddress,displayName:'Synthetic member',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn(memberAddress)
  await h.cmd('document-import.preview',{id:replay.id},member,403);await h.cmd('document-import.undo',{id},member,403);assert.equal((await h.send('/api/platter/imported-original?id='+id+'&name='+hash(f.quote.bytes),undefined,member)).status,403);assert.deepEqual((await h.state()).templates,before)
  console.log('PROBE MIG-001 Word: reviewed DOCX -> 6 exact priced rows, 5 linked SKUs, 1 unmatched; image and Client.Company retained')

@@ -75,7 +75,7 @@ export async function proposifyTemplateCommand(db:D1Database,actor:Actor,name:st
  need(client,'The destination client no longer exists',409)
  need(input.consent===true||input.consent==='yes','Confirm the fixed pages and the destination draft prices')
  const fingerprint=sha256(canonicalJson({movein:movein.id,review:movein.fingerprint,configuration:movein.configuration_json,source:stored.revision,content,client,version:row.version,templateName,outputKind,consent:true}))
- if(name==='document-import.template-preview') return {id:movein.id,kind:'Proposify fixed pages',fingerprint,proposalId:row.id,version:row.version,templateName,outputKind,documentId:sourceId,clientName:client.name,sourceTitle:source.title,sourceSha256:source.sha256,prices:content.options.map((o:any)=>({name:o.label,cents:o.cents})),pages:source.pages}
+ if(name==='document-import.template-preview') return {id:movein.id,kind:'Proposify fixed pages',fingerprint,proposalId:row.id,version:row.version,templateName,outputKind,documentId:sourceId,clientName:client.name,destinationTitle:row.title,sourceTitle:source.title,sourceSha256:source.sha256,prices:content.options.map((o:any)=>({name:o.label,cents:o.cents})),pages:source.pages}
  need(name==='document-import.template-apply','Unknown fixed-page command',400)
  need(input.fingerprint===fingerprint,'The reviewed bytes, destination, prices or name changed; preview again',409)
  const originals=await readD1ImportOriginals(movein.job_id,kit),file=originals.find(o=>o.name==='documents/'+source.sha256+'.pdf')

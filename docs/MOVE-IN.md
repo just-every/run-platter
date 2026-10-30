@@ -221,3 +221,29 @@ needs `nodejs_compat`, as required by Base's kit. The copied kit and D1 transpor
 come from the supplied Base source; the adapter follows supplied Run Glove and
 Run Lanyard integrations. This is an authored CSV interface, not a vendor export
 format or an account-tested vendor connector.
+
+## Reviewed Proposify fixed-page outputs
+
+On Move in, choose Proposify exported files and map every documents-report
+column explicitly. Retain the PDFs and report as original source evidence;
+report values never become proposal prices. Ambiguous matches stay held until
+reviewed. A signed source remains a read-only agreement.
+
+After applying the reviewed import, open Apply Proposify template pages. Choose
+an independent template, an owner-private library section, or an open-document
+reissue. Select the source PDF and a native USD draft whose client and prices
+you have supplied. Review the source hash, destination, client and prices before
+applying. A template requires the separately identified template PDF; reissue
+requires a matched open source. Templates and library sections are labelled
+“rebuild in the editor”; they keep fixed pages and offer no Word reconstruction.
+Library insertion makes an independent copy into a draft without fixed pages.
+Reissued drafts require ordinary fresh human approval and sending. No imported
+role, signature, billing authorization or invitation activates anything.
+
+Proposify fee CSVs use the existing reviewed business import. Before promotion,
+supply a native SKU when the export has none and explicitly choose recurrence
+for recurring source fees. Review the exact USD unit price; trailing decimal
+zeros are removed without rounding, while a sub-cent source price needs an
+explicit replacement price. Native priced copies survive undo of reference
+records; the original CSV and journal retain their custody. Document undo
+refuses later edits, sent reissues, template starts and used library copies.

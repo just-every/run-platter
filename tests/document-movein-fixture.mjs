@@ -77,7 +77,7 @@ export async function applyProposify(h,fixture,cookie=h.owner) {
  return {id,review,choices,reviewed,result}
 }
 export async function fixedTemplate(h,movein,cookie=h.owner,output={}) {
- const client=(await h.state(cookie)).clients.find(c=>c.email===h.auth.OWNER_EMAIL)??await h.cmd('client.save',{name:'Synthetic template client',email:h.auth.OWNER_EMAIL},cookie)
+ const client=(await h.state(cookie)).clients.find(c=>output.destinationClientId?c.id===output.destinationClientId:c.email===h.auth.OWNER_EMAIL)??await h.cmd('client.save',{name:'Synthetic template client',email:h.auth.OWNER_EMAIL},cookie)
  const draft=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic owner-priced draft',scope:'Owner-supplied work',packages:[{id:'chosen',label:'Owner priced',price:'725.25'}],depositPercent:'25'},cookie)
  const input={id:movein.id,proposalId:draft.id,version:draft.version,templateName:'Synthetic independent template',consent:true,...output}
  const preview=await h.cmd('document-import.template-preview',input,cookie)
@@ -205,10 +205,41 @@ export async function proposifyJourney(h) {
 
 // The same public reviewed door serves safe reissue and usable library copies.
 export async function proposifyNativeOutputs(h,movein,fixture,cookie=h.owner) {
+ const address=['synthetic-platter-source-client','example.invalid'].join('@')
+ const csv='client_id,name,email\nsynthetic-platter-movein-client,Synthetic selected client,'+address
+ const preview=await h.cmd('import.preview',{csv},cookie)
+ const clients=await h.cmd('import.apply',{csv,fingerprint:preview.fingerprint},cookie)
+ assert.equal(clients.job.state,'completed')
+ const importedClient=(await h.state(cookie)).clients.find(c=>c.id==='synthetic-platter-movein-client')
+ assert.equal(importedClient.email,address)
+ const fees={kind:'catalog',format:'proposify',csv:'Name,Price,Quantity,Description,Type,Optional for clients,Adjustable,Tags\nSynthetic Proposify fee,150.50000,3,Owner reviewed service,Recurring,Yes,Yes,Synthetic'}
+ const plan=await h.cmd('business-import.preview',fees,cookie)
+ const applied=await h.cmd('business-import.apply',{...fees,fingerprint:plan.fingerprint},cookie)
+ assert.equal(applied.job.state,'completed')
+ const record=plan.catalog[0]
+ await h.cmd('business-import.promote-preview',{itemIds:[record.id],fallbackUnit:'each'},cookie,409)
+ const promotion={itemIds:[record.id],fallbackUnit:'each',itemChoices:{[record.id]:{sku:'synthetic-platter-150',defaultRecurrence:'monthly'}}}
+ const price=await h.cmd('business-import.promote-preview',promotion,cookie)
+ assert.equal(price.items[0].unitCents,15050)
+ await h.cmd('business-import.promote',{...promotion,itemChoices:{[record.id]:{sku:'synthetic-platter-changed',defaultRecurrence:'annual'}},fingerprint:price.fingerprint},cookie,409)
+ const promoted=await h.cmd('business-import.promote',{...promotion,fingerprint:price.fingerprint},cookie)
+ const nativePrices=(await h.state(cookie)).catalogItems
+ await h.cmd('business-import.undo',{id:applied.job.id},cookie)
+ assert.deepEqual((await h.state(cookie)).catalogItems,nativePrices,'reversing source records preserves independent priced copies')
+ const sourceJournal=await h.cmd('business-import.journal',{id:applied.job.id},cookie)
+ assert.deepEqual(Buffer.from(sourceJournal.originals.find(o=>o.name.endsWith('.csv')).original.base64,'base64'),Buffer.from(fees.csv),'source CSV remains exact custody after reversing reference records')
  const source=hash(fixture.originals[24]),before=(await h.state(cookie)).importedDocuments
- const reissue=await fixedTemplate(h,movein,cookie,{outputKind:'reissue',documentId:source})
+ const reissue=await fixedTemplate(h,movein,cookie,{outputKind:'reissue',documentId:source,destinationClientId:importedClient.id})
  const state=await h.state(cookie),draft=state.proposals.find(p=>p.id===reissue.draft.id)
  assert.equal(draft.status,'draft');assert.equal(draft.options[0].cents,72525)
+ assert.equal(draft.client_id,importedClient.id)
+ await h.cmd('import.undo',{id:clients.job.id},cookie,409)
+ await h.cmd('catalog.insert',{id:draft.id,version:draft.version,catalogId:promoted.items[0].id,catalogVersion:1,optionId:'chosen',quantity:'3',term:'12',startsOn:'2027-01-01'},cookie)
+ const priced=(await h.state(cookie)).proposals.find(p=>p.id===draft.id)
+ const line=priced.options[0].tables[0].lines.find(l=>l.catalogId===promoted.items[0].id)
+ assert.equal(line.unitPrice,'150.50');assert.equal(line.quantity,'3');assert.equal(line.recurrence.interval,'monthly')
+ await h.cmd('document-import.template-undo',{id:movein.id,applicationId:reissue.applied.applicationId},cookie,409)
+ const reversibleReissue=await fixedTemplate(h,movein,cookie,{outputKind:'reissue',documentId:hash(fixture.originals[25])})
  assert.deepEqual(JSON.parse(draft.recipient_plan),[])
  assert.equal(draft.approved_by,null);assert.equal(draft.shareToken,undefined);assert.equal(draft.collectionPolicy.enabled,false)
  const original=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+draft.id+'/'+draft.document.fixedPdf.fileId,{headers:{cookie}})
@@ -221,9 +252,9 @@ export async function proposifyNativeOutputs(h,movein,fixture,cookie=h.owner) {
  await h.cmd('document-import.template-preview',request,cookie,409)
  assert.deepEqual((await h.state(cookie)).proposals,unchanged,'signed originals cannot be reissued')
  await h.cmd('document-import.template-apply',{...reissue.input,outputKind:'library',fingerprint:reissue.preview.fingerprint},cookie,409)
- await h.cmd('document-import.template-undo',{id:movein.id,applicationId:reissue.applied.applicationId},cookie)
- assert.equal((await h.state(cookie)).proposals.find(p=>p.id===reissue.draft.id).document?.fixedPdf,undefined)
- await h.cmd('document-import.template-apply',{...reissue.input,fingerprint:reissue.preview.fingerprint},cookie,409)
+ await h.cmd('document-import.template-undo',{id:movein.id,applicationId:reversibleReissue.applied.applicationId},cookie)
+ assert.equal((await h.state(cookie)).proposals.find(p=>p.id===reversibleReissue.draft.id).document?.fixedPdf,undefined)
+ await h.cmd('document-import.template-apply',{...reversibleReissue.input,fingerprint:reversibleReissue.preview.fingerprint},cookie,409)
  const library=await fixedTemplate(h,movein,cookie,{outputKind:'library',documentId:hash(fixture.template)})
  const item=(await h.state(cookie)).libraryItems.find(i=>i.id===library.applied.libraryId)
  assert.match(item.title,/rebuild in the editor/)
@@ -242,7 +273,8 @@ export async function proposifyNativeOutputs(h,movein,fixture,cookie=h.owner) {
  await h.send('/auth/invite',{email:outsiderAddress,displayName:'Synthetic library reader',role:'member',returnTo:'/app'},cookie)
  const outsider=await h.signIn(outsiderAddress)
  assert.equal((await h.state(outsider)).libraryItems.some(i=>i.id===item.id),false,'source library custody stays owner-only')
- await h.cmd('library.insert',{id:destination.id,version:inserted.version,itemId:item.id,itemVersion:1,mode:'detached',consent:true},outsider,403)
+ const outsiderDraft=await h.cmd('proposal.prepare',{clientId:reissue.client.id,title:'Synthetic reader draft',scope:'Reader scope',packages:[{id:'reader',label:'Reader',price:'100'}],depositPercent:'25'},outsider)
+ await h.cmd('library.insert',{id:outsiderDraft.id,version:1,itemId:item.id,itemVersion:1,mode:'detached',consent:true},outsider,403)
  const beforeUndo=await h.state(cookie)
  await h.cmd('document-import.template-undo',{id:movein.id,applicationId:library.applied.applicationId},cookie,409)
  await h.cmd('document-import.undo',{id:movein.id},cookie,409)
@@ -250,7 +282,26 @@ export async function proposifyNativeOutputs(h,movein,fixture,cookie=h.owner) {
  const reversible=await fixedTemplate(h,movein,cookie,{outputKind:'library',documentId:hash(fixture.template)})
  await h.cmd('document-import.template-undo',{id:movein.id,applicationId:reversible.applied.applicationId},cookie)
  assert.equal((await h.state(cookie)).libraryItems.some(i=>i.id===reversible.applied.libraryId),false)
- return {reissue,library,destination}
+ const reissues=[reissue]
+ for(let i=25;i<30;i++){
+  const output=await fixedTemplate(h,movein,cookie,{outputKind:'reissue',documentId:hash(fixture.originals[i]),destinationClientId:importedClient.id})
+  const draft=(await h.state(cookie)).proposals.find(p=>p.id===output.draft.id)
+  assert.equal(draft.status,'draft');assert.equal(draft.approved_by,null);assert.equal(draft.shareToken,undefined)
+  const original=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+draft.id+'/'+draft.document.fixedPdf.fileId,{headers:{cookie}})
+  assert.equal(original.status,200);assert.deepEqual(Buffer.from(await original.arrayBuffer()),fixture.originals[i])
+  reissues.push(output)
+ }
+ assert.equal(new Set(reissues.map(r=>r.input.documentId)).size,6,'each of the six open originals has an independently reviewed native draft')
+ const sendable=reissues.at(-1)
+ await h.cmd('proposal.send',{id:sendable.draft.id,version:sendable.applied.version},cookie,409)
+ await h.cmd('proposal.approve',{id:sendable.draft.id,version:sendable.applied.version,revision:sendable.applied.revision},cookie)
+ const approved=(await h.state(cookie)).proposals.find(p=>p.id===sendable.draft.id)
+ const sent=await h.cmd('proposal.send',{id:approved.id,version:approved.version},cookie)
+ assert.ok(sent.shareUrl,'ordinary fresh human approval and sending can reissue the independent draft')
+ const retainedSource=await h.mf.dispatchFetch(h.origin+'/api/platter/imported-original?document='+sendable.input.documentId,{headers:{cookie}})
+ assert.deepEqual(Buffer.from(await retainedSource.arrayBuffer()),fixture.originals[29])
+ await h.cmd('document-import.template-undo',{id:movein.id,applicationId:sendable.applied.applicationId},cookie,409)
+ return {reissue,reissues,library,destination,clientsJobId:clients.job.id,feesJobId:applied.job.id,catalogItemId:promoted.items[0].id}
 }
 
 export async function proposifyBrowser(page,context,app) {
@@ -328,6 +379,8 @@ export async function proposifyBrowser(page,context,app) {
   await section.getByRole('button',{name:'Review fixed-page application',exact:true}).click()
   const review=section.locator('section').filter({has:page.getByRole('heading',{name:'Review fixed pages and supplied prices',exact:true})})
   assert.match(await review.innerText(),/925.50/)
+  assert.match(await review.innerText(),/Synthetic browser client/)
+  assert.ok((await review.innerText()).includes('Synthetic browser '+outputKind))
   await capture(outputKind+'-review',review)
   await section.getByRole('button',{name:outputKind==='reissue'?'Apply fixed pages to reissue draft':'Apply fixed pages and save library section',exact:true}).click()
   const status=outputKind==='reissue'?'Independent reissue draft saved; fresh approval and sending required':'Independent fixed-page library section saved; rebuild in the editor'
@@ -351,6 +404,26 @@ export async function proposifyBrowser(page,context,app) {
  await section.getByRole('button',{name:'Undo fixed-page application',exact:true}).click()
  for(let i=0;i<10&&await section.getByRole('button',{name:/^(Undo document move-in|Continue document undo)$/,exact:true}).count();i++)await section.getByRole('button',{name:/^(Undo document move-in|Continue document undo)$/,exact:true}).click()
  assert.match(await section.innerText(),/Import undone/)
+ const feeInput={kind:'catalog',format:'proposify',csv:'Name,Price,Quantity,Description,Type,Optional for clients,Adjustable,Tags\nSynthetic browser fee,150.50000,3,Owner supplied,Recurring,Yes,Yes,Synthetic'}
+ const feePlan=await api('business-import.preview',feeInput)
+ await api('business-import.apply',{...feeInput,fingerprint:feePlan.fingerprint})
+ await page.goto(app.origin+'/app/import')
+ const promotion=page.locator('section').filter({has:page.getByRole('heading',{name:'Promote imported prices',exact:true})})
+ const feeId=feePlan.catalog[0].id
+ await promotion.locator('[name="promote:'+feeId+'"]').check()
+ await promotion.getByLabel('Unit for records without a unit').selectOption('each')
+ await promotion.getByText('Native pricing choices',{exact:true}).click()
+ await promotion.getByLabel('Native SKU for Synthetic browser fee').fill('synthetic-platter-browser-fee')
+ await promotion.getByLabel('Native recurrence for Synthetic browser fee').selectOption('monthly')
+ await capture('fee-choices',promotion)
+ await promotion.getByRole('button',{name:'Review selected priced items',exact:true}).click()
+ const priceReview=page.locator('section').filter({has:page.getByRole('heading',{name:'Review priced catalog promotion',exact:true})})
+ assert.match(await priceReview.innerText(),/150.50/);assert.match(await priceReview.innerText(),/monthly/)
+ await capture('fee-review',priceReview)
+ await priceReview.getByRole('button',{name:'Promote reviewed priced items',exact:true}).click()
+ const prices=(await(await context.request.get(app.origin+'/api/platter/state')).json()).catalogItems
+ const fee=prices.find(i=>i.sku==='synthetic-platter-browser-fee')
+ assert.equal(fee.unit_cents,15050);assert.equal(fee.default_recurrence,'monthly')
  assert.equal(await page.getByRole('heading',{name:'Retained imported originals',exact:true}).count(),0)
  await section.getByRole('heading',{name:'Synthetic Proposify browser move-in',exact:true}).scrollIntoViewIfNeeded();await capture('undo',section.getByRole('heading',{name:'Synthetic Proposify browser move-in',exact:true}))
 }

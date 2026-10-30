@@ -498,14 +498,16 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  const options={alias:{'cloudflare:sockets':'./tests/catalog-socket-edge.ts'},outboundService:r=>fileHost(r)}
+  const options={assetsDirectory:'public',alias:{'cloudflare:sockets':'./tests/catalog-socket-edge.ts'},outboundService:r=>fileHost(r)}
   h=await harness({root:source,...options})
   const contacts=await applyBusiness(h,{kind:'contacts',format:'platter',csv:await businessCsv('platter-contacts.csv')})
   const catalog=await applyBusiness(h,{kind:'catalog',format:'pandadoc',csv:await businessCsv('pandadoc-catalog.csv')})
   const {moveinFixture,applyMovein,hash}=await import('./document-movein-fixture.mjs'),documentFixture=await moveinFixture()
   const movein=await applyMovein(h,documentFixture)
-  const {proposifyFixture,applyProposify,fixedTemplate}=await import('./document-movein-fixture.mjs'),proposify=await proposifyFixture()
+  const {proposifyFixture,applyProposify,fixedTemplate,proposifyNativeOutputs}=await import('./document-movein-fixture.mjs'),proposify=await proposifyFixture()
   const sourceMovein=await applyProposify(h,proposify),fixed=await fixedTemplate(h,sourceMovein),reversible=await fixedTemplate(h,sourceMovein)
+  const native=await proposifyNativeOutputs(h,sourceMovein,proposify)
+  const nativeDraft=(await h.state()).proposals.find(p=>p.id===native.reissue.draft.id),nativePrices=(await h.state()).catalogItems
   const reissue=await fixedTemplate(h,sourceMovein,h.owner,{outputKind:'reissue',documentId:hash(proposify.originals[24])}),library=await fixedTemplate(h,sourceMovein,h.owner,{outputKind:'library',documentId:hash(proposify.template)}),unusedLibrary=await fixedTemplate(h,sourceMovein,h.owner,{outputKind:'library',documentId:hash(proposify.template)})
   const sourceJournal=await h.cmd('document-import.journal',{id:sourceMovein.id}),applications=(await h.state()).documentMoveins.find(m=>m.id===sourceMovein.id).applications
   const documentJournal=await h.cmd('document-import.journal',{id:movein.id}),beforeDocuments=(await h.state()).importedDocuments
@@ -529,6 +531,12 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   assert.equal(usable.status,'draft');assert.equal(usable.options[0].cents,72525);assert.equal(usable.document.fixedPdf.source,'proposify')
   const fixedOriginal=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+child.id+'/'+usable.document.fixedPdf.fileId,{headers:{cookie}})
   assert.equal(fixedOriginal.status,200);assert.deepEqual(Buffer.from(await fixedOriginal.arrayBuffer()),proposify.template)
+  const restoredNative=(await h.state(cookie)).proposals.find(p=>p.id===native.reissue.draft.id)
+  assert.deepEqual(restoredNative.options,nativeDraft.options)
+  assert.equal(restoredNative.client_id,'synthetic-platter-movein-client')
+  assert.deepEqual((await h.state(cookie)).catalogItems,nativePrices)
+  assert.equal((await h.cmd('business-import.journal',{id:native.feesJobId},cookie)).job.state,'undone')
+  await h.cmd('import.undo',{id:native.clientsJobId},cookie,409)
   const restoredReissue=(await h.state(cookie)).proposals.find(p=>p.id===reissue.draft.id)
   assert.equal(restoredReissue.status,'draft');assert.equal(restoredReissue.options[0].cents,72525)
   assert.equal(restoredReissue.approved_by,null);assert.equal(restoredReissue.shareToken,undefined);assert.equal(restoredReissue.collectionPolicy.enabled,false)
@@ -574,6 +582,7 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   assert.deepEqual(Buffer.from(original.original.base64,'base64'),await readFile('fixtures/business/brand.png'))
   await undoBusiness(h,catalog.job.id,cookie);await undoBusiness(h,contacts.job.id,cookie)
   assert.deepEqual((await h.state(cookie)).businessRecords,{companies:[],contacts:[],catalog:[]})
+  assert.deepEqual((await h.state(cookie)).catalogItems,nativePrices,'independent priced copies remain after source record undo')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 

@@ -3646,7 +3646,7 @@
       "executable": false
     },
     "tests/tracking-browser.mjs": {
-      "sha256": "05c4008462cf595f182b026fbce26f9c10274dad9214a10c6a246d6b9f916ea4",
+      "sha256": "4f298f29b24357bbdcea7522c4a6c6321adc7876244c0e4aa1d555f6c2895ecf",
       "executable": false
     },
     "tests/tracking-details-browser.mjs": {

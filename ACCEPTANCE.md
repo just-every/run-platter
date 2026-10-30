@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 15 | 100 | 44 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 15 | 100 | 48 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
 Judged from the code and tests at commit `8f4ff0320aaafd58b41dabcf9e39bc60db7dc646` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. EDIT-009 is a builder completion claim with independently filled West and East variable conditions, pending exact-candidate Verify and guarded landing. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -476,7 +476,7 @@ Core · target · **partial** · From EDIT-018 · Cites BASE-ROLE-001, BASE-AUDI
 4. A person outside proposal scope is refused; signed-out and client-only sessions see no private preview.
 5. Preview audit records retain actor, subject and server time through archive; refusals add no preview audit.
 
-**Evidence.** `src/platter/preview.ts`; `tests/platter.test.mjs` — “EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state”; `tests/site.test.mjs`; `tests/archive.test.mjs`
+**Evidence.** `src/platter/preview.ts`; `tests/platter.test.mjs` — “EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state”; `tests/site.test.mjs`; `tests/archive.test.mjs` Additional replayed proof: `tests/platter.test.mjs` — “EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state” (disabled submissions, complete unchanged business history, scoped and session refusals); `tests/mail.test.mjs` — “APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once” (emitted manager URL, revision-bound approval and stale refusal); `tests/approval-preview-fixture.mjs` — managerApprovalPreview (independent manager, subject and server-time audit); `tests/site.test.mjs` — “APPROVE-002 email preview and decision links work under a member session at desktop and phone widths” (registered through `tests/site-documents.mjs`); `tests/archive.test.mjs` — “APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority” (exact manager preview audit after public CLI restore, without session or invitation authority)
 **Gap.** Delivered: Preview submissions are refused and previewing leaves proposal revisions, approvals and outbound/tracking activity unchanged apart from its own audit. Missing “EDIT-022 complete preview isolation and exact approval link journey”: A pending manager follows the exact approval-request preview, an out-of-scope reader sees no content, and that specific preview audit survives public CLI custody without restoring authority.
 
 ### Catalog and pricing
@@ -1402,15 +1402,15 @@ Core · target · **missing** · Rules D-1
 
 #### PAY-009 — PayPal, Square and Authorize.net collection
 
-Core · target · **partial** · Rules D-1
+Core · target · **missing** · Rules D-1
 
 **Requirement.** A firm that does not take payment through Stripe connects its own PayPal, Square or Authorize.net account instead, and the client pays the deposit, milestones and net-terms invoices inside the proposal by card, or by PayPal or Venmo where PayPal is connected. Payment states, retries, refunds and accounting sync work as for Stripe (`PAY-002` to `PAY-008`, `ACCT-001` to `ACCT-006`), with each processor's signed webhooks or notifications processed once per event. Where a processor cannot charge a stored method for a schedule, Platter sends a pay link for each scheduled amount and says so when the firm connects it. Card numbers never touch Platter. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#pay-009).
 
 **Acceptance.**
 1. With PayPal, Square and Authorize.net sandbox fakes: connect each in turn, accept and pay a deposit, refund half of it, replay each webhook twice, and see the same payment states and QuickBooks Online fake records as the Stripe journey with one record per event; inspect the database and logs for card numbers (none).
 
-**Evidence.** `tests/platter.test.mjs` — “PAY-009 verified PayPal one-time deposits capture once, authenticate notifications and reserve explicit financial refunds” proves the selected PayPal edge flow, exact amounts, duplicate capture and notification refusal, financial roles, revoked authority and uncertain holds; `tests/site.test.mjs` — “PAY-009 native PayPal Settings connection, deposit selection, hosted approval, explicit capture and owner half refund” proves compiled hosted approval and explicit capture at 1440 and 390; `tests/archive.test.mjs` — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” proves exact receipts, half refunds and events without restored credentials or execution authority.
-**Gap.** Square, Authorize.net, PayPal card and Venmo variants, milestone and recurring collection, net-terms collection, retry notices, full processor-state parity, QuickBooks reconciliation and other accounting synchronization, payout and fee posting, and live-provider qualification remain. The selected PayPal path is limited to tax-free one-off USD deposits on ordinary mailbox-verified single-client agreements. Its conservative authority floor requires an owner or admin to explicitly connect and select the verified merchant, exact client consent and hosted approval, and explicit owner, admin or billing refund authority; scoped delegation and broader provider boundaries remain unqualified. Firm provider accounts and credentials are required for live qualification; network-edge fakes establish native behavior only. Configured recipients and the recorded SEND-003 and SIGN-004 authority holds remain outside this slice. Existing real-key holds are unchanged.
+**Evidence.** None.
+**Gap.** No payment processors are connected.
 
 ### Accounting sync
 

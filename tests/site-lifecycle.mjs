@@ -562,7 +562,16 @@ test('MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
    edge=await browserEdge()
-   app=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,unclaimed:true})
+   const messages=[]
+   app=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,unclaimed:true,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9703'},outboundService:async request=>{messages.push(await request.json());return Response.json({id:'synthetic-platter-mail-'+messages.length})}})
+   app.signIn=async email=>{
+    const requested=await app.send('/auth/magic-link',{email});assert.equal(requested.status,202)
+    const mail=messages.findLast(message=>[message.to].flat().includes(email)&&message.text?.includes('/auth/confirm?token='))
+    assert.ok(mail,'production auth mail reaches the network edge')
+    const token=new URL(mail.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get('token')
+    const confirmed=await app.send('/auth/confirm',{token});assert.equal(confirmed.status,303,confirmed.text);assert.ok(confirmed.cookie)
+    return confirmed.cookie
+   }
    app.token=app.auth.SETUP_TOKEN;edge.attach(app)
    const context=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
    try{
@@ -591,7 +600,11 @@ test('MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss
      const expected=[proof.ownerPast,proof.peerPast,...proof.expectedTies,proof.peerNext,proof.ownerFuture]
      assert.deepEqual(await page.locator('[data-followup-id]').evaluateAll(rows=>rows.map(row=>row.dataset.followupId)),expected)
      for(const [id,period] of [[proof.ownerPast,'overdue'],[proof.peerPast,'overdue'],[proof.expectedTies[0],'today'],[proof.peerNext,'today'],[proof.ownerFuture,'upcoming']])assert.match(await page.locator(`[data-followup-id="${id}"]`).innerText(),new RegExp(period))
-     for(const {currency,valueCents} of proof.expectedTotals)assert.ok((await page.locator(`[data-pipeline-total="${currency}"]`).innerText()).includes((valueCents/100).toLocaleString('en-US',{minimumFractionDigits:2})))
+     // The completed sales action leaves its $6,800 draft in the pipeline.
+     for(const {currency,valueCents} of proof.expectedTotals){
+      const expectedValue=valueCents+(currency==='USD'?680000:0),shown=await page.locator(`[data-pipeline-total="${currency}"]`).innerText()
+      assert.ok(shown.includes((expectedValue/100).toLocaleString('en-US',{minimumFractionDigits:2})+' '+currency),shown)
+     }
      assert.match(await page.locator('[aria-label="Sales follow-ups"]').innerText(),/Engagement unavailable/)
      await capture('personal-zones-and-ties')
      await page.setViewportSize({width:390,height:900});await capture('personal-zones-and-ties',390)

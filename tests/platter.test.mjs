@@ -8,6 +8,7 @@ import { templatesHttp } from './templates-http.mjs'
 import { followupJourney } from './followup-journey.mjs'
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { unstable_splitSqlQuery } from 'wrangler'
 import { run, harness } from './harness.mjs'
@@ -153,7 +154,28 @@ test('HTTP-001 complete authorized domain dispatch journey and native auth, CSRF
  assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id}),retainedJournal)
 }))
 test('PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations invalidate old authority',()=>run(async h=>{
- const{client,p}=await draft(h);await h.cmd('proposal.approve',{id:p.id,version:1,revision:2},h.owner,409);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});await h.cmd('proposal.revise',{...offer,clientId:client.id,id:p.id,version:2,priceOne:'2600'});await h.cmd('proposal.send',{id:p.id,version:3},h.owner,409);await h.cmd('proposal.approve',{id:p.id,version:2,revision:1},h.owner,409);await h.cmd('proposal.approve',{id:p.id,version:3,revision:2});await h.cmd('proposal.send',{id:p.id,version:4});await h.cmd('proposal.revise',{...offer,clientId:client.id,id:p.id,version:5},h.owner,409)
+ const at=Date.parse('2031-04-05T12:00:00Z'),tick=async time=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(time),cron:'*/15 * * * *'})
+ await tick(at)
+ const{client,p}=await draft(h),owner=(await h.state()).actor
+ const step={id:'default',name:'Default approval',approvers:['role:owner'],any:false}
+ const expected=revision=>({proposal_id:p.id,revision,plan:createHash('sha256').update(JSON.stringify({version:0,steps:[step],revision})).digest('hex'),step:'default',actor_id:owner.id,approver_index:0,decision:'approved',note:'',occurred_at:at+(revision-1)*60000,actor_role:'owner',actor_name:'Jordan Venue',basis:{policy:{version:0,required:true,defaultRole:'owner'},step,rule:null}})
+ const history=async()=> (await h.state()).proposals.find(row=>row.id===p.id).approvalHistory
+ const facts=rows=>rows.map(({id,...row})=>row)
+ await h.cmd('proposal.approve',{id:p.id,version:1,revision:2},h.owner,409)
+ assert.deepEqual(await history(),[],'a refused stale approval retains no decision')
+ await h.cmd('proposal.approve',{id:p.id,version:1,revision:1})
+ assert.deepEqual(facts(await history()),[expected(1)])
+ await h.cmd('proposal.revise',{...offer,clientId:client.id,id:p.id,version:2,priceOne:'2600'})
+ await h.cmd('proposal.send',{id:p.id,version:3},h.owner,409)
+ await h.cmd('proposal.approve',{id:p.id,version:2,revision:1},h.owner,409)
+ assert.deepEqual(facts(await history()),[expected(1)],'edit and refused send preserve the first decision without approving the new revision')
+ assert.equal((await h.state()).proposals.find(row=>row.id===p.id).approval.complete,false)
+ await tick(at+60000)
+ await h.cmd('proposal.approve',{id:p.id,version:3,revision:2})
+ await h.cmd('proposal.send',{id:p.id,version:4})
+ assert.deepEqual(facts(await history()),[expected(1),expected(2)],'owner reads both complete decision-time records after sending')
+ assert.equal(new Set((await history()).map(row=>row.id)).size,2)
+ await h.cmd('proposal.revise',{...offer,clientId:client.id,id:p.id,version:5},h.owner,409)
  const state=await h.state();assert.equal(state.proposals[0].prepared_by,h.auth.OWNER_EMAIL);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_approvals').first()).n,2)
  const before=state.proposals.find(x=>x.id===p.id),oldPath='/p/'+before.shareToken,cookie=await verified(h,oldPath)
  const terms=({title,scope,options,deposit_bps,revision,approved_by,approved_at})=>({title,scope,options,deposit_bps,revision,approved_by,approved_at})
@@ -170,6 +192,22 @@ test('PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations i
  const newCookie=await verified(h,newPath)
  response=await h.send(newPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},newCookie);assert.equal(response.status,200)
  assert.deepEqual(terms((await h.state()).proposals.find(x=>x.id===p.id)),terms(before))
+ const retained=await history()
+ await h.cmd('approval.policy',{version:0,required:false,defaultRole:'manager'})
+ assert.deepEqual(await history(),retained,'later policy settings do not rewrite historical decisions')
+ const legacy=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Retained historical approval'})
+ // A pre-migration record has no decision-time role, name or approval basis.
+ await h.db.prepare('INSERT INTO p_approval_decisions(id,proposal_id,revision,plan,step,actor_id,approver_index,decision,note,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind('synthetic-platter-9951',legacy.id,1,'synthetic-platter-9952','default',owner.id,0,'approved','Historical decision',at-60000).run()
+ const old=(await h.state()).proposals.find(row=>row.id===legacy.id).approvalHistory
+ assert.deepEqual(old,[{id:'synthetic-platter-9951',proposal_id:legacy.id,revision:1,plan:'synthetic-platter-9952',step:'default',actor_id:owner.id,approver_index:0,decision:'approved',note:'Historical decision',occurred_at:at-60000,actor_role:'not recorded',actor_name:'not recorded',basis:'not recorded'}])
+ const earlier=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Before routed approvals'})
+ await h.db.prepare('INSERT INTO p_approvals(id,proposal_id,revision,actor_id,approved_at) VALUES(?,?,?,?,?)').bind('synthetic-platter-9953',earlier.id,1,owner.id,at-120000).run()
+ assert.deepEqual((await h.state()).proposals.find(row=>row.id===earlier.id).approvalHistory,[{id:'synthetic-platter-9953',proposal_id:earlier.id,revision:1,plan:'not recorded',step:'not recorded',actor_id:owner.id,approver_index:null,decision:'approved',note:'not recorded',occurred_at:at-120000,actor_role:'not recorded',actor_name:'not recorded',basis:'not recorded'}],'approvals predating routed decisions stay visible without inventing a role or rule')
+ const key=await h.cmd('agent.create',{label:'Synthetic approval history reader'})
+ const agent=await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})
+ assert.equal(agent.status,200);assert.ok(agent.value.proposals.every(row=>!Object.hasOwn(row,'approvalHistory')))
+ await h.cmd('agent.revoke',{id:key.id})
+ assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,401)
 }))
 test('email verification precedes acceptance, code is single-use, immutable option and deposit exported once',()=>run(async h=>{
  const{p,path}=await sent(h);let r=await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true});assert.equal(r.status,401)
@@ -2393,6 +2431,8 @@ test('PRICE-004 scoped discounts preserve exact selections, private margins, tem
 })
 
 test('APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied',()=>run(async h=>{
+ const decisionAt=Date.parse('2031-06-10T10:00:00Z')
+ await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(decisionAt),cron:'*/15 * * * *'})
  const team=await h.cmd('team.create',{name:'East'}),people={}
  for(const role of ['manager','sales']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[team.id]});people[role]={cookie,id}}
  const {client}=await draft(h),owner=(await h.state()).actor,policy=async()=>(await h.state()).approvalSettings.policy,rule=async(name,condition,approvers,position=0,templates=[])=>h.cmd('approval.rule',{version:(await policy()).version,name,condition,approvers,position,templates}),remove=async id=>h.cmd('approval.rule.delete',{id,version:(await policy()).version}),current=async(id,cookie=h.owner)=>(await h.state(cookie)).proposals.find(p=>p.id===id),prepare=async(packages,other={})=>h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic approval conditions',scope:'Public scope',depositPercent:'25',packages,...other},people.sales.cookie)
@@ -2401,7 +2441,25 @@ test('APPROVE-001 gross value and 20% discount require manager then owner; margi
  let row=await current(p.id);assert.equal(row.options[0].cents,2400000);assert.deepEqual(row.approval.steps.map(s=>s.id),[amount.id,discount.id]);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1},people.manager.cookie);row=await current(p.id);assert.equal(row.approval.steps[0].done,true);assert.equal(row.approval.steps[1].active,true)
  await h.cmd('proposal.revise',{clientId:client.id,id:p.id,version:2,title:row.title,scope:'Edited after manager approval',depositPercent:'25',packages},people.sales.cookie);row=await current(p.id);assert.ok(row.approval.steps.every(s=>!s.done));await h.cmd('proposal.approve',{id:p.id,version:3,revision:2},h.owner,403);await h.cmd('proposal.send',{id:p.id,version:3},people.sales.cookie,409)
  await h.cmd('proposal.approve',{id:p.id,version:3,revision:2},people.manager.cookie);await h.cmd('proposal.approve',{id:p.id,version:4,revision:2});await h.cmd('proposal.send',{id:p.id,version:5},people.sales.cookie)
+ const held=(await current(p.id)).approvalHistory
+ const amountStep={id:amount.id,name:'Manager over $25,000',approvers:['role:manager'],any:false},discountStep={id:discount.id,name:'Owner above 15% discount',approvers:['role:owner'],any:false}
+ const expectedDecisions=[]
+ for(const revision of [1,2])for(const [index,step,actorId,actorRole,actorName,condition,position] of [[0,amountStep,people.manager.id,'manager','manager',{kind:'totalOver',cents:2500000,currency:'USD'},0],[0,discountStep,owner.id,'owner','Jordan Venue',{kind:'discountOver',bps:1500},1]]){
+  if(revision===1&&step===discountStep)continue
+  expectedDecisions.push({proposal_id:p.id,revision,plan:createHash('sha256').update(JSON.stringify({version:3,steps:[amountStep,discountStep],revision})).digest('hex'),step:step.id,actor_id:actorId,approver_index:index,decision:'approved',note:'',occurred_at:decisionAt,actor_role:actorRole,actor_name:actorName,basis:{policy:{version:3,required:false,defaultRole:'owner'},step,rule:{id:step.id,name:step.name,position,condition,approvers:step.approvers,templates:[]}}})
+ }
+ assert.deepEqual(held.map(({id,...decision})=>decision).sort((a,b)=>a.revision-b.revision||a.basis.rule.position-b.basis.rule.position),expectedDecisions,'manager decisions retain the matching rule and exact plan for each revision')
+ for(const person of Object.values(people)){
+  const scoped=await current(p.id,person.cookie);assert.equal(scoped.approvalHistory,undefined)
+  assert.ok(scoped.approval.steps.flatMap(step=>step.decisions).every(decision=>!Object.hasOwn(decision,'basis')&&!Object.hasOwn(decision,'actor_role')),'owner history facts do not leak into the ordinary approval plan')
+ }
+ const memberVersion=async()=> (await h.state()).teamPeople.find(person=>person.id===people.manager.id).version
+ await h.cmd('member.set',{operatorId:people.manager.id,version:await memberVersion(),role:'billing',teams:[team.id]})
+ await h.cmd('approval.rule',{id:amount.id,version:3,name:'Changed owner threshold',condition:{kind:'totalOver',cents:5000000,currency:'USD'},approvers:['role:owner'],position:0})
+ assert.deepEqual((await current(p.id)).approvalHistory,held,'later role and rule changes cannot invent new historical facts')
+ await h.cmd('member.set',{operatorId:people.manager.id,version:await memberVersion(),role:'manager',teams:[team.id]})
  await remove(amount.id);await remove(discount.id)
+ assert.deepEqual((await current(p.id)).approvalHistory,held,'deleted rules leave their decision-time basis intact')
  const margin=await rule('Private margin floor',{kind:'marginBelow',bps:5000},['person:'+owner.id]),m=await prepare([{id:'main',label:'Delivery',price:'100'}]);row=await current(m.id);assert.equal(row.approval.required,true,'unrecorded cost never bypasses review');assert.equal((await current(m.id,people.sales.cookie)).approval.steps[0].name,'Internal approval review')
  await h.cmd('pricing.cost',{id:m.id,version:1,lineKey:row.internalPricing.lines[0].key,unitCost:'60'},people.manager.cookie);assert.equal((await current(m.id)).approval.required,true)
  row=await current(m.id);await h.cmd('pricing.cost',{id:m.id,version:2,lineKey:row.internalPricing.lines[0].key,unitCost:'40'},people.manager.cookie);assert.equal((await current(m.id)).approval.required,false)

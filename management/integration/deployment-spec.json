@@ -594,6 +594,12 @@
       "name": "0098_sms_reenable.sql",
       "sha256": "cbebdc3767ad5463c708c3ddac223639549305289aad9a1f12678d1b2c92d62b",
       "sql": "-- Provider opt-in receipts are history, never consent or sending authority.\nCREATE TABLE p_sms_provider_optins (\n id TEXT PRIMARY KEY, phone TEXT NOT NULL, transport_hash TEXT NOT NULL, received_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_reenable_eligibility (\n phone TEXT PRIMARY KEY, event_id TEXT NOT NULL REFERENCES p_sms_provider_optins(id), stopped_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_reenable_history (\n id TEXT PRIMARY KEY, phone TEXT NOT NULL, proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n assent_id TEXT NOT NULL REFERENCES p_sms_assents(id), actor_id TEXT NOT NULL,\n provider_event_id TEXT NOT NULL REFERENCES p_sms_provider_optins(id), stopped_at INTEGER NOT NULL,\n source TEXT NOT NULL, reenabled_at INTEGER NOT NULL\n);\nCREATE TRIGGER p_frozen_sms_provider_optin BEFORE UPDATE ON p_sms_provider_optins BEGIN SELECT RAISE(ABORT,'Provider opt-in history is immutable'); END;\nCREATE TRIGGER p_frozen_sms_reenable BEFORE UPDATE ON p_sms_reenable_history BEGIN SELECT RAISE(ABORT,'SMS re-enablement history is immutable'); END;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0099_qwilr_ignition_exports.sql",
+      "sha256": "7da39f40aff2036c86ec6131cdf14120794762b431ef01fefa0b6f80b0a0ce6c",
+      "sql": "-- Export history conveys no provider or payment execution authority.\nALTER TABLE p_document_moveins ADD COLUMN source_provider TEXT NOT NULL DEFAULT 'generic';\nALTER TABLE p_document_moveins ADD COLUMN mapping_json TEXT NOT NULL DEFAULT '{}';\nCREATE TABLE p_imported_source_facts (\n id TEXT PRIMARY KEY, data_json TEXT NOT NULL, revision TEXT NOT NULL\n);\nCREATE TABLE p_imported_source_dependencies (\n fact_id TEXT NOT NULL REFERENCES p_imported_source_facts(id),\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n PRIMARY KEY(fact_id,proposal_id)\n);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

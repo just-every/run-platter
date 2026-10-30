@@ -938,7 +938,7 @@ test('AUTO-001 Settings authorizes signed rules and exposes separate run outcome
  const fake=automationFixture(),edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-10108'},outboundService:fake.outboundService});edge.attach(h)
  let browser,context
  try{
-  browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH??'/usr/bin/chromium',args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   context=await browser.newContext({viewport:{width:1440,height:1000},ignoreHTTPSErrors:true})
   const [name,value]=h.owner.split('=');await context.addCookies([{name,value,url:h.origin}])
   const page=await context.newPage();await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()

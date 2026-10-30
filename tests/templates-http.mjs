@@ -264,4 +264,17 @@ async function generalVariableTemplates(h) {
  assert.deepEqual(await get(p.id), accepted)
  assert.deepEqual(await Promise.all(drafts.map(d => get(d.id))), drafts)
  noSourceValues(await saved())
+ // Saving variable prices must retain valid fixed discounts without evaluating unresolved prices.
+ const discountedFields=variableTemplateFields(clients[0].id)
+ discountedFields.pricingTables[0].lines[0].discountAmount='10.00'
+ const discountedSource=await h.cmd('proposal.prepare',discountedFields)
+ const discounted=await h.cmd('template.save',{id:discountedSource.id,version:1,name:'Synthetic variable discount'})
+ const discountedStart=await h.cmd('template.start',{id:discounted.id,version:1,clientId:clients[1].id})
+ assert.deepEqual((await get(discountedStart.id)).options.map(o=>o.cents),[24000,37500])
+ await h.cmd('template.locks',{id:discounted.id,version:1,sections:['pricing']})
+ await h.cmd('template.save',{id:discountedSource.id,version:1,name:'Synthetic variable discount',templateId:discounted.id,templateVersion:2})
+ await h.cmd('proposal.variables',{id:discountedSource.id,version:1,fields:{pricingTables:fields.pricingTables}})
+ const lockedBefore=(await h.state()).templates.find(t=>t.id===discounted.id)
+ await h.cmd('template.save',{id:discountedSource.id,version:2,name:'Synthetic variable discount',templateId:discounted.id,templateVersion:3},h.owner,403)
+ assert.deepEqual((await h.state()).templates.find(t=>t.id===discounted.id),lockedBefore)
 }

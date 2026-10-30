@@ -3538,7 +3538,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "e5c2f2d29c5147346ecbff0a958d2235b46f1d5773f2974a35a8b487e99eb951",
+      "sha256": "21b9c6dea2e3d70cfa447e9e32ebc1efada08f7d18b48c355002026b8422fccb",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

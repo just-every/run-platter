@@ -1530,6 +1530,7 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close o
 })
 
 test('TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP',()=>run(async h=>{
+ await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2027-03-08T12:00:00Z'),cron:'*/15 * * * *'})
  assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)
  const people={owner:{cookie:h.owner,...(await h.state()).actor}},red=await h.cmd('team.create',{name:'Sales East'}),blue=await h.cmd('team.create',{name:'Sales West'})
  for(const role of ['admin','manager','sales','content_editor','viewer','billing','other','billing2']){

@@ -28,7 +28,7 @@ Core · published · **partial** · Cites BASE-ACCESS-002, BASE-ACCESS-004, BASE
 **Acceptance.**
 1. A member attempts an owner-only invoice export and import: neither changes records.
 
-**Evidence.** `tests/platter.test.mjs` — “native auth, CSRF, roles and revocable agent boundary”; `src/platter/http.ts`
+**Evidence.** `tests/platter.test.mjs` — “HTTP-001 complete authorized domain dispatch journey and native auth, CSRF, roles and revocable agent boundary”: a collection-off mailbox-verified agreement, retained deposit invoice, populated import journal and valid owner-reviewed CSV; explicit member 403 responses for invoice.export, import.preview and import.apply; complete owner-visible state and journal equality plus independent stored client, proposal, revision, approval, acceptance, invoice and import-job equality after each refusal, including identical invoice download content. The same reviewed CSV then succeeds for the owner.
 **Gap.** Delivered: Role-bound owner-only invoice/import commands are refused through the harness, whose command helper checks the response. Missing “HTTP-001 complete authorized domain dispatch journey”: Member invoice export and import are refused with the complete proposal/client/invoice state read back unchanged.
 
 #### ACCESS-001 — Proposal preparation grants
@@ -42,7 +42,7 @@ Core · published · **partial** · Cites BASE-AGENT-004, BASE-AGENT-005, BASE-A
 2. Under a held company policy, a commitment-class price approval waits for the named person and client creation follows its standard rule; under the all-autonomous company policy, each permitted call runs.
 3. Revoke the grant and read context again: access is refused.
 
-**Evidence.** `tests/platter.test.mjs` — “native auth, CSRF, roles and revocable agent boundary”; “AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund”; `src/platter/credentials.ts`
+**Evidence.** `tests/platter.test.mjs` — “HTTP-001 complete authorized domain dispatch journey and native auth, CSRF, roles and revocable agent boundary”; “AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund”; `src/platter/credentials.ts`
 **Gap.** Delivered: A labelled key prepares an attributed draft and revocation ends context access. Missing “ACCESS-001 complete proposal preparation grants journey”: The same permitted sponsor/grant workflow runs under held and all-autonomous company policies with computed classes.
 
 ### Approval, sending and acceptance

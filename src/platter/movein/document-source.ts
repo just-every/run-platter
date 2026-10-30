@@ -6,6 +6,7 @@ import { extractText, getDocumentProxy } from 'unpdf'
 import { parseBusinessCsv } from './business-csv'
 import { fail } from './errors'
 import { exportedFacts, type ExportProvider, type ExportMapping } from './qwilr-ignition-export'
+import { qwilrApiFacts } from './qwilr-api-source'
 
 export const documentNamespace = 'platter.exported-documents.v1'
 export type UploadedDocument = { filename: string; sha256: string; bytes: Uint8Array }
@@ -16,6 +17,7 @@ type ReportRow = { id: string; source: string; line: number; title: string; clie
 export async function documentSource(uploads: UploadedDocument[], choices: Record<string,string>, moveinId: string, provider: ExportProvider = 'generic', mapping: ExportMapping = {}) {
  const artifacts: SourceArtifact[] = [], pdfs = new Map<string,Pdf>(), rows: ReportRow[] = [], seenReports = new Set<string>(), unmapped: string[] = []
  const exportFiles: {name:string;source:string;bytes:Uint8Array}[]=[]
+ const apiFiles: {name:string;source:string;bytes:Uint8Array}[]=[],apiArtifacts=new Set<string>()
  let expanded = 0, duplicateDocuments = 0
  const artifact = (name: string, bytes: Uint8Array) => {
   artifacts.push({ name, sha256: sha256(bytes), size: bytes.length, original: { status: 'available', base64: Buffer.from(bytes).toString('base64') } })
@@ -58,6 +60,10 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
    for (const [i,row] of parsed.rows.entries()) rows.push({id:sha256(bytes)+':'+(i+1),source,line:row.line,
     title:row.cells[columns.title],client:row.cells[columns.client],date:row.cells[columns.date],
     fields:Object.fromEntries(parsed.headers.map((h,i)=>[h,row.cells[i]])),candidates:[],selected:null})
+  } else if(provider==='qwilr'&&/^qwilr-api\/[^/]+\.json$/.test(filename)) {
+   const hash=sha256(bytes)
+   if(!apiArtifacts.has(hash)){artifact('exports/'+hash+'.json',bytes);apiArtifacts.add(hash)}
+   apiFiles.push({name:filename,source,bytes})
   } else unmapped.push(source)
  }
  for (const upload of uploads) {
@@ -82,6 +88,19 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
   row.selected=choices[row.id]==='unmapped'?null:choices[row.id] || (row.candidates.length===1?row.candidates[0]:null)
  }
  const exported=exportedFacts(provider,exportFiles,documents,choices,mapping,moveinId)
+ if(provider==='qwilr'&&apiFiles.length) {
+  const api=qwilrApiFacts(apiFiles,documents,choices,moveinId)
+  exported.records.push(...api.records)
+  for(const key of api.usedChoices)exported.usedChoices.add(key)
+  exported.report.facts.push(...api.report.facts)
+  exported.report.bindings.push(...api.report.bindings)
+  exported.report.issues.push(...api.report.issues)
+  exported.report.unmapped.push(...api.report.unmapped)
+  for(const kind of ['clients','services','proposals','billingSchedules'] as const)exported.report.counts[kind]+=api.report.counts[kind]
+  exported.report.held+=api.report.held
+  exported.report.omitted+=api.report.omitted
+  exported.canApply=exported.canApply&&api.canApply
+ }
  if (Object.keys(choices).some(key=>!rows.some(row=>row.id===key)&&!exported.usedChoices.has(key))) fail('invalid_report_choice',409,'Preview the current report rows again')
  const selected=rows.filter(r=>r.selected).map(r=>r.selected)
  const conflicts=rows.filter(r=>r.candidates.length>1&&!Object.hasOwn(choices,r.id))

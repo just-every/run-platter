@@ -124,7 +124,13 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
   }
   if(!movein.job_id)fail('import_job_not_found',404)
   if(name==='document-import.continue')return {id,job:await applyD1ImportBatches(movein.job_id,kit)}
-  if(name==='document-import.undo')return {id,job:await undoD1Import(movein.job_id,kit)}
+  if(name==='document-import.undo'){
+   const dependency=await db.prepare(`SELECT 1 FROM p_imported_source_facts f WHERE json_extract(f.data_json,'$.moveinId')=?
+    AND (EXISTS(SELECT 1 FROM p_priced_catalog c WHERE c.source_id=f.id) OR EXISTS(SELECT 1 FROM p_imported_source_dependencies d WHERE d.fact_id=f.id))
+    UNION ALL SELECT 1 FROM p_imported_documents f JOIN p_imported_document_links d ON d.document_id=f.id WHERE json_extract(f.data_json,'$.moveinId')=? LIMIT 1`).bind(id,id).first()
+   if(dependency)fail('import_dependency_conflict',409,'This move-in has dependent proposals or promoted prices. Its source records and originals must remain retained.')
+   return {id,job:await undoD1Import(movein.job_id,kit)}
+  }
   if(name==='document-import.journal'){
    const job=await readD1ImportJob(movein.job_id,kit),originals=await readD1ImportOriginals(job.id,kit)
    const provenance=(await db.prepare('SELECT record_json FROM ik_provenance WHERE job_id=? ORDER BY ordinal,effect_ordinal').bind(job.id).all<{record_json:string}>()).results.map(r=>JSON.parse(r.record_json))

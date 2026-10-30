@@ -917,6 +917,7 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
   await (await import('./document-movein-fixture.mjs')).sourceExportBrowser({page,context,app,capture})
   await context.close()
  }finally{await browser?.close();await app?.close()}
+ await (await import('./qwilr-api-browser.mjs')).qwilrApiBrowser()
 })
 
 test('CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows', { timeout: 120000 }, async () => {

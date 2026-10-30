@@ -1,6 +1,6 @@
 import { canonicalJson, sha256, type Json, type SourceRecord } from '../../modules/import-kit/src/d1/index.ts'
 import { parseBusinessCsv } from './business-csv'
-import { ignitionExportColumns } from './business-presets'
+import { ignitionExportColumns, ignitionServiceFields } from './business-presets'
 import { fail } from './errors'
 
 export type ExportProvider = 'generic' | 'qwilr' | 'ignition'
@@ -14,7 +14,7 @@ export function exportMapping(value: unknown): ExportMapping {
  if (!value || typeof value!=='object' || Array.isArray(value)) fail('invalid_export_mapping',400)
  for (const [kind,columns] of Object.entries(value)) {
   if (!Object.hasOwn(ignitionExportColumns,kind) || !columns || typeof columns!=='object' || Array.isArray(columns)
-   || Object.entries(columns).some(([key,header])=>!Object.hasOwn(ignitionExportColumns[kind as keyof typeof ignitionExportColumns],key)||typeof header!=='string'||!header)) fail('invalid_export_mapping',400,'Map supported source fields to exact column names')
+   || Object.entries(columns).some(([key,header])=>(!Object.hasOwn(ignitionExportColumns[kind as keyof typeof ignitionExportColumns],key)&&!(kind==='services'&&ignitionServiceFields.includes(key)))||typeof header!=='string'||!header)) fail('invalid_export_mapping',400,'Map supported source fields to exact column names')
  }
  return value as ExportMapping
 }

@@ -499,7 +499,8 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  const options={alias:{'cloudflare:sockets':'./tests/catalog-socket-edge.ts'},outboundService:r=>fileHost(r)}
+  const {qwilrApiFixture}=await import('./qwilr-api-fixture.mjs'),qwilr=qwilrApiFixture()
+  const options={alias:{'cloudflare:sockets':'./tests/catalog-socket-edge.ts'},outboundService:r=>new URL(r.url).hostname==='api.qwilr.com'?qwilr.fetch(r):fileHost(r)}
   h=await harness({root:source,...options})
   const contacts=await applyBusiness(h,{kind:'contacts',format:'platter',csv:await businessCsv('platter-contacts.csv')})
   const catalog=await applyBusiness(h,{kind:'catalog',format:'pandadoc',csv:await businessCsv('pandadoc-catalog.csv')})
@@ -507,7 +508,17 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   const movein=await applyMovein(h,documentFixture)
   const beforeDocuments=(await h.state()).importedDocuments
   const {sourceExportFixture,applySourceExport}=await import('./document-movein-fixture.mjs'),exportFixture=await sourceExportFixture('ignition')
-  const sourceMovein=await applySourceExport(h,exportFixture),sourceJournal=await h.cmd('document-import.journal',{id:sourceMovein.id}),beforeFacts=(await h.state()).importedSourceFacts
+  const sourceMovein=await applySourceExport(h,exportFixture),sourceJournal=await h.cmd('document-import.journal',{id:sourceMovein.id})
+  const itemIds=['ignition:services:s-1'],priceReview=await h.cmd('business-import.promote-preview',{itemIds})
+  const promoted=await h.cmd('business-import.promote',{itemIds,fingerprint:priceReview.fingerprint}),promotedId=promoted.items[0].id
+  const apiMove=await h.cmd('document-import.create',{label:'Synthetic Qwilr API archive',sourceProvider:'qwilr'})
+  await h.cmd('document-import.qwilr-capture',{id:apiMove.id,token:'synthetic-platter-991',consent:true})
+  const apiChoices={'binding:qwilr:api-pages:synthetic-platter-1:document':'unmapped','binding:qwilr:api-pages:synthetic-platter-2:document':'unmapped'}
+  const apiReview=await h.cmd('document-import.preview',{id:apiMove.id,choices:apiChoices})
+  let apiResult=await h.cmd('document-import.apply',{id:apiMove.id,choices:apiChoices,fingerprint:apiReview.fingerprint})
+  while(apiResult.job.state!=='completed')apiResult=await h.cmd('document-import.continue',{id:apiMove.id})
+  const apiJournal=await h.cmd('document-import.journal',{id:apiMove.id}),beforeFacts=(await h.state()).importedSourceFacts
+  const beforePrices=(await h.state()).catalogItems,apiCalls=qwilr.requests.length
   assert.equal(sourceMovein.resumed,true)
   const documentJournal=await h.cmd('document-import.journal',{id:movein.id}),beforeAllDocuments=(await h.state()).importedDocuments
   const nativeClient=await h.cmd('client.save',{name:'Synthetic retained dependency',email:h.auth.OWNER_EMAIL})
@@ -522,6 +533,11 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   assert.deepEqual((await h.state(cookie)).businessRecords,before)
   assert.deepEqual((await h.state(cookie)).importedDocuments,beforeAllDocuments)
   assert.deepEqual((await h.state(cookie)).importedSourceFacts,beforeFacts)
+  assert.deepEqual((await h.state(cookie)).catalogItems,beforePrices)
+  const restoredApiJournal=await h.cmd('document-import.journal',{id:apiMove.id},cookie)
+  assert.deepEqual(restoredApiJournal.originals,apiJournal.originals)
+  assert.deepEqual(restoredApiJournal.provenance,apiJournal.provenance)
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_connection_secrets').first()).n,0)
   const restoredSourceJournal=await h.cmd('document-import.journal',{id:sourceMovein.id},cookie)
   assert.deepEqual(restoredSourceJournal.originals,sourceJournal.originals)
   assert.deepEqual(restoredSourceJournal.provenance,sourceJournal.provenance)
@@ -534,8 +550,14 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   await h.cmd('document-import.undo',{id:sourceMovein.id},cookie,409)
   assert.deepEqual((await h.state(cookie)).importedSourceFacts,beforeFacts)
   await h.db.prepare('DELETE FROM p_imported_source_dependencies WHERE fact_id=?').bind('ignition:billingSchedules:b-1').run()
+  await h.cmd('document-import.undo',{id:sourceMovein.id},cookie,409)
+  assert.deepEqual((await h.state(cookie)).importedSourceFacts,beforeFacts)
+  await h.db.prepare('DELETE FROM p_priced_catalog WHERE id=?').bind(promotedId).run()
   let sourceUndo=await h.cmd('document-import.undo',{id:sourceMovein.id},cookie)
   while(sourceUndo.job.state!=='undone')sourceUndo=await h.cmd('document-import.undo',{id:sourceMovein.id},cookie)
+  assert.equal(qwilr.requests.length,apiCalls,'restored source evidence confers no provider execution')
+  let apiUndo=await h.cmd('document-import.undo',{id:apiMove.id},cookie)
+  while(apiUndo.job.state!=='undone')apiUndo=await h.cmd('document-import.undo',{id:apiMove.id},cookie)
   assert.deepEqual((await h.state(cookie)).importedSourceFacts,[])
   assert.ok((await h.cmd('document-import.journal',{id:sourceMovein.id},cookie)).provenance.every(p=>p.reversed))
   console.log('PROBE MIG-004 restore: public CLI archive -> exact source facts and original bytes, inactive schedules and working dependency-safe undo')

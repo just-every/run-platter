@@ -47,7 +47,7 @@ export async function sourceExportFixture(provider='ignition') {
  const base=await moveinFixture()
  const files=provider==='ignition'?{
   'clients.csv':'Client ID,Client Name,Original Note\nc-1,Synthetic retained client,Exact source note\nc-2,Synthetic retained client,Second distinct client',
-  'services.csv':'#ID,Service Name,Service Description,Exported Price,Currency\ns-1,Synthetic monthly service,Fixed source description,1200.00,USD\ns-2,Synthetic euro service,No currency conversion,81.12500,EUR',
+  'services.csv':'#ID,Service Name,Service Description,Exported Price,Currency,SKU,Unit Name,Recurring Type\ns-1,Synthetic monthly service,Fixed source description,1200.00,USD,SYNTHETIC-PLATTER-1,month,monthly\ns-2,Synthetic euro service,No currency conversion,81.12500,EUR,SYNTHETIC-PLATTER-2,each,one-off',
   'proposals.csv':'Proposal ID,Proposal Name,Client ID,Created Date,Status,Currency,Value,PDF\np-1,Alpha,c-1,2026-01-15,Accepted,USD,14400.00,signed.pdf\np-2,Open,,2026-01-15,Sent,EUR,81.12500,open.pdf\np-3,Missing,c-1,2026-01-16,Draft,USD,19.00,missing.pdf',
   'billing-schedules.csv':'Billing Schedule ID,Proposal ID,Service ID,Status,Start Date,Currency,Amount,Frequency\nb-1,p-1,s-1,Active,2026-02-01,USD,1200.00,Monthly',
  }:{'proposals.csv':'Page ID,Title,Client,Date,Status,Currency,Value,PDF\nq-1,Review,Synthetic retained client,2026-01-15,Accepted,GBP,2500.00,unknown.pdf\nq-2,Open,Synthetic retained client,2026-01-15,Sent,GBP,120.00,open.pdf'}
@@ -55,7 +55,7 @@ export async function sourceExportFixture(provider='ignition') {
  const pdfs=provider==='ignition'?{'signed.pdf':originals[0],'open.pdf':originals[1]}:{'first.pdf':originals[0],'second.pdf':originals[1],'open.pdf':originals[2]}
  const bytes=Buffer.from(zipSync({...pdfs,...Object.fromEntries(Object.entries(files).map(([name,text])=>[name,strToU8(text)]))}))
  const choices=provider==='ignition'?{'binding:ignition:proposals:p-2:clientId':'ignition:clients:c-2','binding:ignition:proposals:p-3:document':'unmapped'}:{'binding:qwilr:proposals:q-1:document':hash(originals[0])}
- const mapping=provider==='ignition'?{services:{id:'#ID',name:'Service Name',description:'Service Description',price:'Exported Price',currency:'Currency'}}:{}
+ const mapping=provider==='ignition'?{services:{id:'#ID',name:'Service Name',description:'Service Description',price:'Exported Price',currency:'Currency',sku:'SKU',unit_name:'Unit Name',billing_frequency:'Recurring Type'}}:{}
  return {provider,files,originals,zips:[{filename:provider+'-export.zip',bytes}],choices,mapping}
 }
 export async function applySourceExport(h,fixture,cookie=h.owner) {
@@ -152,12 +152,27 @@ export async function sourceExportJourney() {
   const replay=await h.cmd('document-import.preview',{id:repeated.id,choices:fixture.choices,mapping:fixture.mapping})
   assert.equal(replay.canApply,false);assert.ok(replay.existing.length>0)
   await h.cmd('document-import.apply',{id:repeated.id,choices:fixture.choices,mapping:fixture.mapping,fingerprint:replay.fingerprint},h.owner,409)
+  let promotedId
+  if(provider==='ignition') {
+   const itemIds=['ignition:services:s-1'],review=await h.cmd('business-import.promote-preview',{itemIds})
+   assert.deepEqual(review.items.map(r=>[r.sku,r.unitCents,r.unit,r.defaultRecurrence]),[['SYNTHETIC-PLATTER-1',120000,'month','monthly']])
+   await h.cmd('business-import.promote',{itemIds,fingerprint:'changed-review'},h.owner,409)
+   await h.cmd('business-import.promote-preview',{itemIds:['ignition:services:s-2']},h.owner,409)
+   const promoted=await h.cmd('business-import.promote',{itemIds,fingerprint:review.fingerprint})
+   promotedId=promoted.items[0].id
+   const catalog=(await h.state()).catalogItems.find(r=>r.id===promotedId)
+   assert.deepEqual([catalog.sku,catalog.unit_cents,catalog.default_recurrence,catalog.source_id],['SYNTHETIC-PLATTER-1',120000,'monthly','ignition:services:s-1'])
+   await h.cmd('business-import.promote',{itemIds,fingerprint:review.fingerprint},h.owner,409)
+   await h.cmd('document-import.undo',{id},h.owner,409)
+   assert.deepEqual((await h.state()).importedSourceFacts,facts,'a promoted price preserves its source custody')
+  }
   const client=await h.cmd('client.save',{name:'Synthetic source dependency',email:['synthetic-platter-'+provider+'-dependency','example.invalid'].join('@')})
   const proposal=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic source dependency',scope:'Retain source fact',optionOne:'One',priceOne:'100',optionTwo:'Two',priceTwo:'200',depositPercent:'25'})
   await h.db.prepare('INSERT INTO p_imported_source_dependencies(fact_id,proposal_id) VALUES(?,?)').bind(facts[0].id,proposal.id).run()
   await h.cmd('document-import.undo',{id},h.owner,409)
   assert.deepEqual((await h.state()).importedSourceFacts,facts)
   await h.db.prepare('DELETE FROM p_imported_source_dependencies WHERE fact_id=?').bind(facts[0].id).run()
+  if(promotedId)await h.db.prepare('DELETE FROM p_priced_catalog WHERE id=?').bind(promotedId).run()
   let undo=await h.cmd('document-import.undo',{id})
   while(undo.job.state!=='undone')undo=await h.cmd('document-import.undo',{id})
   assert.deepEqual((await h.state()).importedSourceFacts,[])

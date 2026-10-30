@@ -3619,6 +3619,7 @@ test('MIG-007 exported document move-in resumes across sessions, holds ambiguous
  assert.equal((await h.send('/api/platter/imported-original?document='+originalId,undefined,second)).status,404)
  assert.ok((await h.cmd('document-import.journal',{id},second)).provenance.every(p=>p.reversed))
  await (await import('./document-movein-fixture.mjs')).sourceExportJourney(h)
+ await (await import('./qwilr-api-fixture.mjs')).qwilrApiJourney()
  const actor=(await h.state(second)).actor
  const successorAddress=['synthetic-platter-6','example.invalid'].join('@')
  await h.send('/auth/invite',{email:successorAddress,displayName:'Synthetic successor',role:'member',returnTo:'/app'},second)

@@ -172,6 +172,22 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal((await h.send(packagePath+'/action?name=accept',{name:'Avery Chen',optionId:'two',items:packageItems,consent:true},packageVerified.cookie)).status,200)
     const packagesBefore=(await h.state()).proposals.find(x=>x.id===packages.id),scheduleBytes=(await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(packages.id).first()).snapshot
     assert.equal(packagesBefore.acceptance.totalCents,packageExpected.totalCents);assert.equal(packagesBefore.acceptance.depositCents,packageExpected.depositCents)
+    // Keep the combined preview's sent and accepted facts through the public archive door.
+    const {configureTaxes,taxRequest}=await import('./taxes-fixture.mjs'),{previewFixture,previewExpected,previewSelection}=await import('./packages-fixture.mjs')
+    await configureTaxes(h.cmd)
+    const combined=await h.cmd('proposal.prepare',{...previewFixture(),clientId:client.id,tax:taxRequest()})
+    const combinedQuery='?optionId=premium&items='+encodeURIComponent(JSON.stringify(previewSelection))
+    const combinedBeforePreview=await h.state(),combinedPreview=await h.send('/app/preview/client'+combinedQuery+'&id='+combined.id+'&revision=1',undefined,h.owner)
+    assert.equal(combinedPreview.status,200);assert.ok(combinedPreview.text.includes('Sales tax: USD 272.33'));assert.ok(combinedPreview.text.includes(previewFixture().terms));assert.deepEqual(await h.state(),combinedBeforePreview)
+    await h.cmd('proposal.approve',{id:combined.id,version:1,revision:1});const combinedPath=new URL((await h.cmd('proposal.send',{id:combined.id,version:2})).shareUrl).pathname
+    await h.send(combinedPath+'/action?name=code.request',{})
+    const combinedCode=(await h.state()).outbox.find(m=>m.proposal_id===combined.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    const combinedCookie=(await h.send(combinedPath+'/action?name=code.verify',{code:combinedCode})).cookie
+    const combinedSent=(await h.send(combinedPath+'/data.json'+combinedQuery,undefined,combinedCookie)).value
+    assert.equal(combinedSent.selection.totalCents,previewExpected.totalCents);assert.equal(combinedSent.selection.tax.taxCents,previewExpected.taxCents);assert.equal(combinedSent.selection.depositCents,previewExpected.depositCents);assert.deepEqual(combinedSent.paymentSchedule,previewExpected.paymentSchedule)
+    assert.equal((await h.send(combinedPath+'/action?name=accept',{name:'Synthetic preview signer',optionId:'premium',items:previewSelection,consent:true},combinedCookie)).status,200)
+    const combinedBefore=(await h.state()).proposals.find(r=>r.id===combined.id),combinedSnapshot=(await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(combined.id).first()).snapshot
+    assert.deepEqual(combinedBefore.acceptance.paymentSchedule,previewExpected.paymentSchedule);assert.equal(combinedBefore.acceptance.totalCents,previewExpected.totalCents)
     // PRICE-002 / SIGN-008: uploaded-paper choices and original file are product records too.
     const paper=await h.cmd('proposal.prepare',{...offer,title:'Archived signed-copy package',paymentTerms:{...scheduleFixture(),depositFixed:'500'},packages:packageFixture()})
     await h.cmd('proposal.approve',{id:paper.id,version:1,revision:1});await h.cmd('proposal.send',{id:paper.id,version:2})
@@ -297,6 +313,12 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).pdfDownloads,packagesBefore.pdfDownloads,'PRICE-002 selected PDF timeline survives public CLI restore')
     assert.deepEqual(JSON.parse(restoredState.proposals.find(x=>x.id===packages.id).section_conditions),{terms:'item:rush'},'PRICE-002 / EDIT-009 optional-item section condition survives public CLI restore')
     assert.equal(JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(packages.id).first()).snapshot).terms,'Rush delivery terms apply.','PRICE-002 / EDIT-009 agreement keeps the section its added optional item showed')
+    const restoredCombined=restoredState.proposals.find(r=>r.id===combined.id)
+    assert.deepEqual(restoredCombined.acceptance,combinedBefore.acceptance,'combined tax, deposit, milestones and selected quantities retain exact custody')
+    assert.deepEqual(restoredCombined.options,combinedBefore.options,'sent rates, packages and bounded quantities remain frozen')
+    assert.equal((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(combined.id).first()).snapshot,combinedSnapshot)
+    assert.equal(JSON.parse(combinedSnapshot).terms,previewFixture().terms)
+    assert.equal((await h.send(combinedPath+'/data.json'+combinedQuery,undefined,combinedCookie)).status,404,'restore does not restore client invitation authority')
     assert.deepEqual(restoredState.proposals.find(x=>x.id===paper.id).acceptance,paperBefore.acceptance,'PRICE-002 / SIGN-008 selected upload, attestation and file metadata survive public CLI restore')
     assert.equal((await h.send(paperInvoicePath,undefined,restoredOwner)).text,paperCsv,'PRICE-002 selected deposit invoice survives restore byte-identically')
     const paperFile=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+paper.id+'/'+paperBefore.acceptance.signedCopy.id,{headers:{host:new URL(h.origin).host,cookie:restoredOwner}});assert.equal(paperFile.status,200);assert.deepEqual(new Uint8Array(await paperFile.arrayBuffer()),paperBytes,'SIGN-008 original signed copy survives restore byte-identically')

@@ -1038,7 +1038,62 @@ test('EDIT-018 / EDIT-022 member-only exact-revision previews share selection ma
  await h.cmd('proposal.approve',{id:p.id,version:6,revision:3});const next=await h.cmd('proposal.send',{id:p.id,version:7}),nextPath=new URL(next.shareUrl).pathname,nextCookie=await verified(h,nextPath)
  await h.send(nextPath+'/action?name=accept',{name:'Avery Chen',optionId:'two',consent:true},nextCookie)
  const final=(await h.state()).proposals.find(row=>row.id===p.id);assert.equal(final.acceptance.totalCents,430003);assert.equal(final.acceptance.depositCents,143320);assert.equal(final.scope,'New negotiated scope for preview.')
+ await combinedPreviewHttp(h)
 }))
+
+async function combinedPreviewHttp(h){
+ const {configureTaxes,taxRequest}=await import('./taxes-fixture.mjs')
+ const {previewFixture,previewExpected:expected,previewSelection:items}=await import('./packages-fixture.mjs')
+ await configureTaxes(h.cmd)
+ const client=await h.cmd('client.save',{name:'Synthetic Platter preview client',email:h.auth.OWNER_EMAIL})
+ const input={...previewFixture(),clientId:client.id,tax:taxRequest()},p=await h.cmd('proposal.prepare',input)
+ const query=new URLSearchParams({id:p.id,revision:'1',optionId:'premium',items:JSON.stringify(items)})
+ const url='/app/preview/client?'+query,audit=async()=>(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
+ const before=await h.state(),beforeAudit=await audit()
+ const preview=await h.send(url,undefined,h.owner);assert.equal(preview.status,200,preview.text)
+ for(const value of ['Basic','Standard','Premium',input.terms,'Sales tax: USD 272.33','$3,573.33 USD','$1,072.00 USD','$1,250.67 USD','$1,250.66 USD','2099-03-01','Design approval'])assert.ok(preview.text.includes(value),value)
+ const standard=await h.send(url.replace('optionId=premium','optionId=standard'),undefined,h.owner)
+ assert.equal(standard.status,200);assert.ok(!standard.text.includes(input.terms))
+ const invalid=new URLSearchParams(query);invalid.set('items',JSON.stringify([{id:'rush',quantity:11}]))
+ assert.equal((await h.send('/app/preview/client?'+invalid,undefined,h.owner)).status,400)
+ assert.deepEqual(await h.state(),before,'all owner-visible business state is unchanged by preview use and refusal')
+ const afterAudit=await audit();assert.deepEqual(afterAudit.filter(r=>r.action!=='proposal.preview'),beforeAudit.filter(r=>r.action!=='proposal.preview'))
+ assert.equal(afterAudit.filter(r=>r.action==='proposal.preview').length,beforeAudit.filter(r=>r.action==='proposal.preview').length+2)
+ await h.cmd('proposal.approve',{id:p.id,version:1,revision:1})
+ const share=await h.cmd('proposal.send',{id:p.id,version:2}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+ const selected='?optionId=premium&items='+encodeURIComponent(JSON.stringify(items)),sent=await h.send(path+selected,undefined,cookie)
+ assert.equal(sent.status,200);for(const value of [input.terms,'Sales tax: USD 272.33','$3,573.33 USD','$1,072.00 USD','$1,250.67 USD','$1,250.66 USD'])assert.ok(sent.text.includes(value),value)
+ const data=(await h.send(path+'/data.json'+selected,undefined,cookie)).value
+ assert.equal(data.selection.tax.taxCents,expected.taxCents);assert.deepEqual(data.selection.tax.components.map(c=>c.taxCents),expected.componentCents)
+ assert.equal(data.selection.totalCents,expected.totalCents);assert.equal(data.selection.depositCents,expected.depositCents);assert.deepEqual(data.paymentSchedule,expected.paymentSchedule)
+ const sentBefore=await h.state()
+ assert.equal((await h.send(path+'?optionId=premium&items='+encodeURIComponent(JSON.stringify([{id:'rush',quantity:11}])),undefined,cookie)).status,400)
+ assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'premium',items:[{id:'rush',quantity:11}],consent:true},cookie)).status,400)
+ assert.deepEqual(await h.state(),sentBefore,'invalid review and acceptance leave complete business state unchanged')
+ assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'premium',items,consent:true},cookie)).status,200)
+ const accepted=(await h.state()).proposals.find(r=>r.id===p.id).acceptance
+ assert.equal(accepted.totalCents,expected.totalCents);assert.equal(accepted.depositCents,expected.depositCents);assert.deepEqual(accepted.paymentSchedule,expected.paymentSchedule);assert.equal(accepted.selection.tax.taxCents,expected.taxCents)
+ // Exercise the same money and section choices for both configured signer views.
+ const multi=await h.cmd('proposal.prepare',{...input,title:'Synthetic Platter two-signer preview',document:{version:1,blocks:[
+  {id:'first-detail',type:'field',title:'Signer one reference',text:'',recipientRole:'slot',recipientId:'first',fieldKind:'text',required:true},
+  {id:'second-detail',type:'field',title:'Signer two reference',text:'',recipientRole:'slot',recipientId:'second',fieldKind:'text',required:true},
+ ]}})
+ const recipients=['first','second'].map((id,i)=>({id,name:'Signer '+(i+1),email:'synthetic-platter-'+(1800+i)+String.fromCharCode(64)+'example.test',role:'signer',group:1}))
+ const configured=await h.cmd('recipient.save',{id:multi.id,version:1,recipients})
+ const multiBefore=await h.state()
+ for(const [id,own,other]of [['first','Signer one reference','Signer two reference'],['second','Signer two reference','Signer one reference']]){
+  const r=await h.send('/app/preview/client?'+new URLSearchParams({id:multi.id,revision:String(configured.revision),recipientId:id,optionId:'premium',items:JSON.stringify(items)}),undefined,h.owner)
+  assert.equal(r.status,200,r.text);assert.ok(r.text.includes(own));assert.ok(!r.text.includes(other));assert.ok(r.text.includes(input.terms));assert.ok(r.text.includes('$3,573.33 USD'));assert.ok(r.text.includes('Sales tax: USD 272.33'));assert.ok(r.text.includes('$1,072.00 USD'))
+ }
+ assert.deepEqual(await h.state(),multiBefore)
+ await h.cmd('proposal.approve',{id:multi.id,version:configured.version,revision:configured.revision})
+ const sentMulti=await h.cmd('proposal.send',{id:multi.id,version:configured.version+1}),{verifyRecipient}=await import('./recipients-http.mjs')
+ for(const recipient of sentMulti.recipients){
+  const path=new URL(recipient.shareUrl).pathname,cookie=await verifyRecipient(h,path),r=await h.send(path+selected,undefined,cookie),data=(await h.send(path+'/data.json'+selected,undefined,cookie)).value
+  assert.equal(r.status,200,r.text);assert.ok(r.text.includes(recipient.id==='first'?'Signer one reference':'Signer two reference'));assert.ok(!r.text.includes(recipient.id==='first'?'Signer two reference':'Signer one reference'))
+  assert.equal(data.selection.totalCents,expected.totalCents);assert.equal(data.selection.tax.taxCents,expected.taxCents);assert.equal(data.selection.depositCents,expected.depositCents);assert.deepEqual(data.paymentSchedule,expected.paymentSchedule)
+ }
+}
 
 test('FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal',()=>run(h=>followupJourney(h,{offer,verified})))
 

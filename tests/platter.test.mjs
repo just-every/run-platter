@@ -2481,14 +2481,16 @@ test('APPROVE-001 gross value and 20% discount require manager then owner; margi
   row=await act(order[0],legal.id,false)
   assert.equal(row.status,'draft');assert.equal(row.approval.steps[2].done,false);assert.equal(row.approval.complete,false)
   await refuse('proposal.send',{id:parallel.id,version},people.sales.cookie,409,new RegExp('approv','i'));await check()
-  const replacement={id:legal.id,version:4,name:'Unauthorized replacement',position:2,condition:{kind:'termsEdited'},approvers:['role:owner'],templates:[]}
-  for(const role of ['manager','sales','billing','content_editor','viewer']){
-   await refuse('approval.rule',replacement,people[role].cookie,403,/Only owner and admins/);await check()
-   await refuse('approval.rule.delete',{id:legal.id,version:4},people[role].cookie,403,/Only owner and admins/);await check()
-   await refuse('approval.policy',{version:4,required:true,defaultRole:'manager'},people[role].cookie,403,/Only owner and admins/);await check()
-  }
-  for(const role of ['sales','content_editor','viewer']){
-   await refuse('approval.rule',{...replacement,approvers:['person:'+people[role].id]},h.owner,400,/Named approvers must be/);await check()
+  if(order[0]==='admin'){
+   const replacement={id:legal.id,version:4,name:'Unauthorized replacement',position:2,condition:{kind:'termsEdited'},approvers:['role:owner'],templates:[]}
+   for(const role of ['manager','sales','billing','content_editor','viewer']){
+    await refuse('approval.rule',replacement,people[role].cookie,403,/Only owner and admins/);await check()
+    await refuse('approval.rule.delete',{id:legal.id,version:4},people[role].cookie,403,/Only owner and admins/);await check()
+    await refuse('approval.policy',{version:4,required:true,defaultRole:'manager'},people[role].cookie,403,/Only owner and admins/);await check()
+   }
+   for(const role of ['sales','content_editor','viewer']){
+    await refuse('approval.rule',{...replacement,approvers:['person:'+people[role].id]},h.owner,400,/Named approvers must be/);await check()
+   }
   }
   row=await act(order[1],legal.id,true)
   assert.equal(row.status,'approved');assert.equal(row.approval.complete,true);assert.ok(row.approval.steps.every(s=>s.done))

@@ -48,10 +48,10 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
  await documentOwner(db,actor)
  try {
   if (name==='document-import.create') {
-   const id=randomUUID(),label=String(input.label??'Document move-in').trim()
+   const id=randomUUID(),label=String(input.label??'Document move-in').trim(),kind=String(input.contentKind??input.kind??'documents')
    if (!label || label.length>150) fail('invalid_input',400,'Name the move-in in 150 characters or fewer')
    await db.batch([db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN '+ownerSql+' THEN 1 ELSE 0 END').bind(actor.id),
-    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label,kind) VALUES(?,?,?,?)').bind(id,actor.id,label,contentKinds.includes(String(input.kind))?String(input.kind):'documents')])
+    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label,kind) VALUES(?,?,?,?)').bind(id,actor.id,label,contentKinds.includes(kind)?kind:'documents')])
    return {id}
   }
   const movein=await session(db,actor,input.id),id=movein.id

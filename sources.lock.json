@@ -2798,7 +2798,7 @@
       "executable": false
     },
     "src/platter/movein/document-import.ts": {
-      "sha256": "ecdae232198f707ace632f16e038e3fb73402e9cba65d2959845b5847319b135",
+      "sha256": "8c2711b14edd93aa894fe09c1ed9234e2d8ade862d60422f26ec694412878b18",
       "executable": false
     },
     "src/platter/movein/document-source.ts": {
@@ -3126,7 +3126,7 @@
       "executable": false
     },
     "src/platter/ui/document-movein.ts": {
-      "sha256": "37d4ef6b1fe95e57507058e98f480ba2da119e812a671de22129c6c908b20468",
+      "sha256": "24c589c3e15729501f76a802e771d6361d403021182b237a923d835b32ae848d",
       "executable": false
     },
     "src/platter/ui/duplicate.ts": {

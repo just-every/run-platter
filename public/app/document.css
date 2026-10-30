@@ -8,6 +8,6 @@
 .fixed-pdf-page{display:block;width:100%;height:auto;margin:16px 0;border:1px solid var(--pl-rule);border-radius:8px}
 
 /* Keep offscreen native controls searchable and focusable without laying out every block. */
-.document-editor-block{content-visibility:auto;contain-intrinsic-size:auto 560px}
+.document-editor-block{content-visibility:auto;contain-intrinsic-block-size:auto 560px}
 /* Active controls may paint their tooltip beyond the card. */
 .document-editor-block:hover,.document-editor-block:focus-within{content-visibility:visible}

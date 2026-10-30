@@ -451,8 +451,8 @@ test('PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores re-expor
     ? item.row.id===original.row.id
     : item.row.proposal_id===original.row.proposal_id&&item.row.revision===original.row.revision))
    assert.equal(matches.length,1,original.table+' retained exactly once by its primary key')
-   const {currency,document,payment_terms,previous_sent_revision,sales_owner_id,sales_owner_name,terms,attachments,section_conditions,recipient_plan,...unchanged}=matches[0].row
-   if(original.table==='p_proposals'){assert.deepEqual(JSON.parse(recipient_plan),[],'Legacy proposals gain no recipient roles or authority');assert.equal(payment_terms,null,'Legacy payment terms stay absent');assert.deepEqual(JSON.parse(document),{},'EDIT-001 legacy proposals have no added blocks');assert.deepEqual(JSON.parse(section_conditions),{},'EDIT-009 legacy proposals remain unconditional');assert.equal(terms,'');assert.deepEqual(JSON.parse(attachments),[]);assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision');assert.equal(sales_owner_id,null);assert.equal(sales_owner_name,null,'legacy sales ownership is not inferred')}
+   const {currency,document,payment_terms,previous_sent_revision,sales_owner_id,sales_owner_name,terms,attachments,section_conditions,recipient_plan,template_recipients,...unchanged}=matches[0].row
+   if(original.table==='p_proposals'){assert.equal(template_recipients,null);assert.deepEqual(JSON.parse(recipient_plan),[],'Legacy proposals gain no recipient roles or authority');assert.equal(payment_terms,null,'Legacy payment terms stay absent');assert.deepEqual(JSON.parse(document),{},'EDIT-001 legacy proposals have no added blocks');assert.deepEqual(JSON.parse(section_conditions),{},'EDIT-009 legacy proposals remain unconditional');assert.equal(terms,'');assert.deepEqual(JSON.parse(attachments),[]);assert.equal(previous_sent_revision,null,'legacy proposal has no earlier sent revision');assert.equal(sales_owner_id,null);assert.equal(sales_owner_name,null,'legacy sales ownership is not inferred')}
    assert.equal(currency,'AUD');assert.deepEqual(unchanged,original.row,original.table+' first-release bytes and amounts unchanged')
   }
  } finally {await h?.close();await rm(temporary,{recursive:true,force:true})}
@@ -596,6 +596,8 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const shared=await h.cmd('recipient.share',{id:voided.id,version:partial.version,recipientName:'Shared archive viewer',recipientEmail:'synthetic-platter-9001'+String.fromCharCode(64)+'example.test',embedOrigin:h.origin,shareConsent:true})
   const withdrawRow=(await h.state()).proposals.find(r=>r.id===voided.id)
   await h.cmd('proposal.withdraw',{id:voided.id,version:withdrawRow.version,reason:'Void before completion',notice:true})
+  const {templateRolesFixture}=await import('./templates-http.mjs')
+  const templateRoles=await templateRolesFixture(h),roleState=await h.state(),roleTemplate=roleState.templates.find(t=>t.id===templateRoles.template.id),roleDraft=roleState.proposals.find(p=>p.id===templateRoles.first.id)
   const signatures=(await h.db.prepare('SELECT * FROM p_recipient_signatures ORDER BY proposal_id,revision,slot_id').all()).results
   const voids=(await h.db.prepare('SELECT * FROM p_void_signatures ORDER BY proposal_id,revision').all()).results
   assert.equal(signatures.length,4);assert.equal(voids.length,1)
@@ -623,6 +625,12 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   await command(restored,['import','--input',archive,'--yes'])
   h=await harness({root:restored,unclaimed:true,assetsDirectory:'public'})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
+  assert.deepEqual(after.templates.find(t=>t.id===roleTemplate.id),roleTemplate)
+  assert.deepEqual(after.proposals.find(p=>p.id===roleDraft.id),roleDraft)
+  const roleCopy=await h.cmd('proposal.duplicate',{id:roleDraft.id,version:1},owner),copiedRole=(await h.state(owner)).proposals.find(p=>p.id===roleCopy.id)
+  assert.deepEqual(copiedRole.template_recipients,roleDraft.template_recipients);assert.deepEqual(copiedRole.document,roleDraft.document)
+  assert.deepEqual(copiedRole.recipient_plan,roleDraft.recipient_plan);assert.deepEqual(copiedRole.recipientLinks,[]);assert.deepEqual(copiedRole.recipientSignatures,[]);assert.equal(copiedRole.approved_by,null)
+  await h.cmd('proposal.send',{id:roleCopy.id,version:1},owner,409)
   assert.deepEqual(after.proposals.find(row=>row.id===p.id),proposal)
   assert.deepEqual(after.proposals.find(row=>row.id===real.id).invitationMessages,retained)
   assert.equal(after.proposals.find(row=>row.id===real.id).client_locale,'es')

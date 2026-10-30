@@ -1,3 +1,4 @@
+import { templateRecipients, startTemplateRecipients } from './template-recipients'
 import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields } from './variables'
 import { proposalFields } from './commands'
@@ -33,7 +34,8 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
  const options=clientId===displayed.client_id?sourceOptions:withoutTaxAddresses(sourceOptions)
  const copiedDocument=bindDocument(displayed.document,clientId)
  if(input.title===undefined&&!titleLocked&&copiedDocument.merge?.patterns['/title'])copiedDocument.merge.patterns['/title']+=' (copy)'
- const row = { recipient_plan:recipientPlan(displayed).map((r,i)=>({...r,email:documentOf(displayed).merge?.patterns['/recipientPlan/'+i+'/email']?r.email:null})), document:copiedDocument, id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '', section_conditions: displayed.section_conditions??{},
+ const definition=templateRecipients(source)
+ const row = { template_recipients:definition, recipient_plan:definition?await startTemplateRecipients(db,a,definition,recipientPlan(displayed)):recipientPlan(displayed).map((r,i)=>({...r,email:documentOf(displayed).merge?.patterns['/recipientPlan/'+i+'/email']?r.email:null})), document:copiedDocument, id, client_id: clientId, title, scope: displayed.scope, terms: displayed.terms ?? '', section_conditions: displayed.section_conditions??{},
   payment_terms:paymentTerms(displayed), revision: 1, deposit_bps: displayed.deposit_bps, options, currency: displayed.currency, attachments }
  await commit(db, a, [
   db.prepare(`INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,
@@ -44,7 +46,7 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
   db.prepare('INSERT INTO p_proposal_block_locks(proposal_id,section) SELECT ?,section FROM p_proposal_block_locks WHERE proposal_id=?').bind(id,source.id),
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) SELECT ?,template_id,template_version FROM p_template_sources WHERE proposal_id=?').bind(id,source.id),
   copyDocumentMedia(db,source.id,id,documentOf(displayed)),copyCosts(db,source.id,displayed.revision,id,1),copyDefaults(db,source.id,id),
-  db.prepare('UPDATE p_proposals SET recipient_plan=? WHERE id=?').bind(JSON.stringify(row.recipient_plan),id),
+  db.prepare('UPDATE p_proposals SET recipient_plan=?,template_recipients=? WHERE id=?').bind(JSON.stringify(row.recipient_plan),definition?JSON.stringify(definition):null,id),
   db.prepare('UPDATE p_proposals SET section_conditions=?,document=?,payment_terms=? WHERE id=?').bind(typeof row.section_conditions==='string'?row.section_conditions:JSON.stringify(row.section_conditions),JSON.stringify(documentOf(row)),row.payment_terms?JSON.stringify(row.payment_terms):null,id),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)')
    .bind(id, JSON.stringify(snapshot(row)), a.email, at, row.currency),

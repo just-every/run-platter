@@ -8,7 +8,7 @@ const verbs: Record<string, string> = {
  'mail.client-reply':'recorded an email reply for',
  'mail.accepted':'sent mail accepted by the provider for','mail.uncertain':'recorded an uncertain sending result for','mail.withheld':'refused mail for',
  'team.create':'created the team','member.set':'changed membership for','member.zone':'changed the personal time zone of','member.invite':'issued the member invitation',
- 'proposal.share':'changed collaborator access to','proposal.unlock':'unlocked a section in','template.save':'saved the template','template.start':'started a draft from a template:', 'template.locks':'changed section locks in',
+ 'proposal.share':'changed collaborator access to','proposal.unlock':'unlocked a section in','template.save':'saved the template','template.start':'started a draft from a template:', 'template.locks':'changed section locks in', 'template.recipients':'changed recipient definitions in',
  'folder.save':'changed the shared resource folder','library.save':'saved the library item','catalog.save':'saved the catalog item','catalog.insert':'copied a catalog price into',
  'workspace.defaults':'changed workspace defaults for','approval.policy':'changed the approval policy for','approval.rule':'saved the approval rule','approval.rule.delete':'removed the approval rule',
  'pricing.cost':'saved private costing for','pricing.export':'downloaded private costing for','provider.connect':'verified the provider connection','provider.disconnect':'disconnected the provider',

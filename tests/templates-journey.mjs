@@ -7,7 +7,7 @@ import { installedApp } from './site-harness.mjs'
 export async function templatesJourney() {
  const screenshots = process.env.PLATTER_SCREENSHOTS
  if (screenshots) await mkdir(screenshots, { recursive: true })
- const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
+ const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}), args: ['--use-mock-keychain', '--password-store=basic', '--no-sandbox'] })
  try {
   for (const width of [1440, 390]) {
    const app = await installedApp(), context = await browser.newContext({ viewport: { width, height: 900 } })
@@ -115,5 +115,47 @@ export async function templatesJourney() {
     await page.goto(app.origin + '/app/proposal?id=' + thirdId); await capture('accepted')
    } finally { await clientContext?.close(); await context.close(); await app.close() }
   }
+  await templateRecipientJourney(browser,screenshots)
  } finally { await browser.close() }
+}
+
+async function templateRecipientJourney(browser,screenshots) {
+ const {templateRoleData}=await import('./templates-http.mjs')
+ for(const width of [1440,390]){
+  const app=await installedApp(),context=await browser.newContext({viewport:{width,height:900}})
+  try{
+   const page=await context.newPage(),state=async()=>(await(await context.request.get(app.origin+'/api/platter/state')).json())
+   const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+   await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic Platter owner'},maxRedirects:0})
+   await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+   const data=templateRoleData((await state()).actor.email),client=await cmd('client.save',{name:'Synthetic Platter template client',email:data.recipients[0].email})
+   const source=await cmd('proposal.prepare',{clientId:client.id,title:'Synthetic Platter role custody',scope:'Reviewed services',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:30,recipientPlan:data.recipients,document:data.document})
+   await page.goto(app.origin+'/app/proposal?id='+source.id)
+   const save=page.locator('section').filter({has:page.getByRole('heading',{name:'Save a personal template',exact:true})}).locator('form').filter({has:page.getByRole('button',{name:'Save personal template',exact:true})})
+   await save.getByLabel('Template name',{exact:true}).fill('Three role template')
+   await save.getByLabel('Explicit owner preassignment',{exact:true}).selectOption('owner')
+   await save.getByRole('button',{name:'Save personal template',exact:true}).click()
+   await page.goto(app.origin+'/app');await page.getByRole('button',{name:'Start from Three role template',exact:true}).click()
+   const firstId=new URL(page.url()).searchParams.get('id'),first=(await state()).proposals.find(p=>p.id===firstId)
+   const capture=async name=>{await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});if(screenshots)await page.screenshot({path:join(screenshots,`SIGN-011-${name}-${width}.png`),fullPage:true})}
+   if(width===1440){
+    assert.deepEqual(JSON.parse(first.recipient_plan).map(r=>[r.name,r.group,r.email]),data.recipients.map(r=>[r.name,r.group,r.id==='owner'?r.email:null]))
+    assert.deepEqual(first.document,data.document);assert.deepEqual(first.recipientLinks,[]);assert.equal(first.approved_by,null)
+    const recipients=page.locator('section').filter({has:page.getByRole('heading',{name:'Recipients and signing',exact:true})})
+    assert.match(await recipients.innerText(),/Client signer.*Group 1/s);assert.match(await recipients.innerText(),/Client CFO approver.*Group 2/s)
+    assert.equal(await recipients.getByText('Mailbox not assigned',{exact:true}).count(),2)
+   }
+   await capture('captured-draft')
+   await page.goto(app.origin+'/app/settings')
+   const settings=page.locator('section').filter({has:page.getByRole('heading',{name:'Template recipient definitions',exact:true})})
+   await settings.getByText('Three role template recipient definitions',{exact:true}).click()
+   await settings.locator('[name="roleGroup:client"]').fill('2');await settings.locator('[name="roleGroup:cfo"]').fill('1')
+   await capture('definitions')
+   await settings.getByRole('button',{name:'Save Three role template recipient definitions',exact:true}).click()
+   await page.goto(app.origin+'/app');await page.getByRole('button',{name:'Start from Three role template',exact:true}).click()
+   const secondId=new URL(page.url()).searchParams.get('id')
+   if(width===1440){const s=await state();assert.deepEqual(s.proposals.find(p=>p.id===firstId),first);assert.deepEqual(JSON.parse(s.proposals.find(p=>p.id===secondId).recipient_plan).map(r=>[r.id,r.group]),[['client',2],['cfo',1],['owner',3]])}
+   await capture('next-draft')
+  }finally{await context.close();await app.close()}
+ }
 }

@@ -2474,7 +2474,7 @@
       "executable": false
     },
     "src/platter/archive-policy.mjs": {
-      "sha256": "94bb754c2ec258f9e5c816bc023ea3b572decafc49a98c7846623ac377be9bf2",
+      "sha256": "1b90a4303824b260a560ad601b5af28a10c1b6f0dd70adcad1ccc1e55c5e9a45",
       "executable": false
     },
     "src/platter/archiving/google-drive.ts": {
@@ -2538,7 +2538,7 @@
       "executable": false
     },
     "src/platter/commands.ts": {
-      "sha256": "6e8343c285fb2856a16f02db0841bbc6e4db17f796a95a804130bcfd00ab212d",
+      "sha256": "f9dd4f5add0be5ab6daa172f04383babdd41b8053d8dbffb5d17f636390c3684",
       "executable": false
     },
     "src/platter/completion-mail.ts": {
@@ -2790,7 +2790,7 @@
       "executable": false
     },
     "src/platter/movein/csv.ts": {
-      "sha256": "c3ba54fb4fb381765116f61f78d3d59fcbcb03a6779f6ca8be718c760e5aed51",
+      "sha256": "2d9d82e325c78142499cd6262cef205e1e28bd53f46237501fdb7289f11e281f",
       "executable": false
     },
     "src/platter/movein/document-import.ts": {
@@ -3002,7 +3002,7 @@
       "executable": false
     },
     "src/platter/templates.ts": {
-      "sha256": "2a5267fa05c93d1007c88ca798b806c1bb5a98b71b781505d5d490a10dd27de3",
+      "sha256": "9693cbaf04a436ba6a9c73056f144e7fac6f6f290edbd2520af04f5803995121",
       "executable": false
     },
     "src/platter/test-mail.ts": {

@@ -670,11 +670,11 @@
       "executable": false
     },
     "public/app/composer.css": {
-      "sha256": "9c93398239af44b2c46c18c8d24e88af4e34aeaf7d0dbb02ab68a86976edb17e",
+      "sha256": "374ca912f8f0db0198ca0c7a004e751b954b90cf206cf6c8ebd9f2851276ed52",
       "executable": false
     },
     "public/app/document.css": {
-      "sha256": "b1d1b7a5dfcf698e86841f84a1cfdeaf93cdc7170409f90bc93090deeb832f55",
+      "sha256": "87d48e6863b965bdf3843a94f4aa20e8b20487b74986a16e8e990015342bbada",
       "executable": false
     },
     "public/app/forms.css": {
@@ -746,7 +746,7 @@
       "executable": false
     },
     "public/document-editor.js": {
-      "sha256": "19db5fbeef534da18e8c7a6cfc233a338cff494651a31b51b5895efe3c85f010",
+      "sha256": "a360184c805125584fad55de52c2dbb5c34219a3b26e1b4bf9f722d1860c4060",
       "executable": false
     },
     "public/document-movein.js": {
@@ -3474,7 +3474,7 @@
       "executable": false
     },
     "tests/editor-budget.mjs": {
-      "sha256": "a83e3a35b856e0d98653e1ec4628f18ebfddeae94c095b76218484dd5947e2f1",
+      "sha256": "f6cf5ee4eb6f581bf6688c1863992e5acdaadf0f9b5fcbef6ab1c3ebcb52fffa",
       "executable": false
     },
     "tests/followup-journey.mjs": {

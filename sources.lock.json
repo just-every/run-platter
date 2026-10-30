@@ -2698,7 +2698,7 @@
       "executable": false
     },
     "src/platter/http.ts": {
-      "sha256": "62974bd964ecc04d41612a0daff9c38ed779f33b5ce0c20b582beb4a8aa65f13",
+      "sha256": "ecb3fbc5de5bda98567eb33580cb93bbf9e9217781c89f51527100f2a6ba54cd",
       "executable": false
     },
     "src/platter/internal-pricing.ts": {
@@ -2894,7 +2894,7 @@
       "executable": false
     },
     "src/platter/paypal.ts": {
-      "sha256": "76b4f1575a11c737ab62c5caefe1d36df8605824dee314ef79a5fe91ec333127",
+      "sha256": "4625cb6bad92473e6d1e7aadd37cb07ffb8213d0d8ba61bf5c6626474ecbd3ce",
       "executable": false
     },
     "src/platter/permissions.ts": {
@@ -3570,7 +3570,7 @@
       "executable": false
     },
     "tests/paypal-browser.mjs": {
-      "sha256": "444e3f3e94d26c8594c3f0c8b5a3480dfb5f66113a163436a40248ba42f623ef",
+      "sha256": "5a1b54c484e830497da85b19929fc80862de0b2679f4bb3af7231495cfe86b4f",
       "executable": false
     },
     "tests/paypal-fixture.mjs": {

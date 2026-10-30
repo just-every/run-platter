@@ -6,7 +6,7 @@ import { harness } from './harness.mjs'
 import { browserEdge } from './browser-edge.mjs'
 import { captureRuntimeLog } from './instrument-scan.mjs'
 import { paypalFixture, paypalToken, paypalMerchant, paypalWebhook } from './paypal-fixture.mjs'
-import { preparePaypalAgreement, verifyPaypalSigner, inspectPaypalReservations, assertPaypalSanitized } from './paypal-journey.mjs'
+import { preparePaypalAgreement, inspectPaypalReservations, assertPaypalSanitized } from './paypal-journey.mjs'
 
 export async function paypalBrowser(){
  const screenshots=process.env.PLATTER_SCREENSHOTS,log=captureRuntimeLog()
@@ -57,8 +57,13 @@ export async function paypalBrowser(){
      assert.equal(await page.getByRole('alert').count(),0)
      await capture('selection')
     })
-    p=await verifyPaypalSigner(h,p);await putCookie(p.cookie)
     await page.goto(h.origin+p.path)
+    await page.getByRole('button',{name:'Send verification code',exact:true}).click()
+    const mail=(await h.state()).outbox.find(message=>message.proposal_id===p.id&&message.subject.includes('verification code'))
+    await page.getByLabel('Email verification code',{exact:true}).fill(mail.body.match(/\b\d{6}\b/)[0])
+    await page.getByRole('button',{name:'Verify email',exact:true}).click()
+    const nativeCookie=(await context.cookies()).find(cookie=>cookie.path===p.path)
+    assert.ok(nativeCookie?.sameSite==='Strict'&&nativeCookie.httpOnly&&nativeCookie.secure,'The browser retains the actual native verified client cookie')
     const acceptance=page.locator('form').filter({has:page.getByRole('button',{name:/Accept.*proposal|Accept selected option/i})}).first()
     await acceptance.locator('[name="name"]').fill('Synthetic PayPal signer')
     await acceptance.locator('[name="optionId"][value="one"]').check()
@@ -85,7 +90,12 @@ export async function paypalBrowser(){
     await capture('hosted-approval')
     assert.equal(fake.captures.size,0)
     await page.getByRole('link',{name:'Approve deposit on PayPal',exact:true}).click()
-    await page.waitForURL(h.origin+p.path+'**')
+    await page.waitForURL(h.origin+p.path+'/paypal-return')
+    await page.getByRole('heading',{name:'Return from PayPal',exact:true}).waitFor()
+    assert.equal(fake.captures.size,0,'Returning from PayPal performs no capture')
+    await capture('return')
+    await page.getByRole('link',{name:'Continue to agreement',exact:true}).click()
+    await page.waitForURL(h.origin+p.path)
     const refresh=page.getByRole('button',{name:'Refresh PayPal payment status',exact:true})
     await refresh.click()
     const pay=page.locator('[data-paypal-capture]')

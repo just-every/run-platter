@@ -35,7 +35,7 @@ export async function clientPaypal(env:Bindings,c:any,input:Record<string,unknow
    ])
   }catch{fail('PayPal deposit preparation is already claimed or its authority changed. Refresh status.',409)}
   try{
-   const {secret}=await paypalLive(env,saved),returnUrl=env.AUTH_ORIGIN+'/p/'+encodeURIComponent(c.token)
+   const {secret}=await paypalLive(env,saved),returnUrl=env.AUTH_ORIGIN+'/p/'+encodeURIComponent(c.token)+'/paypal-return'
    const order=await createPaypalOrder(secret,paypalBinding(saved),returnUrl,returnUrl,saved.create_request)
    await paypalClient(env,c)
    const approvalUrl=paypalApproval(order)

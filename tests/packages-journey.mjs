@@ -165,3 +165,84 @@ export async function taxesBrowserJourney(browser,screenshots){
   const accepted=(await state()).proposals.find(x=>x.id===p.id).acceptance;assert.equal(accepted.selection.tax.taxCents,7885);assert.equal(accepted.totalCents,146885)
  }finally{await clientContext?.close();await context.close();await app.close()}
 }
+
+export async function combinedPreviewBrowser(browser,screenshots){
+ const {previewFixture,previewExpected:expected,previewSelection:items}=await import('./packages-fixture.mjs')
+ const {configureTaxes,taxRequest}=await import('./taxes-fixture.mjs')
+ const app=await installedApp(),context=await browser.newContext({viewport:{width:1440,height:1000}})
+ const clients=[]
+ try{
+  const headers={origin:app.origin},page=await context.newPage()
+  assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers,data:{token:app.token,displayName:'Synthetic preview owner'},maxRedirects:0})).status(),303)
+  await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers,data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
+  const state=async()=>{const r=await context.request.get(app.origin+'/api/platter/state');assert.equal(r.status(),200);return r.json()}
+  const audit=async()=>{const r=await context.request.get(app.origin+'/api/platter/audit');assert.equal(r.status(),200);return(await r.json()).rows}
+  const capture=async(target,name)=>{if(!screenshots)return;await target.evaluate(()=>document.fonts.ready);for(const width of [1440,390]){await target.setViewportSize({width,height:1000});await target.screenshot({path:join(screenshots,`EDIT-018-combined-${name}-${width}.png`),fullPage:true})}await target.setViewportSize({width:1440,height:1000})}
+  const check=async target=>{
+   assert.equal(await target.getByLabel('Selected total').innerText(),'$3,573.33 USD')
+   assert.equal(await target.getByLabel('Selected deposit').innerText(),'$1,072.00 USD')
+   assert.ok((await target.locator('main').innerText()).includes('Sales tax: USD 272.33'))
+   assert.ok((await target.locator('main').innerText()).includes(previewFixture().terms))
+   const schedule=target.locator('section').filter({has:target.getByRole('heading',{name:'Payment schedule',exact:true})})
+   assert.deepEqual(await schedule.locator('li').allTextContents(),[
+    'Deposit · Acceptance · $1,072.00 USD · net 0',
+    'Design approved · Design approval · $1,250.67 USD · net 15',
+    'Final delivery · 2099-03-01 · $1,250.66 USD · net 15',
+   ])
+  }
+  const verify=async(target,id,recipient)=>{
+   await target.getByRole('button',{name:'Send verification code',exact:true}).click()
+   const mail=(await state()).outbox.find(m=>m.proposal_id===id&&(!recipient||m.recipient===recipient)&&m.subject.includes('verification code'))
+   assert.ok(mail);await target.getByLabel('Email verification code').fill(mail.body.match(/\b\d{6}\b/)[0]);await target.getByRole('button',{name:'Verify email',exact:true}).click()
+  }
+  await configureTaxes(cmd)
+  const client=await cmd('client.save',{name:'Synthetic preview client',email:(await state()).actor.email}),input={...previewFixture(),clientId:client.id,tax:taxRequest()}
+  const p=await cmd('proposal.prepare',input),before=await state(),beforeAudit=await audit()
+  await page.goto(app.origin+`/app/preview?id=${p.id}&revision=1`)
+  const frame=page.frameLocator('iframe'),update=async()=>{const nav=page.waitForEvent('framenavigated',{predicate:f=>f.url().includes('/app/preview/client?')});await frame.getByRole('button',{name:'Update preview selection'}).click();await(await nav).waitForLoadState('load')}
+  assert.match(await frame.locator('main').innerText(),/Revision 1/)
+  assert.deepEqual(await frame.locator('#preview-option option').allTextContents(),['Basic','Standard','Premium'])
+  assert.ok(!(await frame.locator('main').innerText()).includes(input.terms))
+  await frame.getByLabel('Choose one option',{exact:true}).selectOption('premium');await update()
+  await frame.getByRole('checkbox',{name:/Add Rush delivery/}).check();await frame.getByLabel('Quantity for Rush delivery').fill('4');await update();await check(frame)
+  await frame.getByLabel('Quantity for Rush delivery').fill('11');assert.equal(await frame.getByLabel('Quantity for Rush delivery').evaluate(x=>x.validity.rangeOverflow),true)
+  const invalid=new URL(page.frames().find(f=>f.url().includes('/app/preview/client?')).url());invalid.searchParams.set('items',JSON.stringify([{id:'rush',quantity:11}]))
+  assert.equal((await context.request.get(invalid.href)).status(),400)
+  await frame.getByLabel('Quantity for Rush delivery').fill('4')
+  const preview=await context.newPage();try{await preview.goto(page.frames().find(f=>f.url().includes('/app/preview/client?')).url());await check(preview);await capture(preview,'preview')}finally{await preview.close()}
+  assert.deepEqual(await state(),before,'preview use leaves the complete owner-visible business state unchanged')
+  const afterAudit=await audit();assert.deepEqual(afterAudit.filter(r=>r.action!=='proposal.preview'),beforeAudit.filter(r=>r.action!=='proposal.preview'));assert.ok(afterAudit.filter(r=>r.action==='proposal.preview').length>beforeAudit.filter(r=>r.action==='proposal.preview').length)
+  await cmd('proposal.approve',{id:p.id,version:1,revision:1});const share=await cmd('proposal.send',{id:p.id,version:2}),path=new URL(share.shareUrl).pathname
+  const clientContext=await browser.newContext({viewport:{width:1440,height:1000},javaScriptEnabled:false});clients.push(clientContext)
+  const clientPage=await clientContext.newPage();await clientPage.goto(app.origin+path);await verify(clientPage,p.id)
+  await clientPage.getByLabel('Review sections for').selectOption('premium');await clientPage.getByRole('button',{name:'Review package',exact:true}).click()
+  await clientPage.getByRole('checkbox',{name:/Add Rush delivery/}).check();await clientPage.getByLabel('Quantity for Rush delivery').fill('4');await clientPage.getByRole('button',{name:'Review package',exact:true}).click();await check(clientPage)
+  const selected='?optionId=premium&items='+encodeURIComponent(JSON.stringify(items)),data=await(await clientContext.request.get(app.origin+path+'/data.json'+selected)).json()
+  assert.equal(data.selection.tax.taxCents,expected.taxCents);assert.equal(data.selection.totalCents,expected.totalCents);assert.equal(data.selection.depositCents,expected.depositCents);assert.deepEqual(data.paymentSchedule,expected.paymentSchedule)
+  const sentBefore=await state();await clientPage.getByLabel('Quantity for Rush delivery').fill('11');assert.equal(await clientPage.getByLabel('Quantity for Rush delivery').evaluate(x=>x.validity.rangeOverflow),true)
+  assert.equal((await clientContext.request.get(app.origin+path+'?optionId=premium&items='+encodeURIComponent(JSON.stringify([{id:'rush',quantity:11}])))).status(),400)
+  assert.deepEqual(await state(),sentBefore)
+  await clientPage.getByLabel('Quantity for Rush delivery').fill('4');await capture(clientPage,'sent-client')
+  await clientPage.getByLabel('Your full name').fill('Synthetic preview signer');await clientPage.locator('[name=consent]').check();await clientPage.getByRole('button',{name:'Accept proposal',exact:true}).click();await check(clientPage)
+  const agreement=(await state()).proposals.find(r=>r.id===p.id).acceptance;assert.equal(agreement.totalCents,expected.totalCents);assert.equal(agreement.depositCents,expected.depositCents);assert.deepEqual(agreement.paymentSchedule,expected.paymentSchedule)
+  const multi=await cmd('proposal.prepare',{...input,title:'Synthetic two-signer preview',document:{version:1,blocks:[
+   {id:'first-detail',type:'field',title:'Signer one reference',text:'',recipientRole:'slot',recipientId:'first',fieldKind:'text',required:true},
+   {id:'second-detail',type:'field',title:'Signer two reference',text:'',recipientRole:'slot',recipientId:'second',fieldKind:'text',required:true},
+  ]}})
+  const recipients=['first','second'].map((id,i)=>({id,name:'Signer '+(i+1),email:'synthetic-platter-'+(1810+i)+String.fromCharCode(64)+'example.test',role:'signer',group:1})),configured=await cmd('recipient.save',{id:multi.id,version:1,recipients})
+  const multiBefore=await state()
+  await page.goto(app.origin+'/app/preview?'+new URLSearchParams({id:multi.id,revision:String(configured.revision),optionId:'premium',items:JSON.stringify(items)}))
+  await page.getByLabel('Preview recipient').selectOption('second');await page.getByRole('button',{name:'Change preview width'}).click()
+  await check(frame);assert.equal(await frame.getByLabel('Signer two reference',{exact:true}).count(),1);assert.equal(await frame.getByLabel('Signer one reference',{exact:true}).count(),0);assert.equal(await frame.getByLabel('Signer two reference',{exact:true}).isDisabled(),true)
+  const secondPreview=await context.newPage();try{await secondPreview.goto(page.frames().find(f=>f.url().includes('/app/preview/client?')).url());await capture(secondPreview,'signer-two-preview')}finally{await secondPreview.close()}
+  assert.deepEqual(await state(),multiBefore)
+  await cmd('proposal.approve',{id:multi.id,version:configured.version,revision:configured.revision});const sentMulti=await cmd('proposal.send',{id:multi.id,version:configured.version+1})
+  for(const recipient of sentMulti.recipients){
+   const recipientContext=await browser.newContext({viewport:{width:1440,height:1000},javaScriptEnabled:false});clients.push(recipientContext)
+   const recipientPage=await recipientContext.newPage();await recipientPage.goto(app.origin+new URL(recipient.shareUrl).pathname+selected);await verify(recipientPage,multi.id,recipient.email);await check(recipientPage)
+   assert.equal(await recipientPage.getByLabel(recipient.id==='first'?'Signer one reference':'Signer two reference',{exact:true}).count(),1);assert.equal(await recipientPage.getByLabel(recipient.id==='first'?'Signer two reference':'Signer one reference',{exact:true}).count(),0)
+   await capture(recipientPage,recipient.id+'-sent')
+  }
+ }finally{for(const c of clients)await c.close();await context.close();await app.close()}
+}

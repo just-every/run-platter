@@ -220,7 +220,7 @@ test('EDIT-018 desktop and phone preview exact client content, switch widths and
  let app,browser
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
    app=await installedApp({businessFixture:'fixtures/first-release-aud.ndjson'});const context=await browser.newContext({viewport:{width,height:900}})
@@ -268,6 +268,7 @@ test('EDIT-018 desktop and phone preview exact client content, switch widths and
     assert.match(await page.locator('main').innerText(),/GST-free in AUD/);assert.match(await page.getByLabel('Selected total').innerText(),/AUD/);await capture('legacy-aud-preview')
    }finally{await context.close();await app.close();app=undefined}
   }
+  const {combinedPreviewBrowser}=await import('./packages-journey.mjs');await combinedPreviewBrowser(browser,screenshots)
  }finally{await browser?.close();await app?.close()}
 })
 

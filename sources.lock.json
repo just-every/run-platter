@@ -3570,7 +3570,7 @@
       "executable": false
     },
     "tests/paypal-browser.mjs": {
-      "sha256": "13d4c4201d4efb5d23bb0e5065b1ea5f3eabca9783ef9cde11553c59977363ee",
+      "sha256": "444e3f3e94d26c8594c3f0c8b5a3480dfb5f66113a163436a40248ba42f623ef",
       "executable": false
     },
     "tests/paypal-fixture.mjs": {

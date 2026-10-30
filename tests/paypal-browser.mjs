@@ -27,7 +27,12 @@ export async function paypalBrowser(){
     const capture=async phase=>{
      await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))})
      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'PayPal page has no horizontal overflow at '+width)
-     if(screenshots)await page.screenshot({path:join(screenshots,'PAY-009-'+phase+'-'+width+'.png'),fullPage:true})
+     if(screenshots){
+      await page.screenshot({path:join(screenshots,'PAY-009-'+phase+'-'+width+'.png'),fullPage:true})
+      const panels=page.locator('section.panel').filter({has:page.getByRole('heading',{name:/^(Deposit collection|Deposit due|Deposit paid|PayPal approval confirmed|Deposit awaiting confirmation|Payments and refunds)/})})
+      for(let index=0;index<await panels.count();index++)await panels.nth(index).screenshot({path:join(screenshots,'PAY-009-'+phase+'-'+width+'-panel-'+index+'.png')})
+      const merchant=page.locator('article').filter({has:page.getByRole('heading',{name:'PayPal',exact:true})});if(await merchant.count())await merchant.screenshot({path:join(screenshots,'PAY-009-'+phase+'-'+width+'-merchant.png')})
+     }
     }
     await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     await page.goto(h.origin+'/app/settings')
@@ -40,7 +45,9 @@ export async function paypalBrowser(){
     await capture('settings')
     let p=await preparePaypalAgreement(h,async draft=>{
      await page.goto(h.origin+'/app/proposal?id='+draft.id)
+     await capture('draft')
      const policy=page.locator('form[action*="payment.collection"]')
+     assert.equal(await policy.count(),1,'Deposit collection form is present: '+JSON.stringify({headings:await page.getByRole('heading').allTextContents(),alerts:await page.getByRole('alert').allTextContents()}))
      await policy.getByLabel('Acceptance and deposit',{exact:true}).selectOption('required')
      await policy.getByLabel('Deposit payment provider',{exact:true}).selectOption('paypal')
      assert.equal(await policy.locator('[name="merchantId"]').inputValue(),paypalMerchant)

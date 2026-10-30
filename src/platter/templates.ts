@@ -55,16 +55,19 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   const folderId=shared?(input.folderId===undefined?existing?.folder_id??null:input.folderId||null):null,folder=await folderGuard(db,a,folderId,'template'),previous=existing?await folderGuard(db,a,existing.folder_id,'template'):{sql:'1',values:[]}
   if(existing?.shared===1)await requireAudienceConsent(db,existing.folder_id,folderId,input.shareConsent)
   const templateName = text(input.name, 'a template name')
-  const { id: _id, client_id: _client, revision: _revision, ...content } = snapshot(displayed)
+  const { id: _id, client_id: _client, revision: _revision, ...savedContent } = snapshot(displayed)
+  const content:typeof savedContent&{template_input?:Omit<ReturnType<typeof unfilledVariableFields>,'clientId'>}=savedContent
   if(content.document?.merge){
    const fields=unfilledVariableFields({...content,client_id:source.client_id})
-   const {client_id:_sourceClient,...unfilled}=proposalFields(fields)
-   unfilled.options=unfilled.options.map((option:any,index:number)=>({...option,...(content.options[index].tax?{tax:content.options[index].tax}:{})}))
-   Object.assign(content,unfilled)
+   const {clientId:_sourceClient,...templateInput}=fields
+   // Retain editable pricing patterns, never a calculation using source values.
+   Object.assign(content,{template_input:templateInput,title:fields.title,scope:fields.scope,terms:fields.terms,document:fields.document,
+    options:fields.packages.map((p:any)=>({...p,cents:0,tables:fields.pricingTables.filter((t:any)=>t.optionId===p.id)}))})
    if(content.recipient_plan)content.recipient_plan=fields.recipientPlan
   }
   if(content.document)content.document=bindDocument(content.document)
   if(content.recipient_plan)content.recipient_plan=content.recipient_plan.map((r:any)=>({...r,email:null}))
+  if(content.template_input)content.template_input.recipientPlan=content.recipient_plan??[]
   if(existing)await assertTemplateLocks(db,existing,content)
   const [pdf, savedExpiry, sections] = await Promise.all([
    db.prepare('SELECT enabled FROM p_pdf_settings WHERE proposal_id=?').bind(source.id).first<any>(),
@@ -101,7 +104,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  const personal = starter ? null : template as any
  const access=starter?{sql:'1',values:[]}:await folderGuard(db,a,personal.folder_id,'template')
  let content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
- if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...editableVariableFields(content),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan}}
+ if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...(content.template_input??editableVariableFields(content)),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan};delete content.template_input}
  const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)
  need(content.currency === 'USD', 'Personal templates require USD content', 409)

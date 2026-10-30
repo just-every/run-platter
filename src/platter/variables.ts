@@ -28,9 +28,11 @@ export function unfilledVariableFields(row:any){
  for(const [path,pattern]of Object.entries(merge.patterns)){
   const keys=path.slice(1).split('/');let parent:any=fields
   for(const key of keys.slice(0,-1)){parent=parent?.[key];if(!parent)break}
-  // Numeric inputs need a valid inert price until a destination fills the pattern.
-  if(parent&&typeof parent==='object')parent[keys.at(-1)!]=/(?:price|priceOne|priceTwo|unitPrice|quantity)$/i.test(path)?'0.01':pattern
+  if(parent&&typeof parent==='object')parent[keys.at(-1)!]=pattern
  }
+ // Table-backed package totals and optional-item cents are derived source values.
+ // Recompute them only when the new client fills the editable pricing inputs.
+ fields.packages=fields.packages.map((p:any)=>({...p,...(fields.pricingTables.some((t:any)=>t.optionId===p.id)?{price:'0.01'}:{}),optionalItems:p.optionalItems.map(({unitCents,...item}:any)=>item)}))
  fields.document.merge={patterns:merge.patterns,values:{},...(merge.conditions?{conditions:merge.conditions}:{})}
  return fields
 }

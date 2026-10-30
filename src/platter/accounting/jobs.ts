@@ -1,6 +1,9 @@
 import type { Bindings } from '../../auth.server'
 import { providerCredential } from '../connections'
 import { commit, hash, need, text, type Actor } from '../model'
+import { adjustmentCommand } from './stripe'
+import { acceptedLines, invoiceLines, recheckLines, reviewedLines } from './lines'
+import { markMilestone, runScheduledInvoices, scheduleRows } from './schedule'
 import { lifecycleCommand } from './lifecycle'
 import { currentTime } from '../expiry-time'
 import { administrators } from '../permissions'
@@ -25,16 +28,16 @@ export function reader(env: Bindings, actor: Actor, config: any): QuickBooksAuth
  need(connection.version === config.connection_version && connection.account_id === config.account_id, 'QuickBooks connection changed', 409)
  return { token: secret.token, company: connection.account_id }
 } }
-async function planFor(env: Bindings, actor: Actor, input: Record<string, unknown>) {
+async function planFor(env: Bindings, actor: Actor, input: Record<string, unknown>, scheduled = false, mapped = false) {
  const db = env.DB, id = text(input.proposalId, 'an accepted proposal'), config = await configuration(env)
  const row = await db.prepare(`SELECT a.*,p.version AS proposal_version,p.client_id,p.status,f.method FROM p_acceptances a
  JOIN p_proposals p ON p.id=a.proposal_id JOIN p_clients c ON c.id=p.client_id
  JOIN p_signature_facts f ON f.proposal_id=a.proposal_id AND f.revision=a.revision WHERE a.proposal_id=?`).bind(id).first<any>()
  need(row?.status === 'accepted' && row.method === 'mailbox code', 'Review a mailbox-verified accepted agreement', 409)
  const snap = JSON.parse(row.snapshot), selection = snap.selection
- need(row.currency === 'USD' && !selection?.tax && !snap.options?.some((o: any) => o.tax), 'Only tax-free USD deposits are supported; accounting tax propagation is not available', 409)
+ need(row.currency === 'USD' && (mapped || !selection?.tax && !snap.options?.some((o: any) => o.tax)), 'Only tax-free USD deposits are supported; accounting tax propagation is not available', 409)
  need(!snap.recipient_plan?.length && !snap.collectionPolicy?.enabled, 'Only single-client agreements with collection off are supported', 409)
- need(!selection?.fees?.recurring?.length && !selection?.recurring && !selection?.recurringFees && !JSON.stringify(selection ?? {}).includes('"recurrence"') && !snap.options?.find((o: any) => o.id === row.option_id)?.recurrence, 'Recurring pricing requires future accounting support', 409)
+ need(scheduled || (!selection?.fees?.recurring?.length && !selection?.recurring && !selection?.recurringFees && !JSON.stringify(selection ?? {}).includes('"recurrence"') && !snap.options?.find((o: any) => o.id === row.option_id)?.recurrence), 'Recurring pricing requires explicit schedule authorization', 409)
  need(Number.isSafeInteger(row.deposit_cents) && row.deposit_cents > 0, 'The accepted agreement needs a positive deposit', 409)
  const name = text(snap.clientName, 'the accepted customer name', 100), authorize = reader(env, actor, config)
  const matches = await customerMatches(authorize, name)
@@ -42,13 +45,14 @@ async function planFor(env: Bindings, actor: Actor, input: Record<string, unknow
  need(!existing || existing.status === 'complete', 'This customer has a retained uncertain request. Reconcile it in QuickBooks; no blind replay is allowed.', 409)
  const choice = String(input.customerId ?? '')
  need(choice === 'new' ? matches.length === 0 && !existing : matches.some((c: any) => c.id === choice) && (!existing || existing.provider_id === choice), matches.length > 1 ? 'Customer matching is ambiguous. Explicitly select one returned QuickBooks customer.' : 'Explicitly choose the matched customer or create a new customer only when none matches', 409)
- const mapping = await itemMapping(authorize, providerId(input.itemId), providerId(input.incomeAccountId))
+ const lineDetails = mapped ? await reviewedLines(authorize,snap,row,input) : undefined
+ const mapping = lineDetails?.lines[0].mapping ?? await itemMapping(authorize, providerId(input.itemId), providerId(input.incomeAccountId))
  const invoice = await db.prepare('SELECT number FROM p_invoices WHERE proposal_id=?').bind(id).first<any>()
  const plan = { proposalId: id, proposalVersion: row.proposal_version, revision: row.revision, clientId: row.client_id, clientName: name,
   acceptedAt: row.accepted_at, acceptedDigest: await hash(row.snapshot), totalCents: row.total_cents, depositCents: row.deposit_cents, currency: row.currency,
   accountId: config.account_id, connectionVersion: config.connection_version, settingsVersion: config.version,
-  customer: { choice, matches }, mapping, number: invoice?.number ?? 'PL-' + id.replaceAll('-','').toUpperCase(),
-  title: snap.title, acceptedSelection: selection ?? { optionId: row.option_id },
+  customer: { choice, matches }, mapping, ...(lineDetails?{lineDetails}:{}), number: invoice?.number ?? 'PL-' + id.replaceAll('-','').toUpperCase(),
+  ...(scheduled ? { schedule: scheduleRows(snap) } : {}), title: snap.title, acceptedSelection: selection ?? { optionId: row.option_id },
   actorId: actor.id, actorRole: actor.role, operatorVersion: await operatorVersion(db, actor.id), memberVersion: actor.memberVersion ?? 0 }
  return { plan, config }
 }
@@ -56,11 +60,13 @@ export async function accountingState(env: Bindings, actor: Actor) {
  if (!administrators.includes(actor.role)) return undefined
  const settings = await env.DB.prepare('SELECT * FROM p_accounting_settings WHERE singleton=1').first<any>()
  const jobs = (await env.DB.prepare('SELECT j.*,EXISTS(SELECT 1 FROM p_accounting_job_authority a WHERE a.proposal_id=j.proposal_id) AS executable FROM p_accounting_jobs j ORDER BY authorized_at DESC LIMIT 100').all<any>()).results
- return { observations: (await env.DB.prepare('SELECT * FROM p_accounting_observations').all<any>()).results, postings: (await env.DB.prepare('SELECT * FROM p_accounting_postings').all<any>()).results, settings: settings ? { ...settings, active: Boolean(await env.DB.prepare(live).first()) } : null, locked: Boolean(jobs.length), jobs, requests: (await env.DB.prepare('SELECT * FROM p_accounting_requests ORDER BY requested_at,request_id').all<any>()).results, customers: (await env.DB.prepare('SELECT * FROM p_accounting_customers').all<any>()).results }
+ return { adjustments:(await env.DB.prepare('SELECT * FROM p_accounting_adjustments ORDER BY requested_at').all<any>()).results, amounts: (await env.DB.prepare('SELECT * FROM p_accounting_amounts ORDER BY proposal_id,amount_index').all<any>()).results, amountObservations: (await env.DB.prepare('SELECT * FROM p_accounting_amount_observations').all<any>()).results, observations: (await env.DB.prepare('SELECT * FROM p_accounting_observations').all<any>()).results, postings: (await env.DB.prepare('SELECT * FROM p_accounting_postings').all<any>()).results, settings: settings ? { ...settings, active: Boolean(await env.DB.prepare(live).first()) } : null, locked: Boolean(jobs.length), jobs, requests: (await env.DB.prepare('SELECT * FROM p_accounting_requests ORDER BY requested_at,request_id').all<any>()).results, customers: (await env.DB.prepare('SELECT * FROM p_accounting_customers').all<any>()).results }
 }
 export async function accountingCommand(env: Bindings, actor: Actor, name: string, input: Record<string, unknown>) {
  need(administrators.includes(actor.role), 'Only owner and admins review accounting requests', 403)
  const db = env.DB, at = await currentTime(db)
+ if (name==='accounting.adjustment.review'||name==='accounting.adjustment.apply')return adjustmentCommand(env,actor,name,input)
+ if (name==='accounting.milestone') return markMilestone(env,actor,input)
  if (['accounting.readback','accounting.payment.review','accounting.payment.apply'].includes(name)) return lifecycleCommand(env,actor,name,input)
  if (name === 'accounting.configure') {
   need(actor.role === 'owner', 'Only the owner chooses the invoice authority', 403)
@@ -79,12 +85,12 @@ export async function accountingCommand(env: Bindings, actor: Actor, name: strin
  if (name === 'accounting.dispatch') { await commit(db, actor, []); await runAccounting(env); return { saved: true } }
  if (name === 'accounting.customers') {
   const config = await configuration(env)
-  const row = await db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(text(input.proposalId,'an accepted proposal')).first<any>()
+  const row = await db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(text(input.proposalId,'an accepted proposal')).first<any>()
   need(row, 'Choose an accepted agreement', 409)
-  return { accountingMatches: true, proposalId: input.proposalId, matches: await customerMatches(reader(env, actor, config), text(JSON.parse(row.snapshot).clientName,'the accepted customer name',100)) }
+  return { accountingMatches: true, proposalId: input.proposalId, lines:acceptedLines(JSON.parse(row.snapshot),row), tax:JSON.parse(row.snapshot).selection?.tax??null, hasSchedule:Boolean(JSON.parse(row.snapshot).paymentSchedule?.rows?.length>1), matches: await customerMatches(reader(env, actor, config), text(JSON.parse(row.snapshot).clientName,'the accepted customer name',100)) }
  }
- if (name === 'accounting.review') {
-  const { plan, config } = await planFor(env, actor, input), encoded = canonical(plan), digest = await hash(encoded), id = crypto.randomUUID()
+ if (name === 'accounting.review' || name === 'accounting.review-scheduled' || name === 'accounting.review-mapped') {
+  const { plan, config } = await planFor(env, actor, input, name === 'accounting.review-scheduled' || name === 'accounting.review-mapped' && input.includeSchedule === 'yes', name === 'accounting.review-mapped'), encoded = canonical(plan), digest = await hash(encoded), id = crypto.randomUUID()
   await commit(db, actor, [db.prepare('INSERT INTO p_accounting_reviews VALUES(?,?,?,?,?,?,NULL)').bind(id, plan.proposalId, actor.id, digest, encoded, at + 600000)], false, configGuard(config))
   return { accountingReview: true, id, digest, plan }
  }
@@ -95,7 +101,7 @@ export async function accountingCommand(env: Bindings, actor: Actor, name: strin
  if (previous) return { accountingResult: true, status: previous.status, message: 'This deposit already has one retained accounting request. It is never posted twice.' }
  need(!review.consumed_at && review.expires_at > at && (input.consent === true || input.consent === 'yes'), 'The review expired or consent is missing. Review again.', 409)
  const recorded = JSON.parse(review.plan)
- const { plan, config } = await planFor(env, actor, { proposalId: recorded.proposalId, customerId: recorded.customer.choice, itemId: recorded.mapping.itemId, incomeAccountId: recorded.mapping.accountId })
+ const { plan, config } = await planFor(env, actor, { proposalId: recorded.proposalId, customerId: recorded.customer.choice, itemId: recorded.mapping.itemId, incomeAccountId: recorded.mapping.accountId, lineMappings:recorded.lineDetails?.lines.map((l:any)=>({key:l.key,itemId:l.mapping.itemId,incomeAccountId:l.mapping.accountId})),taxGroupId:recorded.lineDetails?.taxMapping?.id }, Boolean(recorded.schedule), Boolean(recorded.lineDetails))
  need(canonical(plan) === review.plan, 'The accepted deposit, customer match, mapping, authority or connection changed. Review again.', 409)
  const guard = configGuard(config)
  guard.sql += ' AND EXISTS(SELECT 1 FROM p_accounting_reviews WHERE id=? AND consumed_at IS NULL AND expires_at>?) AND EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status=\'accepted\')'
@@ -103,6 +109,7 @@ export async function accountingCommand(env: Bindings, actor: Actor, name: strin
  await commit(db, actor, [
   db.prepare('UPDATE p_accounting_reviews SET consumed_at=? WHERE id=?').bind(at, review.id),
   db.prepare(`INSERT INTO p_accounting_jobs(proposal_id,review_id,account_id,client_id,revision,settings_version,connection_version,authorized_by,actor_role,operator_version,member_version,plan,authorized_at,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'queued')`).bind(plan.proposalId, review.id, plan.accountId, plan.clientId, plan.revision, plan.settingsVersion, plan.connectionVersion, actor.id, actor.role, plan.operatorVersion, plan.memberVersion, review.plan, at),
+  ...(plan.schedule??[]).flatMap((row:any,index:number)=>index>0&&row.amountCents>0?[db.prepare("INSERT INTO p_accounting_amounts(proposal_id,amount_index,row_json,amount_cents,status) VALUES(?,?,?,?,'scheduled')").bind(plan.proposalId,index,canonical(row),row.amountCents)]:[]),
   db.prepare('INSERT INTO p_accounting_job_authority VALUES(?)').bind(plan.proposalId),
   db.prepare(`INSERT INTO p_accounting_customers VALUES(?,?,?,?,?) ON CONFLICT(account_id,client_id) DO NOTHING`).bind(plan.accountId, plan.clientId, plan.customer.choice === 'new' ? null : plan.customer.choice, plan.clientName, plan.customer.choice === 'new' ? 'reserved' : 'complete')
  ], false, guard)
@@ -148,6 +155,7 @@ export async function runAccounting(env: Bindings) {
    const plan = JSON.parse(job.plan), authorize = () => execution(env,job)
    await authorize()
    // Re-read the reviewed provider mapping before the first write as well.
+   if(plan.lineDetails)await recheckLines(authorize,plan)
    need(canonical(await itemMapping(authorize,plan.mapping.itemId,plan.mapping.accountId)) === canonical(plan.mapping), 'The reviewed QuickBooks item mapping changed', 409)
    let customer = await db.prepare('SELECT * FROM p_accounting_customers WHERE account_id=? AND client_id=?').bind(job.account_id,job.client_id).first<any>()
    need(customer && customer.name === plan.clientName, 'The retained customer mapping changed', 409)
@@ -166,8 +174,9 @@ export async function runAccounting(env: Bindings) {
     need(matches.some((c: any) => c.id === customer.provider_id), 'The reviewed QuickBooks customer is no longer available', 409)
    }
    need(canonical(await itemMapping(authorize,plan.mapping.itemId,plan.mapping.accountId)) === canonical(plan.mapping), 'The reviewed QuickBooks item mapping changed before invoice creation', 409)
+   if(plan.lineDetails)await recheckLines(authorize,plan)
    const day = new Date(plan.acceptedAt).toISOString().slice(0,10)
-   const invoice = { CustomerRef: { value: customer.provider_id }, DocNumber: plan.number.slice(0,21), PrivateNote: 'Platter deposit ' + plan.number, TxnDate: day, DueDate: day, CurrencyRef: { value: 'USD' }, GlobalTaxCalculation: 'NotApplicable', Line: [{ Amount: plan.depositCents / 100, DetailType: 'SalesItemLineDetail', Description: 'Deposit: ' + plan.title, SalesItemLineDetail: { ItemRef: { value: plan.mapping.itemId }, Qty: 1, UnitPrice: plan.depositCents / 100, TaxCodeRef: { value: 'NON' } } }] }
+   const invoice = { CustomerRef: { value: customer.provider_id }, DocNumber: plan.number.slice(0,21), PrivateNote: 'Platter deposit ' + plan.number, TxnDate: day, DueDate: day, CurrencyRef: { value: 'USD' }, ...invoiceLines(plan,plan.depositCents) }
    const id = await write(env,job,'invoice',invoice,authorize)
    await db.prepare("UPDATE p_accounting_jobs SET status='complete',provider_id=?,completed_at=?,reason=NULL WHERE proposal_id=?").bind(id,await currentTime(db),job.proposal_id).run()
   } catch {
@@ -175,4 +184,5 @@ export async function runAccounting(env: Bindings) {
    await db.prepare("UPDATE p_accounting_jobs SET status='held',reason='Accounting request held. Review authority, matching and retained receipts in QuickBooks; uncertain writes are never automatically replayed.' WHERE proposal_id=?").bind(job.proposal_id).run()
   }
  }
+ await runScheduledInvoices(env)
 }

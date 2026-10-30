@@ -13,7 +13,10 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { getPlatformProxy } from 'wrangler'
 import { harness } from './harness.mjs'
-const exec = promisify(execFile)
+const runFile = promisify(execFile)
+// Wrangler repeats the entire migration table after each applied file.
+// Keep that growing setup transcript separate from the business command limits.
+const exec = (file,args,options) => runFile(file,args,{...options,...(args.includes('migrations')&&args.includes('apply')?{maxBuffer:8e6}:{})})
 const cli = resolve('node_modules/@runeditrun/rer/global/rer.mjs')
 const command = async (cwd, args, expected = 0) => {
   let result
@@ -1077,7 +1080,8 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
 
 test('ACCT-001 public CLI retains exact QuickBooks accounting custody without credentials or synchronization authority', {timeout:300000}, async () => {
  const {quickbooksFixture,connectQuickbooks,acceptedQuickbooksAgreement,quickbooksReviewInput}=await import('./provider-network.mjs')
- const temporary=await mkdtemp(join(tmpdir(),'platter-accounting-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=quickbooksFixture()
+ const {quickbooksMoneyFixture,postStripeReceipt}=await import('./quickbooks-money.mjs')
+ const temporary=await mkdtemp(join(tmpdir(),'platter-accounting-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=quickbooksMoneyFixture()
  let h
  try {
   for(const path of [source,restored])await checkout(path)
@@ -1086,21 +1090,33 @@ test('ACCT-001 public CLI retains exact QuickBooks accounting custody without cr
   await connectQuickbooks(h,fake)
   const complete=await acceptedQuickbooksAgreement(h,'Retained accounting agreement')
   const invoice=await h.cmd('invoice.export',{id:complete.proposal.id})
-  const review=await h.cmd('accounting.review',quickbooksReviewInput(complete,fake))
+  const review=await h.cmd('accounting.review-scheduled',quickbooksReviewInput(complete,fake))
   await h.cmd('accounting.apply',{id:review.id,digest:review.digest,consent:true});await h.cmd('accounting.dispatch',{})
+  await h.cmd('accounting.milestone',{proposalId:complete.proposal.id,amountIndex:1,event:'Delivery complete',consent:true})
+  await h.cmd('accounting.dispatch',{})
+  await h.cmd('accounting.readback',{proposalId:complete.proposal.id,amountIndex:1})
   const receipt=await h.cmd('payment.record',{id:complete.proposal.id,method:'check',amount:'100.01',reference:'Retained synthetic check',receivedOn:'2030-03-02',consent:true})
   const paymentReview=await h.cmd('accounting.payment.review',{paymentId:receipt.id,depositAccountId:fake.bank})
   await h.cmd('accounting.payment.apply',{id:paymentReview.id,digest:paymentReview.digest,consent:true})
   await h.cmd('accounting.readback',{proposalId:complete.proposal.id})
+  const stripe=await acceptedQuickbooksAgreement(h,'Archived Stripe agreement')
+  const stripeReview=await h.cmd('accounting.review',quickbooksReviewInput(stripe,fake))
+  await h.cmd('accounting.apply',{id:stripeReview.id,digest:stripeReview.digest,consent:true});await h.cmd('accounting.dispatch',{})
+  const payment=await postStripeReceipt(h,fake,stripe)
+  const reflect=async input=>{const r=await h.cmd('accounting.adjustment.review',input);await h.cmd('accounting.adjustment.apply',{id:r.id,digest:r.digest,consent:true})}
+  await reflect({kind:'fee',paymentId:payment.id,expenseAccountId:fake.expense})
+  await reflect({kind:'payout',paymentId:payment.id,payoutId:fake.payoutId,bankAccountId:fake.bank})
+  const refund=await h.cmd('payment.refund',{paymentId:payment.id,amount:'100',requestId:'synthetic-platter-archive-refund',reason:'Retained refund',consent:true})
+  await reflect({kind:'refund',paymentId:payment.id,refundId:refund.id})
   const queued=await acceptedQuickbooksAgreement(h,'Queued accounting agreement',complete.client.id)
   const queuedReview=await h.cmd('accounting.review',quickbooksReviewInput(queued,fake,[...fake.customers.keys()][0]))
   await h.cmd('accounting.apply',{id:queuedReview.id,digest:queuedReview.digest,consent:true})
-  const tables=['p_accounting_settings','p_accounting_jobs','p_accounting_requests','p_accounting_customers','p_accounting_postings','p_accounting_observations','p_acceptances','p_invoices']
+  const tables=['p_accounting_settings','p_accounting_jobs','p_accounting_requests','p_accounting_customers','p_accounting_adjustments','p_payment_records','p_refunds','p_accounting_amounts','p_accounting_amount_observations','p_accounting_postings','p_accounting_observations','p_acceptances','p_invoices']
   const before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
-  assert.deepEqual(before.p_accounting_jobs.map(j=>j.status).sort(),['complete','queued'])
+  assert.deepEqual(before.p_accounting_jobs.map(j=>j.status).sort(),['complete','complete','queued'])
   await h.close();h=undefined
   const archive=join(temporary,'accounting.rer');await command(source,['export','--output',archive])
-  const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(fake.token))
+  const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(fake.token));assert.ok(!contents.includes(fake.stripeToken))
   const records=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
   const local=['p_accounting_reviews','p_accounting_authority','p_accounting_job_authority','p_connection_secrets']
   for(const table of local)assert.equal(records.filter(r=>r.table===table).length,0)
@@ -1122,6 +1138,6 @@ test('ACCT-001 public CLI retains exact QuickBooks accounting custody without cr
   assert.equal(receiver.calls.length,calls,'fresh reconnection and owner authorization cannot execute restored requests')
   await h.cmd('accounting.readback',{proposalId:complete.proposal.id},owner,409)
   assert.equal(receiver.calls.length,calls,'restored observations confer no read or write authority')
-  for(const table of ['p_accounting_postings','p_accounting_observations','p_accounting_jobs','p_accounting_requests','p_accounting_customers'])assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table])
+  for(const table of ['p_accounting_adjustments','p_payment_records','p_refunds','p_accounting_amounts','p_accounting_amount_observations','p_accounting_postings','p_accounting_observations','p_accounting_jobs','p_accounting_requests','p_accounting_customers'])assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table])
  } finally {await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

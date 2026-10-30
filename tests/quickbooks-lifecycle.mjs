@@ -55,3 +55,94 @@ export async function quickbooksLifecycle(){
   assert.equal(fake.calls.length,disconnected)
  }finally{await h.close()}
 }
+
+export async function quickbooksSchedule(){
+ const fake=quickbooksFixture(),h=await harness({outboundService:fake.outboundService})
+ const tick=async day=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(day+'T15:00:00Z'),cron:'*/15 * * * *'})
+ const apply=async(a)=>{const review=await h.cmd('accounting.review-scheduled',quickbooksReviewInput(a,fake));await h.cmd('accounting.apply',{id:review.id,digest:review.digest,consent:true});return review}
+ try{
+  await tick('2030-03-01');await connectQuickbooks(h,fake)
+  const event=await acceptedQuickbooksAgreement(h,'Scheduled delivery',undefined,{paymentTerms:{netDays:30,milestones:[{label:'Delivery',percent:100,event:'Delivery complete'}],retainer:null}})
+  const review=await apply(event)
+  assert.equal(review.plan.schedule[1].amountCents,75002)
+  await h.cmd('accounting.dispatch',{})
+  assert.equal(fake.invoices.size,1,'acceptance and deposit issue never create an event milestone early')
+  const index=1,proposalId=event.proposal.id
+  await h.cmd('accounting.milestone',{proposalId,amountIndex:index,event:'Wrong event',consent:true},h.owner,409)
+  await h.cmd('accounting.dispatch',{});assert.equal(fake.invoices.size,1)
+  await h.cmd('accounting.milestone',{proposalId,amountIndex:index,event:'Delivery complete',consent:true})
+  await Promise.all([h.cmd('accounting.dispatch',{}),h.cmd('accounting.dispatch',{}),tick('2030-03-01')])
+  assert.equal(fake.invoices.size,2)
+  const milestone=[...fake.invoices.values()][1]
+  assert.equal(milestone.TotalAmt,750.02);assert.equal(milestone.TxnDate,'2030-03-01');assert.equal(milestone.DueDate,'2030-03-31')
+  assert.equal(milestone.Line[0].Description,'Delivery')
+  await h.cmd('accounting.milestone',{proposalId,amountIndex:index,event:'Delivery complete',consent:true},h.owner,409)
+  await h.cmd('accounting.dispatch',{});assert.equal(fake.invoices.size,2)
+  const receipt=await h.cmd('payment.record',{id:proposalId,method:'wire',amount:'750.02',reference:'Synthetic milestone wire',receivedOn:'2030-03-02',consent:true})
+  const payment=await h.cmd('accounting.payment.review',{paymentId:receipt.id,amountIndex:1,depositAccountId:fake.bank})
+  await h.cmd('accounting.payment.apply',{id:payment.id,digest:payment.digest,consent:true})
+  assert.equal([...fake.payments.values()][0].Line[0].LinkedTxn[0].TxnId,milestone.Id)
+  assert.equal((await h.cmd('accounting.readback',{proposalId,amountIndex:1})).status,'paid')
+  assert.equal((await h.state()).accounting.amountObservations[0].balance_cents,0)
+
+  const dated=await acceptedQuickbooksAgreement(h,'Date invoice',undefined,{paymentTerms:{netDays:15,milestones:[{label:'Dated delivery',percent:100,date:'2030-03-10'}]}})
+  await apply(dated);await h.cmd('accounting.dispatch',{})
+  assert.equal(fake.invoices.size,3)
+  await tick('2030-03-09');assert.equal(fake.invoices.size,3)
+  await tick('2030-03-10');assert.equal(fake.invoices.size,4)
+  const datedInvoice=[...fake.invoices.values()][3]
+  assert.equal(datedInvoice.TxnDate,'2030-03-10');assert.equal(datedInvoice.DueDate,'2030-03-25')
+
+  const recurring=await acceptedQuickbooksAgreement(h,'Recurring invoice',undefined,{packages:[{id:'one',label:'Monthly consulting',price:'1'}],pricingTables:[{optionId:'one',name:'Consulting',lines:[{name:'Monthly care',quantity:'1',unit:'service',unitPrice:'1200',interval:'monthly',term:2,startsOn:'2030-04-01'}]}],paymentTerms:null})
+  await h.cmd('accounting.review',quickbooksReviewInput(recurring,fake),h.owner,409)
+  const recurringReview=await apply(recurring)
+  assert.deepEqual(recurringReview.plan.schedule.map(r=>r.amountCents),[60000,60000,120000])
+  await h.cmd('accounting.dispatch',{});assert.equal(fake.invoices.size,5)
+  await tick('2030-03-31');assert.equal(fake.invoices.size,5)
+  await tick('2030-04-01');assert.equal(fake.invoices.size,6)
+  assert.equal([...fake.invoices.values()][5].TotalAmt,600)
+  await Promise.all([tick('2030-04-01'),h.cmd('accounting.dispatch',{})]);assert.equal(fake.invoices.size,6)
+  fake.setTimeout('invoice');await tick('2030-05-01');assert.equal(fake.invoices.size,7)
+  fake.setTimeout(undefined);await tick('2030-06-01');await h.cmd('accounting.dispatch',{});assert.equal(fake.invoices.size,7)
+  assert.equal((await h.state()).accounting.amounts.find(a=>a.proposal_id===recurring.proposal.id&&a.amount_index===2).status,'held')
+ }finally{await h.close()}
+}
+
+export async function quickbooksTaxedLines(){
+ const {configureTaxes,taxRequest,taxPackages,taxTables}=await import('./taxes-fixture.mjs')
+ const fake=quickbooksFixture(),h=await harness({outboundService:fake.outboundService})
+ try{
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-03-01T15:00:00Z'),cron:'*/15 * * * *'})
+  await connectQuickbooks(h,fake);await configureTaxes(h.cmd)
+  const secondItem='synthetic-platter-9410',secondAccount='synthetic-platter-9411'
+  fake.items.set(secondItem,{Id:secondItem,Name:'Non-taxable consulting',Active:true,Type:'Service',IncomeAccountRef:{value:secondAccount}})
+  fake.accounts.set(secondAccount,{Id:secondAccount,Name:'Other consulting income',Active:true,AccountType:'Income'})
+  const tables=taxTables().map(t=>({...t,lines:t.lines.map((l,i)=>({...l,incomeAccount:i?secondAccount:fake.incomeAccount}))}))
+  const agreement=await acceptedQuickbooksAgreement(h,'Frozen Austin lines',undefined,{packages:taxPackages(),pricingTables:tables,tax:taxRequest(),paymentTerms:{netDays:30,milestones:[{label:'Delivery',percent:100,event:'Delivery complete'}]}})
+  const input={...quickbooksReviewInput(agreement,fake),lineMappings:[{key:'0',itemId:fake.item,incomeAccountId:fake.incomeAccount},{key:'1',itemId:secondItem,incomeAccountId:secondAccount}],taxGroupId:fake.taxGroup,includeSchedule:'yes'}
+  await h.cmd('accounting.review',quickbooksReviewInput(agreement,fake),h.owner,409)
+  await h.cmd('accounting.review-mapped',{...input,lineMappings:input.lineMappings.slice(0,1)},h.owner,409)
+  await h.cmd('accounting.review-mapped',{...input,lineMappings:[input.lineMappings[0],{...input.lineMappings[1],itemId:fake.item,incomeAccountId:fake.incomeAccount}]},h.owner,409)
+  const review=await h.cmd('accounting.review-mapped',input)
+  assert.equal(review.plan.depositCents,39563);assert.equal(review.plan.lineDetails.tax.taxCents,8250)
+  assert.deepEqual(review.plan.lineDetails.lines.map(l=>[l.netCents,l.taxCode,l.mapping.accountId]),[[100000,'synthetic-platter-service',fake.incomeAccount],[50000,'synthetic-platter-nontaxable',secondAccount]])
+  fake.taxRates.get('synthetic-platter-9401').RateValue=7
+  await h.cmd('accounting.apply',{id:review.id,digest:review.digest,consent:true},h.owner,409)
+  assert.equal(fake.invoices.size,0);assert.equal((await h.state()).accounting.jobs.length,0)
+  fake.taxRates.get('synthetic-platter-9401').RateValue=6.25
+  await h.cmd('accounting.apply',{id:review.id,digest:review.digest,consent:true});await h.cmd('accounting.dispatch',{})
+  assert.equal(fake.invoices.size,1)
+  const invoice=[...fake.invoices.values()][0]
+  assert.equal(invoice.TotalAmt,395.63)
+  assert.deepEqual(invoice.Line.map(l=>[l.Amount,l.SalesItemLineDetail.ItemRef.value,l.SalesItemLineDetail.TaxCodeRef.value]),[[250,fake.item,'TAX'],[125,secondItem,'NON']])
+  assert.equal(invoice.TxnTaxDetail.TotalTax,20.63);assert.equal(invoice.TxnTaxDetail.TxnTaxCodeRef.value,fake.taxGroup)
+  assert.deepEqual(invoice.TxnTaxDetail.TaxLine.map(l=>[l.Amount,l.TaxLineDetail.TaxPercent,l.TaxLineDetail.NetAmountTaxable]),[[15.63,6.25,250],[2.5,1,250],[2.5,1,250]])
+  await h.cmd('accounting.milestone',{proposalId:agreement.proposal.id,amountIndex:1,event:'Delivery complete',consent:true});await h.cmd('accounting.dispatch',{})
+  const balance=[...fake.invoices.values()][1]
+  assert.equal(balance.TotalAmt,1186.87);assert.deepEqual(balance.Line.map(l=>l.Amount),[750,375]);assert.equal(balance.TxnTaxDetail.TotalTax,61.87)
+  assert.equal(invoice.TxnTaxDetail.TotalTax+balance.TxnTaxDetail.TotalTax,82.5)
+  const immutable=JSON.parse((await h.state()).accounting.jobs[0].plan).lineDetails
+  await h.cmd('tax.rate',{version:5,level:'state',region:'TX',percent:'7',startsOn:'2029-01-01'})
+  assert.deepEqual(JSON.parse((await h.state()).accounting.jobs[0].plan).lineDetails,immutable)
+ }finally{await h.close()}
+}

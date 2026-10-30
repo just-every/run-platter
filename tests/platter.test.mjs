@@ -3818,4 +3818,7 @@ test('ACCT-001 reviewed QuickBooks deposits preserve accepted cents, explicit ma
   assert.ok(!JSON.stringify(await h.state()).includes(fake.token),'accounting state never exposes provider credentials')
  } finally {await h.close()}
  await (await import('./quickbooks-lifecycle.mjs')).quickbooksLifecycle()
+ await (await import('./quickbooks-lifecycle.mjs')).quickbooksSchedule()
+ await (await import('./quickbooks-lifecycle.mjs')).quickbooksTaxedLines()
+ await (await import('./quickbooks-money.mjs')).quickbooksMoney()
 })

@@ -2822,7 +2822,7 @@
       "executable": false
     },
     "src/platter/movein/qwilr-ignition-export.ts": {
-      "sha256": "6a251c4ea5b8f01ced816e349b22e81a44ea951abb1762c39f75bf7c665e1e1c",
+      "sha256": "584b703fd76f88172bd92ae029182c26eaa3ef58d52d12639e0a92954060d7ac",
       "executable": false
     },
     "src/platter/movein/schema.sql": {
@@ -3482,7 +3482,7 @@
       "executable": false
     },
     "tests/document-movein-fixture.mjs": {
-      "sha256": "45fa1c5937548c621a7a2cb16b3324bc7d07e88e64ccdad3ddef09c9c21dac7b",
+      "sha256": "606dd9627a4c226f4a54c1bfaacfef9e90787fcb38810dd315d088a3313a569a",
       "executable": false
     },
     "tests/drive-fixture.mjs": {

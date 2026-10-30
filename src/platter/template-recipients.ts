@@ -11,7 +11,12 @@ export function templateRecipients(row:any):TemplateRecipients|null {
 /** Capture definitions, never ordinary recipient mailboxes or invitation capabilities. */
 export function captureTemplateRecipients(content:any,a:Actor,preassignedOwner:unknown=undefined):TemplateRecipients|null {
  const plan=recipientPlan(content),previous=templateRecipients(content)
- if(!plan.length){need(!previous,'Keep the captured template roles or explicitly replace their definitions',409);return null}
+ if(!plan.length){
+  need(!previous,'Keep the captured template roles or explicitly replace their definitions',409)
+  need(!documentOf(content).blocks.some(b=>['field','signature'].includes(b.type)&&b.recipientRole==='slot'),'Assign every template field to a defined role before publication')
+  need(!preassignedOwner,'Add template role slots before preassigning an owner')
+  return null
+ }
  need(a.role==='owner','Only the current owner manages template recipient definitions',403)
  const clean=recipientInput(plan,a)
  need(new Set(clean.map(r=>r.name.toLowerCase())).size===clean.length,'Template role names must be distinct')

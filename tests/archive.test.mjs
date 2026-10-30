@@ -597,7 +597,11 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const withdrawRow=(await h.state()).proposals.find(r=>r.id===voided.id)
   await h.cmd('proposal.withdraw',{id:voided.id,version:withdrawRow.version,reason:'Void before completion',notice:true})
   const {templateRolesFixture}=await import('./templates-http.mjs')
-  const templateRoles=await templateRolesFixture(h),roleState=await h.state(),roleTemplate=roleState.templates.find(t=>t.id===templateRoles.template.id),roleDraft=roleState.proposals.find(p=>p.id===templateRoles.first.id)
+  const templateRoles=await templateRolesFixture(h)
+  const captured=(await h.state()).templates.find(t=>t.id===templateRoles.template.id).snapshot.template_recipients
+  await h.cmd('template.recipients',{id:templateRoles.template.id,version:1,roles:captured.roles.map(r=>({...r,group:r.id==='cfo'?1:r.id==='client'?2:3})),preassignedOwner:'owner'})
+  const nextRoleDraft=await h.cmd('template.start',{id:templateRoles.template.id,version:2,clientId:templateRoles.client.id})
+  const roleState=await h.state(),roleTemplate=roleState.templates.find(t=>t.id===templateRoles.template.id),roleDraft=roleState.proposals.find(p=>p.id===templateRoles.first.id),nextRoleSnapshot=roleState.proposals.find(p=>p.id===nextRoleDraft.id)
   const signatures=(await h.db.prepare('SELECT * FROM p_recipient_signatures ORDER BY proposal_id,revision,slot_id').all()).results
   const voids=(await h.db.prepare('SELECT * FROM p_void_signatures ORDER BY proposal_id,revision').all()).results
   assert.equal(signatures.length,4);assert.equal(voids.length,1)
@@ -627,6 +631,8 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
   assert.deepEqual(after.templates.find(t=>t.id===roleTemplate.id),roleTemplate)
   assert.deepEqual(after.proposals.find(p=>p.id===roleDraft.id),roleDraft)
+  assert.deepEqual(after.proposals.find(p=>p.id===nextRoleDraft.id),nextRoleSnapshot)
+  assert.deepEqual(JSON.parse(roleDraft.recipient_plan).map(r=>r.group),[1,2,3]);assert.deepEqual(JSON.parse(nextRoleSnapshot.recipient_plan).map(r=>r.group),[2,1,3])
   const roleCopy=await h.cmd('proposal.duplicate',{id:roleDraft.id,version:1},owner),copiedRole=(await h.state(owner)).proposals.find(p=>p.id===roleCopy.id)
   assert.deepEqual(copiedRole.template_recipients,roleDraft.template_recipients);assert.deepEqual(copiedRole.document,roleDraft.document)
   assert.deepEqual(copiedRole.recipient_plan,roleDraft.recipient_plan);assert.deepEqual(copiedRole.recipientLinks,[]);assert.deepEqual(copiedRole.recipientSignatures,[]);assert.equal(copiedRole.approved_by,null)

@@ -260,6 +260,8 @@ async function templateRolesHttp(h,member) {
  await h.cmd('proposal.document',{id:source.id,version:1,document:extra})
  await unchanged(()=>h.cmd('template.save',{id:source.id,version:2,name:'Invalid extra signature',preassignedOwner:'owner'},h.owner,400))
  await unchanged(()=>h.cmd('template.save',{id:source.id,version:1,name:'Stale source'},h.owner,409))
+ const orphan=await h.cmd('proposal.prepare',{...fields,recipientPlan:[],document:extra})
+ await unchanged(()=>h.cmd('template.save',{id:orphan.id,version:1,name:'Missing template role definitions'},h.owner,400))
  assert.deepEqual((await state(first.id)).template_recipients,definition)
  // Replacing a role-bearing shared template is also a definition change.
  const shared=await h.cmd('template.save',{id:first.id,version:sent.version,name:'Shared role definitions',shared:true,shareConsent:true,preassignedOwner:'owner'})

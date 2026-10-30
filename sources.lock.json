@@ -3462,7 +3462,7 @@
       "executable": false
     },
     "tests/conditional-browser.mjs": {
-      "sha256": "f6ee8547ee665c0ad38a89585dee7db06fa6b318cf2fac69dd4558d95678ad13",
+      "sha256": "22cf44bce991046c9dcea54dcf48c5789f8dfa40d07d3392ff5c6904114f5840",
       "executable": false
     },
     "tests/conditional-journey.mjs": {

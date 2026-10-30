@@ -81,3 +81,24 @@ returns the same request. Editing the proposal makes the old request visibly sta
 The owner can dismiss it, or mark it fulfilled only after that same revision was
 actually sent. Requests and their opaque key provenance travel in business archives;
 the credentials themselves never do.
+
+## Computed draft facts
+
+Successful MCP `prepare_proposal`, `prepare_from_template` and `revise_proposal`
+calls retain the native draft result in the text content and add
+`_meta.classification`. Its `classes` contains `standard`; `proposal` identifies
+the exact saved revision and resulting version. A template-derived draft also
+names the source template ID and version used. Counts come from the saved native
+revision after the ordinary input validation and version checks.
+
+The `facts` object counts one `affectedProposalCount`, each priced table line
+(or one row for a flat package) in `pricedRowCount`, and every offered optional
+item in `optionalItemCount`. `itemCount` sums the latter two counts across all
+offered packages. Quantities and client selection do not multiply or remove
+these records. Caller-supplied class arguments are refused; class labels or
+instructions inside proposal content cannot change the computed facts.
+
+`_meta.companyPolicy` separately reports `evaluated: false` and `decision: null`.
+The classification describes the prepared revision and grants no approval,
+sending, signing or refund authority. Other action classes and company-policy
+execution remain unfinished.

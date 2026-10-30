@@ -42,3 +42,34 @@ export async function applyMovein(h,fixture,cookie=h.owner) {
  while(result.job.state!=='completed')result=await h.cmd('document-import.continue',{id},cookie)
  return {id,reviewed,result}
 }
+
+export async function betterProposalsFixture() {
+ const {betterProposalsContacts}=await import('./business-import-fixture.mjs'),{csv,mapping}=betterProposalsContacts()
+ const pdfs=[]
+ for(let i=1;i<=30;i++){
+  const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica)
+  pdf.setTitle('Better Proposals supplied proposal '+i);pdf.setCreationDate(new Date('2026-01-15T12:00:00Z'))
+  pdf.addPage().drawText('Synthetic platter '+i+' supplied terms and exact original',{x:40,y:700,size:16,font})
+  if(i<=24)pdf.addPage().drawText('Signature page - supplied source evidence '+i,{x:40,y:700,size:16,font})
+  pdfs.push({filename:'proposal-'+i+'.pdf',bytes:Buffer.from(await pdf.save())})
+ }
+ const contacts={filename:'better-proposals-contacts.csv',bytes:Buffer.from(csv)}
+ const bindings=Object.fromEntries(pdfs.map((p,i)=>[hash(p.bytes),i===23?'held':i%2?'bp-contact-2':'bp-contact-1']))
+ return {pdfs,contacts,review:{contactsFile:hash(contacts.bytes),mapping,bindings,contactChoices:{'bp-contact-3':'include','bp-contact-4':'held'}}}
+}
+export async function startBetterProposals(h,fixture,cookie=h.owner) {
+ const {id}=await h.cmd('document-import.create',{label:'Synthetic Better Proposals move-in',sourceKind:'betterproposals'},cookie)
+ for(const file of [...fixture.pdfs,fixture.contacts])await uploadMovein(h,id,file,cookie)
+ return id
+}
+export async function finishMovein(h,id,cookie=h.owner,undo=false) {
+ let result,steps=0
+ do { assert.ok(++steps<100,'bounded move-in progresses');result=await h.cmd('document-import.'+(undo?'undo':'continue'),{id},cookie) } while(result.job.state!==(undo?'undone':'completed'))
+ return result
+}
+export async function applyBetterProposals(h,fixture,cookie=h.owner) {
+ const id=await startBetterProposals(h,fixture,cookie),preview=await h.cmd('document-import.preview',{id,...fixture.review},cookie)
+ assert.equal(preview.canApply,true,JSON.stringify(preview))
+ await h.cmd('document-import.apply',{id,...fixture.review,fingerprint:preview.fingerprint},cookie)
+ return {id,preview,...await finishMovein(h,id,cookie)}
+}

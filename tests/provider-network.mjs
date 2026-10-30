@@ -1,4 +1,5 @@
 // Bridge the worker request implementation to Node's real network transport.
+import assert from 'node:assert/strict'
 export async function forwardProviderRequest(request){
  const body=['GET','HEAD'].includes(request.method)?undefined:await request.arrayBuffer()
  const headers=new Headers(request.headers)
@@ -35,6 +36,7 @@ export function quickbooksFixture() {
   const requestId = url.searchParams.get('requestid')
   if (!requestId || requestIds.has(requestId)) throw Error('A QuickBooks write was replayed')
   requestIds.add(requestId)
+  if (kind === 'invoice') assert.ok(body.DocNumber.length <= 21, 'QuickBooks document numbers are bounded')
   const collection = kind === 'customer' ? customers : invoices, id = 'synthetic-platter-' + (9200 + customers.size + invoices.size)
   const value = { Id: id, ...body, ...(kind === 'invoice' ? { TotalAmt: body.Line.reduce((sum,line) => sum + line.Amount,0) } : {}) }
   collection.set(id,value)
@@ -43,3 +45,21 @@ export function quickbooksFixture() {
  }
  return { calls, customers, invoices, token, company, item, incomeAccount: 'synthetic-platter-9102', outboundService, setHook: value => { hook = value }, setTimeout: value => { timeoutKind = value }, setMapping: value => { mappingAccount = value } }
 }
+
+export async function connectQuickbooks(h, fake, version = 0, settingsVersion = 0, cookie = h.owner) {
+ await h.cmd('provider.connect', { provider: 'quickbooks', version, realmId: fake.company, token: fake.token, consent: true }, cookie)
+ await h.cmd('accounting.configure', { version: settingsVersion, authority: 'quickbooks', accountId: fake.company, connectionVersion: version + 1, consent: true }, cookie)
+}
+export async function acceptedQuickbooksAgreement(h, title = 'Synthetic deposit agreement', clientId, extra = {}) {
+ const client = clientId ? { id: clientId } : await h.cmd('client.save', { name: title + ' client', email: ['synthetic-platter-' + title.toLowerCase().replace(/[^a-z0-9]+/g,'-'), 'example.test'].join('@') })
+ const proposal = await h.cmd('proposal.prepare', { clientId: client.id, title, scope: 'Agreed consulting delivery', optionOne: 'Reviewed consulting', priceOne: '1000.03', optionTwo: 'Extended consulting', priceTwo: '2400.00', depositPercent: '25', paymentTerms: { netDays: 30, milestones: [{ label: 'Delivery', percent: 100, event: 'Delivery complete' }], retainer: { percent: 10, startsOn: '2035-04-01', months: 2 } }, ...extra })
+ await h.cmd('proposal.approve', { id: proposal.id, version: 1, revision: 1 })
+ const share = await h.cmd('proposal.send', { id: proposal.id, version: 2 }), path = new URL(share.shareUrl).pathname
+ assert.equal((await h.send(path + '/action?name=code.request', {})).status, 200)
+ const code = (await h.state()).outbox.find(m => m.proposal_id === proposal.id && m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+ const verified = await h.send(path + '/action?name=code.verify', { code }); assert.equal(verified.status, 200)
+ const input = { name: 'Synthetic accounting signer', optionId: 'one', consent: true }
+ assert.equal((await h.send(path + '/action?name=accept', input, verified.cookie)).status, 200)
+ return { proposal, client, path, cookie: verified.cookie, input }
+}
+export const quickbooksReviewInput = (agreement, fake, customerId = 'new') => ({ proposalId: agreement.proposal.id, customerId, itemId: fake.item, incomeAccountId: fake.incomeAccount })

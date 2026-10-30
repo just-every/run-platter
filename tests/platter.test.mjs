@@ -3663,3 +3663,158 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
  } finally { await h.close() }
  await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
 })
+
+test('ACCT-001 reviewed QuickBooks deposits preserve accepted cents, explicit matching, once-only writes and current authority', {timeout:180000}, async () => {
+ const {quickbooksFixture,connectQuickbooks,acceptedQuickbooksAgreement,quickbooksReviewInput} = await import('./provider-network.mjs')
+ const fake = quickbooksFixture(), h = await harness({outboundService:fake.outboundService})
+ const writes = () => fake.calls.filter(c=>c.method==='POST')
+ const configure = (version,connectionVersion=1) => ({version,authority:'quickbooks',accountId:fake.company,connectionVersion,consent:true})
+ const apply = (review,cookie=h.owner,status=200) => h.cmd('accounting.apply',{id:review.id,digest:review.digest,consent:true},cookie,status)
+ const history = async () => (await h.state()).accounting
+ try {
+  const at=Date.parse('2030-03-01T15:00:00Z'),tick=async time=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(time),cron:'*/15 * * * *'})
+  await tick(at)
+  const agreement=await acceptedQuickbooksAgreement(h)
+  assert.equal(writes().length,0,'acceptance alone never authorizes an accounting write')
+  await h.cmd('accounting.review',quickbooksReviewInput(agreement,fake),h.owner,409)
+  await connectQuickbooks(h,fake)
+  const email=['synthetic-platter-9105','example.test'].join('@')
+  await h.send('/auth/invite',{email,displayName:'Accounting administrator',role:'member',returnTo:'/app'},h.owner)
+  const member=await h.signIn(email),memberActor=(await h.state(member)).actor
+  const before=await history(),noCalls=fake.calls.length
+  await h.cmd('accounting.review',quickbooksReviewInput(agreement,fake),member,403)
+  await h.cmd('accounting.configure',configure(1),member,403)
+  assert.equal((await h.state(member)).accounting,undefined);assert.equal(fake.calls.length,noCalls);assert.deepEqual(await history(),before)
+  await h.cmd('member.set',{operatorId:memberActor.id,role:'admin',version:0,teams:[]})
+  await h.cmd('accounting.configure',configure(1),member,403)
+  const review=await h.cmd('accounting.review',quickbooksReviewInput(agreement,fake),member)
+  assert.equal(review.plan.depositCents,25001);assert.equal(review.plan.totalCents,100003)
+  assert.equal(review.plan.mapping.accountName,'Consulting income')
+  const exported=await h.cmd('invoice.export',{id:agreement.proposal.id})
+  // Export retention never authorizes a second accounting invoice or changes accepted cents.
+  const fresh=await h.cmd('accounting.review',quickbooksReviewInput(agreement,fake),member)
+  const races=await Promise.all([h.send('/api/platter/command',{name:'accounting.apply',input:{id:fresh.id,digest:fresh.digest,consent:true}},member),h.send('/api/platter/command',{name:'accounting.apply',input:{id:fresh.id,digest:fresh.digest,consent:true}},member)])
+  assert.ok(races.every(r=>[200,409].includes(r.status)));assert.ok(races.some(r=>r.status===200))
+  const depositBefore=(await h.state()).proposals.find(p=>p.id===agreement.proposal.id).acceptance
+  await Promise.all([h.cmd('accounting.dispatch',{}),h.cmd('accounting.dispatch',{}),tick(at)])
+  assert.equal(fake.customers.size,1);assert.equal(fake.invoices.size,1)
+  const customer=[...fake.customers.values()][0],invoice=[...fake.invoices.values()][0]
+  assert.deepEqual(writes()[0].body,{DisplayName:'Synthetic deposit agreement client',CompanyName:'Synthetic deposit agreement client'})
+  assert.deepEqual(invoice.CustomerRef,{value:customer.Id})
+  assert.equal(invoice.DocNumber,exported.number.slice(0,21));assert.equal(invoice.PrivateNote,'Platter deposit '+exported.number)
+  assert.equal(invoice.TxnDate,'2030-03-01');assert.equal(invoice.DueDate,'2030-03-01')
+  assert.deepEqual(invoice.Line,[{Amount:250.01,DetailType:'SalesItemLineDetail',Description:'Deposit: Synthetic deposit agreement',SalesItemLineDetail:{ItemRef:{value:fake.item},Qty:1,UnitPrice:250.01,TaxCodeRef:{value:'NON'}}}])
+  assert.equal(invoice.TotalAmt,250.01);assert.equal(invoice.GlobalTaxCalculation,'NotApplicable');assert.equal(invoice.CurrencyRef.value,'USD')
+  assert.ok((await history()).jobs.every(j=>j.status==='complete'));assert.ok((await history()).requests.every(r=>r.status==='confirmed'))
+  const written=writes().length
+  await apply(fresh,member);await h.cmd('accounting.dispatch',{});await tick(at+31*86400000)
+  assert.equal(writes().length,written,'repeated apply, concurrent dispatch and future schedule dates never duplicate or create future invoices')
+  assert.deepEqual((await h.state()).proposals.find(p=>p.id===agreement.proposal.id).acceptance,depositBefore)
+  assert.equal((await h.cmd('invoice.export',{id:agreement.proposal.id})).csv,exported.csv)
+  await h.cmd('provider.connect',{provider:'quickbooks',version:1,realmId:'synthetic-platter-other-company',token:fake.token,consent:true},h.owner,409)
+  assert.equal((await h.state()).connections.find(c=>c.provider==='quickbooks').accountId,fake.company)
+
+  const matched=await acceptedQuickbooksAgreement(h,'Matched customer deposit',agreement.client.id)
+  const match=await h.cmd('accounting.customers',{proposalId:matched.proposal.id})
+  assert.deepEqual(match.matches,[{id:customer.Id,name:customer.DisplayName}])
+  await h.cmd('accounting.review',quickbooksReviewInput(matched,fake,'new'),h.owner,409)
+  const matchedReview=await h.cmd('accounting.review',quickbooksReviewInput(matched,fake,customer.Id))
+  await apply(matchedReview);await h.cmd('accounting.dispatch',{})
+  assert.equal(fake.customers.size,1);assert.equal(fake.invoices.size,2)
+
+  const ambiguous=await acceptedQuickbooksAgreement(h,'Ambiguous deposit'),ambiguousName='Ambiguous deposit client'
+  fake.customers.set('synthetic-platter-9300',{Id:'synthetic-platter-9300',DisplayName:ambiguousName})
+  fake.customers.set('synthetic-platter-9301',{Id:'synthetic-platter-9301',DisplayName:ambiguousName})
+  const candidates=await h.cmd('accounting.customers',{proposalId:ambiguous.proposal.id})
+  assert.equal(candidates.matches.length,2)
+  await h.cmd('accounting.review',quickbooksReviewInput(ambiguous,fake),h.owner,409)
+  await h.cmd('accounting.review',quickbooksReviewInput(ambiguous,fake,'synthetic-platter-missing'),h.owner,409)
+  const explicit=await h.cmd('accounting.review',quickbooksReviewInput(ambiguous,fake,'synthetic-platter-9301'))
+  await apply(explicit);await h.cmd('accounting.dispatch',{})
+  assert.equal([...fake.invoices.values()].at(-1).CustomerRef.value,'synthetic-platter-9301')
+
+  const stale=await acceptedQuickbooksAgreement(h,'Stale reviewed deposit')
+  let staleReview=await h.cmd('accounting.review',quickbooksReviewInput(stale,fake))
+  fake.setMapping('synthetic-platter-changed-account')
+  const beforeStale=await history(),staleWrites=writes().length
+  await apply(staleReview,h.owner,409);assert.deepEqual(await history(),beforeStale);assert.equal(writes().length,staleWrites)
+  fake.setMapping(fake.incomeAccount)
+  staleReview=await h.cmd('accounting.review',quickbooksReviewInput(stale,fake))
+  await h.cmd('accounting.configure',configure(1))
+  await apply(staleReview,h.owner,409)
+  staleReview=await h.cmd('accounting.review',quickbooksReviewInput(stale,fake))
+  await tick(at+31*86400000+600000)
+  await apply(staleReview,h.owner,409);assert.equal(writes().length,staleWrites)
+
+  const demoted=await acceptedQuickbooksAgreement(h,'Demoted reviewed deposit')
+  const adminReview=await h.cmd('accounting.review',quickbooksReviewInput(demoted,fake),member)
+  await apply(adminReview,member)
+  await h.cmd('member.set',{operatorId:memberActor.id,role:'sales',version:1,teams:[]})
+  const demotionCalls=fake.calls.length
+  await h.cmd('accounting.dispatch',{})
+  assert.equal(fake.calls.length,demotionCalls);assert.equal((await history()).jobs.find(j=>j.proposal_id===demoted.proposal.id).status,'held')
+  await apply(adminReview,member,403)
+
+  const timeout=await acceptedQuickbooksAgreement(h,'Timeout deposit')
+  const timeoutReview=await h.cmd('accounting.review',quickbooksReviewInput(timeout,fake))
+  await apply(timeoutReview);fake.setTimeout('invoice')
+  await h.cmd('accounting.dispatch',{})
+  const held=(await history()).jobs.find(j=>j.proposal_id===timeout.proposal.id)
+  assert.equal(held.status,'held');assert.equal((await history()).requests.find(r=>r.proposal_id===timeout.proposal.id&&r.kind==='invoice').status,'uncertain')
+  const timedWrites=writes().length
+  fake.setTimeout(undefined)
+  await apply(timeoutReview);await h.cmd('accounting.dispatch',{});await tick(at+32*86400000)
+  assert.equal(writes().length,timedWrites,'a timeout after provider persistence cannot post another invoice')
+  const retryReview=await h.cmd('accounting.review',quickbooksReviewInput(timeout,fake,(await history()).customers.find(c=>c.client_id===timeout.client.id).provider_id))
+  await apply(retryReview);await h.cmd('accounting.dispatch',{});assert.equal(writes().length,timedWrites)
+
+  const disconnected=await acceptedQuickbooksAgreement(h,'Disconnected deposit')
+  const disconnectedReview=await h.cmd('accounting.review',quickbooksReviewInput(disconnected,fake))
+  await apply(disconnectedReview)
+  await h.cmd('provider.disconnect',{provider:'quickbooks',version:1})
+  const disconnectedCalls=fake.calls.length
+  await h.cmd('accounting.dispatch',{})
+  assert.equal(fake.calls.length,disconnectedCalls);assert.equal((await history()).jobs.find(j=>j.proposal_id===disconnected.proposal.id).status,'held')
+  await connectQuickbooks(h,fake,2,2)
+  const reconnectCalls=fake.calls.length;await h.cmd('accounting.dispatch',{});await apply(disconnectedReview)
+  assert.equal(fake.calls.length,reconnectCalls,'reconnection never grants old requests fresh authority')
+  const revoked=await acceptedQuickbooksAgreement(h,'Revoked during provider write')
+  const revokedReview=await h.cmd('accounting.review',quickbooksReviewInput(revoked,fake))
+  await apply(revokedReview)
+  let revokedOnce=false
+  fake.setHook(async request=>{
+   if(request.method==='POST'&&new URL(request.url).pathname.endsWith('/customer')&&!revokedOnce){revokedOnce=true;await h.cmd('accounting.revoke',{})}
+  })
+  const revokeWrites=writes().length
+  await h.cmd('accounting.dispatch',{})
+  fake.setHook(undefined)
+  assert.equal(writes().length,revokeWrites+1,'revocation during customer creation refuses the subsequent invoice write')
+  assert.equal((await history()).jobs.find(j=>j.proposal_id===revoked.proposal.id).status,'held')
+  await h.cmd('accounting.configure',configure(3,3))
+  await h.cmd('accounting.dispatch',{});assert.equal(writes().length,revokeWrites+1)
+
+  const lostCustomer=await acceptedQuickbooksAgreement(h,'Customer timeout deposit')
+  const lostReview=await h.cmd('accounting.review',quickbooksReviewInput(lostCustomer,fake))
+  await apply(lostReview);fake.setTimeout('customer');await h.cmd('accounting.dispatch',{})
+  fake.setTimeout(undefined)
+  const lostWrites=writes().length,lostHistory=await history()
+  assert.equal(lostHistory.customers.find(c=>c.client_id===lostCustomer.client.id).status,'uncertain')
+  assert.equal(lostHistory.jobs.find(j=>j.proposal_id===lostCustomer.proposal.id).status,'held')
+  await apply(lostReview);await h.cmd('accounting.dispatch',{})
+  await h.cmd('accounting.review',quickbooksReviewInput(lostCustomer,fake),h.owner,409)
+  assert.equal(writes().length,lostWrites,'an uncertain customer creation never creates a second customer or any invoice')
+  const {configureTaxes,taxRequest,taxPackages,taxTables}=await import('./taxes-fixture.mjs')
+  await configureTaxes(h.cmd)
+  const taxed=await acceptedQuickbooksAgreement(h,'Unsupported taxed deposit',undefined,{packages:taxPackages(),pricingTables:taxTables(),tax:taxRequest(),paymentTerms:null})
+  const recurring=await acceptedQuickbooksAgreement(h,'Unsupported recurring deposit',undefined,{packages:[{id:'one',label:'Monthly consulting',price:'1'}],pricingTables:[{optionId:'one',name:'Consulting',lines:[{name:'Monthly care',quantity:'1',unit:'service',unitPrice:'1200',interval:'monthly',term:12,startsOn:'2035-04-01'}]}],paymentTerms:null})
+  const unsupportedBefore=await history(),unsupportedCalls=fake.calls.length
+  await h.cmd('accounting.review',quickbooksReviewInput(taxed,fake),h.owner,409)
+  await h.cmd('accounting.review',quickbooksReviewInput(recurring,fake),h.owner,409)
+  assert.equal(fake.calls.length,unsupportedCalls);assert.deepEqual(await history(),unsupportedBefore,'unsupported tax and recurring pricing cannot create accounting requests')
+  const futureWrites=writes().length
+  await tick(Date.parse('2035-05-01T15:00:00Z'))
+  assert.equal(writes().length,futureWrites,'future informational milestone and recurring schedule amounts never create invoices in this slice')
+  assert.ok((await h.send('/api/platter/audit?action=accounting.apply',undefined,h.owner)).value.rows.length>=6)
+  assert.ok(!JSON.stringify(await h.state()).includes(fake.token),'accounting state never exposes provider credentials')
+ } finally {await h.close()}
+})

@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "3faefe8e7e0aa36f2719ed2986e76c1e5f4c7ae4bba262fb956dd100a4e4a4b5",
+      "sha256": "0ac18d5d18487dce4a3188b140e64bd7af33d2e787d224933abe63b18e3a6333",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "1211c486785f4025bb0e613c237ee92a242a86e909740fa1195bf2066ca543d5",
+      "sha256": "5d2e7ca4cbe7176d065499d1484362f28e2d7fe2eb83b82ce12ed39a01b28fc7",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "e754ef5a8c2e2afe6595f46e3dd058979a01090674e81a0e3cbcaf6025f3507b",
+      "sha256": "0b82703a14b84262c66e8b6f8840f89581ee81a44b3c0be01c263cc36d0777a9",
       "executable": false
     },
     "docs/contract-behavior.md": {
@@ -643,6 +643,10 @@
     },
     "migrations/core/0098_sms_reenable.sql": {
       "sha256": "cbebdc3767ad5463c708c3ddac223639549305289aad9a1f12678d1b2c92d62b",
+      "executable": false
+    },
+    "migrations/core/0099_quickbooks_deposits.sql": {
+      "sha256": "be553289f142152aeabdc9dc31d05b6ac75d87cf69bd4520796935590eba005a",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -1482,7 +1486,7 @@
       "executable": false
     },
     "scripts/verification/run.mjs": {
-      "sha256": "8c6b4159ca6fdf6e03b32bf346a2a394b8b22e9606f9f69ce4a4d1f9185984b3",
+      "sha256": "10ca8a1e26674e11f675a10aed01c6710049f3316a61a5291735533c9bec6464",
       "executable": false
     },
     "SEED-COMMAND-CONTRACT.md": {
@@ -2449,6 +2453,14 @@
       "sha256": "ce31b0bae06aca21b3350c86344c981d53022e4fa502f1423e0027cd6bc1bc3c",
       "executable": false
     },
+    "src/platter/accounting/jobs.ts": {
+      "sha256": "6a71136110bd2363844e10bd5128f1d63297f8b1d4bd7be7fb6c1c28be7c196f",
+      "executable": false
+    },
+    "src/platter/accounting/quickbooks.ts": {
+      "sha256": "0f37b669452ad787e897fb8d75688c163efdddc787efa2fc91b95615e1d50121",
+      "executable": false
+    },
     "src/platter/api/index.ts": {
       "sha256": "ec1522844efda9de4efa405258fc24e7c2f4cf33f767d21259928101707f48a9",
       "executable": false
@@ -3021,6 +3033,10 @@
       "sha256": "060375e17262544b24ea9c6c37acd431481c0d07c79b51f68a82c65a1938e484",
       "executable": false
     },
+    "src/platter/ui/accounting.ts": {
+      "sha256": "1dc424d9518b97e9d286e50fecac85e5ecc4309762f319c6d0471c2875b9b0ff",
+      "executable": false
+    },
     "src/platter/ui/admin.ts": {
       "sha256": "189ed9e2368688b157999e3fb81045ed7940d0bbd06a740ae5e4433044c4450a",
       "executable": false
@@ -3390,7 +3406,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "24b59f2313dbd7f32bf45ada3b3fabccfbdfcad646ca0ea0ca4f7bb397d0f91a",
+      "sha256": "3f753e15ed3c7aa8e3abdf462e8e1ef0540cb8b90c3d180d38188d8794a72514",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3534,7 +3550,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "0ed1809cf02e1f604e15828a7604e3ce8008f7362c6f7835bfdc17848f13cb73",
+      "sha256": "77cb4183950633eb631bba5d9c87a7b15d5c04c770b034a422506ebaaf074fd6",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3546,7 +3562,11 @@
       "executable": false
     },
     "tests/provider-network.mjs": {
-      "sha256": "b0f0160903528744de74bf4fbcaadd24779428789a3c5d4cae42852ae04e4c70",
+      "sha256": "7c84f78ced48c4a270b120e132d4332e745751a844626b21954e46e6f2545869",
+      "executable": false
+    },
+    "tests/quickbooks-browser.mjs": {
+      "sha256": "2672933712511cc2a979a404086e85ec604db31bdc693cfd8030584484bb7eab",
       "executable": false
     },
     "tests/recipients-browser.mjs": {
@@ -3586,7 +3606,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "583da9415960756e1aa17eeccd68bcfff23f4af4bb68b9225483b3521b698604",
+      "sha256": "c42ba0058cf196914ceb1f65bc787b93645d1d04a91c615dabf8a1a3499e51eb",
       "executable": false
     },
     "tests/site-harness.mjs": {

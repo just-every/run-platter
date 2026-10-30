@@ -22,7 +22,7 @@ const tasks={
  business_lifecycle:[businessCommand('--test-skip-pattern')],
  archive:['pnpm test:archive'],
  archive_custody:["node --test --test-name-pattern='public CLI preserves business' tests/archive.test.mjs"],
- archive_restore:["node --test --test-name-pattern='PORT-001 public CLI refuses|first-release AUD|bounce follow-ups|imported business' tests/archive.test.mjs"],
+ archive_restore:["node --test --test-name-pattern='PORT-001 public CLI refuses|first-release AUD|bounce follow-ups|imported business|QuickBooks accounting custody' tests/archive.test.mjs"],
  archive_media:["node --test --test-name-pattern='retains real invitation|restores scoped roles|notification business|document archive history|retains displayed' tests/archive.test.mjs"]
 }
 if(shard&&!Object.hasOwn(tasks,shard))throw Error('Unknown verification shard')

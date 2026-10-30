@@ -15,20 +15,23 @@ export async function quickbooks(authorize: QuickBooksAuthority, path: string, b
  need(response.ok, 'QuickBooks refused the request. Review the retained accounting history before any further write.', 409)
  const raw = await response.text()
  need(raw.length <= 262144, 'QuickBooks returned an oversized response', 409)
- return JSON.parse(raw)
+ const value = JSON.parse(raw)
+ need(value && typeof value === 'object' && !value.Fault, 'QuickBooks returned an invalid accounting response', 409)
+ return value
 }
 export async function customerMatches(authorize: QuickBooksAuthority, name: string) {
  // The fixed query grammar escapes provider string literals; identifiers never come from input.
  const escaped = name.replaceAll('\\', '\\\\').replaceAll("'", "\\'")
  const value = await quickbooks(authorize, '/query?query=' + encodeURIComponent("select * from Customer where DisplayName = '" + escaped + "' maxresults 100"))
- const customers = value.QueryResponse?.Customer ?? []
+ need(value.QueryResponse && typeof value.QueryResponse === 'object', 'QuickBooks did not confirm customer matching', 409)
+ const customers = value.QueryResponse.Customer ?? []
  need(Array.isArray(customers) && customers.length < 100, 'Customer matching needs manual reconciliation in QuickBooks', 409)
  return customers.map((c: any) => { need(c.Active !== false && c.DisplayName === name, 'QuickBooks returned an unexpected customer match', 409); return { id: providerId(c.Id), name: c.DisplayName } }).sort((a: any, b: any) => a.id.localeCompare(b.id))
 }
 export async function itemMapping(authorize: QuickBooksAuthority, itemId: string, accountId: string) {
  const item = (await quickbooks(authorize, '/item/' + encodeURIComponent(itemId))).Item
  const account = (await quickbooks(authorize, '/account/' + encodeURIComponent(accountId))).Account
- need(item?.Id === itemId && item.Active !== false && ['Service','NonInventory'].includes(item.Type) && item.IncomeAccountRef?.value === accountId, 'Choose an active non-inventory item with this income account', 409)
- need(account?.Id === accountId && account.Active !== false && account.AccountType === 'Income', 'Choose an active income account', 409)
+ need(item?.Id === itemId && item.Active === true && ['Service','NonInventory'].includes(item.Type) && item.IncomeAccountRef?.value === accountId, 'Choose an active non-inventory item with this income account', 409)
+ need(account?.Id === accountId && account.Active === true && account.AccountType === 'Income', 'Choose an active income account', 409)
  return { itemId, itemName: text(item.Name, 'the item name'), accountId, accountName: text(account.Name, 'the income account name') }
 }

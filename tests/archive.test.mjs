@@ -1074,3 +1074,48 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('ACCT-001 public CLI retains exact QuickBooks accounting custody without credentials or synchronization authority', {timeout:300000}, async () => {
+ const {quickbooksFixture,connectQuickbooks,acceptedQuickbooksAgreement,quickbooksReviewInput}=await import('./provider-network.mjs')
+ const temporary=await mkdtemp(join(tmpdir(),'platter-accounting-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=quickbooksFixture()
+ let h
+ try {
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService})
+  await connectQuickbooks(h,fake)
+  const complete=await acceptedQuickbooksAgreement(h,'Retained accounting agreement')
+  const invoice=await h.cmd('invoice.export',{id:complete.proposal.id})
+  const review=await h.cmd('accounting.review',quickbooksReviewInput(complete,fake))
+  await h.cmd('accounting.apply',{id:review.id,digest:review.digest,consent:true});await h.cmd('accounting.dispatch',{})
+  const queued=await acceptedQuickbooksAgreement(h,'Queued accounting agreement',complete.client.id)
+  const queuedReview=await h.cmd('accounting.review',quickbooksReviewInput(queued,fake,[...fake.customers.keys()][0]))
+  await h.cmd('accounting.apply',{id:queuedReview.id,digest:queuedReview.digest,consent:true})
+  const tables=['p_accounting_settings','p_accounting_jobs','p_accounting_requests','p_accounting_customers','p_acceptances','p_invoices']
+  const before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
+  assert.deepEqual(before.p_accounting_jobs.map(j=>j.status).sort(),['complete','queued'])
+  await h.close();h=undefined
+  const archive=join(temporary,'accounting.rer');await command(source,['export','--output',archive])
+  const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(fake.token))
+  const records=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
+  const local=['p_accounting_reviews','p_accounting_authority','p_accounting_job_authority','p_connection_secrets']
+  for(const table of local)assert.equal(records.filter(r=>r.table===table).length,0)
+  await command(restored,['import','--input',archive,'--yes'])
+  const receiver=quickbooksFixture()
+  h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:receiver.outboundService})
+  for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table],table+' retains exact business custody')
+  for(const table of local)assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  assert.equal(receiver.calls.length,0)
+  const owner=await h.signIn(h.auth.OWNER_EMAIL),accounting=(await h.state(owner)).accounting
+  assert.equal(accounting.settings.active,false);assert.ok(accounting.jobs.every(j=>!j.executable))
+  assert.equal((await h.cmd('invoice.export',{id:complete.proposal.id},owner)).csv,invoice.csv)
+  await h.cmd('accounting.apply',{id:queuedReview.id,digest:queuedReview.digest,consent:true},owner,409)
+  await connectQuickbooks(h,receiver,1,1,owner)
+  const calls=receiver.calls.length
+  await h.cmd('accounting.dispatch',{},owner)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  assert.equal(receiver.calls.length,calls,'fresh reconnection and owner authorization cannot execute restored requests')
+  for(const table of ['p_accounting_jobs','p_accounting_requests','p_accounting_customers'])assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table])
+ } finally {await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

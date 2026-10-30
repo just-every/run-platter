@@ -11,7 +11,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 3 | Shows what each client read | `TRACK-001` partial; `TRACK-002` done | partial |
 | 4 | Collects the signature and deposit together | `SIGN-001` partial; `SIGN-003` partial; `PAY-001` partial; `PAY-002` partial | partial |
 | 5 | Good / Better / Best packages, add-ons, Austin sales tax, 50% deposit | `PRICE-001` partial; `PRICE-002` partial; `PRICE-005` partial; `PRICE-007` partial | partial |
-| 6 | HubSpot deal won, QuickBooks invoice paid | `CRM-001` partial; `ACCT-001` missing | partial |
+| 6 | HubSpot deal won, QuickBooks invoice paid | `CRM-001` partial; `ACCT-001` partial | partial |
 | 7 | 100% free, open source alternative to PandaDoc, Proposify and Better Proposals; MIT licensed | `MIG-001` missing; `MIG-002` missing; `MIG-003` missing | missing |
 | 8 | Run Platter (the one-line start) | `SITE-001` partial | partial |
 | 9 | Sent, read, back and forth, signed, first payment, per proposal | `SEND-001` partial; `SEND-011` partial; `TRACK-001` partial; `NEG-001` done; `SIGN-003` partial; `PAY-001` partial; `PAY-002` partial; `PAY-004` missing | partial |
@@ -36,7 +36,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 28 | ESIGN consent, drawn and typed signatures | `SIGN-003` partial | partial |
 | 29 | Certificate of completion with document hash | `SIGN-005` partial | partial |
 | 30 | Emailed to all, filed to Google Drive, Salesforce Closed Won | `AUTO-002` partial; `CRM-002` missing | partial |
-| 31 | Stripe ACH deposit, fee and payout cleared in QuickBooks Online, balance $0.00 | `PAY-001` partial; `ACCT-001` missing; `ACCT-006` missing | partial |
+| 31 | Stripe ACH deposit, fee and payout cleared in QuickBooks Online, balance $0.00 | `PAY-001` partial; `ACCT-001` partial; `ACCT-006` missing | partial |
 | 32 | One invoice per amount, created on its issue day; net 15 | `ACCT-004` partial; `ACCT-007` missing; `PAY-008` missing | partial |
 | 33 | Card declined, the client told why, ACH from the same invoice link | `PAY-004` missing; `PAY-005` missing | missing |
 | 34 | The agent’s exception card carries evidence; money and outbound corrections follow company policy | `AGENT-005` partial; `AGENT-009` partial | partial |

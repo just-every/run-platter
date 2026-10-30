@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 14 | 101 | 44 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 14 | 101 | 48 | 163 |
 
 Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -1416,15 +1416,15 @@ Core · target · **missing** · Rules D-1
 
 #### ACCT-001 — QuickBooks Online invoices and payments
 
-Core · target · **missing** · Register R-2
+Core · target · **partial** · Register R-2
 
 **Requirement.** The owner or an admin connects QuickBooks Online. On acceptance, Platter creates or matches the customer and creates the deposit invoice; each milestone and recurring invoice is created on its issue day under `ACCT-007`, never at acceptance. Every invoice carries items, tax codes and the income accounts set in the catalog, and Platter records Stripe and offline payments, refunds and fees against them, with Stripe payouts and fees posted through a clearing account (`ACCT-006`). Invoices paid in QuickBooks Online, including through QuickBooks Payments, are read back as paid. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#acct-001).
 
 **Acceptance.**
 1. With a QuickBooks Online sandbox fake: accept a proposal with a deposit and a net-30 milestone and see one customer and only the deposit invoice, with the right tax code; pay the deposit by Stripe and see the payment applied in full with its fee posted as in `ACCT-006`; mark the milestone done and see its invoice appear dated that day; pay that invoice in QuickBooks and see it paid in Platter.
 
-**Evidence.** None.
-**Gap.** No QuickBooks connection.
+**Evidence.** `tests/platter.test.mjs` — “ACCT-001 reviewed QuickBooks deposits preserve accepted cents, explicit matching, once-only writes and current authority”; `tests/site.test.mjs` loads `tests/site-documents.mjs` — “ACCT-001 owner reviews exact QuickBooks deposits in Settings and retains once-only invoice history”; `tests/archive.test.mjs` — “ACCT-001 public CLI retains exact QuickBooks accounting custody without credentials or synchronization authority”.
+**Gap.** Delivered: the owner explicitly selects a verified QuickBooks company and connection as invoice authority. Current owners and admins review the immutable accepted deposit, explicit customer matching and a verified deposit item with its income account. The tax-free USD, one-off, mailbox-verified single-client slice with collection off retains one customer mapping and one deposit request before provider writes; concurrent dispatch, stale reviews, disconnect, demotion and uncertain acknowledgements cannot duplicate writes. Authority and company lock after the first retained request. Future milestones and recurring amounts create no invoice in this slice. Restore retains exact history without credentials, reviews or synchronization authority, and reconnection never activates old requests. Gap: taxable invoices and PRICE-005 tax-code propagation, per-line catalog mapping, milestone and recurring issue-day execution, Stripe and offline payment application, refunds, fee and payout clearing under ACCT-006, provider-paid readback and complete reconciliation remain. ACCT-005 still requires real QuickBooks Online and Xero sandboxes for retained-file import proof; the recorded PAY-003 and PAY-008 real-key holds remain unchanged. No live-provider qualification is claimed; R-2 remains not run.
 
 #### ACCT-002 — Xero invoices and payments
 

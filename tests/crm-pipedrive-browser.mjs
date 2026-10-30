@@ -65,6 +65,7 @@ export async function pipedriveBrowser() {
    assert.equal(provider.calls.length, calls); assert.equal((await h.state()).proposals[0].options[0].cents, 36122)
    provider.state.attached[0].item_price = 120.5
    await providerSyncControls(page, h, provider, 'pipedrive', capture)
+   await (await import('./crm-provider-card-browser.mjs')).providerCardControls(page, h, provider, 'pipedrive', capture)
    await page.goto(h.origin + '/app/settings'); await connection.getByRole('button', { name: 'Disconnect Pipedrive', exact: true }).click()
    assert.equal((await h.state()).connections.find(r => r.provider === 'pipedrive').status, 'disconnected')
   } finally { await context.close() }

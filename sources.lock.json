@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "0f4a3a680bec0d27ac76fd09d867ffb138f2c8ddd88ead8eb754b391a133e03d",
+      "sha256": "ba45118929a10996ec0aad46d1ec8956330f20d13ff05dd6b84dd58431441eaa",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "18f912a401c615fba315a8eaf687a836df367af72ad2901b22da6cd3f4e348ad",
+      "sha256": "1d228aede82cb3a92cf19fc4e97580e050c07703da971f06cac58fd5be558970",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2582,7 +2582,7 @@
       "executable": false
     },
     "src/platter/crm/pipedrive-draft.ts": {
-      "sha256": "687d7e1bf4f98e30586b706fa03415fd18e029b3e73f127832792ea55f32c04e",
+      "sha256": "bb1bd4f27bd5f790a4c4c9c1d6aef84eac14609b1946688762f3e3c1da8db066",
       "executable": false
     },
     "src/platter/crm/provider-sync-plan.ts": {
@@ -2594,7 +2594,7 @@
       "executable": false
     },
     "src/platter/crm/zoho-draft.ts": {
-      "sha256": "f7f750083406f192c2230b59b1d778e36156f450617eee46ee29db83b8db4733",
+      "sha256": "2a3479b9e83e9b64aac9635cc3484205936ee5c770db00ab9f03e6dfd3acf768",
       "executable": false
     },
     "src/platter/crm/zoho-http.ts": {
@@ -2718,7 +2718,7 @@
       "executable": false
     },
     "src/platter/http.ts": {
-      "sha256": "7a79678854dbbf357d8abfd18b14809ddf34e3c99b116b4461658928edb30670",
+      "sha256": "836562128fdd8a5cdf73f8eded6a20cbea59d268d387201860bbee2b9e1d3fb5",
       "executable": false
     },
     "src/platter/internal-pricing.ts": {
@@ -3126,11 +3126,11 @@
       "executable": false
     },
     "src/platter/ui/crm-settings.ts": {
-      "sha256": "3c82643b47f1ffd5ee5a478bbae5617cbd46bde4b92040f97f1b0aaf3a457952",
+      "sha256": "d4c6b247c84ef80cec6607e494548415faea8637145c0c4ee09c9c14cbd6ce17",
       "executable": false
     },
     "src/platter/ui/crm-start.ts": {
-      "sha256": "8600b0cdb07069469f0fb118540335a6e58cb6fe0c50ab89bdaf4ae82451d518",
+      "sha256": "5eefacb63333455b8b82b4ab18819e105f68d1ddd1081e76c14f3408dd81c9c7",
       "executable": false
     },
     "src/platter/ui/delivery.ts": {
@@ -3174,7 +3174,7 @@
       "executable": false
     },
     "src/platter/ui/index.ts": {
-      "sha256": "6f950c186eea90d1516c87452e9cdbd5ec578c01157e73f8e1be220ac93e779e",
+      "sha256": "1c1a18f4f4e3797c4032755b1e57cee273473d62ef27bf52bee6d4c914dabd6a",
       "executable": false
     },
     "src/platter/ui/internal-pricing.ts": {
@@ -3458,15 +3458,15 @@
       "executable": false
     },
     "tests/crm-pipedrive-browser.mjs": {
-      "sha256": "c33bc409bddeb1a26420c82aa8d85b346651dbb78b7e0d1de54b8fd5134c4947",
+      "sha256": "01212d2423b44b2d659ede19a4b7f22ecaebc975fe46e32343c72ab334e3b2ed",
       "executable": false
     },
     "tests/crm-pipedrive-http.mjs": {
-      "sha256": "d89d2e445eb6c82fabd1f2a250c05710a0330d92d565a73b474c24f2c7b882a0",
+      "sha256": "9bf7b3f6ae7df991fa2f55557d37606f9356106ce92491db91668a1b1763c8ed",
       "executable": false
     },
     "tests/crm-provider-archive.mjs": {
-      "sha256": "f664c9b54c7f51ce4407c11481b89a89f04cb71575aaeb0d93386376824e3d7b",
+      "sha256": "c96d964bb74ad5c94ae188b4aa4fa5ae4480a6a823f3fca68189702e601bc667",
       "executable": false
     },
     "tests/crm-provider-sync-browser.mjs": {
@@ -3482,7 +3482,7 @@
       "executable": false
     },
     "tests/crm-zoho-browser.mjs": {
-      "sha256": "caf255b7853f7b750e4fda06da01529845defda04def0e549f7f5223e6f1d954",
+      "sha256": "568d9607145b1bc4ce23834d5d608bc6129c4a837a54a6b7803d4cf8836c8461",
       "executable": false
     },
     "tests/crm-zoho-http.mjs": {
@@ -3594,7 +3594,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "81856b3187a8feafbc8e64ea432a9f69e63b383d1e2503ccd4697c337939ed2b",
+      "sha256": "ed4bc3373a67e1d9504d06442741305d2d36e5649e266f07c12a5179b0d71d87",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

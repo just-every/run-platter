@@ -2,7 +2,8 @@ import { area, escape, field, form, hidden, money, panel, type Feedback } from '
 
 export function crmStartPanel(state: any, feedback?: Feedback, card?: URLSearchParams) {
  if (!['owner', 'admin'].includes(state.actor?.role)) return ''
- return startPanel(state, 'hubspot', feedback, card) + (card ? '' : startPanel(state, 'pipedrive', feedback) + startPanel(state, 'zoho', feedback))
+ if (card) return startPanel(state, card.get('provider') ?? 'hubspot', feedback, card)
+ return startPanel(state, 'hubspot', feedback) + startPanel(state, 'pipedrive', feedback) + startPanel(state, 'zoho', feedback)
 }
 function startPanel(state: any, provider: string, feedback?: Feedback, card?: URLSearchParams) {
  const label = provider === 'pipedrive' ? 'Pipedrive' : provider === 'zoho' ? 'Zoho CRM' : 'HubSpot'
@@ -12,7 +13,7 @@ function startPanel(state: any, provider: string, feedback?: Feedback, card?: UR
  const connected = state.connections?.find((row: any) => row.provider === provider && row.status === 'connected')
  const back = card ? '/app/crm-card?' + card.toString() : '/app'
  const cardFields = card ? hidden('accountId', card.get('accountId')) : ''
- const start = connected ? form(command + 'review', back, cardFields + field(label + ' deal ID', 'dealId', card?.get('dealId') ?? '', 'required maxlength="100"') + (provider === 'zoho' ? field('Zoho quote ID linked to this deal', 'quoteId', '', 'required maxlength="100"') : '') + area('Draft scope (optional)', 'crmScope', '', 'maxlength="10000"') + '<button>Read ' + label + ' deal</button>') : '<p>Connect ' + label + ' under Settings before reading a deal.</p><a href="/app/settings">Open Settings</a>'
+ const start = connected ? form(command + 'review', back, cardFields + field(label + ' deal ID', 'dealId', card?.get('dealId') ?? '', 'required maxlength="100"') + (provider === 'zoho' ? field('Zoho quote ID linked to this deal', 'quoteId', card?.get('quoteId') ?? '', 'required maxlength="100"') : '') + area('Draft scope (optional)', 'crmScope', '', 'maxlength="10000"') + '<button>Read ' + label + ' deal</button>') : '<p>Connect ' + label + ' under Settings before reading a deal.</p><a href="/app/settings">Open Settings</a>'
  let contents = '<p>Read a deal, explicitly select its organization and person, then review an independent USD draft. Collection stays off. Approval and sending require fresh human actions.</p>' + start
  if (review) {
   contents += '<h3>Choose source records</h3>' + (review.held ? '<p role="status">' + escape(review.held) + '</p>' : '')

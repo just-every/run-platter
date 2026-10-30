@@ -3667,5 +3667,8 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
 test('CRM-004 reviewed Pipedrive and Zoho drafts and lifecycle writes retain exact money and refuse stale source, replay and revoked authority', async () => {
  await (await import('./crm-pipedrive-http.mjs')).pipedriveHttpJourney(verified)
  await (await import('./crm-zoho-http.mjs')).zohoHttpJourney(verified)
- for (const provider of ['pipedrive', 'zoho']) await (await import('./crm-provider-sync-http.mjs')).providerSyncJourney(verified, provider)
+ for (const provider of ['pipedrive', 'zoho']) {
+  await (await import('./crm-provider-sync-http.mjs')).providerSyncJourney(verified, provider)
+  await (await import('./crm-provider-card-http.mjs')).providerCardJourney(provider)
+ }
 })

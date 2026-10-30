@@ -27,6 +27,7 @@ async function record(kind: string, id: string, token: string) {
 }
 export async function readPipedriveDeal(env: Bindings, input: Record<string, unknown>) {
  const { connection, secret } = await providerCredential(env, 'workspace:pipedrive')
+ need(input.accountId === undefined || input.accountId === connection.account_id, 'This card belongs to another provider account', 409)
  need(!connection.broken_at, 'Reconnect Pipedrive before reading deals', 409)
  const identity = await providerJson('https://api.pipedrive.com/v1/users/me', secret.token)
  need(identity.success === true && identity.data?.active_flag === true && String(identity.data.company_id) === connection.account_id, 'Pipedrive no longer confirms this company', 409)

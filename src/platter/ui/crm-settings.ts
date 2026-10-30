@@ -23,9 +23,10 @@ function hubspotSettings(state: any, feedback?: Feedback) {
  return panel('HubSpot proposal synchronization', body) + panel('HubSpot app card', card)
 }
 export function crmCardPage(state: any, params: URLSearchParams, feedback?: Feedback) {
+ const provider = params.get('provider') ?? 'hubspot', label = provider === 'pipedrive' ? 'Pipedrive' : provider === 'zoho' ? 'Zoho CRM' : 'HubSpot'
  const dealId = params.get('dealId') ?? '', accountId = params.get('accountId') ?? ''
- const linked = state.crmDraftSources?.filter((s: any) => s.provider === 'hubspot' && s.deal_id === dealId && s.account_id === accountId) ?? []
- return panel('HubSpot deal proposals', '<p>Account ' + escape(accountId) + ' · Deal ' + escape(dealId) + '</p><ul>' + linked.map((s: any) => { const p = state.proposals.find((p: any) => p.id === s.proposal_id); return p ? '<li><a href="/app/proposal?id=' + escape(p.id) + '">' + escape(p.title) + '</a><p>' + escape(p.status) + ' · revision ' + p.revision + '</p></li>' : '' }).join('') + '</ul>')
+ const linked = state.crmDraftSources?.filter((s: any) => s.provider === provider && s.deal_id === dealId && s.account_id === accountId) ?? []
+ return panel(label + ' deal proposals', '<p>Account ' + escape(accountId) + ' · Deal ' + escape(dealId) + '</p><ul>' + linked.map((s: any) => { const p = state.proposals.find((p: any) => p.id === s.proposal_id); return p ? '<li><a href="/app/proposal?id=' + escape(p.id) + '">' + escape(p.title) + '</a><p>' + escape(p.status) + ' · revision ' + p.revision + '</p></li>' : '' }).join('') + '</ul>')
 }
 
 function providerSettings(state: any, provider: string, feedback?: Feedback) {
@@ -46,5 +47,6 @@ function providerSettings(state: any, provider: string, feedback?: Feedback) {
  if (result) body += '<p role="status">' + escape(result.message) + ' Confirmed: ' + result.confirmed + ' · Held: ' + result.held + '</p>'
  const receipts = (state.crmProviderSyncHistory ?? []).filter((r: any) => r.provider === provider)
  if (receipts.length) body += '<h3>CRM write receipts</h3><ul>' + receipts.map((r: any) => '<li>Deal ' + escape(r.deal_id) + ' · Revision ' + r.revision + ' · ' + escape(r.status) + (r.provider_id ? ' · Provider record ' + escape(r.provider_id) : '') + '</li>').join('') + '</ul>'
- return panel(label + ' proposal synchronization', body)
+ const card = '<p>Open this session-protected link from a deal button in your CRM. The link carries only provider record ids. Sign in to Platter to inspect linked proposals or review a new draft. Opening it grants no provider write or sending authority.</p><form method="get" action="/app/crm-card">' + hidden('provider', provider) + hidden('accountId', connection.accountId) + field(label + ' card deal ID', 'dealId', '', 'required inputmode="numeric" maxlength="100"') + (provider === 'zoho' ? field('Zoho card quote ID (optional)', 'quoteId', '', 'inputmode="numeric" maxlength="100"') : '') + '<button>Open ' + label + ' deal card</button></form>'
+ return panel(label + ' proposal synchronization', body) + panel(label + ' deal card', card)
 }

@@ -65,6 +65,7 @@ export async function zohoBrowser() {
    assert.equal(provider.calls.length, calls); assert.equal((await h.state()).proposals[0].options[0].cents, 36122)
    provider.state.quote.Product_Details[0].list_price = 120.5
    await providerSyncControls(page, h, provider, 'zoho', capture)
+   await (await import('./crm-provider-card-browser.mjs')).providerCardControls(page, h, provider, 'zoho', capture)
    await page.goto(h.origin + '/app/settings'); await connection.getByRole('button', { name: 'Disconnect Zoho CRM (US)', exact: true }).click()
    assert.equal((await h.state()).connections.find(r => r.provider === 'zoho').status, 'disconnected')
   } finally { await context.close() }

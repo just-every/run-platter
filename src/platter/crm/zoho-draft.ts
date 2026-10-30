@@ -17,6 +17,7 @@ export const sourceCents = (value: unknown) => {
 }
 export async function readZohoDeal(env: Bindings, input: Record<string, unknown>) {
  const { connection, secret } = await providerCredential(env, 'workspace:zoho')
+ need(input.accountId === undefined || input.accountId === connection.account_id, 'This card belongs to another provider account', 409)
  need(!connection.broken_at, 'Reconnect Zoho before reading deals', 409)
  await verifyZoho(secret.token, connection.account_id)
  const dealId = zohoId(input.dealId), deal = await zohoRecord('Deals', dealId, secret.token)

@@ -21,10 +21,10 @@ export function pipedriveFixture() {
   calls.push({ path: url.pathname, query: url.search }); if (hook) await hook(req)
   let data
   if (url.pathname === '/v1/users/me') data = { id: 12109, company_id: state.companyId, active_flag: true }
-  if (url.pathname === '/v1/deals/12102') data = state.deal
+  if (url.pathname === '/v1/deals/' + state.deal.id) data = state.deal
   if (url.pathname === '/v1/organizations/12103') data = state.organization
   if (url.pathname === '/v1/persons/12104') data = state.person
-  if (url.pathname === '/v1/deals/12102/products') {
+  if (url.pathname === '/v1/deals/' + state.deal.id + '/products') {
    assert.equal(url.searchParams.get('start'), '0'); assert.equal(url.searchParams.get('limit'), '50')
    return Response.json({ success: true, data: structuredClone(state.attached), additional_data: { pagination: { more_items_in_collection: state.more } } })
   }

@@ -85,6 +85,6 @@ export async function privacyJourney(){
   assert.ok(!(await h.state()).proposals.some(p=>p.id===configured.id))
   assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_mail WHERE proposal_id=?').bind(configured.id).first()).n,0)
   assert.equal(edge.calls.length,calls+7,'only explicit source review reads HubSpot; scheduled work sends nothing')
-  assert.deepEqual(new Set((await h.state()).privacy.receipts.map(r=>r.id)),new Set([result.receipt.id,importReceipt.id,configuredReceipt.id]))
+  assert.deepEqual([...(await h.state()).privacy.receipts].sort((a,b)=>a.id.localeCompare(b.id)),[result.receipt,importReceipt,configuredReceipt].sort((a,b)=>a.id.localeCompare(b.id)))
  }finally{await h.close()}
 }

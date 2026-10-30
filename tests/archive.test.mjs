@@ -415,7 +415,7 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
     assert.ok(!restoredState.clients.some(row=>row.id===p.id),'erased clients stay absent through the restored app door')
     h=privacyOwner(h,restoredOwner)
     await assertPrivacyErased(h,privacy,privacyReceipt)
-    assert.deepEqual(new Set(restoredState.privacy.receipts.map(r=>r.id)),new Set([privacyReceipt.id,importedPrivacy.receipt.id]))
+    assert.deepEqual([...restoredState.privacy.receipts].sort((a,b)=>a.id.localeCompare(b.id)),[privacyReceipt,importedPrivacy.receipt].sort((a,b)=>a.id.localeCompare(b.id)))
     await assertImportedPrivacyErased(h,importedPrivacy,importedPrivacy.receipt,{undo:true})
     const callCount=edge.calls.length
     await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-01-01T15:00:00Z'),cron:'*/15 * * * *'})

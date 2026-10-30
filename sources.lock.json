@@ -3406,7 +3406,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "df52a6f9f492bf7a89e49a6cb29b5336274e2245fee3c808057b64e570ff8fb7",
+      "sha256": "10c53b42307811a77891cd52c41eecfe0a073617290095d490604f527a85ee8c",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3574,7 +3574,7 @@
       "executable": false
     },
     "tests/privacy-journey.mjs": {
-      "sha256": "309ce0b5bf8cd0de9b785841a91909de2acb94aeab4b4648073fdc7ccdfc728a",
+      "sha256": "fd6f612e0d97e5ba9abe97d55c60d384d37da9cfdac3a4453eaa83b4c7c29eae",
       "executable": false
     },
     "tests/provider-network.mjs": {

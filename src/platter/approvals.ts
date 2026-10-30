@@ -14,7 +14,7 @@ export async function approvalSettings(db:D1Database){
  return {policy,rules}
 }
 function matches(a:Actor,approver:string){return approver==='person:'+a.id||approver==='role:'+a.role}
-export async function approvalPlan(db:D1Database,row:any,a?:Actor){
+async function evaluateApproval(db:D1Database,row:any,a?:Actor){
  const {policy,rules}=await approvalSettings(db),options=typeof row.options==='string'?JSON.parse(row.options):row.options
  const totals=options.map((o:any)=>BigInt(o.pricingGrossCents??o.discount?.grossCents??o.cents)+(o.optionalItems??[]).reduce((sum:bigint,item:any)=>sum+BigInt(item.unitCents)*BigInt(item.editable?item.max:item.quantity)*BigInt(item.recurrence?.term??1),0n)),total=totals.reduce((a:bigint,b:bigint)=>a>b?a:b,0n),first=await db.prepare('SELECT snapshot,prepared_by FROM p_revisions WHERE proposal_id=? AND revision=1').bind(row.id).first<any>(),origin=await db.prepare('SELECT template_id FROM p_template_sources WHERE proposal_id=?').bind(row.id).first<any>()
  let costing:any
@@ -37,7 +37,7 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
  const agent=String(row.prepared_by).startsWith('agent:')||String(first?.prepared_by).startsWith('agent:')
  const steps=selected.map(r=>({id:r.id,name:r.name,approvers:r.approvers as string[],any:false}))
  if(!steps.length&&(policy.required||agent))steps.push({id:'default',name:agent&&!policy.required?'Person approval for agent draft':'Default approval',approvers:agent&&!policy.required?['role:owner','role:admin','role:manager']:['role:'+policy.default_role],any:agent&&!policy.required})
- const plan=await hash(JSON.stringify({version:policy.version,steps,revision:row.revision})),history=(await db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=? AND revision=? ORDER BY occurred_at,id').bind(row.id,row.revision).all<any>()).results,decisions=history.filter(d=>d.plan===plan)
+ const plan=await hash(JSON.stringify({version:policy.version,steps,revision:row.revision})),history=(await db.prepare('SELECT id,proposal_id,revision,plan,step,actor_id,approver_index,decision,note,occurred_at FROM p_approval_decisions WHERE proposal_id=? AND revision=? ORDER BY occurred_at,id').bind(row.id,row.revision).all<any>()).results,decisions=history.filter(d=>d.plan===plan)
  const legacy=policy.version===0&&row.approved_by&&steps.length===1&&steps[0].id==='default'
  let prior=true,rejected=history.some(d=>d.decision==='rejected')
  const access=a?scope(a,'approve'):null,mayApprove=Boolean(a&&access&&await db.prepare('SELECT p.id FROM p_proposals p WHERE p.id=? AND ('+access.sql+')').bind(row.id,...access.values).first())
@@ -48,7 +48,21 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
   const result={...step,...(privateName?{name:'Internal approval review'}:{}),done,active:prior&&!done&&!rejected,canApprove:prior&&!done&&!rejected&&eligible.some((i:number)=>!approvals.some(d=>d.approver_index===i)),decisions:decisions.filter(d=>d.step===step.id)}
   prior=prior&&done;return result
  })
- return {policyVersion:policy.version,plan,steps:evaluated,required:steps.length>0,complete:prior&&!rejected,rejected}
+ return {policyVersion:policy.version,plan,steps:evaluated,required:steps.length>0,complete:prior&&!rejected,rejected,facts:{policy:{version:policy.version,required:Boolean(policy.required),defaultRole:policy.default_role},rules:selected,steps}}
+}
+export async function approvalPlan(db:D1Database,row:any,a?:Actor){
+ const {facts,...plan}=await evaluateApproval(db,row,a)
+ return plan
+}
+export async function approvalHistories(db:D1Database,a:Actor,ids:string[]){
+ need(a.role==='owner','Only the owner reads retained approval history',403)
+ const visibility=scope(a,'view')
+ const rows=(await db.prepare('SELECT d.* FROM p_approval_decisions d JOIN p_proposals p ON p.id=d.proposal_id WHERE d.proposal_id IN (SELECT value FROM json_each(?)) AND ('+visibility.sql+') ORDER BY d.revision,d.occurred_at,d.id').bind(JSON.stringify(ids),...visibility.values).all<any>()).results
+ const legacy=(await db.prepare('SELECT a.* FROM p_approvals a JOIN p_proposals p ON p.id=a.proposal_id WHERE a.proposal_id IN (SELECT value FROM json_each(?)) AND ('+visibility.sql+') AND NOT EXISTS(SELECT 1 FROM p_approval_decisions d WHERE d.id=a.id)').bind(JSON.stringify(ids),...visibility.values).all<any>()).results.map(row=>({id:row.id,proposal_id:row.proposal_id,revision:row.revision,plan:null,step:null,actor_id:row.actor_id,approver_index:null,decision:'approved',note:null,occurred_at:row.approved_at,actor_role:null,actor_name:null,basis:null}))
+ // Historical missing facts stay missing; current membership and settings cannot reconstruct them.
+ const histories=new Map<string,any[]>(ids.map(id=>[id,[]]))
+ for(const {basis,actor_role,actor_name,plan,step,note,...row} of [...rows,...legacy].sort((a,b)=>a.revision-b.revision||a.occurred_at-b.occurred_at||a.id.localeCompare(b.id)))histories.get(row.proposal_id)?.push({...row,plan:plan??'not recorded',step:step??'not recorded',note:note??'not recorded',actor_role:actor_role??'not recorded',actor_name:actor_name??'not recorded',basis:basis===null?'not recorded':JSON.parse(basis)})
+ return histories
 }
 export async function approvalCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  const db=env.DB,at=await currentTime(db)
@@ -97,18 +111,19 @@ export async function approvalCommand(env:Bindings,a:Actor,name:string,p:Record<
  const original=await permitted(db,a,p.id,'approve');exact(original,p)
  const row=negotiatedView(original,await pendingNegotiation(db,original.id))
  need(['draft','approved','sent'].includes(row.status)&&row.revision===Number(p.revision),'Approve the current draft revision',409)
- const plan=await approvalPlan(db,row,a),step=p.step===undefined?plan.steps.find(s=>s.canApprove):plan.steps.find(s=>s.id===p.step)
+ const {facts,...plan}=await evaluateApproval(db,row,a),step=p.step===undefined?plan.steps.find(s=>s.canApprove):plan.steps.find(s=>s.id===p.step)
  need(step?.canApprove,'No current approval step names you',403)
  const note=p.note===undefined?'':String(p.note);need(note.length<=2000,'Keep the approval note under 2000 characters')
  const index=step.approvers.findIndex(v=>matches(a,v)&&!step.decisions.some(d=>d.approver_index===step.approvers.indexOf(v)))
  const decision=name==='proposal.reject'?'rejected':'approved'
  const id=crypto.randomUUID(),pending=row.negotiating
+ const basis=JSON.stringify({policy:facts.policy,step:facts.steps.find(s=>s.id===step.id),rule:facts.rules.find(r=>r.id===step.id)??null})
  // Serialize decisions with the existing proposal version; only the exact current plan may advance.
  const guard={sql:'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=?',values:[original.id,original.version,plan.policyVersion]}
  const complete=decision==='approved'&&plan.steps.every(s=>s.done||s.id===step.id&&(s.any||s.approvers.every((_,i)=>i===index||s.decisions.some(d=>d.decision==='approved'&&d.approver_index===i))))
  const finalize=complete?[pending?db.prepare('UPDATE p_negotiations SET approved_by=?,approved_at=? WHERE proposal_id=? AND revision=?').bind(a.email,at,row.id,row.revision):db.prepare("UPDATE p_proposals SET status=?,approved_by=?,approved_at=? WHERE id=? AND revision=?").bind(original.status==='sent'?'sent':'approved',a.email,at,row.id,row.revision)]:[]
  await commit(db,a,[
-  db.prepare('INSERT INTO p_approval_decisions(id,proposal_id,revision,plan,step,actor_id,approver_index,decision,note,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,row.id,row.revision,plan.plan,step.id,a.id,index,decision,note,at),
+  db.prepare('INSERT INTO p_approval_decisions(id,proposal_id,revision,plan,step,actor_id,approver_index,decision,note,occurred_at,actor_role,actor_name,basis) SELECT ?,?,?,?,?,?,?,?,?,?,?,display_name,? FROM oa_operators WHERE id=?').bind(id,row.id,row.revision,plan.plan,step.id,a.id,index,decision,note,at,a.role,basis,a.id),
   db.prepare('UPDATE p_proposals SET version=version+1 WHERE id=?').bind(row.id),
   ...(decision==='approved'?[db.prepare('INSERT INTO p_approvals(id,proposal_id,revision,actor_id,approved_at) VALUES(?,?,?,?,?)').bind(id,row.id,row.revision,a.id,at)]:[]),...finalize,
  ],false,guard)

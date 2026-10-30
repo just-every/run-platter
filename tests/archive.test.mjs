@@ -56,6 +56,9 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     await h.cmd('proposal.approve',{id:proposal.id,version:1,revision:1})
     await h.cmd('proposal.revise',{...offer,id:proposal.id,version:2,scope:'Studio photographs, usage licence and delivery'})
     await h.cmd('proposal.approve',{id:proposal.id,version:3,revision:2})
+    const approvalOwner=(await h.state()).actor.id,approvalHistory=(await h.state()).proposals.find(p=>p.id===proposal.id).approvalHistory
+    assert.deepEqual(approvalHistory.map(row=>({revision:row.revision,actor:row.actor_id,role:row.actor_role,name:row.actor_name,basis:row.basis})),[1,2].map(revision=>({revision,actor:approvalOwner,role:'owner',name:'Jordan Venue',basis:{policy:{version:0,required:true,defaultRole:'owner'},step:{id:'default',name:'Default approval',approvers:['role:owner'],any:false},rule:null}})))
+    const approvalRows=(await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=? ORDER BY revision').bind(proposal.id).all()).results
     const restKey=(await h.send('/api/platter/v1/keys',{label:'Synthetic archive key',scopes:['proposals.read']},h.owner)).value
     const webhook=(await h.send('/api/platter/v1/webhooks',{url:'https://hooks.example.com/archive',consent:true},h.owner)).value
     assert.ok(restKey.token&&webhook.secret)
@@ -241,6 +244,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     for(const row of requests)assert.deepEqual(row,Object.fromEntries(Object.keys(row).map(field=>[field,beforeRequests.find(r=>r.id===row.id)[field]])),'AI-003 request and resolution custody survives the CLI archive')
     const revisions=archived.filter(item=>item.table==='p_revisions'&&item.row.proposal_id===proposal.id)
     const approvals=archived.filter(item=>item.table==='p_approvals'&&item.row.proposal_id===proposal.id)
+    assert.deepEqual(archived.filter(item=>item.table==='p_approval_decisions'&&item.row.proposal_id===proposal.id).map(item=>item.row).sort((a,b)=>a.revision-b.revision),approvalRows,'decision-time role and rule bytes survive the public archive exactly')
     assert.equal(revisions.length,2)
     assert.equal(approvals.length,2)
     assert.equal(archived.filter(item=>item.table==='p_negotiations').length,1)
@@ -253,6 +257,10 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal((await h.send(path,undefined,verified.cookie)).status,404)
     const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
     const restoredState=await h.state(restoredOwner)
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).approvalHistory,approvalHistory,'the owner reads the same retained approval facts after restore')
+    const approvalCapture=await h.send('/api/platter/command',{name:'proposal.approve',input:{id:proposal.id,version:3,revision:2}},identity.owner)
+    assert.equal(approvalCapture.status,401,'restored history confers no authority to replay a captured approval request')
+    assert.deepEqual((await h.state(restoredOwner)).proposals.find(p=>p.id===proposal.id).approvalHistory,approvalHistory)
     const restoredHooks=(await h.send('/api/platter/v1/webhooks',undefined,restoredOwner)).value;assert.equal(restoredHooks.length,1);assert.equal(restoredHooks[0].id,webhook.id);assert.equal(restoredHooks[0].url,webhook.url);assert.equal(restoredHooks[0].connected,0)
     assert.deepEqual((await h.send('/api/platter/v1/deliveries',undefined,restoredOwner)).value,webhookDeliveries)
     assert.equal((await h.send('/api/platter/v1/proposals',undefined,'',{authorization:'Bearer '+restKey.token})).status,401)
@@ -788,6 +796,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.equal((await h.state(sales)).followups.timeZone,'America/New_York')
   assert.equal((await h.state(other)).proposals.some(r=>r.id===p.id),true)
   assert.deepEqual(after.proposals.find(r=>r.id===p.id).approval,before.proposals.find(r=>r.id===p.id).approval)
+  assert.deepEqual(after.proposals.find(r=>r.id===p.id).approvalHistory,before.proposals.find(r=>r.id===p.id).approvalHistory,'manager decision-time facts retain exact owner readback after restore')
   assert.equal((await h.send('/api/platter/state',undefined,people.sales.cookie)).status,401,'source sessions confer no restored authority')
   await h.cmd('proposal.send',{id:p.id,version:4},sales)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+10*86400000),cron:'*/15 * * * *'})

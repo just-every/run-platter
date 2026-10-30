@@ -645,6 +645,10 @@
       "sha256": "cbebdc3767ad5463c708c3ddac223639549305289aad9a1f12678d1b2c92d62b",
       "executable": false
     },
+    "migrations/core/0099_paypal_collection.sql": {
+      "sha256": "e4dbf0b9aba86ace4f1568599220c92af2ff5ef3a90f6a6341558c427eafd0f9",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -1283,6 +1287,10 @@
     },
     "public/packages.js": {
       "sha256": "ba05e32ebd40761772aeeaafcfc57f465ec85701174795d4243f39052e72380e",
+      "executable": false
+    },
+    "public/paypal-collection.js": {
+      "sha256": "de18f8dd5e26a60c59c04ad2301839219f9e73b8966995d5cdc282b5d8b08478",
       "executable": false
     },
     "public/platter.js": {
@@ -2474,7 +2482,7 @@
       "executable": false
     },
     "src/platter/archive-policy.mjs": {
-      "sha256": "94bb754c2ec258f9e5c816bc023ea3b572decafc49a98c7846623ac377be9bf2",
+      "sha256": "a908925b80d0694ba0a37ce194e654478aa0531e834e9791d3c7b9b11749c7e0",
       "executable": false
     },
     "src/platter/archiving/google-drive.ts": {
@@ -2530,11 +2538,11 @@
       "executable": false
     },
     "src/platter/collection-policy.ts": {
-      "sha256": "fa74d27fcad0f43effb0b5d426dc194e3fa08309fd561d97cd882170eaa2d0dc",
+      "sha256": "2e5ec1ec64a743b959daa61e32d76ed4562fe999d0a801c2e33fac6cbbaa4c20",
       "executable": false
     },
     "src/platter/collection.ts": {
-      "sha256": "1884c4c773c83f9fd6366b60416cd55502ff17549e3ce9bcbf141df6d55f63a3",
+      "sha256": "aaa551403067c1112bacf72a8a30c6ccbc695fb51523d398f2994f00f5542b6e",
       "executable": false
     },
     "src/platter/commands.ts": {
@@ -2542,7 +2550,7 @@
       "executable": false
     },
     "src/platter/completion-mail.ts": {
-      "sha256": "9bda3f888207b356cd0f95789bc70f90dc3c9490fec9aff7fc36bc1d2b220bac",
+      "sha256": "28077916487fcb4a9b74d8a61ec6bb5efa674fece092f7518825272fb92b369f",
       "executable": false
     },
     "src/platter/conditional.ts": {
@@ -2550,7 +2558,7 @@
       "executable": false
     },
     "src/platter/connections.ts": {
-      "sha256": "9961c356f44e71010614615704c2911c76882a0fa05dbb3ad6b4583f0303b887",
+      "sha256": "e30d118611c070a23bdf9c85af5c9d3ee4d4f12b18f7238369226d0955361704",
       "executable": false
     },
     "src/platter/credentials.ts": {
@@ -2690,7 +2698,7 @@
       "executable": false
     },
     "src/platter/http.ts": {
-      "sha256": "d8889da8e143627fa10e9d05b4799872884e507cd156cdf540cd82c44cf9a57f",
+      "sha256": "62974bd964ecc04d41612a0daff9c38ed779f33b5ce0c20b582beb4a8aa65f13",
       "executable": false
     },
     "src/platter/internal-pricing.ts": {
@@ -2866,7 +2874,27 @@
       "executable": false
     },
     "src/platter/payments.ts": {
-      "sha256": "91346753ee7eb715c5388c4660451c0cb853896c5c04d704d9afbd54edbdfd29",
+      "sha256": "38dc4409493f07da96854142355a73585d53b11895fd16c55cfda84219847a86",
+      "executable": false
+    },
+    "src/platter/paypal-authority.ts": {
+      "sha256": "28d145192b545f576e113ae7bae90702df8ab7170b42762a8ea8cee08d860fd1",
+      "executable": false
+    },
+    "src/platter/paypal-events.ts": {
+      "sha256": "fe30568bb9c5e08945a9652a3fee49e528a10b5df90f60c362727d1d2392a51a",
+      "executable": false
+    },
+    "src/platter/paypal-provider.ts": {
+      "sha256": "06e73a168d758620c740c94e64bb6a596147839f0568ab246b76aaaf8d3f1f58",
+      "executable": false
+    },
+    "src/platter/paypal-refunds.ts": {
+      "sha256": "f0c054c345f30798eea5226fc30c1cb92ff5ae5025c39e0c8c975f49c26ca9ee",
+      "executable": false
+    },
+    "src/platter/paypal.ts": {
+      "sha256": "76b4f1575a11c737ab62c5caefe1d36df8605824dee314ef79a5fe91ec333127",
       "executable": false
     },
     "src/platter/permissions.ts": {
@@ -3082,11 +3110,11 @@
       "executable": false
     },
     "src/platter/ui/collection-policy.ts": {
-      "sha256": "c168f87711af2d5d87ef1bab3e46f57cbff194ccafd9a8879e89fb166deb1fd4",
+      "sha256": "faa17438c8914e87710abda3a63ae67c4b7d05e24e7b0410ac552a18f015e34d",
       "executable": false
     },
     "src/platter/ui/collection.ts": {
-      "sha256": "56651539e260d695a167e33bb3764174c76559454e3d2d03a4599fbea1d1ba12",
+      "sha256": "9a32355220a3929dc5b909742f05d2842d6b27ce1988b9209cb27e17ad87fe5f",
       "executable": false
     },
     "src/platter/ui/composer.ts": {
@@ -3094,7 +3122,7 @@
       "executable": false
     },
     "src/platter/ui/connections.ts": {
-      "sha256": "e48b5f46362bf7a82ff5b59c6f0e15761d5b164c417e16cdbf753a05400432ed",
+      "sha256": "80be8af93f6d8bdd181c80e477f405476ad4439dccff580de1f271666708a47f",
       "executable": false
     },
     "src/platter/ui/crm-settings.ts": {
@@ -3174,7 +3202,11 @@
       "executable": false
     },
     "src/platter/ui/payments.ts": {
-      "sha256": "19979feae1125a3ccdf6cd3de81e97980f5b5467c10971f643be7d2ae448a408",
+      "sha256": "8990852427eb800d578da981d17cc6722fd791a07b8760f7400320be5cdb7a8b",
+      "executable": false
+    },
+    "src/platter/ui/paypal-collection.ts": {
+      "sha256": "eb72b6f60d472f6902d7d492e8acb7120f0d1b4d3da2ce951e265cd1a555b953",
       "executable": false
     },
     "src/platter/ui/pipeline.ts": {
@@ -3190,7 +3222,7 @@
       "executable": false
     },
     "src/platter/ui/proposals.ts": {
-      "sha256": "ad7e9f159d089e77de32a1c48e5ba76c7043f82f633de4cb47f9f16c966f17f4",
+      "sha256": "45ddaea0340ec209e0917016715102b4355e28a2b687e5b0b777dd93bb9dd1db",
       "executable": false
     },
     "src/platter/ui/questions.ts": {
@@ -3390,7 +3422,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "56480eb1e40fb0798b571390f523757c7b8b8a71ae243fc3a1ff045362388e0d",
+      "sha256": "18f681b9af7da705509e4c8dbfecf1429b999b81867e504c4a20088cbe5a25f2",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3537,12 +3569,24 @@
       "sha256": "2a810ab4fa0ad903a3ff9d47621a1d7ec8b383f9d103e46ef2284f732f23e4a3",
       "executable": false
     },
+    "tests/paypal-browser.mjs": {
+      "sha256": "13d4c4201d4efb5d23bb0e5065b1ea5f3eabca9783ef9cde11553c59977363ee",
+      "executable": false
+    },
+    "tests/paypal-fixture.mjs": {
+      "sha256": "a5253aade9a70c16884330e942f18fa879e9ce2113e7be770005756d6c66165d",
+      "executable": false
+    },
+    "tests/paypal-journey.mjs": {
+      "sha256": "c439376ed55d9832fe55d423449aed52e3c9e718928c29f46d9b05fe80111891",
+      "executable": false
+    },
     "tests/pdf-document.mjs": {
       "sha256": "a87d24ebfc961daa440523ef346b632c1bfcd24a3f09c6407e0032c05d2d9f55",
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "4adbb6122f7df0830a3dcc117d42ba3c3a03f0f9696bd5411720e0c17d3b5ad2",
+      "sha256": "c5ee5ef1358b0d5f395ac44bf9a12dd2ce8030e999bf333e646cbfcf0942c8ff",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3594,7 +3638,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "988a5096714a762dc27c7681d33c630aafc69c95b951b543d3c7ef71cca36109",
+      "sha256": "a53e0be41979711d4407be33623c6c4a65a6a5785d706276e7e8a5f92cf1be05",
       "executable": false
     },
     "tests/site-harness.mjs": {

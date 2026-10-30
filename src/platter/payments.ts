@@ -1,3 +1,4 @@
+import { refundPaypal } from './paypal-refunds'
 import type { Bindings } from '../auth.server'
 import { providerCredential, providerJson } from './connections'
 import { commit, dollars, need, text, type Actor } from './model'
@@ -35,7 +36,8 @@ export async function paymentCommand(env:Bindings,a:Actor,name:string,p:Record<s
   return {id:recordId,proposalId:id}
  }
  need(name==='payment.refund','Unknown payment action',404)
- const payment=await db.prepare('SELECT * FROM p_payment_records WHERE id=?').bind(text(p.paymentId,'a payment')).first<any>();need(payment&&payment.method==='stripe','Choose a linked Stripe deposit',404)
+ const payment=await db.prepare('SELECT * FROM p_payment_records WHERE id=?').bind(text(p.paymentId,'a payment')).first<any>();if(payment?.method==='paypal')return refundPaypal(env,a,payment,p)
+ need(payment&&payment.method==='stripe','Choose a linked Stripe deposit',404)
  const reason=text(p.reason,'a refund reason',1000),cents=dollars(p.amount,'a refund amount'),requestId=text(p.requestId,'a refund request id',100);need(/^[A-Za-z0-9_-]+$/.test(requestId),'Use an opaque refund request id')
  need(p.consent===true||p.consent==='yes','Confirm this refund explicitly')
  const previous=await db.prepare('SELECT * FROM p_refunds WHERE id=?').bind(requestId).first<any>()

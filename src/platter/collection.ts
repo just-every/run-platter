@@ -10,7 +10,8 @@ import { need, fail } from './model'
 export async function collectionView(db:D1Database,id:string,accepted?:any){
  const frozen=accepted?JSON.parse(accepted.snapshot).collectionPolicy:null
  const policy=accepted?(frozen??{enabled:false,completion:'off',methods:[]}):await collectionPolicy(db,id)
- const intent=await db.prepare('SELECT method,status,cents,deposit_cents,fee_cents,billing_state,currency,authorization,authorized_at,provider_mandate FROM p_collection_intents WHERE proposal_id=? AND revision=?').bind(id,accepted?.revision??0).first<any>()
+ const paypal=policy.provider==='paypal'
+ const intent=paypal?await db.prepare('SELECT status,cents,cents AS deposit_cents,0 AS fee_cents,currency,authorization,authorized_at FROM p_paypal_deposits WHERE proposal_id=? AND revision=?').bind(id,accepted?.revision??0).first<any>():await db.prepare('SELECT method,status,cents,deposit_cents,fee_cents,billing_state,currency,authorization,authorized_at,provider_mandate FROM p_collection_intents WHERE proposal_id=? AND revision=?').bind(id,accepted?.revision??0).first<any>()
  return {...policy,payment:intent,agreementState:!accepted?'unsigned':!policy.enabled||policy.completion==='due'||accepted.deposit_cents===0||intent?.status==='succeeded'&&Boolean(intent.authorized_at)?'complete':'waiting_for_payment',complete:!policy.enabled||policy.completion==='due'||accepted?.deposit_cents===0||intent?.status==='succeeded'&&Boolean(intent.authorized_at)}
 }
 
@@ -32,7 +33,8 @@ async function boundClient(env:Bindings,c:any){
 }
 
 export async function clientCollection(env:Bindings,c:any,input:Record<string,unknown>,refresh=false){
- const {accepted,policy}=await boundClient(env,c),db=env.DB,{secret}=await providerCredential(env,'workspace:stripe')
+ const {accepted,policy}=await boundClient(env,c);need(policy.provider!=='paypal','Use the PayPal collection door for this deposit',409)
+ const db=env.DB,{secret}=await providerCredential(env,'workspace:stripe')
  let saved=await db.prepare('SELECT * FROM p_collection_intents WHERE proposal_id=? AND revision=?').bind(accepted.proposal_id,accepted.revision).first<any>()
  const method=String(input.method??saved?.method??'card')
  need(policy.methods.includes(method),'This payment method is not offered',400)
@@ -82,7 +84,8 @@ export async function clientCollection(env:Bindings,c:any,input:Record<string,un
 
 
 export async function authorizeCollection(env:Bindings,c:any,input:Record<string,unknown>){
- const {accepted}=await boundClient(env,c),db=env.DB
+ const {accepted,policy}=await boundClient(env,c);need(policy.provider!=='paypal','Use the PayPal collection door for this deposit',409)
+ const db=env.DB
  const saved=await db.prepare('SELECT * FROM p_collection_intents WHERE proposal_id=? AND revision=?').bind(accepted.proposal_id,accepted.revision).first<any>()
  const {secret}=await providerCredential(env,'workspace:stripe')
  need(saved?.account_id===secret.accountId,'The Stripe account changed. Prepare the payment again with the firm.',409)

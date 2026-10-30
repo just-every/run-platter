@@ -3718,3 +3718,9 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
  } finally { await h.close() }
  await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
 })
+
+
+test('PAY-009 verified PayPal one-time deposits capture once, authenticate notifications and reserve explicit financial refunds', {timeout:120000}, async()=>{
+ const {paypalJourney}=await import('./paypal-journey.mjs')
+ await paypalJourney()
+})

@@ -932,3 +932,9 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
   } finally { await context.close() }
  } finally { await browser?.close(); await h?.close(); await edge.close() }
 })
+
+
+test('PAY-009 native PayPal Settings connection, deposit selection, hosted approval, explicit capture and owner half refund', {timeout:180000}, async()=>{
+ const {paypalBrowser}=await import('./paypal-browser.mjs')
+ await paypalBrowser()
+})

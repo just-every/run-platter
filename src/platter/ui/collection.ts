@@ -1,8 +1,10 @@
 import { escape, hidden, money, panel } from './shared'
+import { paypalCollectionPanel } from './paypal-collection'
 const labels:Record<string,string>={card:'Card',ach:'ACH bank debit',apple_pay:'Apple Pay',google_pay:'Google Pay'}
 export function collectionPanel(view:any,token:string){
  const c=view.collection
  if(!c?.enabled||!view.verified||view.preview)return ''
+ if(c.provider==='paypal')return paypalCollectionPanel(view,token)
  const paid=c.payment?.status==='succeeded',amount=view.acceptance?.depositCents??view.selection?.deposit
  if(!view.acceptance)return panel('Deposit payment',`<p>${c.completion==='required'?'Your signature is retained immediately. Acceptance completes when Stripe confirms the deposit.':'Signing completes acceptance. The deposit remains due until Stripe confirms payment.'}</p><p>Available methods: ${c.methods.map((m:string)=>escape(labels[m])).join(', ')}.</p>`)
  if(view.acceptance.depositCents===0)return ''

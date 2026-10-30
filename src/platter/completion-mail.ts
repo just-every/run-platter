@@ -30,7 +30,9 @@ export function readyCompletionStatements(env:Bindings,id:string){
  COALESCE(json_extract(a.snapshot,'$.collectionPolicy.enabled'),0)=0
  OR json_extract(a.snapshot,'$.collectionPolicy.completion')='due' OR a.deposit_cents=0
  OR EXISTS(SELECT 1 FROM p_collection_intents i WHERE i.proposal_id=a.proposal_id AND i.revision=a.revision
-           AND i.status='succeeded' AND i.authorized_at IS NOT NULL AND i.deposit_cents=a.deposit_cents AND i.currency=a.currency))`
+           AND i.status='succeeded' AND i.authorized_at IS NOT NULL AND i.deposit_cents=a.deposit_cents AND i.currency=a.currency)
+ OR EXISTS(SELECT 1 FROM p_paypal_deposits i WHERE i.proposal_id=a.proposal_id AND i.revision=a.revision
+           AND i.status='succeeded' AND i.authorized_at IS NOT NULL AND i.cents=a.deposit_cents AND i.currency=a.currency))`
  // The accepted plan is the immutable destination list; an owner in that plan receives one copy.
  writes.push(db.prepare(`INSERT INTO p_completion_mail
  SELECT lower(hex(randomblob(16))),g.proposal_id,g.revision,'recipient:'||json_extract(r.value,'$.id'),json_extract(r.value,'$.email')

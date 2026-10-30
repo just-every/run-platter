@@ -1,4 +1,5 @@
 import type { Bindings } from '../auth.server'
+import { verifyPaypalMerchant } from './paypal-provider'
 import { administrators, senders } from './permissions'
 import { commit, email, fail, need, text, type Actor } from './model'
 const mailboxRoles=[...senders,'billing']
@@ -42,7 +43,7 @@ export async function connectionState(env:Bindings,a:Actor){
  return rows.map(r=>({id:r.id,provider:r.provider,operatorId:r.operator_id,accountId:r.account_id,mailboxEmail:r.mailbox_email,status:r.status==='connected'&&!r.has_secret?'needs_reconnection':r.broken_at?'broken':r.status,version:r.version,connectedAt:r.connected_at}))
 }
 export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
- const provider=String(p.provider??'');need(['stripe','quickbooks','gmail','microsoft','hubspot','salesforce','google_drive','slack','teams'].includes(provider),'Choose a supported provider')
+ const provider=String(p.provider??'');need(['stripe','paypal','quickbooks','gmail','microsoft','hubspot','salesforce','google_drive','slack','teams'].includes(provider),'Choose a supported provider')
  need((isMailbox(provider)?mailboxRoles:administrators).includes(a.role),isMailbox(provider)?'Your role cannot connect a mailbox':'Only owner and admins connect workspace providers',403)
  need(p.operatorId===undefined||p.operatorId===a.id,'Connect only your own mailbox',403)
  const db=env.DB,id=connectionId(provider,a)
@@ -59,7 +60,10 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
  need(p.consent===true||p.consent==='yes','Confirm permission to connect this account')
  const token=text(p.token,'a provider token',8192);need(!/[\r\n\0]/.test(token),'Use a single-line provider token')
  let accountId:string,mailboxEmail:string|null=null,webhookSecret:string|undefined,instanceOrigin:string|undefined
- if(provider==='stripe'){
+ if(provider==='paypal'){
+  accountId=await verifyPaypalMerchant(token,text(p.merchantId,'the PayPal merchant id',200))
+  webhookSecret=text(p.webhookId,'the PayPal webhook id',200)
+ }else if(provider==='stripe'){
   webhookSecret=p.webhookSecret?text(p.webhookSecret,'the Stripe webhook signing secret',8192):undefined
   if(p.publishableKey!==undefined&&p.publishableKey!=='')need(typeof p.publishableKey==='string'&&p.publishableKey.length>0&&p.publishableKey.length<=8192&&!/[\r\n\0]/.test(p.publishableKey),'Use the Stripe publishable key')
   const result=await providerJson('https://api.stripe.com/v1/account',token);accountId=text(result.id,'the verified provider account',200)
@@ -90,7 +94,7 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
   need(await db.prepare('SELECT 1 WHERE '+sql).bind(...values).first(),'This mailbox is already bound to another member',403)
   guard.sql+=' AND '+sql;guard.values.push(...values)
  }
- const sealed=await sealCredential(env,id,{provider,token,accountId,...(instanceOrigin?{instanceOrigin}:{}),...(webhookSecret?{webhookSecret}:{}),...(provider==='stripe'&&p.publishableKey?{publishableKey:p.publishableKey}:{})}),at=Date.now()
+ const sealed=await sealCredential(env,id,{provider,token,accountId,...(instanceOrigin?{instanceOrigin}:{}),...(webhookSecret?(provider==='paypal'?{webhookId:webhookSecret}:{webhookSecret}):{}),...(provider==='stripe'&&p.publishableKey?{publishableKey:p.publishableKey}:{})}),at=Date.now()
  await commit(db,a,[db.prepare("INSERT INTO p_connections(id,provider,operator_id,account_id,mailbox_email,status,connected_by,connected_at) VALUES(?,?,?,?,?,'connected',?,?) ON CONFLICT(id) DO UPDATE SET account_id=excluded.account_id,mailbox_email=excluded.mailbox_email,status='connected',broken_at=NULL,version=p_connections.version+1,connected_by=excluded.connected_by,connected_at=excluded.connected_at").bind(id,provider,isMailbox(provider)?a.id:null,accountId,mailboxEmail,a.id,at),db.prepare('INSERT INTO p_connection_secrets(connection_id,sealed) VALUES(?,?) ON CONFLICT(connection_id) DO UPDATE SET sealed=excluded.sealed').bind(id,sealed)],false,guard)
  return {id,status:'connected'}
 }

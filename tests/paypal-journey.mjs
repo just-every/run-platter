@@ -114,7 +114,7 @@ export async function paypalJourney(){
  const fake=paypalFixture(),log=captureRuntimeLog()
  let h
  try{
-  h=await harness({origin:'https://synthetic-platter-9000.example.test',assetsDirectory:'public',outboundService:fake.outboundService})
+  h=await harness({origin:'https://127.0.0.1:9449',assetsDirectory:'public',outboundService:fake.outboundService})
   inspectPaypalReservations(h,fake)
   const roles=await people(h)
   const before=fake.calls.length

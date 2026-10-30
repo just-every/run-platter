@@ -3578,7 +3578,7 @@
       "executable": false
     },
     "tests/paypal-journey.mjs": {
-      "sha256": "c439376ed55d9832fe55d423449aed52e3c9e718928c29f46d9b05fe80111891",
+      "sha256": "13a7db52cde81f5ad8ada274d1bcd0b73b384be251d440345b55d3d6e2376866",
       "executable": false
     },
     "tests/pdf-document.mjs": {

@@ -7,7 +7,7 @@ export async function paperDepositMailJourney() {
  for(const provider of ['local','resend','gmail']) {
 
   let h,refreshMutation,uncertain=false,hold=false,entered,release
-  const sent=[],arrived=new Promise(resolve=>{entered=resolve}),waiting=new Promise(resolve=>{release=resolve})
+  const sent=[],arrived=new Promise(resolve=>{entered=resolve});let waiting=new Promise(resolve=>{release=resolve})
   h=await harness({cf:false,...(provider==='local'?{}:{origin:'https://platter.example'}),auth:{AUTH_LOCAL:provider==='local'?'true':'false',MAIL_PROVIDER:provider==='local'?'development':'resend',MAIL_API_KEY:'synthetic-platter-8101',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-8102',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-8103'},outboundService:async request=>{
    const url=new URL(request.url)
    if(url.hostname==='oauth2.googleapis.com'){
@@ -53,14 +53,13 @@ export async function paperDepositMailJourney() {
    await h.cmd('deposit.request',{...first.input,recipient:h.auth.OWNER_EMAIL},h.owner,409)
    assert.equal(sent.length,before)
    hold=provider==='resend'
-   const requesting=h.cmd('deposit.request',first.input)
+   const requesting=Promise.all([h.cmd('deposit.request',first.input),h.cmd('deposit.request',first.input)])
    if(hold){await arrived;await h.cmd('deposit.request',first.input);release()}
-   const result=await requesting;hold=false;
-   assert.equal(result.status,provider==='local'?'local':'accepted')
+   const results=await requesting;hold=false;const result=results.find(r=>r.status===(provider==='local'?'local':'accepted'));assert.ok(result);assert.equal(results[0].requestId,results[1].requestId)
    const retained=(await h.state()).proposals.find(x=>x.id===first.p.id).depositRequests[0]
    const messages=provider==='local'?(await h.state()).outbox.filter(m=>m.id===retained.mail_id).map(m=>({to:[m.recipient],subject:m.subject,text:m.body})):sent.filter(m=>m.subject.startsWith('Deposit request:'))
    assert.equal(messages.length,1);assert.deepEqual(messages[0].to,[recipient]);assert.match(messages[0].text,/USD 1050\.00/);assert.ok(messages[0].text.includes(first.path));assert.ok(messages[0].text.includes(result.requestId));assert.match(messages[0].text,/Accepted revision: 1/);assert.match(messages[0].text,/Platter did not verify the signature/)
-   assert.equal(retained.deposit_cents,105000);assert.equal(retained.recipient,recipient);assert.equal(retained.revision,1)
+   assert.equal(retained.status,provider==='local'?'local':'accepted');assert.deepEqual(retained.history.map(e=>e.status),provider==='local'?['local']:['pending','sending','accepted']);assert.equal(retained.deposit_cents,105000);assert.equal(retained.recipient,recipient);assert.equal(retained.revision,1)
    if(provider!=='local'){assert.equal(retained.provider,provider==='gmail'?'gmail':'installation');assert.ok(retained.provider_message_id);const history=await h.db.prepare('SELECT * FROM p_mail_attributions WHERE mail_id=?').bind(retained.mail_id).first();assert.equal(history.outcome,'accepted')}
    const n=sent.length
    await Promise.all([h.cmd('deposit.request',first.input),h.cmd('deposit.request',first.input)]);assert.equal(sent.length,n)
@@ -72,7 +71,18 @@ export async function paperDepositMailJourney() {
     const result=await h.cmd('deposit.request',second.input);assert.equal(result.status,'uncertain')
     const count=sent.length;uncertain=false
     await Promise.all([h.cmd('deposit.request',second.input),h.cmd('deposit.request',second.input)]);assert.equal(sent.length,count,'an uncertain response never authorizes another send')
-    const rows=(await h.db.prepare('SELECT * FROM p_deposit_requests WHERE proposal_id=?').bind(second.p.id).all()).results;assert.equal(rows.length,1);assert.equal(rows[0].status,'uncertain')
+    const rows=(await h.db.prepare('SELECT * FROM p_deposit_requests WHERE proposal_id=?').bind(second.p.id).all()).results;assert.equal(rows.length,1);assert.equal(rows[0].status,'uncertain');assert.deepEqual((await h.state()).proposals.find(p=>p.id===second.p.id).depositRequests[0].history.map(e=>e.status),['pending','sending','uncertain'])
+    const interrupted=await paper();hold=true
+    const reached=new Promise(resolve=>{entered=resolve});waiting=new Promise(resolve=>{release=resolve})
+    const inFlight=h.cmd('deposit.request',interrupted.input);await reached
+    const beforeRecovery=sent.length
+    await h.db.prepare('UPDATE p_deposit_requests SET updated_at=0 WHERE proposal_id=?').bind(interrupted.p.id).run()
+    const recovered=await h.cmd('deposit.request',interrupted.input);assert.equal(recovered.status,'uncertain');assert.equal(sent.length,beforeRecovery,'an interrupted send is held without another provider request')
+    release();await inFlight;hold=false
+    await h.cmd('deposit.request',interrupted.input)
+    const heldRequest=(await h.state()).proposals.find(p=>p.id===interrupted.p.id).depositRequests[0]
+    assert.equal(heldRequest.status,'uncertain','a late response cannot release the hold');assert.deepEqual(heldRequest.history.map(e=>e.status),['pending','sending','uncertain']);assert.equal(sent.length,beforeRecovery)
+    assert.equal((await h.db.prepare('SELECT status FROM p_mail WHERE id=?').bind(heldRequest.mail_id).first()).status,'uncertain')
    }
 
    if(provider==='gmail'){

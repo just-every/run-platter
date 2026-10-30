@@ -32,6 +32,7 @@ export async function paperDepositBrowserJourney(browser,screenshots) {
   await panel.getByRole('checkbox').check();await panel.getByRole('button',{name:'Send deposit request',exact:true}).click()
   const state=await(await owner.request.get(app.origin+'/api/platter/state')).json(),accepted=state.proposals.find(x=>x.id===p.id),request=accepted.depositRequests[0]
   assert.equal(request.deposit_cents,105000);assert.equal(request.recipient,recipient);assert.equal(request.status,'local');assert.ok((await panel.innerText()).includes(request.id));assert.equal(await panel.getByRole('button',{name:'Send deposit request',exact:true}).count(),0)
+  assert.equal(await panel.getByRole('list',{name:'Deposit delivery history'}).getByRole('listitem').count(),1);assert.match(await panel.getByRole('list',{name:'Deposit delivery history'}).innerText(),/local/)
   await capture(page,'owner-request')
   const original=await owner.request.get(app.origin+'/api/platter/attachments/'+p.id+'/'+accepted.acceptance.signedCopy.id);assert.deepEqual(await original.body(),bytes)
   await clientPage.goto(app.origin+path);assert.ok(!(await clientPage.locator('main').innerText()).includes(request.id))

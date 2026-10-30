@@ -191,7 +191,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const depositResponse=await h.mf.dispatchFetch(depositUpload.url,{method:'POST',headers:depositUpload.headers,body:await depositUpload.arrayBuffer()});assert.equal(depositResponse.status,200,await depositResponse.text())
     const depositBefore=(await h.state()).proposals.find(p=>p.id===depositPaper.id),depositInput={id:depositPaper.id,version:depositBefore.version,...depositBefore.depositRequestReview,consent:true}
     const depositRequested=await h.cmd('deposit.request',depositInput),depositHistory=(await h.state()).proposals.find(p=>p.id===depositPaper.id).depositRequests
-    assert.equal(depositHistory[0].id,depositRequested.requestId);assert.equal(depositHistory[0].deposit_cents,105000)
+    assert.equal(depositHistory[0].id,depositRequested.requestId);assert.equal(depositHistory[0].deposit_cents,105000);assert.deepEqual(depositHistory[0].history.map(e=>e.status),['local'])
     const templateSource=(await h.state()).proposals.find(p=>p.id===work.id)
     const template=await h.cmd('template.save',{id:work.id,version:templateSource.version,name:'Restorable campaign'})
     const beforeVendorDocuments=(await h.state()).vendorDocuments

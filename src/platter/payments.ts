@@ -24,7 +24,7 @@ export async function paymentCommand(env:Bindings,a:Actor,name:string,p:Record<s
  if(name==='payment.invoice-share')return shareOfflineInvoice(env,a,p)
  if(name==='payment.invoice-prepare')return prepareOfflineInvoice(env,a,p)
  if(name==='payment.invoice-issue')return issueOfflineInvoice(env,a,p)
- if(['payment.invoice-link','payment.accounting-sync'].includes(name))return offlineAccountingCommand(env,a,name,p)
+ if(['payment.invoice-link','payment.invoice-refresh','payment.accounting-sync'].includes(name))return offlineAccountingCommand(env,a,name,p)
  if(name==='payment.milestone-complete')return completePaymentMilestone(env,a,p)
  if(name==='payment.allocate')return allocatePayment(env,a,p)
  if(name==='payment.record'){

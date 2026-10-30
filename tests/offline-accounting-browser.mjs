@@ -10,7 +10,7 @@ export async function offlineInvoiceBrowser({h,page,browser,panel,milestone,capt
  const prepare=milestone.locator('form').filter({has:page.getByRole('button',{name:'Prepare accounting invoice',exact:true})})
  await prepare.getByLabel('QuickBooks customer id',{exact:true}).fill('synthetic-platter-customer-1');await prepare.getByLabel('QuickBooks service item id').fill('synthetic-platter-item-1');await prepare.getByLabel('Invoice remittance instructions').fill('Send a check to Synthetic Studio, 100 Example Street. Reference the invoice number.');await prepare.getByRole('checkbox').check();await prepare.getByRole('button').click();await page.waitForLoadState('load')
  const review=milestone.locator('[data-invoice-review]');assert.match(await review.innerText(),/Synthetic reviewed customer[\s\S]*Synthetic reviewed service[\s\S]*\$700\.00 USD · Issued 2030-06-01 · Due 2030-07-01/)
- await review.getByRole('checkbox').check();await review.getByRole('button',{name:'Issue reviewed invoice'}).click();await page.waitForLoadState('load')
+ const issue=review.locator('form').filter({has:page.getByRole('button',{name:'Issue reviewed invoice',exact:true})});await issue.getByRole('checkbox').check();await issue.getByRole('button',{name:'Issue reviewed invoice'}).click();await page.waitForLoadState('load')
  assert.match(await milestone.locator('[data-accounting-invoice]').innerText(),/SYN-ISSUED-1 · due/)
  const record=panel.locator('form').filter({has:page.getByRole('button',{name:'Record received payment',exact:true})})
  await record.getByLabel('Payment method').selectOption('check');await record.getByLabel('Amount received').fill('700');await record.getByLabel('Payment reference').fill('Synthetic check 123');await record.getByLabel('Payment received on').fill('2030-06-01');await record.getByRole('checkbox').check();await record.getByRole('button').click();await page.waitForLoadState('load')
@@ -20,6 +20,7 @@ export async function offlineInvoiceBrowser({h,page,browser,panel,milestone,capt
  await sync.getByLabel('QuickBooks payment method id').fill('check');await sync.getByRole('checkbox').check();await sync.getByRole('button').click();await page.waitForLoadState('load')
  const share=milestone.locator('form').filter({has:page.getByRole('button',{name:'Show invoice to verified client',exact:true})});await share.getByRole('checkbox').check();await share.getByRole('button').click();await page.waitForLoadState('load')
  assert.match(await milestone.locator('[data-accounting-invoice]').innerText(),/SYN-ISSUED-1 · paid[\s\S]*Provider balance \$0\.00 USD/)
+ const refresh=milestone.locator('form').filter({has:page.getByRole('button',{name:'Refresh accounting balance',exact:true})});await refresh.getByRole('checkbox').check();await refresh.getByRole('button').click();await page.waitForLoadState('load');assert.match(await milestone.innerText(),/Provider balance \$0\.00 USD/)
  await capture('issued')
  const client=await browser.newContext({viewport:{width:1440,height:1000}})
  try {

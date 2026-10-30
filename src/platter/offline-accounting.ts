@@ -39,6 +39,13 @@ export async function offlineAccountingCommand(env: Bindings, actor: Actor, name
  need(financeRoles.includes(actor.role), 'Only owner, admins and billing reconcile received payments', 403)
  const proposal = await permitted(env.DB, actor, input.id), db = env.DB
  need(input.consent === true || input.consent === 'yes', 'Confirm this accounting action explicitly')
+ if (name === 'payment.invoice-refresh') {
+  const invoice = await db.prepare('SELECT i.*,a.connection_version FROM p_offline_invoices i JOIN p_offline_invoice_authority a ON a.invoice_id=i.id WHERE i.id=? AND i.proposal_id=?').bind(text(input.invoiceId,'a retained invoice'),proposal.id).first<any>()
+  need(invoice,'This invoice has no current accounting authority',409)
+  const confirmed = invoiceFacts(await accountingProvider(env,actor,invoice.realm_id,invoice.connection_version,'/invoice/'+encodeURIComponent(invoice.provider_invoice)),invoice)
+  await commit(db,actor,[db.prepare('UPDATE p_offline_invoices SET balance_cents=?,invoice_json=?,observed_at=? WHERE id=?').bind(confirmed.balance,JSON.stringify(confirmed.invoice),Date.now(),invoice.id)],false,{sql:"EXISTS(SELECT 1 FROM p_offline_invoice_authority a JOIN p_connections c ON c.id='workspace:quickbooks' JOIN p_connection_secrets s ON s.connection_id=c.id WHERE a.invoice_id=? AND a.connection_version=? AND c.version=a.connection_version AND c.account_id=? AND c.status='connected' AND c.broken_at IS NULL) AND EXISTS(SELECT 1 FROM p_offline_invoices WHERE id=? AND balance_cents=?) AND NOT EXISTS(SELECT 1 FROM p_offline_accounting WHERE invoice_id=? AND status='reserved')",values:[invoice.id,invoice.connection_version,invoice.realm_id,invoice.id,invoice.balance_cents,invoice.id]})
+  return {id:invoice.id,proposalId:proposal.id,balanceCents:confirmed.balance}
+ }
  if (name === 'payment.invoice-link') {
   need(['owner', 'admin'].includes(actor.role), 'Only owner and admins bind accounting invoices', 403)
   const schedule = (await allocationState(env, actor)).paymentSchedules.find(x => x.proposalId === proposal.id)

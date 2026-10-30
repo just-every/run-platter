@@ -86,6 +86,16 @@ export async function offlineAccountingJourney(h,fake,billing,sales) {
  assert.equal((await h.cmd('payment.accounting-sync',request,billing.cookie)).status,'needs_review');assert.equal(fake.writes.length,writes+1)
  await refuse('payment.accounting-sync',{...request,requestId:crypto.randomUUID()},billing.cookie)
  fake.mode='ok'
+ const uncertainInvoice=(await h.state()).offlineInvoices.find(x=>x.proposal_id===uncertain.id)
+ fake.invoices.get('synthetic-platter-invoice-2').Balance=400
+ const heldWrites=fake.writes.length;assert.equal((await h.cmd('payment.invoice-refresh',{id:uncertain.id,invoiceId:uncertainInvoice.id,consent:true},billing.cookie)).balanceCents,40000)
+ const refreshed=(await h.state()).offlineInvoices.find(x=>x.proposal_id===uncertain.id);assert.equal(refreshed.needsReview,true);assert.equal(fake.writes.length,heldWrites,'reading provider evidence never retries a held write')
+ await refuse('payment.invoice-refresh',{id:uncertain.id,invoiceId:uncertainInvoice.id,consent:true},sales.cookie,403)
+ const external=await allocationAgreement(h);fake.invoice('synthetic-platter-invoice-external');const externalLink=await h.cmd('payment.invoice-link',await invoiceLinkInput(h,external.id,'synthetic-platter-invoice-external'))
+ fake.invoices.get('synthetic-platter-invoice-external').Balance=0
+ assert.equal((await h.cmd('payment.invoice-refresh',{id:external.id,invoiceId:externalLink.id,consent:true},billing.cookie)).balanceCents,0)
+ assert.equal((await h.state()).offlineInvoices.find(x=>x.id===externalLink.id).balanceStatus,'paid')
+ assert.ok(!(await h.send('/api/platter/offline-invoices?overdue=yes',undefined,billing.cookie)).value.rows.some(x=>x.id===externalLink.id))
  // A response naming the wrong customer never confirms payment or clears the overdue invoice.
  const wrong=await allocationAgreement(h);fake.invoice('synthetic-platter-invoice-wrong');await h.cmd('payment.invoice-link',await invoiceLinkInput(h,wrong.id,'synthetic-platter-invoice-wrong'))
  const wrongReceipt=await h.cmd('payment.record',receiptInput(wrong.id),billing.cookie),wrongAllocation=await allocationInput(h,wrong.id,wrongReceipt.id);await h.cmd('payment.allocate',wrongAllocation,billing.cookie)

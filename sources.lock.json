@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "bebb730333d75c023c2edb2fade058e943d0f013806fdd0989c9a875eca4b26e",
+      "sha256": "9cbb0b64fb26e9c3ca99cc851e50156a03caa218161eece850d05f563617acfd",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "a4931f46b85ae89dad7c91ae6191a5b4adeeff37396b81aba37cab1460553a61",
+      "sha256": "511d9c9b6f0f2c8eda5ea366868d50b917d88682be0e353d7f53ca3cceb62709",
       "executable": false
     },
     "deploy-demo.json": {
@@ -651,6 +651,10 @@
     },
     "migrations/core/0100_offline_accounting.sql": {
       "sha256": "71d363c2e47e2606e44a6f1480d0e2e765b379ee7a68522c97cd756df02d5de4",
+      "executable": false
+    },
+    "migrations/core/0101_offline_history.sql": {
+      "sha256": "14dd42f1fa8568395357212c245a678dcaeeecb2c759d146fa817108c6aa04c0",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -2858,7 +2862,15 @@
       "executable": false
     },
     "src/platter/offline-accounting.ts": {
-      "sha256": "942d89fd8ed0bb18f0cf5213f2e754f12d7b85d7b14c315ffb078dfde8f2c1c1",
+      "sha256": "2d8e371131bd69e1f7a1d59bf38376b5ae683dadad3bef6325fb33e235b0934c",
+      "executable": false
+    },
+    "src/platter/offline-invoice-issue.ts": {
+      "sha256": "f45e69088c7463ec427f348eccd0622712bc257d1bff7f66c448cbb637565b59",
+      "executable": false
+    },
+    "src/platter/offline-invoice-view.ts": {
+      "sha256": "29847370ece94b102edce7b5054eff4f4887e0c6cc615a883e9d5f6523e5ba5a",
       "executable": false
     },
     "src/platter/outcomes.ts": {
@@ -2882,7 +2894,7 @@
       "executable": false
     },
     "src/platter/payments.ts": {
-      "sha256": "742c831f8d680921842d919204a75447658b3adadb2836b6974ad910924d837f",
+      "sha256": "c39ebd4b32a10ebca674cf726d695c01f43eb32b1e4bceb4d396091483831ac2",
       "executable": false
     },
     "src/platter/permissions.ts": {
@@ -3190,7 +3202,7 @@
       "executable": false
     },
     "src/platter/ui/payments.ts": {
-      "sha256": "e3bfa86e405aa6eb04fe9181669491853d40cfee33ccc97f830c9874bba8afcf",
+      "sha256": "62d09f961ac125da9efbf58fc601f8081e77562898f03be6b1de6e0392539dc0",
       "executable": false
     },
     "src/platter/ui/pipeline.ts": {
@@ -3537,8 +3549,12 @@
       "sha256": "12eaf4517b230f4417606d0ba4360cd9505730a6563818248cb5fa924b15b31a",
       "executable": false
     },
+    "tests/offline-accounting-browser.mjs": {
+      "sha256": "7de55b93e5b9f948109f3ef66ea5045e717d2bd3ec906f8284ab20794ac1aa12",
+      "executable": false
+    },
     "tests/offline-accounting-fixture.mjs": {
-      "sha256": "988e47aa342627b565264f8370c3a65237cef8bedd390d1873d1049ba761c554",
+      "sha256": "37c0ce37134d37f94f234cb2e0e0b079d9fa5cff91b4803ca55d5dc254e6390c",
       "executable": false
     },
     "tests/packages-fixture.mjs": {

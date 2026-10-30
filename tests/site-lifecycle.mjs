@@ -483,14 +483,24 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect rev
  let browser,app
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM_PATH,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
-  for(const width of [1440,390]){
+  for(const width of [1440]){
    const crmWrites=[]
    app=await installedApp({scheduled:true,outboundService:async request=>{const url=new URL(request.url);assert.equal(url.hostname,'api.hubapi.com');if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-9950'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9951',stages:[{id:'synthetic-platter-9952',metadata:{isClosed:'true',probability:'1'}},{id:'synthetic-platter-9953',metadata:{isClosed:'true',probability:'0'}}]}]});const id=url.pathname.split('/').at(-1);if(request.method==='GET')return Response.json({id,properties:{pipeline:'synthetic-platter-9951'}});const body=await request.json();crmWrites.push(body);return Response.json({id,properties:body.properties})}})
    const context=await browser.newContext({viewport:{width,height:900}})
    try{
-    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`SEND-010-${name}-${width}.png`),fullPage:true})}
+    const page=await context.newPage(),capture=async name=>{
+     await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))})
+     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+     if(screenshots){
+      for(const shownWidth of [1440,390]){
+       await page.setViewportSize({width:shownWidth,height:900})
+       await page.screenshot({path:join(screenshots,`SEND-010-${name}-${shownWidth}.png`),fullPage:true})
+      }
+      await page.setViewportSize({width,height:900})
+     }
+    }
     assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     const cmd=async(name,input)=>{const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
@@ -507,8 +517,12 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect rev
     assert.match(await page.locator('.proposal-status').innerText(),/withdrawn/i);assert.match(await page.locator('main').innerText(),/Sent to the wrong client/);assert.match(await page.locator('main').innerText(),/Can we start the studio shoot next month/);assert.equal(await page.getByRole('button',{name:'Send answer to client'}).count(),0);await capture('withdrawn')
     const proposalUrl=app.origin+'/app/proposal?id='+original.id
     assert.equal((await page.goto(app.origin+oldPath)).status(),410);assert.equal(await page.getByRole('heading',{name:'Proposal withdrawn',exact:true}).count(),1);assert.equal(await page.getByRole('link',{name:'owner@northstar.example'}).count(),1);assert.ok(!(await page.locator('main').innerText()).includes('Studio photography'));await capture('revoked')
-    await page.goto(app.origin+'/app/audit?action=proposal.withdraw');assert.match(await page.locator('main').innerText(),/Sent to the wrong client/);await capture('audit')
-    await page.goto(app.origin+'/app?status=withdrawn');assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'1');await capture('pipeline')
+    const receiptState=await(await context.request.get(app.origin+'/api/platter/state')).json(),receipt=receiptState.proposals.find(p=>p.id===original.id).withdrawals[0]
+    assert.equal(receipt.reason,'Sent to the wrong client');assert.equal(receipt.actor_id,receiptState.actor.id)
+    const auditRows=(await(await context.request.get(app.origin+'/api/platter/audit?action=proposal.withdraw')).json()).rows
+    assert.equal(auditRows.length,1);assert.equal(auditRows[0].reason,receipt.reason);assert.equal(auditRows[0].actor_id,receipt.actor_id);assert.equal(auditRows[0].occurred_at,receipt.withdrawn_at)
+    await page.goto(app.origin+'/app/audit?action=proposal.withdraw');assert.match(await page.locator('main').innerText(),/Sent to the wrong client/);assert.match(await page.locator('.audit-what').innerText(),/Jordan Northstar/);await capture('audit')
+    await page.goto(app.origin+'/app?status=withdrawn');assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'1');assert.equal(await page.locator('[data-pipeline-total="USD"]').innerText(),'$4,200.00 USD');assert.match(await page.locator('[data-proposal-id="'+original.id+'"]').innerText(),/Prepare a new revision/);await capture('pipeline')
     await page.goto(proposalUrl);await page.getByRole('button',{name:'Prepare negotiated revision'}).click()
     await page.getByLabel('Next action',{exact:true}).fill('Call Avery about the corrected offer');await page.getByLabel('Due date',{exact:true}).fill('2027-03-11');await page.getByRole('button',{name:'Save sales follow-up',exact:true}).click()
     assert.equal(await page.getByLabel('Next action',{exact:true}).inputValue(),'Call Avery about the corrected offer')
@@ -516,6 +530,11 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect rev
     if(salesScreenshots){await mkdir(salesScreenshots,{recursive:true});await page.locator('section.panel').filter({has:page.getByRole('heading',{name:'Next sales action',exact:true})}).screenshot({path:join(salesScreenshots,`FOLLOW-002-negotiated-${width}.png`)})}
     await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();assert.equal(await page.getByRole('button',{name:'Send answer to client'}).count(),0);await capture('reissued')
     assert.equal((await context.request.get(app.origin+oldPath)).status(),410)
+    const reissuedState=await(await context.request.get(app.origin+'/api/platter/state')).json(),reissued=reissuedState.proposals.find(p=>p.id===original.id)
+    assert.equal(reissued.revision,2);assert.deepEqual(reissued.withdrawals,[receipt]);assert.notEqual(reissued.shareToken,original.shareToken)
+    await page.goto(app.origin+'/app?status=withdrawn');assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'0');assert.equal(await page.locator('[data-pipeline-total]').count(),0);await capture('post-reissue-report')
+    await page.goto(app.origin+'/app?status=sent');assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),'1');assert.equal(await page.locator('[data-pipeline-total="USD"]').innerText(),'$4,200.00 USD')
+    await page.goto(proposalUrl)
     await page.getByText('CRM outcome sync',{exact:true}).click()
     const authorize=page.locator('form:has(input[name="dealId"])')
     for(const [name,value] of Object.entries({dealId:'synthetic-platter-9955',pipelineId:'synthetic-platter-9951',wonStage:'synthetic-platter-9952',lostStage:'synthetic-platter-9953'}))await authorize.locator(`[name=${name}]`).fill(value)

@@ -1164,6 +1164,17 @@ test('SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically c
   const second=(await h.state()).proposals.find(p=>p.id===ids[1].id),mailBefore=email.length
   await h.cmd('proposal.withdraw',{id:second.id,version:second.version,reason:'Sent to the wrong client'})
   assert.equal(email.length,mailBefore+1,'the existing recipient withdrawal notice still sends once')
+  const notice=email.at(-1)
+  assert.deepEqual(notice.to,[recipient]);assert.equal(notice.subject,'Proposal withdrawn: '+offer.title)
+  assert.equal(notice.text,'The firm has withdrawn this proposal.\nReason: Sent to the wrong client\nContact: '+h.auth.OWNER_EMAIL)
+  await h.cmd('proposal.withdraw',{id:second.id,version:second.version,reason:'Repeated withdrawal'},h.owner,409)
+  assert.equal(email.length,mailBefore+1,'a replay sends no second withdrawal notice')
+  const quietId=await approved(h);await h.cmd('proposal.send',{id:quietId,version:2})
+  const quietMail=email.length
+  await h.cmd('proposal.withdraw',{id:quietId,version:3,reason:'No outbound notice requested',notice:false})
+  assert.equal(email.length,quietMail,'notice off makes no provider request')
+  assert.equal((await mailRows(h)).filter(m=>m.proposal_id===quietId&&m.subject.startsWith('Proposal withdrawn:')).length,0,'notice off creates no deferred withdrawal mail')
+
   const history=await h.send('/api/platter/sms?id='+second.id,undefined,h.owner);assert.equal(history.value.messages[0].status,'cancelled')
   assert.equal((await h.send(new URL(ids[1].sent.shareUrl).pathname)).status,410)
   await tick('2030-03-10T14:59:00Z');assert.equal(sms.length,0)

@@ -3553,12 +3553,16 @@
       "sha256": "971a4687c0ac0a1f3dfe2107e46bae8f799465f93e9bf529bbfd9938fdc9fef9",
       "executable": false
     },
+    "tests/privacy-browser.mjs": {
+      "sha256": "a672ad28495c074aca793d9a788988b250acd59c5f94ad215e0e242d9e9cad20",
+      "executable": false
+    },
     "tests/privacy-fixture.mjs": {
-      "sha256": "5451e8330831a8f43337187a7743051dacbecca0f8f263cedba9bab105e716f2",
+      "sha256": "ac0272e38f411505fdb035118e2096b9b48c25285c97c14ab1c09f5d0edbe54e",
       "executable": false
     },
     "tests/privacy-journey.mjs": {
-      "sha256": "1c7a866b5bf012a4c07ac704968f9f01de310803c92ef4032a6c41238830f80b",
+      "sha256": "5e0b98dcb1974dddafdba3c764a8d41765e2ab9ec8d9dd51b8481fc1173fd41e",
       "executable": false
     },
     "tests/provider-network.mjs": {

@@ -7,6 +7,7 @@ import { templatesHttp } from './templates-http.mjs'
 import { followupJourney } from './followup-journey.mjs'
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { unstable_splitSqlQuery } from 'wrangler'
 import { run, harness } from './harness.mjs'
@@ -2337,13 +2338,116 @@ test('PRICE-004 scoped discounts preserve exact selections, private margins, tem
 
 test('APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied',()=>run(async h=>{
  const team=await h.cmd('team.create',{name:'East'}),people={}
- for(const role of ['manager','sales']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[team.id]});people[role]={cookie,id}}
+ for(const role of ['manager','sales','admin','billing','billing2','content_editor','viewer']){
+  const email='synthetic-platter-93-'+role+String.fromCharCode(64)+'example.test'
+  assert.equal((await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)).status,202)
+  const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id
+  await h.cmd('member.set',{operatorId:id,version:0,role:role==='billing2'?'billing':role,teams:[team.id]});people[role]={cookie,id}
+ }
  const {client}=await draft(h),owner=(await h.state()).actor,policy=async()=>(await h.state()).approvalSettings.policy,rule=async(name,condition,approvers,position=0,templates=[])=>h.cmd('approval.rule',{version:(await policy()).version,name,condition,approvers,position,templates}),remove=async id=>h.cmd('approval.rule.delete',{id,version:(await policy()).version}),current=async(id,cookie=h.owner)=>(await h.state(cookie)).proposals.find(p=>p.id===id),prepare=async(packages,other={})=>h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic approval conditions',scope:'Public scope',depositPercent:'25',packages,...other},people.sales.cookie)
- await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
+ const at=Date.parse('2035-06-01T15:00:00Z')
+ await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+ assert.deepEqual(await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'}),{saved:true,id:'installation'})
  const amount=await rule('Manager over $25,000',{kind:'totalOver',cents:2500000,currency:'USD'},['role:manager']),discount=await rule('Owner above 15% discount',{kind:'discountOver',bps:1500},['role:owner'],1),packages=[{id:'main',label:'Delivery',price:'30000',discountPercent:'20'}],p=await prepare(packages)
- let row=await current(p.id);assert.equal(row.options[0].cents,2400000);assert.deepEqual(row.approval.steps.map(s=>s.id),[amount.id,discount.id]);await h.cmd('proposal.approve',{id:p.id,version:1,revision:1},people.manager.cookie);row=await current(p.id);assert.equal(row.approval.steps[0].done,true);assert.equal(row.approval.steps[1].active,true)
- await h.cmd('proposal.revise',{clientId:client.id,id:p.id,version:2,title:row.title,scope:'Edited after manager approval',depositPercent:'25',packages},people.sales.cookie);row=await current(p.id);assert.ok(row.approval.steps.every(s=>!s.done));await h.cmd('proposal.approve',{id:p.id,version:3,revision:2},h.owner,403);await h.cmd('proposal.send',{id:p.id,version:3},people.sales.cookie,409)
- await h.cmd('proposal.approve',{id:p.id,version:3,revision:2},people.manager.cookie);await h.cmd('proposal.approve',{id:p.id,version:4,revision:2});await h.cmd('proposal.send',{id:p.id,version:5},people.sales.cookie)
+ const expectedRules=[
+  {id:amount.id,name:'Manager over $25,000',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager'],templates:[]},
+  {id:discount.id,name:'Owner above 15% discount',position:1,condition:{kind:'discountOver',bps:1500},approvers:['role:owner'],templates:[]},
+ ]
+ const expectedSettings={policy:{singleton:1,required:0,default_role:'owner',version:3},rules:expectedRules}
+ const expectedSteps=()=>expectedRules.map(r=>({id:r.id,name:r.name,approvers:r.approvers,any:false}))
+ const expectedPlan=revision=>createHash('sha256').update(JSON.stringify({version:expectedSettings.policy.version,steps:expectedSteps(),revision})).digest('hex')
+ const retained=[]
+ const readDecisions=async()=> (await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=? ORDER BY rowid').bind(p.id).all()).results
+ const checkDecisions=async()=>{
+  const decisions=await readDecisions()
+  assert.equal(new Set(decisions.map(d=>d.id)).size,retained.length)
+  for(const d of decisions)assert.match(d.id,/^[0-9a-f-]{36}$/)
+  assert.deepEqual(decisions.map(({id,...facts})=>facts),retained,'all recorded revisions retain the exact actor, rule, plan, decision, note and time')
+  return decisions
+ }
+ const view=async()=>{
+  const s=await h.state()
+  assert.deepEqual(s.approvalSettings,expectedSettings,'complete saved policy and rules match independently expected configuration')
+  return {settings:s.approvalSettings,proposals:s.proposals,revisions:s.revisions,decisions:await checkDecisions()}
+ }
+ const refuse=async(name,input,cookie,status,message)=>{
+  const before=await view(),r=await h.send('/api/platter/command',{name,input},cookie)
+  assert.equal(r.status,status,r.text);assert.match(r.text,message)
+  assert.deepEqual(await view(),before,'each refusal retains complete saved configuration, proposal state and every decision')
+ }
+ const decide=async(role,step,revision,version,decision='approved')=>{
+  const actor=role==='owner'?owner:people[role],name=decision==='rejected'?'proposal.reject':'proposal.approve',note='Synthetic '+role+' '+decision+' revision '+revision
+  const result=await h.cmd(name,{id:p.id,version,revision,step,note},role==='owner'?h.owner:actor.cookie)
+  const rule=expectedRules.find(r=>r.id===step),approver=role==='owner'?'role:owner':role==='manager'?'role:manager':'person:'+actor.id
+  retained.push({proposal_id:p.id,revision,plan:expectedPlan(revision),step,actor_id:actor.id,approver_index:rule.approvers.indexOf(approver),decision,note,occurred_at:at})
+  await checkDecisions();return result
+ }
+ let row=await current(p.id)
+ assert.equal(row.options[0].cents,2400000);assert.deepEqual(row.approval.steps.map(s=>s.id),[amount.id,discount.id]);assert.equal(row.approval.plan,expectedPlan(1));await view()
+ await refuse('proposal.approve',{id:p.id,version:1,revision:1},h.owner,403,/No current approval step names you/)
+ assert.deepEqual(await decide('manager',amount.id,1,1),{approved:false,rejected:false})
+ row=await current(p.id);assert.equal(row.approval.steps[0].done,true);assert.equal(row.approval.steps[1].active,true)
+ await h.cmd('proposal.revise',{clientId:client.id,id:p.id,version:2,title:row.title,scope:'Edited after manager approval',depositPercent:'25',packages},people.sales.cookie)
+ row=await current(p.id);assert.equal(row.revision,2);assert.ok(row.approval.steps.every(s=>!s.done&&s.decisions.length===0));assert.equal(row.approval.plan,expectedPlan(2));await checkDecisions()
+ await refuse('proposal.approve',{id:p.id,version:3,revision:1},people.manager.cookie,409,/current draft revision/)
+ await refuse('proposal.approve',{id:p.id,version:3,revision:2},h.owner,403,/No current approval step names you/)
+ await refuse('proposal.send',{id:p.id,version:3},people.sales.cookie,409,new RegExp('approv','i'))
+ assert.deepEqual(await decide('manager',amount.id,2,3),{approved:false,rejected:false})
+ assert.deepEqual(await decide('owner',discount.id,2,4),{approved:true,rejected:false})
+ await h.cmd('proposal.send',{id:p.id,version:5},people.sales.cookie)
+ assert.equal((await current(p.id)).status,'sent');await view()
+ // Keep the two saved thresholds while adding a named parallel legal step.
+ const legal=await h.cmd('approval.rule',{version:3,name:'Counsel and finance legal review',position:2,condition:{kind:'termsEdited'},approvers:['person:'+people.admin.id,'person:'+people.billing.id],templates:[]},people.admin.cookie)
+ expectedRules.push({id:legal.id,name:'Counsel and finance legal review',position:2,condition:{kind:'termsEdited'},approvers:['person:'+people.admin.id,'person:'+people.billing.id],templates:[]});expectedSettings.policy.version=4
+ for(const order of [['admin','billing'],['billing','admin']]){
+  const parallel=await prepare(packages,{terms:'Original legal terms'})
+  await h.cmd('proposal.revise',{clientId:client.id,id:parallel.id,version:1,title:'Synthetic parallel '+order.join(' then '),scope:'Public scope',depositPercent:'25',packages,terms:'Edited legal terms'},people.sales.cookie)
+  let row=await current(parallel.id),version=row.version
+  assert.equal(row.revision,2);assert.equal(row.approval.plan,expectedPlan(2));assert.deepEqual(row.approval.steps.map(s=>s.id),[amount.id,discount.id,legal.id])
+  const decisions=[]
+  const check=async()=>{
+   const row=await current(parallel.id)
+   assert.equal(row.approval.plan,expectedPlan(2))
+   assert.deepEqual(row.approval.steps.flatMap(s=>s.decisions).map(({id,...facts})=>facts).sort((a,b)=>a.approver_index-b.approver_index||a.step.localeCompare(b.step)),[...decisions].sort((a,b)=>a.approver_index-b.approver_index||a.step.localeCompare(b.step)))
+   return row
+  }
+  const act=async(role,step,complete)=>{
+   const actor=role==='owner'?owner:people[role],rule=expectedRules.find(r=>r.id===step),note='Synthetic '+role+' revision 2'
+   assert.deepEqual(await h.cmd('proposal.approve',{id:parallel.id,version:version++,revision:2,step,note},role==='owner'?h.owner:actor.cookie),{approved:complete,rejected:false})
+   decisions.push({proposal_id:parallel.id,revision:2,plan:expectedPlan(2),step,actor_id:actor.id,approver_index:rule.approvers.indexOf(role==='owner'?'role:owner':role==='manager'?'role:manager':'person:'+actor.id),decision:'approved',note,occurred_at:at})
+   return check()
+  }
+  await refuse('proposal.approve',{id:parallel.id,version,revision:2,step:legal.id},people.admin.cookie,403,/No current approval step names you/)
+  await act('manager',amount.id,false);await act('owner',discount.id,false)
+  for(const role of order)assert.equal((await current(parallel.id,people[role].cookie)).approval.steps[2].canApprove,true,'both named people can act before either parallel decision')
+  await refuse('proposal.approve',{id:parallel.id,version,revision:2,step:legal.id},people.billing2.cookie,403,/No current approval step names you/);await check()
+  row=await act(order[0],legal.id,false)
+  assert.equal(row.status,'draft');assert.equal(row.approval.steps[2].done,false);assert.equal(row.approval.complete,false)
+  await refuse('proposal.send',{id:parallel.id,version},people.sales.cookie,409,new RegExp('approv','i'));await check()
+  const replacement={id:legal.id,version:4,name:'Unauthorized replacement',position:2,condition:{kind:'termsEdited'},approvers:['role:owner'],templates:[]}
+  for(const role of ['manager','sales','billing','content_editor','viewer']){
+   await refuse('approval.rule',replacement,people[role].cookie,403,/Only owner and admins/);await check()
+   await refuse('approval.rule.delete',{id:legal.id,version:4},people[role].cookie,403,/Only owner and admins/);await check()
+   await refuse('approval.policy',{version:4,required:true,defaultRole:'manager'},people[role].cookie,403,/Only owner and admins/);await check()
+  }
+  for(const role of ['sales','content_editor','viewer']){
+   await refuse('approval.rule',{...replacement,approvers:['person:'+people[role].id]},h.owner,400,/Named approvers must be/);await check()
+  }
+  row=await act(order[1],legal.id,true)
+  assert.equal(row.status,'approved');assert.equal(row.approval.complete,true);assert.ok(row.approval.steps.every(s=>s.done))
+  await h.cmd('proposal.send',{id:parallel.id,version},people.sales.cookie)
+  assert.equal((await check()).status,'sent');await view()
+ }
+ const rejected=await prepare(packages,{terms:'Original legal terms'})
+ await h.cmd('proposal.revise',{clientId:client.id,id:rejected.id,version:1,title:'Synthetic rejected legal review',scope:'Public scope',depositPercent:'25',packages,terms:'Edited legal terms'},people.sales.cookie)
+ for(const [role,step,version] of [['manager',amount.id,2],['owner',discount.id,3]])assert.deepEqual(await h.cmd('proposal.approve',{id:rejected.id,version,revision:2,step},role==='owner'?h.owner:people[role].cookie),{approved:false,rejected:false})
+ assert.deepEqual(await h.cmd('proposal.reject',{id:rejected.id,version:4,revision:2,step:legal.id,note:'Synthetic legal changes refused'},people.billing.cookie),{approved:false,rejected:true})
+ row=await current(rejected.id);assert.equal(row.approval.complete,false);assert.equal(row.approval.rejected,true);assert.ok(row.approval.steps.every(s=>!s.canApprove&&!s.active))
+ assert.deepEqual(row.approval.steps[2].decisions.map(({id,...facts})=>facts),[{proposal_id:rejected.id,revision:2,plan:expectedPlan(2),step:legal.id,actor_id:people.billing.id,approver_index:1,decision:'rejected',note:'Synthetic legal changes refused',occurred_at:at}])
+ await refuse('proposal.approve',{id:rejected.id,version:5,revision:2,step:legal.id},people.admin.cookie,403,/No current approval step names you/)
+ await refuse('proposal.send',{id:rejected.id,version:5},people.sales.cookie,409,new RegExp('approv|reject','i'))
+ assert.equal((await current(rejected.id)).status,'draft');await view()
+ await remove(legal.id)
  await remove(amount.id);await remove(discount.id)
  const margin=await rule('Private margin floor',{kind:'marginBelow',bps:5000},['person:'+owner.id]),m=await prepare([{id:'main',label:'Delivery',price:'100'}]);row=await current(m.id);assert.equal(row.approval.required,true,'unrecorded cost never bypasses review');assert.equal((await current(m.id,people.sales.cookie)).approval.steps[0].name,'Internal approval review')
  await h.cmd('pricing.cost',{id:m.id,version:1,lineKey:row.internalPricing.lines[0].key,unitCost:'60'},people.manager.cookie);assert.equal((await current(m.id)).approval.required,true)

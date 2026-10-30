@@ -84,3 +84,65 @@ export async function importPrivacyInventory(h) {
  for(const table of ['p_clients','p_proposals','p_contacts','p_companies','p_import_business_revisions','p_imported_documents','p_document_moveins','p_document_uploads','p_document_upload_chunks','p_privacy_reviews','p_privacy_receipts','p_privacy_erased_uploads','p_erased_clients','rer_portability_state','ik_jobs','ik_originals','ik_d1_original_chunks','ik_provenance','ik_sources','ik_d1_plan_chunks'])rows[table]=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results
  return rows
 }
+
+/** Separate uploads must not let wrapper hashes withdraw selected-out PDFs. */
+export async function separateImportedPrivacyJourney(h) {
+ const name='Synthetic separate upload contact',client=await h.cmd('client.save',{name,email:'synthetic-separate-upload@example.test'})
+ const makePdf=async(title,signed,contact)=>{
+  const pdf=await PDFDocument.create();pdf.setTitle(title);pdf.setSubject(contact)
+  pdf.addPage().drawText(title+' Client: '+contact)
+  if(signed)pdf.addPage().drawText('Certificate of completion')
+  return Buffer.from(await pdf.save())
+ }
+ const files=[]
+ for(const [filename,signed,contact] of [['open.pdf',false,name],['signed.pdf',true,name],['other.pdf',false,'Synthetic other contact'],['other-signed.pdf',true,'Synthetic other contact']])files.push({filename,bytes:await makePdf(filename,signed,contact)})
+ // An earlier, undone job still owns byte-identical copies of the peer files.
+ const earlier=await h.cmd('document-import.create',{label:'Synthetic previous peer custody'})
+ for(const file of files.slice(1))await uploadMovein(h,earlier.id,file)
+ const earlierReview=await h.cmd('document-import.preview',{id:earlier.id})
+ await h.cmd('document-import.apply',{id:earlier.id,fingerprint:earlierReview.fingerprint})
+ await h.cmd('document-import.undo',{id:earlier.id})
+ const earlierJournal=await h.cmd('document-import.journal',{id:earlier.id})
+ const movein=await h.cmd('document-import.create',{label:'Synthetic four separate PDFs'})
+ for(const file of files)await uploadMovein(h,movein.id,file)
+ const preview=await h.cmd('document-import.preview',{id:movein.id})
+ assert.equal(preview.canApply,true)
+ await h.cmd('document-import.apply',{id:movein.id,fingerprint:preview.fingerprint})
+ const originals=async()=>Promise.all(files.map(async file=>{
+  const response=await h.mf.dispatchFetch(h.origin+'/api/platter/imported-original?document='+hash(file.bytes),{headers:{cookie:h.owner}})
+  const bytes=Buffer.from(await response.arrayBuffer())
+  return {file:file.filename,status:response.status,exact:bytes.equals(file.bytes)}
+ }))
+ assert.deepEqual(await originals(),files.map(file=>({file:file.filename,status:200,exact:true})))
+ const documentIds=[hash(files[0].bytes)]
+ const review=(await h.cmd('privacy.review',{id:client.id,documentIds})).privacyReview
+ assert.deepEqual(review.documentIds,documentIds);assert.deepEqual(review.erasedImportedDocumentIds,documentIds);assert.deepEqual(review.retainedImported,[])
+ assert.equal(review.removed.find(r=>r.table==='p_imported_documents').count,1)
+ const receipt=(await h.cmd('privacy.erase',{id:client.id,...review,confirmName:name,consent:'yes'})).receipt
+ assert.deepEqual(receipt.erasedImportedDocumentIds,documentIds);assert.deepEqual(receipt.retainedImported,review.retainedImported)
+ assert.equal(receipt.removed.find(r=>r.table==='p_imported_documents').count,1)
+ const after=await originals(),replay=await h.cmd('document-import.create',{label:'Synthetic separate upload replay'}),uploads=[]
+ for(const file of files){
+  const response=await h.send('/api/platter/command',{name:'document-import.upload-start',input:{id:replay.id,filename:file.filename,sha256:hash(file.bytes),size:file.bytes.length}},h.owner)
+  uploads.push({file:file.filename,status:response.status})
+  if(file===files[0])assert.match(response.text,/This exact source file was erased/)
+ }
+ console.log('PRIV-001 separate PDFs '+JSON.stringify({beforeServed:4,after,reuploads:uploads,erasedImportedDocumentIds:receipt.erasedImportedDocumentIds,retainedImported:receipt.retainedImported}))
+ assert.deepEqual(after,files.map((file,i)=>({file:file.filename,status:i===0?404:200,exact:i!==0})),'only the selected original is withdrawn; every other original remains byte-identical')
+ assert.deepEqual(uploads,files.map((file,i)=>({file:file.filename,status:i===0?410:200})),'only the erased PDF hash is fenced against re-upload')
+ for(const file of files.slice(1))await uploadMovein(h,replay.id,file)
+ const journal=await h.cmd('document-import.journal',{id:movein.id})
+ const erasedOriginals=journal.originals.filter(o=>o.sha256===hash(files[0].bytes))
+ assert.equal(erasedOriginals.length,2,'both the selected upload and its normalized PDF were held')
+ assert.ok(erasedOriginals.every(o=>o.original.status==='unavailable'&&o.original.reason==='unavailable-after-erasure'))
+ for(const file of files.slice(1)){
+  for(const name of ['documents/'+hash(file.bytes)+'.pdf','uploads/'+hash(file.bytes)+'/'+file.filename]){
+   const original=journal.originals.find(o=>o.name===name)
+   assert.ok(original,name);assert.equal(original.original.status,'retained');assert.deepEqual(Buffer.from(original.original.base64,'base64'),file.bytes)
+  }
+ }
+ assert.deepEqual(await h.cmd('document-import.journal',{id:earlier.id}),earlierJournal,'erasure must not change another job merely because its originals share a hash')
+ const state=await h.state()
+ for(const file of files.slice(1))assert.ok(state.importedDocuments.some(d=>d.id===hash(file.bytes)))
+ assert.deepEqual(state.privacy.receipts.find(r=>r.id===receipt.id),receipt)
+}

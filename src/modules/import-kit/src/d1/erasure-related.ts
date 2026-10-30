@@ -76,9 +76,9 @@ export async function relatedSelection(context: D1ImportContext, related: D1Rela
     if (!related.original) continue;
     for (const original of await readOriginals(plan, row.id, context)) {
       if (original.kind !== 'artifact' || original.original.status !== 'retained') continue;
-      if (!related.original(Buffer.from(original.original.base64, 'base64'), { name: original.name, sha256: original.sha256 })) continue;
+      if (!related.original(Buffer.from(original.original.base64, 'base64'), { jobId: row.id, name: original.name, sha256: original.sha256 })) continue;
       if (!originals.has(row.id)) originals.set(row.id, new Set());
-      originals.get(row.id)!.add(original.sha256);
+      originals.get(row.id)!.add(original.key);
     }
   }
   const jobs = rows.map(row => ({ id: row.id, fingerprint: row.fingerprint }));

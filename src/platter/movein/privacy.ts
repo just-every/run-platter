@@ -59,13 +59,13 @@ export async function businessContactErasure(db:D1Database,actor:Actor,contact:a
  return {before:packGuards(erasure.before),after:[...packGuards(erasure.after),...readonlyChecks(erasure.final)]}
 }
 
-export async function importedDocumentErasure(db:D1Database,actor:Actor,ids:string[],originalHashes:string[]) {
+export async function importedDocumentErasure(db:D1Database,actor:Actor,ids:string[],originalArtifacts:{job_id:string;name:string;sha256:string}[]) {
  if(!ids.length)return {before:[] as D1Sql[],after:[] as D1Sql[]}
- const selected=new Set(ids),originals=new Set(originalHashes)
+ const selected=new Set(ids),originals=new Set(originalArtifacts.map(o=>canonicalJson([o.job_id,o.name,o.sha256])))
  const context=d1RequestContext({destination:documentDestination,namespace:documentNamespace,mappingVersion:'exported-documents-v1',
   storage:{database:db,targets:documentTargets},originalErasurePolicy:'withdraw-affected-artifacts',
   authorization:{principalId:actor.id,predicate:()=>({sql:"EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND role='owner' AND status='active')",params:[actor.id]})}})
- const erasure=await targetErasure({kind:'documents',id:ids[0]},context,{source:record=>record.kind==='documents'&&selected.has(record.sourceId),original:(_bytes,original)=>originals.has(original.sha256)})
+ const erasure=await targetErasure({kind:'documents',id:ids[0]},context,{source:record=>record.kind==='documents'&&selected.has(record.sourceId),original:(_bytes,original)=>originals.has(canonicalJson([original.jobId,original.name,original.sha256]))})
  return {before:packGuards(erasure.before),after:[...packGuards(erasure.after),...readonlyChecks(erasure.final)]}
 }
 

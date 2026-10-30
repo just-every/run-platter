@@ -2,16 +2,16 @@ import type { ImportPlan, OriginalErasurePolicy, SourceLocation, SourceRecord } 
 import { canonicalJson, sha256, sourceIdentity } from '../provenance/identity.ts';
 
 const artifactKey = (name: string, hash: string) => canonicalJson([name, hash]);
-/** Lineage, including duplicate source occurrences and byte-identical artifacts,
- * selects complete originals. Names and pointers can themselves contain PII. */
+/** Source lineage withdraws complete originals, including byte-identical aliases.
+ * Additional product selections are exact artifact keys within this job. */
 export function withdrawArtifacts(plan: ImportPlan, next: ImportPlan, identities: Set<string>, policy?: OriginalErasurePolicy, originals?: Set<string>): void {
   if (policy === undefined) return;
   if (!['withdraw-affected-artifacts', 'withdraw-all-job-artifacts'].includes(policy)) throw new Error('INVALID_ORIGINAL_ERASURE_POLICY');
   if (plan.erasure?.originalPolicy && plan.erasure.originalPolicy !== policy) throw new Error('IMPORT_ORIGINAL_ERASURE_POLICY_CONFLICT');
-  const hashes = new Set([...plan.source.records.filter(record => identities.has(sourceIdentity(plan.destination, plan.namespace, record.kind, record.sourceId))).map(record => record.artifactHash), ...originals ?? []]);
+  const hashes = new Set([...plan.source.records.filter(record => identities.has(sourceIdentity(plan.destination, plan.namespace, record.kind, record.sourceId))).map(record => record.artifactHash)]);
   const names = new Set<string>(), replacements = new Map<string, string>();
   next.source.artifacts = plan.source.artifacts.map(artifact => {
-    if (policy !== 'withdraw-all-job-artifacts' && !hashes.has(artifact.sha256)) return artifact;
+    if (policy !== 'withdraw-all-job-artifacts' && !hashes.has(artifact.sha256) && !originals?.has(artifactKey(artifact.name, artifact.sha256))) return artifact;
     names.add(artifact.name);
     const key = artifactKey(artifact.name, artifact.sha256);
     const name = artifact.original?.status === 'unavailable' && artifact.original.reason === 'unavailable-after-erasure' ? artifact.name : `erased-artifact:${sha256(key)}`;

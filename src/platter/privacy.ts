@@ -45,8 +45,13 @@ async function inventory(db: D1Database, clientId: string, contactId?:string, do
  need(!erasedDocuments.some(d=>links.some(l=>l.document_id===d.id&&l.client_id!==clientId)),'A shared imported document needs review for every linked client; nothing was changed',409)
  const retainedImported=documents.filter(d=>!erasedDocuments.includes(d)).map(d=>({documentId:d.id,sha256:JSON.parse(d.data_json).sha256,exception:'Imported signed agreement and its original PDF are retained business records; the exact original bytes and source facts remain.'}))
  const moveinIds=[...new Set(erasedDocuments.map(d=>JSON.parse(d.data_json).moveinId))].sort()
- const withdrawnOriginals=(await db.prepare("SELECT o.job_id,o.sha256 FROM ik_originals o JOIN p_document_moveins m ON m.job_id=o.job_id WHERE m.id IN (SELECT value FROM json_each(?)) AND (o.name GLOB 'uploads/*' OR o.name='reviewed-report-choices.json') ORDER BY o.job_id,o.sha256").bind(JSON.stringify(moveinIds)).all<any>()).results
- const erasedUploadHashes=[...new Set([...erasedDocuments.map(d=>d.id),...(await db.prepare('SELECT sha256 FROM p_document_uploads WHERE movein_id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(moveinIds)).all<{sha256:string}>()).results.map(u=>u.sha256)])].sort()
+ // A standalone upload and its normalized document have the same hash. Keep
+ // every upload still owned by a selected-out or retained document; ZIP/report
+ // wrappers are withdrawn as before, without using their hashes as ownership.
+ const allDocuments=(await db.prepare('SELECT * FROM p_imported_documents ORDER BY id').all<any>()).results
+ const keptHashes=new Set(allDocuments.filter(d=>!erasedDocuments.some(e=>e.id===d.id)).map(d=>JSON.parse(d.data_json).sha256))
+ const withdrawnOriginals=(await db.prepare("SELECT o.job_id,o.name,o.sha256 FROM ik_originals o JOIN p_document_moveins m ON m.job_id=o.job_id WHERE m.id IN (SELECT value FROM json_each(?)) AND (o.name GLOB 'uploads/*' OR o.name='reviewed-report-choices.json') ORDER BY o.job_id,o.name,o.sha256").bind(JSON.stringify(moveinIds)).all<{job_id:string;name:string;sha256:string}>()).results.filter(o=>!keptHashes.has(o.sha256))
+ const erasedUploadHashes=[...new Set([...erasedDocuments.map(d=>JSON.parse(d.data_json).sha256),...withdrawnOriginals.filter(o=>o.name.startsWith('uploads/')).map(o=>o.sha256)])].filter(h=>!keptHashes.has(h)).sort()
  const moves=(await db.prepare('SELECT * FROM p_document_moveins WHERE id IN (SELECT value FROM json_each(?)) OR id IN (SELECT movein_id FROM p_document_uploads WHERE sha256 IN (SELECT value FROM json_each(?))) ORDER BY id').bind(JSON.stringify(moveinIds),JSON.stringify(erasedUploadHashes)).all<any>()).results
 
  const identities=[importTargetIdentity('platter:clients','clients',clientId),...(businessContact?[importTargetIdentity('platter:business-records','contacts',businessContact.id)]:[]),...(company?[importTargetIdentity('platter:business-records','companies',company.id)]:[]),...erasedDocuments.map(d=>importTargetIdentity('platter:exported-documents','documents',d.id))]
@@ -56,7 +61,7 @@ async function inventory(db: D1Database, clientId: string, contactId?:string, do
  for (const { name } of names) {
   const columns = (await db.prepare(`PRAGMA table_info(${quote(name)})`).all<any>()).results.map(c => c.name)
   const foreign = (await db.prepare(`PRAGMA foreign_key_list(${quote(name)})`).all<any>()).results
-  const selection = name === 'p_imported_documents' ? {sql:'id IN (SELECT value FROM json_each(?))',values:[JSON.stringify(erasedDocuments.map(d=>d.id))]} : name === 'p_document_uploads' ? {sql:'movein_id IN (SELECT value FROM json_each(?)) OR sha256 IN (SELECT value FROM json_each(?))',values:[JSON.stringify(moveinIds),JSON.stringify(erasedUploadHashes)]} : name === 'p_contacts' && businessContact ? {sql:'id=?',values:[businessContact.id]} : name === 'p_import_business_revisions' && businessContact ? {sql:"(kind='contacts' AND target_id=?) OR (kind='companies' AND target_id=?)",values:[businessContact.id,company?.id??'']} : name === 'p_import_client_revisions' ? {sql:'client_id=?',values:[clientId]} : name === 'p_proposals' ? { sql: 'id IN (SELECT value FROM json_each(?))', values: [unretained] } : columns.includes('proposal_id') && !name.startsWith('p_privacy_') ? { sql: 'proposal_id IN (SELECT value FROM json_each(?))', values: [outbound.has(name) ? all : unretained] } : undefined
+  const selection = name === 'p_imported_documents' ? {sql:'id IN (SELECT value FROM json_each(?))',values:[JSON.stringify(erasedDocuments.map(d=>d.id))]} : name === 'p_document_uploads' ? {sql:'sha256 IN (SELECT value FROM json_each(?))',values:[JSON.stringify(erasedUploadHashes)]} : name === 'p_contacts' && businessContact ? {sql:'id=?',values:[businessContact.id]} : name === 'p_import_business_revisions' && businessContact ? {sql:"(kind='contacts' AND target_id=?) OR (kind='companies' AND target_id=?)",values:[businessContact.id,company?.id??'']} : name === 'p_import_client_revisions' ? {sql:'client_id=?',values:[clientId]} : name === 'p_proposals' ? { sql: 'id IN (SELECT value FROM json_each(?))', values: [unretained] } : columns.includes('proposal_id') && !name.startsWith('p_privacy_') ? { sql: 'proposal_id IN (SELECT value FROM json_each(?))', values: [outbound.has(name) ? all : unretained] } : undefined
   tables.push({ name, columns, foreign, selection, rows: [] })
  }
  // Delete only files actually referenced by these drafts. A shared original stays with
@@ -105,8 +110,8 @@ async function inventory(db: D1Database, clientId: string, contactId?:string, do
  const remote = [...new Map(sources.map(s => [s.account_id + ':' + s.contact_id, {provider:s.provider,accountId:s.account_id,kind:'contact',recordId:s.contact_id,action:'Review and erase this exact contact in HubSpot, subject to provider retention and legal holds. Platter made no provider deletion request.'}])).values()]
  const files = (await db.prepare('SELECT f.*,j.account_id FROM p_archive_files f JOIN p_archive_jobs j ON j.proposal_id=f.proposal_id WHERE j.client_id=? ORDER BY f.proposal_id,f.kind').bind(clientId).all<any>()).results
  const retained = await Promise.all(accepted.map(async a => ({proposalId:a.proposal_id,revision:a.revision,snapshotSha256:await hash(a.snapshot),exception:'Retained agreement and its original files are business records; contact details in these immutable records are retained.'})))
- const plan = {client,businessContact,company,documents,moves,erasedUploadHashes,withdrawnOriginals,links,imported,importJobs,proposals,sources,files,accepted,tables:ordered.filter(t => t.selection).map(t => ({name:t.name,rows:t.rows}))}
- return {client,businessContact,company,selectedIds,documents,erasedDocuments,retainedImported,moves,moveinIds,erasedUploadHashes,withdrawnOriginals,importedCustody,importJobs,proposals,drafts,accepted,retained,remote,files,ordered,digest:await hash(canonical(plan))}
+ const plan = {client,businessContact,company,allDocuments,documents,moves,erasedUploadHashes,withdrawnOriginals,links,imported,importJobs,proposals,sources,files,accepted,tables:ordered.filter(t => t.selection).map(t => ({name:t.name,rows:t.rows}))}
+ return {client,businessContact,company,selectedIds,allDocuments,documents,erasedDocuments,retainedImported,moves,moveinIds,erasedUploadHashes,withdrawnOriginals,importedCustody,importJobs,proposals,drafts,accepted,retained,remote,files,ordered,digest:await hash(canonical(plan))}
 }
 
 function unchanged(db: D1Database, table: Table) {
@@ -143,12 +148,12 @@ export async function privacyCommand(env: Bindings, actor: Actor, name: string, 
  const portability=await createPortability({db:writesDb,policy:archivePolicy})
  const checkpoint=(await portability.redactionStatements()).map(captured.query)
  const business=await businessContactErasure(db,actor,plan.businessContact)
- const documents=await importedDocumentErasure(db,actor,plan.erasedDocuments.map(d=>d.id),plan.withdrawnOriginals.map(o=>o.sha256))
+ const documents=await importedDocumentErasure(db,actor,plan.erasedDocuments.map(d=>d.id),plan.withdrawnOriginals)
  const writes=[
   writesDb.prepare('INSERT INTO p_guard(ok) VALUES(EXISTS(SELECT 1 FROM p_clients WHERE id=? AND version=? AND name=? AND email=? AND variable_fields=?))').bind(clientId,plan.client.version,plan.client.name,plan.client.email,plan.client.variable_fields),
   writesDb.prepare('INSERT INTO p_guard(ok) VALUES(NOT EXISTS(SELECT 1 FROM p_privacy_holds WHERE client_id=?) AND NOT EXISTS(SELECT 1 FROM p_tracking_holds h JOIN p_proposals p ON p.id=h.proposal_id WHERE p.client_id=?) AND EXISTS(SELECT 1 FROM p_privacy_reviews WHERE id=? AND digest=?))').bind(clientId,clientId,review.id,review.digest),
   ...(plan.businessContact?[writesDb.prepare('INSERT INTO p_guard(ok) VALUES(NOT EXISTS(SELECT 1 FROM p_privacy_holds h JOIN p_clients c ON c.id=h.client_id WHERE c.email=?))').bind(plan.client.email)]:[]),
-  unchanged(writesDb,{...plan.ordered.find(t=>t.name==='p_imported_documents')!,selection:{sql:'id IN (SELECT value FROM json_each(?))',values:[JSON.stringify(plan.selectedIds)]},rows:plan.documents}),
+  unchanged(writesDb,{...plan.ordered.find(t=>t.name==='p_imported_documents')!,selection:{sql:'1',values:[]},rows:plan.allDocuments}),
   unchanged(writesDb,{name:'ik_jobs',columns:['id','fingerprint','state','checkpoint','total','fence'],foreign:[],selection:{sql:"destination IN ('platter:clients','platter:business-records','platter:exported-documents')",values:[]},rows:plan.importJobs}),
   unchanged(writesDb,{...plan.ordered.find(t=>t.name==='p_proposals')!,selection:{sql:'client_id=?',values:[clientId]},rows:plan.proposals}),
   ...plan.ordered.filter(t=>t.selection).map(t=>unchanged(writesDb,t)),

@@ -3,9 +3,11 @@ import { harness } from './harness.mjs'
 import { driveFixture,connectDrive } from './drive-fixture.mjs'
 import { hubspotFixture } from './hubspot-fixture.mjs'
 import { recipientFixture,verifyRecipient,roles } from './recipients-http.mjs'
-import { importedPrivacyFixture,assertImportedPrivacyErased,importPrivacyInventory } from './privacy-import-fixture.mjs'
+import { importedPrivacyFixture,assertImportedPrivacyErased,importPrivacyInventory,separateImportedPrivacyJourney } from './privacy-import-fixture.mjs'
 import { privacyFixture,privacyInventory,assertPrivacyErased,digest,privacyOffer } from './privacy-fixture.mjs'
 export async function privacyJourney(){
+ const separate=await harness()
+ try{await separateImportedPrivacyJourney(separate)}finally{await separate.close()}
  const edge=hubspotFixture(),drive=driveFixture(),h=await harness({outboundService:request=>new URL(request.url).hostname==='api.hubapi.com'?edge.request(request):drive.outboundService(request),assetsDirectory:'public'})
  try{
   await connectDrive(h)

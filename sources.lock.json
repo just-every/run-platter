@@ -1698,7 +1698,7 @@
       "executable": false
     },
     "src/modules/import-kit/src/d1/erased-artifacts.ts": {
-      "sha256": "e2766643f0653bef87672698295be3aecf9fd221f0455bba629de9c9503878bd",
+      "sha256": "44465e157389b8583a72babbf3be713be387f303e0291e61bc0c7133e6db848d",
       "executable": false
     },
     "src/modules/import-kit/src/d1/erased-custody.ts": {
@@ -1750,7 +1750,7 @@
       "executable": false
     },
     "src/modules/import-kit/src/d1/erasure-related.ts": {
-      "sha256": "c07448313510c116c9f2fc96d1d35a415674f284700257bfafadcc94c6dd1f1a",
+      "sha256": "779e60ca03ef446e93a1fd11a0b16c24e17b4f2aaa24337864cd6b19b9f7fbc3",
       "executable": false
     },
     "src/modules/import-kit/src/d1/erasure-report.ts": {
@@ -2174,7 +2174,7 @@
       "executable": false
     },
     "src/modules/import-kit/src/d1/types.ts": {
-      "sha256": "6aa12c766998a259e38675ad69270b32073c9138b8101e6be7ea9cd1e0940e64",
+      "sha256": "9380e34dc7f7a38d0e33ad1483231110ce3d1d662a253c136dff64ba811d2b1b",
       "executable": false
     },
     "src/modules/import-kit/src/d1/undo-observations.ts": {
@@ -2822,7 +2822,7 @@
       "executable": false
     },
     "src/platter/movein/privacy.ts": {
-      "sha256": "0f8d627d1120cde5b097dd098b58e622ae40f33aca8d6b3c32f70af0ba3620a1",
+      "sha256": "dc2fda6e51154ee2d01e35dcebb15a2f2d6adc3222ddd347f070735bce03da09",
       "executable": false
     },
     "src/platter/movein/schema.sql": {
@@ -2898,7 +2898,7 @@
       "executable": false
     },
     "src/platter/privacy.ts": {
-      "sha256": "f4630baad388dfc8823b29a8542fe0d0ace2dfc95c3e6a644a6cb46bdc59dd9c",
+      "sha256": "0bbd428d6debfdc0c5c92734cd4bb67e0cd0d965ef5eb9c426785d6eb4fe8a8c",
       "executable": false
     },
     "src/platter/question-replies.ts": {
@@ -3570,11 +3570,11 @@
       "executable": false
     },
     "tests/privacy-import-fixture.mjs": {
-      "sha256": "188b5ed797ba95872f52ad2b49dd3e16f22e591027f7926911a6a813cd05bd85",
+      "sha256": "1935ac6404a610b7cf2a5c32d250dfcf5f6cb871a3745bf7314c81c8159148c1",
       "executable": false
     },
     "tests/privacy-journey.mjs": {
-      "sha256": "fd6f612e0d97e5ba9abe97d55c60d384d37da9cfdac3a4453eaa83b4c7c29eae",
+      "sha256": "04d251293b128808e215118481bac9ce5f6d95773202f8634e3604430c8bfb56",
       "executable": false
     },
     "tests/provider-network.mjs": {

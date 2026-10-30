@@ -74,8 +74,9 @@ export interface D1RelatedErasure {
   snapshot?: string;
   /** True when this retained source record holds the erased person's data. */
   source?(record: import('../types.ts').SourceRecord): boolean;
-  /** True when this retained original's exact bytes hold the erased person's data. */
-  original?(bytes: Uint8Array, original: { name: string; sha256: string }): boolean;
+  /** True when this retained original holds the erased person's data. Job and
+   * artifact identity allow selection without withdrawing byte-identical peers. */
+  original?(bytes: Uint8Array, original: { jobId: string; name: string; sha256: string }): boolean;
   /** Remove exact string values at named paths in retained source payloads,
    * effect/native values and reversal before-images. `*` visits array items.
    * Matching array items are removed; matching object properties are deleted.

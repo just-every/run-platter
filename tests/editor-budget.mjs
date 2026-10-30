@@ -92,7 +92,7 @@ try{
  if(process.env.PLATTER_SCREENSHOTS){
   const directory=process.env.PLATTER_SCREENSHOTS;await mkdir(directory,{recursive:true})
   for(const width of [1440,390]){
-   await page.setViewportSize({width,height:900});await page.locator('[data-block-id="page-30"] [data-block-drag]').focus();await page.screenshot({path:join(directory,'EDIT-011-editor-'+width+'.png')})
+   await page.setViewportSize({width,height:900});await page.locator('[data-block-id="page-30"] [data-block-drag]').focus();await page.locator('[data-block-id="page-30"] [data-block-drag]').evaluate(node=>node.scrollIntoView({block:'center'}));await page.screenshot({path:join(directory,'EDIT-011-editor-'+width+'.png')})
    await phone.setViewportSize({width,height:900});await phone.locator('.proposal-document').scrollIntoViewIfNeeded();await phone.screenshot({path:join(directory,'EDIT-011-client-'+width+'.png')})
   }
  }

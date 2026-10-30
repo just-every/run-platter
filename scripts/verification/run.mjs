@@ -17,12 +17,13 @@ function partitions(files, groups) {
 }
 const businessFiles='tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs'
 // EDIT-012 had a 126s group; isolate it alongside archive custody. Templates
-// and 500-proposal search use spare capacity in the two existing browser jobs.
+// use browser capacity; search and internal comments use lighter archive jobs.
 const business=partitions(businessFiles,[
  ['templates','^EDIT-002\\b'],
  ['copies','^EDIT-012\\b'],
  ['search','^EDIT-016\\b'],
  ['authoring','^(EDIT|PRICE|TEAM|SEND)-'],
+ ['comments','^COLLAB-002\\b'],
  ['lifecycle',null]
 ])
 // Move bounce custody and legacy currency to lighter jobs, and Drive history
@@ -42,14 +43,14 @@ const tasks={
  runtime:['node src/base/contract-docs.mjs check','pnpm build','pnpm exec rer build --site','pnpm typecheck','PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs'],
  browser_documents_all:['pnpm build','PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 tests/site.test.mjs'],
  browser_documents:['pnpm build',documentCommand('--test-name-pattern'),business.templates,archive.bounce],
- browser_commercial:['pnpm build',documentCommand('--test-skip-pattern'),business.search],
+ browser_commercial:['pnpm build',documentCommand('--test-skip-pattern')],
  business:['pnpm test:platter'],
  business_authoring:[business.authoring],
- business_lifecycle:[business.lifecycle,archive.currency],
+ business_lifecycle:[business.lifecycle],
  archive:['pnpm test:archive'],
- archive_custody:[archive.custody,business.copies],
- archive_restore:[archive.restore],
- archive_media:[archive.media]
+ archive_custody:[archive.custody,business.copies,archive.currency],
+ archive_restore:[archive.restore,business.search],
+ archive_media:[archive.media,business.comments]
 }
 if(shard&&!Object.hasOwn(tasks,shard))throw Error('Unknown verification shard')
 for(const command of shard?tasks[shard]:['runtime','browser_documents_all','business','archive'].flatMap(key=>tasks[key])){const result=spawnSync(command,{shell:true,stdio:'inherit',env:process.env});if(result.status!==0)process.exit(result.status??1)}

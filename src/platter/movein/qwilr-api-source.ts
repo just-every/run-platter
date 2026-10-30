@@ -50,10 +50,12 @@ export function qwilrApiFacts(files: File[], documents: Document[], choices: Rec
   let value:unknown
   try{value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(file.bytes))}catch{issues.push('Qwilr page list is not valid JSON');continue}
   if(!qwilrObject(value)||!Array.isArray(value.data)||!value.data.every(page=>qwilrPage(page,false))){issues.push('Qwilr page list does not match its documented schema');continue}
-  for(const page of value.data as (ObjectValue&{id:string;createdAt:string})[]) {
+  for(const page of value.data) {
+   const date=page.createdAt
+   if(typeof date!=='string'){issues.push('Qwilr page list is missing its source creation date');continue}
    const previous=listed.get(page.id)
-   if(previous&&previous.date!==page.createdAt)issues.push('Qwilr page has conflicting source creation dates')
-   else if(!previous)listed.set(page.id,{date:page.createdAt,sha256:sha256(file.bytes),file:file.source})
+   if(previous&&previous.date!==date)issues.push('Qwilr page has conflicting source creation dates')
+   else if(!previous)listed.set(page.id,{date,sha256:sha256(file.bytes),file:file.source})
   }
  }
  const add = (kind: string, sourceId: string, sourceFields: ObjectValue, file: File, sourceHash: string) => {

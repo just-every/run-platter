@@ -10,11 +10,11 @@ export function collectionPolicyPanel(proposal: any, state?: any): string {
  const labels = { off: 'Off — collect payment separately', required: 'Required — collect the deposit before acceptance completes', due: 'Due — allow acceptance with the deposit still due' }
  const policyField = !editable
   ? hidden('completion', completion) + `<p>${escape(labels[completion as keyof typeof labels])}</p><p>Only the owner and admins change when deposit collection is required or select the payment provider.</p>`
-  : `<label>Acceptance and deposit<select name="completion">${Object.entries(labels).map(([value, label]) => `<option value="${value}"${completion === value ? ' selected' : ''}>${escape(label)}</option>`).join('')}</select></label>`
+  : `<label>Acceptance and deposit<select name="completion" aria-label="Acceptance and deposit">${Object.entries(labels).map(([value, label]) => `<option value="${value}"${completion === value ? ' selected' : ''}>${escape(label)}</option>`).join('')}</select></label>`
  const merchant = provider === 'paypal' ? (editable ? paypal?.accountId ?? policy?.merchantId : policy?.merchantId) ?? '' : ''
  const connectionVersion = provider === 'paypal' ? (editable ? paypal?.version ?? policy?.connectionVersion : policy?.connectionVersion) ?? '' : ''
  const providerField = editable
-  ? `<label>Deposit payment provider<select name="provider" data-collection-provider><option value="stripe"${provider === 'stripe' ? ' selected' : ''}>Stripe</option><option value="paypal" data-merchant-id="${escape(paypal?.accountId ?? merchant)}" data-connection-version="${escape(paypal?.version ?? connectionVersion)}"${provider === 'paypal' ? ' selected' : ''}>PayPal${paypal ? ' · ' + escape(paypal.accountId) : ' · connect in Settings'}</option></select></label>`
+  ? `<label>Deposit payment provider<select name="provider" aria-label="Deposit payment provider" data-collection-provider><option value="stripe"${provider === 'stripe' ? ' selected' : ''}>Stripe</option><option value="paypal" data-merchant-id="${escape(paypal?.accountId ?? merchant)}" data-connection-version="${escape(paypal?.version ?? connectionVersion)}"${provider === 'paypal' ? ' selected' : ''}>PayPal${paypal ? ' · ' + escape(paypal.accountId) : ' · connect in Settings'}</option></select></label>`
   : hidden('provider', provider) + '<p>Deposit payment provider: ' + (provider === 'paypal' ? 'PayPal' : 'Stripe') + '</p>'
  return panel('Deposit collection', form('payment.collection', proposalPath(proposal.id),
   hidden('id', proposal.id) + hidden('version', proposal.version) + policyField +

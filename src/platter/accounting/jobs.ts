@@ -1,24 +1,25 @@
 import type { Bindings } from '../../auth.server'
 import { providerCredential } from '../connections'
 import { commit, hash, need, text, type Actor } from '../model'
+import { lifecycleCommand } from './lifecycle'
 import { currentTime } from '../expiry-time'
 import { administrators } from '../permissions'
 import { customerMatches, itemMapping, providerId, quickbooks, type QuickBooksAuthority } from './quickbooks'
 
-const canonical = (value: any): string => JSON.stringify(value, (_key, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k,v[k]])) : v)
+export const canonical = (value: any): string => JSON.stringify(value, (_key, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k,v[k]])) : v)
 const live = `SELECT s.* FROM p_accounting_settings s JOIN p_accounting_authority g ON g.singleton=s.singleton AND g.version=s.version
  JOIN oa_operators o ON o.id=s.authorized_by AND o.role='owner' AND o.status='active' AND o.version=g.operator_version
  LEFT JOIN p_members m ON m.operator_id=o.id
  JOIN p_connections c ON c.id='workspace:quickbooks' AND c.status='connected' AND c.broken_at IS NULL AND c.version=s.connection_version AND c.account_id=s.account_id
  JOIN p_connection_secrets secret ON secret.connection_id=c.id WHERE COALESCE(m.version,0)=g.member_version`
-async function configuration(env: Bindings) {
+export async function configuration(env: Bindings) {
  const config = await env.DB.prepare(live).first<any>()
  need(config, 'The owner must authorize the current verified QuickBooks company first', 409)
  return config
 }
-function configGuard(config: any) { return { sql: `EXISTS(SELECT 1 FROM (${live}) current WHERE current.version=? AND current.account_id=? AND current.connection_version=?)`, values: [config.version, config.account_id, config.connection_version] } }
+export function configGuard(config: any) { return { sql: `EXISTS(SELECT 1 FROM (${live}) current WHERE current.version=? AND current.account_id=? AND current.connection_version=?)`, values: [config.version, config.account_id, config.connection_version] } }
 async function operatorVersion(db: D1Database, id: string) { return (await db.prepare('SELECT version FROM oa_operators WHERE id=?').bind(id).first<any>())?.version }
-function reader(env: Bindings, actor: Actor, config: any): QuickBooksAuthority { return async () => {
+export function reader(env: Bindings, actor: Actor, config: any): QuickBooksAuthority { return async () => {
  await commit(env.DB, actor, [], false, configGuard(config))
  const { connection, secret } = await providerCredential(env, 'workspace:quickbooks')
  need(connection.version === config.connection_version && connection.account_id === config.account_id, 'QuickBooks connection changed', 409)
@@ -55,11 +56,12 @@ export async function accountingState(env: Bindings, actor: Actor) {
  if (!administrators.includes(actor.role)) return undefined
  const settings = await env.DB.prepare('SELECT * FROM p_accounting_settings WHERE singleton=1').first<any>()
  const jobs = (await env.DB.prepare('SELECT j.*,EXISTS(SELECT 1 FROM p_accounting_job_authority a WHERE a.proposal_id=j.proposal_id) AS executable FROM p_accounting_jobs j ORDER BY authorized_at DESC LIMIT 100').all<any>()).results
- return { settings: settings ? { ...settings, active: Boolean(await env.DB.prepare(live).first()) } : null, locked: Boolean(jobs.length), jobs, requests: (await env.DB.prepare('SELECT * FROM p_accounting_requests ORDER BY requested_at,request_id').all<any>()).results, customers: (await env.DB.prepare('SELECT * FROM p_accounting_customers').all<any>()).results }
+ return { observations: (await env.DB.prepare('SELECT * FROM p_accounting_observations').all<any>()).results, postings: (await env.DB.prepare('SELECT * FROM p_accounting_postings').all<any>()).results, settings: settings ? { ...settings, active: Boolean(await env.DB.prepare(live).first()) } : null, locked: Boolean(jobs.length), jobs, requests: (await env.DB.prepare('SELECT * FROM p_accounting_requests ORDER BY requested_at,request_id').all<any>()).results, customers: (await env.DB.prepare('SELECT * FROM p_accounting_customers').all<any>()).results }
 }
 export async function accountingCommand(env: Bindings, actor: Actor, name: string, input: Record<string, unknown>) {
  need(administrators.includes(actor.role), 'Only owner and admins review accounting requests', 403)
  const db = env.DB, at = await currentTime(db)
+ if (['accounting.readback','accounting.payment.review','accounting.payment.apply'].includes(name)) return lifecycleCommand(env,actor,name,input)
  if (name === 'accounting.configure') {
   need(actor.role === 'owner', 'Only the owner chooses the invoice authority', 403)
   need(input.authority === 'quickbooks' && (input.consent === true || input.consent === 'yes'), 'Explicitly select QuickBooks as invoice authority')
@@ -106,7 +108,7 @@ export async function accountingCommand(env: Bindings, actor: Actor, name: strin
  ], false, guard)
  return { accountingResult: true, status: 'queued', message: 'The exact reviewed deposit is retained for once-only dispatch.' }
 }
-async function execution(env: Bindings, job: any) {
+export async function execution(env: Bindings, job: any) {
  const db = env.DB, config = await configuration(env)
  need(config.version === job.settings_version && config.connection_version === job.connection_version && config.account_id === job.account_id, 'QuickBooks authority changed. Old requests remain held; new consent never reactivates them.', 409)
  const person = await db.prepare(`SELECT o.*,COALESCE(m.role,'sales') AS member_role,COALESCE(m.version,0) AS member_version FROM oa_operators o LEFT JOIN p_members m ON m.operator_id=o.id WHERE o.id=? AND o.status='active'`).bind(job.authorized_by).first<any>()

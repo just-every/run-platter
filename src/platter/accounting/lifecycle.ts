@@ -1,0 +1,72 @@
+import type { Bindings } from '../../auth.server'
+import { commit, hash, need, text, type Actor } from '../model'
+import { currentTime } from '../expiry-time'
+import { canonical, configuration, configGuard, execution, reader } from './jobs'
+import { providerId, quickbooks, type QuickBooksAuthority } from './quickbooks'
+
+function cents(value: unknown) {
+ need(typeof value === 'number' && Number.isFinite(value) && value >= 0 && Number.isSafeInteger(Math.round(value * 100)) && Math.abs(value * 100 - Math.round(value * 100)) < 0.00001, 'QuickBooks returned an invalid amount', 409)
+ return Math.round(value * 100)
+}
+async function invoiceFor(env: Bindings, actor: Actor, id: string) {
+ const job = await env.DB.prepare("SELECT * FROM p_accounting_jobs WHERE proposal_id=? AND status='complete' AND provider_id IS NOT NULL").bind(id).first<any>()
+ need(job, 'Choose a confirmed QuickBooks deposit invoice', 409)
+ const config = await configuration(env)
+ const authorize: QuickBooksAuthority = async () => { await reader(env,actor,config)(); return execution(env,job) }
+ const invoice = (await quickbooks(authorize, '/invoice/' + encodeURIComponent(providerId(job.provider_id)))).Invoice
+ const plan = JSON.parse(job.plan), customer = await env.DB.prepare("SELECT provider_id FROM p_accounting_customers WHERE account_id=? AND client_id=? AND status='complete'").bind(job.account_id,job.client_id).first<any>()
+ need(invoice?.Id === job.provider_id && invoice.CustomerRef?.value === customer?.provider_id && invoice.CurrencyRef?.value === 'USD', 'QuickBooks invoice identity or currency changed', 409)
+ const total = cents(invoice.TotalAmt), balance = cents(invoice.Balance)
+ need(balance <= total, 'QuickBooks returned an invalid balance', 409)
+ return { job, config, authorize, invoice, total, balance, expected: plan.depositCents, customerId: customer.provider_id }
+}
+async function paymentPlan(env: Bindings, actor: Actor, input: Record<string,unknown>) {
+ const payment = await env.DB.prepare('SELECT * FROM p_payment_records WHERE id=?').bind(text(input.paymentId,'a recorded payment')).first<any>()
+ need(payment && ['check','wire','ach_credit'].includes(payment.method), 'Choose a recorded offline payment', 409)
+ const state = await invoiceFor(env,actor,payment.proposal_id)
+ need(state.total === state.expected && state.balance >= payment.cents && payment.cents > 0 && payment.currency === 'USD' && payment.revision === state.job.revision, 'The recorded receipt must fit this unchanged QuickBooks invoice balance and revision', 409)
+ const accountId = providerId(input.depositAccountId), account = (await quickbooks(state.authorize,'/account/' + encodeURIComponent(accountId))).Account
+ need(account?.Id === accountId && account.Active === true && ['Bank','Other Current Asset'].includes(account.AccountType), 'Choose an active bank or undeposited-funds account',409)
+ const person = await env.DB.prepare('SELECT version FROM oa_operators WHERE id=?').bind(actor.id).first<any>()
+ const plan = { paymentId:payment.id, proposalId:payment.proposal_id, paymentVersion:payment.version, cents:payment.cents, method:payment.method, reference:payment.reference, receivedOn:payment.received_on, invoiceId:state.job.provider_id, customerId:state.customerId, totalCents:state.total, balanceCents:state.balance, depositAccountId:accountId, depositAccountName:account.Name, settingsVersion:state.config.version, connectionVersion:state.config.connection_version, actorId:actor.id, actorRole:actor.role, operatorVersion:person.version, memberVersion:actor.memberVersion??0 }
+ return { ...state, plan }
+}
+export async function lifecycleCommand(env: Bindings, actor: Actor, name: string, input: Record<string,unknown>) {
+ const db=env.DB, at=await currentTime(db)
+ if(name === 'accounting.readback') {
+  const state=await invoiceFor(env,actor,text(input.proposalId,'a confirmed accounting agreement'))
+  const status=state.total!==state.expected?'mismatch':state.balance===0?'paid':state.balance===state.total?'unpaid':'partially_paid'
+  await commit(db,actor,[db.prepare(`INSERT INTO p_accounting_observations VALUES(?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET provider_id=excluded.provider_id,total_cents=excluded.total_cents,balance_cents=excluded.balance_cents,observed_at=excluded.observed_at,status=excluded.status,detail=excluded.detail`).bind(state.job.proposal_id,state.job.provider_id,state.total,state.balance,at,status,'QuickBooks confirmed invoice total and open balance')],false,configGuard(state.config))
+  return { accountingResult:true,status,message:status==='mismatch'?'QuickBooks total differs from the accepted deposit. Reconcile before posting payments.':'QuickBooks invoice is '+status.replaceAll('_',' ')+'.' }
+ }
+ if(name === 'accounting.payment.review') {
+  const {plan,config}=await paymentPlan(env,actor,input), encoded=canonical(plan), digest=await hash(encoded), id=crypto.randomUUID()
+  await commit(db,actor,[db.prepare('INSERT INTO p_accounting_reviews VALUES(?,?,?,?,?,?,NULL)').bind(id,plan.proposalId,actor.id,digest,encoded,at+600000)],false,configGuard(config))
+  return { accountingPaymentReview:true,id,digest,plan }
+ }
+ need(name==='accounting.payment.apply','Unknown accounting action',404)
+ const review=await db.prepare('SELECT * FROM p_accounting_reviews WHERE id=? AND actor_id=?').bind(text(input.id,'a reviewed payment'),actor.id).first<any>()
+ need(review && review.digest===input.digest,'Review this exact recorded payment first',409)
+ const recorded=JSON.parse(review.plan)
+ need(recorded.paymentId,'Choose a payment review',409)
+ const previous=await db.prepare('SELECT status FROM p_accounting_postings WHERE payment_id=?').bind(recorded.paymentId).first<any>()
+ if(previous)return {accountingResult:true,status:previous.status,message:'This receipt already has one retained posting. Uncertain writes require reconciliation in QuickBooks.'}
+ need(!review.consumed_at && review.expires_at>at && (input.consent===true||input.consent==='yes'),'The payment review expired or consent is missing',409)
+ const state=await paymentPlan(env,actor,{paymentId:recorded.paymentId,depositAccountId:recorded.depositAccountId})
+ need(canonical(state.plan)===review.plan,'The receipt, invoice balance, account or authority changed. Review again.',409)
+ const requestId=crypto.randomUUID(), guard=configGuard(state.config)
+ guard.sql+=' AND EXISTS(SELECT 1 FROM p_accounting_reviews WHERE id=? AND consumed_at IS NULL AND expires_at>?) AND EXISTS(SELECT 1 FROM p_payment_records WHERE id=? AND version=?) AND ? <= ? - COALESCE((SELECT SUM(p.cents) FROM p_accounting_postings x JOIN p_payment_records p ON p.id=x.payment_id WHERE x.proposal_id=?),0)'
+ guard.values.push(review.id,at,recorded.paymentId,recorded.paymentVersion,recorded.cents,state.expected,recorded.proposalId)
+ await commit(db,actor,[db.prepare('UPDATE p_accounting_reviews SET consumed_at=? WHERE id=?').bind(at,review.id),db.prepare("INSERT INTO p_accounting_postings VALUES(?,?,?,?,'writing',NULL,?)").bind(recorded.paymentId,recorded.proposalId,requestId,review.plan,at)],false,guard)
+ let status='uncertain',id:string|null=null
+ try {
+  // Recheck the current member and connection immediately before the provider write.
+  const authorize: QuickBooksAuthority = async()=>{ await commit(db,actor,[],false,configGuard(state.config)); return state.authorize() }
+  const body={CustomerRef:{value:recorded.customerId},TotalAmt:recorded.cents/100,TxnDate:recorded.receivedOn,PaymentRefNum:recorded.reference.slice(0,21),PrivateNote:'Platter receipt '+recorded.paymentId,DepositToAccountRef:{value:recorded.depositAccountId},Line:[{Amount:recorded.cents/100,LinkedTxn:[{TxnId:recorded.invoiceId,TxnType:'Invoice'}]}]}
+  const payment=(await quickbooks(authorize,'/payment',body,requestId)).Payment
+  need(payment && payment.CustomerRef?.value===recorded.customerId && cents(payment.TotalAmt)===recorded.cents && canonical(payment.Line)===canonical(body.Line),'QuickBooks did not confirm this exact applied receipt',409)
+  id=providerId(payment.Id);status='confirmed'
+ } catch { /* The durable claim remains even if the provider persisted the payment. */ }
+ await db.prepare('UPDATE p_accounting_postings SET status=?,provider_id=? WHERE payment_id=?').bind(status,id,recorded.paymentId).run()
+ return {accountingResult:true,status,message:status==='confirmed'?'QuickBooks confirmed this receipt against the deposit invoice.':'Payment posting held. Reconcile in QuickBooks; this receipt will never be blindly replayed.'}
+}

@@ -3817,4 +3817,5 @@ test('ACCT-001 reviewed QuickBooks deposits preserve accepted cents, explicit ma
   assert.ok((await h.send('/api/platter/audit?action=accounting.apply',undefined,h.owner)).value.rows.length>=6)
   assert.ok(!JSON.stringify(await h.state()).includes(fake.token),'accounting state never exposes provider credentials')
  } finally {await h.close()}
+ await (await import('./quickbooks-lifecycle.mjs')).quickbooksLifecycle()
 })

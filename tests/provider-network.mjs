@@ -13,9 +13,9 @@ export async function forwardProviderRequest(request){
 
 // A receiver fake stores writes before simulating a lost acknowledgement.
 export function quickbooksFixture() {
- const calls = [], customers = new Map(), invoices = new Map(), requestIds = new Set()
+ const calls = [], customers = new Map(), invoices = new Map(), payments = new Map(), requestIds = new Set()
  let hook, timeoutKind, mappingAccount = 'synthetic-platter-9102'
- const token = 'synthetic-platter-9100', company = 'synthetic-platter-9101', item = 'synthetic-platter-9103'
+ const token = 'synthetic-platter-9100', company = 'synthetic-platter-9101', item = 'synthetic-platter-9103', bank = 'synthetic-platter-9104'
  const outboundService = async request => {
   const url = new URL(request.url)
   if (url.hostname !== 'quickbooks.api.intuit.com') throw Error('Unexpected provider destination')
@@ -31,19 +31,21 @@ export function quickbooksFixture() {
    return Response.json({ QueryResponse: { Customer: [...customers.values()].filter(c => c.DisplayName === name) } })
   }
   if (url.pathname.includes('/item/')) return Response.json({ Item: { Id: item, Name: 'Reviewed deposit service', Active: true, Type: 'Service', IncomeAccountRef: { value: mappingAccount } } })
-  if (url.pathname.includes('/account/')) return Response.json({ Account: { Id: 'synthetic-platter-9102', Name: 'Consulting income', Active: true, AccountType: 'Income' } })
-  if (request.method !== 'POST' || !['customer','invoice'].includes(kind)) throw Error('Unexpected QuickBooks operation')
+  if (url.pathname.includes('/account/')) return Response.json({ Account: url.pathname.endsWith('/'+bank)?{Id:bank,Name:'Operating bank',Active:true,AccountType:'Bank'}:{ Id: 'synthetic-platter-9102', Name: 'Consulting income', Active: true, AccountType: 'Income' } })
+  if (request.method === 'GET' && url.pathname.includes('/invoice/')) return Response.json({Invoice:invoices.get(url.pathname.split('/').at(-1))})
+  if (request.method !== 'POST' || !['customer','invoice','payment'].includes(kind)) throw Error('Unexpected QuickBooks operation')
   const requestId = url.searchParams.get('requestid')
   if (!requestId || requestIds.has(requestId)) throw Error('A QuickBooks write was replayed')
   requestIds.add(requestId)
   if (kind === 'invoice') assert.ok(body.DocNumber.length <= 21, 'QuickBooks document numbers are bounded')
-  const collection = kind === 'customer' ? customers : invoices, id = 'synthetic-platter-' + (9200 + customers.size + invoices.size)
-  const value = { Id: id, ...body, ...(kind === 'invoice' ? { TotalAmt: body.Line.reduce((sum,line) => sum + line.Amount,0) } : {}) }
+  const collection = kind === 'customer' ? customers : kind === 'payment' ? payments : invoices, id = 'synthetic-platter-' + (9200 + customers.size + invoices.size + payments.size)
+  const value = { Id: id, ...body, ...(kind === 'invoice' ? { TotalAmt: body.Line.reduce((sum,line) => sum + line.Amount,0), Balance:body.Line.reduce((sum,line) => sum + line.Amount,0) } : {}) }
   collection.set(id,value)
+  if(kind==='payment'){const invoice=invoices.get(body.Line[0].LinkedTxn[0].TxnId);assert.ok(invoice);invoice.Balance=Math.round((invoice.Balance-body.TotalAmt)*100)/100}
   if (timeoutKind === kind) return new Response('synthetic-platter-provider-timeout', { status: 504 })
-  return Response.json({ [kind === 'customer' ? 'Customer' : 'Invoice']: value })
+  return Response.json({ [kind === 'customer' ? 'Customer' : kind === 'payment' ? 'Payment' : 'Invoice']: value })
  }
- return { calls, customers, invoices, token, company, item, incomeAccount: 'synthetic-platter-9102', outboundService, setHook: value => { hook = value }, setTimeout: value => { timeoutKind = value }, setMapping: value => { mappingAccount = value } }
+ return { calls, customers, invoices, payments, bank, token, company, item, incomeAccount: 'synthetic-platter-9102', outboundService, setHook: value => { hook = value }, setTimeout: value => { timeoutKind = value }, setMapping: value => { mappingAccount = value } }
 }
 
 export async function connectQuickbooks(h, fake, version = 0, settingsVersion = 0, cookie = h.owner) {

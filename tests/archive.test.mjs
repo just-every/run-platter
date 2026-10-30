@@ -1088,10 +1088,14 @@ test('ACCT-001 public CLI retains exact QuickBooks accounting custody without cr
   const invoice=await h.cmd('invoice.export',{id:complete.proposal.id})
   const review=await h.cmd('accounting.review',quickbooksReviewInput(complete,fake))
   await h.cmd('accounting.apply',{id:review.id,digest:review.digest,consent:true});await h.cmd('accounting.dispatch',{})
+  const receipt=await h.cmd('payment.record',{id:complete.proposal.id,method:'check',amount:'100.01',reference:'Retained synthetic check',receivedOn:'2030-03-02',consent:true})
+  const paymentReview=await h.cmd('accounting.payment.review',{paymentId:receipt.id,depositAccountId:fake.bank})
+  await h.cmd('accounting.payment.apply',{id:paymentReview.id,digest:paymentReview.digest,consent:true})
+  await h.cmd('accounting.readback',{proposalId:complete.proposal.id})
   const queued=await acceptedQuickbooksAgreement(h,'Queued accounting agreement',complete.client.id)
   const queuedReview=await h.cmd('accounting.review',quickbooksReviewInput(queued,fake,[...fake.customers.keys()][0]))
   await h.cmd('accounting.apply',{id:queuedReview.id,digest:queuedReview.digest,consent:true})
-  const tables=['p_accounting_settings','p_accounting_jobs','p_accounting_requests','p_accounting_customers','p_acceptances','p_invoices']
+  const tables=['p_accounting_settings','p_accounting_jobs','p_accounting_requests','p_accounting_customers','p_accounting_postings','p_accounting_observations','p_acceptances','p_invoices']
   const before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
   assert.deepEqual(before.p_accounting_jobs.map(j=>j.status).sort(),['complete','queued'])
   await h.close();h=undefined
@@ -1116,6 +1120,8 @@ test('ACCT-001 public CLI retains exact QuickBooks accounting custody without cr
   await h.cmd('accounting.dispatch',{},owner)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
   assert.equal(receiver.calls.length,calls,'fresh reconnection and owner authorization cannot execute restored requests')
-  for(const table of ['p_accounting_jobs','p_accounting_requests','p_accounting_customers'])assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table])
+  await h.cmd('accounting.readback',{proposalId:complete.proposal.id},owner,409)
+  assert.equal(receiver.calls.length,calls,'restored observations confer no read or write authority')
+  for(const table of ['p_accounting_postings','p_accounting_observations','p_accounting_jobs','p_accounting_requests','p_accounting_customers'])assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table])
  } finally {await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

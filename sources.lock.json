@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "0ac18d5d18487dce4a3188b140e64bd7af33d2e787d224933abe63b18e3a6333",
+      "sha256": "e3e29a53a8fa564cd1c8d7a3b42aa11db79b5d54229a5e85f23f2112367d21fc",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "5d2e7ca4cbe7176d065499d1484362f28e2d7fe2eb83b82ce12ed39a01b28fc7",
+      "sha256": "e5cd40ef3ee59fc6a4907d6aa013a766cc2e8d8a5392657d9f0d10893d0d0ff5",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2454,7 +2454,7 @@
       "executable": false
     },
     "src/platter/accounting/jobs.ts": {
-      "sha256": "6a71136110bd2363844e10bd5128f1d63297f8b1d4bd7be7fb6c1c28be7c196f",
+      "sha256": "1d30324422d838bb07245eade8ee67364b27b1abc9d3bf0dce42e57f35b05f74",
       "executable": false
     },
     "src/platter/accounting/quickbooks.ts": {
@@ -3034,7 +3034,7 @@
       "executable": false
     },
     "src/platter/ui/accounting.ts": {
-      "sha256": "1dc424d9518b97e9d286e50fecac85e5ecc4309762f319c6d0471c2875b9b0ff",
+      "sha256": "cc9ea826efc6da1aa82fedb9c6fcbb74cb01978a514820ee02b0edd2ef34d6f8",
       "executable": false
     },
     "src/platter/ui/admin.ts": {
@@ -3406,7 +3406,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "3f753e15ed3c7aa8e3abdf462e8e1ef0540cb8b90c3d180d38188d8794a72514",
+      "sha256": "beddad3c0ff6f617172a1d693973efd1b70db04fa9350e051ae6bc8343ad051e",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3550,7 +3550,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "77cb4183950633eb631bba5d9c87a7b15d5c04c770b034a422506ebaaf074fd6",
+      "sha256": "b5943095359b4e804482eb677bbd0012388d845cbbe3ee0ffd5ae56276eecff6",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3562,11 +3562,11 @@
       "executable": false
     },
     "tests/provider-network.mjs": {
-      "sha256": "7c84f78ced48c4a270b120e132d4332e745751a844626b21954e46e6f2545869",
+      "sha256": "b8ddee480acd088dac3c5fc7dd9746ae9d807005f8b650e1b8294ccc4bb3eaee",
       "executable": false
     },
     "tests/quickbooks-browser.mjs": {
-      "sha256": "2672933712511cc2a979a404086e85ec604db31bdc693cfd8030584484bb7eab",
+      "sha256": "55c2df7f002db7e03c494d775e46a99a46535c0d4e1177c1d70fcf7d04ec9c87",
       "executable": false
     },
     "tests/recipients-browser.mjs": {

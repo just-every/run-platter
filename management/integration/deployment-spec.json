@@ -600,6 +600,12 @@
       "name": "0099_qwilr_ignition_exports.sql",
       "sha256": "7da39f40aff2036c86ec6131cdf14120794762b431ef01fefa0b6f80b0a0ce6c",
       "sql": "-- Export history conveys no provider or payment execution authority.\nALTER TABLE p_document_moveins ADD COLUMN source_provider TEXT NOT NULL DEFAULT 'generic';\nALTER TABLE p_document_moveins ADD COLUMN mapping_json TEXT NOT NULL DEFAULT '{}';\nCREATE TABLE p_imported_source_facts (\n id TEXT PRIMARY KEY, data_json TEXT NOT NULL, revision TEXT NOT NULL\n);\nCREATE TABLE p_imported_source_dependencies (\n fact_id TEXT NOT NULL REFERENCES p_imported_source_facts(id),\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n PRIMARY KEY(fact_id,proposal_id)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0100_imported_catalog_custody.sql",
+      "sha256": "0a1bd3b694f223f21baf9d6f055c441e92319a8078d0aba53141bdea349f3ce1",
+      "sql": "-- A separately promoted price still owes its retained source and original journal.\nCREATE TRIGGER p_imported_catalog_priced_dependency BEFORE DELETE ON p_catalog_items\nWHEN EXISTS(SELECT 1 FROM p_priced_catalog WHERE source_id=OLD.id)\nBEGIN\n SELECT RAISE(ABORT,'IMPORT_CATALOG_DEPENDENCY_CONFLICT');\nEND;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

@@ -47,7 +47,7 @@ export async function sourceExportFixture(provider='ignition') {
  const base=await moveinFixture()
  const files=provider==='ignition'?{
   'clients.csv':'Client ID,Client Name,Original Note\nc-1,Synthetic retained client,Exact source note\nc-2,Synthetic retained client,Second distinct client',
-  'services.csv':'#ID,Service Name,Service Description,Price,Currency\ns-1,Synthetic monthly service,Fixed source description,1200.00,USD\ns-2,Synthetic euro service,No currency conversion,81.12500,EUR',
+  'services.csv':'#ID,Service Name,Service Description,Exported Price,Currency\ns-1,Synthetic monthly service,Fixed source description,1200.00,USD\ns-2,Synthetic euro service,No currency conversion,81.12500,EUR',
   'proposals.csv':'Proposal ID,Proposal Name,Client ID,Created Date,Status,Currency,Value,PDF\np-1,Alpha,c-1,2026-01-15,Accepted,USD,14400.00,signed.pdf\np-2,Open,,2026-01-15,Sent,EUR,81.12500,open.pdf\np-3,Missing,c-1,2026-01-16,Draft,USD,19.00,missing.pdf',
   'billing-schedules.csv':'Billing Schedule ID,Proposal ID,Service ID,Status,Start Date,Currency,Amount,Frequency\nb-1,p-1,s-1,Active,2026-02-01,USD,1200.00,Monthly',
  }:{'proposals.csv':'Page ID,Title,Client,Date,Status,Currency,Value,PDF\nq-1,Review,Synthetic retained client,2026-01-15,Accepted,GBP,2500.00,unknown.pdf\nq-2,Open,Synthetic retained client,2026-01-15,Sent,GBP,120.00,open.pdf'}
@@ -55,16 +55,17 @@ export async function sourceExportFixture(provider='ignition') {
  const pdfs=provider==='ignition'?{'signed.pdf':originals[0],'open.pdf':originals[1]}:{'first.pdf':originals[0],'second.pdf':originals[1],'open.pdf':originals[2]}
  const bytes=Buffer.from(zipSync({...pdfs,...Object.fromEntries(Object.entries(files).map(([name,text])=>[name,strToU8(text)]))}))
  const choices=provider==='ignition'?{'binding:ignition:proposals:p-2:clientId':'ignition:clients:c-2','binding:ignition:proposals:p-3:document':'unmapped'}:{'binding:qwilr:proposals:q-1:document':hash(originals[0])}
- return {provider,files,originals,zips:[{filename:provider+'-export.zip',bytes}],choices}
+ const mapping=provider==='ignition'?{services:{id:'#ID',name:'Service Name',description:'Service Description',price:'Exported Price',currency:'Currency'}}:{}
+ return {provider,files,originals,zips:[{filename:provider+'-export.zip',bytes}],choices,mapping}
 }
 export async function applySourceExport(h,fixture,cookie=h.owner) {
  const {id}=await h.cmd('document-import.create',{label:'Synthetic '+fixture.provider+' export',sourceProvider:fixture.provider},cookie)
  for(const file of fixture.zips)await uploadMovein(h,id,file,cookie)
  const initial=await h.cmd('document-import.preview',{id},cookie)
  assert.equal(initial.canApply,false)
- const reviewed=await h.cmd('document-import.preview',{id,choices:fixture.choices},cookie)
+ const reviewed=await h.cmd('document-import.preview',{id,choices:fixture.choices,mapping:fixture.mapping},cookie)
  assert.equal(reviewed.canApply,true)
- let result=await h.cmd('document-import.apply',{id,choices:fixture.choices,fingerprint:reviewed.fingerprint},cookie)
+ let result=await h.cmd('document-import.apply',{id,choices:fixture.choices,mapping:fixture.mapping,fingerprint:reviewed.fingerprint},cookie)
  const resumed=result.job.state!=='completed'
  while(result.job.state!=='completed')result=await h.cmd('document-import.continue',{id},cookie)
  return {id,initial,reviewed,result,resumed}
@@ -83,23 +84,23 @@ export async function sourceExportJourney() {
   for(const file of fixture.zips)await uploadMovein(h,id,file)
   const initial=await h.cmd('document-import.preview',{id})
   assert.equal(initial.canApply,false)
-  assert.deepEqual(initial.report.exports.counts,provider==='ignition'?{clients:2,services:2,proposals:3,billingSchedules:1}:{clients:0,services:0,proposals:2,billingSchedules:0})
-  assert.deepEqual([initial.report.arrived,initial.report.held,initial.report.unmapped],provider==='ignition'?[1,3,1]:[2,2,0])
+  assert.deepEqual(initial.report.exports.counts,provider==='ignition'?{clients:2,services:0,proposals:3,billingSchedules:1}:{clients:0,services:0,proposals:2,billingSchedules:0})
+  assert.deepEqual([initial.report.arrived,initial.report.held,initial.report.unmapped],provider==='ignition'?[1,5,1]:[2,2,0])
   assert.equal((await h.state()).importedSourceFacts.length,0)
   await h.cmd('document-import.apply',{id,fingerprint:initial.fingerprint},h.owner,409)
   await h.cmd('document-import.preview',{id,choices:{...fixture.choices,['binding:'+provider+':proposals:'+(provider==='ignition'?'p-2:clientId':'q-1:document')]:'absent'}},h.owner,409)
-  const reviewed=await h.cmd('document-import.preview',{id,choices:fixture.choices})
+  const reviewed=await h.cmd('document-import.preview',{id,choices:fixture.choices,mapping:fixture.mapping})
   assert.equal(reviewed.canApply,true)
   assert.deepEqual([reviewed.report.arrived,reviewed.report.held,reviewed.report.unmapped],provider==='ignition'?[1,1,2]:[2,1,0])
-  await h.cmd('document-import.apply',{id,choices:fixture.choices,fingerprint:initial.fingerprint},h.owner,409)
+  await h.cmd('document-import.apply',{id,choices:fixture.choices,mapping:fixture.mapping,fingerprint:initial.fingerprint},h.owner,409)
   if(provider==='ignition') {
    const changed={services:{...reviewed.report.exports.mappings.services,price:'Service Name'}}
    await h.cmd('document-import.apply',{id,choices:fixture.choices,mapping:changed,fingerprint:reviewed.fingerprint},h.owner,409)
   }
   await uploadMovein(h,id,{filename:'source-note.csv',bytes:Buffer.from('Supplied note\nRetained original')})
-  await h.cmd('document-import.apply',{id,choices:fixture.choices,fingerprint:reviewed.fingerprint},h.owner,409)
-  const current=await h.cmd('document-import.preview',{id,choices:fixture.choices})
-  let applied=await h.cmd('document-import.apply',{id,choices:fixture.choices,fingerprint:current.fingerprint})
+  await h.cmd('document-import.apply',{id,choices:fixture.choices,mapping:fixture.mapping,fingerprint:reviewed.fingerprint},h.owner,409)
+  const current=await h.cmd('document-import.preview',{id,choices:fixture.choices,mapping:fixture.mapping})
+  let applied=await h.cmd('document-import.apply',{id,choices:fixture.choices,mapping:fixture.mapping,fingerprint:current.fingerprint})
   if(provider==='ignition')assert.notEqual(applied.job.state,'completed','multi-batch application is resumable')
   if(provider==='ignition') {
    const actor=(await h.state()).actor,email=['synthetic-platter-successor','example.invalid'].join('@')
@@ -120,7 +121,7 @@ export async function sourceExportJourney() {
    h.owner=await h.signIn(actor.email)
   }
   while(applied.job.state!=='completed')applied=await h.cmd('document-import.continue',{id})
-  await Promise.all([h.cmd('document-import.apply',{id,choices:fixture.choices,fingerprint:current.fingerprint}),h.cmd('document-import.apply',{id,choices:fixture.choices,fingerprint:current.fingerprint})])
+  await Promise.all([h.cmd('document-import.apply',{id,choices:fixture.choices,mapping:fixture.mapping,fingerprint:current.fingerprint}),h.cmd('document-import.apply',{id,choices:fixture.choices,mapping:fixture.mapping,fingerprint:current.fingerprint})])
   const state=await h.state(),facts=state.importedSourceFacts
   assert.equal(facts.length,provider==='ignition'?8:2)
   assert.ok(facts.every(f=>f.execution==='source-evidence-only'))
@@ -148,9 +149,9 @@ export async function sourceExportJourney() {
   assert.deepEqual(await Promise.all(['p_invoices','p_payment_records','p_proposals','p_mail'].map(t=>h.db.prepare('SELECT * FROM '+t+' ORDER BY rowid').all().then(r=>r.results))),baseline,'advancing a source billing schedule creates no invoices, proposals or outbound work')
   const repeated=await h.cmd('document-import.create',{label:'Synthetic replay',sourceProvider:provider})
   for(const file of fixture.zips)await uploadMovein(h,repeated.id,file)
-  const replay=await h.cmd('document-import.preview',{id:repeated.id,choices:fixture.choices})
+  const replay=await h.cmd('document-import.preview',{id:repeated.id,choices:fixture.choices,mapping:fixture.mapping})
   assert.equal(replay.canApply,false);assert.ok(replay.existing.length>0)
-  await h.cmd('document-import.apply',{id:repeated.id,choices:fixture.choices,fingerprint:replay.fingerprint},h.owner,409)
+  await h.cmd('document-import.apply',{id:repeated.id,choices:fixture.choices,mapping:fixture.mapping,fingerprint:replay.fingerprint},h.owner,409)
   const client=await h.cmd('client.save',{name:'Synthetic source dependency',email:['synthetic-platter-'+provider+'-dependency','example.invalid'].join('@')})
   const proposal=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic source dependency',scope:'Retain source fact',optionOne:'One',priceOne:'100',optionTwo:'Two',priceTwo:'200',depositPercent:'25'})
   await h.db.prepare('INSERT INTO p_imported_source_dependencies(fact_id,proposal_id) VALUES(?,?)').bind(facts[0].id,proposal.id).run()
@@ -178,11 +179,15 @@ export async function sourceExportBrowser({page,context,app,capture}) {
  await page.waitForFunction(()=>Array.from(document.querySelectorAll('[data-document-upload]')).every(f=>!f.querySelector('input[type=file]').files.length))
  await section.getByRole('button',{name:'Preview document move-in',exact:true}).click()
  assert.equal(await section.getByRole('button',{name:'Apply reviewed document move-in',exact:true}).count(),0)
- assert.match(await section.innerText(),/clients\s+2\s+services\s+2\s+proposals\s+3\s+billingSchedules\s+1/)
+ assert.match(await section.innerText(),/Clients\s+2\s+Services\s+0\s+Proposals\s+3\s+Billing schedules\s+1/)
+ assert.match(await section.innerText(),/map missing fields price/)
  const mapping=JSON.parse(await section.getByLabel('Export column mapping (JSON)').inputValue())
  assert.equal(mapping.services.price,'Price')
+ mapping.services=fixture.mapping.services
+ await section.getByLabel('Export column mapping (JSON)').fill(JSON.stringify(mapping))
  for(const [key,value] of Object.entries(fixture.choices))await section.locator('select[name="match:'+key+'"]').selectOption(value)
  await section.getByRole('button',{name:'Review report matches',exact:true}).click()
+ assert.match(await section.innerText(),/Clients\s+2\s+Services\s+2\s+Proposals\s+3\s+Billing schedules\s+1/)
  await section.getByText('Source facts, dates, currencies and provenance',{exact:true}).click()
  assert.match(await section.innerText(),/1200.00/)
  assert.match(await section.innerText(),/2026-02-01/)

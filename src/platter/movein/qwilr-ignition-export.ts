@@ -29,8 +29,8 @@ export function exportedFacts(provider: ExportProvider, files: Csv[], documents:
   const columns=supplied[kind]??(provider==='qwilr'?{id:'Page ID',title:'Title',clientId:'Client',date:'Date',status:'Status',currency:'Currency',value:'Value',document:'PDF'}:ignitionExportColumns[kind as keyof typeof ignitionExportColumns])
   mappings[kind]=columns
   const parsed=parseBusinessCsv(new TextDecoder().decode(file.bytes),','),sourceHash=sha256(file.bytes)
-  const required=kind==='clients'?['id','name']:kind==='services'?['id','name']:kind==='proposals'?['id','title','clientId','date','status','currency','document']:['id','proposalId','serviceId','status','date','currency','value','frequency']
-  const missing=required.filter(key=>!columns[key]||!parsed.headers.includes(columns[key]))
+  const required=kind==='clients'?['id','name']:kind==='services'?['id','name','price','currency']:kind==='proposals'?['id','title','clientId','date','status','currency','document']:['id','proposalId','serviceId','status','date','currency','value','frequency']
+  const missing=[...new Set([...required.filter(key=>!columns[key]),...Object.keys(columns).filter(key=>!parsed.headers.includes(columns[key]))])]
   if (missing.length) {issues.push(file.source+': map missing fields '+missing.join(', '));continue}
   for (const header of parsed.headers) if(!Object.values(columns).includes(header))unmapped.push(file.source+': retained unmapped column '+header)
   for (const row of parsed.rows) {

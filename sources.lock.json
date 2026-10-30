@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "e0fa8b4836573d438f332febb1dbbd2fc468546f4a3f323cdc8a91886cba763a",
+      "sha256": "1684607c5f05c5592e69c35123256841dede3b4a8a33672dcea01a7bf70ca793",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "2363629d8bb94e77af6f54bb572ccf3db86c3a2e7777d9109f52fdd50541eeff",
+      "sha256": "fcaa8e75bffb84b68074f91c95e9d6b740e4c42b17203c89fea2405f51326d10",
       "executable": false
     },
     "deploy-demo.json": {
@@ -3389,8 +3389,12 @@
       "sha256": "951def8c6b83614a7fc749bc4ab3b6b16323fbfe6de3f354eed154b9d3e7d3ed",
       "executable": false
     },
+    "tests/approval-preview-fixture.mjs": {
+      "sha256": "e0e2240524f6850ed3618fe86399c402343571765ce6b54c8887886686c97c95",
+      "executable": false
+    },
     "tests/archive.test.mjs": {
-      "sha256": "56480eb1e40fb0798b571390f523757c7b8b8a71ae243fc3a1ff045362388e0d",
+      "sha256": "b0c07600512be530e80299e4489fb7609833e972f497ca016db8cd02f2e977f1",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3522,7 +3526,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "62c66f7f58e5aab72d9c80d3244bd0746b42e8e1993cc2fdc123f5700c9d02ae",
+      "sha256": "0952dac43db0981652f1a3bddc0bc2e0dd6bf2b3f16e07affb4f9c027bc1d0a8",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {
@@ -3542,7 +3546,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "4adbb6122f7df0830a3dcc117d42ba3c3a03f0f9696bd5411720e0c17d3b5ad2",
+      "sha256": "74ecc2b1102c52fb5789ac39144741e3f189aba7da44faafadc495726d988ae7",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3594,7 +3598,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "988a5096714a762dc27c7681d33c630aafc69c95b951b543d3c7ef71cca36109",
+      "sha256": "21aaaa05ecaed13c4a2bc170f6297fc173c51af5b7979a7378d4957b2807a6e6",
       "executable": false
     },
     "tests/site-harness.mjs": {

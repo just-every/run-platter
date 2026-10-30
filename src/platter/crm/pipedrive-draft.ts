@@ -22,7 +22,7 @@ const cents = (value: unknown) => {
 }
 async function record(kind: string, id: string, token: string) {
  const response = await providerJson(base + kind + '/' + id, token), row = response.data
- need(response.success === true && row && identifier(row.id) === id && row.active_flag !== false && row.is_deleted !== true && row.deleted !== true, 'Pipedrive did not confirm the selected record', 409)
+ need(response.success === true && row && identifier(row.id) === id && row.active_flag !== false && row.is_deleted !== true && row.deleted !== true && row.status !== 'deleted', 'Pipedrive did not confirm the selected record', 409)
  return row
 }
 export async function readPipedriveDeal(env: Bindings, input: Record<string, unknown>) {
@@ -45,6 +45,7 @@ export async function readPipedriveDeal(env: Bindings, input: Record<string, unk
  need(new Set(ids).size === ids.length, 'The deal has ambiguous product rows', 409)
  const lines = await Promise.all(attached.data.map(async (row: any) => {
   const id = identifier(row.id), productId = identifier(row.product_id), product = await record('products', productId, secret.token)
+  need(product.active_flag === true, 'The source product must be confirmed active', 409)
   need(row.enabled_flag === true && row.currency === 'USD', 'Only enabled USD products can start a draft', 409)
   need(cents(row.tax) === 0 && cents(row.discount) === 0 && row.billing_frequency === 'one-time' && !row.billing_start_date && !row.billing_frequency_cycles, 'Taxed, discounted or recurring products need manual preparation', 409)
   const quantity = decimal(row.quantity, 3, 'quantity'), unitPrice = decimal(row.item_price, 2, 'unit price')

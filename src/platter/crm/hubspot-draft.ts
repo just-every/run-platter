@@ -71,6 +71,7 @@ function connectionGuard(connection: any, provider: string) {
  return { sql: "EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL)", values: ['workspace:' + provider, connection.account_id, connection.version] }
 }
 export async function hubspotDraftCommand(env: Bindings, actor: Actor, name: string, input: Record<string, unknown>) {
+ need(['crm.deal.review', 'crm.deal.apply'].includes(name), 'Unknown CRM draft action', 404)
  return reviewedDraftCommand(env, actor, name, input, 'hubspot', readDeal)
 }
 export async function reviewedDraftCommand(env: Bindings, actor: Actor, name: string, input: Record<string, unknown>, provider: string, reader: typeof readDeal) {

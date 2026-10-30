@@ -2566,7 +2566,7 @@
       "executable": false
     },
     "src/platter/crm/hubspot-draft.ts": {
-      "sha256": "5cc96f56504eb01c1733aa60e372b0b86b33643ce4ef3bd64657055ce660a07c",
+      "sha256": "bf969cac711f0d94f560e939478071dd2ec09d48f7075e5c737c8503804415a0",
       "executable": false
     },
     "src/platter/crm/hubspot-sync-plan.ts": {
@@ -2578,7 +2578,7 @@
       "executable": false
     },
     "src/platter/crm/pipedrive-draft.ts": {
-      "sha256": "da5e0b0835e3f540c5b859b40a4340e6f53397c1b94313408cbbbbf66df78995",
+      "sha256": "687d7e1bf4f98e30586b706fa03415fd18e029b3e73f127832792ea55f32c04e",
       "executable": false
     },
     "src/platter/delivery-intake.d.mts": {
@@ -3110,7 +3110,7 @@
       "executable": false
     },
     "src/platter/ui/crm-start.ts": {
-      "sha256": "2e44227e563bd135ec2c6e4bfb2762770aa9026acdd120f738369ee95e7c204d",
+      "sha256": "08bcfc56aa17f1c6ed362b250184a5746a3e68f38f356def1c26d8cbf6bc8e67",
       "executable": false
     },
     "src/platter/ui/delivery.ts": {
@@ -3438,7 +3438,7 @@
       "executable": false
     },
     "tests/crm-pipedrive-browser.mjs": {
-      "sha256": "ae979550a9314d7d98c82995c5be990890ccaee948c4924efb750d781fb29fdb",
+      "sha256": "2f78adc23b67214eee336c4f804f70faa85dbb802cf3339308d7ae6dc3fa6b05",
       "executable": false
     },
     "tests/crm-pipedrive-http.mjs": {

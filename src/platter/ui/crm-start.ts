@@ -26,8 +26,9 @@ function startPanel(state: any, provider: string, feedback?: Feedback, card?: UR
  return panel('Start from ' + label, contents)
 }
 function sourceSummary(source: any) {
- return '<dl><dt>Deal</dt><dd>' + escape(source.name) + ' · ' + escape(source.dealId) + '</dd><dt>Company</dt><dd>' + escape(source.company.name) + ' · ' + escape(source.company.id) + '</dd><dt>Contact</dt><dd>' + escape(source.contact.name) + ' · ' + escape(source.contact.email) + ' · ' + escape(source.contact.id) + '</dd></dl>'
-  + '<ul>' + source.lines.map((line: any) => '<li><strong>' + escape(line.name) + '</strong><p>' + escape(line.quantity) + ' × ' + money(Number(line.unitPrice) * 100, 'USD') + '</p><p>Source item: ' + escape(line.id) + '</p></li>').join('') + '</ul>'
+ const pipedrive = source.provider === 'pipedrive'
+ return '<dl><dt>Provider account</dt><dd>' + escape(source.accountId) + '</dd><dt>Deal</dt><dd>' + escape(source.name) + ' · ' + escape(source.dealId) + '</dd><dt>' + (pipedrive ? 'Organization' : 'Company') + '</dt><dd>' + escape(source.company.name) + ' · ' + escape(source.company.id) + '</dd><dt>' + (pipedrive ? 'Person' : 'Contact') + '</dt><dd>' + escape(source.contact.name) + ' · ' + escape(source.contact.email) + ' · ' + escape(source.contact.id) + '</dd></dl>'
+  + '<ul>' + source.lines.map((line: any) => '<li><strong>' + escape(line.name) + '</strong>' + (line.description ? '<p class="preserve">' + escape(line.description) + '</p>' : '') + '<p>' + escape(line.quantity) + ' × ' + money(Number(line.unitPrice) * 100, 'USD') + '</p><p>Source item: ' + escape(line.id) + (line.productId ? ' · Product: ' + escape(line.productId) : '') + '</p></li>').join('') + '</ul>'
 }
 export function crmSourcePanel(state: any, id: string) {
  const source = state.crmDraftSources?.find((row: any) => row.proposal_id === id)

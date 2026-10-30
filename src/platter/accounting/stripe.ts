@@ -14,7 +14,7 @@ export async function stripeReader(env:Bindings,actor:Actor,authorize:()=>Promis
   await authorize()
   const {connection,secret}=await providerCredential(env,'workspace:stripe')
   need(connection.version===current.connection.version&&connection.account_id===current.connection.account_id,'Stripe connection changed. Review again.',409)
-  const response=await fetch('https://api.stripe.com/v1'+path,{headers:{authorization:'Bearer '+secret.token,accept:'application/json'},redirect:'manual',signal:AbortSignal.timeout(30000)})
+  const response=await fetch('https://api.stripe.com/v1'+path,{headers:{authorization:'Bearer '+secret.token,accept:['application','json'].join('/')},redirect:'manual',signal:AbortSignal.timeout(30000)})
   need(response.ok,'Stripe did not confirm this accounting source',409)
   const raw=await response.text();need(raw.length<=262144,'Stripe returned an oversized accounting source',409)
   const value=JSON.parse(raw);need(value&&typeof value==='object'&&!value.error,'Stripe returned an invalid accounting source',409)
@@ -25,6 +25,7 @@ export async function stripeReader(env:Bindings,actor:Actor,authorize:()=>Promis
 export async function stripeReceipt(env:Bindings,actor:Actor,payment:any,authorize:()=>Promise<unknown>) {
  const source=await stripeReader(env,actor,authorize),charge=await source.get('/charges/'+encodeURIComponent(payment.provider_charge))
  need(source.account===payment.reference&&charge.id===payment.provider_charge&&charge.paid===true&&charge.status==='succeeded'&&charge.currency==='usd'&&charge.amount===payment.cents&&charge.metadata?.platter_proposal_id===payment.proposal_id&&String(charge.metadata?.platter_revision)===String(payment.revision)&&integer(charge.amount_refunded)&&charge.amount_refunded>=0&&charge.amount_refunded<=charge.amount,'Stripe did not confirm this exact accepted receipt',409)
+ need(charge.balance_transaction===null||typeof charge.balance_transaction==='string','Stripe returned an invalid balance transaction reference',409)
  need(integer(charge.created)&&charge.created>0,'Stripe did not confirm the receipt date',409)
  return {source,charge,facts:{account:source.account,version:source.version,id:charge.id,amountCents:charge.amount,refundedCents:charge.amount_refunded,balanceTransaction:charge.balance_transaction,receivedOn:new Date(charge.created*1000).toISOString().slice(0,10)}}
 }
@@ -39,7 +40,7 @@ function journal(day:string,amount:number,debit:string,credit:string,note:string
 }
 async function adjustmentPlan(env:Bindings,actor:Actor,input:Record<string,unknown>) {
  const db=env.DB,kind=String(input.kind)
- need(['fee','refund','refund_fee','payout'].includes(kind),'Choose a charge fee, confirmed refund or paid payout',409)
+ need(['fee','refund','refund_fee','dispute','payout'].includes(kind),'Choose a charge fee, confirmed refund or paid payout',409)
  const payment=await db.prepare("SELECT * FROM p_payment_records WHERE id=? AND method='stripe'").bind(text(input.paymentId,'a linked Stripe receipt')).first<any>()
  need(payment,'Choose a linked Stripe receipt',409)
  const job=await db.prepare("SELECT * FROM p_accounting_jobs WHERE proposal_id=? AND status='complete'").bind(payment.proposal_id).first<any>()
@@ -48,7 +49,7 @@ async function adjustmentPlan(env:Bindings,actor:Actor,input:Record<string,unkno
  const config=await configuration(env),authorize=async()=>{await reader(env,actor,config)();return execution(env,job)}
  const {source,charge,facts}=await stripeReceipt(env,actor,payment,authorize),posted=JSON.parse(posting.plan)
  const clearing=await accountMapping(authorize,posted.depositAccountId,['Other Current Asset'])
- let body:any,bodyKind='journalentry',sourceId:string,sourceFacts:any,expense:any=null,bank:any=null,refundId:any=null,payoutId:any=null
+ let body:any,bodyKind='journalentry',sourceId:string,sourceFacts:any,expense:any=null,bank:any=null,refundId:any=null,payoutId:any=null,disputeId:any=null,disputeAccount:any=null,balanceTransactionId:any=null
  if(kind==='fee') {
   need(typeof charge.balance_transaction==='string','Stripe has not confirmed the charge balance transaction',409)
   const balance=await source.get('/balance_transactions/'+encodeURIComponent(charge.balance_transaction))
@@ -78,6 +79,22 @@ async function adjustmentPlan(env:Bindings,actor:Actor,input:Record<string,unkno
   bodyKind='refundreceipt';sourceId=refund.id;refundId=saved.id;sourceFacts={id:refund.id,balanceTransaction:balance.id,cents:saved.cents,created:refund.created}
   body={CustomerRef:original.CustomerRef,DepositToAccountRef:{value:clearing.id},TxnDate:new Date(refund.created*1000).toISOString().slice(0,10),CurrencyRef:{value:'USD'},GlobalTaxCalculation:original.GlobalTaxCalculation,PrivateNote:'Platter Stripe refund '+refund.id,Line:originalLines.map((l:any,i:number)=>({...l,Amount:nets[i]/100,Description:'Refund: '+l.Description,SalesItemLineDetail:{...l.SalesItemLineDetail,Qty:1,UnitPrice:nets[i]/100}})),...(original.TxnTaxDetail?{TxnTaxDetail:{...original.TxnTaxDetail,TotalTax:taxCents/100,TaxLine:taxLines.map((l:any,i:number)=>({...l,Amount:taxParts[i]/100,TaxLineDetail:{...l.TaxLineDetail,NetAmountTaxable:taxable/100}}))}}:{})}
   }
+ } else if(kind==='dispute'){
+  disputeId=providerId(input.disputeId)
+  const saved=await db.prepare('SELECT * FROM p_disputes WHERE id=? AND payment_id=?').bind(disputeId,payment.id).first<any>()
+  need(saved,'Import the matching Stripe dispute before reviewing its accounting',409)
+  const dispute=await source.get('/disputes/'+encodeURIComponent(disputeId))
+  need(dispute.id===disputeId&&dispute.charge===charge.id&&dispute.amount===saved.cents&&dispute.currency==='usd'&&Array.isArray(dispute.balance_transactions)&&dispute.balance_transactions.length<=100,'Stripe did not confirm this exact dispute and its balance entries',409)
+  balanceTransactionId=input.balanceTransactionId?providerId(input.balanceTransactionId):dispute.balance_transactions.length===1?providerId(dispute.balance_transactions[0].id):null
+  const balance=dispute.balance_transactions.find((b:any)=>b.id===balanceTransactionId)
+  need(balance&&balance.source===disputeId&&balance.type==='adjustment'&&['dispute','dispute_reversal'].includes(balance.reporting_category)&&balance.currency==='usd'&&integer(balance.amount)&&balance.amount!==0&&Math.abs(balance.amount)<=saved.cents&&integer(balance.fee)&&balance.net===balance.amount-balance.fee&&integer(balance.created),'Select a verified principal and fee adjustment belonging to this dispute',409)
+  disputeAccount=await accountMapping(authorize,input.disputeAccountId,['Other Current Asset','Expense','Other Expense'])
+  expense=await accountMapping(authorize,input.expenseAccountId,['Expense','Other Expense'])
+  if(balance.amount>0)need(await db.prepare("SELECT 1 FROM p_accounting_adjustments WHERE kind='dispute' AND status='confirmed' AND json_extract(plan,'$.disputeId')=? AND json_extract(plan,'$.disputeAccount.id')=? AND json_extract(plan,'$.sourceFacts.amount')<0").bind(disputeId,disputeAccount.id).first(),'A dispute reversal must use the account of its confirmed original adjustment',409)
+  const day=new Date(balance.created*1000).toISOString().slice(0,10)
+  body=journal(day,Math.abs(balance.amount),balance.amount<0?disputeAccount.id:clearing.id,balance.amount<0?clearing.id:disputeAccount.id,'Platter Stripe dispute '+disputeId+' entry '+balance.id)
+  if(balance.fee)body.Line.push(...journal(day,Math.abs(balance.fee),balance.fee>0?expense.id:clearing.id,balance.fee>0?clearing.id:expense.id,'').Line)
+  sourceId=balance.id;sourceFacts={id:balance.id,source:disputeId,status:dispute.status,amount:balance.amount,fee:balance.fee,net:balance.net,created:balance.created}
  } else {
   payoutId=providerId(input.payoutId)
   const payout=await source.get('/payouts/'+encodeURIComponent(payoutId)),balances=await source.get('/balance_transactions?payout='+encodeURIComponent(payoutId)+'&limit=100')
@@ -85,14 +102,15 @@ async function adjustmentPlan(env:Bindings,actor:Actor,input:Record<string,unkno
   need(balances.has_more===false&&Array.isArray(balances.data)&&balances.data.length>0&&balances.data.length<=100,'Review a complete payout of at most one hundred balance transactions',409)
   const entries=[]
   for(const balance of balances.data) {
-   need(['charge','refund'].includes(balance.type)&&balance.currency==='usd'&&integer(balance.amount)&&integer(balance.fee)&&balance.net===balance.amount-balance.fee,'This payout contains an unsupported accounting entry',409)
+   need(['charge','refund','adjustment'].includes(balance.type)&&balance.currency==='usd'&&integer(balance.amount)&&integer(balance.fee)&&balance.net===balance.amount-balance.fee,'This payout contains an unsupported accounting entry',409)
    const receipt=await db.prepare("SELECT p.*,a.plan AS posting_plan FROM p_payment_records p JOIN p_accounting_postings a ON a.payment_id=p.id AND a.status='confirmed' WHERE p.provider_charge=? AND p.reference=?").bind(balance.type==='charge'?balance.source:'',source.account).first<any>()
    if(balance.type==='charge') {
     need(receipt&&receipt.cents===balance.amount&&JSON.parse(receipt.posting_plan).depositAccountId===clearing.id,'Every payout charge must already have a confirmed gross posting to this clearing account',409)
     if(balance.fee)need(await db.prepare("SELECT 1 FROM p_accounting_adjustments WHERE source_key=? AND status='confirmed' AND json_extract(plan,'$.clearing.id')=? AND json_extract(plan,'$.sourceFacts.fee')=?").bind(sourceKey(source.account,'fee',balance.id),clearing.id,balance.fee).first(),'Post every payout fee before clearing the payout',409)
-   } else { need(await db.prepare("SELECT 1 FROM p_accounting_adjustments WHERE source_key=? AND status='confirmed' AND json_extract(plan,'$.clearing.id')=? AND json_extract(plan,'$.sourceFacts.cents')=?").bind(sourceKey(source.account,'refund',balance.source),clearing.id,-balance.amount).first(),'Every payout refund must already have a confirmed accounting reflection',409)
+   } else if(balance.type==='refund') { need(await db.prepare("SELECT 1 FROM p_accounting_adjustments WHERE source_key=? AND status='confirmed' AND json_extract(plan,'$.clearing.id')=? AND json_extract(plan,'$.sourceFacts.cents')=?").bind(sourceKey(source.account,'refund',balance.source),clearing.id,-balance.amount).first(),'Every payout refund must already have a confirmed accounting reflection',409)
     if(balance.fee)need(await db.prepare("SELECT 1 FROM p_accounting_adjustments WHERE source_key=? AND status='confirmed' AND json_extract(plan,'$.clearing.id')=? AND json_extract(plan,'$.sourceFacts.fee')=?").bind(sourceKey(source.account,'refund_fee',balance.id),clearing.id,balance.fee).first(),'Post the confirmed refund fee adjustment before clearing this payout',409)
    }
+   if(balance.type==='adjustment')need(await db.prepare("SELECT 1 FROM p_accounting_adjustments WHERE source_key=? AND status='confirmed' AND json_extract(plan,'$.clearing.id')=? AND json_extract(plan,'$.sourceFacts.source')=? AND json_extract(plan,'$.sourceFacts.amount')=? AND json_extract(plan,'$.sourceFacts.fee')=?").bind(sourceKey(source.account,'dispute',balance.id),clearing.id,balance.source,balance.amount,balance.fee).first(),'Every payout dispute entry must already have a confirmed accounting reflection',409)
    entries.push({id:providerId(balance.id),source:providerId(balance.source),type:balance.type,amount:balance.amount,fee:balance.fee,net:balance.net})
   }
   need(new Set(entries.map(e=>e.id)).size===entries.length&&entries.reduce((n,e)=>n+e.net,0)===payout.amount,'The complete payout entries must equal its exact net bank deposit',409)
@@ -100,7 +118,7 @@ async function adjustmentPlan(env:Bindings,actor:Actor,input:Record<string,unkno
   body=journal(new Date(payout.arrival_date*1000).toISOString().slice(0,10),payout.amount,bank.id,clearing.id,'Platter Stripe payout '+payoutId)
  }
  const person=await db.prepare('SELECT version FROM oa_operators WHERE id=?').bind(actor.id).first<any>()
- const plan={sourceKey:sourceKey(source.account,kind,sourceId),kind,paymentId:payment.id,proposalId:payment.proposal_id,refundId,payoutId,clearing,expense,bank,stripe:facts,sourceFacts,bodyKind,body,settingsVersion:config.version,connectionVersion:config.connection_version,actorId:actor.id,actorRole:actor.role,operatorVersion:person.version,memberVersion:actor.memberVersion??0}
+ const plan={sourceKey:sourceKey(source.account,kind,sourceId),kind,paymentId:payment.id,proposalId:payment.proposal_id,refundId,payoutId,disputeId,disputeAccount,balanceTransactionId,clearing,expense,bank,stripe:facts,sourceFacts,bodyKind,body,settingsVersion:config.version,connectionVersion:config.connection_version,actorId:actor.id,actorRole:actor.role,operatorVersion:person.version,memberVersion:actor.memberVersion??0}
  return {plan,config,authorize:async()=>{const current=await providerCredential(env,'workspace:stripe');need(current.connection.version===facts.version&&current.connection.account_id===facts.account,'Stripe connection changed before the accounting write',409);return authorize()}}
 }
 export async function adjustmentCommand(env:Bindings,actor:Actor,name:string,input:Record<string,unknown>) {
@@ -116,7 +134,7 @@ export async function adjustmentCommand(env:Bindings,actor:Actor,name:string,inp
  const previous=await db.prepare('SELECT status FROM p_accounting_adjustments WHERE source_key=?').bind(recorded.sourceKey).first<any>()
  if(previous)return {accountingResult:true,status:previous.status,message:'This processor source already has one retained accounting reflection. Uncertain outcomes are never replayed.'}
  need(!review.consumed_at&&review.expires_at>at&&(input.consent===true||input.consent==='yes'),'The adjustment review expired or consent is missing',409)
- const state=await adjustmentPlan(env,actor,{kind:recorded.kind,paymentId:recorded.paymentId,refundId:recorded.refundId,payoutId:recorded.payoutId,expenseAccountId:recorded.expense?.id,bankAccountId:recorded.bank?.id})
+ const state=await adjustmentPlan(env,actor,{kind:recorded.kind,paymentId:recorded.paymentId,refundId:recorded.refundId,payoutId:recorded.payoutId,disputeId:recorded.disputeId,disputeAccountId:recorded.disputeAccount?.id,balanceTransactionId:recorded.balanceTransactionId,expenseAccountId:recorded.expense?.id,bankAccountId:recorded.bank?.id})
  need(canonical(state.plan)===review.plan,'The processor source, accounts or authority changed. Review again.',409)
  const requestId=crypto.randomUUID(),guard=configGuard(state.config)
  guard.sql+=' AND EXISTS(SELECT 1 FROM p_accounting_reviews WHERE id=? AND consumed_at IS NULL AND expires_at>?)'

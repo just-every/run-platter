@@ -7,7 +7,7 @@ import { markMilestone, runScheduledInvoices, scheduleRows } from './schedule'
 import { lifecycleCommand } from './lifecycle'
 import { currentTime } from '../expiry-time'
 import { administrators } from '../permissions'
-import { customerMatches, itemMapping, providerId, quickbooks, type QuickBooksAuthority } from './quickbooks'
+import { confirmedInvoice, customerMatches, itemMapping, providerId, quickbooks, type QuickBooksAuthority } from './quickbooks'
 
 export const canonical = (value: any): string => JSON.stringify(value, (_key, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k,v[k]])) : v)
 const live = `SELECT s.* FROM p_accounting_settings s JOIN p_accounting_authority g ON g.singleton=s.singleton AND g.version=s.version
@@ -135,7 +135,7 @@ async function write(env: Bindings, job: any, kind: string, body: any, authorize
   const value = await quickbooks(authorize, '/' + kind, body, requestId), record = value[kind === 'customer' ? 'Customer' : 'Invoice']
   const id = providerId(record?.Id)
   if (kind === 'customer') need(record.DisplayName === body.DisplayName, 'QuickBooks returned a different customer', 409)
-  if (kind === 'invoice') need(record.CustomerRef?.value === body.CustomerRef.value && Math.round(Number(record.TotalAmt) * 100) === JSON.parse(job.plan).depositCents, 'QuickBooks returned a different invoice amount or customer', 409)
+  if (kind === 'invoice') confirmedInvoice(record,body,JSON.parse(job.plan).depositCents)
   await db.prepare("UPDATE p_accounting_requests SET status='confirmed',provider_id=? WHERE proposal_id=? AND kind=?").bind(id,job.proposal_id,kind).run()
   return id
  } catch {

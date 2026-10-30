@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "bb4234036f800284348b09e4fd21144a095e2cc0d2e2656e1e860ec774e7e762",
+      "sha256": "da77d09cefe1c2bb2995abb86597348f2cc2aa449a17b148f3581b23ed9beb79",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "a18802dc0ed8c0b9ad70860ea8d0205818269573d39409600bf44b8b7f34f978",
+      "sha256": "e92a3d6a3a646ac1c28c59c375025f5f002de2f9ae3b5584cfb5d5d7476606b0",
       "executable": false
     },
     "deploy-demo.json": {
@@ -651,6 +651,14 @@
     },
     "migrations/core/0100_quickbooks_lifecycle.sql": {
       "sha256": "6dc173d09e54684ca3e502fc47512de2a8d5b868d88ce809e10b9174e0276ea1",
+      "executable": false
+    },
+    "migrations/core/0101_quickbooks_schedule.sql": {
+      "sha256": "1c7a5eac95419b361897bda4a6b55c80f2cab3c203581cc25b9cc9175915e580",
+      "executable": false
+    },
+    "migrations/core/0102_quickbooks_adjustments.sql": {
+      "sha256": "a3679e7db65eb90128a5767aedb740768f11b62c6e98b2a1ed6af075d2e88d5e",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -2458,15 +2466,27 @@
       "executable": false
     },
     "src/platter/accounting/jobs.ts": {
-      "sha256": "171afb217a2e882d3d7a39cbffccf8966ed779b93aad053cef99a2323ee51cdd",
+      "sha256": "3970eea1312ccaab42fb0c026a3cd4ab14eab197ffa7159825e1c358fd10751d",
       "executable": false
     },
     "src/platter/accounting/lifecycle.ts": {
       "sha256": "21d1023a923c24b4ac26bafbd5a538ca3eee0ee85fa54babbccd057a2f5c69d1",
       "executable": false
     },
+    "src/platter/accounting/lines.ts": {
+      "sha256": "77b797e797ea7f958aa51e6122922f22b7e3d38339701320a366617897db6c7f",
+      "executable": false
+    },
     "src/platter/accounting/quickbooks.ts": {
-      "sha256": "0f37b669452ad787e897fb8d75688c163efdddc787efa2fc91b95615e1d50121",
+      "sha256": "b4024e3c813f7efc46cab2e333280a41a7c646c25a80c0c63a4f9b3b4712f316",
+      "executable": false
+    },
+    "src/platter/accounting/schedule.ts": {
+      "sha256": "6e9ec744cc60f64f5f8a49a1de52b599fca14513ce0a956cbd6ce0810a78cb71",
+      "executable": false
+    },
+    "src/platter/accounting/stripe.ts": {
+      "sha256": "18f126b5f8dec242e854fd7d20c7836a6b9d946ddae7761605dbb166bbc2419d",
       "executable": false
     },
     "src/platter/api/index.ts": {
@@ -3042,7 +3062,7 @@
       "executable": false
     },
     "src/platter/ui/accounting.ts": {
-      "sha256": "23645a742147be7adb07085495c18e0f9693adaceb6ea209883768f950d3580e",
+      "sha256": "907af309e9fe1bab83b669e3a8fca6701dcc2c04340f6ade1b6f7f97752cf453",
       "executable": false
     },
     "src/platter/ui/admin.ts": {
@@ -3578,7 +3598,11 @@
       "executable": false
     },
     "tests/quickbooks-lifecycle.mjs": {
-      "sha256": "172f471dddbd5a2621fcf9310881cd0607968f88eb05592a2930cd276a395f1e",
+      "sha256": "e5adb95fea036b314c3c205777d45ad230b415ee3983fcb46f406f5166b495b4",
+      "executable": false
+    },
+    "tests/quickbooks-money.mjs": {
+      "sha256": "2797ebc797e50d40441009ef73ac78ba5df4a08ce6b36f3797a3f442ce5e0729",
       "executable": false
     },
     "tests/recipients-browser.mjs": {

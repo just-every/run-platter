@@ -14,6 +14,9 @@ export async function quickbooksLifecycle(){
   assert.equal((await h.cmd('accounting.readback',{proposalId:id})).status,'unpaid')
   const receipt=await h.cmd('payment.record',{id,method:'check',amount:'100.01',reference:'Synthetic check 104',receivedOn:'2030-03-02',consent:true})
   const input={paymentId:receipt.id,depositAccountId:fake.bank}
+  const foreignBefore=await state(),foreignCalls=fake.calls.length
+  await h.cmd('accounting.payment.review',{...input,invoiceTarget:'synthetic-platter-foreign:0'},h.owner,409)
+  assert.deepEqual(await state(),foreignBefore);assert.equal(fake.calls.length,foreignCalls)
   const reviewed=await h.cmd('accounting.payment.review',input)
   assert.equal(reviewed.plan.balanceCents,25001);assert.equal(reviewed.plan.cents,10001)
   assert.equal(fake.payments.size,0)
@@ -48,6 +51,18 @@ export async function quickbooksLifecycle(){
   assert.equal((await state()).observations[0].balance_cents,0)
   const confirmed=(await state()).postings.find(p=>p.payment_id===receipt.id)
   assert.equal(confirmed.status,'confirmed');assert.equal(confirmed.provider_id,payment.Id)
+  const concurrent=await acceptedQuickbooksAgreement(h,'Concurrent receipt reservations')
+  const concurrentReview=await h.cmd('accounting.review',quickbooksReviewInput(concurrent,fake))
+  await h.cmd('accounting.apply',{id:concurrentReview.id,digest:concurrentReview.digest,consent:true});await h.cmd('accounting.dispatch',{})
+  const paymentReviews=[]
+  for(const reference of ['Synthetic check A','Synthetic check B']){
+   const record=await h.cmd('payment.record',{id:concurrent.proposal.id,method:'check',amount:'200',reference,receivedOn:'2030-03-04',consent:true})
+   paymentReviews.push(await h.cmd('accounting.payment.review',{paymentId:record.id,depositAccountId:fake.bank}))
+  }
+  const paymentsBefore=fake.payments.size
+  const reservations=await Promise.all(paymentReviews.map(r=>h.send('/api/platter/command',{name:'accounting.payment.apply',input:{id:r.id,digest:r.digest,consent:true}},h.owner)))
+  assert.deepEqual(reservations.map(r=>r.status).sort(),[200,409])
+  assert.equal(fake.payments.size,paymentsBefore+1,'different receipts cannot concurrently overpay the same accepted amount')
   await h.cmd('provider.disconnect',{provider:'quickbooks',version:1})
   const disconnected=fake.calls.length
   await h.cmd('accounting.readback',{proposalId:id},h.owner,409)
@@ -105,6 +120,16 @@ export async function quickbooksSchedule(){
   fake.setTimeout('invoice');await tick('2030-05-01');assert.equal(fake.invoices.size,7)
   fake.setTimeout(undefined);await tick('2030-06-01');await h.cmd('accounting.dispatch',{});assert.equal(fake.invoices.size,7)
   assert.equal((await h.state()).accounting.amounts.find(a=>a.proposal_id===recurring.proposal.id&&a.amount_index===2).status,'held')
+  const slipped=await acceptedQuickbooksAgreement(h,'Delayed milestone dispatch',undefined,{paymentTerms:{netDays:30,milestones:[{label:'Delayed delivery',percent:100,event:'Delivery complete'}]}})
+  await apply(slipped);await h.cmd('accounting.dispatch',{})
+  await tick('2030-07-01')
+  await h.cmd('accounting.milestone',{proposalId:slipped.proposal.id,amountIndex:1,event:'Delivery complete',consent:true})
+  const delayedBefore=fake.invoices.size
+  await tick('2030-07-02')
+  assert.equal(fake.invoices.size,delayedBefore+1)
+  assert.equal([...fake.invoices.values()].at(-1).TxnDate,'2030-07-01')
+  assert.equal([...fake.invoices.values()].at(-1).DueDate,'2030-07-31')
+
  }finally{await h.close()}
 }
 
@@ -141,6 +166,14 @@ export async function quickbooksTaxedLines(){
   const balance=[...fake.invoices.values()][1]
   assert.equal(balance.TotalAmt,1186.87);assert.deepEqual(balance.Line.map(l=>l.Amount),[750,375]);assert.equal(balance.TxnTaxDetail.TotalTax,61.87)
   assert.equal(invoice.TxnTaxDetail.TotalTax+balance.TxnTaxDetail.TotalTax,82.5)
+  const optional=await acceptedQuickbooksAgreement(h,'Discounted selected taxable extras',undefined,{depositPercent:'100',packages:taxPackages(),pricingTables:tables,tax:taxRequest(),paymentTerms:null,acceptanceInput:{optionId:'two',items:[{id:'extra',quantity:3}]}})
+  const optionalReview=await h.cmd('accounting.review-mapped',{...input,proposalId:optional.proposal.id,includeSchedule:'no',lineMappings:[...input.lineMappings,{key:'2',itemId:fake.item,incomeAccountId:fake.incomeAccount}]})
+  assert.equal(optionalReview.plan.totalCents,144450)
+  await h.cmd('accounting.apply',{id:optionalReview.id,digest:optionalReview.digest,consent:true});await h.cmd('accounting.dispatch',{})
+  const optionalInvoice=[...fake.invoices.values()].at(-1)
+  assert.deepEqual(optionalInvoice.Line.map(l=>l.Amount),[868.25,434.13,65.12])
+  assert.equal(optionalInvoice.TxnTaxDetail.TotalTax,77)
+  assert.equal(optionalInvoice.TotalAmt,1444.5)
   const immutable=JSON.parse((await h.state()).accounting.jobs[0].plan).lineDetails
   await h.cmd('tax.rate',{version:5,level:'state',region:'TX',percent:'7',startsOn:'2029-01-01'})
   assert.deepEqual(JSON.parse((await h.state()).accounting.jobs[0].plan).lineDetails,immutable)

@@ -35,3 +35,9 @@ export async function itemMapping(authorize: QuickBooksAuthority, itemId: string
  need(account?.Id === accountId && account.Active === true && account.AccountType === 'Income', 'Choose an active income account', 409)
  return { itemId, itemName: text(item.Name, 'the item name'), accountId, accountName: text(account.Name, 'the income account name') }
 }
+
+export function confirmedInvoice(record:any,body:any,totalCents:number) {
+ const project=(v:any)=>({customer:v.CustomerRef?.value,date:v.TxnDate,due:v.DueDate,currency:v.CurrencyRef?.value,lines:v.Line?.filter((l:any)=>l.DetailType==='SalesItemLineDetail').map((l:any)=>({amount:l.Amount,item:l.SalesItemLineDetail?.ItemRef?.value,quantity:l.SalesItemLineDetail?.Qty,tax:l.SalesItemLineDetail?.TaxCodeRef?.value})),tax:v.TxnTaxDetail?.TotalTax??0,taxGroup:v.TxnTaxDetail?.TxnTaxCodeRef?.value??null})
+ need(record&&Number.isFinite(record.TotalAmt)&&Math.round(record.TotalAmt*100)===totalCents&&JSON.stringify(project(record))===JSON.stringify(project(body)),'QuickBooks did not confirm the exact reviewed invoice lines, tax, dates and amount',409)
+ return providerId(record.Id)
+}

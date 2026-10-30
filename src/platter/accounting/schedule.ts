@@ -4,7 +4,7 @@ import { addDays, currentTime, localDate } from '../expiry-time'
 import { installationZone } from '../reports/report-state'
 import { invoiceLines, recheckLines } from './lines'
 import { canonical, configuration, configGuard, execution } from './jobs'
-import { itemMapping, providerId, quickbooks } from './quickbooks'
+import { confirmedInvoice, itemMapping, providerId, quickbooks } from './quickbooks'
 
 export function scheduleRows(snapshot:any) {
  const rows=snapshot.paymentSchedule?.rows
@@ -31,10 +31,10 @@ export async function markMilestone(env:Bindings,actor:Actor,input:Record<string
 export async function runScheduledInvoices(env:Bindings) {
  const db=env.DB,now=await currentTime(db),zone=await installationZone(db),day=localDate(now,zone)
  await db.prepare("UPDATE p_accounting_amounts SET status='held',reason='Interrupted invoice request. Reconcile in QuickBooks; no blind replay.' WHERE status='running' AND started_at<?").bind(now-900000).run()
- const amounts=(await db.prepare("SELECT a.* FROM p_accounting_amounts a JOIN p_accounting_jobs j ON j.proposal_id=a.proposal_id JOIN p_accounting_job_authority g ON g.proposal_id=j.proposal_id WHERE a.status='scheduled' AND j.status='complete' AND (a.event_at IS NOT NULL OR json_extract(a.row_json,'$.event')='Acceptance' OR json_extract(a.row_json,'$.date')<=?) ORDER BY a.proposal_id,a.amount_index LIMIT 20").bind(day).all<any>()).results
+ const amounts=(await db.prepare("SELECT a.*,j.plan AS job_plan FROM p_accounting_amounts a JOIN p_accounting_jobs j ON j.proposal_id=a.proposal_id JOIN p_accounting_job_authority g ON g.proposal_id=j.proposal_id WHERE a.status='scheduled' AND j.status='complete' AND (a.event_at IS NOT NULL OR json_extract(a.row_json,'$.event')='Acceptance' OR json_extract(a.row_json,'$.date')<=?) ORDER BY a.proposal_id,a.amount_index LIMIT 20").bind(day).all<any>()).results
  for(const amount of amounts) {
-  const row=JSON.parse(amount.row_json),dueOn=addDays(day,row.netDays),requestId=crypto.randomUUID()
-  const claimed=await db.prepare("UPDATE p_accounting_amounts SET status='running',request_id=?,issued_on=?,due_on=?,started_at=? WHERE proposal_id=? AND amount_index=? AND status='scheduled' RETURNING proposal_id").bind(requestId,day,dueOn,now,amount.proposal_id,amount.amount_index).first()
+  const row=JSON.parse(amount.row_json),plan=JSON.parse(amount.job_plan),issueDay=row.date??localDate(amount.event_at??plan.acceptedAt,zone),dueOn=addDays(issueDay,row.netDays),requestId=crypto.randomUUID()
+  const claimed=await db.prepare("UPDATE p_accounting_amounts SET status='running',request_id=?,issued_on=?,due_on=?,started_at=? WHERE proposal_id=? AND amount_index=? AND status='scheduled' RETURNING proposal_id").bind(requestId,issueDay,dueOn,now,amount.proposal_id,amount.amount_index).first()
   if(!claimed)continue
   try {
    const job=await db.prepare('SELECT * FROM p_accounting_jobs WHERE proposal_id=?').bind(amount.proposal_id).first<any>(),plan=JSON.parse(job.plan),authorize=()=>execution(env,job)
@@ -43,11 +43,11 @@ export async function runScheduledInvoices(env:Bindings) {
    need(canonical(await itemMapping(authorize,plan.mapping.itemId,plan.mapping.accountId))===canonical(plan.mapping),'The reviewed accounting mapping changed',409)
    const customer=await db.prepare("SELECT provider_id FROM p_accounting_customers WHERE account_id=? AND client_id=? AND status='complete'").bind(job.account_id,job.client_id).first<any>()
    need(customer,'The retained customer mapping is unavailable',409)
-   const body={CustomerRef:{value:customer.provider_id},DocNumber:(plan.number.slice(0,15)+'-'+amount.amount_index).slice(0,21),PrivateNote:'Platter schedule '+plan.proposalId+' amount '+amount.amount_index,TxnDate:day,DueDate:dueOn,CurrencyRef:{value:'USD'},...invoiceLines(plan,amount.amount_cents,amount.amount_index)}
+   const body={CustomerRef:{value:customer.provider_id},DocNumber:(plan.number.slice(0,15)+'-'+amount.amount_index).slice(0,21),PrivateNote:'Platter schedule '+plan.proposalId+' amount '+amount.amount_index,TxnDate:issueDay,DueDate:dueOn,CurrencyRef:{value:'USD'},...invoiceLines(plan,amount.amount_cents,amount.amount_index)}
    // The once-only row is already claimed before retaining and sending these bytes.
    await db.prepare('UPDATE p_accounting_amounts SET request_body=? WHERE proposal_id=? AND amount_index=?').bind(canonical(body),amount.proposal_id,amount.amount_index).run()
    const invoice=(await quickbooks(authorize,'/invoice',body,requestId)).Invoice
-   need(invoice?.CustomerRef?.value===customer.provider_id&&Math.round(Number(invoice.TotalAmt)*100)===amount.amount_cents,'QuickBooks returned a different scheduled invoice',409)
+   confirmedInvoice(invoice,body,amount.amount_cents)
    await db.prepare("UPDATE p_accounting_amounts SET status='complete',provider_id=?,completed_at=? WHERE proposal_id=? AND amount_index=?").bind(providerId(invoice.Id),await currentTime(db),amount.proposal_id,amount.amount_index).run()
   } catch {
    await db.prepare("UPDATE p_accounting_amounts SET status='held',reason='Scheduled invoice held. Reconcile authority, mapping and provider receipts; no automatic replay.' WHERE proposal_id=? AND amount_index=?").bind(amount.proposal_id,amount.amount_index).run()

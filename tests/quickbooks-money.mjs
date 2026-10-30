@@ -7,7 +7,7 @@ export function quickbooksMoneyFixture(){
  const stripeAccount='synthetic-platter-9500',chargeId='synthetic-platter-9501',balanceId='synthetic-platter-9502',payoutId='synthetic-platter-9503',stripeToken='synthetic-platter-9504',clearing='synthetic-platter-9505',expense='synthetic-platter-9506'
  fake.accounts.set(clearing,{Id:clearing,Name:'Stripe clearing',Active:true,AccountType:'Other Current Asset'})
  fake.accounts.set(expense,{Id:expense,Name:'Processor fees',Active:true,AccountType:'Expense'})
- const refunds=new Map(),balances=new Map(),stripeCalls=[]
+ const refunds=new Map(),balances=new Map(),stripeCalls=[],disputeId='synthetic-platter-9900',disputeBalances=[]
  let proposalId,amount,fee=750,refunded=0,refundFee=0
  const created=Date.parse('2030-03-02T12:00:00Z')/1000
  const charge=()=>({id:chargeId,paid:true,status:'succeeded',amount,amount_refunded:refunded,currency:'usd',created,balance_transaction:balanceId,metadata:{platter_proposal_id:proposalId,platter_revision:'1'}})
@@ -30,11 +30,12 @@ export function quickbooksMoneyFixture(){
    refunds.set(id,value);balances.set(bt,{id:bt,type:'refund',source:id,amount:-cents,fee:refundFee,net:-cents-refundFee,currency:'usd'})
    return Response.json(value)
   }
+  if(url.pathname==='/v1/disputes/'+disputeId)return Response.json({id:disputeId,charge:chargeId,amount:5000,currency:'usd',status:'under_review',evidence_details:{due_by:created+864000},balance_transactions:disputeBalances})
   if(url.pathname.startsWith('/v1/refunds/'))return Response.json(refunds.get(url.pathname.split('/').at(-1)))
   if(url.pathname.startsWith('/v1/balance_transactions/'))return Response.json(balances.get(url.pathname.split('/').at(-1)))
   throw Error('Unexpected Stripe accounting source')
  }
- return Object.assign(fake,{stripeAccount,chargeId,balanceId,payoutId,stripeToken,clearing,expense,stripeCalls,sourceRefunds:refunds,setCharge:(id,cents)=>{proposalId=id;amount=cents},setFee:value=>{fee=value},setRefundFee:value=>{refundFee=value}})
+ return Object.assign(fake,{stripeAccount,chargeId,balanceId,payoutId,stripeToken,clearing,expense,stripeCalls,sourceRefunds:refunds,setCharge:(id,cents)=>{proposalId=id;amount=cents},setFee:value=>{fee=value},setRefundFee:value=>{refundFee=value},disputeId,disputeBalances})
 }
 export async function postStripeReceipt(h,fake,agreement){
  fake.setCharge(agreement.proposal.id,25001)
@@ -96,8 +97,20 @@ export async function quickbooksMoney(){
   await apply(refundFee);await apply(refundFee)
   const reversal=[...fake.journals.values()].at(-1)
   assert.deepEqual(reversal.Line.map(l=>[l.Amount,l.JournalEntryLineDetail.PostingType,l.JournalEntryLineDetail.AccountRef.value]),[[1,'Debit',fake.clearing],[1,'Credit',fake.expense]])
+  await h.cmd('dispute.import',{paymentId:payment.id,disputeId:fake.disputeId})
+  const disputeEntry={id:'synthetic-platter-9901',source:fake.disputeId,type:'adjustment',reporting_category:'dispute',currency:'usd',amount:-5000,fee:1500,net:-6500,created:Date.parse('2030-03-06T12:00:00Z')/1000}
+  fake.disputeBalances.push(disputeEntry)
+  const disputeReview=await adjustment({kind:'dispute',paymentId:payment.id,disputeId:fake.disputeId,expenseAccountId:fake.expense,disputeAccountId:fake.expense})
+  await apply(disputeReview);await apply(disputeReview)
+  const disputeJournal=[...fake.journals.values()].at(-1)
+  assert.deepEqual(disputeJournal.Line.map(l=>[l.Amount,l.JournalEntryLineDetail.PostingType,l.JournalEntryLineDetail.AccountRef.value]),[[50,'Debit',fake.expense],[50,'Credit',fake.clearing],[15,'Debit',fake.expense],[15,'Credit',fake.clearing]])
+  fake.disputeBalances.push({...disputeEntry,id:'synthetic-platter-9902',reporting_category:'dispute_reversal',amount:5000,fee:-1500,net:6500})
+  const reversed=await adjustment({kind:'dispute',paymentId:payment.id,disputeId:fake.disputeId,balanceTransactionId:'synthetic-platter-9902',expenseAccountId:fake.expense,disputeAccountId:fake.expense})
+  await apply(reversed)
+  const reverseJournal=[...fake.journals.values()].at(-1)
+  assert.deepEqual(reverseJournal.Line.map(l=>[l.Amount,l.JournalEntryLineDetail.PostingType,l.JournalEntryLineDetail.AccountRef.value]),[[50,'Debit',fake.clearing],[50,'Credit',fake.expense],[15,'Debit',fake.clearing],[15,'Credit',fake.expense]])
   const state=(await h.state()).accounting
-  assert.equal(state.adjustments.filter(a=>a.status==='confirmed').length,5)
+  assert.equal(state.adjustments.filter(a=>a.status==='confirmed').length,7)
   assert.equal(state.adjustments.filter(a=>a.status==='uncertain').length,1)
   assert.ok(!JSON.stringify(state).includes(fake.stripeToken))
   await h.cmd('provider.disconnect',{provider:'stripe',version:1})

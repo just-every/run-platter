@@ -13,8 +13,9 @@ export async function preparePaypalAgreement(h,configure){
  const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic PayPal agreement',scope:'One studio shoot with edited photographs.',optionOne:'Studio essentials',priceOne:'2400.00',optionTwo:'Full campaign',priceTwo:'4200.00',depositPercent:'25'})
  if(configure)await configure(p)
  else await h.cmd('payment.collection',{id:p.id,version:1,completion:'required',provider:'paypal',merchantId:paypalMerchant,connectionVersion:1,paymentMethods:['paypal'],consent:true})
- await h.cmd('proposal.approve',{id:p.id,version:2,revision:1})
- const share=await h.cmd('proposal.send',{id:p.id,version:3})
+ let current=(await h.state()).proposals.find(row=>row.id===p.id)
+ if(current.approval.required){await h.cmd('proposal.approve',{id:p.id,version:current.version,revision:1});current=(await h.state()).proposals.find(row=>row.id===p.id)}
+ const share=await h.cmd('proposal.send',{id:p.id,version:current.version})
  return {id:p.id,path:new URL(share.shareUrl).pathname,client}
 }
 

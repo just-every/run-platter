@@ -1,3 +1,4 @@
+import { approvalReevaluation } from './approval-reevaluation.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { collectionLifecycle, collectionFees, collectionMethodInheritance } from './collection-journey.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
@@ -2352,6 +2353,7 @@ test('APPROVE-001 gross value and 20% discount require manager then owner; margi
  const duplicate=await h.cmd('proposal.duplicate',{id:consultancy.id,version:1},people.sales.cookie);assert.equal((await current(duplicate.id)).approval.required,true,'a duplicate retains its template rule scope')
  const scoped=await rule('Agency manager',{kind:'totalOver',cents:0,currency:'USD'},['role:manager'],1,['starter:agency']);assert.deepEqual((await current(agency.id)).approval.steps.map(s=>s.id),[scoped.id]);assert.deepEqual((await current(consultancy.id)).approval.steps.map(s=>s.id),[sourceRule.id])
  const priorVersion=(await policy()).version;await h.cmd('approval.rule',{version:priorVersion,name:'Unknown template',condition:{kind:'template'},approvers:['role:owner'],position:2,templates:['synthetic-platter-missing']},h.owner,400);assert.equal((await policy()).version,priorVersion)
+ await approvalReevaluation(h)
 }))
 
 

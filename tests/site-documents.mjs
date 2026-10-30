@@ -1,3 +1,4 @@
+import { approvalReevaluation, originalLegal, changedLegal } from './approval-reevaluation.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { localeBrowser } from './locale-browser.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
@@ -530,6 +531,40 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
     await page.goto(app.origin+'/app/proposal?id='+fallbackDraft.id);await page.getByRole('button',{name:'Send proposal',exact:true}).click()
     assert.match(await page.locator('main').innerText(),/Mailbox unavailable; sent through the installation sender/);assert.equal(mailboxSends.length,4);await capture(page,'mailbox-fallback')
     await mailboxPage.goto(app.origin+'/app/team');assert.match(await mailboxPage.locator('main').innerText(),/broken/);await capture(mailboxPage,'mailbox-broken')
+    if(width===1440){
+     const fixture=await approvalReevaluation({db:h.db,cmd:(name,input,cookie,status)=>command(owner,name,input,status),state:()=>state(owner)})
+     await op.goto(app.origin+'/app/proposal?id='+fixture.usd)
+     const approvals=()=>op.locator('section').filter({has:op.getByRole('heading',{name:'Revision approvals',exact:true})})
+     const names=['USD maximum below','Renamed legal review','Earlier inserted legal review']
+     assert.deepEqual(await approvals().locator('li').allTextContents(),names.map(name=>name+' · '+(name===names[0]?'Waiting':'Pending earlier step')))
+     await op.getByRole('button',{name:'Approve this revision',exact:true}).click()
+     await op.getByLabel('Terms',{exact:true}).fill(originalLegal)
+     await op.getByRole('button',{name:'Save revision',exact:true}).click();await op.reload()
+     assert.equal(await op.getByRole('alert').count(),0)
+     assert.deepEqual(await approvals().locator('li').allTextContents(),['USD maximum below · Waiting'])
+     let row=(await state(owner)).proposals.find(p=>p.id===fixture.usd)
+     assert.equal(row.revision,6);assert.deepEqual(row.approval.steps[0].decisions,[])
+     await command(owner,'proposal.send',{id:row.id,version:row.version},409)
+     await op.getByLabel('Terms',{exact:true}).fill(changedLegal)
+     await op.getByRole('button',{name:'Save revision',exact:true}).click();await op.reload()
+     row=(await state(owner)).proposals.find(p=>p.id===fixture.usd)
+     assert.equal(row.revision,7);assert.deepEqual(row.approval.steps.map(s=>s.id),fixture.order)
+     assert.ok(row.approval.steps.every(s=>!s.done&&s.decisions.length===0))
+     assert.deepEqual(await approvals().locator('li').allTextContents(),names.map(name=>name+' · '+(name===names[0]?'Waiting':'Pending earlier step')))
+     assert.equal(row.options[1].optionalItems[0].max,3)
+     assert.equal(row.currency,'USD');assert.equal((await state(owner)).proposals.find(p=>p.id===fixture.aud).currency,'AUD')
+     for(const proofWidth of [1440,390]){
+      await op.setViewportSize({width:proofWidth,height:900})
+      if(screenshots)await approvals().screenshot({path:join(screenshots,`APPROVE-004-revision-${proofWidth}.png`)})
+      assert.ok(await op.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+      await op.goto(app.origin+'/app/approvals')
+      const rules=op.locator('section').filter({has:op.getByRole('heading',{name:'Approval rules',exact:true})})
+      if(screenshots)await rules.screenshot({path:join(screenshots,`APPROVE-004-rules-${proofWidth}.png`)})
+      assert.ok(await op.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+      await op.goto(app.origin+'/app/proposal?id='+fixture.usd)
+     }
+    }
+
    }finally{await owner.close();await sales.close();await manager.close();await admin.close();await editor.close();await clientContext.close();await newMember.close();await billing.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}

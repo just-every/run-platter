@@ -90,6 +90,10 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
   need(await db.prepare('SELECT 1 WHERE '+sql).bind(...values).first(),'This mailbox is already bound to another member',403)
   guard.sql+=' AND '+sql;guard.values.push(...values)
  }
+ if(provider==='quickbooks'){
+  guard.sql+=' AND NOT EXISTS(SELECT 1 FROM p_accounting_jobs WHERE account_id!=?)'
+  guard.values.push(accountId)
+ }
  const sealed=await sealCredential(env,id,{provider,token,accountId,...(instanceOrigin?{instanceOrigin}:{}),...(webhookSecret?{webhookSecret}:{}),...(provider==='stripe'&&p.publishableKey?{publishableKey:p.publishableKey}:{})}),at=Date.now()
  await commit(db,a,[db.prepare("INSERT INTO p_connections(id,provider,operator_id,account_id,mailbox_email,status,connected_by,connected_at) VALUES(?,?,?,?,?,'connected',?,?) ON CONFLICT(id) DO UPDATE SET account_id=excluded.account_id,mailbox_email=excluded.mailbox_email,status='connected',broken_at=NULL,version=p_connections.version+1,connected_by=excluded.connected_by,connected_at=excluded.connected_at").bind(id,provider,isMailbox(provider)?a.id:null,accountId,mailboxEmail,a.id,at),db.prepare('INSERT INTO p_connection_secrets(connection_id,sealed) VALUES(?,?) ON CONFLICT(connection_id) DO UPDATE SET sealed=excluded.sealed').bind(id,sealed)],false,guard)
  return {id,status:'connected'}

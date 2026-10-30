@@ -1,3 +1,4 @@
+import { accountingCommand } from './accounting/jobs'
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
@@ -75,6 +76,7 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
+ if(name.startsWith('accounting.'))return accountingCommand(env,a,name,p)
  if(name==='crm.card.configure')return configureHubspotCard(env,a,p)
  if(name.startsWith('crm.sync.'))return hubspotSyncCommand(env,a,name,p)
  if(name.startsWith('crm.deal.'))return hubspotDraftCommand(env,a,name,p)

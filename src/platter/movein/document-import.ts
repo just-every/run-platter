@@ -147,7 +147,7 @@ export async function documentMoveinState(db:D1Database,actor:Actor) {
  if(actor.role!=='owner')return {documentMoveins:[],importedDocuments:[]}
  await documentOwner(db,actor)
  const moves=(await db.prepare('SELECT m.*,j.state,j.checkpoint,j.total FROM p_document_moveins m LEFT JOIN ik_jobs j ON j.id=m.job_id WHERE owner_id=? ORDER BY m.rowid DESC').bind(actor.id).all<any>()).results
- for(const move of moves){move.applications=(await db.prepare('SELECT id,proposal_id,template_id,source_sha256,reversed_at FROM p_proposify_applications WHERE movein_id=? ORDER BY created_at').bind(move.id).all()).results;move.uploads=(await db.prepare('SELECT sha256,filename,size,received,complete FROM p_document_uploads WHERE movein_id=? ORDER BY rowid').bind(move.id).all()).results}
+ for(const move of moves){move.applications=(await db.prepare('SELECT id,proposal_id,template_id,output_kind,library_id,source_sha256,reversed_at FROM p_proposify_applications WHERE movein_id=? ORDER BY created_at').bind(move.id).all()).results;move.uploads=(await db.prepare('SELECT sha256,filename,size,received,complete FROM p_document_uploads WHERE movein_id=? ORDER BY rowid').bind(move.id).all()).results}
  const documents=(await db.prepare("SELECT d.data_json FROM p_imported_documents d JOIN p_document_moveins m ON m.id=json_extract(d.data_json,'$.moveinId') WHERE m.owner_id=? ORDER BY d.id").bind(actor.id).all<{data_json:string}>()).results.map(r=>JSON.parse(r.data_json))
  return {documentMoveins:moves,importedDocuments:documents}
 }

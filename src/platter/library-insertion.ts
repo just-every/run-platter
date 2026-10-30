@@ -1,3 +1,4 @@
+import { proposifyLibraryScope } from './movein/proposify-library'
 import { libraryBlock, libraryMatches as matches, libraryKind } from './library-content'
 import { pricedOptions, pricingInput, editablePackages, packageInputs } from './pricing'
 import { documentOf, proposalDocument } from './documents/blocks'
@@ -32,7 +33,8 @@ export async function insertLibrary(db:D1Database,a:Actor,p:Record<string,unknow
  const ref=typeof p.itemRef==='string'?p.itemRef.split(':'):[],itemId=p.itemId??ref[0],itemVersion=p.itemVersion??ref[1]
  const item=await db.prepare('SELECT * FROM p_library_items WHERE id=?').bind(text(itemId,'a library item')).first<any>();need(item,'Library item not found',404)
  need(item.version===Number(itemVersion),'Library item changed. Reload before inserting.',409)
- const access=await folderGuard(db,a,item.folder_id,'library')
+ const access=await folderGuard(db,a,item.folder_id,'library'),sourceAccess=proposifyLibraryScope(a)
+ need(await db.prepare('SELECT 1 FROM p_library_items r WHERE r.id=? AND '+sourceAccess.sql).bind(item.id,...sourceAccess.values).first(),'This imported library section is private to its current owner',403)
  need(['linked','detached'].includes(String(p.mode)),'Choose a linked or detached copy')
  need(p.consent===true||p.consent==='yes','Authorize recipient display and future linked draft edits')
  item.kind=libraryKind(item)
@@ -48,13 +50,19 @@ export async function insertLibrary(db:D1Database,a:Actor,p:Record<string,unknow
  const imported=await db.prepare('SELECT * FROM p_imported_library WHERE item_id=?').bind(item.id).first<any>()
  if(imported){
   const saved=proposalDocument(JSON.parse(imported.document)),savedTables=JSON.parse(imported.options),tables=pricingInput(options)
+  if(saved.fixedPdf){
+   need(p.mode==='detached','Fixed-page library sections make independent copies; rebuild in the editor',409)
+   need(!doc.fixedPdf,'This draft already has fixed pages',409)
+   doc.fixedPdf=saved.fixedPdf
+   doc.importReport=saved.importReport
+  }
   for(const block of saved.blocks){const copy={...block,id:crypto.randomUUID()};if(copy.type==='pricing'){const source=savedTables.filter((t:any)=>t.optionId===copy.optionId)[copy.tableIndex!];need(source&&option,'Choose a package for imported pricing');copy.optionId=optionId;copy.tableIndex=tables.filter((t:any)=>t.optionId===optionId).length;tables.push({...source,optionId})}doc.blocks.push(copy);additions.push(copy)}
   if(tables.length)nextOptions=pricedOptions(packageInputs(editablePackages(options),tables),tables)
  }else doc.blocks.push(libraryBlock(item,blockId,optionId,option?.tables?.length??0))
  const change=await documentWrites(db,a,row,doc,Date.now(),nextOptions)
  change.writes.push(db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_library_media WHERE item_id=? ON CONFLICT DO NOTHING').bind(row.id,item.id))
  const uses=imported?additions.map(block=>db.prepare('INSERT INTO p_library_uses(proposal_id,block_id,item_id,linked,item_version,title,content,kind) VALUES(?,?,?,?,?,?,?,?)').bind(row.id,block.id,item.id,p.mode==='linked'?1:0,item.version,item.title,JSON.stringify({block,...(block.type==='pricing'?{table:(nextOptions??options).find((o:any)=>o.id===block.optionId).tables[block.tableIndex]}:{})}),'imported')):[]
- await commit(db,a,[...change.writes,...uses,...(imported?[]:[db.prepare('INSERT INTO p_library_uses(proposal_id,block_id,item_id,linked,item_version,title,content,kind) VALUES(?,?,?,?,?,?,?,?)').bind(row.id,blockId,item.id,p.mode==='linked'?1:0,item.version,item.title,item.content,item.kind)])],false,{sql:access.sql+' AND EXISTS(SELECT 1 FROM p_library_items WHERE id=? AND version=? AND folder_id IS ?)',values:[...access.values,item.id,item.version,item.folder_id]})
+ await commit(db,a,[...change.writes,...uses,...(imported?[]:[db.prepare('INSERT INTO p_library_uses(proposal_id,block_id,item_id,linked,item_version,title,content,kind) VALUES(?,?,?,?,?,?,?,?)').bind(row.id,blockId,item.id,p.mode==='linked'?1:0,item.version,item.title,item.content,item.kind)])],false,{sql:access.sql+' AND EXISTS(SELECT 1 FROM p_library_items WHERE id=? AND version=? AND folder_id IS ?) AND EXISTS(SELECT 1 FROM p_library_items r WHERE r.id=? AND '+sourceAccess.sql+')',values:[...access.values,item.id,item.version,item.folder_id,item.id,...sourceAccess.values]})
  return {id:row.id,version:row.version+1,revision:change.revision,blockId}
 }
 

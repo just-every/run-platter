@@ -76,10 +76,10 @@ export async function applyProposify(h,fixture,cookie=h.owner) {
  while(result.job.state!=='completed')result=await h.cmd('document-import.continue',{id},cookie)
  return {id,review,choices,reviewed,result}
 }
-export async function fixedTemplate(h,movein,cookie=h.owner) {
+export async function fixedTemplate(h,movein,cookie=h.owner,output={}) {
  const client=(await h.state(cookie)).clients.find(c=>c.email===h.auth.OWNER_EMAIL)??await h.cmd('client.save',{name:'Synthetic template client',email:h.auth.OWNER_EMAIL},cookie)
  const draft=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic owner-priced draft',scope:'Owner-supplied work',packages:[{id:'chosen',label:'Owner priced',price:'725.25'}],depositPercent:'25'},cookie)
- const input={id:movein.id,proposalId:draft.id,version:draft.version,templateName:'Synthetic independent template',consent:true}
+ const input={id:movein.id,proposalId:draft.id,version:draft.version,templateName:'Synthetic independent template',consent:true,...output}
  const preview=await h.cmd('document-import.template-preview',input,cookie)
  await h.cmd('document-import.template-apply',{...input,templateName:'Different name',fingerprint:preview.fingerprint},cookie,409)
  await h.cmd('document-import.template-apply',{...input,consent:false,fingerprint:preview.fingerprint},cookie,400)
@@ -87,7 +87,7 @@ export async function fixedTemplate(h,movein,cookie=h.owner) {
  const attempts=await Promise.all([1,2].map(()=>h.send('/api/platter/command',{name:'document-import.template-apply',input:{...input,fingerprint:preview.fingerprint}},cookie)))
  assert.ok(attempts.every(r=>[200,409].includes(r.status))&&attempts.some(r=>r.status===200),'concurrent application is served once or held without duplicate output')
  const served=attempts.find(r=>r.status===200).value,applied=served.result??served
- assert.equal((await h.state(cookie)).templates.length,before+1)
+ assert.equal((await h.state(cookie)).templates.length,before+(!output.outputKind||output.outputKind==='template'?1:0))
  return {client,draft,input,preview,applied}
 }
 export async function proposifyJourney(h) {
@@ -150,6 +150,7 @@ export async function proposifyJourney(h) {
  assert.equal(child.document.fixedPdf.source,'proposify');assert.equal(child.options[0].cents,72525);assert.equal(child.status,'draft')
  await h.cmd('document-import.template-undo',{id:start.id,applicationId:another.applied.applicationId},h.owner,409)
  await h.cmd('document-import.undo',{id:start.id},h.owner,409)
+ await proposifyNativeOutputs(h,{id:start.id},fixture)
  const journal=await h.cmd('document-import.journal',{id:start.id})
  assert.equal(journal.provenance.length,31)
  assert.deepEqual(Buffer.from(journal.originals.find(o=>o.name.endsWith('/documents.csv')).original.base64,'base64'),Buffer.from(fixture.csv))
@@ -191,7 +192,7 @@ export async function proposifyJourney(h) {
  assert.equal((await h.send('/auth/operator/role',{operatorId:successorId,role:'owner'},await h.signIn(owner.email))).status,200)
  assert.equal((await h.send('/auth/operator/role',{operatorId:owner.id,role:'admin'},await h.signIn(successorAddress))).status,200)
  const revoked=await h.signIn(owner.email)
- const tables=['p_proposals','p_revisions','p_document_moveins','p_imported_documents','p_proposify_applications','p_personal_templates','p_imported_document_links','p_document_media','p_attachment_files','p_attachment_chunks','ik_jobs','ik_provenance']
+ const tables=['p_library_items','p_imported_library','p_library_media','p_library_uses','p_proposals','p_revisions','p_document_moveins','p_imported_documents','p_proposify_applications','p_personal_templates','p_imported_document_links','p_document_media','p_attachment_files','p_attachment_chunks','ik_jobs','ik_provenance']
  const frozen=async()=>Promise.all(tables.map(table=>h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all().then(r=>r.results))),beforeRefusals=await frozen()
  await h.cmd('document-import.template-preview',input,revoked,403)
  await h.cmd('document-import.template-apply',{...input,fingerprint:approved.fingerprint},revoked,403)
@@ -200,6 +201,56 @@ export async function proposifyJourney(h) {
  assert.deepEqual((await h.state(revoked)).importedDocuments,[])
  assert.deepEqual(await frozen(),beforeRefusals,'revoked authority exposes no originals and changes no business records')
  return {fixture,movein,fixed:another,documents}
+}
+
+// The same public reviewed door serves safe reissue and usable library copies.
+export async function proposifyNativeOutputs(h,movein,fixture,cookie=h.owner) {
+ const source=hash(fixture.originals[24]),before=(await h.state(cookie)).importedDocuments
+ const reissue=await fixedTemplate(h,movein,cookie,{outputKind:'reissue',documentId:source})
+ const state=await h.state(cookie),draft=state.proposals.find(p=>p.id===reissue.draft.id)
+ assert.equal(draft.status,'draft');assert.equal(draft.options[0].cents,72525)
+ assert.deepEqual(JSON.parse(draft.recipient_plan),[])
+ assert.equal(draft.approved_by,null);assert.equal(draft.shareToken,undefined);assert.equal(draft.collectionPolicy.enabled,false)
+ const original=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+draft.id+'/'+draft.document.fixedPdf.fileId,{headers:{cookie}})
+ assert.equal(original.status,200);assert.deepEqual(Buffer.from(await original.arrayBuffer()),fixture.originals[24])
+ const retained=await h.mf.dispatchFetch(h.origin+'/api/platter/imported-original?document='+source,{headers:{cookie}})
+ assert.deepEqual(Buffer.from(await retained.arrayBuffer()),fixture.originals[24])
+ assert.deepEqual((await h.state(cookie)).importedDocuments,before,'reissue never rewrites the retained original or report')
+ const request={...reissue.input,proposalId:(await h.cmd('proposal.prepare',{clientId:reissue.client.id,title:'Synthetic unsafe source',scope:'Owner work',packages:[{id:'owner',label:'Owner',price:'725.25'}],depositPercent:'25'},cookie)).id,version:1,documentId:hash(fixture.originals[0])}
+ const unchanged=(await h.state(cookie)).proposals
+ await h.cmd('document-import.template-preview',request,cookie,409)
+ assert.deepEqual((await h.state(cookie)).proposals,unchanged,'signed originals cannot be reissued')
+ await h.cmd('document-import.template-apply',{...reissue.input,outputKind:'library',fingerprint:reissue.preview.fingerprint},cookie,409)
+ await h.cmd('document-import.template-undo',{id:movein.id,applicationId:reissue.applied.applicationId},cookie)
+ assert.equal((await h.state(cookie)).proposals.find(p=>p.id===reissue.draft.id).document?.fixedPdf,undefined)
+ await h.cmd('document-import.template-apply',{...reissue.input,fingerprint:reissue.preview.fingerprint},cookie,409)
+ const library=await fixedTemplate(h,movein,cookie,{outputKind:'library',documentId:hash(fixture.template)})
+ const item=(await h.state(cookie)).libraryItems.find(i=>i.id===library.applied.libraryId)
+ assert.match(item.title,/rebuild in the editor/)
+ const destination=await h.cmd('proposal.prepare',{clientId:reissue.client.id,title:'Synthetic library destination',scope:'Independent work',packages:[{id:'owner',label:'Owner',price:'925.50'}],depositPercent:'25'},cookie)
+ await h.cmd('library.insert',{id:destination.id,version:1,itemId:item.id,itemVersion:1,mode:'linked',consent:true},cookie,409)
+ await h.cmd('library.insert',{id:destination.id,version:1,itemId:item.id,itemVersion:1,mode:'detached',consent:true},cookie)
+ const inserted=(await h.state(cookie)).proposals.find(p=>p.id===destination.id)
+ assert.equal(inserted.options[0].cents,92550,'a section never replaces independently supplied prices')
+ const pdf=await h.mf.dispatchFetch(h.origin+'/api/platter/document-export?id='+inserted.id+'&format=pdf',{headers:{cookie}})
+ assert.equal(pdf.status,200)
+ const {pdfPages}=await import('./pdf-document.mjs'),pages=await pdfPages(await pdf.arrayBuffer())
+ assert.match(pages[0],/Synthetic template fixed page/)
+ assert.match(pages.slice(1).join(' '),/925.50/)
+ assert.equal((await h.send('/api/platter/document-export?id='+inserted.id+'&format=docx',undefined,cookie)).status,409)
+ const outsiderAddress=['synthetic-platter-library-reader','example.invalid'].join('@')
+ await h.send('/auth/invite',{email:outsiderAddress,displayName:'Synthetic library reader',role:'member',returnTo:'/app'},cookie)
+ const outsider=await h.signIn(outsiderAddress)
+ assert.equal((await h.state(outsider)).libraryItems.some(i=>i.id===item.id),false,'source library custody stays owner-only')
+ await h.cmd('library.insert',{id:destination.id,version:inserted.version,itemId:item.id,itemVersion:1,mode:'detached',consent:true},outsider,403)
+ const beforeUndo=await h.state(cookie)
+ await h.cmd('document-import.template-undo',{id:movein.id,applicationId:library.applied.applicationId},cookie,409)
+ await h.cmd('document-import.undo',{id:movein.id},cookie,409)
+ assert.deepEqual((await h.state(cookie)).libraryItems,beforeUndo.libraryItems,'dependent library copies prevent undo without losing records')
+ const reversible=await fixedTemplate(h,movein,cookie,{outputKind:'library',documentId:hash(fixture.template)})
+ await h.cmd('document-import.template-undo',{id:movein.id,applicationId:reversible.applied.applicationId},cookie)
+ assert.equal((await h.state(cookie)).libraryItems.some(i=>i.id===reversible.applied.libraryId),false)
+ return {reissue,library,destination}
 }
 
 export async function proposifyBrowser(page,context,app) {
@@ -264,6 +315,39 @@ export async function proposifyBrowser(page,context,app) {
  const csv=await context.request.get(app.origin+await csvLink.getAttribute('href'));assert.deepEqual(await csv.body(),Buffer.from(fixture.csv))
  await section.getByRole('button',{name:'Undo document move-in',exact:true}).click()
  assert.match(await page.getByRole('alert').innerText(),/Dependent drafts or templates/)
+ // Existing controls explicitly choose each native output and retain byte-exact originals.
+ for(const outputKind of ['reissue','library']){
+  const target=await api('proposal.prepare',{clientId:client.id,title:'Synthetic browser '+outputKind,scope:'Owner supplied work',packages:[{id:'owner',label:'Owner',price:'925.50'}],depositPercent:'25'})
+  await page.goto(app.origin+'/app/import')
+  await section.getByText('Apply Proposify template pages',{exact:true}).click()
+  await section.getByLabel('Output purpose').selectOption(outputKind)
+  await section.getByLabel('Source PDF',{exact:true}).selectOption(hash(outputKind==='reissue'?fixture.originals[24]:fixture.template))
+  await section.getByLabel('Priced destination draft').selectOption(target.id+':1')
+  await section.getByLabel('Independent template name').fill('Synthetic browser '+outputKind)
+  await section.getByRole('checkbox').check()
+  await section.getByRole('button',{name:'Review fixed-page application',exact:true}).click()
+  const review=section.locator('section').filter({has:page.getByRole('heading',{name:'Review fixed pages and supplied prices',exact:true})})
+  assert.match(await review.innerText(),/925.50/)
+  await capture(outputKind+'-review',review)
+  await section.getByRole('button',{name:outputKind==='reissue'?'Apply fixed pages to reissue draft':'Apply fixed pages and save library section',exact:true}).click()
+  const status=outputKind==='reissue'?'Independent reissue draft saved; fresh approval and sending required':'Independent fixed-page library section saved; rebuild in the editor'
+  const output=section.locator('article').filter({has:page.getByText(status,{exact:true})})
+  assert.equal(await output.count(),1)
+  await capture(outputKind+'-saved',output)
+  await output.getByRole('link',{name:'Open destination draft',exact:true}).click()
+  assert.equal(await page.getByRole('link',{name:'Export Word document',exact:true}).count(),0)
+  const r=await context.request.get(app.origin+await page.getByRole('link',{name:'Download original PDF',exact:true}).getAttribute('href'))
+  assert.deepEqual(await r.body(),outputKind==='reissue'?fixture.originals[24]:fixture.template)
+  if(outputKind==='library'){
+   const state=await(await context.request.get(app.origin+'/api/platter/state')).json()
+   assert.equal(state.libraryItems.some(i=>i.title==='Synthetic browser library — rebuild in the editor'),true)
+  }
+  await page.goto(app.origin+'/app/import')
+  await output.getByRole('button',{name:'Undo fixed-page application',exact:true}).click()
+  const state=await(await context.request.get(app.origin+'/api/platter/state')).json()
+  assert.equal(state.proposals.find(p=>p.id===target.id).document?.fixedPdf,undefined)
+  await capture(outputKind+'-undo',section.getByRole('heading',{name:'Synthetic Proposify browser move-in',exact:true}))
+ }
  await section.getByRole('button',{name:'Undo fixed-page application',exact:true}).click()
  for(let i=0;i<10&&await section.getByRole('button',{name:/^(Undo document move-in|Continue document undo)$/,exact:true}).count();i++)await section.getByRole('button',{name:/^(Undo document move-in|Continue document undo)$/,exact:true}).click()
  assert.match(await section.innerText(),/Import undone/)

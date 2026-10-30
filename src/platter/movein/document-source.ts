@@ -97,7 +97,7 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
   held:documents.filter(p=>!p.signatureEvidence.length).length+conflicts.length,
   unmapped:unmapped.length+rows.filter(r=>!r.selected&&!conflicts.includes(r)).length,
   duplicateDocuments,unmappedItems:unmapped,rows,
-  notes:['Signature pages and certificates are source evidence, not validated signatures.','Open documents are retained read-only for review; reissue and editable conversion are not available here.','Attachments, roles, formulas, omitted images, comments, analytics and audit events beyond the supplied certificate are not reconstructed.']}
+  notes:['Signature pages and certificates are source evidence, not validated signatures.',review?'Open originals stay read-only; separately review fixed-page reissue with current clients, fresh prices and human approval.':'Open documents are retained read-only for review; reissue and editable conversion are not available here.','Attachments, roles, formulas, omitted images, comments, analytics and audit events beyond the supplied certificate are not reconstructed.']}
  artifact('reviewed-report-choices.json',Buffer.from(canonicalJson({choices,report,review:review??null})))
  const source: SourceBundle={artifacts,diagnostics:conflicts.map(r=>({severity:'error',code:'ambiguous_report',message:'Choose a PDF for report row '+r.line,location:{artifact:r.source,row:r.line}})),
   records:documents.map(p=>{

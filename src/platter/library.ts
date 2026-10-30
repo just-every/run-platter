@@ -1,3 +1,4 @@
+import { proposifyLibraryScope } from './movein/proposify-library'
 import { insertLibrary, libraryUsage, propagateLibrary } from './library-insertion'
 import { captureLibraryContent, libraryKind, richLibraryKinds } from './library-content'
 import { resourceScope, folderGuard, requireAudienceConsent } from './folders'
@@ -6,7 +7,7 @@ export const libraryEditors=['owner','admin','manager','content_editor']
 export const libraryReaders=[...libraryEditors,'sales']
 export async function libraryState(db:D1Database,a:Actor){
  if(!libraryReaders.includes(a.role))return []
- const access=resourceScope(a,'r');const rows=(await db.prepare('SELECT r.* FROM p_library_items r WHERE '+access.sql+' ORDER BY title,id').bind(...access.values).all<any>()).results
+ const access=resourceScope(a,'r'),sourceAccess=proposifyLibraryScope(a);const rows=(await db.prepare('SELECT r.* FROM p_library_items r WHERE '+access.sql+' AND '+sourceAccess.sql+' ORDER BY title,id').bind(...access.values,...sourceAccess.values).all<any>()).results
  return Promise.all(rows.map(async item=>({...item,kind:libraryKind(item),tags:JSON.parse(item.tags),uses:await libraryUsage(db,a,item.id)})))
 }
 export async function libraryCommand(db:D1Database,a:Actor,name:string,p:Record<string,unknown>){
@@ -15,7 +16,7 @@ export async function libraryCommand(db:D1Database,a:Actor,name:string,p:Record<
  need(name==='library.save','Unknown library action',404)
  const id=p.id?text(p.id,'a library item'):crypto.randomUUID(),old=p.id?await db.prepare('SELECT * FROM p_library_items WHERE id=?').bind(id).first<any>():null
  if(p.id)need(old,'Library item not found',404)
- if(old)exact(old,p)
+ if(old){const sourceAccess=proposifyLibraryScope(a);need(await db.prepare('SELECT 1 FROM p_library_items r WHERE r.id=? AND '+sourceAccess.sql).bind(old.id,...sourceAccess.values).first(),'This imported library section is private to its current owner',403);exact(old,p)}
  const previous=old?await folderGuard(db,a,old.folder_id,'library'):{sql:'1',values:[]},folderId=p.folderId===undefined?old?.folder_id??null:p.folderId||null,next=await folderGuard(db,a,folderId,'library')
  if(old)await requireAudienceConsent(db,old.folder_id,folderId,p.shareConsent)
  const title=text(p.title,'a title'),kind=String(p.kind)

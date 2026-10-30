@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "66724ee484d667bc0633757b852444cc75e081b370fb081f07087b184348f814",
+      "sha256": "1d0d897182285150a116362a0a5b947e89c9fb5f8536b54592171a64e4c48578",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "d9e071cdd2602564cacbff48dd0cae95c9ec34f7f95ee4ba23294b46e27a9085",
+      "sha256": "235f016211819064dd48ecf1bc489a0f798b515029bdeca94c60512f4e9f7cf2",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2478,7 +2478,7 @@
       "executable": false
     },
     "src/platter/archive-policy.mjs": {
-      "sha256": "e8b47182a80d9d14409e89eb796cdd4c39cd927341d8618b43aeb439fc8270a9",
+      "sha256": "a4ad71d199f116942b56bb25a27334f4cea6c846ceaa7e249e5a80967a1843bd",
       "executable": false
     },
     "src/platter/archiving/google-drive.ts": {
@@ -2874,7 +2874,7 @@
       "executable": false
     },
     "src/platter/payments.ts": {
-      "sha256": "15b6cd302632c8a14f5c51fa0bbca6c4641d4c8b8e1e23bd58b0b52d281d1d14",
+      "sha256": "22657f9f969edffc7f062ad22788dac9a3313fd38ca9c7aee8a13231052df1a1",
       "executable": false
     },
     "src/platter/permissions.ts": {
@@ -2998,7 +2998,7 @@
       "executable": false
     },
     "src/platter/state.ts": {
-      "sha256": "835374f6cc826b956ec72f0c4861ba008f12008e8985c5a22c3189d6e2f2dc46",
+      "sha256": "b54569d976646fa64f0d3cd4759ad1406bfce4936521f72c92da891ff97eec22",
       "executable": false
     },
     "src/platter/suggestions.ts": {
@@ -3182,7 +3182,7 @@
       "executable": false
     },
     "src/platter/ui/payments.ts": {
-      "sha256": "99b466086ad5b90261c87f09377f08ab9f31d8251e085099b7a1620c16b43c71",
+      "sha256": "cdc6c27ff03e7fedb36edc2a0d9ca1e4514908db0919cc47f8e4d7d0c2585b66",
       "executable": false
     },
     "src/platter/ui/pipeline.ts": {
@@ -3546,7 +3546,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "5294ee77b8f2a710a5eae0a504b06a4c6aa47413d2dfee61f75777a5972c97f0",
+      "sha256": "c89a82f3c281ba568aba705f2e3bad44174825aa7ec622cd04bf7175072fa291",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3598,7 +3598,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "00fe24e5ca8c515b0da7b87e92b19cb84c4e57cadec41e3e6d389ef28663137f",
+      "sha256": "88e9c8e6619853832a2249c8f9571d631a2c66c753febf27678360639651b83d",
       "executable": false
     },
     "tests/site-harness.mjs": {

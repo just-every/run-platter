@@ -3665,7 +3665,8 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
 })
 
 test('PAY-007 received offline money reconciles frozen dated milestones once and refuses unsafe allocations without writes',async()=>{
- const h=await harness({assetsDirectory:'public'});try{
+ const {offlineAccountingFake,offlineAccountingJourney}=await import('./offline-accounting-fixture.mjs'),fake=offlineAccountingFake()
+ const h=await harness({assetsDirectory:'public',outboundService:request=>fake.receive(request)});try{
  const {allocationAgreement,receiptInput,allocationInput}=await import('./payment-allocation-fixture.mjs')
  const member=async role=>{const email='synthetic-platter-9902-'+role+String.fromCharCode(64)+'example.test';await h.send('/auth/invite',{email,displayName:role,role:'member'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[]});return{cookie,id}}
  const billing=await member('billing'),sales=await member('sales'),agreement=await allocationAgreement(h)
@@ -3728,7 +3729,7 @@ test('PAY-007 received offline money reconciles frozen dated milestones once and
  const afterPdf=await h.mf.dispatchFetch(h.origin+agreement.path+'/agreement.pdf',{headers:{cookie:agreement.cookie}});assert.deepEqual(new Uint8Array(await afterPdf.arrayBuffer()),agreementBytes)
  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_invoices').first()).n,0,'informational schedule reconciliation never issues a provider invoice')
  assert.deepEqual((await h.state(sales.cookie)).paymentAllocations,[]);assert.deepEqual((await h.state(sales.cookie)).paymentSchedules,[])
- await h.cmd('member.set',{operatorId:billing.id,version:1,role:'sales',teams:[]})
+ await offlineAccountingJourney(h,fake,billing,sales)
  await refuse('payment.allocate',race,billing.cookie,403)
  await refuse('payment.record',{...duplicate,requestId:crypto.randomUUID()},billing.cookie,403)
  }finally{await h.close()}

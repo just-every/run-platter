@@ -934,9 +934,10 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
 
 test('PAY-007 billing controls record and reconcile two received payments to a frozen milestone', {timeout:120000}, async()=>{
  const {harness}=await import('./harness.mjs'),{allocationAgreement}=await import('./payment-allocation-fixture.mjs')
- const h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client'});let browser
+ const {offlineAccountingFake,connectOfflineAccounting}=await import('./offline-accounting-fixture.mjs'),fake=offlineAccountingFake();fake.invoice()
+ const h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',outboundService:request=>fake.receive(request)});let browser
  try{
-  const agreement=await allocationAgreement(h)
+  const agreement=await allocationAgreement(h);await connectOfflineAccounting(h)
   const finish=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(finish.status,303)
   browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   const context=await browser.newContext({viewport:{width:1440,height:1000}})
@@ -945,6 +946,10 @@ test('PAY-007 billing controls record and reconcile two received payments to a f
    const page=await context.newPage();await page.goto(h.origin+'/app/proposal?id='+agreement.id)
    const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Payments and refunds',exact:true})}),milestone=panel.locator('[data-payment-milestone="1"]')
    assert.match(await milestone.innerText(),/Remaining \$700\.00 USD/)
+   const link=milestone.locator('form').filter({has:page.getByRole('button',{name:'Link reviewed accounting invoice',exact:true})})
+   await link.getByLabel('Existing QuickBooks invoice id').fill('synthetic-platter-invoice-1');await link.getByLabel('Reviewed QuickBooks customer id').fill('synthetic-platter-customer-1');await link.getByLabel('Reviewed invoice number').fill('SYN-700');await link.getByRole('checkbox').check();await link.getByRole('button').click();await page.waitForLoadState('load')
+   assert.match(await milestone.locator('[data-accounting-invoice]').innerText(),/SYN-700 · overdue/)
+   assert.match(await milestone.innerText(),/Send a check to Synthetic Studio, 100 Example Street/)
    const capture=async phase=>{
     if(!process.env.PLATTER_SCREENSHOTS)return
     await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true})
@@ -954,10 +959,13 @@ test('PAY-007 billing controls record and reconcile two received payments to a f
    for(const [method,amount] of [['check','300'],['wire','400']]){
     const record=panel.locator('form').filter({has:page.getByRole('button',{name:'Record received payment',exact:true})})
     await record.getByLabel('Payment method').selectOption(method);await record.getByLabel('Amount received').fill(amount);await record.getByLabel('Payment reference').fill('synthetic-platter-browser-'+method);await record.getByLabel('Payment received on').fill('2030-01-15');await record.getByRole('checkbox').check();await record.getByRole('button',{name:'Record received payment',exact:true}).click();await page.waitForLoadState('load')
-    const allocate=milestone.locator('form');await allocate.getByLabel('Received payment').selectOption({label:method+' · synthetic-platter-browser-'+method+' · $'+amount+'.00 USD available'});await allocate.getByLabel('Amount to allocate').fill(amount);await allocate.getByRole('checkbox').check();await allocate.getByRole('button',{name:'Allocate received payment',exact:true}).click();await page.waitForLoadState('load')
+    const allocate=milestone.locator('form').filter({has:page.getByRole('button',{name:'Allocate received payment',exact:true})});await allocate.getByLabel('Received payment').selectOption({label:method+' · synthetic-platter-browser-'+method+' · $'+amount+'.00 USD available'});await allocate.getByLabel('Amount to allocate').fill(amount);await allocate.getByRole('checkbox').check();await allocate.getByRole('button',{name:'Allocate received payment',exact:true}).click();await page.waitForLoadState('load')
     assert.match(await milestone.innerText(),method==='check'?/partially paid[\s\S]*Allocated \$300\.00 USD · Remaining \$400\.00 USD/:/Dated delivery · paid[\s\S]*Allocated \$700\.00 USD · Remaining \$0\.00 USD/)
     assert.match(await milestone.innerText(),/synthetic-platter-browser-check/)
     if(method==='wire')assert.match(await milestone.innerText(),/synthetic-platter-browser-wire/)
+    const sync=milestone.locator('form').filter({has:page.getByRole('button',{name:'Sync allocated receipt',exact:true})})
+    await sync.getByLabel('QuickBooks payment method id').fill(method);await sync.getByRole('checkbox').check();await sync.getByRole('button').click();await page.waitForLoadState('load')
+    assert.match(await milestone.locator('[data-accounting-invoice]').innerText(),method==='check'?/SYN-700 · overdue[\s\S]*Provider balance \$400\.00 USD/:/SYN-700 · paid[\s\S]*Provider balance \$0\.00 USD/)
     await capture(method==='check'?'partial':'paid')
    }
    assert.equal(await milestone.getByRole('button',{name:'Allocate received payment'}).count(),0)

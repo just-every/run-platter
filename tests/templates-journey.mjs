@@ -132,6 +132,15 @@ async function templateRecipientJourney(browser,screenshots) {
    const source=await cmd('proposal.prepare',{clientId:client.id,title:'Synthetic Platter role custody',scope:'Reviewed services',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:30,recipientPlan:data.recipients,document:data.document})
    await page.goto(app.origin+'/app/proposal?id='+source.id)
    const save=page.locator('section').filter({has:page.getByRole('heading',{name:'Save a personal template',exact:true})}).locator('form').filter({has:page.getByRole('button',{name:'Save personal template',exact:true})})
+   const extra={...data.document,blocks:[...data.document.blocks,{id:'extra',type:'signature',title:'Unassigned extra signature',text:'',recipientRole:'slot',recipientId:'missing'}]}
+   await cmd('proposal.document',{id:source.id,version:1,document:extra})
+   await page.reload()
+   await save.getByLabel('Template name',{exact:true}).fill('Three role template')
+   await save.getByLabel('Explicit owner preassignment',{exact:true}).selectOption('owner')
+   await save.getByRole('button',{name:'Save personal template',exact:true}).click()
+   if(width===1440){assert.match(await page.locator('main').innerText(),/Assign Unassigned extra signature/);assert.equal((await state()).templates.length,0)}
+   await cmd('proposal.document',{id:source.id,version:2,document:data.document})
+   await page.reload()
    await save.getByLabel('Template name',{exact:true}).fill('Three role template')
    await save.getByLabel('Explicit owner preassignment',{exact:true}).selectOption('owner')
    await save.getByRole('button',{name:'Save personal template',exact:true}).click()

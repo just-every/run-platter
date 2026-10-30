@@ -3394,7 +3394,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "b0c07600512be530e80299e4489fb7609833e972f497ca016db8cd02f2e977f1",
+      "sha256": "42d6e4149532d9ad045e1a31613a8aa524e99930106cfee78f6b3dc6d8809898",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3546,7 +3546,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "74ecc2b1102c52fb5789ac39144741e3f189aba7da44faafadc495726d988ae7",
+      "sha256": "0a0072a87e13628f724d96775d3c1432e6b7942e066abac21978ebbacf380bc0",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3598,7 +3598,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "21aaaa05ecaed13c4a2bc170f6297fc173c51af5b7979a7378d4957b2807a6e6",
+      "sha256": "582808479993ec58244c52efe609cb180c2db821deb876e40bcea19b97c2b240",
       "executable": false
     },
     "tests/site-harness.mjs": {

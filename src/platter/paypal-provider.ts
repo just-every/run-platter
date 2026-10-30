@@ -78,7 +78,7 @@ export function paypalApproval(order:any){
  const links=order.links.filter((link:any)=>link?.rel==='approve'||link?.rel==='payer-action')
  need(links.length===1&&links[0].method==='GET'&&typeof links[0].href==='string'&&links[0].href.length<=2048,'PayPal did not return one approval link',409)
  let url:URL
- try{url=new URL(links[0].href)}catch{fail('PayPal returned an invalid approval link',409)}
+ try{url=new URL(links[0].href)}catch{return fail('PayPal returned an invalid approval link',409)}
  need(url.protocol==='https:'&&url.hostname==='www.paypal.com'&&!url.port&&!url.username&&!url.password&&!url.hash&&url.pathname==='/checkoutnow'&&url.searchParams.getAll('token').length===1&&url.searchParams.get('token')===order.id&&Array.from(url.searchParams.keys()).every(key=>key==='token'),'PayPal returned an invalid approval link',409)
  return url.href
 }
@@ -106,7 +106,7 @@ function captureLink(links:any,captureId:string){
  const up=links.filter((link:any)=>link?.rel==='up')
  need(up.length===1&&up[0].method==='GET'&&typeof up[0].href==='string','PayPal did not identify one refunded capture',409)
  let url:URL
- try{url=new URL(up[0].href)}catch{fail('PayPal returned an invalid capture binding',409)}
+ try{url=new URL(up[0].href)}catch{return fail('PayPal returned an invalid capture binding',409)}
  need(url.protocol==='https:'&&['api-m.paypal.com','api.paypal.com'].includes(url.hostname)&&!url.port&&!url.username&&!url.password&&!url.search&&!url.hash&&url.pathname==='/v2/payments/captures/'+captureId,'PayPal refund belongs to another capture',409)
 }
 function checkRefundBinding(binding:PaypalRefundBinding){
@@ -126,7 +126,7 @@ export async function createPaypalOrder(secret:PaypalSecret,binding:PaypalOrderB
  checkBinding(binding)
  need(secret.accountId===undefined||secret.accountId===binding.merchantId,'PayPal connection merchant changed',409)
  for(const value of [returnUrl,cancelUrl]){
-  let url:URL;try{url=new URL(value)}catch{fail('Use a valid PayPal return address',409)}
+  let url:URL;try{url=new URL(value)}catch{return fail('Use a valid PayPal return address',409)}
   need(url.protocol==='https:'&&!url.username&&!url.password&&!url.hash,'Use a secure PayPal return address',409)
  }
  const order=await requestPaypal(secret,'/v2/checkout/orders',{intent:'CAPTURE',purchase_units:[{reference_id:binding.referenceId,payee:{merchant_id:binding.merchantId},amount:paypalAmount(binding.cents)}],payment_source:{paypal:{experience_context:{return_url:returnUrl,cancel_url:cancelUrl,user_action:'PAY_NOW',shipping_preference:'NO_SHIPPING'}}}},requestId)

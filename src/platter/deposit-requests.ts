@@ -84,8 +84,8 @@ export async function depositRequestAuthority(env:Bindings,mail:any) {
   'Deposit request invitation or acceptance changed',403)
 }
 
-export function depositDeliveryStatements(db:D1Database,mail:any,status:string,provider?:string|null,providerMessageId?:string|null) {
- const at=Date.now(),mailStatus=status==='withheld'?'uncertain':status
+export async function depositDeliveryStatements(db:D1Database,mail:any,status:string,provider?:string|null,providerMessageId?:string|null) {
+ const at=await currentTime(db),mailStatus=status==='withheld'?'uncertain':status
  return [
   db.prepare(`INSERT INTO p_deposit_request_events(request_id,status,occurred_at,provider,provider_message_id)
    SELECT id,?,?,?,? FROM p_deposit_requests WHERE mail_id=? AND status IN ('pending','sending') AND status!=?
@@ -97,7 +97,7 @@ export function depositDeliveryStatements(db:D1Database,mail:any,status:string,p
 
 /** An abandoned attempt is evidence of uncertainty, never permission to retry. */
 export async function holdInterruptedDepositRequests(env:Bindings,proposalId:string) {
- const db=env.DB,at=Date.now(),cutoff=at-15*60*1000
+ const db=env.DB,at=await currentTime(env.DB),cutoff=at-15*60*1000
  const interrupted=`SELECT r.id FROM p_deposit_requests r JOIN p_mail m ON m.id=r.mail_id
   WHERE r.proposal_id=? AND r.status IN ('pending','sending') AND r.updated_at<? AND m.status='sending'`
  await db.batch([

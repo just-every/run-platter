@@ -4,6 +4,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { richLibraryPropagation, richLibrarySource } from './library-fixture.mjs'
 import { documentFixture } from './document-fixture.mjs'
 import { templatesHttp } from './templates-http.mjs'
+import { thirtyProposalFixture, followupReportingJourney } from './followup-reporting-journey.mjs'
 import { followupJourney } from './followup-journey.mjs'
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -232,35 +233,7 @@ test('NEG-001 negotiated offer requires exact approval, preserves the live offer
 }))
 
 test('FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership',()=>run(async h=>{
- await h.cmd('tracking.settings',{enabled:'yes',alerts:'no',retentionDays:90,quietMinutes:30,consent:'yes'})
- const clients=[]
- for(const [name,email] of [['Northstar Coffee','avery@northstar.example'],['Juniper Design','sam@juniper.example']])clients.push(await h.cmd('client.save',{name,email}))
- const people=[{email:h.auth.OWNER_EMAIL,cookie:h.owner,id:(await h.state()).actor.id}]
- for(const email of ['morgan@studio.example','casey@studio.example']){
-  await h.send('/auth/invite',{email,displayName:email.split('@')[0],role:'member',returnTo:'/app'},h.owner)
-  const cookie=await h.signIn(email);people.push({email,cookie,id:(await h.state(cookie)).actor.id})
- }
- const fixture=[]
- for(let i=0;i<30;i++){
-  const person=people[i%3],client=clients[i%2],input={...offer,clientId:client.id,title:`Campaign ${String(i+1).padStart(2,'0')}`,priceOne:String(1000+i*10),priceTwo:String(2000+i*20)}
-  const made=await h.cmd('proposal.prepare',input,person.cookie),status=i===22?'viewed':i===2?'expired':i===6?'withdrawn':i===10?'declined':i===14?'lost':i===18?'won':['draft','approved','sent','accepted'][i%4]
-  let version=1
-  if(status!=='draft'){await h.cmd('proposal.approve',{id:made.id,version:version++,revision:1})}
-  if(['sent','viewed','accepted','expired','withdrawn','declined','lost','won'].includes(status)){
-   const shared=await h.cmd('proposal.send',{id:made.id,version:version++})
-   if(status==='viewed')assert.equal((await h.send(new URL(shared.shareUrl).pathname)).status,200)
-   if(status==='won')await h.cmd('proposal.win',{id:made.id,version:version++,reason:'Signed outside'})
-   if(status==='lost')await h.cmd('proposal.lose',{id:made.id,version:version++,reason:'Project cancelled'})
-   if(status==='declined'){const path=new URL(shared.shareUrl).pathname,cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=decline',{revision:1,reason:'Budget'},cookie)).status,410)}
-   if(status==='withdrawn')await h.cmd('proposal.withdraw',{id:made.id,version:version++,reason:'Client project cancelled',notice:false})
-   if(status==='expired')await h.cmd('expiry.set',{id:made.id,version:version++,mode:'date',date:'2020-03-01'})
-   if(status==='accepted'){
-    const path=new URL(shared.shareUrl).pathname,cookie=await verified(h,path)
-    assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
-   }
-  }
-  fixture.push({id:made.id,title:input.title,status:status==='draft'?'awaiting-approval':status,owner:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':['sent','viewed'].includes(status)?'await-client':status==='expired'?'reopen':['withdrawn','declined','lost','won'].includes(status)?'withdrawn':'export-deposit'})
- }
+ const {clients,people,fixture}=await thirtyProposalFixture(h,{offer,verified})
  const scheduled=fixture.filter(p=>['sent','viewed'].includes(p.status)).slice(0,2)
  for(const [i,row] of scheduled.entries()){await h.cmd('followup.schedule',{id:row.id,action:'Call the client',dueDate:i?'2000-03-02':'2000-03-01'});row.nextAction='followup'}
  const aged=fixture.find(p=>p.status==='awaiting-approval')
@@ -318,6 +291,7 @@ test('FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposal
   assert.equal(response.value.count,response.value.rows.length);assert.equal(response.value.totals[0].valueCents,response.value.rows.reduce((n,r)=>n+r.valueCents,0))
   const viewed=(await h.send('/api/platter/pipeline?status=viewed',undefined,cookie)).value;assert.deepEqual(viewed.rows.map(r=>r.id),[fixture[22].id]);assert.equal(viewed.totals[0].valueCents,244000);assert.equal((await h.state(cookie)).tracking,undefined)
  }
+ await run(h=>followupReportingJourney(h))
 
 }))
 

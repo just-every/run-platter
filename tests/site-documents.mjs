@@ -932,3 +932,8 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
   } finally { await context.close() }
  } finally { await browser?.close(); await h?.close(); await edge.close() }
 })
+
+test('RENEW-001 compiled reviewed CSV preview, draft creation and reopened resume keep held rows unsent', {timeout:120000},async()=>{
+ const {bulkDraftBrowser}=await import('./bulk-drafts-browser.mjs')
+ await bulkDraftBrowser(1440)
+})

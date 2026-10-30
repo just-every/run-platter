@@ -3,7 +3,7 @@ import { commit, dollars, hash, need, snapshot, text, type Actor } from './model
 import { currentTime } from './expiry-time'
 import { templateDraftPlan } from './templates'
 import { parse } from './movein/csv'
-import { missingMerge, variableNames } from './variables'
+import { missingMerge, templateVariableNames } from './variables'
 import { canonical } from './crm/hubspot-draft'
 
 type Guard = { sql: string; values: any[] }
@@ -29,6 +29,7 @@ async function sourceState(db: D1Database, id: string) {
   ['p_template_document_media', 'template_id=?', [id]],
   ['p_template_costs', 'template_id=?', [id]],
   ['p_workspace_defaults', '1', []],
+  ['p_installation_settings', '1', []],
   ['p_reminder_templates', '1', []],
  ] as const
  const captured: any[] = [], guards: Guard[] = []
@@ -49,7 +50,7 @@ function csvRows(value: unknown, template: any) {
  const content = JSON.parse(template.snapshot)
  need(content.currency === 'USD' && !(content.recipient_plan ?? []).length && !content.payment_terms, 'Bulk drafts currently require an ordinary USD single-client template without a payment schedule', 409)
  need(content.options.every((o: any) => !(o.tables ?? []).length && !(o.optionalItems ?? []).length && !o.discount && !o.tax && !o.taxable && !o.taxCode), 'Use flat untaxed packages without optional items or discounts for bulk drafts', 409)
- const variables = [...new Set([...variableNames(Object.values(content.document?.merge?.patterns ?? {})), ...(content.document?.merge?.conditions ?? [])])]
+ const variables = templateVariableNames(content)
  const allowed = ['client', ...variables.map(k => 'var:' + k), ...content.options.map((o: any) => 'price:' + o.id)]
  need(columns.every(k => allowed.includes(k)) && allowed.every(k => columns.includes(k)), 'Use these CSV columns: ' + allowed.join(', '))
  return records.slice(1).map(({ cells, line }, index) => {
@@ -99,11 +100,12 @@ export async function bulkDraftCommand(env: Bindings, a: Actor, name: string, in
   need(source.template && source.template.version === Number(input.templateVersion), 'Template changed; select its current version', 409)
   need(source.template.owner_id === a.id || source.template.shared === 1, 'This template is unavailable', 403)
   const records = csvRows(input.csv, source.template), id = crypto.randomUUID(), csv = input.csv as string, csvHash = await hash(csv)
-  const batch = { template_id: templateId, template_version: source.template.version }, rows: any[] = []
+  const batch = { template_id: templateId, template_version: source.template.version }, rows: any[] = [], bindings = new Set<string>()
   const clients = (await db.prepare('SELECT * FROM p_clients ORDER BY id').all<any>()).results
   const guards: Guard[] = [...source.guards, { sql: "EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND version=? AND role='owner' AND status='active')", values: [a.id, version] }]
   for (const record of records) {
    const selector = record.fields.client.trim(), matches = clients.filter(c => c.id === selector || c.name === selector)
+   for(const match of matches)bindings.add(match.id)
    const client = matches.length === 1 ? matches[0] : null, rowId = await hash(id + ':' + record.ordinal)
    let exception: string | null = !client ? matches.length ? 'Ambiguous client binding: ' + selector : 'Missing client binding: ' + selector : null
    const missing = record.variables.filter(key => !record.fields['var:' + key].trim())
@@ -126,6 +128,7 @@ export async function bulkDraftCommand(env: Bindings, a: Actor, name: string, in
   await commit(db, a, [
    ...guardWrites(db,guards),
    db.prepare('INSERT INTO p_bulk_batches(id,actor_id,request_id,template_id,template_version,csv,csv_hash,digest,source_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id, a.id, requestId, templateId, source.template.version, csv, csvHash, digest, source.json, at),
+   ...[...bindings].map(clientId=>db.prepare('INSERT INTO p_bulk_bindings(batch_id,client_id) VALUES(?,?)').bind(id,clientId)),
    ...rows.map(row => db.prepare('INSERT INTO p_bulk_rows(batch_id,ordinal,row_id,client_id,input_json,client_json,content_json,exception) VALUES(?,?,?,?,?,?,?,?)').bind(id, row.ordinal, row.row_id, row.client_id, row.input_json, row.client_json, row.content_json, row.exception)),
    db.prepare('INSERT INTO p_bulk_authority(batch_id,actor_id,actor_version,reviewed_digest) VALUES(?,?,?,?)').bind(id, a.id, version, digest),
   ], true)
@@ -139,25 +142,31 @@ export async function bulkDraftCommand(env: Bindings, a: Actor, name: string, in
  need(grant, 'This review has no current authority. Restored batches remain inactive.', 409)
  const source = await sourceState(db, batch.template_id)
  need(source.json === batch.source_json, 'Template or delivery defaults changed after review; preview again', 409)
- const rows = (await db.prepare('SELECT * FROM p_bulk_rows WHERE batch_id=? AND exception IS NULL AND proposal_id IS NULL ORDER BY ordinal LIMIT 5').bind(batch.id).all<any>()).results
- // Each row and its completion marker share one transaction. Another request
- // may finish first; the guard refuses that row without repeating its writes.
- for (const row of rows) {
+ const pending = (await db.prepare('SELECT * FROM p_bulk_rows WHERE batch_id=? AND exception IS NULL AND proposal_id IS NULL ORDER BY ordinal').bind(batch.id).all<any>()).results
+ const clients = new Map<string,any>()
+ for (const row of pending) {
   const fresh = await db.prepare('SELECT * FROM p_clients WHERE id=?').bind(row.client_id).first<any>()
   need(fresh && canonical(fresh) === row.client_json, 'A reviewed client changed; preview again', 409)
-  const plan = await rowPlan(env, a, batch, row)
-  need(contentOf(plan) === row.content_json, 'Reviewed draft content changed; preview again', 409)
-  const guards = [...source.guards, plan.guard,
-   { sql: 'EXISTS(SELECT 1 FROM p_bulk_authority g JOIN oa_operators o ON o.id=g.actor_id WHERE g.batch_id=? AND g.actor_id=? AND g.actor_version=? AND g.reviewed_digest=? AND o.version=g.actor_version AND o.status=? AND o.role=?)', values: [batch.id, a.id, version, batch.digest, 'active', 'owner'] },
+  clients.set(row.row_id,fresh)
+ }
+ const rows=pending.slice(0,5),writes:D1PreparedStatement[]=[],guards:Guard[]=[...source.guards,
+  { sql: 'EXISTS(SELECT 1 FROM p_bulk_authority g JOIN oa_operators o ON o.id=g.actor_id WHERE g.batch_id=? AND g.actor_id=? AND g.actor_version=? AND g.reviewed_digest=? AND o.version=g.actor_version AND o.status=? AND o.role=?)', values: [batch.id, a.id, version, batch.digest, 'active', 'owner'] },
+ ]
+ // A bounded chunk is atomic, including every completion marker. Replays
+ // either see those rows completed or lose the guard and create nothing.
+ for (const row of rows) {
+  const fresh=clients.get(row.row_id),plan=await rowPlan(env,a,batch,row)
+  need(contentOf(plan)===row.content_json,'Reviewed draft content changed; preview again',409)
+  guards.push(plan.guard,
    { sql: 'EXISTS(SELECT 1 FROM p_clients WHERE id=? AND name=? AND email=? AND variable_fields=? AND version=?)', values: [fresh.id, fresh.name, fresh.email, fresh.variable_fields, fresh.version] },
    { sql: 'EXISTS(SELECT 1 FROM p_bulk_rows WHERE batch_id=? AND row_id=? AND proposal_id IS NULL AND content_json=?)', values: [batch.id, row.row_id, row.content_json] },
-  ]
-  try {
-   await commit(db, a, [...guardWrites(db,guards), ...plan.writes, db.prepare('UPDATE p_bulk_rows SET proposal_id=?,completed_at=? WHERE batch_id=? AND row_id=?').bind(plan.id, at, batch.id, row.row_id)], true)
-  } catch (error) {
-   const completed = await db.prepare('SELECT proposal_id FROM p_bulk_rows WHERE batch_id=? AND row_id=?').bind(batch.id, row.row_id).first<any>()
-   if (!completed?.proposal_id || (error as any).status !== 409) throw error
-  }
+  )
+  writes.push(...plan.writes,db.prepare('UPDATE p_bulk_rows SET proposal_id=?,completed_at=? WHERE batch_id=? AND row_id=?').bind(plan.id,at,batch.id,row.row_id))
+ }
+ try { await commit(db,a,[...guardWrites(db,guards),...writes],true) }
+ catch(error) {
+  const completed=(await db.prepare('SELECT row_id FROM p_bulk_rows WHERE batch_id=? AND proposal_id IS NOT NULL').bind(batch.id).all<any>()).results
+  if((error as any).status!==409||!rows.length||!rows.every(row=>completed.some(done=>done.row_id===row.row_id)))throw error
  }
  return bulkDraftState(db, a, batch.id)
 }

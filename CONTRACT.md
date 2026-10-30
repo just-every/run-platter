@@ -2177,8 +2177,8 @@ Judged from the code and tests at commit `8f4ff0320aaafd58b41dabcf9e39bc60db7dc6
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 1 | 11 | 0 | 12 |
-| Target and push further | 14 | 88 | 49 | 151 |
-| All | 15 | 99 | 49 | 163 |
+| Target and push further | 14 | 89 | 48 | 151 |
+| All | 15 | 100 | 48 | 163 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -2301,7 +2301,7 @@ Judged from the code and tests at commit `8f4ff0320aaafd58b41dabcf9e39bc60db7dc6
 | `AUTO-005` | Zapier, Make and Crank apps | target | missing |  | No automation-platform apps. |
 | `HAND-001` | Accepted-scope handoff to delivery tools | target | missing |  | No delivery handoff. |
 | `HAND-002` | Handoff to Gauge with budget and rates | target | missing |  | No Gauge handoff. |
-| `RENEW-001` | Bulk proposal creation and sending | target | missing |  | No bulk sending. |
+| `RENEW-001` | Bulk proposal creation and sending | target | partial | `tests/platter.test.mjs` — “RENEW-001 reviewed CSV creates exactly 35 independent unsent drafts with resumable once-only rows and no restored or lost authority”; `tests/site.test.mjs` — “RENEW-001 compiled reviewed CSV preview, draft creation and reopened resume keep held rows unsent” (registered through `tests/site-documents.mjs`); `tests/archive.test.mjs` — “RENEW-001 public CLI imported business bulk drafts retain exact inactive batch and draft custody” | Owner-only reviewed CSV drafting for existing clients and flat untaxed USD packages is implemented under the conservative authority default; ct approval and broader member delegation remain pending. Batch approval for sending, paced delivery and per-client sent results, CRM and ending-quarter lists, SIGN-011 and SIGN-012 signer roles and countersigners, configured-recipient execution, priced tables and optional items, taxed or recurring packages, payment execution and agent company-policy execution remain unproved. SEND-003 and SIGN-004 authority holds and RENEW-002’s ambiguous-remainder hold remain unchanged. |
 | `RENEW-002` | Renewal proposals from accepted agreements | target | missing |  | No renewals. |
 | `REPORT-001` | Proposal pipeline dashboard | target | partial | `src/platter/pipeline.ts`; `src/platter/ui/pipeline.ts`; `tests/platter.test.mjs` — “FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership”; `tests/site.test.mjs`; `tests/archive.test.mjs` | Delivered: Thirty populated proposals reconcile field filters, ordering, counts and currency totals without reassigning the recorded owner. Missing “REPORT-001 complete proposal pipeline dashboard journey”: The complete report-rights journey includes content/revenue specialists once those report capabilities exist, with each role’s exact visible report set. |
 | `REPORT-002` | Win rate and sales performance | target | missing |  | No conversion reporting. |

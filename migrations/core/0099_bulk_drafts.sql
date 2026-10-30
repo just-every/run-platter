@@ -18,7 +18,12 @@ CREATE TABLE p_bulk_authority (
  batch_id TEXT PRIMARY KEY REFERENCES p_bulk_batches(id) ON DELETE CASCADE,
  actor_id TEXT NOT NULL, actor_version INTEGER NOT NULL, reviewed_digest TEXT NOT NULL
 );
+CREATE TABLE p_bulk_bindings (
+ batch_id TEXT NOT NULL REFERENCES p_bulk_batches(id) ON DELETE CASCADE,
+ client_id TEXT NOT NULL REFERENCES p_clients(id),
+ PRIMARY KEY(batch_id,client_id)
+);
 -- An unused client can still be erased after preview; its capture must vanish too.
 CREATE TRIGGER p_bulk_client_erasure BEFORE DELETE ON p_clients BEGIN
- DELETE FROM p_bulk_batches WHERE id IN (SELECT batch_id FROM p_bulk_rows WHERE client_id=OLD.id);
+ DELETE FROM p_bulk_batches WHERE id IN (SELECT batch_id FROM p_bulk_bindings WHERE client_id=OLD.id);
 END;

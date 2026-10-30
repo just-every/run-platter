@@ -173,3 +173,34 @@ when those execution capabilities ship.
 
 The follow-up queue ranks package values using one-off value plus the first
 year of recurring fees, retaining separate currency totals.
+## Reviewed bulk drafts
+
+The owner opens **Start multiple drafts** on the proposals page, chooses a saved
+personal template, and pastes a CSV for existing clients. This creates drafts
+only. Ordinary approval and human sending are still required for each proposal.
+
+Use the column list shown for the selected template. The first column is
+`client`, containing an exact client ID or a unique client name. Each template
+variable has a `var:` column and every flat package has an explicit `price:`
+column, for example:
+
+```csv
+client,var:Custom.Project,price:one,price:two
+Synthetic client,Annual review,1200.17,2400.31
+```
+
+A missing variable, unknown or ambiguous client, or invalid price holds that row
+as an exception. Review the sample, prices, copied reminder and expiry settings,
+and all exceptions before confirming creation. Each confirmation creates the
+next bounded group. Leave the page and reopen the batch to resume its retained
+progress; repeated or concurrent confirmations cannot create a row twice.
+
+The preview binds exact CSV bytes, template version, inherited delivery settings,
+client records and current owner authority. Changed sources require a new
+preview. Erasing an unused client removes its retained preview captures.
+An exported batch retains exact business history and created drafts; restored
+batches remain inactive and cannot resume creation from old consent.
+
+This path supports flat untaxed USD packages and ordinary single-client
+templates. It holds configured recipient roles, countersigners, priced tables,
+optional items, payment schedules and batch sending for future work.

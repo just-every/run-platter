@@ -102,7 +102,7 @@ export async function templateDraftPlan(env:Bindings,a:Actor,input:Record<string
  const personal = starter ? null : template as any
  const access=starter?{sql:'1',values:[]}:await folderGuard(db,a,personal.folder_id,'template')
  let content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
- if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...editableVariableFields(content),clientId,...(input.deal?{variableDeal:input.deal}:{}),...(overrides?.values?{variableValues:overrides.values}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan}}
+ if(documentOf(content).merge||overrides?.values){const fill=await resolveVariables(env,a,{...editableVariableFields(content),clientId,...(input.deal?{variableDeal:input.deal}:{}),...(overrides?.values?{variableValues:overrides.values}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan}}
  if(overrides?.content)content=await overrides.content(content)
  const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)

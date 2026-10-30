@@ -2826,7 +2826,7 @@
       "executable": false
     },
     "src/platter/movein/qwilr-api-source.ts": {
-      "sha256": "33b18bbf138328ef6d2c3c9163e75d62499510bc560ea4e5c2d87450daada0cf",
+      "sha256": "9f7af6e669c2c565e6a2e761cef9a278db45ac2f38eb93e671080b22ce5bfdb0",
       "executable": false
     },
     "src/platter/movein/qwilr-api.ts": {
@@ -3146,7 +3146,7 @@
       "executable": false
     },
     "src/platter/ui/document-movein.ts": {
-      "sha256": "077f4e60e62d1261156140a973da1cad02d0928a5df747de5bcd3d0eec521b8e",
+      "sha256": "da8c5ddb79dd61da9071a2a791dbc0805883541226e1d00fe69b17f00abdbed7",
       "executable": false
     },
     "src/platter/ui/duplicate.ts": {
@@ -3422,7 +3422,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "e41c6e344cacb97e8c0c8c4e4f3875ba581fd9d8878f1f8bd040e489b975c98e",
+      "sha256": "ef3d6966195556145bae956bc0d86e18cb646930e981ac10e6927883633da529",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3594,7 +3594,7 @@
       "executable": false
     },
     "tests/qwilr-api-fixture.mjs": {
-      "sha256": "9536ecae6730222865b23a46b4151814e5aee948682a1a364ca2f2c506bf1caa",
+      "sha256": "e3d3d4f1e960b37acabbfac6e078d195cf8050f683510b3916bc099c37c4af56",
       "executable": false
     },
     "tests/recipients-browser.mjs": {

@@ -8,7 +8,7 @@ export function qwilrApiFixture() {
  const pages=[page('synthetic-platter-1','Review','accepted'),page('synthetic-platter-2','Open','live')]
  pages[0].acceptance={acceptersTotal:1,acceptersCount:1,accepters:[{name:'Synthetic accepter',email:['synthetic-platter-1','example.invalid'].join('@'),legalEntity:'Synthetic client',esigned:true,acceptedAt:'2026-01-15T12:00:00Z'}],quote:{amount:2400,amountExcludingTax:2400,quoteSections:[{selected:true,lineItems:[{type:'fixedCost',unitPrice:1200,quantity:2,selected:true,billingSchedule:'monthly',metadata:{service:'synthetic-platter-1'}}]}]}}
  pages[1].acceptance=null;pages[1].previewAcceptance=null
- const summaries=pages.map(p=>({...p,createdAt:'2026-01-15T12:00:00Z'}))
+ const summaries=pages.map(({id,name,status,tags,folderId,ownerId,links,metadata})=>({id,name,status,tags,folderId,ownerId,links,metadata,createdAt:'2026-01-15T12:00:00Z'}))
  let fault=0,beforeResponse
  return {requests,originals,pages,setFault:value=>{fault=value},setBeforeResponse:fn=>{beforeResponse=fn},async fetch(request) {
   const url=new URL(request.url)
@@ -64,6 +64,10 @@ export async function qwilrApiJourney() {
   const state=await h.state(),facts=state.importedSourceFacts
   assert.equal(facts.length,3)
   assert.ok(facts.every(f=>f.execution==='source-evidence-only'))
+  const pageFact=facts.find(f=>f.sourceId==='synthetic-platter-1')
+  assert.equal(pageFact.fields.date,'2026-01-15T12:00:00Z')
+  assert.deepEqual(pageFact.sourceData.acceptance.quote.quoteSections[0].lineItems.map(item=>[item.unitPrice,item.quantity,item.billingSchedule]),[[1200,2,'monthly']])
+  assert.equal(Object.hasOwn(pageFact.fields,'currency'),false,'the API supplies no currency to infer')
   const journal=await h.cmd('document-import.journal',{id})
   for(const bytes of provider.originals.values()) {
    const original=journal.originals.find(o=>o.name==='exports/'+hash(bytes)+'.json')

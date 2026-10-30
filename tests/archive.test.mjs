@@ -14,7 +14,10 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { getPlatformProxy } from 'wrangler'
 import { harness } from './harness.mjs'
-const exec = promisify(execFile)
+const execute = promisify(execFile)
+// A growing migration inventory repeats Wrangler's progress table. Keep errors,
+// rather than buffering megabytes of progress before the custody journey starts.
+const exec = (file,args,options={})=>execute(file,args,{...options,env:{...process.env,...options.env,WRANGLER_LOG:'error'}})
 const cli = resolve('node_modules/@runeditrun/rer/global/rer.mjs')
 const command = async (cwd, args, expected = 0) => {
   let result

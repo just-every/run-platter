@@ -45,6 +45,17 @@ export function qwilrApiFacts(files: File[], documents: Document[], choices: Rec
  const facts: Fact[] = [], records: SourceRecord[] = [], issues: string[] = [], unmapped: string[] = [], bindings: Binding[] = [], usedChoices = new Set<string>()
  let proposals = 0, billingSchedules = 0
  const seen = new Map<string, string>()
+ const listed=new Map<string,{date:string;sha256:string;file:string}>()
+ for(const file of files.filter(file=>/^qwilr-api\/(?:archived-)?pages-\d+\.json$/.test(file.name))) {
+  let value:unknown
+  try{value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(file.bytes))}catch{issues.push('Qwilr page list is not valid JSON');continue}
+  if(!qwilrObject(value)||!Array.isArray(value.data)||!value.data.every(page=>qwilrPage(page,false))){issues.push('Qwilr page list does not match its documented schema');continue}
+  for(const page of value.data as (ObjectValue&{id:string;createdAt:string})[]) {
+   const previous=listed.get(page.id)
+   if(previous&&previous.date!==page.createdAt)issues.push('Qwilr page has conflicting source creation dates')
+   else if(!previous)listed.set(page.id,{date:page.createdAt,sha256:sha256(file.bytes),file:file.source})
+  }
+ }
  const add = (kind: string, sourceId: string, sourceFields: ObjectValue, file: File, sourceHash: string) => {
   const id = 'qwilr:api-' + (kind === 'proposals' ? 'pages' : 'blocks') + ':' + sourceId
   const prior = seen.get(id)
@@ -55,8 +66,11 @@ export function qwilrApiFacts(files: File[], documents: Document[], choices: Rec
    sourceData: sourceFields, sourceHash, sourceFile: file.source, sourceLine: 1, bindings: {}, execution: 'source-evidence-only',
    notes: ['Qwilr does not expose editable page or template bodies through this documented API.', 'Acceptance, prices, schedules and ownership are source evidence; signatures are not validated and no execution or role authority is granted.'] }
   facts.push(fact)
+  const summary=kind==='proposals'?listed.get(sourceId):undefined
+  if(summary){fact.fields.date??=summary.date;Object.assign(fact,{dateSource:summary})}
   if (kind !== 'proposals') { unmapped.push('Saved block ' + sourceId + ': summary retained; editable content requires rebuilding'); return }
   proposals++
+  unmapped.push('Qwilr page '+sourceId+': editable body is unavailable from this API; rebuilding requires source content')
   const accepted = sourceFields.acceptance
   if (qwilrObject(accepted) && qwilrObject(accepted.quote) && Array.isArray(accepted.quote.quoteSections)) {
    for (const section of accepted.quote.quoteSections) if (qwilrObject(section) && Array.isArray(section.lineItems)) {

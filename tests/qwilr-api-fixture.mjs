@@ -83,7 +83,9 @@ export async function qwilrApiJourney() {
   while(undo.job.state!=='undone')undo=await h.cmd('document-import.undo',{id})
   assert.deepEqual((await h.state()).importedSourceFacts,[])
   const authorityMove=await h.cmd('document-import.create',{label:'Synthetic revoked API read',sourceProvider:'qwilr'})
-  assert.equal((await h.send('/auth/operator/role',{operatorId:memberId,role:'owner'},h.owner)).status,200)
+  h.owner=await h.signIn(originalOwner.email)
+  const promotion=await h.send('/auth/operator/role',{operatorId:memberId,role:'owner'},h.owner)
+  assert.equal(promotion.status,200,promotion.text)
   const successor=await h.signIn(memberEmail)
   h.owner=await h.signIn(originalOwner.email)
   let demoted=false

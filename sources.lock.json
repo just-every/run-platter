@@ -653,6 +653,10 @@
       "sha256": "7da39f40aff2036c86ec6131cdf14120794762b431ef01fefa0b6f80b0a0ce6c",
       "executable": false
     },
+    "migrations/core/0100_imported_catalog_custody.sql": {
+      "sha256": "0a1bd3b694f223f21baf9d6f055c441e92319a8078d0aba53141bdea349f3ce1",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -2821,6 +2825,18 @@
       "sha256": "5177d49e5e5576d0c62c8d20419092542121c57a48da087f7430eed350d08f0c",
       "executable": false
     },
+    "src/platter/movein/qwilr-api-source.ts": {
+      "sha256": "33b18bbf138328ef6d2c3c9163e75d62499510bc560ea4e5c2d87450daada0cf",
+      "executable": false
+    },
+    "src/platter/movein/qwilr-api.ts": {
+      "sha256": "60a5c70a3d7af0e9bf9b94eababae62131fb7edaa25d33454302ac78a44bd079",
+      "executable": false
+    },
+    "src/platter/movein/qwilr-capture.ts": {
+      "sha256": "e4002283f248091c4acaf8e5ea7e1bea97fc8679625bfd96fcf32ab812d5b953",
+      "executable": false
+    },
     "src/platter/movein/qwilr-ignition-export.ts": {
       "sha256": "25867f346e6f529a3143fb3b8dc28cd10dab1d7c32571b497d2e2f272981cd89",
       "executable": false
@@ -3571,6 +3587,14 @@
     },
     "tests/provider-network.mjs": {
       "sha256": "1e506ab70fa34969d89b35c9f58d0db52e47f8a31d328f125da3e17513c44e00",
+      "executable": false
+    },
+    "tests/qwilr-api-browser.mjs": {
+      "sha256": "79ba2a91add6247a0d457dc8499bdde4d9eab051d1f3c2158592ac222e01c07b",
+      "executable": false
+    },
+    "tests/qwilr-api-fixture.mjs": {
+      "sha256": "9536ecae6730222865b23a46b4151814e5aee948682a1a364ca2f2c506bf1caa",
       "executable": false
     },
     "tests/recipients-browser.mjs": {

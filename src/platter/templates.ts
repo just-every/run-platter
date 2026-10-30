@@ -1,6 +1,7 @@
 import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields, unfilledVariableFields } from './variables'
 import { proposalFields } from './commands'
+import { packageInputs, pricedOptions } from './pricing'
 import { documentMediaIds } from './documents/media'
 import { methodsInput } from './collection-policy'
 import { documentOf, bindDocument } from './documents/blocks'
@@ -60,14 +61,17 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   if(content.document?.merge){
    const fields=unfilledVariableFields({...content,client_id:source.client_id})
    const {clientId:_sourceClient,...templateInput}=fields
+   const variablePrices=Object.keys(fields.document.merge.patterns).some(path=>/^\/(?:priceOne|priceTwo)$/.test(path)||/^\/(?:packages|pricingTables)\//.test(path)&&! /\/(?:label|name|description|unit|incomeAccount|taxCode)$/.test(path))
+   const options=variablePrices?fields.packages.map((p:any)=>({...p,cents:0,tables:fields.pricingTables.filter((t:any)=>t.optionId===p.id)}))
+    :pricedOptions(packageInputs(fields.packages,fields.pricingTables),fields.pricingTables).map((p:any,i:number)=>({...p,...(content.options[i].tax?{tax:content.options[i].tax}:{})}))
    // Retain editable pricing patterns, never a calculation using source values.
    Object.assign(content,{template_input:templateInput,title:fields.title,scope:fields.scope,terms:fields.terms,document:fields.document,
-    options:fields.packages.map((p:any)=>({...p,cents:0,tables:fields.pricingTables.filter((t:any)=>t.optionId===p.id)}))})
+    options})
    if(content.recipient_plan)content.recipient_plan=fields.recipientPlan
   }
   if(content.document)content.document=bindDocument(content.document)
   if(content.recipient_plan)content.recipient_plan=content.recipient_plan.map((r:any)=>({...r,email:null}))
-  if(content.template_input)content.template_input.recipientPlan=content.recipient_plan??[]
+  if(content.template_input){content.template_input.recipientPlan=content.recipient_plan??[];content.template_input.document=content.document}
   if(existing)await assertTemplateLocks(db,existing,content)
   const [pdf, savedExpiry, sections] = await Promise.all([
    db.prepare('SELECT enabled FROM p_pdf_settings WHERE proposal_id=?').bind(source.id).first<any>(),

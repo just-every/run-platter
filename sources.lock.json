@@ -3002,7 +3002,7 @@
       "executable": false
     },
     "src/platter/templates.ts": {
-      "sha256": "f3dbf06122894d83ebf4c057216183072ae83d879d173e510557efb110d17d24",
+      "sha256": "4ba7e451f3cd6255cd4345ea544411af994a777f6db6d85f646a823d700212b7",
       "executable": false
     },
     "src/platter/test-mail.ts": {
@@ -3630,7 +3630,7 @@
       "executable": false
     },
     "tests/templates-http.mjs": {
-      "sha256": "e16287d375b2b59457d566a871098da9694dee1eda62e7c1dab266cb012cc27a",
+      "sha256": "983819ce04dd69d1920e76f505bb4c676a3c9024fb57977d374b5d18900513ec",
       "executable": false
     },
     "tests/templates-journey.mjs": {

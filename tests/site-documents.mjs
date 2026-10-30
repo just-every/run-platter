@@ -718,7 +718,7 @@ test('REPORT-004 booked snapshots and independent receipt periods export and sch
     const app={...h,owner,cmd:(name,input,cookie=owner)=>h.cmd(name,input,cookie),state:(cookie=owner)=>h.state(cookie)}
     const client=await app.cmd('client.save',{name:'Reporting client',email:h.auth.OWNER_EMAIL})
     const first=await acceptRevenue(app,{clientId:client.id}),later=await acceptRevenue(app,{clientId:client.id,term:24,date:'2099-04-01',title:'Two-year care'})
-    for(const [id,amount,receivedOn] of [[first.id,'2500','2099-03-31'],[first.id,'1200','2099-04-01'],[later.id,'2400','2099-06-30']])await app.cmd('payment.record',{id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4500',consent:true})
+    for(const [id,amount,receivedOn] of [[first.id,'2500','2099-03-31'],[first.id,'1200','2099-04-01'],[later.id,'2400','2099-06-30']])await app.cmd('payment.record',{requestId:crypto.randomUUID(),id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4500',consent:true})
     await page.goto(h.origin+'/app?view=recorded-revenue')
     const ownerId=(await app.state()).actor.id
     await page.getByLabel('Currency',{exact:true}).selectOption('USD');await page.getByLabel('Owner',{exact:true}).selectOption(ownerId)

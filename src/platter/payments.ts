@@ -1,11 +1,14 @@
+import { allocatePayment, financeRoles, paymentRequestId } from './payment-allocations'
+import { permitted } from './permissions'
 import type { Bindings } from '../auth.server'
 import { providerCredential, providerJson } from './connections'
 import { commit, dollars, need, text, type Actor } from './model'
-const finance=['owner','admin','billing']
+const finance=financeRoles
 export async function paymentState(env:Bindings,a:Actor){
  if(!finance.includes(a.role))return []
+ const allocations=(await env.DB.prepare('SELECT payment_id,cents FROM p_payment_allocations').all<any>()).results
  const refunds=(await env.DB.prepare('SELECT * FROM p_refunds ORDER BY requested_at,id').all<any>()).results
- return (await env.DB.prepare('SELECT * FROM p_payment_records ORDER BY recorded_at,id').all<any>()).results.map(p=>({...p,refunds:refunds.filter(r=>r.payment_id===p.id),heldCents:refunds.filter(r=>r.payment_id===p.id).reduce((n,r)=>n+r.cents,0)}))
+ return (await env.DB.prepare('SELECT * FROM p_payment_records ORDER BY recorded_at,id').all<any>()).results.map(p=>({...p,allocatedCents:allocations.filter(x=>x.payment_id===p.id).reduce((n,x)=>n+x.cents,0),unallocatedCents:p.cents-allocations.filter(x=>x.payment_id===p.id).reduce((n,x)=>n+x.cents,0),refunds:refunds.filter(r=>r.payment_id===p.id),heldCents:refunds.filter(r=>r.payment_id===p.id).reduce((n,r)=>n+r.cents,0)}))
 }
 async function chargeFor(env:Bindings,id:string){
  const {secret}=await providerCredential(env,'workspace:stripe'),charge=await providerJson('https://api.stripe.com/v1/charges/'+encodeURIComponent(id),secret.token)
@@ -15,13 +18,17 @@ async function chargeFor(env:Bindings,id:string){
 export async function paymentCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  need(finance.includes(a.role),'Only owner, admins and billing manage payments and refunds',403)
  const db=env.DB
+ if(name==='payment.allocate')return allocatePayment(env,a,p)
  if(name==='payment.record'){
-  const id=text(p.id,'a proposal'),accepted=await db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(id).first<any>();need(accepted,'Accept the proposal before recording payment',409)
+  const id=(await permitted(db,a,p.id)).id,accepted=await db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(id).first<any>();need(accepted,'Accept the proposal before recording payment',409)
   const method=String(p.method);need(['check','wire','ach_credit'].includes(method),'Choose check, wire or ACH credit')
   const receivedOn=text(p.receivedOn,'the payment date',10);need(/^\d{4}-\d{2}-\d{2}$/.test(receivedOn)&&Number.isFinite(Date.parse(receivedOn+'T00:00:00Z'))&&new Date(receivedOn+'T00:00:00Z').toISOString().slice(0,10)===receivedOn,'Use a valid payment date')
-  const cents=dollars(p.amount,'a payment amount'),reference=text(p.reference,'a payment reference',200),recordId=crypto.randomUUID()
+  const cents=dollars(p.amount,'a payment amount'),reference=text(p.reference,'a payment reference',200),recordId=crypto.randomUUID(),requestId=paymentRequestId(p.requestId)
+  need((p.revision===undefined||Number(p.revision)===accepted.revision)&&(p.currency===undefined||p.currency===accepted.currency),'The accepted agreement changed. Reload before recording.',409)
   need(p.consent===true||p.consent==='yes','Confirm that the money was received')
-  await commit(db,a,[db.prepare('INSERT INTO p_payment_records(id,proposal_id,revision,currency,cents,method,reference,received_on,recorded_by,recorded_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(recordId,id,accepted.revision,accepted.currency,cents,method,reference,receivedOn,a.id,Date.now())])
+  const previous=await db.prepare('SELECT * FROM p_payment_records WHERE request_id=?').bind(requestId).first<any>()
+  if(previous){need(previous.proposal_id===id&&previous.revision===accepted.revision&&previous.currency===accepted.currency&&previous.cents===cents&&previous.method===method&&previous.reference===reference&&previous.received_on===receivedOn,'This request id already names a different receipt',409);return{id:previous.id,proposalId:id,recorded:true}}
+  await commit(db,a,[db.prepare('INSERT INTO p_payment_records(id,proposal_id,revision,currency,cents,method,reference,received_on,recorded_by,recorded_at,request_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(recordId,id,accepted.revision,accepted.currency,cents,method,reference,receivedOn,a.id,Date.now(),requestId)],false,{sql:'EXISTS(SELECT 1 FROM p_acceptances WHERE proposal_id=? AND revision=? AND currency=? AND snapshot=?)',values:[id,accepted.revision,accepted.currency,accepted.snapshot]})
   return {id:recordId,proposalId:id,recorded:true}
  }
  if(name==='payment.bind'){

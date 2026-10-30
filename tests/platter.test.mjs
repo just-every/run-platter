@@ -1803,7 +1803,7 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   const people={};for(const role of ['admin','manager','sales','content_editor','viewer','billing']){const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[]});people[role]=cookie}
   const {p,path}=await sent(h),cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},cookie)).status,200);accepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-2402',webhookSecret:'synthetic-platter-2403',consent:true})
-  for(const role of ['manager','sales','content_editor','viewer']){await h.cmd('payment.bind',{id:p.id,chargeId:'synthetic-platter-2401',consent:true},people[role],403);await h.cmd('payment.record',{id:p.id,amount:'1',receivedOn:'2026-10-21',method:'wire',reference:'Synthetic reference',consent:true},people[role],403)}
+  for(const role of ['manager','sales','content_editor','viewer']){await h.cmd('payment.bind',{id:p.id,chargeId:'synthetic-platter-2401',consent:true},people[role],403);await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:p.id,amount:'1',receivedOn:'2026-10-21',method:'wire',reference:'Synthetic reference',consent:true},people[role],403)}
   assert.equal(calls.length,1);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_payment_records').first()).n,0)
   const linked=await h.cmd('payment.bind',{id:p.id,chargeId:'synthetic-platter-2401',consent:true},people.billing)
   const before=calls.length;await h.cmd('payment.refund',{paymentId:linked.id,amount:'100',requestId:'synthetic-platter-2404',reason:'Synthetic partial refund',consent:true},people.sales,403);assert.equal(calls.length,before);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_refunds').first()).n,0)
@@ -1813,7 +1813,7 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   assert.deepEqual(attempts.map(r=>r.status).sort(),[200,409]);assert.equal(refunded,40000)
   uncertain=true;const pending={...refund,amount:'50',requestId:'synthetic-platter-2407'};assert.equal((await h.cmd('payment.refund',pending,people.billing)).status,'needs_review');const pendingCalls=calls.length;assert.equal((await h.cmd('payment.refund',pending,people.billing)).status,'needs_review');assert.equal(calls.length,pendingCalls)
   await h.cmd('payment.refund',{...refund,amount:'200',requestId:'synthetic-platter-2408'},people.billing,409);assert.equal(calls.filter(c=>c.method==='POST').length,3)
-  for(const [index,method] of ['check','wire','ach_credit'].entries())await h.cmd('payment.record',{id:p.id,amount:'1',receivedOn:'2026-10-21',method,reference:'synthetic-platter-'+(2600+index),consent:true},people.billing)
+  for(const [index,method] of ['check','wire','ach_credit'].entries())await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:p.id,amount:'1',receivedOn:'2026-10-21',method,reference:'synthetic-platter-'+(2600+index),consent:true},people.billing)
   const records=(await h.state(people.billing)).paymentRecords;assert.equal(records.length,4);assert.equal(records.find(r=>r.id===linked.id).heldCents,45000);assert.deepEqual((await h.state(people.sales)).paymentRecords,[])
   assert.equal((await h.state()).proposals.find(r=>r.id===p.id).acceptance.depositCents,60000,'refunds never rewrite the accepted deposit')
   // Recorded revenue is a pipeline view, so CSV and scheduled email retain the same rows, scope and exact money.
@@ -1822,7 +1822,7 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   const client=await h.cmd('client.save',{name:'Synthetic second client',email:'revenue-client@synthetic-platter.example'}),second=await h.cmd('proposal.prepare',{...offer,title:'Sales owned revenue',clientId:client.id},people.sales)
   await h.cmd('proposal.approve',{id:second.id,version:1,revision:1});const secondSend=await h.cmd('proposal.send',{id:second.id,version:2},people.sales),secondPath=new URL(secondSend.shareUrl).pathname,secondCookie=await verified(h,secondPath)
   assert.equal((await h.send(secondPath+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},secondCookie)).status,200)
-  await h.cmd('payment.record',{id:second.id,amount:'7',receivedOn:'2026-10-21',method:'check',reference:'synthetic-platter-4200',consent:true},people.billing);await h.cmd('invoice.export',{id:p.id})
+  await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:second.id,amount:'7',receivedOn:'2026-10-21',method:'check',reference:'synthetic-platter-4200',consent:true},people.billing);await h.cmd('invoice.export',{id:p.id})
   const query='view=recorded-revenue&sort=value&direction=desc',totals={currency:'USD',count:2,valueCents:480000,oneOffCents:480000,firstYearCents:480000,receivedCents:61000,refundedCents:40000,netReceivedCents:21000,uncertainRefundCents:5000,exportedDepositCents:60000}
   for(const [role,cookie] of Object.entries({owner:h.owner,...people})){
    const report=await h.send('/api/platter/pipeline?'+query,undefined,cookie)
@@ -1840,7 +1840,7 @@ test('TEAM-001 billing records received payments and refunds a verified Stripe d
   const ownerId=(await h.state()).actor.id
   const first=await acceptRevenue(h,{clientId:client.id}),later=await acceptRevenue(h,{clientId:client.id,term:24,date:'2099-04-01',title:'Two-year care'})
   const other=await acceptRevenue(h,{clientId:client.id,cookie:people.sales,title:'Sales care'}),aud=await acceptRevenue(h,{clientId:client.id,currency:'AUD',title:'Historical AUD care'})
-  for(const [id,amount,receivedOn] of [[first.id,'2500','2099-03-31'],[first.id,'1200','2099-04-01'],[later.id,'2400','2099-06-30'],[other.id,'900','2099-04-01'],[aud.id,'700','2099-04-01']])await h.cmd('payment.record',{id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4300',consent:true},people.billing)
+  for(const [id,amount,receivedOn] of [[first.id,'2500','2099-03-31'],[first.id,'1200','2099-04-01'],[later.id,'2400','2099-06-30'],[other.id,'900','2099-04-01'],[aud.id,'700','2099-04-01']])await h.cmd('payment.record',{requestId:crypto.randomUUID(),id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4300',consent:true},people.billing)
   const filters=new URLSearchParams({view:'recorded-revenue',currency:'USD',owner:ownerId,bookedFrom:'2099-01-15',bookedTo:'2099-03-31',receivedFrom:'2099-04-01',receivedTo:'2099-06-30',sort:'value',direction:'desc'}).toString()
   const read=async query=>{const r=await h.send('/api/platter/pipeline?'+query,undefined,h.owner);assert.equal(r.status,200,r.text);return r.value}
   const native=await read(filters)
@@ -2984,7 +2984,7 @@ test('AUTO-004 scoped REST drafting, immutable owner keys and human-only authori
   await h.cmd('proposal.approve',{id:made.value.id,version:3,revision:2});const sent=await h.cmd('proposal.send',{id:made.value.id,version:4});assert.ok(sent.shareUrl)
   assert.equal((await api('/proposals/'+made.value.id+'/variables',{version:5,values:{'Client.Company':'Changed'}},key.token)).status,400)
   const path=new URL(sent.shareUrl).pathname,cookie=await verified(h,path);assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic API signer',optionId:'one',consent:true},cookie)).status,200)
-  const payment=await h.cmd('payment.record',{id:made.value.id,method:'wire',amount:'600',receivedOn:'2026-10-25',reference:'synthetic-platter-95',consent:true})
+  const payment=await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:made.value.id,method:'wire',amount:'600',receivedOn:'2026-10-25',reference:'synthetic-platter-95',consent:true})
   assert.deepEqual((await api('/payments',undefined,key.token)).value,[{id:payment.id,proposalId:made.value.id,amountCents:60000,currency:'USD',method:'wire',receivedOn:'2026-10-25'}])
   const agreements=(await api('/agreements',undefined,key.token)).value;assert.equal(agreements.length,1);assert.equal(agreements[0].id,made.value.id);assert.equal(agreements[0].totalCents,240000);assert.equal(agreements[0].revision,2)
   assert.equal((await api('/proposals',undefined,readonly.token)).value.find(r=>r.id===made.value.id).status,'accepted')
@@ -3662,4 +3662,56 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
   const expired = await review(); await h.mf.getWorker().then(w => w.scheduled({ scheduledTime: new Date(Date.now() + 901000), cron: '*/15 * * * *' })); await apply(expired, h.owner, 409)
  } finally { await h.close() }
  await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
+})
+
+test('PAY-007 received offline money reconciles frozen dated milestones once and refuses unsafe allocations without writes',async()=>{
+ const h=await harness({assetsDirectory:'public'});try{
+ const {allocationAgreement,receiptInput,allocationInput}=await import('./payment-allocation-fixture.mjs')
+ const member=async role=>{const email='synthetic-platter-9902-'+role+String.fromCharCode(64)+'example.test';await h.send('/auth/invite',{email,displayName:role,role:'member'},h.owner);const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;await h.cmd('member.set',{operatorId:id,version:0,role,teams:[]});return{cookie,id}}
+ const billing=await member('billing'),sales=await member('sales'),agreement=await allocationAgreement(h)
+ const snapshot=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(agreement.id).first(),revisions=(await h.db.prepare('SELECT * FROM p_revisions WHERE proposal_id=?').bind(agreement.id).all()).results
+ const beforePdf=await h.mf.dispatchFetch(h.origin+agreement.path+'/agreement.pdf',{headers:{cookie:agreement.cookie}});assert.equal(beforePdf.status,200);const agreementBytes=new Uint8Array(await beforePdf.arrayBuffer())
+ const business=async()=>{const result={};for(const table of ['p_payment_records','p_payment_allocations','p_acceptances','p_proposals','p_revisions','p_invoices','p_mail','p_audit'])result[table]=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results;return result}
+ const refuse=async(name,input,cookie=h.owner,status=409)=>{const before=await business();await h.cmd(name,input,cookie,status);assert.deepEqual(await business(),before,'a refused financial request changes no business record')}
+ const checkInput=receiptInput(agreement.id),check=await h.cmd('payment.record',checkInput,billing.cookie)
+ assert.equal((await h.cmd('payment.record',checkInput,billing.cookie)).id,check.id)
+ await refuse('payment.record',{...checkInput,amount:'301'},billing.cookie)
+ await refuse('payment.record',{...checkInput,requestId:crypto.randomUUID(),revision:2},billing.cookie)
+ await refuse('payment.record',{...checkInput,requestId:crypto.randomUUID(),currency:'AUD'},billing.cookie)
+ await refuse('payment.record',{...checkInput,requestId:crypto.randomUUID(),receivedOn:'2030-02-30'},billing.cookie,400)
+ await refuse('payment.record',{...checkInput,requestId:crypto.randomUUID(),consent:false},billing.cookie,400)
+ const wire=await h.cmd('payment.record',receiptInput(agreement.id,'wire','400'),billing.cookie)
+ const allocation=await allocationInput(h,agreement.id,check.id)
+ await refuse('payment.allocate',allocation,sales.cookie,403)
+ for(const change of [{amount:'300.01'},{revision:2},{currency:'AUD'},{rowIndex:0},{rowIndex:99},{rowHash:'0'.repeat(64)},{agreementHash:'0'.repeat(64)},{paymentVersion:0},{remainingCents:69999}])await refuse('payment.allocate',{...allocation,...change},billing.cookie)
+ await refuse('payment.allocate',{...allocation,consent:false},billing.cookie,400)
+ await h.cmd('payment.allocate',allocation,billing.cookie)
+ let state=await h.state(billing.cookie),row=state.paymentSchedules.find(x=>x.proposalId===agreement.id).rows[0]
+ assert.deepEqual([row.amountCents,row.allocatedCents,row.remainingCents,row.status],[70000,30000,40000,'partially paid'])
+ const once=(await business()).p_payment_allocations;assert.equal((await h.cmd('payment.allocate',allocation,billing.cookie)).id,allocation.requestId);assert.deepEqual((await business()).p_payment_allocations,once)
+ await refuse('payment.allocate',{...allocation,amount:'299'},billing.cookie)
+ await refuse('payment.allocate',{...allocation,requestId:crypto.randomUUID()},billing.cookie)
+ const second=await allocationInput(h,agreement.id,wire.id,'400');await h.cmd('payment.allocate',second,billing.cookie)
+ state=await h.state(billing.cookie);row=state.paymentSchedules.find(x=>x.proposalId===agreement.id).rows[0]
+ assert.deepEqual([row.allocatedCents,row.remainingCents,row.status],[70000,0,'paid'])
+ assert.deepEqual(state.paymentRecords.filter(x=>x.proposal_id===agreement.id).map(x=>[x.cents,x.allocatedCents,x.unallocatedCents]).sort((a,b)=>a[0]-b[0]),[[30000,30000,0],[40000,40000,0]])
+ const ach=await h.cmd('payment.record',receiptInput(agreement.id,'ach_credit','700'),billing.cookie)
+ await refuse('payment.allocate',await allocationInput(h,agreement.id,ach.id,'1'),billing.cookie)
+ const another=await allocationAgreement(h),otherReceipt=await h.cmd('payment.record',receiptInput(another.id,'ach_credit','700'),billing.cookie)
+ await refuse('payment.allocate',{...await allocationInput(h,another.id,otherReceipt.id,'700'),paymentId:ach.id},billing.cookie)
+ const race=await allocationInput(h,another.id,otherReceipt.id,'700')
+ const results=await Promise.all([race,{...race,requestId:crypto.randomUUID()}].map(input=>h.send('/api/platter/command',{name:'payment.allocate',input},billing.cookie)))
+ assert.deepEqual(results.map(x=>x.status).sort(),[200,409]);assert.equal((await h.state()).paymentSchedules.find(x=>x.proposalId===another.id).rows[0].remainingCents,0)
+ const duplicate=receiptInput(another.id,'wire','1'),attempts=await Promise.all([1,2].map(()=>h.send('/api/platter/command',{name:'payment.record',input:duplicate},billing.cookie)))
+ assert.ok(attempts.every(x=>[200,409].includes(x.status)));assert.equal((await h.db.prepare('SELECT count(*) n FROM p_payment_records WHERE request_id=?').bind(duplicate.requestId).first()).n,1)
+ assert.equal((await h.cmd('payment.record',duplicate,billing.cookie)).recorded,true)
+ assert.deepEqual(await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(agreement.id).first(),snapshot)
+ assert.deepEqual((await h.db.prepare('SELECT * FROM p_revisions WHERE proposal_id=?').bind(agreement.id).all()).results,revisions)
+ const afterPdf=await h.mf.dispatchFetch(h.origin+agreement.path+'/agreement.pdf',{headers:{cookie:agreement.cookie}});assert.deepEqual(new Uint8Array(await afterPdf.arrayBuffer()),agreementBytes)
+ assert.equal((await h.db.prepare('SELECT count(*) n FROM p_invoices').first()).n,0,'informational schedule reconciliation never issues a provider invoice')
+ assert.deepEqual((await h.state(sales.cookie)).paymentAllocations,[]);assert.deepEqual((await h.state(sales.cookie)).paymentSchedules,[])
+ await h.cmd('member.set',{operatorId:billing.id,version:1,role:'sales',teams:[]})
+ await refuse('payment.allocate',race,billing.cookie,403)
+ await refuse('payment.record',{...duplicate,requestId:crypto.randomUUID()},billing.cookie,403)
+ }finally{await h.close()}
 })

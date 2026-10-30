@@ -59,7 +59,7 @@ export async function reviewedSyncJourney(verified) {
   await apply(await fresh()); assert.equal(edge.state.line_items[0].properties.price, '120.50'); assert.equal(edge.state.line_items[0].properties.amount, '301.25'); assert.equal(edge.state.deal.properties.amount, '361.22'); assert.equal(edge.notes.length, 2, 'a fresh explicit review reconciles changed provider prices without duplicating timeline notes')
   const accepted = await h.send(path + '/action?name=accept', { name: 'Taylor Reed', optionId: 'one', consent: true }, clientCookie); assert.equal(accepted.status, 200, accepted.text)
   await apply(await fresh()); assert.equal(edge.state.deal.properties.dealstage, syncMapping.wonStage); assert.equal(edge.state.deal.properties.synthetic_status, 'signed'); assert.equal(edge.notes.length, 3, 'signing does not manufacture a paid event')
-  await h.cmd('payment.record', { id: made.id, method: 'wire', amount: '361.22', receivedOn: '2030-01-01', reference: 'synthetic-platter-4701', consent: true })
+  await h.cmd('payment.record', { requestId:crypto.randomUUID(), id: made.id, method: 'wire', amount: '361.22', receivedOn: '2030-01-01', reference: 'synthetic-platter-4701', consent: true })
   await apply(await fresh()); assert.equal(edge.state.deal.properties.synthetic_status, 'paid'); assert.equal(edge.notes.length, 4)
   assert.deepEqual(edge.notes.map(n => n.properties.hs_note_body.match(/: (\w+)\./)[1]), ['sent', 'viewed', 'signed', 'paid'])
   assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_crm_sync_consents').first()).n, 4)

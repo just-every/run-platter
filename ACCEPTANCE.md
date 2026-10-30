@@ -9,9 +9,9 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Core | 14 | 100 | 45 | 159 |
-| Agent surface | 0 | 0 | 4 | 4 |
+| Agent surface | 0 | 4 | 0 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 14 | 104 | 45 | 163 |
 
 Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -2083,8 +2083,8 @@ Core · target · **partial** · Cites BASE-AGENT-001, BASE-AGENT-002, BASE-AGEN
 5. Premature fulfillment and an unauthorized person’s queue decision are refused; tool results exclude invitation credentials.
 6. Use the queue at desktop/phone widths and archive requests and resolutions without credentials.
 
-**Evidence.** `src/platter/mcp.ts`; `src/platter/send-requests.ts`; `tests/platter.test.mjs` — “AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund”; `tests/site.test.mjs` — “AI-003 desktop and phone owners review MCP requests, approve/send explicitly, and dismiss stale requests” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
-**Gap.** Delivered: Schemas, search, drafting, status, honest engagement and revision-bound send requests use the public MCP door; the owner queue and archives retain request/resolution history. Missing “AI-003 complete mcp server for ai assistants journey”: The same MCP workflow classifies and executes permitted calls under held and all-autonomous company policies instead of relying on the legacy hard-coded tool-name refusals.
+**Evidence.** `src/platter/agent/index.ts`; `agent-surface.json`; `tests/agent-native-journey.mjs`; `src/platter/send-requests.ts`; `tests/platter.test.mjs` — “AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund”; `tests/site.test.mjs` — “AI-003 desktop and phone owners review MCP requests, approve/send explicitly, and dismiss stale requests” (registered through tests/site-lifecycle.mjs); `tests/archive.test.mjs` — “FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences”
+**Gap.** Delivered: One shared door serves both supported MCP eras, signed company policy and the existing local preparation credentials. Native read, draft, template, revision and send-review request tools pass autonomous and held standard-class policies, current sponsor checks, consent refusal, local and Business Pause, immutable attribution, replay and audit. Missing: permitted native external sending, commitment approval/signing, money operations and their exact-revision journeys; inactive and excluded sponsor fixtures; complete role parity. Resources, events, prompts and subscriptions are undeclared, and multi-sponsor, mail edges, queued and timed lifecycle, resource refresh and dual-host proof remain partial.
 
 #### AI-004 — Explainable price suggestions
 
@@ -2266,7 +2266,7 @@ Core · push-further · **partial** · Cites BASE-AGENT-009, BASE-AGENT-011
 
 #### SURFACE-001 — Proposal registry and role parity
 
-Agent surface · target · **missing** · From new · Cites BASE-AGENT-002, BASE-AGENT-003, BASE-AGENT-013
+Agent surface · target · **partial** · From new · Cites BASE-AGENT-002, BASE-AGENT-003, BASE-AGENT-013
 
 **Requirement.** The proposal registry covers exactly the Core jobs and non-tool reasons in this area.
 
@@ -2275,12 +2275,12 @@ Agent surface · target · **missing** · From new · Cites BASE-AGENT-002, BASE
 2. Each tool returns the native action’s proposal state, error and event type.
 3. The registry documents every listed record URI, event and specialist prompt.
 
-**Evidence.** None.
-**Gap.** The seed-specific MCP registry, computed-class proof and Base policy-matrix conformance are not implemented.
+**Evidence.** `agent-surface.json`; `tests/agent-native-journey.mjs`; `rer verify` agent-door conformance — 873/873 points on the declared preparation surface with released rer 0.2.93
+**Gap.** The core preparation registry is implemented; remaining native product verbs in the Agent surface tool table are not exposed. Undeclared families: resources, events, prompts and subscriptions. Broader role-parity and stranger-specialist work remain.
 
 #### SURFACE-002 — Proposal classes from business facts
 
-Agent surface · target · **missing** · From new · Cites BASE-AGENT-006, BASE-AGENT-007
+Agent surface · target · **partial** · From new · Cites BASE-AGENT-006, BASE-AGENT-007
 
 **Requirement.** Proposal classifiers use the saved revision, recipient, provider and affected records to apply the class computations above.
 
@@ -2294,12 +2294,12 @@ Agent surface · target · **missing** · From new · Cites BASE-AGENT-006, BASE
 7. Irreversible erasure/restore replacement computes destructive with item count; W-9/identity/bank/card records add sensitive with record count and kind.
 8. Running automation/connector changes compute live with service identity; an argument or record-text claim cannot change any computed class.
 
-**Evidence.** None.
-**Gap.** The seed-specific MCP registry, computed-class proof and Base policy-matrix conformance are not implemented.
+**Evidence.** `agent-surface.json`; `tests/agent-native-journey.mjs`; `rer verify` agent-door conformance — 873/873 points on the declared preparation surface with released rer 0.2.93
+**Gap.** The implemented preparation and read tools compute standard from their internal-record effect. External, money, commitment, accounts, gated, access, security, destructive, sensitive and live tools remain outside this preparation registry; their classifiers and journeys remain required before exposure.
 
 #### SURFACE-003 — Exact proposal decisions and custody
 
-Agent surface · target · **missing** · From new · Cites BASE-AGENT-007, BASE-AGENT-008, BASE-AGENT-012
+Agent surface · target · **partial** · From new · Cites BASE-AGENT-007, BASE-AGENT-008, BASE-AGENT-012
 
 **Requirement.** The company-policy journey uses Platter’s exact revision and immutable-agreement semantics.
 
@@ -2309,12 +2309,12 @@ Agent surface · target · **missing** · From new · Cites BASE-AGENT-007, BASE
 3. Under all-autonomous policy a permitted agent offer/signature decision carries its own commitment attribution.
 4. A restored proposal or schedule gains no earlier recipient, provider or execution authority.
 
-**Evidence.** None.
-**Gap.** The seed-specific MCP registry, computed-class proof and Base policy-matrix conformance are not implemented.
+**Evidence.** `agent-surface.json`; `tests/agent-native-journey.mjs`; `rer verify` agent-door conformance — 873/873 points on the declared preparation surface with released rer 0.2.93
+**Gap.** Version-bound preparation and send-review requests prove policy, review, attribution and replay. Native sending, approval/signature decisions and restored execution remain unproved through the company door. Undeclared queued lifecycle, multi-sponsor and resource-refresh families remain partial.
 
 #### SURFACE-004 — A seeded service-firm week through MCP
 
-Agent surface · target · **missing** · From new · Cites BASE-AGENT-005, BASE-AGENT-007, BASE-AGENT-008, BASE-AGENT-009, BASE-AGENT-013
+Agent surface · target · **partial** · From new · Cites BASE-AGENT-005, BASE-AGENT-007, BASE-AGENT-008, BASE-AGENT-009, BASE-AGENT-013
 
 **Requirement.** A stranger specialist given only the installation URL runs the proposal coordinator’s week through MCP under two complete company policies.
 
@@ -2325,8 +2325,8 @@ Agent surface · target · **missing** · From new · Cites BASE-AGENT-005, BASE
 4. Before the company policy is complete, the first call changes no proposal and returns the setup question; an all-class answer covers every declared class.
 5. Every run preserves truthful preparer/decider attribution and the same role scope as the sponsoring person.
 
-**Evidence.** None.
-**Gap.** The seed-specific MCP registry, computed-class proof and Base policy-matrix conformance are not implemented.
+**Evidence.** `agent-surface.json`; `tests/agent-native-journey.mjs`; `rer verify` agent-door conformance — 873/873 points on the declared preparation surface with released rer 0.2.93
+**Gap.** The declared proposal preparation journey passes autonomous and held policies, Pause, consent refusal, replay and audit. The complete service-firm week, provider edges, client signing/payment, handoff and renewal remain unimplemented through MCP. Mail edges, timed lifecycle and stranger-specialist completion remain partial.
 
 ## Later
 

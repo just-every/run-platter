@@ -1,3 +1,4 @@
+// Template definitions and assignments restore as data; live owner checks precede new draft preassignment.
 // SMS assent and suppression are business history; invitation and sender authority stay local.
 // Auth identities retain approval authors. Credentials, invitations and messages stay local.
 export default {

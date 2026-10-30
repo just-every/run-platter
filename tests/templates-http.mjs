@@ -186,4 +186,95 @@ export async function templatesHttp(h) {
  assert.deepEqual(await paymentDraft(paymentSecond.id),frozen[1])
  await h.cmd('template.delivery',{id:paymentTemplate.id,version:3,methodsProvided:'yes'})
  assert.deepEqual((await paymentDraft((await paymentStart(4)).id)).collectionPolicy,{enabled:false,completion:'off',methods:[]})
+ await templateRolesHttp(h,member)
+}
+
+export function templateRoleData(owner) {
+ const mailbox=n=>['synthetic-platter-'+n,'example.test'].join('@')
+ const recipients=[{id:'client',name:'Client signer',role:'signer',group:1,email:mailbox(1101)},{id:'cfo',name:'Client CFO approver',role:'approver',group:2,email:mailbox(1102)},{id:'owner',name:'Owner countersigner',role:'countersigner',group:3,email:owner}]
+ const document={version:1,blocks:[
+  {id:'signature',type:'signature',title:'Client signature',text:'',recipientRole:'slot',recipientId:'client'},
+  {id:'date',type:'field',title:'Signing date',text:'',fieldKind:'date',required:true,recipientRole:'slot',recipientId:'client'},
+  {id:'po',type:'field',title:'Required PO',text:'',fieldKind:'text',required:true,recipientRole:'slot',recipientId:'cfo'},
+  {id:'counter',type:'signature',title:'Owner signature',text:'',recipientRole:'slot',recipientId:'owner'},
+ ]}
+ return {recipients,document}
+}
+export async function templateRolesFixture(h) {
+ const data=templateRoleData(h.auth.OWNER_EMAIL)
+ const client=await h.cmd('client.save',{name:'Synthetic Platter template client',email:data.recipients[0].email})
+ const fields={clientId:client.id,title:'Synthetic Platter role custody',scope:'Reviewed independent services',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:30,recipientPlan:data.recipients,document:data.document}
+ const source=await h.cmd('proposal.prepare',fields)
+ const template=await h.cmd('template.save',{id:source.id,version:1,name:'Three role template',preassignedOwner:'owner'})
+ const first=await h.cmd('template.start',{id:template.id,version:1,clientId:client.id})
+ return {data,client,fields,source,template,first}
+}
+async function templateRolesHttp(h,member) {
+ const {data,client,fields,source,template,first}=await templateRolesFixture(h)
+ const erased=await h.cmd('client.save',{name:'Synthetic Platter former CFO',email:data.recipients[1].email})
+ await h.cmd('client.erase',{id:erased.id,confirmName:'Synthetic Platter former CFO'})
+ const read=async()=>{const tables=(await h.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB 'p_*' ORDER BY name").all()).results;return Promise.all(tables.map(async({name})=>({name,rows:(await h.db.prepare('SELECT * FROM "'+name+'" ORDER BY rowid').all()).results})))}
+ const unchanged=async action=>{const before=await read();await action();assert.deepEqual(await read(),before,'Refused template operation writes nothing')}
+ const state=async id=>(await h.state()).proposals.find(p=>p.id===id),plan=p=>typeof p.recipient_plan==='string'?JSON.parse(p.recipient_plan):p.recipient_plan
+ const definition=(await h.state()).templates.find(t=>t.id===template.id).snapshot.template_recipients
+ assert.deepEqual(definition.assignments,{signature:'client',date:'client',po:'cfo',counter:'owner'})
+ assert.deepEqual(definition.roles.map(r=>[r.id,r.group,r.identity,r.preassignedOwnerId]),[['client',1,'mailbox',null],['cfo',2,'mailbox',null],['owner',3,'mailbox',(await h.state()).actor.id]])
+ assert.ok(!JSON.stringify(definition).includes('@'))
+ const original=await state(first.id)
+ assert.deepEqual(plan(original).map(r=>[r.id,r.role,r.group,r.email]),data.recipients.map(r=>[r.id,r.role,r.group,r.id==='owner'?h.auth.OWNER_EMAIL:null]))
+ assert.deepEqual(original.document,data.document);assert.deepEqual(original.template_recipients,definition)
+ assert.equal(original.approved_by,null);assert.deepEqual(original.recipientLinks,[]);assert.deepEqual(original.recipientSignatures,[])
+ await h.cmd('proposal.approve',{id:first.id,version:1,revision:1})
+ await unchanged(async()=>{const r=await h.send('/api/platter/command',{name:'proposal.send',input:{id:first.id,version:2}},h.owner);assert.equal(r.status,409);assert.match(r.text,/Client signer, Client CFO approver/)})
+ const edit={id:template.id,version:1,roles:definition.roles.map(r=>({...r,group:r.id==='cfo'?1:r.id==='client'?2:3})),preassignedOwner:'owner'}
+ await unchanged(()=>h.cmd('template.recipients',edit,member,403))
+ await unchanged(()=>h.cmd('template.start',{id:template.id,version:1,clientId:client.id},member,403))
+ for(const input of [
+  {...edit,roles:[...edit.roles.slice(0,2),{...edit.roles[2],identity:'link'}]},
+  {...edit,roles:edit.roles.map(r=>({...r,name:'Repeated role'}))},
+  {...edit,preassignedOwner:'cfo'},
+    {...edit,roles:edit.roles.map(r=>({...r,email:data.recipients[0].email}))},
+ ])await unchanged(()=>h.cmd('template.recipients',input,h.owner,400))
+ await unchanged(()=>h.cmd('template.recipients',{...edit,assignments:{...definition.assignments,signature:'cfo'}},h.owner,400))
+ await h.cmd('template.recipients',edit)
+ await unchanged(()=>h.cmd('template.recipients',edit,h.owner,409))
+ await unchanged(()=>h.cmd('template.start',{id:template.id,version:1,clientId:client.id},h.owner,409))
+ const second=await h.cmd('template.start',{id:template.id,version:2,clientId:client.id})
+ assert.deepEqual((await state(first.id)).template_recipients,definition)
+ assert.deepEqual(plan(await state(second.id)).map(r=>[r.id,r.group,r.email]),[['client',2,null],['cfo',1,null],['owner',3,h.auth.OWNER_EMAIL]])
+ await h.cmd('recipient.save',{id:first.id,version:2,recipients:data.recipients})
+ await h.cmd('proposal.approve',{id:first.id,version:3,revision:2})
+ await h.cmd('proposal.send',{id:first.id,version:4})
+ const sent=await state(first.id),copy=await h.cmd('proposal.duplicate',{id:first.id,version:sent.version})
+ const duplicate=await state(copy.id)
+ assert.deepEqual(plan(duplicate),plan(original));assert.deepEqual(duplicate.template_recipients,definition);assert.deepEqual(duplicate.document,original.document)
+ assert.deepEqual(duplicate.recipientLinks,[]);assert.deepEqual(duplicate.recipientSignatures,[]);assert.equal(duplicate.acceptance,undefined);assert.equal(duplicate.approved_by,null)
+ assert.equal((await h.db.prepare('SELECT count(*) n FROM p_shares WHERE proposal_id=?').bind(copy.id).first()).n,0)
+ await unchanged(()=>h.cmd('recipient.save',{id:copy.id,version:1,recipients:data.recipients},member,403))
+ const revisedRoles=data.recipients.map(r=>({...r,group:r.group+3}))
+ await h.cmd('recipient.save',{id:copy.id,version:1,recipients:revisedRoles})
+ const editedCopy=await h.cmd('proposal.duplicate',{id:copy.id,version:2}),editedDraft=await state(editedCopy.id)
+ assert.deepEqual(plan(editedDraft),revisedRoles.map(r=>({...r,email:r.id==='owner'?r.email:null})))
+ assert.deepEqual(editedDraft.template_recipients,definition)
+ const extra={...data.document,blocks:[...data.document.blocks,{id:'extra',type:'signature',title:'Unassigned extra signature',text:'',recipientRole:'slot',recipientId:'missing'}]}
+ await h.cmd('proposal.document',{id:source.id,version:1,document:extra})
+ await unchanged(()=>h.cmd('template.save',{id:source.id,version:2,name:'Invalid extra signature',preassignedOwner:'owner'},h.owner,400))
+ await unchanged(()=>h.cmd('template.save',{id:source.id,version:1,name:'Stale source'},h.owner,409))
+ assert.deepEqual((await state(first.id)).template_recipients,definition)
+ // Replacing a role-bearing shared template is also a definition change.
+ const shared=await h.cmd('template.save',{id:first.id,version:sent.version,name:'Shared role definitions',shared:true,shareConsent:true,preassignedOwner:'owner'})
+ const ordinary=await h.cmd('proposal.prepare',{...fields,recipientPlan:[],document:{version:1,blocks:[]}})
+ const person=(await h.state(member)).actor
+ await h.cmd('member.set',{operatorId:person.id,version:0,role:'manager',teams:[]})
+ await h.cmd('proposal.share',{id:ordinary.id,operatorId:person.id})
+ await unchanged(()=>h.cmd('template.save',{id:ordinary.id,version:1,name:'Unauthorized role deletion',templateId:shared.id,templateVersion:1},member,403))
+ // A real ownership handoff cannot reuse the former owner's explicit preassignment.
+ const key=await h.cmd('agent.create',{label:'Synthetic Platter template custody'})
+ const owner=(await h.state()).actor,fresh=await h.signIn(owner.email)
+ assert.equal((await h.send('/auth/operator/role',{operatorId:person.id,role:'owner'},fresh)).status,200)
+ const successor=await h.signIn(person.email)
+ assert.equal((await h.send('/auth/operator/role',{operatorId:owner.id,role:'admin'},successor)).status,200)
+ await unchanged(()=>h.cmd('template.start',{id:shared.id,version:1,clientId:client.id},successor,409))
+ await unchanged(()=>h.cmd('proposal.duplicate',{id:copy.id,version:2},successor,409))
+ await unchanged(async()=>{const r=await h.send('/api/platter/agent/command',{name:'template.recipients',input:{id:shared.id,version:1}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,401)})
 }

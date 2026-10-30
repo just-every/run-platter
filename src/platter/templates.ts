@@ -1,3 +1,4 @@
+import { captureTemplateRecipients, templateRecipients, bindTemplateAssignments, startTemplateRecipients, editedTemplateRecipients } from './template-recipients'
 import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields } from './variables'
 import { proposalFields } from './commands'
@@ -38,10 +39,18 @@ async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false)
 }
 
 export async function templateCommand(env: Bindings, a: Actor, name: string, input: Record<string, unknown>) {
- need(name === 'template.save' || name === 'template.start' || name === 'template.delivery', 'Unknown template command', 404)
+ need(name === 'template.save' || name === 'template.start' || name === 'template.delivery' || name === 'template.recipients', 'Unknown template command', 404)
  need(['owner','admin','manager','sales','content_editor'].includes(a.role) || (a.role === 'agent' && name === 'template.start'), 'A person saves personal templates', 403)
  const db = env.DB, at = await currentTime(db)
  if(name==='template.delivery')return templateDeliveryCommand(db,a,input,at)
+ if(name==='template.recipients'){
+  need(a.role==='owner','Only the current owner manages template recipient definitions',403)
+  const row=await ownTemplate(db,a,input.id,true);exact(row,input)
+  const access=await folderGuard(db,a,row.folder_id,'template'),content=editedTemplateRecipients(JSON.parse(row.snapshot),a,input)
+  await assertTemplateLocks(db,row,content)
+  await commit(db,a,[db.prepare('UPDATE p_personal_templates SET snapshot=?,version=version+1,updated_at=? WHERE id=?').bind(JSON.stringify(content),at,row.id)],false,{sql:'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?) AND '+access.sql,values:[row.id,row.version,...access.values]})
+  return {id:row.id,version:row.version+1}
+ }
  if (name === 'template.save') {
   const source = await proposal(db, input.id)
   exact(source, input)
@@ -49,6 +58,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   need(displayed.currency === 'USD', 'Personal templates require a USD proposal; historical AUD agreements stay unchanged', 409)
   const existing = input.templateId === undefined ? null : await ownTemplate(db, a, input.templateId,true)
   if (existing) exact(existing, { version: input.templateVersion })
+  if(existing&&templateRecipients(JSON.parse(existing.snapshot)))need(a.role==='owner','Only the current owner replaces template recipient definitions',403)
   const shared=existing?.shared===1||input.shared===true||input.shared==='yes'
   if(shared)need(resourceEditors.includes(a.role),'Your role cannot edit shared templates',403)
   if(shared&&existing?.shared!==1)need(input.shareConsent===true||input.shareConsent==='yes','Confirm that this content may be shared')
@@ -57,6 +67,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   const templateName = text(input.name, 'a template name')
   const { id: _id, client_id: _client, revision: _revision, ...content } = snapshot(displayed)
   if(content.document){content.document=bindDocument(content.document);if(content.document.merge)content.document.merge={patterns:content.document.merge.patterns,values:{}}}
+  const definition=captureTemplateRecipients(content,a,input.preassignedOwner)
+  if(definition){content.template_recipients=definition;content.document=bindTemplateAssignments(documentOf(content),definition)}
   if(content.recipient_plan)content.recipient_plan=content.recipient_plan.map((r:any)=>({...r,email:null}))
   if(existing)await assertTemplateLocks(db,existing,content)
   const [pdf, savedExpiry, sections] = await Promise.all([
@@ -102,6 +114,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  const templateLocks=starter?[]:(await db.prepare('SELECT section FROM p_template_locks WHERE template_id=? UNION ALL SELECT section FROM p_template_block_locks WHERE template_id=?').bind(template.id,template.id).all<any>()).results.map(l=>l.section)
  need(!templateLocks.includes('title')||title===content.title,'The template title is locked',403)
  const attachments = copyAttachments(content.attachments ?? [])
+ const definition=templateRecipients(content)
+ if(definition)content={...content,recipient_plan:await startTemplateRecipients(db,a,definition)}
  const row = { ...content, options:withoutTaxAddresses(content.options), document:bindDocument(content.document,clientId), id, client_id: clientId, title, revision: 1, attachments }
  const preparer = a.role === 'agent' ? `agent:${a.keyId}` : a.email
  await commit(db, a, [
@@ -113,7 +127,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   ...(!starter?[db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_template_locks WHERE template_id=?').bind(id,template.id),db.prepare('INSERT INTO p_proposal_block_locks(proposal_id,section) SELECT ?,section FROM p_template_block_locks WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_template_document_media WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify(resolved.settings)),
-  db.prepare('UPDATE p_proposals SET recipient_plan=? WHERE id=?').bind(JSON.stringify(row.recipient_plan??[]),id),
+  db.prepare('UPDATE p_proposals SET recipient_plan=?,template_recipients=? WHERE id=?').bind(JSON.stringify(row.recipient_plan??[]),definition?JSON.stringify(definition):null,id),
   db.prepare('UPDATE p_proposals SET section_conditions=?,document=?,payment_terms=? WHERE id=?').bind(JSON.stringify(row.section_conditions ?? {}),JSON.stringify(documentOf(row)),row.payment_terms?JSON.stringify(row.payment_terms):null, id),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)').bind(id, JSON.stringify(snapshot(row)), preparer, at, 'USD'),
   db.prepare('INSERT INTO p_pdf_settings(proposal_id,enabled) VALUES(?,?)').bind(id, template.pdf_enabled),

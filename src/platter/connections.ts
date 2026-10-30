@@ -1,4 +1,4 @@
-import { verifyZoho } from './crm/zoho-draft'
+import { verifyZoho } from './crm/zoho-http'
 import type { Bindings } from '../auth.server'
 import { administrators, senders } from './permissions'
 import { commit, email, fail, need, text, type Actor } from './model'

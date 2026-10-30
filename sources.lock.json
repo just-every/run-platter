@@ -2558,7 +2558,7 @@
       "executable": false
     },
     "src/platter/connections.ts": {
-      "sha256": "2953f2aaff4799de3eb8bf2db7ba9442e51a31501c5d1f521fff9c843f852e01",
+      "sha256": "45605ce8db1b46a783de0622e945df297c0718ae31e0bcd2844911ccd590089e",
       "executable": false
     },
     "src/platter/credentials.ts": {
@@ -2586,7 +2586,7 @@
       "executable": false
     },
     "src/platter/crm/provider-sync-plan.ts": {
-      "sha256": "9538a258d4e6bbf5755370b7e2fe0bcfd54217ceddd0d67513a414906e972e9e",
+      "sha256": "e55d5b7460e6941e571f33ab960b3979ddd329917fd48aeab47f3f73f6c0f8bb",
       "executable": false
     },
     "src/platter/crm/provider-sync.ts": {
@@ -2594,7 +2594,11 @@
       "executable": false
     },
     "src/platter/crm/zoho-draft.ts": {
-      "sha256": "dce9eb8710eab39370050157e02439a4356b8f5fea5db1f9b9c2687c913f44ac",
+      "sha256": "f7f750083406f192c2230b59b1d778e36156f450617eee46ee29db83b8db4733",
+      "executable": false
+    },
+    "src/platter/crm/zoho-http.ts": {
+      "sha256": "c24e3443d5a791ab0b436eae5c4b38adb592e887e81c58e7daaa4317347d9f72",
       "executable": false
     },
     "src/platter/delivery-intake.d.mts": {

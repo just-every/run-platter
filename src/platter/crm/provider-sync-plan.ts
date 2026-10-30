@@ -5,7 +5,8 @@ import { administrators, permitted } from '../permissions'
 import { canonical } from './hubspot-draft'
 import { syncFacts } from './hubspot-sync-plan'
 import { readPipedriveDeal } from './pipedrive-draft'
-import { readZohoDeal, sourceCents, zohoJson, zohoRecord } from './zoho-draft'
+import { readZohoDeal, sourceCents } from './zoho-draft'
+import { zohoJson, zohoRecord } from './zoho-http'
 
 export type CrmProvider = 'pipedrive' | 'zoho'
 export type ProviderOperation = { key: string; method: 'PUT' | 'POST'; path: string; body: any; label: string; expected?: any }

@@ -3663,3 +3663,7 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
  } finally { await h.close() }
  await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
 })
+
+test('CRM-004 reviewed Pipedrive drafts copy exact rows and refuse stale source, replay and revoked authority', async () => {
+ await (await import('./crm-pipedrive-http.mjs')).pipedriveHttpJourney(verified)
+})

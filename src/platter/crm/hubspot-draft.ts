@@ -62,43 +62,46 @@ export async function readDeal(env: Bindings, input: Record<string, unknown>) {
  need(cents(source.amount) === table.subtotalCents && lines.every((line, index) => !line.amount || cents(line.amount) === table.lines[index].lineTotalCents), 'Source totals do not match the exact priced rows; review in HubSpot first', 409)
  return { connection, choices, source, content }
 }
-function contentFor(source: any, scope: unknown) {
+export function contentFor(source: any, scope: unknown) {
  return proposalFields({ clientId: 'review', title: source.name, scope: scope ?? source.description, depositPercent: 25,
   packages: [{ id: 'one', label: 'Deal scope' }], pricingTables: [{ optionId: 'one', name: 'Deal line items', lines: source.lines.map((line: any) => ({ name: line.name, description: line.description, quantity: line.quantity, unit: 'each', unitPrice: line.unitPrice })) }],
  })
 }
-function connectionGuard(connection: any) {
- return { sql: "EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL)", values: [connectionId, connection.account_id, connection.version] }
+function connectionGuard(connection: any, provider: string) {
+ return { sql: "EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL)", values: ['workspace:' + provider, connection.account_id, connection.version] }
 }
 export async function hubspotDraftCommand(env: Bindings, actor: Actor, name: string, input: Record<string, unknown>) {
+ return reviewedDraftCommand(env, actor, name, input, 'hubspot', readDeal)
+}
+export async function reviewedDraftCommand(env: Bindings, actor: Actor, name: string, input: Record<string, unknown>, provider: string, reader: typeof readDeal) {
  need(administrators.includes(actor.role), 'Only owner and admins start drafts from connected deals', 403)
  const db = env.DB, at = await currentTime(db)
- if (name === 'crm.deal.review') {
-  const read = await readDeal(env, input)
+ if (name.endsWith('.review')) {
+  const read = await reader(env, input)
   if (!read.source) {
-   await commit(db, actor, [], true, connectionGuard(read.connection))
-   return { crmReview: true, ...read.choices, draftScope: String(input.crmScope ?? input.scope ?? ''), held: 'Explicitly select the company and contact to review.' }
+   await commit(db, actor, [], true, connectionGuard(read.connection, provider))
+   return { crmReview: true, provider, ...read.choices, draftScope: String(input.crmScope ?? input.scope ?? ''), held: 'Explicitly select the company and contact to review.' }
   }
   const content = read.content!, fields = JSON.stringify(copiedContactFields(read.source.contact, read.source.company.address))
   const client = await db.prepare('SELECT * FROM p_clients WHERE email=?').bind(read.source.contact.email).first<any>()
   need(!client || client.name === read.source.company.name && canonical(JSON.parse(client.variable_fields)) === canonical(JSON.parse(fields)), 'This contact already belongs to different client details; reconcile the client before review', 409)
   const clientJson = client ? canonical(client) : null, sourceJson = canonical(read.source), contentJson = canonical(content), digest = await hash(sourceJson + '\n' + contentJson + '\n' + clientJson), id = crypto.randomUUID()
-  await commit(db, actor, [db.prepare('INSERT INTO p_crm_draft_reviews(id,actor_id,actor_role,actor_version,connection_version,account_id,client_json,source_json,content_json,digest,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id, actor.id, actor.role, actor.memberVersion ?? 0, read.connection.version, read.connection.account_id, clientJson, sourceJson, contentJson, digest, at)], true, connectionGuard(read.connection))
-  return { crmReview: true, id, digest, existingClient: Boolean(client), source: read.source, content, ...read.choices }
+  await commit(db, actor, [db.prepare('INSERT INTO p_crm_draft_reviews(id,actor_id,actor_role,actor_version,connection_version,account_id,client_json,source_json,content_json,digest,created_at,provider) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(id, actor.id, actor.role, actor.memberVersion ?? 0, read.connection.version, read.connection.account_id, clientJson, sourceJson, contentJson, digest, at, provider)], true, connectionGuard(read.connection, provider))
+  return { crmReview: true, provider, id, digest, existingClient: Boolean(client), source: read.source, content, ...read.choices }
  }
- need(name === 'crm.deal.apply', 'Unknown CRM draft action', 404)
+ need(name.endsWith('.apply'), 'Unknown CRM draft action', 404)
  need(input.consent === true || input.consent === 'yes', 'Confirm the reviewed source and copied draft')
  const review = await db.prepare('SELECT * FROM p_crm_draft_reviews WHERE id=? AND actor_id=?').bind(text(input.id, 'a review'), actor.id).first<any>()
- need(review && !review.applied_proposal_id && review.created_at > at - 900000, 'Review expired or was already applied; read the deal again', 409)
+ need(review && review.provider === provider && !review.applied_proposal_id && review.created_at > at - 900000, 'Review expired or was already applied; read the deal again', 409)
  need(review.digest === input.digest && review.actor_role === actor.role && review.actor_version === (actor.memberVersion ?? 0), 'Reviewed bytes or authority changed; review again', 409)
  const source = JSON.parse(review.source_json), content = JSON.parse(review.content_json)
- const { connection } = await providerCredential(env, connectionId)
+ const { connection } = await providerCredential(env, 'workspace:' + provider)
  need(connection.version === review.connection_version && connection.account_id === review.account_id, 'The connection changed; review the deal again', 409)
- const fresh = await readDeal(env, { dealId: source.dealId, companyId: source.company.id, contactId: source.contact.id, scope: content.scope })
+ const fresh = await reader(env, { dealId: source.dealId, companyId: source.company.id, contactId: source.contact.id, scope: content.scope })
  need(canonical(fresh.source) === review.source_json, 'The deal changed after review; read it again', 409)
  const client = review.client_json ? JSON.parse(review.client_json) : null
  const id = crypto.randomUUID(), clientId = client?.id ?? crypto.randomUUID(), row = { ...content, id, client_id: clientId, revision: 1, currency: 'USD' }
- const guard = connectionGuard(connection)
+ const guard = connectionGuard(connection, provider)
  guard.sql += ' AND EXISTS(SELECT 1 FROM p_crm_draft_reviews WHERE id=? AND digest=? AND applied_proposal_id IS NULL)'
  guard.values.push(review.id, review.digest)
  guard.sql += client ? ' AND EXISTS(SELECT 1 FROM p_clients WHERE id=? AND name=? AND email=? AND variable_fields=? AND version=?)' : ' AND NOT EXISTS(SELECT 1 FROM p_clients WHERE email=?)'
@@ -108,7 +111,7 @@ export async function hubspotDraftCommand(env: Bindings, actor: Actor, name: str
   db.prepare("INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,prepared_by,created_at,currency,sales_owner_id,sales_owner_name,document,section_conditions) VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?,'{}')").bind(id, clientId, row.title, row.scope, row.terms, row.deposit_bps, JSON.stringify(row.options), actor.email, at, 'USD', actor.id, actor.email, JSON.stringify(row.document)),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)').bind(id, JSON.stringify(snapshot(row)), actor.email, at, 'USD'),
   ...await defaultStatements(db, id),
-  db.prepare('INSERT INTO p_crm_draft_sources(proposal_id,provider,account_id,connection_version,deal_id,company_id,contact_id,source_json,digest,reviewed_by,reviewed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id, 'hubspot', review.account_id, review.connection_version, source.dealId, source.company.id, source.contact.id, review.source_json, review.digest, actor.id, review.created_at),
+  db.prepare('INSERT INTO p_crm_draft_sources(proposal_id,provider,account_id,connection_version,deal_id,company_id,contact_id,source_json,digest,reviewed_by,reviewed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id, provider, review.account_id, review.connection_version, source.dealId, source.company.id, source.contact.id, review.source_json, review.digest, actor.id, review.created_at),
   db.prepare('UPDATE p_crm_draft_reviews SET applied_proposal_id=? WHERE id=?').bind(id, review.id),
  ], true, guard)
  return { id, revision: 1, version: 1 }

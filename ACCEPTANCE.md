@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 14 | 101 | 44 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 14 | 101 | 48 | 163 |
 
 Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -1542,15 +1542,15 @@ Core · target · **missing**
 
 #### CRM-004 — Pipedrive and Zoho CRM sync
 
-Core · target · **missing**
+Core · target · **partial**
 
 **Requirement.** Platter syncs deals, persons and products with Pipedrive and Zoho CRM as in `CRM-001`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#crm-004).
 
 **Acceptance.**
 1. Run the `CRM-001` journey against Pipedrive and Zoho CRM fakes.
 
-**Evidence.** None.
-**Gap.** No Pipedrive or Zoho connection.
+**Evidence.** `tests/platter.test.mjs` — “CRM-004 reviewed Pipedrive drafts copy exact rows and refuse stale source, replay and revoked authority” calls `tests/crm-pipedrive-http.mjs`; `tests/site.test.mjs` — “CRM-004 Pipedrive Settings and reviewed independent draft through the compiled browser” registered through `tests/site-documents.mjs`; `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority”
+**Gap.** Owner and admin explicitly verify the selected Pipedrive company, review its deal organization, person and tax-free one-off USD products, and create an independent collection-off draft with exact priced rows and credential-free source history. Review bytes, current connection and actor are rechecked; ambiguous contacts, incomplete products, unsupported currency or recurrence, inconsistent totals, replay, disconnect and demotion are refused. Fresh human approval and sending remain required. Missing: Zoho connections and deal drafts; two-way amount, product, stage, link and timeline writes; sent, viewed, signed and paid synchronization; broader member and delegated access; live-provider qualification. The conservative owner and admin floor follows the standing scope policy; scoped delegation and provider boundaries remain gaps. FOLLOW-007 still requires ct consent, scope and public-door assertions before standing-grant execution. CRM-001 installed HubSpot qualification remains held for account and app credentials. Configured-recipient execution and the recorded SEND-003 and SIGN-004 authority holds remain unchanged.
 
 ### Automation and integrations
 

@@ -54,7 +54,11 @@ try{
  await page.waitForFunction(()=>document.querySelector('[data-document-editor]').dataset.saveState==='saved')
  const source=page.locator('[data-block-id="page-30"]'),previous=source.locator('xpath=preceding-sibling::*[1]'),before=await page.locator('[data-block-id]').evaluateAll(nodes=>nodes.map(n=>n.dataset.blockId)),previousId=await previous.getAttribute('data-block-id')
  await page.evaluate(()=>{window.budgetDrop=null;document.addEventListener('drop',()=>{const start=performance.now();requestAnimationFrame(()=>requestAnimationFrame(()=>window.budgetDrop=performance.now()-start))},{capture:true,once:true})})
- await source.getByRole('button',{name:'Drag block',exact:true}).dragTo(previous.locator('.document-block-bar'))
+ // Start the native drag at the handle before crossing the tall document.
+ // Two target moves let Chromium deliver dragover before the real mouse release.
+ const handle=source.getByRole('button',{name:'Drag block',exact:true});await handle.hover();const start=await handle.boundingBox();assert.ok(start,'Drag handle is visible')
+ await page.mouse.down();await page.mouse.move(start.x+start.width/2-12,start.y+start.height/2,{steps:4})
+ await previous.locator('.document-block-bar').hover();await previous.locator('.document-block-bar').hover();await page.mouse.up()
  await page.waitForFunction(()=>window.budgetDrop!==null);report.dragReorderMs=await page.evaluate(()=>window.budgetDrop)
  const after=await page.locator('[data-block-id]').evaluateAll(nodes=>nodes.map(n=>n.dataset.blockId)),expected=before.filter(id=>id!=='page-30');expected.splice(expected.indexOf(previousId),0,'page-30');assert.deepEqual(after,expected)
  await page.waitForFunction(()=>document.querySelector('[data-document-editor]').dataset.saveState==='saved')

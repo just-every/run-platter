@@ -11,3 +11,7 @@
 .document-editor-block{content-visibility:auto;contain-intrinsic-block-size:auto 560px}
 /* Active controls may paint their tooltip beyond the card. */
 .document-editor-block:hover,.document-editor-block:focus-within{content-visibility:visible}
+
+/* Defer distant pricing controls while keeping active controls fully rendered. */
+[data-pricing-line]{content-visibility:auto;contain-intrinsic-block-size:auto 500px}
+[data-pricing-line]:hover,[data-pricing-line]:focus-within{content-visibility:visible}

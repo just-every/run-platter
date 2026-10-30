@@ -1,5 +1,7 @@
 import { need } from '../model'
 
+export const canonical = (value: any): string => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item)
+
 export type XeroAuthorization = () => Promise<{ token: string; accountId: string }>
 export async function xeroRequest(authorize: XeroAuthorization, resource: string, payload?: unknown) {
  const { token, accountId } = await authorize()

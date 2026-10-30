@@ -12,7 +12,7 @@ export async function forwardProviderRequest(request){
 
 // Captures the actual Xero transport boundary without replacing application doors.
 export function xeroFixture() {
- const accountId='synthetic-platter-11001', token='synthetic-platter-11002', calls=[], state={ contacts:[], invoices:[], currency:'USD', fail:'', before:undefined }
+ const accountId='synthetic-platter-11001', token='synthetic-platter-11002', calls=[], state={ organizations:[accountId], contacts:[], invoices:[], currency:'USD', fail:'', before:undefined, observe:undefined }
  const accounts=[{Code:'200',Name:'Deposit revenue',AccountID:'synthetic-platter-11003',Type:'REVENUE',Status:'ACTIVE'},{Code:'300',Name:'Bank',Type:'BANK',Status:'ACTIVE'}]
  const outboundService=async request=>{
   const url=new URL(request.url)
@@ -20,11 +20,12 @@ export function xeroFixture() {
   const body=request.method==='GET'?undefined:await request.json(),call={path:url.pathname,method:request.method,tenant:request.headers.get('xero-tenant-id'),body}
   calls.push(call)
   if(request.headers.get('authorization')!=='Bearer '+token)return new Response(null,{status:401})
+  if(state.observe)await state.observe(call)
   if(state.before)await state.before(call)
-  if(url.pathname==='/connections')return Response.json([{tenantId:accountId,tenantType:'ORGANISATION'}])
-  if(call.tenant!==accountId)return new Response(null,{status:403})
+  if(url.pathname==='/connections')return Response.json(state.organizations.map(tenantId=>({tenantId,tenantType:'ORGANISATION'})))
+  if(!state.organizations.includes(call.tenant))return new Response(null,{status:403})
   const kind=url.pathname.split('/').at(-1)
-  if(kind==='Organisation')return Response.json({Organisations:[{OrganisationID:accountId,BaseCurrency:state.currency}]})
+  if(kind==='Organisation')return Response.json({Organisations:[{OrganisationID:call.tenant,BaseCurrency:state.currency}]})
   if(kind==='Accounts')return Response.json({Accounts:accounts})
   if(kind==='Contacts'&&request.method==='GET')return Response.json({Contacts:state.contacts.filter(c=>!url.searchParams.has('where')||url.searchParams.get('where').includes(c.EmailAddress))})
   if(kind==='Contacts'){

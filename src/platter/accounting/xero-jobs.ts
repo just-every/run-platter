@@ -3,8 +3,7 @@ import { providerCredential } from '../connections'
 import { currentTime } from '../expiry-time'
 import { commit, hash, need, text, type Actor } from '../model'
 import { administrators, permitted } from '../permissions'
-import { canonical } from '../crm/hubspot-draft'
-import { xeroRequest, xeroSources } from './xero'
+import { canonical, xeroRequest, xeroSources } from './xero'
 
 const connectionId = 'workspace:xero'
 const version = (a: Actor) => a.memberVersion ?? 0
@@ -38,7 +37,7 @@ export async function xeroCommand(env: Bindings, a: Actor, name: string, p: Reco
  if (name === 'xero.authority') {
   need(a.role === 'owner', 'Only the owner chooses the invoice authority', 403)
   need(p.consent === true || p.consent === 'yes', 'Explicitly confirm the invoice authority')
-  const choice = String(p.authority); need(['xero', 'platter', 'quickbooks', 'pantry'].includes(choice), 'Choose one invoice authority')
+  const choice = String(p.authority); need(['xero', 'platter'].includes(choice), 'Choose one invoice authority')
   const old = await db.prepare('SELECT * FROM p_invoice_authority WHERE singleton=1').first<any>()
   need(Number(p.version) === (old?.version ?? 0), 'Invoice authority changed. Reload.', 409)
   need(!await db.prepare('SELECT 1 FROM p_xero_jobs LIMIT 1').first(), 'Invoice authority and organization are locked after the first retained request', 409)
@@ -103,6 +102,7 @@ export async function xeroCommand(env: Bindings, a: Actor, name: string, p: Reco
   const invoice = { ...source.invoice, Contact: { ContactID: mapping.contact_id } }
   await db.prepare("UPDATE p_xero_jobs SET status='writing',request_json=? WHERE proposal_id=?").bind(canonical(invoice), job.proposal_id).run()
   const result = await xeroRequest(authorize, 'Invoices', { Invoices: [invoice] }), issued = result.Invoices?.[0]
+  need(issued?.LineAmountTypes === 'NoTax' && issued.LineItems?.length === 1 && issued.LineItems[0].AccountCode === source.account.Code && issued.LineItems[0].TaxType === 'NONE' && Number(issued.LineItems[0].Quantity) === 1 && Math.round(Number(issued.LineItems[0].UnitAmount) * 100) === acceptance.row.deposit_cents, 'Xero did not confirm the reviewed income account and tax-free deposit line', 409)
   need(result.Invoices?.length === 1 && typeof issued.InvoiceID === 'string' && !issued.HasValidationErrors && issued.Status === 'AUTHORISED' && issued.Type === 'ACCREC' && issued.Contact?.ContactID === mapping.contact_id && issued.CurrencyCode === 'USD' && Math.round(Number(issued.Total) * 100) === acceptance.row.deposit_cents && issued.InvoiceNumber === invoice.InvoiceNumber, 'Xero did not confirm the exact deposit invoice', 409)
   await db.prepare("UPDATE p_xero_jobs SET status='complete',invoice_id=?,completed_at=? WHERE proposal_id=?").bind(issued.InvoiceID, at, job.proposal_id).run()
  } catch {

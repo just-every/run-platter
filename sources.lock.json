@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "08644d590efed1f72a97df03f0771f4d6a11a2f5cde00b5d23164389c168ac71",
+      "sha256": "616ac25221df0aa9ca47fbb41edc72cc0be40f796b3c633099343e98dfe123e4",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2454,11 +2454,11 @@
       "executable": false
     },
     "src/platter/accounting/xero-jobs.ts": {
-      "sha256": "0b87cd8c037adc7b15f3f0211a32be21488aaf5d994383d0fda6d4634baaca4c",
+      "sha256": "526c249f99eeab83557c44403c9035ea6495ebe992993c8f8b0666feb654a82d",
       "executable": false
     },
     "src/platter/accounting/xero.ts": {
-      "sha256": "01f34af410b6a55960b2989272862bd42c8b815610cbc02ef58862ab754d634c",
+      "sha256": "25b72717de899d80d09dc9fc13ba8cc49634aea76fe92cdfdd9525f8e72e3ccd",
       "executable": false
     },
     "src/platter/api/index.ts": {
@@ -3282,7 +3282,7 @@
       "executable": false
     },
     "src/platter/ui/xero-accounting.ts": {
-      "sha256": "06cdca24c4ad4fe2b38dc41988af82be0263207cca965fb4e907c4c7a5f3acf5",
+      "sha256": "1aa5873efba2dacc29f7e76370200ea1e46af9b07048da330abe94364b119ebe",
       "executable": false
     },
     "src/platter/variables.ts": {
@@ -3406,7 +3406,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "56480eb1e40fb0798b571390f523757c7b8b8a71ae243fc3a1ff045362388e0d",
+      "sha256": "1376f77c767817bed6e535e15dc090855c7616b728c2ba0eb283bfeb8f17ea09",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3558,7 +3558,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "eb258076149604165ef464ae6d20ea2fc2b3f50f1d10f6fe8ce99cd8856ae1b5",
+      "sha256": "bd4e2a5c075b433f88111379acf2ce5829847e4472a0b6c47b160205de45bfc9",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3570,7 +3570,7 @@
       "executable": false
     },
     "tests/provider-network.mjs": {
-      "sha256": "535a897489f55f7f0b58a1dcb8c85db6e471b65171b8f6c361539d5988711e42",
+      "sha256": "14383731f6677d59994b99b757962df0ae3817291b9fb358ccd676d96744f00f",
       "executable": false
     },
     "tests/recipients-browser.mjs": {
@@ -3610,7 +3610,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "988a5096714a762dc27c7681d33c630aafc69c95b951b543d3c7ef71cca36109",
+      "sha256": "5cc64aef77d29fbc40e941f2a712e037536c2487b5ec00b0120f8f57b135ee27",
       "executable": false
     },
     "tests/site-harness.mjs": {
@@ -3667,6 +3667,10 @@
     },
     "tests/worker.ts": {
       "sha256": "d6be2235616cae0687c98f148895f2d085831480c8870512019bace6f91ddcd6",
+      "executable": false
+    },
+    "tests/xero-browser.mjs": {
+      "sha256": "7c4d01fac609aaacc77abb01a3bbbfbb2f00400750782ae8f545ed1369609fca",
       "executable": false
     },
     "tests/xero-fixture.mjs": {

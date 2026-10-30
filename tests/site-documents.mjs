@@ -932,3 +932,5 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
   } finally { await context.close() }
  } finally { await browser?.close(); await h?.close(); await edge.close() }
 })
+
+test('ACCT-002 Settings reviews the exact deposit and explicitly issues one Xero invoice', {timeout:120000}, async()=>{await (await import('./xero-browser.mjs')).xeroBrowser()})

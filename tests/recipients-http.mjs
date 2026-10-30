@@ -342,6 +342,7 @@ export async function recipientWithdrawalHttp(h){
   assert.equal((await h.send(path+'/data.json',undefined,sessions[oldId])).status,401,'old recipient sessions confer no reissued authority')
   const fresh=await verifyRecipient(h,path)
   assert.equal((await h.send(path+'/data.json',undefined,fresh)).value.scope,'Corrected leadership agreement.')
+  assert.equal((await h.send(path+'/data.json',undefined,fresh)).value.recipientSignatureHistory,undefined,'client projections do not expose the member history ledger')
   assert.equal((await h.send(p.links[oldId]+'/data.json',undefined,sessions[oldId])).status,410,'reissue never revives a withdrawn link')
  }
  assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(p.id).all()).results,before,'reissue retains the earlier void signature')

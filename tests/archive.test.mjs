@@ -138,25 +138,6 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const withdrawn=await h.cmd('proposal.prepare',{...offer,title:'Withdrawn offer'})
     await h.cmd('proposal.approve',{id:withdrawn.id,version:1,revision:1});const withdrawnShare=await h.cmd('proposal.send',{id:withdrawn.id,version:2})
     await h.cmd('proposal.withdraw',{id:withdrawn.id,version:3,reason:'Sent to the wrong client'})
-    const firstReceipt=(await h.state()).proposals.find(p=>p.id===withdrawn.id).withdrawals
-    const withdrawnReport=(await h.send('/api/platter/pipeline?status=withdrawn',undefined,h.owner)).value
-    assert.equal(withdrawnReport.count,1);assert.deepEqual(withdrawnReport.totals,[{currency:'USD',count:1,valueCents:420000}])
-    const reissue=await h.cmd('proposal.negotiate',{...offer,id:withdrawn.id,version:4,title:'Withdrawn offer',scope:'Corrected archive offer.'})
-    assert.equal(reissue.revision,2);await h.cmd('proposal.send',{id:withdrawn.id,version:reissue.version},h.owner,409)
-    await h.cmd('proposal.approve',{id:withdrawn.id,version:reissue.version,revision:2})
-    const reissueShare=await h.cmd('proposal.send',{id:withdrawn.id,version:reissue.version+1}),reissuePath=new URL(reissueShare.shareUrl).pathname
-    assert.equal((await h.send(new URL(withdrawnShare.shareUrl).pathname)).status,410)
-    assert.equal((await h.send(reissuePath+'/action?name=code.request',{})).status,200)
-    const reissueCode=(await h.state()).outbox.find(m=>m.proposal_id===withdrawn.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
-    const reissueSession=await h.send(reissuePath+'/action?name=code.verify',{code:reissueCode});assert.equal(reissueSession.status,200)
-    assert.equal((await h.send(reissuePath+'/data.json',undefined,reissueSession.cookie)).value.scope,'Corrected archive offer.')
-    const postReissue=(await h.send('/api/platter/pipeline?status=withdrawn',undefined,h.owner)).value
-    assert.equal(postReissue.count,0);assert.deepEqual(postReissue.totals,[])
-    assert.deepEqual((await h.state()).proposals.find(p=>p.id===withdrawn.id).withdrawals,firstReceipt)
-    await h.cmd('proposal.withdraw',{id:withdrawn.id,version:reissue.version+2,reason:'Corrected offer cancelled',notice:false})
-    const withdrawalReport=(await h.send('/api/platter/pipeline?status=withdrawn',undefined,h.owner)).value
-    assert.equal(withdrawalReport.count,1);assert.deepEqual(withdrawalReport.totals,[{currency:'USD',count:1,valueCents:420000}])
-
     const declined=await h.cmd('proposal.prepare',{...offer,title:'Declined budget'})
     await h.cmd('proposal.approve',{id:declined.id,version:1,revision:1});const declinedShare=await h.cmd('proposal.send',{id:declined.id,version:2}),declinedPath=new URL(declinedShare.shareUrl).pathname
     await h.send(declinedPath+'/action?name=code.request',{})
@@ -241,7 +222,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     for(const excluded of [restKey.token,webhook.secret])assert.ok(!bytes.includes(excluded),'API credentials stay local')
     assert.ok(bytes.includes('Temporary joiner'))
     for(const excluded of [replyKey,replyAddress,createHash('sha256').update(replyKey).digest('hex'),productionOwner.split('=')[1]])assert.ok(!bytes.includes(excluded),'FOLLOW-004 reply capability, hosted session and transport stay local')
-    for(const excluded of [reissuePath,reissueSession.cookie.split('=')[1],'Excluded secret','token_hash',key.token,createHash('sha256').update(key.token).digest('hex'),new URL(withdrawnShare.shareUrl).pathname.slice(3),new URL(shared.shareUrl).pathname.slice(3),new URL(pendingShare.shareUrl).pathname.slice(3),verified.cookie.split('=')[1],identity.owner.split('=')[1]])assert.ok(!bytes.includes(excluded),'credentials and private invitations stay local')
+    for(const excluded of ['Excluded secret','token_hash',key.token,createHash('sha256').update(key.token).digest('hex'),new URL(withdrawnShare.shareUrl).pathname.slice(3),new URL(shared.shareUrl).pathname.slice(3),new URL(pendingShare.shareUrl).pathname.slice(3),verified.cookie.split('=')[1],identity.owner.split('=')[1]])assert.ok(!bytes.includes(excluded),'credentials and private invitations stay local')
     await command(restored,['import','--input',old,'--yes','--no-queue'])
     await command(restored,['export','--output',again,'--no-queue'])
     const rows=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part')
@@ -299,16 +280,6 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal((await h.db.prepare('SELECT COUNT(*) AS count FROM p_question_reply_keys').first()).count,0,'restoring business threads never restores email reply authority')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===withdrawn.id).withdrawals,withdrawalHistory,'SEND-010 history survives CLI restore without invitation authority')
     assert.equal(restoredState.proposals.find(p=>p.id===withdrawn.id).status,'withdrawn')
-    assert.deepEqual(withdrawalHistory.map(w=>({revision:w.revision,reason:w.reason,notice:w.notice})),[{revision:2,reason:'Corrected offer cancelled',notice:0},{revision:1,reason:'Sent to the wrong client',notice:1}])
-    const restoredWithdrawalReport=(await h.send('/api/platter/pipeline?status=withdrawn',undefined,restoredOwner)).value
-    assert.equal(restoredWithdrawalReport.count,withdrawalReport.count);assert.deepEqual(restoredWithdrawalReport.totals,withdrawalReport.totals)
-    const restoredReceipt=await h.send('/app/proposal?id='+withdrawn.id,undefined,restoredOwner)
-    assert.equal(restoredReceipt.status,200);for(const receipt of withdrawalHistory){assert.ok(restoredReceipt.text.includes(receipt.reason));assert.ok(restoredReceipt.text.includes(receipt.actor_email))}
-    for(const path of [new URL(withdrawnShare.shareUrl).pathname,reissuePath])for(const door of ['', '/data.json','/action?name=accept'])assert.equal((await h.send(path+door,door.includes('/action')?{name:'Avery Chen',optionId:'one',consent:true}:undefined,reissueSession.cookie)).status,404,'restore retains history without reviving either revision invitation')
-    const restoredMail=(await h.db.prepare('SELECT COUNT(*) n FROM p_mail').first()).n
-    await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.UTC(2030,2,10,15)),cron:'*/15 * * * *'})
-    assert.equal((await h.db.prepare('SELECT COUNT(*) n FROM p_mail').first()).n,restoredMail,'restored withdrawal receipts cannot replay notices')
-
     assert.deepEqual(restoredState.proposals.filter(p=>[declined.id,lost.id].includes(p.id)).map(p=>({id:p.id,outcomes:p.outcomes,pipelineStatus:p.pipelineStatus})),outcomeHistory,'FOLLOW-005 reasons, actors, times and report outcomes survive public CLI restore')
     assert.equal((await h.send(declinedPath,undefined,declinedSession.cookie)).status,404,'restoring a decline never restores its invitation or verified session')
     await h.cmd('proposal.negotiate',{...offer,id:declined.id,version:4},restoredOwner)
@@ -672,7 +643,6 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.equal((await h.db.prepare('SELECT count(*) n FROM p_completion_authority').first()).n,0,'restored multi-party history grants no completion execution')
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures ORDER BY proposal_id,revision,slot_id').all()).results,signatures)
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_void_signatures ORDER BY proposal_id,revision').all()).results,voids)
-  assert.deepEqual(after.proposals.find(row=>row.id===voided.id).recipientSignatureHistory.map(s=>({revision:s.revision,voided_at:s.voided_at,void_reason:s.void_reason})),[{revision:voided.revision,voided_at:voids[0].voided_at,void_reason:'Void before completion'}])
   for(const path of [...Object.values(multi.links),...Object.values(voided.links),new URL(shared.shareUrl).pathname])assert.equal((await h.send(path)).status,404)
   assert.equal((await h.db.prepare('SELECT count(*) n FROM p_shares').first()).n,0)
   assert.equal((await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n,0)
@@ -1105,5 +1075,74 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   await h.cmd('archive.configure',{...driveSettings,version:1,connectionVersion:2},owner)
   const calls=restoredFake.calls.length;await h.cmd('archive.dispatch',{},owner);assert.equal(restoredFake.calls.length,calls)
   await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})
+
+
+test('SEND-015 public CLI preserves business withdrawal receipts and approved reissue without restored authority', {timeout:300000},async()=>{
+ const temporary=await mkdtemp(join(tmpdir(),'platter-withdrawal-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
+ let h
+ try{
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source,assetsDirectory:'public'})
+  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+  const clock=Date.UTC(2030,2,10,15);await(await h.mf.getWorker()).scheduled({scheduledTime:new Date(clock),cron:'*/15 * * * *'})
+  const client=await h.cmd('client.save',{name:'Synthetic Platter client',email:'synthetic-platter-1515'+String.fromCharCode(64)+'example.test'})
+  const offer={clientId:client.id,title:'Withdrawal custody',scope:'The exact original scope.',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'}
+  const sent=async fields=>{const p=await h.cmd('proposal.prepare',{...offer,...fields});await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});const invitation=await h.cmd('proposal.send',{id:p.id,version:2});return {...p,path:new URL(invitation.shareUrl).pathname}}
+  const verify=async path=>{assert.equal((await h.send(path+'/action?name=code.request',{})).status,200);const code=(await h.state()).outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0];const r=await h.send(path+'/action?name=code.verify',{code});assert.equal(r.status,200,r.text);return r.cookie}
+  const first=await sent(),firstCookie=await verify(first.path),fresh=await h.cmd('proposal.send',{id:first.id,version:3}),freshPath=new URL(fresh.shareUrl).pathname,freshCookie=await verify(freshPath)
+  await h.cmd('proposal.withdraw',{id:first.id,version:4,reason:'Sent to the wrong client'})
+  const firstReceipt=(await h.state()).proposals.find(p=>p.id===first.id).withdrawals
+  assert.deepEqual(firstReceipt.map(w=>({revision:w.revision,actor:w.actor_id,at:w.withdrawn_at,reason:w.reason,notice:w.notice})),[{revision:1,actor:(await h.state()).actor.id,at:clock,reason:'Sent to the wrong client',notice:1}])
+  const quiet=await sent({title:'Silent withdrawal',priceOne:'900',priceTwo:'1700'})
+  await h.cmd('proposal.withdraw',{id:quiet.id,version:3,reason:'No recipient notice',notice:false})
+  const report=async owner=>(await h.send('/api/platter/pipeline?status=withdrawn',undefined,owner??h.owner)).value
+  assert.deepEqual((await report()).totals,[{currency:'USD',count:2,valueCents:590000}]);assert.equal((await report()).count,2)
+  const revised=await h.cmd('proposal.negotiate',{...offer,id:first.id,version:5,scope:'Corrected revision two scope.'})
+  assert.equal(revised.revision,2);await h.cmd('proposal.send',{id:first.id,version:revised.version},h.owner,409)
+  await h.cmd('proposal.approve',{id:first.id,version:revised.version,revision:2});const reissued=await h.cmd('proposal.send',{id:first.id,version:revised.version+1}),reissuedPath=new URL(reissued.shareUrl).pathname,reissuedCookie=await verify(reissuedPath)
+  assert.equal((await h.send(reissuedPath+'/data.json',undefined,freshCookie)).status,401)
+  assert.equal((await h.send(reissuedPath+'/data.json',undefined,reissuedCookie)).value.scope,'Corrected revision two scope.')
+  assert.equal((await h.send(first.path,undefined,firstCookie)).status,404);assert.equal((await h.send(freshPath,undefined,freshCookie)).status,410)
+  assert.equal((await report()).count,1);assert.deepEqual((await report()).totals,[{currency:'USD',count:1,valueCents:170000}])
+  const accepted=await sent({title:'Immutable accepted agreement'}),acceptedCookie=await verify(accepted.path)
+  assert.equal((await h.send(accepted.path+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},acceptedCookie)).status,200)
+  const artifact=async(kind,owner=h.owner)=>{const r=await h.mf.dispatchFetch(h.origin+'/api/platter/'+kind+'.pdf?id='+accepted.id,{headers:{cookie:owner}});assert.equal(r.status,200);return Buffer.from(await r.arrayBuffer())}
+  const agreement=await artifact('agreement'),certificate=await artifact('certificate'),acceptedBefore=(await h.state()).proposals.find(p=>p.id===accepted.id)
+  await h.cmd('proposal.withdraw',{id:accepted.id,version:acceptedBefore.version,reason:'Refused accepted withdrawal'},h.owner,409)
+  assert.deepEqual((await h.state()).proposals.find(p=>p.id===accepted.id),acceptedBefore)
+  const {recipientFixture,roles,verifyRecipient,decision}=await import('./recipients-http.mjs')
+  const partial=await recipientFixture(h,'Void signature custody',roles(h.auth.OWNER_EMAIL)),partialCookie=await verifyRecipient(h,partial.links.ceo)
+  assert.equal((await decision(h,partial.links.ceo,partialCookie)).status,200)
+  const partialRow=(await h.state()).proposals.find(p=>p.id===partial.id)
+  await h.cmd('proposal.withdraw',{id:partial.id,version:partialRow.version,reason:'Partly signed offer cancelled'})
+  const partialWithdrawn=(await h.state()).proposals.find(p=>p.id===partial.id),voidHistory=partialWithdrawn.recipientSignatureHistory
+  assert.equal(voidHistory.length,1);assert.equal(voidHistory[0].void_reason,'Partly signed offer cancelled')
+  const next=await h.cmd('proposal.negotiate',{...partial.offer,id:partial.id,version:partialWithdrawn.version,scope:'New leadership offer.'})
+  await h.cmd('proposal.approve',{id:partial.id,version:next.version,revision:next.revision});await h.cmd('proposal.send',{id:partial.id,version:next.version+1})
+  const custody=state=>state.proposals.map(p=>({id:p.id,scope:p.scope,revision:p.revision,options:p.options,withdrawals:p.withdrawals,recipientSignatures:p.recipientSignatures,recipientSignatureHistory:p.recipientSignatureHistory,...(p.acceptance?{acceptance:p.acceptance}:{})})).sort((a,b)=>a.id.localeCompare(b.id))
+  const before=await h.state(),retained=custody(before),beforeAudit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows,beforeReport=await report()
+  const currentPartial=before.proposals.find(p=>p.id===partial.id)
+  assert.deepEqual(currentPartial.recipientSignatureHistory,voidHistory);assert.deepEqual(currentPartial.recipientSignatures,[])
+  const links=[first.path,freshPath,reissuedPath,quiet.path,accepted.path,...Object.values(partial.links),...currentPartial.recipientLinks.map(r=>'/p/'+r.token)],sessions=[firstCookie,freshCookie,reissuedCookie,acceptedCookie,partialCookie]
+  await h.close();h=null
+  const archive=join(temporary,'withdrawal.rer');await command(source,['export','--output',archive,'--no-queue']);await command(restored,['import','--input',archive,'--yes','--no-queue'])
+  const bytes=await readFile(archive,'utf8')
+  for(const secret of [...links,...sessions.map(c=>c.split('=')[1])])assert.ok(!bytes.includes(secret),'withdrawal history carries no invitation or session capability')
+  h=await harness({root:restored,unclaimed:true,assetsDirectory:'public'})
+  const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
+  assert.deepEqual(custody(after),retained,'ordinary receipts, reissued revisions, accepted facts and void signatures survive exactly')
+  assert.deepEqual(after.proposals.find(p=>p.id===first.id).withdrawals,firstReceipt)
+  assert.deepEqual(after.proposals.find(p=>p.id===partial.id).recipientSignatureHistory,voidHistory)
+  const auditIds=new Set(beforeAudit.map(r=>r.id));assert.deepEqual((await h.send('/api/platter/audit',undefined,owner)).value.rows.filter(r=>auditIds.has(r.id)),beforeAudit)
+  assert.equal((await report(owner)).count,beforeReport.count);assert.deepEqual((await report(owner)).totals,beforeReport.totals)
+  assert.deepEqual(await artifact('agreement',owner),agreement);assert.deepEqual(await artifact('certificate',owner),certificate)
+  for(const path of links)for(const door of ['', '/data.json','/action?name=accept'])assert.equal((await h.send(path+door,door.includes('/action')?{name:'Synthetic client',optionId:'one',consent:true}:undefined,reissuedCookie)).status,404)
+  await(await h.mf.getWorker()).scheduled({scheduledTime:new Date(clock+86400000),cron:'*/15 * * * *'})
+  for(const table of ['p_shares','p_mail'])assert.equal((await h.db.prepare('SELECT count(*) n FROM '+table).first()).n,0,'restore cannot execute old invitation or mail authority')
+  const setupRestored=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setupRestored.status,303)
+  const history=await h.send('/app/proposal?id='+partial.id,undefined,owner);assert.equal(history.status,200);assert.match(history.text,/Void: Partly signed offer cancelled/)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

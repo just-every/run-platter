@@ -1054,14 +1054,15 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
    const response=await h.mf.dispatchFetch(h.origin+completed.path+'/'+kind+'.pdf',{headers:{cookie:completed.cookie}});assert.equal(response.status,200);artifacts[kind]=Buffer.from(await response.arrayBuffer())
   }
   const certificate=(await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).value
-  await h.cmd('archive.revoke',{version:1})
   await connectXero(h,xero);await chooseXero(h,xero)
   const deposit=await acceptXeroDeposit(h),review=await reviewXero(h,deposit.p.id);await issueXero(h,review)
   const nextDeposit=await acceptXeroDeposit(h,'Synthetic pending review',deposit.client.id),unusedReview=await reviewXero(h,nextDeposit.p.id,h.owner,{contactId:xero.state.contacts[0].ContactID})
   const xeroTables=['p_invoice_authority','p_xero_contacts','p_xero_jobs'],xeroBefore=Object.fromEntries(await Promise.all(xeroTables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
   // Include completion artifacts materialized by the additional accounting agreements.
   for(const table of tables)before[table]=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results
-  console.log('Archive custody fixture captured after all completed agreements')
+  assert.equal((await h.state()).archiving.settings.active,true,'Drive configuration remains authorized at export')
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_archive_authority').first()).n,1,'export exercises live configuration authority')
+  assert.ok((await h.db.prepare('SELECT COUNT(*) AS n FROM p_archive_job_authority').first()).n>0,'export exercises live job authority')
   await h.close();h=undefined
   const archive=join(temporary,'drive.rer');await command(source,['export','--output',archive])
   const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(driveToken));assert.ok(!contents.includes(xero.token))

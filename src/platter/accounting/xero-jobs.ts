@@ -74,7 +74,10 @@ export async function xeroCommand(env: Bindings, a: Actor, name: string, p: Reco
  need(review && review.digest === p.digest && review.created_at > at - 900000 && review.actor_role === a.role && review.actor_version === version(a) && review.connection_version === live.connection.version && review.authority_version === live.config.version && review.account_id === live.config.account_id, 'The review expired or its actor, authority or connection changed. Review again.', 409)
  await permitted(db, a, review.proposal_id)
  const acceptance = await accepted(env, review.proposal_id); need(acceptance.digest === review.accepted_digest, 'The accepted deposit changed; review again', 409)
- const source = JSON.parse(review.source_json), fresh = await xeroSources(live.authorize, acceptance.row.email)
+ const source = JSON.parse(review.source_json)
+ const reviewedMapping = await db.prepare('SELECT * FROM p_xero_contacts WHERE account_id=? AND client_id=?').bind(review.account_id, acceptance.row.client_id).first<any>()
+ need(!reviewedMapping || reviewedMapping.status === 'complete' && reviewedMapping.contact_id === source.contact.ContactID, 'The client contact mapping changed. Review again.', 409)
+ const fresh = await xeroSources(live.authorize, acceptance.row.email)
  need(canonical(fresh) === canonical(source.sources), 'Xero contacts or income accounts changed. Review again.', 409)
  const g = guard(live.config, live.connection)
  g.sql += ' AND NOT EXISTS(SELECT 1 FROM p_invoices WHERE proposal_id=?) AND EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND version=?)'; g.values.push(review.proposal_id, a.id, review.operator_version)
@@ -89,6 +92,7 @@ export async function xeroCommand(env: Bindings, a: Actor, name: string, p: Reco
  }
  try {
   let mapping = await db.prepare('SELECT * FROM p_xero_contacts WHERE account_id=? AND client_id=?').bind(job.account_id, acceptance.row.client_id).first<any>()
+  need(!mapping || mapping.status === 'complete' && mapping.contact_id === source.contact.ContactID, 'The client contact mapping changed. Review again.', 409)
   if (!mapping) {
    await commit(db, a, [db.prepare('INSERT INTO p_xero_contacts VALUES(?,?,?,?,?)').bind(job.account_id, acceptance.row.client_id, source.contact.ContactID ?? null, source.contact.ContactID ? 'complete' : 'writing', canonical(source.contact))], false, g)
    if (!source.contact.ContactID) {

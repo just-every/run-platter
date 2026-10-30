@@ -3777,12 +3777,21 @@ test('ACCT-002 reviewed Xero deposits preserve exact money, authority, unique ma
   edge.state.contacts.push({ContactID:'synthetic-platter-11007',Name:'Duplicate',EmailAddress:clientAddress,ContactStatus:'ACTIVE'},{ContactID:'synthetic-platter-11008',Name:'Duplicate two',EmailAddress:clientAddress,ContactStatus:'ACTIVE'})
   await h.cmd('xero.review',{id:a.p.id},h.owner,409);edge.state.contacts.length=0
   review=await reviewXero(h,a.p.id)
+  const pending=await acceptXeroDeposit(h,'Synthetic separately reviewed deposit',a.client.id),pendingReview=await reviewXero(h,pending.p.id)
   const outcomes=await Promise.all([1,2].map(()=>h.send('/api/platter/command',{name:'xero.issue',input:{id:review.id,digest:review.digest,consent:true}},h.owner)))
   assert.deepEqual(outcomes.map(r=>r.status).sort(),[200,409]);assert.equal(edge.state.contacts.length,1);assert.equal(edge.state.invoices.length,1)
   const invoice=edge.state.invoices[0]
   assert.deepEqual(invoice.LineItems,[{Description:'Deposit: Synthetic Xero deposit',Quantity:1,UnitAmount:2000.01,AccountCode:'200',TaxType:'NONE'}]);assert.equal(invoice.Total,2000.01);assert.equal(invoice.Type,'ACCREC');assert.equal(invoice.Status,'AUTHORISED');assert.equal(invoice.CurrencyCode,'USD');assert.equal(invoice.Contact.ContactID,edge.state.contacts[0].ContactID)
   const row=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(a.p.id).first();assert.equal(invoice.Date,new Date(row.accepted_at).toISOString().slice(0,10));assert.equal(invoice.DueDate,invoice.Date)
   assert.equal((await h.state()).xero.jobs[0].status,'complete')
+  const contactBefore={...edge.state.contacts[0]},beforeStaleWrites=edge.calls.filter(c=>c.method==='POST').length
+  edge.state.contacts[0].Name='Synthetic changed contact'
+  edge.state.contacts[0].EmailAddress=['synthetic-platter-other','example.test'].join(String.fromCharCode(64))
+  await issueXero(h,pendingReview,h.owner,409)
+  assert.equal(edge.calls.filter(c=>c.method==='POST').length,beforeStaleWrites,'a later-created mapping cannot authorize an invoice to an unreviewed contact')
+  assert.equal(edge.state.invoices.length,1)
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_xero_jobs WHERE proposal_id=?').bind(pending.p.id).first()).n,0,'stale contact review leaves the deposit unclaimed for fresh review')
+  Object.assign(edge.state.contacts[0],contactBefore)
   await issueXero(h,review,h.owner,409);await h.cmd('invoice.export',{id:a.p.id},h.owner,409)
   await h.cmd('xero.authority',{authority:'platter',version:3,consent:true},h.owner,409)
   const change=edge.accountId+'-other';edge.state.organizations.push(change);await h.cmd('provider.connect',{provider:'xero',version:3,organizationId:change,token:edge.token,consent:true},h.owner,409)

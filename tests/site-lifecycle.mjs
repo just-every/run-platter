@@ -852,7 +852,8 @@ test('IMPORT-001 reviewed CSV, independent client edit and refused undo retain o
    assert.equal(claimed.status(),303)
    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
    const state=async()=>await(await context.request.get(app.origin+'/api/platter/state')).json()
-   const csv='client_id,name,email\nsynthetic-platter-1063,Synthetic reviewed studio,synthetic-platter-1063'+String.fromCharCode(64)+'example.test\nsynthetic-platter-1064,Synthetic unchanged studio,synthetic-platter-1064'+String.fromCharCode(64)+'example.test'
+   // Native browser forms submit textarea line breaks as CRLF.
+   const csv=['client_id,name,email','synthetic-platter-1063,Synthetic reviewed studio,synthetic-platter-1063'+String.fromCharCode(64)+'example.test','synthetic-platter-1064,Synthetic unchanged studio,synthetic-platter-1064'+String.fromCharCode(64)+'example.test'].join('\r\n')
    await page.goto(app.origin+'/app/import')
    const preview=page.locator('section.panel').filter({has:page.getByRole('heading',{name:'Preview client CSV',exact:true})})
    await preview.getByLabel('CSV content',{exact:true}).fill(csv);await preview.getByRole('button',{name:'Preview import',exact:true}).click()

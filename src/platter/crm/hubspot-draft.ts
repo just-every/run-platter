@@ -67,8 +67,11 @@ function contentFor(source: any, scope: unknown) {
   packages: [{ id: 'one', label: 'Deal scope' }], pricingTables: [{ optionId: 'one', name: 'Deal line items', lines: source.lines.map((line: any) => ({ name: line.name, description: line.description, quantity: line.quantity, unit: 'each', unitPrice: line.unitPrice })) }],
  })
 }
-function connectionGuard(connection: any) {
- return { sql: "EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL)", values: [connectionId, connection.account_id, connection.version] }
+const erasedContact = "NOT EXISTS(SELECT 1 FROM p_privacy_receipts r,json_each(r.receipt_json,'$.externalRecords') e WHERE json_extract(e.value,'$.provider')='hubspot' AND json_extract(e.value,'$.accountId')=? AND json_extract(e.value,'$.recordId')=?)"
+function connectionGuard(connection: any, source?: any) {
+ const guard = { sql: "EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL)", values: [connectionId, connection.account_id, connection.version] }
+ if(source){guard.sql+=' AND '+erasedContact;guard.values.push(source.accountId,source.contact.id)}
+ return guard
 }
 export async function hubspotDraftCommand(env: Bindings, actor: Actor, name: string, input: Record<string, unknown>) {
  need(administrators.includes(actor.role), 'Only owner and admins start drafts from connected deals', 403)
@@ -79,11 +82,12 @@ export async function hubspotDraftCommand(env: Bindings, actor: Actor, name: str
    await commit(db, actor, [], true, connectionGuard(read.connection))
    return { crmReview: true, ...read.choices, draftScope: String(input.crmScope ?? input.scope ?? ''), held: 'Explicitly select the company and contact to review.' }
   }
+  need(await db.prepare('SELECT ('+erasedContact+') AS ok').bind(read.source.accountId,read.source.contact.id).first<any>().then(r=>r?.ok),'This exact HubSpot contact was erased locally; no new draft or copied details are authorized',409)
   const content = read.content!, fields = JSON.stringify(copiedContactFields(read.source.contact, read.source.company.address))
   const client = await db.prepare('SELECT * FROM p_clients WHERE email=?').bind(read.source.contact.email).first<any>()
   need(!client || client.name === read.source.company.name && canonical(JSON.parse(client.variable_fields)) === canonical(JSON.parse(fields)), 'This contact already belongs to different client details; reconcile the client before review', 409)
   const clientJson = client ? canonical(client) : null, sourceJson = canonical(read.source), contentJson = canonical(content), digest = await hash(sourceJson + '\n' + contentJson + '\n' + clientJson), id = crypto.randomUUID()
-  await commit(db, actor, [db.prepare('INSERT INTO p_crm_draft_reviews(id,actor_id,actor_role,actor_version,connection_version,account_id,client_json,source_json,content_json,digest,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id, actor.id, actor.role, actor.memberVersion ?? 0, read.connection.version, read.connection.account_id, clientJson, sourceJson, contentJson, digest, at)], true, connectionGuard(read.connection))
+  await commit(db, actor, [db.prepare('INSERT INTO p_crm_draft_reviews(id,actor_id,actor_role,actor_version,connection_version,account_id,client_json,source_json,content_json,digest,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id, actor.id, actor.role, actor.memberVersion ?? 0, read.connection.version, read.connection.account_id, clientJson, sourceJson, contentJson, digest, at)], true, connectionGuard(read.connection,read.source))
   return { crmReview: true, id, digest, existingClient: Boolean(client), source: read.source, content, ...read.choices }
  }
  need(name === 'crm.deal.apply', 'Unknown CRM draft action', 404)
@@ -98,7 +102,7 @@ export async function hubspotDraftCommand(env: Bindings, actor: Actor, name: str
  need(canonical(fresh.source) === review.source_json, 'The deal changed after review; read it again', 409)
  const client = review.client_json ? JSON.parse(review.client_json) : null
  const id = crypto.randomUUID(), clientId = client?.id ?? crypto.randomUUID(), row = { ...content, id, client_id: clientId, revision: 1, currency: 'USD' }
- const guard = connectionGuard(connection)
+ const guard = connectionGuard(connection,source)
  guard.sql += ' AND EXISTS(SELECT 1 FROM p_crm_draft_reviews WHERE id=? AND digest=? AND applied_proposal_id IS NULL)'
  guard.values.push(review.id, review.digest)
  guard.sql += client ? ' AND EXISTS(SELECT 1 FROM p_clients WHERE id=? AND name=? AND email=? AND variable_fields=? AND version=?)' : ' AND NOT EXISTS(SELECT 1 FROM p_clients WHERE email=?)'

@@ -1,3 +1,4 @@
+import { privacyCommand } from './privacy'
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
@@ -75,6 +76,11 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
+ if(name.startsWith('privacy.'))return privacyCommand(env,a,name,p)
+ if(['proposal.prepare','proposal.duplicate','template.start','proposal.send'].includes(name)){
+  const clientId=p.clientId??(p.id?(await db.prepare('SELECT client_id FROM p_proposals WHERE id=?').bind(String(p.id)).first<any>())?.client_id:null)
+  if(clientId)need(!await db.prepare('SELECT 1 FROM p_erased_clients WHERE client_id=?').bind(clientId).first(),'This contact was erased; drafting and client invitations remain revoked',410)
+ }
  if(name==='crm.card.configure')return configureHubspotCard(env,a,p)
  if(name.startsWith('crm.sync.'))return hubspotSyncCommand(env,a,name,p)
  if(name.startsWith('crm.deal.'))return hubspotDraftCommand(env,a,name,p)

@@ -76,6 +76,7 @@ export async function mailboxCallback(env:Bindings,a:Actor,url:URL){
  return id
 }
 export async function sendingActor(env:Bindings,row:any){
+ need(!await env.DB.prepare('SELECT 1 FROM p_proposals p JOIN p_erased_clients e ON e.client_id=p.client_id WHERE p.id=?').bind(row.proposal_id).first(),'Contact erasure cancelled this outbound work',403)
  await completionAuthority(env,row)
  if(!row.sender_id)return null
  const a=await actorById(env.DB,row.sender_id);need(a&&senders.includes(a.role),'The sender no longer has permission to send',403)

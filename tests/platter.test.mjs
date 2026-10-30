@@ -205,10 +205,45 @@ test('Client CSV dry run, fingerprint custody, journal, replay and undo through 
 
  const again=await h.cmd('import.apply',{csv,fingerprint:preview.fingerprint});assert.equal(again.job.id,result.job.id)
  let undone=await h.cmd('import.undo',{id:result.job.id});for(let n=0;n<20&&undone.job.state==='undoing';n++)undone=await h.cmd('import.undo',{id:result.job.id});assert.equal(undone.job.state,'undone');assert.equal((await h.state()).clients.length,0)
+
+ // A second reviewed import gets a real native edit, independent of proposals.
+ const native=await h.cmd('client.save',{name:'Synthetic retained client',email:h.auth.OWNER_EMAIL})
+ const priorClients=(await h.state()).clients
+ const editedCsv=csv.replaceAll('\nclient_','\nsynthetic-platter-'),review=await h.cmd('import.preview',{csv:editedCsv})
+ assert.deepEqual((await h.state()).clients,priorClients,'preview retains existing native clients')
+ let editedImport=await h.cmd('import.apply',{csv:editedCsv,fingerprint:review.fingerprint})
+ for(let n=0;n<20&&editedImport.job.state!=='completed';n++)editedImport=await h.cmd('import.apply',{csv:editedCsv,fingerprint:review.fingerprint})
+ assert.equal(editedImport.job.state,'completed')
+ const imported=(await h.state()).clients.find(c=>c.id==='synthetic-platter-001'),custody=await h.cmd('import.journal',{id:editedImport.job.id})
+ const input={id:imported.id,version:imported.version,name:'Synthetic revised client',email:'synthetic-platter-106'+String.fromCharCode(64)+'example.test'}
+ const unchanged=async(action)=>{const before=await h.state();await action();assert.deepEqual(await h.state(),before,'refused client edit makes no business changes')}
+ for(const patch of [{name:''},{name:42},{email:'invalid'},{version:0},{version:true}])await unchanged(()=>h.cmd('client.edit',{...input,...patch},h.owner,400))
+ await unchanged(()=>h.cmd('client.edit',{...input,version:imported.version+1},h.owner,409))
+ await unchanged(()=>h.cmd('client.edit',{...input,email:h.auth.OWNER_EMAIL},h.owner,409))
+ await unchanged(()=>h.cmd('client.edit',input,member,403))
+ await unchanged(()=>h.cmd('client.edit',{...input,id:native.id},h.owner,409))
+ assert.equal((await h.send('/api/platter/command',{name:'client.edit',input})).status,401)
+ const saved=await h.cmd('client.edit',input)
+ assert.deepEqual(saved,{id:imported.id,version:imported.version+1})
+ const editedState=await h.state(),expected=editedState.clients.map(c=>c.id===imported.id?{...imported,name:input.name,email:input.email,version:imported.version+1}:c)
+ assert.deepEqual(editedState.clients,expected)
+ assert.deepEqual(editedState.proposals,[],'the independent edit needs no proposal')
+ assert.deepEqual(await h.cmd('import.journal',{id:editedImport.job.id}),custody,'editing retains the complete reviewed journal and binding')
+ await audited(h,'client.edit',editedState.actor.id,'owner',imported.id)
+ await unchanged(()=>h.cmd('client.edit',input,h.owner,409))
+ assert.equal((await h.cmd('import.apply',{csv:editedCsv,fingerprint:review.fingerprint})).job.id,editedImport.job.id)
+ assert.deepEqual((await h.state()).clients,editedState.clients,'capture replay cannot overwrite the native edit')
+ await h.cmd('import.undo',{id:editedImport.job.id},h.owner,409)
+ assert.deepEqual((await h.state()).clients,editedState.clients,'unsafe undo preserves the edit and every other client')
+ const conflictCustody=await h.cmd('import.journal',{id:editedImport.job.id})
+ assert.deepEqual(conflictCustody.originals,custody.originals);assert.deepEqual(conflictCustody.provenance,custody.provenance)
+ assert.equal((await h.send('/api/platter/client-original?job='+editedImport.job.id+'&name=clients.csv',undefined,h.owner)).text,editedCsv)
+ await h.cmd('import.apply',{csv:editedCsv,fingerprint:review.fingerprint},h.owner,409)
+ assert.deepEqual((await h.state()).clients,editedState.clients,'replay after a refused undo cannot resurrect source values')
 }))
 test('import undo preserves clients with dependent proposals; owner erasure fences unused client',()=>run(async h=>{
  const{client}=await draft(h);await h.cmd('client.erase',{id:client.id,confirmName:'Northstar Coffee'},h.owner,409)
- const other=await h.cmd('client.save',{name:'Temporary enquiry',email:'temporary@studio.example'});await h.cmd('client.erase',{id:other.id,confirmName:'Wrong'},h.owner,400);await h.cmd('client.erase',{id:other.id,confirmName:'Temporary enquiry'});assert.ok(!(await h.state()).clients.some(c=>c.id===other.id));const csv='client_id,name,email\nimported,Longhouse Studio,hello@longhouse.example';const preview=await h.cmd('import.preview',{csv});const applied=await h.cmd('import.apply',{csv,fingerprint:preview.fingerprint});await h.cmd('proposal.prepare',{...offer,clientId:'imported'});await h.cmd('import.undo',{id:applied.job.id},h.owner,409);assert.ok((await h.state()).clients.some(c=>c.id==='imported'))
+ const other=await h.cmd('client.save',{name:'Temporary enquiry',email:'temporary@studio.example'});await h.cmd('client.erase',{id:other.id,confirmName:'Wrong'},h.owner,400);await h.cmd('client.erase',{id:other.id,confirmName:'Temporary enquiry'});assert.ok(!(await h.state()).clients.some(c=>c.id===other.id));const csv='client_id,name,email\nimported,Longhouse Studio,hello@longhouse.example';const preview=await h.cmd('import.preview',{csv});const applied=await h.cmd('import.apply',{csv,fingerprint:preview.fingerprint});await h.cmd('proposal.prepare',{...offer,clientId:'imported'});const before=await h.state();await h.cmd('client.edit',{id:'imported',version:1,name:'Changed dependency',email:h.auth.OWNER_EMAIL},h.owner,409);assert.deepEqual(await h.state(),before);await h.cmd('import.undo',{id:applied.job.id},h.owner,409);assert.ok((await h.state()).clients.some(c=>c.id==='imported'));const after=await h.state();assert.deepEqual(after.clients,before.clients);assert.deepEqual(after.proposals,before.proposals);assert.deepEqual(after.revisions,before.revisions)
 }))
 test('COLLAB-003 every saved revision has an author/time, comparisons highlight changes, restore creates unapproved revision four',()=>run(async h=>{
  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)

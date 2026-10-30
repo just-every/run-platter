@@ -830,3 +830,60 @@ test('AUTO-004 compiled public API reference exposes scoped operations and signe
 
 
 test('SIGN-004 and SEND-003 owner recipient controls, own-field previews, ordered signing and viewer revocation', {timeout:180000},async()=>{const {recipientsBrowser}=await import('./recipients-browser.mjs');await recipientsBrowser(1440)})
+
+test('IMPORT-001 reviewed CSV, independent client edit and refused undo retain originals in the compiled app', {timeout:120000},async()=>{
+ let app,browser
+ try{
+  app=await installedApp()
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  const context=await browser.newContext({viewport:{width:1440,height:900}})
+  try{
+   const page=await context.newPage(),screenshots=process.env.PLATTER_SCREENSHOTS
+   if(screenshots)await mkdir(screenshots,{recursive:true})
+   const capture=async name=>{
+    for(const width of [1440,390]){
+     await page.setViewportSize({width,height:900})
+     await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))})
+     if(screenshots)await page.screenshot({path:join(screenshots,`IMPORT-001-${name}-${width}.png`),fullPage:true})
+    }
+    await page.setViewportSize({width:1440,height:900})
+   }
+   const claimed=await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic import owner'},maxRedirects:0})
+   assert.equal(claimed.status(),303)
+   await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+   const state=async()=>await(await context.request.get(app.origin+'/api/platter/state')).json()
+   // Native browser forms submit textarea line breaks as CRLF.
+   const csv=['client_id,name,email','synthetic-platter-1063,Synthetic reviewed studio,synthetic-platter-1063'+String.fromCharCode(64)+'example.test','synthetic-platter-1064,Synthetic unchanged studio,synthetic-platter-1064'+String.fromCharCode(64)+'example.test'].join('\r\n')
+   await page.goto(app.origin+'/app/import')
+   const preview=page.locator('section.panel').filter({has:page.getByRole('heading',{name:'Preview client CSV',exact:true})})
+   await preview.getByLabel('CSV content',{exact:true}).fill(csv);await preview.getByRole('button',{name:'Preview import',exact:true}).click()
+   assert.deepEqual((await state()).clients,[])
+   assert.match(await page.locator('main').innerText(),/Synthetic reviewed studio/);await capture('review')
+   await page.getByRole('button',{name:'Apply reviewed import',exact:true}).click()
+   const applied=await state(),job=applied.importJobs[0]
+   assert.equal(job.state,'completed');assert.equal(applied.clients.length,2)
+   await page.goto(app.origin+'/app/clients')
+   let card=page.locator('section.client-card').filter({has:page.getByRole('heading',{name:'Synthetic reviewed studio',exact:true})})
+   await card.getByText('Edit imported client',{exact:true}).click()
+   await card.getByLabel('Client name',{exact:true}).fill('Synthetic revised studio')
+   const changedEmail='synthetic-platter-1065'+String.fromCharCode(64)+'example.test'
+   await card.getByLabel('Client email',{exact:true}).fill(changedEmail)
+   assert.match(await card.innerText(),/prevents undoing this import/);await capture('client-edit')
+   await card.getByRole('button',{name:'Save client details',exact:true}).click()
+   card=page.locator('section.client-card').filter({has:page.getByRole('heading',{name:'Synthetic revised studio',exact:true})})
+   assert.ok((await card.innerText()).includes(changedEmail))
+   const edited=await state();assert.deepEqual(edited.clients.find(c=>c.id==='synthetic-platter-1063'),{...applied.clients.find(c=>c.id==='synthetic-platter-1063'),name:'Synthetic revised studio',email:changedEmail,version:2})
+   assert.deepEqual(edited.importedClients,applied.importedClients)
+   await page.goto(app.origin+'/app/import');await page.getByRole('button',{name:'View journal',exact:true}).click()
+   const download=page.getByRole('link',{name:'Download clients.csv',exact:true})
+   assert.equal(await(await context.request.get(app.origin+await download.getAttribute('href'))).text(),csv);await capture('journal')
+   await page.getByRole('button',{name:'Undo import',exact:true}).click()
+   assert.match(await page.getByRole('alert').innerText(),/Later edits and dependent proposals are preserved/)
+   assert.deepEqual((await state()).clients,edited.clients);assert.deepEqual((await state()).proposals,[])
+   await capture('undo-refused')
+   await page.getByRole('button',{name:'View journal',exact:true}).click()
+   assert.equal(await(await context.request.get(app.origin+await page.getByRole('link',{name:'Download clients.csv',exact:true}).getAttribute('href'))).text(),csv)
+   assert.equal(job.total,2)
+  }finally{await context.close()}
+ }finally{await browser?.close();await app?.close()}
+})

@@ -432,7 +432,9 @@ test('TEAM-004 current person, agent, invitation, signature, native, import and 
  assert.equal((await h.send('/api/platter/audit',undefined,'')).status,401)
 }))
 
-test('AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund',()=>run(async h=>{
+test('AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund',async()=>{
+ const outbound=[],h=await harness({entry:'tests/mcp-discovery-worker.ts',outboundService:request=>{outbound.push(request.url);return new Response(null,{status:503})}})
+ try{
  const endpoint='/api/platter/agent/mcp',key=await h.cmd('agent.create',{label:'MCP assistant'})
  let sequence=0
  const transport=async(method,params={},token=key.token,extra={})=>h.send(endpoint,{jsonrpc:'2.0',id:++sequence,method,params},'',{authorization:'Bearer '+token,accept:'application/json, text/event-stream','mcp-protocol-version':'2025-06-18',...extra})
@@ -443,14 +445,104 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  assert.equal(initialized.protocolVersion,'2025-06-18');assert.ok(initialized.capabilities.tools)
  const notified=await h.send(endpoint,{jsonrpc:'2.0',method:'notifications/initialized'},'',{authorization:'Bearer '+key.token});assert.equal(notified.status,202);assert.equal(notified.text,'')
  const listed=await rpc('tools/list');assert.ok(listed.tools.every(t=>t.inputSchema.type==='object'));assert.deepEqual(listed.tools.map(t=>t.name).sort(),['prepare_from_template','prepare_proposal','read_engagement','read_proposal','request_send','revise_proposal','search_proposals','search_templates'])
+ const expectedMappings={
+  search_proposals:['platter.proposals.search',['EDIT-016'],'state',null],
+  search_templates:['platter.templates.start',['EDIT-002'],'state',null],
+  prepare_from_template:['platter.templates.start',['EDIT-002'],'proposal.prepare','proposal.created'],
+  read_proposal:['platter.proposals.read',['HTTP-001','AI-003'],'state',null],
+  read_engagement:['platter.proposals.read',['HTTP-001','AI-003'],'state',null],
+  prepare_proposal:['platter.drafts.prepare',['AI-001'],'proposal.prepare','proposal.created'],
+  revise_proposal:['platter.drafts.prepare',['AI-001'],'proposal.revise','proposal.revised'],
+  request_send:['platter.proposals.send',['PROP-002'],'requestSend',null],
+ }
+ const resources=await rpc('resources/list');assert.deepEqual(resources.resources.map(r=>r.uri),['platter://registry'])
+ assert.deepEqual(await rpc('resources/templates/list'),{resourceTemplates:[]})
+ assert.deepEqual(await rpc('prompts/list'),{prompts:[]})
+ const discovery=await rpc('resources/read',{uri:'platter://registry'})
+ assert.equal(discovery.contents[0].mimeType,'application/json')
+ const registry=JSON.parse(discovery.contents[0].text)
+ assert.equal(registry.authority.policyConformance,'held')
+ for(const key of ['machineApproval','machineSending','machineSigning','machineRefunds'])assert.equal(registry.authority[key],false)
+ for(const tool of listed.tools){
+  const mapping=tool._meta['io.runeditrun.platter.registry']
+  assert.deepEqual([mapping.job,mapping.coreClauses,mapping.nativeAction,mapping.eventType],expectedMappings[tool.name],tool.name)
+  assert.deepEqual(mapping,registry.compatibilityTools[tool.name])
+ }
+ // Compare the public capability projection with the contract, independently of the registry source.
+ const contract=(await readFile('CONTRACT.md','utf8')).split('### Agent surface')[1].split('#### SURFACE-001')[0]
+ const expectedJobs=contract.split('\n').filter(line=>line.startsWith('| `platter.')).map(line=>{const [name,description,clauses,classes]=line.split('|').slice(1).map(value=>value.trim().replaceAll('`',''));return{name,description,coreClauses:clauses.split(', '),declaredRiskClasses:classes.split(' or ')}})
+ assert.deepEqual(registry.jobs.map(({name,description,coreClauses,declaredRiskClasses})=>({name,description,coreClauses,declaredRiskClasses})),expectedJobs)
+ assert.equal(new Set(registry.jobs.map(job=>job.name)).size,registry.jobs.length)
+ for(const job of registry.jobs){
+  const mapped=Object.entries(expectedMappings).filter(([,mapping])=>mapping[0]===job.name).map(([tool])=>tool)
+  assert.deepEqual(job.compatibilityTools,mapped)
+  assert.equal(job.roleParity,'unproved');assert.ok(job.reason.length>20)
+  if(!mapped.length)assert.ok(['unavailable','held'].includes(job.status),job.name)
+ }
+ const declared=heading=>[...contract.split('**'+heading+'.**')[1].split('\n')[0].matchAll(/`([^`]+)`/g)].map(match=>match[1])
+ assert.deepEqual(registry.resources.map(r=>r.uriTemplate),declared('Resources'))
+ assert.deepEqual(registry.events.map(e=>e.name),declared('Events'))
+ assert.deepEqual(registry.prompts.map(p=>[p.name,p.coreClauses]),[
+  ['Discovery-to-proposal',['AI-001','AGENT-001']],['delivery-fit review',['AGENT-002']],['question resolution',['AGENT-003']],
+  ['collection reconciliation',['AGENT-005']],['change order',['AGENT-006']],['renewal',['AGENT-008']],
+ ])
+ assert.deepEqual(registry.nonTools.map(n=>n.coreClause),['SITE-001','EDIT-007','MOB-001','MOB-002',null])
+ assert.deepEqual(registry.handoffs.listens,['crm.deal.changed','delivery.actuals.changed','provider.payment.changed'])
+ assert.deepEqual(registry.handoffs.emits,['agreement.completed','invoice.changed','archive.requested'])
+ assert.equal(registry.handoffs.status,'unavailable')
+ for(const item of [...registry.resources,...registry.events,...registry.prompts]){assert.equal(item.status,'unavailable');assert.ok(item.reason.length>20)}
+ assert.match(registry.events.find(e=>e.name==='proposal.sent').nativeDelivery,/lifecycle webhook/)
+ for(const resource of registry.resources){
+  const response=await transport('resources/read',{uri:resource.uriTemplate.replaceAll(/\{[^}]+\}/g,'synthetic-platter-1')})
+  assert.equal(response.value.error.code,-32002)
+ }
+ for(const prompt of registry.prompts)assert.equal((await transport('prompts/get',{name:prompt.name})).value.error.code,-32602)
+ for(const method of ['resources/list','resources/templates/list','prompts/list'])assert.equal((await transport(method,{cursor:'synthetic-platter-1'})).value.error.code,-32602)
+ assert.equal((await transport('resources/subscribe',{uri:'platter://proposals/synthetic-platter-1'})).value.error.code,-32601)
+ assert.equal((await h.send(endpoint,{jsonrpc:'2.0',id:1,method:'resources/read',params:{uri:'platter://registry'}})).status,401)
+ assert.equal((await h.send(endpoint,{jsonrpc:'2.0',id:1,method:'resources/read',params:{uri:'platter://registry'}},h.owner)).status,401)
+ const scoped=await h.send('/api/platter/v1/keys',{label:'Synthetic discovery refusal',scopes:['proposals.read']},h.owner)
+ assert.equal(scoped.status,200);assert.equal((await transport('resources/read',{uri:'platter://registry'},scoped.value.token)).status,403)
+ const expired=await h.cmd('agent.create',{label:'Synthetic expired discovery'})
+ await h.db.prepare('UPDATE p_agent_keys SET expires_at=1 WHERE id=?').bind(expired.id).run()
+ assert.equal((await transport('resources/read',{uri:'platter://registry'},expired.token)).status,401)
  const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
  const found=await call('search_proposals',{query:'Northstar'});assert.ok(found.clients.some(c=>c.id===client.id));assert.equal(found.proposalCount,0)
  const p=await call('prepare_proposal',{...offer,depositPercent:25,clientId:client.id})
- let current=await call('read_proposal',{id:p.id});assert.equal(current.status,'draft');assert.equal(current.prepared_by,'agent:'+key.id);assert.ok(!current.shareToken)
  assert.ok((await call('search_proposals',{query:'photography',status:'draft',limit:1})).proposals.some(x=>x.id===p.id))
+ assert.deepEqual(p,{id:p.id,revision:1,version:1})
+ const native=await h.send('/api/platter/agent/command',{name:'proposal.prepare',input:{...offer,depositPercent:25,clientId:client.id}},'',{authorization:'Bearer '+key.token})
+ assert.equal(native.status,200);assert.deepEqual(native.value,{id:native.value.id,revision:1,version:1})
+ const nativeContext=(await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).value
+ const nativePrepared=nativeContext.proposals.find(row=>row.id===native.value.id),mcpPrepared=nativeContext.proposals.find(row=>row.id===p.id)
+ for(const field of ['title','scope','options','deposit_bps','status','revision','version','prepared_by','client_id'])assert.deepEqual(mcpPrepared[field],nativePrepared[field],field)
+ for(const id of [p.id,native.value.id])assert.deepEqual((await h.db.prepare('SELECT type,status,revision FROM p_webhook_events WHERE proposal_id=?').bind(id).all()).results,[{type:'proposal.created',status:'draft',revision:1}])
+ const templates=await call('search_templates'),starter=templates.templates[0];assert.ok(starter)
+ const templateInput={templateId:starter.id,templateVersion:starter.version,clientId:client.id,title:'Independent template draft'}
+ const templateDraft=await call('prepare_from_template',templateInput)
+ const nativeTemplate=await h.send('/api/platter/agent/command',{name:'proposal.prepare',input:templateInput},'',{authorization:'Bearer '+key.token})
+ assert.equal(nativeTemplate.status,200)
+ assert.deepEqual(templateDraft,{id:templateDraft.id,revision:1,version:1})
+ const templateContext=(await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).value
+ const fromMcp=templateContext.proposals.find(row=>row.id===templateDraft.id),fromNative=templateContext.proposals.find(row=>row.id===nativeTemplate.value.id)
+ for(const field of ['title','scope','options','deposit_bps','status','revision','version','prepared_by','client_id'])assert.deepEqual(fromMcp[field],fromNative[field],field)
+ assert.deepEqual((await h.db.prepare('SELECT type,status FROM p_webhook_events WHERE proposal_id=?').bind(templateDraft.id).all()).results,[{type:'proposal.created',status:'draft'}])
+ const missingId='synthetic-platter-missing'
+ const nativeError=await h.send('/api/platter/agent/command',{name:'proposal.prepare',input:{...offer,depositPercent:25,clientId:missingId}},'',{authorization:'Bearer '+key.token})
+ const mcpError=await rpc('tools/call',{name:'prepare_proposal',arguments:{...offer,depositPercent:25,clientId:missingId}})
+ assert.equal(nativeError.status,404);assert.equal(mcpError.isError,true);assert.equal(mcpError.content[0].text,nativeError.value.error+' (404)')
+ // A populated installation must expose exactly the same metadata, with no state reads or outbound requests.
+ const beforeDiscovery=(await h.db.prepare('SELECT * FROM p_webhook_events ORDER BY id').all()).results
+ const beforeDiscoveryState=await h.state(),beforeOutbound=outbound.length
+ assert.deepEqual(await rpc('resources/read',{uri:'platter://registry'}),discovery)
+ assert.deepEqual(await rpc('tools/list'),listed)
+ assert.deepEqual((await h.db.prepare('SELECT * FROM p_webhook_events ORDER BY id').all()).results,beforeDiscovery)
+ assert.deepEqual(await h.state(),beforeDiscoveryState);assert.equal(outbound.length,beforeOutbound)
+ for(const privateValue of [client.id,p.id,key.id,key.token,client.email,offer.title,offer.scope])if(privateValue)assert.ok(!JSON.stringify(registry).includes(privateValue))
+ let current=await call('read_proposal',{id:p.id});assert.equal(current.status,'draft');assert.equal(current.prepared_by,'agent:'+key.id);assert.ok(!current.shareToken);assert.deepEqual(current,mcpPrepared)
  const engagement=await call('read_engagement',{id:p.id});assert.equal(engagement.viewTracking.available,false);assert.equal(engagement.sectionReading.available,false);assert.equal(engagement.acceptance,null);assert.equal(engagement.delivery,null)
  const before=await h.state(),requested=await call('request_send',{id:p.id,revision:1}),again=await call('request_send',{id:p.id,revision:1})
- assert.equal(again.request.id,requested.request.id)
+ assert.equal(again.request.id,requested.request.id);assert.deepEqual(requested.request,await h.db.prepare('SELECT * FROM p_send_requests WHERE id=?').bind(requested.request.id).first())
  const queued=await h.send('/api/platter/send-requests',undefined,h.owner);assert.equal(queued.status,200);assert.equal(queued.value.requests.length,1);assert.equal(queued.value.requests[0].actionable,1)
  const after=await h.state();assert.deepEqual(after.proposals,before.proposals);assert.deepEqual(after.outbox,before.outbox)
  for(const name of ['approve','proposal.approve','send','proposal.send','sign','refund']){
@@ -459,7 +551,7 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  await h.cmd('proposal.send',{id:p.id,version:1},h.owner,409)
  await h.cmd('send-request.resolve',{id:requested.request.id,status:'fulfilled'},h.owner,409)
  const changed=await call('revise_proposal',{...offer,depositPercent:25,clientId:client.id,id:p.id,version:1,scope:'A revised campaign plan'})
- assert.equal(changed.revision,2);assert.equal((await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests[0].actionable,0)
+ assert.equal(changed.revision,2);assert.deepEqual(changed,{id:p.id,revision:2,version:2});assert.deepEqual((await h.db.prepare('SELECT type,status,revision FROM p_webhook_events WHERE proposal_id=? AND revision=2').bind(p.id).all()).results,[{type:'proposal.revised',status:'draft',revision:2}]);assert.equal((await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests[0].actionable,0)
  const stale=await rpc('tools/call',{name:'request_send',arguments:{id:p.id,revision:1}});assert.equal(stale.isError,true)
  await h.cmd('send-request.resolve',{id:requested.request.id,status:'dismissed'})
  const next=await call('request_send',{id:p.id,revision:2})
@@ -480,7 +572,9 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  const audit=(await h.send('/api/platter/audit?actor='+encodeURIComponent('agent:'+key.id),undefined,h.owner)).value.rows
  for(const action of ['mcp.search_proposals','mcp.prepare_proposal','mcp.read_proposal','mcp.read_engagement','mcp.request_send','mcp.revise_proposal'])assert.ok(audit.some(row=>row.action===action&&row.actor_role==='agent'),action)
  await h.cmd('agent.revoke',{id:key.id});assert.equal((await transport('ping')).status,401)
-}))
+ for(const method of ['initialize','tools/list','resources/list','resources/templates/list','resources/read','prompts/list','prompts/get'])assert.equal((await transport(method,{uri:'platter://registry'})).status,401,method)
+ }finally{await h.close()}
+})
 
 test('NEG-002 / TEAM-004 opt-in tracked terms edits accept one/reject one into revision two, preserve offer and require fresh approval',()=>run(async h=>{
  const {client,p}=await draft(h)

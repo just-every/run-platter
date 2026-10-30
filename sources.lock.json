@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "e81332f5abcd792f6ad5d4b118bd7a05a01a996b84770e7370eb17c14a9959ab",
+      "sha256": "25de04233400d52b997957b12269c875358cf33586994039e94d4162c4c10800",
       "executable": false
     },
     "deploy-demo.json": {
@@ -126,7 +126,7 @@
       "executable": false
     },
     "docs/contract-behavior.md": {
-      "sha256": "574141099f5fedaf485d390d6776c0ce1dd83e73fff46699445178dff4b6be30",
+      "sha256": "b09b94eceaab2528ac82abbd38bdbcacfb4321a1b73f41c733fad64bdd4c587d",
       "executable": false
     },
     "docs/contract/COVERAGE.json": {
@@ -2449,6 +2449,10 @@
       "sha256": "ce31b0bae06aca21b3350c86344c981d53022e4fa502f1423e0027cd6bc1bc3c",
       "executable": false
     },
+    "src/platter/agent-registry.ts": {
+      "sha256": "bebb31e1637afd56e04f5509cfd56845112a8682acbd350f28b33b6ac7ccff77",
+      "executable": false
+    },
     "src/platter/api/index.ts": {
       "sha256": "ec1522844efda9de4efa405258fc24e7c2f4cf33f767d21259928101707f48a9",
       "executable": false
@@ -2738,7 +2742,7 @@
       "executable": false
     },
     "src/platter/mcp.ts": {
-      "sha256": "12eff99cdbf2f6aeb4eea75cee8221f01994154300c97d6915f11b17ba6ab630",
+      "sha256": "3c71d92e6b0e75133cb5f6a1f7de902ac3206c79e11de3395a664a37ad44fb13",
       "executable": false
     },
     "src/platter/member-invitations.ts": {
@@ -3529,6 +3533,10 @@
       "sha256": "0952dac43db0981652f1a3bddc0bc2e0dd6bf2b3f16e07affb4f9c027bc1d0a8",
       "executable": false
     },
+    "tests/mcp-discovery-worker.ts": {
+      "sha256": "2749bd8b9e888fdec26d58a8132c4c13cf706b3563e75848d7b9ab5bcceb4c66",
+      "executable": false
+    },
     "tests/mobile-client-journey.mjs": {
       "sha256": "12eaf4517b230f4417606d0ba4360cd9505730a6563818248cb5fa924b15b31a",
       "executable": false
@@ -3546,7 +3554,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "74ecc2b1102c52fb5789ac39144741e3f189aba7da44faafadc495726d988ae7",
+      "sha256": "4b07b39e27d282493960657c01d081370322025cb3437b6f389f0dfb5216dc69",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

@@ -702,3 +702,56 @@ The legacy preparation key is labelled and stored as a hash, expires after thirt
 ## AI-003
 
 The legacy stateless Streamable HTTP door uses the existing proposal context, draft and retained-send-request actions. Requests bind key, proposal and revision; replay returns one request, revision changes mark it stale, and fulfillment follows the exact sent revision. This is compatibility behavior pending the policy-class registry in the contract.
+
+
+## SURFACE-001
+
+Authenticated MCP discovery lists one metadata resource, `platter://registry`.
+Read it with the standard resource-read method after initialization. Every request
+uses the existing current owner-bound agent credential check; a native person
+session or a revoked, expired or scoped REST key grants no discovery access.
+The resource contains static product metadata, never client records, proposal
+contents, credentials, destinations or execution consent. It reads no business
+records and creates no events or outbound requests. Responses remain uncached.
+
+The registry enumerates all 149 canonical jobs from the contract table with their
+Core clauses and declared risk classes. These classes describe target obligations;
+they are not computed classes or Base company-policy decisions. Each job names
+its compatibility tools and an explicit partial, unavailable or held status.
+A missing MCP handler is unavailable even where the native application implements
+the feature. Full canonical-job and role parity remains unproved.
+
+The operational tool list remains eight entries. Its metadata maps proposal search
+to `platter.proposals.search`, both template discovery and template drafting to
+`platter.templates.start`, proposal and engagement reads to
+`platter.proposals.read`, structured draft preparation and revision to
+`platter.drafts.prepare`, and owner-review requests to `platter.proposals.send`.
+The last mapping identifies the target job; it grants no sending authority.
+Search projections retain existing limits and visibility. Structured drafting
+is not discovery-call specialist execution. Draft and template results retain
+the native id, revision and version; native draft changes produce the existing
+`proposal.created` and `proposal.revised` lifecycle events. Reads produce no
+business event. A send request retains its native review-request row and produces
+no sent event. Tool errors retain native refusal text and status inside the
+existing MCP error envelope.
+
+Every one of the 21 declared business-record URI templates is documented as
+unavailable: there are no MCP business-record readers, including revision readers.
+The resource-template list is empty; only the static registry can be read.
+Attempting another URI returns resource-unavailable without loading a record.
+The six specialist prompts retain their clause mappings and unavailable status;
+the executable prompt list is empty and prompt retrieval is refused.
+All 21 declared canonical events are documented individually. MCP subscriptions
+and event delivery are unavailable. The existing owner-authorized lifecycle
+webhook can emit `proposal.sent`; it does not establish an MCP event stream or
+canonical connector-envelope delivery for the other declared events. Incoming
+CRM, delivery and payment envelopes, outgoing agreement, invoice and archive
+handoffs, interactive non-tool reasons, and their boundaries are also explicit.
+
+Base company-policy conformance remains held. Machine approval, sending, signing
+and refunds remain refused. No resource reader, event subscription, specialist
+executor or new record access is installed by discovery. SURFACE-001 remains
+PARTIAL pending complete operational tool and role parity, business-record readers,
+event delivery, specialist execution and qualified Base company-policy conformance.
+AUTO-004 retains its ct demotion and existing acceptance and landing requirements;
+this metadata releases no provider or authority hold.

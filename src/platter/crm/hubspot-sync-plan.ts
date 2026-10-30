@@ -14,7 +14,7 @@ export async function syncProposal(env: Bindings, actor: Actor, id: unknown) {
  need(row.currency === 'USD' && ['sent', 'accepted', 'withdrawn'].includes(row.status), 'Send an approved USD revision before reviewing CRM writes', 409)
  need(!await env.DB.prepare('SELECT 1 FROM p_negotiations WHERE proposal_id=?').bind(row.id).first(), 'Finish the negotiated revision before reviewing CRM writes', 409)
  const source = await env.DB.prepare('SELECT * FROM p_crm_draft_sources WHERE proposal_id=?').bind(row.id).first<any>()
- need(source, 'Start from a reviewed HubSpot deal before synchronizing', 409)
+ need(source?.provider === 'hubspot', 'Start from a reviewed HubSpot deal before synchronizing', 409)
  const { connection, secret } = await providerCredential(env, 'workspace:hubspot')
  need(!connection.broken_at && connection.account_id === source.account_id, 'Reconnect the original HubSpot account', 409)
  return { row, source, connection, secret }

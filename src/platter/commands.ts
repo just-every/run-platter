@@ -1,4 +1,5 @@
 import { configureHubspotCard } from './crm/hubspot-card'
+import { salesforceSyncCommand } from './crm/salesforce-sync'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { salesforceDraftCommand } from './crm/salesforce-draft'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
@@ -77,6 +78,7 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
  if(name==='crm.card.configure')return configureHubspotCard(env,a,p)
+ if(name.startsWith('crm.salesforce.'))return salesforceSyncCommand(env,a,name,p)
  if(name.startsWith('crm.sync.'))return hubspotSyncCommand(env,a,name,p)
  if(name.startsWith('crm.opportunity.'))return salesforceDraftCommand(env,a,name,p)
  if(name.startsWith('crm.deal.'))return hubspotDraftCommand(env,a,name,p)

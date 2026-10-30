@@ -881,8 +881,8 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
 })
 
 test('CRM-002 native reviewed Salesforce opportunity creates an independent collection-off draft with exact price-book products', { timeout: 120000 }, async () => {
- const { harness } = await import('./harness.mjs'), { browserEdge } = await import('./browser-edge.mjs'), { salesforceFixture } = await import('./provider-network.mjs')
- const edge = await browserEdge(), provider = salesforceFixture()
+ const { harness } = await import('./harness.mjs'), { browserEdge } = await import('./browser-edge.mjs'), { salesforceSyncFixture } = await import('./salesforce-sync-fixture.mjs')
+ const edge = await browserEdge(), provider = salesforceSyncFixture()
  let h, browser
  try {
   h = await harness({ entry: './dist/server/index.js', assetsDirectory: './dist/client', origin: edge.origin, outboundService: provider.request }); edge.attach(h)
@@ -931,6 +931,7 @@ test('CRM-002 native reviewed Salesforce opportunity creates an independent coll
    const calls = provider.calls.length; provider.state.lines[0].UnitPrice = 999; await page.reload()
    assert.equal(provider.calls.length, calls, 'loading the copied draft never synchronizes Salesforce')
    assert.equal((await h.state()).proposals[0].options[0].cents, 36122)
+   await (await import('./salesforce-browser.mjs')).salesforceBrowser({ h, page, provider, current, capture })
   } finally { await context.close() }
  } finally { await browser?.close(); await h?.close(); await edge.close() }
 })

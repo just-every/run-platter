@@ -3665,6 +3665,7 @@ test('CRM-002 reviewed Salesforce opportunity drafts copy exact products and ref
   assert.ok(edge.calls.some(call => call.query?.includes('FROM OpportunityLineItem') && call.query.includes('PricebookEntry.Product2Id')))
   assert.ok(edge.calls.some(call => call.path.includes('/sobjects/Opportunity/')))
  } finally { await h.close() }
+ await (await import('./salesforce-sync-journey.mjs')).salesforceSyncJourney(verified)
 })
 
 test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance and refuse changed source or authority without writes', async () => {

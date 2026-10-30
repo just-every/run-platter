@@ -3474,7 +3474,7 @@
       "executable": false
     },
     "tests/editor-budget.mjs": {
-      "sha256": "2cdf74eb40eb18526d8ea96015bd39f932cdb39defc204470c984373b5e8fe79",
+      "sha256": "62dcff0204b50b588133fae032bd8fd6c6981076b9695e8c85e8a580ecd739bb",
       "executable": false
     },
     "tests/followup-journey.mjs": {

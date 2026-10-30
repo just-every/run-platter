@@ -9,7 +9,7 @@ const head=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()
 const report={head,cpuThrottle:4,editorViewport:{width:1440,height:900},clientViewport:{width:390,height:900}}
 let app,browser,context,phoneContext
 try{
- app=await installedApp();browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});context=await browser.newContext({viewport:report.editorViewport})
+ app=await installedApp();browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']});context=await browser.newContext({viewport:report.editorViewport})
  const post=async(name,input)=>{const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
  const state=async()=>(await context.request.get(app.origin+'/api/platter/state')).json()
  assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic Platter reference owner'},maxRedirects:0})).status(),303)

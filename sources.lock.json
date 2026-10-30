@@ -2454,7 +2454,7 @@
       "executable": false
     },
     "src/platter/accounting/jobs.ts": {
-      "sha256": "6a71136110bd2363844e10bd5128f1d63297f8b1d4bd7be7fb6c1c28be7c196f",
+      "sha256": "2edb6c031cfecbbd958c1b2ffad50007658344b5c947b185631da93edb3f14a3",
       "executable": false
     },
     "src/platter/accounting/quickbooks.ts": {
@@ -3550,7 +3550,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "77cb4183950633eb631bba5d9c87a7b15d5c04c770b034a422506ebaaf074fd6",
+      "sha256": "1db64334fd86133e425eafb46f4fb2b055392e878051d4db7f424a32714f70a3",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

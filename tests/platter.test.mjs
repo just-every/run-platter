@@ -3733,6 +3733,45 @@ test('ACCT-001 reviewed QuickBooks deposits preserve accepted cents, explicit ma
   await apply(explicit);await h.cmd('accounting.dispatch',{})
   assert.equal([...fake.invoices.values()].at(-1).CustomerRef.value,'synthetic-platter-9301')
 
+  const conflicting=await acceptedQuickbooksAgreement(h,'Conflicting customer deposit')
+  const concurrent=await acceptedQuickbooksAgreement(h,'Concurrent customer deposit',conflicting.client.id)
+  const choices=['synthetic-platter-9400','synthetic-platter-9401']
+  for(const id of choices)fake.customers.set(id,{Id:id,DisplayName:'Conflicting customer deposit client'})
+  const agreements=[conflicting,concurrent],reviews=await Promise.all(agreements.map((a,i)=>h.cmd('accounting.review',quickbooksReviewInput(a,fake,choices[i]))))
+  const proposalsBefore=(await h.state()).proposals.filter(p=>agreements.some(a=>a.proposal.id===p.id))
+  const conflictWrites=writes().length
+  let arrivals=0,release
+  const ready=new Promise(resolve=>{release=resolve})
+  // Both public requests finish their customer precheck before either reserves the mapping.
+  fake.setHook(async request=>{
+   if(request.method==='GET'&&new URL(request.url).pathname.includes('/account/')){
+    if(++arrivals===2)release()
+    await ready
+   }
+  })
+  let results
+  try {
+   results=await Promise.all(reviews.map(r=>h.send('/api/platter/command',{name:'accounting.apply',input:{id:r.id,digest:r.digest,consent:true}},h.owner)))
+  } finally {fake.setHook(undefined)}
+  assert.deepEqual(results.map(r=>r.status).sort(),[200,409],'conflicting reviewed customers cannot both acquire authority')
+  const winner=results.findIndex(r=>r.status===200),loser=1-winner,winnerId=agreements[winner].proposal.id,loserId=agreements[loser].proposal.id
+  const queued=await history(),mapping=queued.customers.find(c=>c.client_id===conflicting.client.id)
+  assert.equal(mapping.provider_id,choices[winner])
+  assert.equal(queued.jobs.find(j=>j.proposal_id===winnerId).status,'queued')
+  assert.ok(!queued.jobs.some(j=>j.proposal_id===loserId),'the refused approval retains no executable request')
+  assert.equal(writes().length,conflictWrites,'approval alone makes no provider write')
+  assert.deepEqual((await h.state()).proposals.filter(p=>agreements.some(a=>a.proposal.id===p.id)),proposalsBefore)
+  await Promise.all([h.cmd('accounting.dispatch',{}),h.cmd('accounting.dispatch',{})])
+  assert.deepEqual(writes().slice(conflictWrites).map(c=>c.body.CustomerRef.value),[choices[winner]],'only the reviewed customer receives the deposit')
+  const dispatched=await history()
+  assert.equal(dispatched.jobs.find(j=>j.proposal_id===winnerId).status,'complete')
+  await apply(reviews[loser],h.owner,409);await apply(reviews[winner]);await h.cmd('accounting.dispatch',{})
+  assert.deepEqual(await history(),dispatched,'conflict retries and replays change no accounting records')
+  assert.equal(writes().length,conflictWrites+1)
+  const corrected=await h.cmd('accounting.review',quickbooksReviewInput(agreements[loser],fake,choices[winner]))
+  await apply(corrected);await h.cmd('accounting.dispatch',{})
+  assert.deepEqual(writes().slice(conflictWrites).map(c=>c.body.CustomerRef.value),[choices[winner],choices[winner]],'fresh explicit review can reuse the same customer for another proposal')
+
   const stale=await acceptedQuickbooksAgreement(h,'Stale reviewed deposit')
   let staleReview=await h.cmd('accounting.review',quickbooksReviewInput(stale,fake))
   fake.setMapping('synthetic-platter-changed-account')

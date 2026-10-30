@@ -98,6 +98,9 @@ export async function accountingCommand(env: Bindings, actor: Actor, name: strin
  const guard = configGuard(config)
  guard.sql += ' AND EXISTS(SELECT 1 FROM p_accounting_reviews WHERE id=? AND consumed_at IS NULL AND expires_at>?) AND EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status=\'accepted\')'
  guard.values.push(review.id, at, plan.proposalId, plan.proposalVersion)
+ // Reserve only the reviewed customer, even when another proposal commits during provider reads.
+ guard.sql += ` AND NOT EXISTS(SELECT 1 FROM p_accounting_customers WHERE account_id=? AND client_id=? AND (status!='complete' OR name!=? OR provider_id IS NOT ? OR ?='new'))`
+ guard.values.push(plan.accountId, plan.clientId, plan.clientName, plan.customer.choice, plan.customer.choice)
  await commit(db, actor, [
   db.prepare('UPDATE p_accounting_reviews SET consumed_at=? WHERE id=?').bind(at, review.id),
   db.prepare(`INSERT INTO p_accounting_jobs(proposal_id,review_id,account_id,client_id,revision,settings_version,connection_version,authorized_by,actor_role,operator_version,member_version,plan,authorized_at,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'queued')`).bind(plan.proposalId, review.id, plan.accountId, plan.clientId, plan.revision, plan.settingsVersion, plan.connectionVersion, actor.id, actor.role, plan.operatorVersion, plan.memberVersion, review.plan, at),
@@ -160,6 +163,7 @@ export async function runAccounting(env: Bindings) {
     customer = { provider_id: id, status: 'complete' }
    } else {
     need(customer.status === 'complete', 'Customer creation is uncertain or already in progress; no blind replay', 409)
+    need(customer.provider_id === plan.customer.choice, 'The retained customer differs from the reviewed QuickBooks customer. Review again.', 409)
     const matches = await customerMatches(authorize,plan.clientName)
     need(matches.some((c: any) => c.id === customer.provider_id), 'The reviewed QuickBooks customer is no longer available', 409)
    }

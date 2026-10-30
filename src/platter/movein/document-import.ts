@@ -12,10 +12,10 @@ const ownerSql = "EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND role='owner' 
 export async function documentOwner(db: D1Database, actor: Actor) {
  if (actor.role!=='owner' || !await db.prepare('SELECT 1 WHERE '+ownerSql).bind(actor.id).first()) fail('owner_required',403)
 }
-const context=(db:D1Database,actor:Actor):D1ImportContext=>d1RequestContext({
+const context=(db:D1Database,actor:Actor,undoId?:string):D1ImportContext=>d1RequestContext({
  destination:documentDestination,namespace:documentNamespace,mappingVersion:'exported-documents-v1',
  storage:{database:db,targets:documentTargets},batchSize:5,maxBatches:1,
- authorization:{principalId:actor.id,predicate:()=>({sql:ownerSql,params:[actor.id]})},
+ authorization:{principalId:actor.id,predicate:()=>({sql:ownerSql+(undoId?" AND NOT EXISTS(SELECT 1 FROM p_imported_document_links l JOIN p_imported_documents d ON d.id=l.document_id WHERE json_extract(d.data_json,'$.moveinId')=?)":''),params:[actor.id,...(undoId?[undoId]:[])]})},
 })
 const mapping:ImportMapping={version:'exported-documents-v1',map(record){
  const payload=record.payload as any
@@ -64,7 +64,7 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    const prior=await db.prepare('SELECT * FROM p_document_uploads WHERE movein_id=? AND sha256=?').bind(id,hash).first<any>()
    if (prior) { if(prior.size!==size)fail('upload_conflict',409);return {sha256:hash,received:prior.received,complete:Boolean(prior.complete)} }
    const total=await db.prepare('SELECT COALESCE(SUM(size),0) AS bytes,COUNT(*) AS count FROM p_document_uploads WHERE movein_id=?').bind(id).first<any>()
-   if(total.bytes+size>20*1024*1024||total.count>=30)fail('upload_limit',413,'Use up to 30 files and 20 MiB per move-in')
+   if(total.bytes+size>20*1024*1024||total.count>=32)fail('upload_limit',413,'Use up to 32 files and 20 MiB per move-in')
    await db.batch([assertion(db,actor,id),db.prepare('INSERT INTO p_document_uploads(movein_id,sha256,filename,size) VALUES(?,?,?,?)').bind(id,hash,filename,size)])
    return {sha256:hash,received:0,complete:false}
   }
@@ -127,7 +127,7 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
   if(name==='document-import.continue')return {id,job:await applyD1ImportBatches(movein.job_id,kit)}
   if(name==='document-import.undo'){
    if(await db.prepare("SELECT 1 FROM p_imported_document_links l JOIN p_imported_documents d ON d.id=l.document_id WHERE json_extract(d.data_json,'$.moveinId')=?").bind(id).first())fail('import_conflict',409,'Dependent drafts or templates still use these originals. No document was removed.')
-   return {id,job:await undoD1Import(movein.job_id,kit)}
+   return {id,job:await undoD1Import(movein.job_id,context(db,actor,id))}
   }
   if(name==='document-import.journal'){
    const job=await readD1ImportJob(movein.job_id,kit),originals=await readD1ImportOriginals(job.id,kit)

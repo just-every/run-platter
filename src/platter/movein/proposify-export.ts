@@ -12,6 +12,15 @@ export const proposifyColumns = {
  title: 'Title', client: 'Client', createdDate: 'Created date', signedDate: 'Signed date',
  status: 'Source status', value: 'Source value', currency: 'Source currency',
 } as const
+export const proposifyOmissions = [
+ 'Proposify API import and provider enrichment are not included.',
+ 'Native content-library, contact and catalog adoption are not included.',
+ 'Open-document reissue and billing continuation are not included.',
+ 'Recipient roles, signing order and fields are not adopted.',
+ 'URL images are omitted until qualified image egress is available.',
+ 'Live-provider qualification and scoped delegation are unproved.',
+ 'Templates remain fixed PDF pages: rebuild in the editor with owner-supplied content and prices.',
+]
 export type ProposifyColumn = keyof typeof proposifyColumns
 export type DocumentReview = { columns: Partial<Record<ProposifyColumn,string>>; templateDocument: string | null }
 export function proposifyReview(input: Record<string,unknown>): DocumentReview {
@@ -32,9 +41,12 @@ export function mappedProposifyReport(headers:string[],cells:string[],review:Doc
 export async function proposifyTemplateCommand(db:D1Database,actor:Actor,name:string,input:Record<string,unknown>,movein:any,kit:D1ImportContext) {
  if (name==='document-import.template-undo') return undoTemplate(db,actor,input,movein)
  need(movein.provider==='proposify'&&movein.job_id,'Apply a reviewed Proposify move-in first',409)
+ if(input.proposalChoice){const [id,version]=String(input.proposalChoice).split(':');input={...input,proposalId:id,version}}
+ const review={proposalId:String(input.proposalId??''),version:Number(input.version),templateName:typeof input.templateName==='string'?input.templateName.trim():'',consent:input.consent===true||input.consent==='yes'}
+ need(Number.isSafeInteger(review.version),'The reviewed draft version is required',409)
  if(name==='document-import.template-apply') {
   const replay=await db.prepare('SELECT * FROM p_proposify_applications WHERE movein_id=? AND fingerprint=?').bind(movein.id,String(input.fingerprint)).first<any>()
-  if(replay){need(!replay.reversed_at,'This application was undone; review a new destination',409);return {id:movein.id,applicationId:replay.id,proposalId:replay.proposal_id,templateId:replay.template_id,version:replay.applied_version,revision:replay.applied_revision}}
+  if(replay){need(!replay.reversed_at,'This application was undone; review a new destination',409);need(canonicalJson(JSON.parse(replay.template_snapshot).review??null)===canonicalJson(review),'The replay differs from the reviewed destination, prices or choices',409);return {id:movein.id,applicationId:replay.id,proposalId:replay.proposal_id,templateId:replay.template_id,version:replay.applied_version,revision:replay.applied_revision}}
  }
  const sourceId=JSON.parse(movein.configuration_json).templateDocument
  const stored=await db.prepare('SELECT * FROM p_imported_documents WHERE id=?').bind(sourceId??'').first<any>()
@@ -43,7 +55,6 @@ export async function proposifyTemplateCommand(db:D1Database,actor:Actor,name:st
  need(source.moveinId===movein.id&&source.provider==='proposify'&&source.disposition==='held-template','Only the separately reviewed template PDF can be applied',409)
  const state=await db.prepare('SELECT state FROM ik_jobs WHERE id=?').bind(movein.job_id).first<any>()
  need(state?.state==='completed','Finish applying the move-in before using its template',409)
- if(input.proposalChoice){const [id,version]=String(input.proposalChoice).split(':');input={...input,proposalId:id,version}}
  const row=await proposal(db,input.proposalId)
  exact(row,input)
  need(row.status==='draft'&&row.currency==='USD','Choose an unsent USD draft with owner-supplied prices',409)
@@ -65,7 +76,7 @@ export async function proposifyTemplateCommand(db:D1Database,actor:Actor,name:st
  const bytes=Buffer.from(file.original.base64,'base64')
  need(sha256(bytes)===source.sha256,'Source PDF integrity failed',409)
  const prepared=await prepareAttachment(db,{filename:'proposify-template.pdf',mediaType:'application/pdf',bytes})
- const document={...previous,fixedPdf:{fileId:prepared.attachment.id,pages:source.pages,source:'proposify' as const},importReport:{unknown:[],unmatched:[],missing:['Proposify fixed pages: rebuild in the editor. No Word reconstruction, source prices, recipient roles or execution authority are adopted.']}}
+ const document={...previous,fixedPdf:{fileId:prepared.attachment.id,pages:source.pages,source:'proposify' as const},importReport:{unknown:previous.importReport?.unknown??[],unmatched:previous.importReport?.unmatched??[],missing:[...(previous.importReport?.missing??[]),'Proposify fixed pages: rebuild in the editor. No Word reconstruction, source prices, recipient roles or execution authority are adopted.']}}
  const revision=row.revision+1,version=row.version+1,at=await currentTime(db),updated={...row,document,revision},applicationId=crypto.randomUUID()
  const template=await independentFixedTemplate(db,actor,updated,templateName+' — rebuild in the editor',at)
  await commit(db,actor,[...prepared.writes,
@@ -74,7 +85,7 @@ export async function proposifyTemplateCommand(db:D1Database,actor:Actor,name:st
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,?,?,?,?,?)').bind(row.id,revision,JSON.stringify(snapshot(updated)),actor.email,at,'USD'),
   copyCosts(db,row.id,row.revision,row.id,revision),...template.writes,
   db.prepare('INSERT INTO p_imported_document_links(document_id,proposal_id) VALUES(?,?)').bind(source.id,row.id),
-  db.prepare('INSERT INTO p_proposify_applications(id,movein_id,document_id,proposal_id,template_id,fingerprint,source_sha256,previous_document,applied_document,applied_version,applied_revision,template_snapshot,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(applicationId,movein.id,source.id,row.id,template.id,fingerprint,source.sha256,JSON.stringify(previous),JSON.stringify(document),version,revision,template.snapshot,at),
+  db.prepare('INSERT INTO p_proposify_applications(id,movein_id,document_id,proposal_id,template_id,fingerprint,source_sha256,previous_document,applied_document,applied_version,applied_revision,template_snapshot,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(applicationId,movein.id,source.id,row.id,template.id,fingerprint,source.sha256,JSON.stringify(previous),JSON.stringify(document),version,revision,canonicalJson({content:template.snapshot,review}),at),
  ],false,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status='draft') AND EXISTS(SELECT 1 FROM p_imported_documents WHERE id=? AND revision=?) AND EXISTS(SELECT 1 FROM ik_jobs WHERE id=? AND state='completed') AND NOT EXISTS(SELECT 1 FROM p_collection_policy WHERE proposal_id=?)",values:[row.id,row.version,source.id,stored.revision,movein.job_id,row.id]})
  return {id:movein.id,applicationId,proposalId:row.id,templateId:template.id,version,revision}
 }
@@ -83,8 +94,9 @@ async function undoTemplate(db:D1Database,actor:Actor,input:Record<string,unknow
  const application=await db.prepare('SELECT * FROM p_proposify_applications WHERE id=? AND movein_id=?').bind(text(input.applicationId,'an application'),movein.id).first<any>()
  need(application,'Fixed-page application not found',404)
  if(application.reversed_at)return {id:movein.id,applicationId:application.id,undone:true}
+ const retained=JSON.parse(application.template_snapshot),retainedSnapshot=retained.content??application.template_snapshot
  const row=await proposal(db,application.proposal_id),template=await db.prepare('SELECT * FROM p_personal_templates WHERE id=?').bind(application.template_id).first<any>()
- need(row.status==='draft'&&row.version===application.applied_version&&canonicalJson(documentOf(row))===canonicalJson(JSON.parse(application.applied_document))&&template?.version===1&&template.snapshot===application.template_snapshot,'Later edits or dependent drafts keep these outputs in use',409)
+ need(row.status==='draft'&&row.version===application.applied_version&&canonicalJson(documentOf(row))===canonicalJson(JSON.parse(application.applied_document))&&template?.version===1&&template.snapshot===retainedSnapshot,'Later edits or dependent drafts keep these outputs in use',409)
  const at=await currentTime(db),revision=row.revision+1,updated={...row,revision,document:JSON.parse(application.previous_document)}
  const writes=['p_template_document_media','p_template_defaults','p_template_costs'].map(table=>db.prepare('DELETE FROM '+table+' WHERE template_id=?').bind(template.id))
  await commit(db,actor,[...writes,db.prepare('DELETE FROM p_personal_templates WHERE id=?').bind(template.id),
@@ -93,6 +105,6 @@ async function undoTemplate(db:D1Database,actor:Actor,input:Record<string,unknow
   copyCosts(db,row.id,row.revision,row.id,revision),
   db.prepare('DELETE FROM p_imported_document_links WHERE document_id=? AND proposal_id=?').bind(application.document_id,row.id),
   db.prepare('UPDATE p_proposify_applications SET reversed_at=? WHERE id=?').bind(at,application.id),
- ],false,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status='draft') AND EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=1 AND snapshot=?) AND NOT EXISTS(SELECT 1 FROM p_template_sources WHERE template_id=?) AND NOT EXISTS(SELECT 1 FROM p_proposify_applications WHERE id=? AND reversed_at IS NOT NULL)",values:[row.id,row.version,template.id,application.template_snapshot,template.id,application.id]})
+ ],false,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status='draft') AND EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=1 AND snapshot=?) AND NOT EXISTS(SELECT 1 FROM p_template_sources WHERE template_id=?) AND NOT EXISTS(SELECT 1 FROM p_proposify_applications WHERE id=? AND reversed_at IS NOT NULL)",values:[row.id,row.version,template.id,retainedSnapshot,template.id,application.id]})
  return {id:movein.id,applicationId:application.id,undone:true}
 }

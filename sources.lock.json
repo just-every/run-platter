@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "ad2b969bce43cbe2b801171e66e3f44042fa9d01e4f42bbe60ee3630211d17cf",
+      "sha256": "a5cec040e45308f78dfbab753dbf13574b7846da9684af8549272277de1037b0",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2798,11 +2798,11 @@
       "executable": false
     },
     "src/platter/movein/document-import.ts": {
-      "sha256": "1910ad5e214fa5e037cf428c0646142c214427a1b828d426e4a01d6650eed427",
+      "sha256": "ae089cd12f0df04e78fc1d15e0ede9cab1cea193c91d97cbea22271325235d54",
       "executable": false
     },
     "src/platter/movein/document-source.ts": {
-      "sha256": "a945305ee83693db19cebeffa121f99804012ae53593d7b0685a7bb825730e8f",
+      "sha256": "dc4a8cfafe61b588906f384fff811c25f64f3e0b672dccc45d0682f49dadfbb7",
       "executable": false
     },
     "src/platter/movein/document-targets.ts": {
@@ -2818,7 +2818,7 @@
       "executable": false
     },
     "src/platter/movein/proposify-export.ts": {
-      "sha256": "d13f06b5fddf09e05e11ec9ff2a109a82581b91da1c693438734b599eccccbb4",
+      "sha256": "62e88fa6feabf9a5a210e186dae28a7b8a93d0f9c3d30a2419a22bcd7e7b80fa",
       "executable": false
     },
     "src/platter/movein/schema.sql": {
@@ -3126,7 +3126,7 @@
       "executable": false
     },
     "src/platter/ui/document-movein.ts": {
-      "sha256": "7eb0785aeb80302243f5454e3e8853c4647615e88cb403fee52f3418cef60ec1",
+      "sha256": "219f184c164358242a6e74fecef35b7905c70624ad434c4cf2f7d41aa0d7403f",
       "executable": false
     },
     "src/platter/ui/duplicate.ts": {
@@ -3398,7 +3398,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "c40f7bd995e712b0fd6c8327043494b0ae135c3f0b9c5f74689b27eac400a10b",
+      "sha256": "3dbf69023b22aeecddac52cc619ba713e07c1e87736bc027d11cd5a7e7ff8972",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3474,7 +3474,7 @@
       "executable": false
     },
     "tests/document-movein-fixture.mjs": {
-      "sha256": "da213fd1ecbc0663155ae66715c863ac5fc62bec432ce84b9772bd8b935b4858",
+      "sha256": "c4e86e459c408db97c70bba3baec01a2595833f5cf2938136fdf437cabbce607",
       "executable": false
     },
     "tests/drive-fixture.mjs": {

@@ -1,3 +1,5 @@
+import { hubspotFixture } from './hubspot-fixture.mjs'
+import { privacyFixture,assertPrivacyErased,privacyOwner } from './privacy-fixture.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { documentFixture } from './document-fixture.mjs'
@@ -347,11 +349,11 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
 })
 
 test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal', {timeout:300000}, async()=>{
- const temporary=await mkdtemp(join(tmpdir(),'platter-erasure-')),source=join(temporary,'source'),erased=join(temporary,'erased');let h
+ const temporary=await mkdtemp(join(tmpdir(),'platter-erasure-')),source=join(temporary,'source'),erased=join(temporary,'erased');const edge=hubspotFixture();let h,privacy,privacyReceipt
  try{
   for(const path of [source,erased])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source})
+  h=await harness({root:source,assetsDirectory:'public',outboundService:edge.request})
   const p=await h.cmd('client.save',{name:'Temporary joiner',email:'synthetic-platter-8200@example.com'}),client=await h.cmd('client.save',{name:'Retained client',email:'synthetic-platter-8201@example.com'})
   const proposal=await h.cmd('proposal.prepare',{clientId:client.id,title:'Retained agreement',scope:'Retained business record',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
   await h.cmd('proposal.approve',{id:proposal.id,version:1,revision:1});const sent=await h.cmd('proposal.send',{id:proposal.id,version:2}),path=new URL(sent.shareUrl).pathname
@@ -365,7 +367,7 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
     const independent=await Promise.allSettled([
       command(erased,['import','--input',corrupt,'--yes','--no-queue'],1),
       (async()=>{
-        h=await harness({root:source,...identity})
+        h=await harness({root:source,...identity,assetsDirectory:'public',outboundService:edge.request})
         try{
           const owner=await h.signIn(h.auth.OWNER_EMAIL)
           await h.cmd('tracking.erase',{id:proposal.id,confirm:'erase'},owner)
@@ -380,17 +382,39 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
     await cp(trackingOnly,join(recovery,'tracking.rer'))
     const trackingRefusal=await command(erased,['import','--input',old,'--journal','.rer/recovery/tracking.rer','--yes','--no-queue'],4)
     assert.match(trackingRefusal.stdout+' '+trackingRefusal.stderr,/\((?:erased_row|erasure_epoch)\)/,'Tracking-only refusal must name the erasure fence')
-    h=await harness({root:source,...identity})
-    try{await h.cmd('client.erase',{id:p.id,confirmName:'Temporary joiner'},await h.signIn(h.auth.OWNER_EMAIL))}finally{await h.close();h=null}
+    h=await harness({root:source,...identity,assetsDirectory:'public',outboundService:edge.request})
+    h=privacyOwner(h,await h.signIn(h.auth.OWNER_EMAIL))
+    privacy=await privacyFixture(h,edge)
+    const acceptanceBefore=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(privacy.retained.id).first()
+    await h.close();h=null
+    const privacyBefore=join(temporary,'privacy-before.rer');await command(source,['export','--output',privacyBefore,'--no-queue'])
+    h=await harness({root:source,...identity,assetsDirectory:'public',outboundService:edge.request})
+    try{
+     const owner=await h.signIn(h.auth.OWNER_EMAIL);h=privacyOwner(h,owner)
+     await h.cmd('client.erase',{id:p.id,confirmName:'Temporary joiner'},owner)
+     const reviewed=await h.cmd('privacy.review',{id:privacy.client.id},owner)
+     privacyReceipt=(await h.cmd('privacy.erase',{id:privacy.client.id,...reviewed.privacyReview,confirmName:privacy.client.name,consent:'yes'},owner)).receipt
+     await assertPrivacyErased(h,privacy,privacyReceipt)
+     assert.deepEqual(await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(privacy.retained.id).first(),acceptanceBefore)
+    }finally{await h.close();h=null}
     await command(source,['export','--output',later,'--no-queue'])
     await cp(later,join(recovery,'latest.rer'))
     const refused=await command(erased,['import','--input',old,'--journal','.rer/recovery/latest.rer','--yes','--no-queue'],4)
     assert.match(refused.stdout+' '+refused.stderr,/\((?:erased_row|erasure_epoch)\)/,'the older archive is refused specifically by the erasure fence')
+    const privacyRefusal=await command(erased,['import','--input',privacyBefore,'--journal','.rer/recovery/latest.rer','--yes','--no-queue'],4)
+    assert.match(privacyRefusal.stdout+' '+privacyRefusal.stderr,/\((?:erased_row|erasure_epoch)\)/,'PRIV-001 refuses the populated contact checkpoint predating erasure')
     await command(erased,['import','--input',later,'--yes','--no-queue'])
     await command(erased,['import','--input',later,'--yes','--no-queue'],4)
-    h=await harness({root:erased,unclaimed:true,auth:identity.auth})
+    h=await harness({root:erased,unclaimed:true,auth:identity.auth,assetsDirectory:'public',outboundService:edge.request})
     const restoredOwner=await h.signIn(identity.auth.OWNER_EMAIL),restoredState=await h.state(restoredOwner)
     assert.ok(!restoredState.clients.some(row=>row.id===p.id),'erased clients stay absent through the restored app door')
+    h=privacyOwner(h,restoredOwner)
+    await assertPrivacyErased(h,privacy,privacyReceipt)
+    assert.deepEqual(restoredState.privacy.receipts,[privacyReceipt])
+    const callCount=edge.calls.length
+    await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-01-01T15:00:00Z'),cron:'*/15 * * * *'})
+    assert.equal(edge.calls.length,callCount,'restored erasure history grants no outbound execution')
+    await h.cmd('crm.deal.apply',{id:privacy.sourceReview.id,digest:privacy.sourceReview.digest,consent:'yes'},restoredOwner,409)
     const retained=restoredState.proposals.find(row=>row.id===proposal.id)
     assert.equal(retained.acceptance.depositCents,105000)
     const retainedCsv=await h.send('/api/platter/invoices/'+retained.invoice.id+'.csv',undefined,restoredOwner)

@@ -2110,8 +2110,8 @@ Core · target · **partial** · Cites BASE-DATA-003, BASE-DATA-006
 **Acceptance.**
 1. Erase a contact with two draft views and one signed agreement: draft data and views are gone, the agreement has a retention note, and the receipt lists the HubSpot fixture’s record.
 
-**Evidence.** `src/platter/commands.ts`, `tests/platter.test.mjs`
-**Gap.** Only unused client records can be erased; no contacts, tracking data or notice to synced systems.
+**Evidence.** `tests/platter.test.mjs` — “PRIV-001 native reviewed erasure and import undo preserves clients with dependent proposals; owner erasure fences unused client”; `tests/site.test.mjs` — “PRIV-001 / TRACK-001 / TRACK-004 owner consent, private alerts, client disclosure and erasure at desktop and phone widths”; `tests/archive.test.mjs` — “PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal”; `src/platter/privacy.ts`
+**Gap.** Delivered: Reviewed owner-only native erasure removes unaccepted offers, their discussions, engagement and exclusive local files, revokes client links and outbound grants, retains exact agreement artifacts with business-record exceptions, names exact HubSpot contact and recorded Drive file IDs for operator review, honors contact and engagement holds, and atomically fences older archives. Missing: Imported contacts, originals and journal erasure; broader provider and file-store coverage; configured-recipient execution. Provider deletion is an explicit operator action, never an automatic request. The existing TRACK-001 and TRACK-004 pending-landing hold and TEAM-001 native issuer-version, SSO, workspace deletion and rights-matrix holds remain unchanged.
 
 #### PORT-002 — Complete product archive
 

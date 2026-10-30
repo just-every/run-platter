@@ -1686,3 +1686,67 @@ test('SIGN-005 completion mail attaches the retained PDFs to both parties once, 
   }finally{release();await h.close()}
  }
 })
+
+test('AUTO-001 durable signed steps share exact Drive artifacts and Slack writes, retry proven rejections and hold uncertain or revoked work', {timeout:120000},async()=>{
+ const {automationFixture,automationDestinations,ruleInput,slackChannel}=await import('./automation-fixture.mjs'),{completeDriveAgreement}=await import('./drive-fixture.mjs'),{createHash}=await import('node:crypto')
+ const fake=automationFixture(),h=await harness({assetsDirectory:'public',origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-10107'},outboundService:fake.outboundService})
+ try{
+  await finishSetup(h)
+  const route=await automationDestinations(h),rule=await h.cmd('automation.configure',ruleInput(route.id))
+  const tick=async()=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  const runFor=async proposal=>(await h.state()).automations.runs.find(r=>r.proposal_id===proposal.id&&r.rule_id===rule.id)
+  const stepsFor=async run=>(await h.state()).automations.steps.filter(s=>s.run_id===run.id)
+  const signed=await completeDriveAgreement(h),run=await runFor(signed.proposal)
+  await Promise.all([tick(),tick(),h.cmd('automation.dispatch',{})])
+  assert.deepEqual((await stepsFor(run)).map(s=>s.status),['success','success'])
+  assert.deepEqual(fake.chats,[{channel:slackChannel,text:'Proposal signed\n'+h.origin+'/app/proposal?id='+signed.proposal.id,unfurl_links:false,unfurl_media:false}])
+  const link=new URL(fake.chats[0].text.split('\n')[1]);assert.equal((await h.send(link.pathname+link.search)).status,303);assert.equal((await h.send(link.pathname+link.search,undefined,h.owner)).status,200)
+  for(const kind of ['agreement','certificate']){
+   const response=await h.mf.dispatchFetch(h.origin+signed.path+'/'+kind+'.pdf',{headers:{cookie:signed.cookie}}),bytes=Buffer.from(await response.arrayBuffer())
+   const file=[...fake.drive.files.values()].find(f=>f.name.endsWith(' - '+kind+'.pdf'))
+   assert.deepEqual(file.bytes,bytes);assert.equal(file.appProperties.platterSha256,createHash('sha256').update(bytes).digest('hex'))
+  }
+  const posts=fake.posts(),drivePosts=fake.drive.calls.filter(c=>c.method==='POST').length
+  await h.send(signed.path+'/action?name=accept',signed.input,signed.cookie);await h.cmd('automation.dispatch',{})
+  assert.equal(fake.posts(),posts);assert.equal(fake.drive.calls.filter(c=>c.method==='POST').length,drivePosts)
+  assert.equal((await h.state()).automations.runs.filter(r=>r.proposal_id===signed.proposal.id).length,1)
+  fake.outcome('failed')
+  const rejected=await completeDriveAgreement(h,'Rejected Slack agreement',signed.client.id),rejectedRun=await runFor(rejected.proposal)
+  await h.cmd('automation.dispatch',{})
+  assert.deepEqual((await stepsFor(rejectedRun)).map(s=>s.status),['success','failed'])
+  const failurePosts=fake.posts(),completedDrivePosts=fake.drive.calls.filter(c=>c.method==='POST').length
+  await tick();assert.equal(fake.posts(),failurePosts,'definite failures never retry automatically')
+  await h.cmd('automation.retry',{id:rejectedRun.id,consent:false},h.owner,400)
+  fake.outcome('success')
+  const responses=await Promise.all([1,2].map(()=>h.send('/api/platter/command',{name:'automation.retry',input:{id:rejectedRun.id,consent:true}},h.owner)))
+  assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);assert.equal(fake.posts(),failurePosts+1)
+  assert.deepEqual((await stepsFor(rejectedRun)).map(s=>s.status),['success','success'])
+  assert.equal(fake.drive.calls.filter(c=>c.method==='POST').length,completedDrivePosts,'retry never repeats an archive')
+  const data=(await h.state()).automations,child=data.steps.find(s=>s.run_id===rejectedRun.id&&s.kind==='notification').child_id
+  assert.deepEqual(data.attempts.filter(a=>a.outbox_id===child).map(a=>a.outcome),['failed','success'])
+  const audit=await h.send('/api/platter/audit?action=automation.retry',undefined,h.owner);assert.equal(audit.value.rows.length,1);assert.equal(audit.value.rows[0].subject,rejectedRun.id)
+  await h.cmd('automation.retry',{id:rejectedRun.id,consent:true},h.owner,409)
+  fake.outcome('uncertain')
+  const uncertain=await completeDriveAgreement(h,'Lost Slack acknowledgement',signed.client.id),uncertainRun=await runFor(uncertain.proposal)
+  await h.cmd('automation.dispatch',{});assert.deepEqual((await stepsFor(uncertainRun)).map(s=>s.status),['success','uncertain'])
+  const unknownPosts=fake.posts();await h.cmd('automation.retry',{id:uncertainRun.id,consent:true},h.owner,409);await tick();assert.equal(fake.posts(),unknownPosts)
+  assert.doesNotMatch(JSON.stringify((await h.state()).automations),/synthetic-platter-never-retain/)
+  fake.outcome('success');fake.drive.setUncertain(true)
+  const driveUncertain=await completeDriveAgreement(h,'Lost Drive acknowledgement',signed.client.id),driveRun=await runFor(driveUncertain.proposal)
+  await h.cmd('automation.dispatch',{});assert.deepEqual((await stepsFor(driveRun)).map(s=>s.status),['uncertain','success'])
+  const writes=fake.drive.calls.filter(c=>c.method==='POST').length
+  await h.cmd('archive.reconcile',{id:driveUncertain.proposal.id})
+  assert.deepEqual((await stepsFor(driveRun)).map(s=>s.status),['success','success']);assert.equal(fake.drive.calls.filter(c=>c.method==='POST').length,writes)
+  fake.drive.setUncertain(false)
+  const revoked=await completeDriveAgreement(h,'Rule revoked before dispatch',signed.client.id),revokedRun=await runFor(revoked.proposal)
+  await h.cmd('automation.revoke',{id:rule.id})
+  const beforeRevoke=[fake.drive.calls.length,fake.posts()];await h.cmd('automation.dispatch',{})
+  assert.deepEqual([fake.drive.calls.length,fake.posts()],beforeRevoke);assert.deepEqual((await stepsFor(revokedRun)).map(s=>s.status),['held','held'])
+  await h.cmd('automation.retry',{id:revokedRun.id,consent:true},h.owner,409)
+  const next=await h.cmd('automation.configure',ruleInput(route.id)),disconnect=await completeDriveAgreement(h,'Disconnected Slack',signed.client.id)
+  await h.cmd('provider.disconnect',{provider:'slack',version:1})
+  const beforeDisconnect=[fake.drive.calls.length,fake.posts()];await h.cmd('automation.dispatch',{});assert.deepEqual([fake.drive.calls.length,fake.posts()],beforeDisconnect)
+  const final=(await h.state()).automations;assert.ok(final.steps.filter(s=>s.run_id===final.runs.find(r=>r.rule_id===next.id&&r.proposal_id===disconnect.proposal.id).id).every(s=>s.status==='held'))
+  console.log('PROBE AUTO-001 outcomes: public sign and dispatch -> exact Drive hashes and one generic Slack request; rejected step retries once with audit; uncertain and revoked work makes no repeat write')
+ }finally{await h.close()}
+})

@@ -932,3 +932,52 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
   } finally { await context.close() }
  } finally { await browser?.close(); await h?.close(); await edge.close() }
 })
+
+test('AUTO-001 Settings authorizes signed rules and exposes separate run outcomes and audited safe retry controls', {timeout:120000},async()=>{
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{automationFixture,slackToken,slackChannel}=await import('./automation-fixture.mjs'),{driveToken,driveRoot,completeDriveAgreement}=await import('./drive-fixture.mjs')
+ const fake=automationFixture(),edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-10108'},outboundService:fake.outboundService});edge.attach(h)
+ let browser,context
+ try{
+  browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH??'/usr/bin/chromium',args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  context=await browser.newContext({viewport:{width:1440,height:1000},ignoreHTTPSErrors:true})
+  const [name,value]=h.owner.split('=');await context.addCookies([{name,value,url:h.origin}])
+  const page=await context.newPage();await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  await page.goto(h.origin+'/app/settings')
+  for(const [label,token] of [['Google Drive',driveToken],['Slack',slackToken]]){
+   const connection=page.locator('article').filter({has:page.getByRole('heading',{name:label,exact:true})})
+   await connection.getByLabel(label+' access token',{exact:true}).fill(token);await connection.getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect '+label,exact:true}).click()
+   assert.equal(await page.getByRole('alert').count(),0)
+  }
+  const archive=page.locator('section').filter({has:page.getByRole('heading',{name:'Completed document archiving',exact:true})})
+  await archive.getByLabel('Drive destination folder id').fill(driveRoot);await archive.getByRole('checkbox').check();await archive.getByRole('button',{name:'Authorize Drive archiving',exact:true}).click()
+  const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Signed-event automations',exact:true})})
+  assert.equal((await h.state()).automations.rules.length,0)
+  await panel.getByLabel('Signed-event Slack channel id').fill(slackChannel)
+  const routeForm=panel.locator('form').filter({has:page.getByRole('button',{name:'Authorize signed Slack route',exact:true})})
+  await routeForm.getByRole('checkbox').check();await routeForm.getByRole('button').click()
+  assert.equal((await h.state()).automations.rules.length,0,'route configuration alone cannot authorize a rule')
+  await panel.getByLabel('Automation rule name').fill('Signed agreement delivery')
+  const configure=panel.locator('form').filter({has:page.getByRole('button',{name:'Authorize automation rule',exact:true})})
+  await configure.getByRole('checkbox').check();await configure.getByRole('button').click();assert.equal(await page.getByRole('alert').count(),0)
+  fake.outcome('failed');const signed=await completeDriveAgreement(h)
+  await page.reload();assert.equal((await h.state()).automations.rules.length,1,'refresh does not resubmit rule authorization');await panel.getByRole('button',{name:'Process automation steps',exact:true}).click()
+  const history=panel.getByRole('list',{name:'Automation run history'})
+  assert.match(await history.innerText(),/Drive archive: success/);assert.match(await history.innerText(),/Slack notification: failed/)
+  const retry=history.locator('form').filter({has:page.getByRole('button',{name:'Retry rejected Slack step',exact:true})})
+  await retry.getByRole('checkbox').check();fake.outcome('success');await retry.getByRole('button').click()
+  assert.equal(await page.getByRole('alert').count(),0);assert.match(await history.innerText(),/Slack notification: success/);assert.equal(await history.getByRole('button',{name:'Retry rejected Slack step',exact:true}).count(),0)
+  assert.deepEqual((await h.send('/api/platter/audit?action=automation.retry',undefined,h.owner)).value.rows.map(r=>r.action),['automation.retry'])
+  fake.outcome('uncertain');await completeDriveAgreement(h,'Uncertain automation step',signed.client.id);await h.cmd('automation.dispatch',{});await page.reload()
+  assert.match(await history.innerText(),/Slack notification: uncertain/);assert.equal(await history.getByRole('button',{name:'Retry rejected Slack step',exact:true}).count(),0)
+  assert.ok(await panel.locator('p,li,label,button,input,select').evaluateAll(nodes=>nodes.every(node=>parseFloat(getComputedStyle(node).fontSize)>=13)))
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+  const screenshots=process.env.PLATTER_SCREENSHOTS
+  if(screenshots){
+   await mkdir(screenshots,{recursive:true});await documentFonts(page);await panel.screenshot({path:join(screenshots,'AUTO-001-settings-1440.png')})
+   await page.setViewportSize({width:390,height:900});await documentFonts(page);await panel.screenshot({path:join(screenshots,'AUTO-001-settings-390.png')})
+  }
+  await page.setViewportSize({width:1440,height:1000});await panel.getByRole('button',{name:'Revoke automation rule',exact:true}).click()
+  assert.match(await panel.getByRole('list',{name:'Automation rules'}).innerText(),/Inactive/)
+  console.log('PROBE AUTO-001 controls: compiled Settings configure, sign, inspect and retry -> distinct outcomes, explicit audited retry, no retry for uncertainty; screens captured at 1440 and 390')
+ }finally{await context?.close();await browser?.close();await edge.close();await h.close()}
+})

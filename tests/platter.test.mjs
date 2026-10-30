@@ -3670,3 +3670,48 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
  } finally { await h.close() }
  await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
 })
+
+test('AUTO-001 signed rules require explicit current destinations, record only new eligible acceptances and share child jobs',async()=>{
+ const {automationFixture,automationDestinations,ruleInput}=await import('./automation-fixture.mjs'),{completeDriveAgreement}=await import('./drive-fixture.mjs')
+ const fake=automationFixture(),h=await harness({assetsDirectory:'public',outboundService:fake.outboundService})
+ try{
+  const {id:routeId}=await automationDestinations(h),historical=await completeDriveAgreement(h,'Before rule authorization')
+  const input=ruleInput(routeId),before=(await h.state()).automations
+  for(const [fields,status] of [[{consent:false},400],[{trigger:'paid'},400],[{archiveVersion:0},409],[{routeId:'synthetic-platter-missing'},409]])await h.cmd('automation.configure',{...input,...fields},h.owner,status)
+  assert.deepEqual((await h.state()).automations,before)
+  const personEmail=['synthetic-platter-10106','example.test'].join('@')
+  await h.send('/auth/invite',{email:personEmail,displayName:'Synthetic rule administrator',role:'member',returnTo:'/app'},h.owner)
+  const member=await h.signIn(personEmail),actor=(await h.state(member)).actor
+  for(const command of ['automation.configure','automation.dispatch','automation.revoke','automation.retry'])await h.cmd(command,input,member,403)
+  assert.equal((await h.state(member)).automations,undefined)
+  const first=await h.cmd('automation.configure',input),second=await h.cmd('automation.configure',{...input,name:'Shared existing work'})
+  assert.equal((await h.state()).automations.runs.length,0,'authorization never backfills an earlier acceptance')
+  const signed=await completeDriveAgreement(h,'Synthetic rule agreement',historical.client.id)
+  assert.equal((await h.send(signed.path+'/action?name=accept',signed.input,signed.cookie)).status,200)
+  const data=(await h.state()).automations
+  assert.equal(data.runs.length,2);assert.deepEqual(new Set(data.runs.map(r=>r.rule_id)),new Set([first.id,second.id]))
+  assert.ok(data.runs.every(r=>r.proposal_id===signed.proposal.id&&r.revision===1&&r.executable))
+  const steps=data.steps.filter(s=>data.runs.some(r=>r.id===s.run_id))
+  assert.equal(steps.length,4)
+  for(const kind of ['archive','notification'])assert.equal(new Set(steps.filter(s=>s.kind===kind).map(s=>s.child_id)).size,1)
+  const outbox=await h.db.prepare("SELECT * FROM p_notification_outbox WHERE event_key=?").bind('signed:'+signed.proposal.id).all()
+  assert.equal(outbox.results.length,1)
+  await h.cmd('automation.revoke',{id:first.id})
+  await h.cmd('automation.dispatch',{})
+  const after=(await h.state()).automations
+  assert.equal(after.runs.length,2);assert.ok(after.steps.every(s=>['success','local'].includes(s.status)))
+  assert.equal(after.runs.filter(r=>r.proposal_id===historical.proposal.id).length,0)
+  // A newly promoted admin can authorize; demotion invalidates that exact rule.
+  await h.cmd('member.set',{operatorId:actor.id,role:'admin',version:0,teams:[]})
+  const adminRule=await h.cmd('automation.configure',{...input,name:'Admin authorized rule'},member)
+  await h.cmd('automation.revoke',{id:second.id})
+  const held=await completeDriveAgreement(h,'Held after author demotion',historical.client.id)
+  await h.cmd('member.set',{operatorId:actor.id,role:'sales',version:1,teams:[]})
+  const calls=fake.drive.calls.length;await h.cmd('automation.dispatch',{})
+  const final=(await h.state()).automations
+  assert.equal(final.rules.find(r=>r.id===adminRule.id).active,0)
+  assert.ok(final.steps.filter(s=>s.run_id===final.runs.find(r=>r.proposal_id===held.proposal.id).id).every(s=>s.status==='held'))
+  assert.equal(fake.drive.calls.length,calls)
+  console.log('PROBE AUTO-001 rule authority: public configure, sign, replay, demote -> new revision runs share children; revoked authority makes no provider call')
+ }finally{await h.close()}
+})

@@ -1037,16 +1037,19 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
 })
 
 test('AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority', {timeout:180000},async()=>{
- const {driveFixture,driveToken,driveSettings,connectDrive,completeDriveAgreement}=await import('./drive-fixture.mjs')
- const temporary=await mkdtemp(join(tmpdir(),'platter-drive-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=driveFixture();let h
+ const {driveToken,driveSettings,connectDrive,completeDriveAgreement}=await import('./drive-fixture.mjs'),{automationFixture,ruleInput,slackToken,slackChannel}=await import('./automation-fixture.mjs')
+ const temporary=await mkdtemp(join(tmpdir(),'platter-drive-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),bundle=automationFixture(),fake=bundle.drive;let h
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectDrive(h)
+  h=await harness({root:source,assetsDirectory:'public',outboundService:bundle.outboundService});await connectDrive(h)
+  await h.cmd('provider.connect',{provider:'slack',version:0,token:slackToken,consent:true})
+  const route=await h.cmd('notification.route',{provider:'slack',event:'signed',kind:'channel',destination:slackChannel,consent:true})
+  await h.cmd('automation.configure',ruleInput(route.id))
   const completed=await completeDriveAgreement(h)
-  await h.cmd('archive.dispatch',{})
+  await h.cmd('automation.dispatch',{})
   const queued=await completeDriveAgreement(h,'Queued archive history',completed.client.id)
-  const tables=['p_archive_settings','p_archive_jobs','p_archive_files','p_archive_folders','p_agreement_artifacts'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
+  const tables=['p_archive_settings','p_archive_jobs','p_archive_files','p_archive_folders','p_agreement_artifacts','p_automation_rules','p_automation_runs','p_automation_steps','p_notification_attempts'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
   assert.deepEqual(before.p_archive_jobs.map(j=>j.status).sort(),['complete','queued'])
   const artifacts={}
   for(const kind of ['agreement','certificate']){
@@ -1057,11 +1060,11 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   const archive=join(temporary,'drive.rer');await command(source,['export','--output',archive])
   const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(driveToken))
   const records=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
-  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0)
+  for(const table of ['p_automation_authority','p_automation_run_authority','p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0)
   await command(restored,['import','--input',archive,'--yes'])
-  const restoredFake=driveFixture();h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:restoredFake.outboundService})
+  const restoredBundle=automationFixture(),restoredFake=restoredBundle.drive;h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:restoredBundle.outboundService})
   for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table],table+' retains exact history')
-  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  for(const table of ['p_automation_authority','p_automation_run_authority','p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'});assert.equal(restoredFake.calls.length,0)
   const owner=await h.signIn(h.auth.OWNER_EMAIL)
   for(const kind of ['agreement','certificate']){
@@ -1075,5 +1078,17 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   await h.cmd('archive.configure',{...driveSettings,version:1,connectionVersion:2},owner)
   const calls=restoredFake.calls.length;await h.cmd('archive.dispatch',{},owner);assert.equal(restoredFake.calls.length,calls)
   await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
+  let restoredAutomations=(await h.state(owner)).automations
+  assert.equal(restoredAutomations.runs.length,2);assert.ok(restoredAutomations.runs.every(r=>!r.executable));assert.ok(restoredAutomations.rules.every(r=>!r.active))
+  await h.cmd('automation.retry',{id:restoredAutomations.runs[0].id,consent:true},owner,409)
+  await h.cmd('provider.connect',{provider:'slack',version:1,token:slackToken,consent:true},owner)
+  const freshRoute=await h.cmd('notification.route',{provider:'slack',event:'signed',kind:'channel',destination:slackChannel,consent:true},owner)
+  await h.cmd('automation.configure',{...ruleInput(freshRoute.id),archiveVersion:2},owner)
+  const reauthorizedCalls=[restoredFake.calls.length,restoredBundle.posts()]
+  await h.cmd('automation.dispatch',{},owner)
+  assert.deepEqual([restoredFake.calls.length,restoredBundle.posts()],reauthorizedCalls)
+  restoredAutomations=(await h.state(owner)).automations
+  assert.ok(restoredAutomations.runs.every(r=>!r.executable));assert.deepEqual(restoredAutomations.steps,before.p_automation_steps)
+  console.log('PROBE AUTO-001 restore: public export and import, reconnect, authorize and dispatch -> identical rule and run history; no restored execution or provider writes')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

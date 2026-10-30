@@ -6,7 +6,7 @@ import { administrators } from '../permissions'
 import { recordAudit } from '../audit'
 import { checkDrivePdf, createDriveFolder, driveFolder, driveId, sha256, uploadDrivePdf } from './google-drive'
 
-const live=`SELECT s.*,o.email,o.role AS native_role,COALESCE(m.role,'sales') AS member_role,COALESCE(m.version,0) AS member_version
+export const archiveAuthoritySql=`SELECT s.*,o.email,o.role AS native_role,COALESCE(m.role,'sales') AS member_role,COALESCE(m.version,0) AS member_version
  FROM p_archive_settings s JOIN p_archive_authority g ON g.singleton=s.singleton AND g.version=s.version
  JOIN oa_operators o ON o.id=s.authorized_by AND o.status='active' AND o.version=g.operator_version
  LEFT JOIN p_members m ON m.operator_id=o.id
@@ -26,14 +26,14 @@ export function archiveCompletion(db:D1Database,id:string){return [
  CROSS JOIN p_archive_settings s WHERE a.proposal_id=? AND f.method='mailbox code'
  AND json_array_length(COALESCE(json_extract(a.snapshot,'$.recipient_plan'),'[]'))=0
  AND COALESCE(json_extract(a.snapshot,'$.collectionPolicy.enabled'),0)=0
- AND EXISTS(SELECT 1 FROM (${live}) eligible WHERE eligible.version=s.version)
+ AND EXISTS(SELECT 1 FROM (${archiveAuthoritySql}) eligible WHERE eligible.version=s.version)
  ON CONFLICT DO NOTHING`).bind(id),
  db.prepare('INSERT INTO p_archive_job_authority SELECT proposal_id FROM p_archive_jobs WHERE proposal_id=? ON CONFLICT DO NOTHING').bind(id)
 ]}
 export async function archiveState(env:Bindings,a:Actor){
  if(!administrators.includes(a.role))return undefined
  const settings=await env.DB.prepare('SELECT * FROM p_archive_settings WHERE singleton=1').first<any>()
- return {settings:settings?{...settings,active:Boolean(await env.DB.prepare(live).first())}:null,jobs:(await env.DB.prepare('SELECT j.*,EXISTS(SELECT 1 FROM p_archive_job_authority g WHERE g.proposal_id=j.proposal_id) AS executable FROM p_archive_jobs j ORDER BY accepted_at DESC LIMIT 100').all<any>()).results}
+ return {settings:settings?{...settings,active:Boolean(await env.DB.prepare(archiveAuthoritySql).first())}:null,jobs:(await env.DB.prepare('SELECT j.*,EXISTS(SELECT 1 FROM p_archive_job_authority g WHERE g.proposal_id=j.proposal_id) AS executable FROM p_archive_jobs j ORDER BY accepted_at DESC LIMIT 100').all<any>()).results}
 }
 export async function archiveCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  need(administrators.includes(a.role),'Only owner and admins authorize document archiving',403)
@@ -62,7 +62,9 @@ export async function archiveCommand(env:Bindings,a:Actor,name:string,p:Record<s
  await commit(db,a,[]);await reconcileArchive(env,text(p.id,'an archive job'));await recordAudit(db,a,'archive.reconciled',String(p.id));return {saved:true}
 }
 async function execution(env:Bindings,job:any){
- const config=await env.DB.prepare(live).first<any>()
+ const {childAuthorized}=await import('../automations/rules')
+ need(await childAuthorized(env,'archive',job.proposal_id),'Automation rule authority changed; this archive is held',409)
+ const config=await env.DB.prepare(archiveAuthoritySql).first<any>()
  need(config&&config.version===job.settings_version&&config.account_id===job.account_id&&config.root_folder===job.root_folder,'Archive authorization or connection changed; fresh configuration applies only to future completions',409)
  need(await env.DB.prepare("SELECT 1 FROM p_archive_job_authority g JOIN p_acceptances a ON a.proposal_id=g.proposal_id JOIN p_proposals p ON p.id=a.proposal_id JOIN p_clients c ON c.id=p.client_id WHERE g.proposal_id=? AND a.revision=? AND p.status='accepted'").bind(job.proposal_id,job.revision).first(),'This job has no current completion authority; restored history never executes',409)
  const credential=await providerCredential(env,'workspace:google_drive')

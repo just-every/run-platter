@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 15 | 99 | 45 | 159 |
+| Core | 15 | 100 | 44 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 15 | 99 | 49 | 163 |
+| Full target | 15 | 100 | 48 | 163 |
 
 Judged from the code and tests at commit `8f4ff0320aaafd58b41dabcf9e39bc60db7dc646` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. EDIT-009 is a builder completion claim with independently filled West and East variable conditions, pending exact-candidate Verify and guarded landing. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -1556,15 +1556,15 @@ Core · target · **missing**
 
 #### AUTO-001 — Status-driven automations
 
-Core · target · **missing**
+Core · target · **partial**
 
 **Requirement.** Admins set rules on proposal events (sent, viewed, commented, signed, paid, declined, expired): update the CRM, archive documents, create invoices, notify a channel, create a delivery project or start a follow-up. Each run is logged with its outcome and can be retried by hand; a failed step is visible and never silently dropped. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#auto-001).
 
 **Acceptance.**
 1. Set a rule on signed that archives the PDF, posts to Slack and creates an Asana project; sign; see three logged successes; break the Slack fake and see a failed step with a manual retry.
 
-**Evidence.** None.
-**Gap.** No automations.
+**Evidence.** `tests/platter.test.mjs` — “AUTO-001 signed rules require explicit current destinations, record only new eligible acceptances and share child jobs”; `tests/mail.test.mjs` — “AUTO-001 durable signed steps share exact Drive artifacts and Slack writes, retry proven rejections and hold uncertain or revoked work”; `tests/site.test.mjs` invokes `tests/site-documents.mjs` — “AUTO-001 Settings authorizes signed rules and exposes separate run outcomes and audited safe retry controls”; `tests/archive.test.mjs` — “AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority”. These public journeys prove explicitly authorized signed-event rules for new mailbox-verified single-client agreements with collection off, one durable run per acceptance revision, separate archive and notification outcomes, shared child jobs, exact Drive artifacts, generic Slack requests, audited retry only after a proven no-effect rejection, current authority checks, uncertainty without replay, and inactive restored history.
+**Gap.** Asana project creation and the third logged success, other triggers and actions, invoice creation, CRM execution, configured recipients and live-provider qualification remain. Rules confer no additional destination, approval or sending authority: they reference current explicit Drive destination and generic signed-event Slack route consent. Uncertain writes remain held for reconciliation and cannot be retried. The recorded HAND-001 ambiguous-remainder and landing-order holds, SEND-003 and SIGN-004 authority holds, and AUTO-002 and AUTO-003 restrictions remain unchanged.
 
 #### AUTO-002 — Completed documents archived to file storage
 

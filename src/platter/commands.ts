@@ -1,3 +1,4 @@
+import { automationCommand } from './automations/jobs'
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
@@ -96,6 +97,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='signer.replace')return replaceSigner(env,a,p)
  if(name==='signer.method')return signerMethodCommand(env,a,p)
  if(name.startsWith('sms.'))return smsCommand(env,a,name,p)
+ if(name.startsWith('automation.'))return automationCommand(env,a,name,p)
  if(name.startsWith('notification.'))return notificationCommand(env,a,name,p)
  if(name.startsWith('team.')||name.startsWith('member.')||name==='proposal.share')return teamCommand(db,a,name,p)
  if(name.startsWith('approval.')||name==='proposal.approve'||name==='proposal.reject')return approvalCommand(env,a,name,p)

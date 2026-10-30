@@ -1,3 +1,4 @@
+import { runAutomations } from './platter/automations/jobs'
 import { runCompletionMail } from './platter/mail'
 import { runArchives } from './platter/archiving/jobs'
 import { runWebhooks } from './platter/api/webhooks'
@@ -58,7 +59,7 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
     await runDueReports(runtimeBindings(env), controller.scheduledTime)
     await runNotifications(runtimeBindings(env))
     await runWebhooks(runtimeBindings(env),controller.scheduledTime)
-    await runArchives(runtimeBindings(env))
+    await runArchives(runtimeBindings(env));await runAutomations(runtimeBindings(env))
     await runCompletionMail(runtimeBindings(env))
   },
 } satisfies ExportedHandler<Bindings>, { seed: seedDemo })

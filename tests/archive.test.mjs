@@ -1,4 +1,5 @@
 import { acceptRevenue } from './revenue-fixture.mjs'
+import {managerApprovalPreview} from './approval-preview-fixture.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { documentFixture } from './document-fixture.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
@@ -871,22 +872,32 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.equal((await h.send(completedPath+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},completedVerification.cookie)).status,200)
   assert.equal(sourceTexts.length,3);assert.ok(sourceTexts.at(-1).Body.includes(completedShare.shareUrl))
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sms_completion_authority').first()).n,1,'a real completion grant exists before export')
+  const previewed=await managerApprovalPreview(h,{clientId:client.id,title:'Archived manager preview',scope:'Exact preview custody',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+  await h.cmd('notification.decide',{requestId:previewed.request.id,version:1,decision:'approved',note:'Reviewed revision one before archive'},previewed.manager.cookie)
+  const previewDecisions=(await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(previewed.proposal.id).all()).results
+  assert.equal(previewDecisions.length,1);assert.equal(previewDecisions[0].actor_id,previewed.manager.id);assert.equal(previewDecisions[0].revision,1)
   const tables=['p_sms_provider_optins','p_sms_reenable_history','p_sms_assents','p_sms_revocations','p_sms_code_runs','p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
   assert.equal(before.p_sms_assents.length,3);assert.equal(before.p_sms_provider_optins.length,1);assert.equal(before.p_sms_reenable_history.length,1);assert.equal(before.p_sms_runs.filter(r=>r.kind==='completion').length,1)
   for(const table of ['p_sms_revocations','p_sms_code_runs','p_sms_optouts'])assert.equal(before[table].length,1,table+' has real history')
-  assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,8,'the added scheduler tick retains the newly observed signature notice')
+  assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,9,'the scheduler signature notice and explicit manager request are retained')
   await h.close();h=undefined
   const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'))
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
+  assert.deepEqual(records.filter(r=>r.table==='p_audit'&&previewed.audit.some(a=>a.id===r.row.id)).map(r=>r.row).sort((a,b)=>a.id.localeCompare(b.id)),previewed.audit.map(({mail_route,sender_address,reason,...row})=>row).sort((a,b)=>a.id.localeCompare(b.id)),'the exact manager preview audit is exported through the public CLI')
+  for(const table of ['oa_sessions','oa_tokens','p_shares'])assert.equal(records.filter(r=>r.table===table).length,0,'preview audit custody carries no native session or invitation authority')
   for(const table of ['p_sms_reenable_eligibility','p_sms_completion_authority','p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0,table+' stays local')
   await command(restored,['import','--input',archive,'--yes'])
   const calls=[];h=await harness({root:restored,origin:'https://platter.example',unclaimed:true,assetsDirectory:'public',auth:{AUTH_LOCAL:'false',TWILIO_ACCOUNT_SID:'synthetic-platter-7110',TWILIO_AUTH_TOKEN:'synthetic-platter-7111',TWILIO_FROM:'+15005550006'},outboundService:request=>{calls.push(request.url);return Response.json({ok:true})}})
   for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results,before[table],table+' retains exact business history')
+  for(const path of [previewed.path,previewed.inner])assert.equal((await h.send(path,undefined,previewed.manager.cookie)).status,401,'archive history never restores a member session')
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(previewed.proposal.id).all()).results,previewDecisions)
   const replayedOptIn=await h.mf.dispatchFetch(callbackUrl,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','x-twilio-signature':optInSignature},body:optIn.toString()});assert.equal(replayedOptIn.status,200);await replayedOptIn.text()
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sms_reenable_eligibility').first()).n,0,'restored provider receipt replay never creates eligibility')
   for(const table of ['p_sms_reenable_eligibility','p_sms_completion_authority','p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(fixed+10*86400000),cron:'*/15 * * * *'})
   const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
+  const restoredPreviewAudit=(await h.send('/api/platter/audit?action=proposal.preview&subject='+previewed.proposal.id,undefined,restoredOwner)).value.rows
+  assert.deepEqual(restoredPreviewAudit,previewed.audit,'actor, scoped subject and original server time survive public CLI restore exactly; refusals add no preview audit')
   const restoredCertificate=await h.send('/api/platter/certificate.json?id='+signed.id,undefined,restoredOwner);assert.equal(restoredCertificate.status,200,restoredCertificate.text);assert.deepEqual(restoredCertificate.value,certificate.value)
   assert.deepEqual(await download('/api/platter/agreement.pdf?id='+signed.id,restoredOwner),documentBytes)
   assert.deepEqual(await download('/api/platter/certificate.pdf?id='+signed.id,restoredOwner),certificateBytes)
@@ -896,7 +907,11 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sms_authority').first()).n,0,'restored SMS consent never restores sending authority')
   assert.equal((await h.send(smsPath+'/action?name=code.verify',{code:smsCode},smsVerification.cookie)).status,404,'restored history cannot verify an old code')
   const restoredSms=(await h.state(restoredOwner)).proposals.find(p=>p.id===expiry.id)
-  const newInvitation=await h.cmd('proposal.send',{id:expiry.id,version:restoredSms.version},restoredOwner),newPath=new URL(newInvitation.shareUrl).pathname
+  // The later manager policy invalidates the earlier owner decision. Fresh
+  // sign-in and a current approval are required before issuing a new link.
+  const restoredManager=await h.signIn(previewed.manager.email)
+  await h.cmd('proposal.approve',{id:expiry.id,version:restoredSms.version,revision:restoredSms.revision},restoredManager)
+  const newInvitation=await h.cmd('proposal.send',{id:expiry.id,version:restoredSms.version+1},restoredOwner),newPath=new URL(newInvitation.shareUrl).pathname
   assert.equal((await h.send(newPath+'/action?name=code.request',{})).status,409,'a new invitation cannot reactivate restored SMS assent')
   await h.cmd('sms.send',{id:expiry.id,message:'Restored SMS must stay stopped',requestId:'synthetic-platter-7115'},restoredOwner,409)
   assert.deepEqual(calls,[],'restored historical requests and routes cannot reactivate outbound work')

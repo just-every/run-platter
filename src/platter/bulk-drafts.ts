@@ -72,13 +72,13 @@ function contentOf(plan: Awaited<ReturnType<typeof templateDraftPlan>>) {
 }
 async function batchFor(db: D1Database, a: Actor, id: unknown) {
  owner(a)
- const row = await db.prepare('SELECT * FROM p_bulk_batches WHERE id=? AND actor_id=?').bind(text(id, 'a batch'), a.id).first<any>()
+ const row = await db.prepare('SELECT * FROM p_bulk_batches WHERE id=? AND actor_id=? AND erased_at IS NULL').bind(text(id, 'a batch'), a.id).first<any>()
  need(row, 'Bulk draft batch not found', 404)
  return row
 }
 export async function bulkDraftState(db: D1Database, a: Actor, id?: unknown) {
  owner(a)
- if (!id) return { batches: (await db.prepare('SELECT id,template_id,template_version,created_at FROM p_bulk_batches WHERE actor_id=? ORDER BY created_at DESC,id').bind(a.id).all<any>()).results }
+ if (!id) return { batches: (await db.prepare('SELECT id,template_id,template_version,created_at FROM p_bulk_batches WHERE actor_id=? AND erased_at IS NULL ORDER BY created_at DESC,id').bind(a.id).all<any>()).results }
  const batch = await batchFor(db, a, id), version = await ownerVersion(db, a)
  const authority = await db.prepare('SELECT 1 FROM p_bulk_authority WHERE batch_id=? AND actor_id=? AND actor_version=? AND reviewed_digest=?').bind(batch.id, a.id, version, batch.digest).first()
  const rows = (await db.prepare('SELECT * FROM p_bulk_rows WHERE batch_id=? ORDER BY ordinal').bind(batch.id).all<any>()).results
@@ -93,6 +93,7 @@ export async function bulkDraftCommand(env: Bindings, a: Actor, name: string, in
   const requestId = text(input.requestId, 'a review request identity', 100)
   const previous = await db.prepare('SELECT * FROM p_bulk_batches WHERE actor_id=? AND request_id=?').bind(a.id, requestId).first<any>()
   if (previous) {
+   need(previous.erased_at === null, 'This bulk review was erased and cannot be replayed', 409)
    need(previous.csv === input.csv && previous.template_id === input.templateId && previous.template_version === Number(input.templateVersion), 'This request already reviewed different bytes', 409)
    return bulkDraftState(db, a, previous.id)
   }

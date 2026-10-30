@@ -1,4 +1,5 @@
 import { acceptRevenue } from './revenue-fixture.mjs'
+import {previewBusiness} from './approval-preview-fixture.mjs'
 import { collectionLifecycle, collectionFees, collectionMethodInheritance } from './collection-journey.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { richLibraryPropagation, richLibrarySource } from './library-fixture.mjs'
@@ -985,6 +986,9 @@ test('EDIT-018 / EDIT-022 member-only exact-revision previews share selection ma
  const member=await h.signIn('previewer@studio.example')
  await h.cmd('proposal.share',{id:p.id,operatorId:(await h.state(member)).actor.id})
  const key=await h.cmd('agent.create',{label:'Preview boundary'})
+ const outsiderEmail=['synthetic-platter-7221','example.test'].join('@')
+ await h.send('/auth/invite',{email:outsiderEmail,displayName:'Outside proposal scope',role:'member',returnTo:'/app'},h.owner)
+ const outsider=await h.signIn(outsiderEmail)
  const url=`/app/preview?id=${p.id}&revision=2`,inner=url.replace('/app/preview?','/app/preview/client?')
  const unchanged=()=>h.state(),audit=async()=>(await h.send('/api/platter/audit',undefined,h.owner)).value.rows
  await h.cmd('tracking.settings',{enabled:'yes',alerts:'yes',retentionDays:90,quietMinutes:30,consent:'yes'})
@@ -1003,14 +1007,17 @@ test('EDIT-018 / EDIT-022 member-only exact-revision previews share selection ma
  const viewedAudit=await audit(),previewRows=viewedAudit.filter(row=>row.action==='proposal.preview')
  assert.equal(previewRows.length,12);for(const row of previewRows){assert.equal(row.subject,p.id);assert.ok(row.actor_id);assert.ok(['owner','sales'].includes(row.actor_role));assert.ok(Number.isFinite(row.occurred_at))}
  assert.deepEqual(viewedAudit.filter(row=>row.action!=='proposal.preview'),initialAudit)
+ const businessBeforeRefusals=await previewBusiness(h)
  for(const path of [url,inner]){
-  assert.equal((await h.send(path)).status,401)
+  const signedOut=await h.send(path);assert.equal(signedOut.status,401);assert.ok(!signedOut.text.includes(offer.scope));assert.ok(!signedOut.text.includes('campaign.pdf'))
+  const denied=await h.send(path,undefined,outsider);assert.equal(denied.status,403);assert.ok(!denied.text.includes(offer.scope));assert.ok(!denied.text.includes('campaign.pdf'))
   assert.equal((await h.send(path,undefined,'',{authorization:'Bearer '+key.token})).status,401)
   for(const name of ['accept','pay','decline','question.create','suggestion.create','code.request','code.verify'])assert.equal((await h.send(path.split('?')[0]+'/action?'+path.split('?')[1]+'&name='+name,{name,optionId:'two',consent:true},h.owner)).status,403)
  }
  assert.equal((await h.send(inner+'&optionId=unknown',undefined,h.owner)).status,400)
  assert.equal((await h.send(inner+'&width=500',undefined,h.owner)).status,400)
  assert.equal((await h.send(inner.replace('revision=2','revision=3'),undefined,h.owner)).status,409)
+ assert.deepEqual(await previewBusiness(h),businessBeforeRefusals,'unauthorized and stale previews create no business or outbound records')
  assert.deepEqual(await unchanged(),before);assert.deepEqual(await audit(),viewedAudit)
  const attachment=before.proposals.find(row=>row.id===p.id).attachments[0]
  const download=await h.send(`/app/preview/client/attachments/${attachment.id}?id=${p.id}&revision=2`,undefined,member);assert.equal(download.status,200);assert.equal(download.text,'%PDF preview attachment');assert.deepEqual(await unchanged(),before)
@@ -1019,8 +1026,10 @@ test('EDIT-018 / EDIT-022 member-only exact-revision previews share selection ma
  const approved=await unchanged();assert.equal((await h.send(inner,undefined,member)).status,200);assert.deepEqual(await unchanged(),approved)
  const sentOffer=await h.cmd('proposal.send',{id:p.id,version:4}),path=new URL(sentOffer.shareUrl).pathname
  const cookie=await verified(h,path)
- assert.equal((await h.send(inner,undefined,cookie)).status,401)
+ const clientRefusalBefore=await previewBusiness(h),clientAuditBefore=await audit()
+ const clientOnly=await h.send(inner,undefined,cookie);assert.equal(clientOnly.status,401);assert.ok(!clientOnly.text.includes(offer.scope));assert.ok(!clientOnly.text.includes('campaign.pdf'))
  assert.equal((await h.send(inner,undefined,h.owner)).status,409)
+ assert.deepEqual(await previewBusiness(h),clientRefusalBefore);assert.deepEqual(await audit(),clientAuditBefore,'a client-only session and a sent revision add no preview audit')
  await h.cmd('proposal.negotiate',{...offer,clientId:client.id,id:p.id,version:5,scope:'New negotiated scope for preview.',priceTwo:'4300.03',depositPercent:'33.33'})
  const negotiationUrl=inner.replace('revision=2','revision=3')+'&optionId=two',pendingBefore=await unchanged()
  const pending=await h.send(negotiationUrl,undefined,member);assert.equal(pending.status,200);assert.match(pending.text,/New negotiated scope for preview/);assert.match(pending.text,/Changes since your previous offer/);assert.match(pending.text,/Selected total">\$4,300.03 USD/);assert.match(pending.text,/Selected deposit">\$1,433.20 USD/)
@@ -3772,6 +3781,29 @@ test('RENEW-001 reviewed CSV creates exactly 35 independent unsent drafts with r
  const stale=await h.cmd('bulk.preview',{...fixture.input,requestId:crypto.randomUUID()})
  await h.cmd('template.delivery',{id:fixture.template.id,version:fixture.template.version,reminderDays:[4,8]})
  const staleBefore=await records();await h.cmd('bulk.apply',bulkApply(stale),h.owner,409);assert.deepEqual(await records(),staleBefore)
+ // Erasing a pending client after a chunk must not forget its completed rows.
+ const interruptedClients=[]
+ for(let i=1;i<=16;i++)interruptedClients.push(await h.cmd('client.save',{name:'Synthetic interrupted client '+i,email:['synthetic-platter-interrupted-'+i,'example.test'].join('@')}))
+ const interruptedInput={...fixture.input,requestId:crypto.randomUUID(),templateVersion:(await h.state()).templates.find(t=>t.id===fixture.template.id).version,csv:fixture.csv.split('\n').slice(0,17).map((line,i)=>i?[interruptedClients[i-1].id,...line.split(',').slice(1)].join(','):line).join('\n')}
+ const interruptedReview=await h.cmd('bulk.preview',interruptedInput)
+ const interruptedFirst=await h.cmd('bulk.apply',bulkApply(interruptedReview));assert.equal(interruptedFirst.completed,5)
+ const completedReceipts=async()=>(await h.db.prepare('SELECT row_id,proposal_id,completed_at FROM p_bulk_rows WHERE batch_id=? AND proposal_id IS NOT NULL ORDER BY ordinal').bind(interruptedReview.id).all()).results
+ const receiptsBefore=await completedReceipts(),draftsBefore=(await h.state()).proposals
+ await h.cmd('client.erase',{id:interruptedClients[10].id,confirmName:'Synthetic interrupted client 11'})
+ await h.cmd('bulk.preview',interruptedInput,h.owner,409)
+ await h.cmd('bulk.apply',bulkApply(interruptedReview),h.owner,404)
+ await h.cmd('bulk.inspect',{id:interruptedReview.id},h.owner,404)
+ assert.deepEqual((await h.state()).proposals,draftsBefore,'erasure and original request replay leave the five completed drafts unchanged')
+ assert.deepEqual(await completedReceipts(),receiptsBefore,'completed row identities survive captured-data erasure')
+ assert.ok(!(await h.cmd('bulk.inspect',{})).batches.some(b=>b.id===interruptedReview.id))
+ const erasedBatch=await h.db.prepare('SELECT csv,csv_hash,digest,source_json,erased_at FROM p_bulk_batches WHERE id=?').bind(interruptedReview.id).first()
+ assert.deepEqual({...erasedBatch,erased_at:null},{csv:'',csv_hash:'',digest:'',source_json:'[]',erased_at:null})
+ assert.ok(erasedBatch.erased_at>0)
+ const erasedRows=(await h.db.prepare('SELECT client_id,input_json,client_json,content_json FROM p_bulk_rows WHERE batch_id=?').bind(interruptedReview.id).all()).results
+ assert.equal(erasedRows.length,16)
+ assert.ok(erasedRows.every(r=>r.client_id===null&&r.input_json==='{}'&&r.client_json===null&&r.content_json===null))
+ for(const table of ['p_bulk_authority','p_bulk_bindings'])assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM '+table+' WHERE batch_id=?').bind(interruptedReview.id).first()).n,0)
+ console.log('PROBE RENEW-001 A: create five drafts, erase pending client 11, replay original preview and apply -> 409 and 404; five unchanged drafts and five durable completion receipts, captured data cleared')
  // A captured unused client can be erased before apply; the reviewed bytes vanish.
  const current=(await h.state()).templates.find(t=>t.id===fixture.template.id)
  const eraseClient=await h.cmd('client.save',{name:'Synthetic erasable bulk client',email:['synthetic-platter-bulk-erase','example.test'].join('@')})

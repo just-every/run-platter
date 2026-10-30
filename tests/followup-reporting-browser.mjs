@@ -34,10 +34,11 @@ export async function followupReportingBrowser(){
   }
   const {page:setup}=await session(h.owner)
   await setup.goto(h.origin+'/setup');await setup.getByRole('checkbox').check();await setup.getByRole('button',{name:'Finish setup'}).click()
-  await followupReportingJourney(h,{inspect:async({label,person,query,rows,queueRows,totals})=>{
+  await followupReportingJourney(h,{inspect:async({label,person,query,rows,queueRows,totals,ownerIds})=>{
    const {page}=await session(person.cookie)
    await page.setViewportSize({width:1440,height:1000})
    assert.equal((await page.goto(h.origin+'/app?'+query)).status(),200,label)
+   assert.deepEqual((await page.getByLabel('Owner',{exact:true}).locator('option').evaluateAll(nodes=>nodes.map(n=>n.value).filter(Boolean))).sort(),ownerIds,label+' exact owner filter choices')
    assert.deepEqual(await page.locator('[data-proposal-id]').evaluateAll(nodes=>nodes.map(n=>n.dataset.proposalId)),rows.map(r=>r.id),label+' browser pipeline ids')
    assert.equal(await page.locator('[data-pipeline-count]').getAttribute('data-pipeline-count'),String(rows.length))
    assert.equal(await page.locator('[data-pipeline-total]').count(),totals.length)
@@ -48,6 +49,7 @@ export async function followupReportingBrowser(){
    }
    for(const row of rows){
     const facts=await page.locator('[data-proposal-id="'+row.id+'"] .line-facts').locator('dd').allTextContents()
+    assert.equal(facts[0],row.ownerName)
     assert.equal(facts[3],row.dueDate??'None')
     assert.equal(facts[4],({followup:'Sales follow-up',approve:'Approve revision',send:'Send approved offer','await-client':'Await client decision','export-deposit':'Export deposit invoice',withdrawn:'Prepare a new revision',reopen:'Review expiry or reopening'})[row.nextAction])
    }

@@ -37,7 +37,7 @@ export async function thirtyProposalFixture(h,{offer=reportingOffer,verified,leg
     assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},cookie)).status,200)
    }
   }
-  fixture.push({currency,index:i,id:made.id,title:input.title,status:status==='draft'?'awaiting-approval':status,owner:unrecorded?null:person.id,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':['sent','viewed'].includes(status)?'await-client':status==='expired'?'reopen':['withdrawn','declined','lost','won'].includes(status)?'withdrawn':'export-deposit'})
+  fixture.push({currency,index:i,id:made.id,title:input.title,status:status==='draft'?'awaiting-approval':status,owner:unrecorded?null:person.id,ownerName:unrecorded?'Not recorded':person.email,client:client.id,valueCents:(status==='accepted'?1000+i*10:2000+i*20)*100,nextAction:status==='draft'?'approve':status==='approved'?'send':['sent','viewed'].includes(status)?'await-client':status==='expired'?'reopen':['withdrawn','declined','lost','won'].includes(status)?'withdrawn':'export-deposit'})
  }
  return {clients,people,fixture}
 }
@@ -93,7 +93,7 @@ export async function followupReportingJourney(h,{inspect=async()=>{}}={}) {
     assert.deepEqual(report.rows.map(r=>({id:r.id,ownerId:r.ownerId,dueDate:r.dueDate,nextAction:r.nextAction,currency:r.currency,valueCents:r.valueCents,dueFollowup:r.dueFollowup})),rows.map(r=>({id:r.id,ownerId:r.owner,dueDate:r.dueDate,nextAction:r.nextAction,currency:r.currency,valueCents:r.valueCents,dueFollowup:Boolean(r.dueDate&&r.dueDate<='2027-03-10')})),label+' exact pipeline '+due)
     for(const row of report.rows.filter(r=>!r.ownerId))assert.equal(row.owner,'Not recorded')
     assert.equal(report.count,rows.length);assert.deepEqual(report.totals,totals(rows))
-    if(!owner)await inspect({label,person,query:q,rows,queueRows:expectedQueue,totals:totals(rows)})
+    if(!owner)await inspect({label,person,query:q,rows,queueRows:expectedQueue,totals:totals(rows),ownerIds:[...new Set(visible.map(p=>p.owner??'unrecorded'))].sort()})
    }
   }
  }
@@ -120,6 +120,7 @@ export async function followupReportingJourney(h,{inspect=async()=>{}}={}) {
  const freshOwner=await h.signIn(originalOwner.email)
  const promoted=await h.send('/auth/operator/role',{operatorId:people[2].id,role:'owner'},freshOwner)
  assert.equal(promoted.status,200,promoted.text)
+ assert.equal((await h.send('/api/platter/pipeline',undefined,people[2].cookie)).status,401,'promotion revokes the previous sales session')
  const successor=await h.signIn(people[2].email)
  assert.equal((await h.state(successor)).actor.role,'owner')
  assert.equal((await h.send('/auth/operator/role',{operatorId:originalOwner.id,role:'member'},successor)).status,200)

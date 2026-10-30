@@ -1,5 +1,6 @@
 import type { Bindings } from '../../auth.server'
 import { providerCredential } from '../connections'
+import { currentTime } from '../expiry-time'
 import { commit, need, text, type Actor } from '../model'
 import { administrators } from '../permissions'
 import { hubspotCardData } from './hubspot-card'
@@ -20,7 +21,12 @@ export async function crmCardData(env: Bindings, actor: Actor, params: URLSearch
   need(/^[1-9]\d{0,19}$/.test(quoteId), 'Use the Zoho quote id')
   query.set('quoteId', quoteId)
  }
- const proposals = (await env.DB.prepare('SELECT p.id,p.title,p.status,p.revision FROM p_crm_draft_sources s JOIN p_proposals p ON p.id=s.proposal_id WHERE s.provider=? AND s.account_id=? AND s.deal_id=? ORDER BY p.created_at,p.id').bind(provider, accountId, dealId).all<any>()).results
+ const at = await currentTime(env.DB)
+ const proposals = (await env.DB.prepare(`SELECT p.id,p.title,p.revision,CASE
+  WHEN EXISTS(SELECT 1 FROM p_withdrawals w WHERE w.proposal_id=p.id AND w.revision=p.revision) THEN 'withdrawn'
+  WHEN p.status='sent' AND EXISTS(SELECT 1 FROM p_expiry e WHERE e.proposal_id=p.id AND e.deadline_at IS NOT NULL AND e.deadline_at<=?) THEN 'expired'
+  ELSE p.status END AS status
+  FROM p_crm_draft_sources s JOIN p_proposals p ON p.id=s.proposal_id WHERE s.provider=? AND s.account_id=? AND s.deal_id=? ORDER BY p.created_at,p.id`).bind(at, provider, accountId, dealId).all<any>()).results
  await commit(env.DB, actor, [], true, {
   sql: "EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL)",
   values: ['workspace:' + provider, accountId, connection.version],

@@ -3671,4 +3671,5 @@ test('CRM-004 reviewed Pipedrive and Zoho drafts and lifecycle writes retain exa
   await (await import('./crm-provider-sync-http.mjs')).providerSyncJourney(verified, provider)
   await (await import('./crm-provider-card-http.mjs')).providerCardJourney(provider)
  }
+ await (await import('./crm-provider-card-http.mjs')).providerCardIsolationJourney()
 })

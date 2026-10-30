@@ -2585,6 +2585,10 @@
       "sha256": "bb1bd4f27bd5f790a4c4c9c1d6aef84eac14609b1946688762f3e3c1da8db066",
       "executable": false
     },
+    "src/platter/crm/provider-card.ts": {
+      "sha256": "b962cad66c350b39149838924603820cc09ef6b63117f90c70321f4f06c64126",
+      "executable": false
+    },
     "src/platter/crm/provider-sync-plan.ts": {
       "sha256": "e55d5b7460e6941e571f33ab960b3979ddd329917fd48aeab47f3f73f6c0f8bb",
       "executable": false
@@ -3469,6 +3473,14 @@
       "sha256": "c96d964bb74ad5c94ae188b4aa4fa5ae4480a6a823f3fca68189702e601bc667",
       "executable": false
     },
+    "tests/crm-provider-card-browser.mjs": {
+      "sha256": "7ba6c06445e38393fe3e85a448b2ba79e16b50e7250c7f462e9b20dfb5e700d3",
+      "executable": false
+    },
+    "tests/crm-provider-card-http.mjs": {
+      "sha256": "c7767ff5374f5fe527b2ea98095aa1bab4001c1e43bba1e903bfd99c3bbf1e36",
+      "executable": false
+    },
     "tests/crm-provider-sync-browser.mjs": {
       "sha256": "cdac2a606d360821952b7b9218c7846c779cc4c652eb3e5e07d288ccf0773d6b",
       "executable": false
@@ -3594,7 +3606,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "ed4bc3373a67e1d9504d06442741305d2d36e5649e266f07c12a5179b0d71d87",
+      "sha256": "31ac3eb8ba7c7892bfd7434aaf34ffc35b0485e8b27636e2f109edb3c57225d1",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

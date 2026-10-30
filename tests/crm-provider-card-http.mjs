@@ -6,6 +6,7 @@ import { zohoFixture, connectZoho } from './crm-zoho-http.mjs'
 export async function providerCardJourney(provider) {
  const edge = provider === 'pipedrive' ? pipedriveFixture() : zohoFixture(), h = await harness({ outboundService: edge.request })
  try {
+  await (await h.mf.getWorker()).scheduled({ scheduledTime: new Date('2035-01-01T12:00:00Z'), cron: '*/15 * * * *' })
   const setup = await h.mf.dispatchFetch(h.origin + '/setup', { method: 'POST', headers: { origin: h.origin, cookie: h.owner, 'content-type': 'application/x-www-form-urlencoded' }, body: 'confirm=yes', redirect: 'manual' })
   assert.equal(setup.status, 303); await setup.text()
   await (provider === 'pipedrive' ? connectPipedrive : connectZoho)(h)
@@ -52,6 +53,11 @@ export async function providerCardJourney(provider) {
   await h.cmd('proposal.send', { id: made.id, version: 1 }, h.owner, 409)
   await h.cmd('proposal.approve', { id: made.id, version: 1, revision: 1 }); await h.cmd('proposal.send', { id: made.id, version: 2 })
   assert.deepEqual((await card()).value.proposals.map(p => [p.id, p.status]), [[made.id, 'sent']])
+  await h.cmd('expiry.set', { id: made.id, version: 3, mode: 'days', days: 1 })
+  await (await h.mf.getWorker()).scheduled({ scheduledTime: new Date('2035-01-03T12:00:00Z'), cron: '*/15 * * * *' })
+  assert.deepEqual((await card()).value.proposals.map(p => [p.id, p.status]), [[made.id, 'expired']])
+  await h.cmd('proposal.withdraw', { id: made.id, version: 4, reason: 'Synthetic reviewed withdrawal', notice: false })
+  assert.deepEqual((await card()).value.proposals.map(p => [p.id, p.status]), [[made.id, 'withdrawn']])
   const source = (await h.send('/api/platter/crm/source?id=' + made.id, undefined, h.owner)).value
   assert.equal(source.deal_id, nextDeal)
   await h.cmd('provider.disconnect', { provider, version: 1 })
@@ -59,5 +65,27 @@ export async function providerCardJourney(provider) {
   assert.equal((await card()).status, 409)
   assert.equal((await h.send(new URL(linked.startUrl).pathname + new URL(linked.startUrl).search, undefined, h.owner)).status, 409)
   assert.equal(edge.calls.length, calls)
+ } finally { await h.close() }
+}
+
+export async function providerCardIsolationJourney() {
+ const pipedrive = pipedriveFixture(), zoho = zohoFixture(), accountId = '12901', dealId = '12902'
+ pipedrive.state.companyId = Number(accountId); pipedrive.state.deal.id = Number(dealId)
+ zoho.state.organizationId = accountId; zoho.state.deal.id = dealId; zoho.state.quote.Deal_Name.id = dealId
+ const h = await harness({ outboundService: req => new URL(req.url).hostname === 'api.pipedrive.com' ? pipedrive.request(req) : zoho.request(req) })
+ try {
+  const expected = {}
+  for (const [provider, edge, token] of [['pipedrive', pipedrive, 'synthetic-platter-12100'], ['zoho', zoho, 'synthetic-platter-12400']]) {
+   await h.cmd('provider.connect', { provider, token, tenantId: accountId, version: 0, consent: true })
+   const review = await h.cmd('crm.' + provider + '.review', { ...edge.selected, dealId })
+   expected[provider] = (await h.cmd('crm.' + provider + '.apply', { id: review.id, digest: review.digest, consent: true })).id
+  }
+  const calls = pipedrive.calls.length + zoho.calls.length
+  for (const provider of ['pipedrive', 'zoho']) {
+   const result = await h.send('/api/platter/crm/card-preview?' + new URLSearchParams({ provider, accountId, dealId }), undefined, h.owner)
+   assert.equal(result.status, 200)
+   assert.deepEqual(result.value.proposals.map(p => [p.id, p.title, p.status]), [[expected[provider], provider === 'pipedrive' ? 'Synthetic Pipedrive engagement' : 'Synthetic Zoho engagement', 'draft']], 'identical tenant and deal ids cannot disclose another provider proposal')
+  }
+  assert.equal(pipedrive.calls.length + zoho.calls.length, calls, 'card reads do not call either provider')
  } finally { await h.close() }
 }

@@ -3498,7 +3498,7 @@
       "executable": false
     },
     "tests/document-movein-fixture.mjs": {
-      "sha256": "50f06e26bcce8e4de89a3c5cff8e91a144b7afded0267c97e8060be7c950081a",
+      "sha256": "22b834748e057715e6666c53b2f2ccb30c0a676e00ccfe307ee7b0b7e20f86dd",
       "executable": false
     },
     "tests/drive-fixture.mjs": {

@@ -81,4 +81,40 @@ export async function providerSyncJourney(verified, provider) {
   assert.equal(edge.writes.length, afterLost); assert.equal(edge.notes.length, notes)
   assert.ok((await h.state()).crmProviderSyncHistory.some(r => r.status === 'uncertain'))
  } finally { await h.close() }
+ await providerWriteRefusals(provider)
+}
+
+async function providerWriteRefusals(provider) {
+ for (const scenario of ['receipt', 'disconnect', 'demotion']) {
+  const edge = providerSyncFixture(provider), h = await harness({ outboundService: edge.request }), prefix = 'crm.' + provider + '.'
+  try {
+   await (provider === 'pipedrive' ? connectPipedrive : connectZoho)(h)
+   const capture = await h.cmd(prefix + 'review', edge.selected), made = await h.cmd(prefix + 'apply', { id: capture.id, digest: capture.digest, consent: true })
+   await h.cmd('proposal.approve', { id: made.id, version: 1, revision: 1 }); await h.cmd('proposal.send', { id: made.id, version: 2 })
+   let actor = h.owner, person
+   if (scenario === 'demotion') {
+    const address = ['synthetic-platter-12432', 'example.test'].join('@')
+    await h.send('/auth/invite', { email: address, displayName: 'CRM admin', role: 'member', returnTo: '/app' }, h.owner)
+    actor = await h.signIn(address); person = (await h.state()).teamPeople.find(p => p.email === address)
+    await h.cmd('member.set', { operatorId: person.id, version: 0, role: 'admin', teams: [] })
+   }
+   const review = await h.cmd(prefix + 'sync.review', { proposalId: made.id, version: 3, ...edge.mapping }, actor)
+   if (scenario === 'receipt') edge.mismatchNextWrite()
+   else {
+    let revoked = false
+    edge.beforeReply(async req => {
+     if (req.method === 'PUT' && !revoked) {
+      revoked = true
+      if (scenario === 'disconnect') await h.cmd('provider.disconnect', { provider, version: 1 })
+      else await h.cmd('member.set', { operatorId: person.id, version: 1, role: 'sales', teams: [] })
+     }
+    })
+   }
+   const result = await h.cmd(prefix + 'sync.apply', { id: review.id, digest: review.digest, consent: true }, actor)
+   assert.equal(result.held, 1); assert.equal(edge.writes.length, 1, scenario + ' stops every subsequent write'); assert.equal(edge.notes.length, 0)
+   assert.equal(edge.state.deal[edge.mapping.statusProperty], '')
+   const after = (await h.state()).crmProviderSyncHistory
+   assert.ok(after.some(r => r.status === 'uncertain') || scenario !== 'receipt'); assert.ok(!JSON.stringify(after).includes(provider === 'pipedrive' ? pipedriveToken : zohoToken))
+  } finally { await h.close() }
+ }
 }

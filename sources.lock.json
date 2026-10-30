@@ -649,6 +649,10 @@
       "sha256": "945f56eb7c002bd5e82e22e44bfeeba597a65b5fa587484762ac5ca067f0c15b",
       "executable": false
     },
+    "migrations/core/0100_reviewed_provider_sync.sql": {
+      "sha256": "4d578f4b77b3f21602ed74b5629ed49d2d91351d96740da284f089f72ccd7768",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -2581,6 +2585,18 @@
       "sha256": "687d7e1bf4f98e30586b706fa03415fd18e029b3e73f127832792ea55f32c04e",
       "executable": false
     },
+    "src/platter/crm/provider-sync-plan.ts": {
+      "sha256": "9538a258d4e6bbf5755370b7e2fe0bcfd54217ceddd0d67513a414906e972e9e",
+      "executable": false
+    },
+    "src/platter/crm/provider-sync.ts": {
+      "sha256": "c4503fe190282a8bd4872e86dc17e10bedf65987de75b77ceeeb392bf98eff5a",
+      "executable": false
+    },
+    "src/platter/crm/zoho-draft.ts": {
+      "sha256": "dce9eb8710eab39370050157e02439a4356b8f5fea5db1f9b9c2687c913f44ac",
+      "executable": false
+    },
     "src/platter/delivery-intake.d.mts": {
       "sha256": "f6b143a15ccb424b9b6e1f568e054b33e813907e743ee9a41be9915823475933",
       "executable": false
@@ -3443,6 +3459,30 @@
     },
     "tests/crm-pipedrive-http.mjs": {
       "sha256": "d89d2e445eb6c82fabd1f2a250c05710a0330d92d565a73b474c24f2c7b882a0",
+      "executable": false
+    },
+    "tests/crm-provider-archive.mjs": {
+      "sha256": "f664c9b54c7f51ce4407c11481b89a89f04cb71575aaeb0d93386376824e3d7b",
+      "executable": false
+    },
+    "tests/crm-provider-sync-browser.mjs": {
+      "sha256": "cdac2a606d360821952b7b9218c7846c779cc4c652eb3e5e07d288ccf0773d6b",
+      "executable": false
+    },
+    "tests/crm-provider-sync-fixture.mjs": {
+      "sha256": "9bc459b5f1973f9d2770147452df809105dc37af79fc51eef1b4f4f51634d045",
+      "executable": false
+    },
+    "tests/crm-provider-sync-http.mjs": {
+      "sha256": "42bb8f9117d0ddab557b92f5ada0eb13c9356f88977dc0532024ffac4745aafb",
+      "executable": false
+    },
+    "tests/crm-zoho-browser.mjs": {
+      "sha256": "caf255b7853f7b750e4fda06da01529845defda04def0e549f7f5223e6f1d954",
+      "executable": false
+    },
+    "tests/crm-zoho-http.mjs": {
+      "sha256": "089b25043d9b67748c36ddc8befce45a4afeb95798f662c5af444ab02a285102",
       "executable": false
     },
     "tests/delivery-provider.mjs": {

@@ -68,7 +68,7 @@ export async function providerSyncPlan(env: Bindings, actor: Actor, input: Recor
   }
   const body = { value: Number(amount), [statusProperty]: facts.status, [linkProperty]: link, ...(['signed', 'paid', 'won'].includes(facts.status) ? { stage_id: Number(wonStage), status: 'won' } : {}) }
   operations.push({ key: '', method: 'PUT', path: 'deals/' + source.deal_id, label: 'Deal amount, status, protected link and stage', body, expected: { id: source.deal_id, ...body } })
-  for (const event of facts.events) operations.push({ key: 'event:' + row.id + ':' + row.revision + ':' + event.kind, method: 'POST', path: 'notes', label: event.kind + ' timeline note', body: { deal_id: Number(source.deal_id), content: 'Platter proposal ' + row.id + ', revision ' + row.revision + ': ' + event.kind + '. ' + link } })
+  for (const event of facts.events) operations.push({ key: 'event:' + row.id + ':' + row.revision + ':' + event.kind, method: 'POST', path: 'notes', label: event.kind + ' timeline note', body: { deal_id: Number(source.deal_id), content: 'Platter proposal ' + row.id + ', revision ' + row.revision + ': ' + event.kind + '. Recorded at ' + new Date(event.at).toISOString() + '. ' + link } })
   mapping.wonStage = wonStage; mapping.pipelineId = pipelineId; metadata = { fields, stage, deal }
  } else {
   const fields = await zohoJson('settings/fields?module=Deals', secret.token)
@@ -85,7 +85,7 @@ export async function providerSyncPlan(env: Bindings, actor: Actor, input: Recor
   operations.push({ key: '', method: 'PUT', path: 'Quotes/' + quoteId, label: 'Quote product quantities and unit prices', body: { data: [{ id: quoteId, Product_Details: details }], trigger: [] }, expected: { module: 'Quotes', id: quoteId, lines: details, totalCents: option.cents } })
   const update = { id: source.deal_id, Amount: Number(amount), [statusProperty]: facts.status, [linkProperty]: link, ...(['signed', 'paid', 'won'].includes(facts.status) ? { Stage: wonStage } : {}) }
   operations.push({ key: '', method: 'PUT', path: 'Deals/' + source.deal_id, label: 'Deal amount, status, protected link and stage', body: { data: [update], trigger: [] }, expected: { module: 'Deals', id: source.deal_id, fields: update } })
-  for (const event of facts.events) operations.push({ key: 'event:' + row.id + ':' + row.revision + ':' + event.kind, method: 'POST', path: 'Deals/' + source.deal_id + '/Notes', label: event.kind + ' timeline note', body: { data: [{ Note_Title: 'Platter ' + event.kind, Note_Content: 'Platter proposal ' + row.id + ', revision ' + row.revision + ': ' + event.kind + '. ' + link }] } })
+  for (const event of facts.events) operations.push({ key: 'event:' + row.id + ':' + row.revision + ':' + event.kind, method: 'POST', path: 'Deals/' + source.deal_id + '/Notes', label: event.kind + ' timeline note', body: { data: [{ Note_Title: 'Platter ' + event.kind, Note_Content: 'Platter proposal ' + row.id + ', revision ' + row.revision + ': ' + event.kind + '. Recorded at ' + new Date(event.at).toISOString() + '. ' + link }] } })
   mapping.wonStage = wonStage; metadata = { fields, deal }
  }
  const remote = canonical({ source: read.source, metadata })

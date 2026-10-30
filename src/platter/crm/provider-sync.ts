@@ -10,6 +10,7 @@ function guard(review: any) {
  return { sql: "EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL) AND EXISTS(SELECT 1 FROM p_proposals p WHERE p.id=? AND p.version=? AND p.revision=? AND NOT EXISTS(SELECT 1 FROM p_negotiations n WHERE n.proposal_id=p.id))", values: ['workspace:' + review.provider, review.account_id, review.connection_version, review.proposal_id, review.proposal_version, review.revision] as any[] }
 }
 export async function providerSyncCommand(env: Bindings, actor: Actor, name: string, input: Record<string, unknown>, provider: CrmProvider) {
+ need(['crm.' + provider + '.sync.review', 'crm.' + provider + '.sync.apply'].includes(name), 'Unknown CRM synchronization action', 404)
  const db = env.DB, at = await currentTime(db)
  if (name.endsWith('.review')) {
   if (typeof input.proposalChoice === 'string') { const [proposalId, version] = input.proposalChoice.split(':'); input = { ...input, proposalId, version } }

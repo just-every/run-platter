@@ -160,6 +160,22 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='client.save'){
   need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email,variable_fields) VALUES(?,?,?,?)').bind(id,text(p.name,'a client name'),email(p.email),JSON.stringify(clientVariableFields(p.variableFields??Object.fromEntries(['contactName','firstName','lastName','title','address'].filter(key=>p[key]!==undefined).map(key=>[key,p[key]])))))]);return{id}
  }
+ if(name==='client.edit'){
+  need(a.role==='owner','Only the owner edits imported clients',403)
+  const id=text(p.id,'a client'),version=Number(p.version)
+  need((typeof p.version==='number'||typeof p.version==='string')&&Number.isSafeInteger(version)&&version>0,'Provide the current client version')
+  const row=await db.prepare('SELECT c.*,r.revision AS import_revision FROM p_clients c LEFT JOIN p_import_client_revisions r ON r.client_id=c.id WHERE c.id=?').bind(id).first<any>()
+  need(row,'Client not found',404)
+  need(row.import_revision,'Only imported clients without proposals can be edited here',409)
+  need(row.version===version,'This client changed. Reload before continuing.',409)
+  need(!await db.prepare('SELECT id FROM p_proposals WHERE client_id=? LIMIT 1').bind(id).first(),'Clients with proposals must retain their current details',409)
+  // Retain the original import binding and journal: the native version change
+  // makes undo preserve this independently edited client.
+  await commit(db,a,[db.prepare('UPDATE p_clients SET name=?,email=?,version=version+1 WHERE id=?').bind(text(p.name,'a client name'),email(p.email),id)],true,{
+   sql:'EXISTS(SELECT 1 FROM p_clients c JOIN p_import_client_revisions r ON r.client_id=c.id WHERE c.id=? AND c.version=? AND r.revision=?) AND NOT EXISTS(SELECT 1 FROM p_proposals WHERE client_id=?)',values:[id,version,row.import_revision,id],
+  })
+  return {id,version:version+1}
+ }
  if(name==='client.erase'){
   need(a.role==='owner','Only the owner erases clients',403);const id=text(p.id,'a client'),c=await db.prepare('SELECT * FROM p_clients WHERE id=?').bind(id).first<any>();need(c,'Client not found',404);need(p.confirmName===c.name,'Type the exact client name to confirm erasure');
   const unused=`NOT EXISTS(SELECT 1 FROM p_proposals WHERE client_id=?) AND NOT EXISTS(SELECT 1 FROM p_import_client_revisions WHERE client_id=?)`

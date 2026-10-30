@@ -157,3 +157,134 @@ export async function followupJourney(h, {offer, verified}) {
   await h.cmd('report.time-zone',{timeZone:'Pacific/Honolulu'});assert.equal((await queue()).today,'2027-03-10')
   await h.cmd('report.time-zone',{timeZone:'UTC'});assert.equal((await queue()).today,'2027-03-11')
 }
+
+
+// One native lifecycle fixture is shared by the HTTP and public CLI journeys.
+// Expected history is declared from the performed actions, independently of storage.
+export async function followupLifecycle(h, events, messages) {
+  const at = Date.parse('2030-06-01T12:00:00Z')
+  const tick = async seconds => (await h.mf.getWorker()).scheduled({scheduledTime:new Date(at + seconds * 1000),cron:'*/15 * * * *'})
+  await tick(0)
+  const owner = (await h.state()).actor
+  const recipient=['synthetic-platter-9900','example.test'].join('@')
+  const client = await h.cmd('client.save',{name:'Synthetic lifecycle client',email:recipient})
+  const fields = {clientId:client.id,title:'Synthetic lifecycle proposal',scope:'Reviewed native scope',optionOne:'One',priceOne:'5000',optionTwo:'Two',priceTwo:'8000',depositPercent:'25'}
+  const current = async id => (await h.state()).proposals.find(p=>p.id===id)
+  const queue = async () => {
+    const r = await h.send('/api/platter/followups',undefined,h.owner)
+    assert.equal(r.status,200,r.text)
+    return r.value.rows
+  }
+  const expectedActions = []
+  const logged = async (seconds,p,revision,name,input) => {
+    await tick(seconds)
+    await h.cmd('followup.'+name,{id:p.id,...input})
+    expectedActions.push({proposal_id:p.id,revision,kind:{schedule:'scheduled',complete:'completed',dismiss:'dismissed'}[name],action:input.action??input.reason,due_date:name==='schedule'?input.dueDate:'2030-06-02',actor_id:owner.id,occurred_at:at+seconds*1000})
+  }
+  const start = async title => {
+    const p = await h.cmd('proposal.prepare',{...fields,title})
+    const row = (await queue()).find(r=>r.id===p.id)
+    assert.deepEqual({owner:row.ownerId,action:row.action,due:row.dueDate,revision:row.revision},{owner:owner.id,action:'Approve revision',due:'2030-06-01',revision:1})
+    return p
+  }
+  const invite = async p => {
+    const row = await current(p.id)
+    await h.cmd('proposal.approve',{id:p.id,version:row.version,revision:row.revision})
+    const sent = await h.cmd('proposal.send',{id:p.id,version:row.version+1})
+    const path = new URL(sent.shareUrl).pathname
+    const requested = await h.send(path+'/action?name=code.request',{})
+    assert.equal(requested.status,200,requested.text)
+    const mail = messages.findLast(m=>m.subject.includes('verification code'))
+    assert.ok(mail,'the verification code reaches the provider edge')
+    const verified = await h.send(path+'/action?name=code.verify',{code:mail.text.match(/\b\d{6}\b/)[0]})
+    assert.equal(verified.status,200,verified.text)
+    return {path,cookie:verified.cookie}
+  }
+  const c = await start('Lifecycle C')
+  await logged(1,c,1,'schedule',{action:'Review initial scope',dueDate:'2030-06-02'})
+  await logged(2,c,1,'complete',{action:'Reviewed initial scope with the client'})
+  assert.ok(!(await queue()).some(r=>r.id===c.id))
+  await tick(3)
+  await h.cmd('proposal.revise',{...fields,id:c.id,version:1,title:'Lifecycle C revised',scope:'Revised native scope'})
+  const revised = (await queue()).find(r=>r.id===c.id)
+  assert.deepEqual({owner:revised.ownerId,action:revised.action,due:revised.dueDate,revision:revised.revision},{owner:owner.id,action:'Approve revision',due:'2030-06-01',revision:2},'a revision starts a fresh action without changing the sales owner')
+  const cInvitation = await invite(c)
+  await logged(4,c,2,'schedule',{action:'Call about delivery and scope',dueDate:'2030-06-02'})
+  const asked = await h.send(cInvitation.path+'/action?name=question.create',{revision:2,section:'scope',text:'Can delivery start next week?'},cInvitation.cookie)
+  assert.equal(asked.status,200,asked.text)
+  const question = (await current(c.id)).questions.find(q=>q.text==='Can delivery start next week?')
+  assert.ok(question,'the client question is retained on the sent revision')
+  assert.deepEqual({revision:question.revision,client:question.client_id,section:question.section,time:question.created_at,status:question.status},{revision:2,client:client.id,section:'scope',time:at+4000,status:'open'})
+  const invitationMail = messages.find(m=>m.subject==='Your proposal: Lifecycle C revised')
+  const bounced = await events.emit(h,invitationMail.id,'email.bounced',{to:recipient,at:Date.now()-1000})
+  assert.equal(bounced.status,200,bounced.text)
+  const bounce = (await h.state()).bounceNotices.find(n=>n.proposal_id===c.id)
+  assert.ok(bounce&&!bounce.closed_at,'the actual signed delivery event opens a correction')
+  const beforeRefusal = (await h.state()).followupActions
+  await h.cmd('followup.dismiss',{id:c.id,reason:''},h.owner,400)
+  assert.deepEqual((await h.state()).followupActions,beforeRefusal,'a missing reason cannot write history')
+  await logged(5,c,2,'complete',{action:'Called client; delivery correction and question remain'})
+  let state = await h.state()
+  assert.ok(!state.followups.rows.some(r=>r.id===c.id))
+  assert.ok(state.openQuestions.some(q=>q.id===question.id),'sales completion leaves the unanswered thread open')
+  assert.equal(state.bounceNotices.find(n=>n.id===bounce.id).closed_at,null,'sales completion cannot resolve bounce correction')
+
+  const e = await start('Lifecycle E')
+  await logged(6,e,1,'schedule',{action:'Review paused work',dueDate:'2030-06-02'})
+  await logged(7,e,1,'dismiss',{reason:'Client requested a pause'})
+  assert.ok(!(await queue()).some(r=>r.id===e.id))
+  await logged(8,e,1,'schedule',{action:'Resume work after client confirmation',dueDate:'2030-06-03'})
+  const reopened = (await queue()).find(r=>r.id===e.id)
+  assert.equal(reopened.action,'Resume work after client confirmation')
+  assert.equal(reopened.dueDate,'2030-06-03')
+
+  const terminal = []
+  let acceptanceQuestionId
+  for (const [index,kind] of ['acceptance','decline','withdrawal'].entries()) {
+    const seconds=9+index
+    await tick(seconds)
+    const p = await start('Lifecycle '+kind),invitation = await invite(p)
+    await logged(seconds,p,1,'schedule',{action:'Discuss '+kind,dueDate:'2030-06-02'})
+    if(kind==='acceptance') {
+      const before = await current(p.id)
+      await h.cmd('followup.notify',{id:p.id})
+      assert.ok((await queue()).some(r=>r.id===p.id),'Notify alone leaves the action open')
+      assert.deepEqual((await current(p.id)).deliveries,before.deliveries,'Notify creates no client invitation')
+      assert.ok(messages.some(m=>m.to.includes(owner.email)&&m.subject==='Sales follow-up: Lifecycle acceptance'))
+      const unverified = await h.send(invitation.path+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true})
+      assert.equal(unverified.status,401,unverified.text)
+      assert.ok((await queue()).some(r=>r.id===p.id),'unverified acceptance cannot close work')
+      const questionResponse=await h.send(invitation.path+'/action?name=question.create',{revision:1,section:'terms',text:'Will the delivery schedule be confirmed?'},invitation.cookie)
+      assert.equal(questionResponse.status,200,questionResponse.text)
+      acceptanceQuestionId=(await current(p.id)).questions.find(q=>q.text==='Will the delivery schedule be confirmed?').id
+      const accepted = await h.send(invitation.path+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},invitation.cookie)
+      assert.equal(accepted.status,200,accepted.text)
+      assert.equal((await current(p.id)).acceptance.acceptedAt,at+seconds*1000)
+      assert.ok((await h.state()).openQuestions.some(q=>q.id===acceptanceQuestionId),'acceptance leaves the unanswered question in its own inbox')
+    } else if(kind==='decline') {
+      const declined = await h.send(invitation.path+'/action?name=decline',{revision:1,reason:'Budget not approved'},invitation.cookie)
+      assert.equal(declined.status,410,declined.text)
+      const outcome = (await current(p.id)).outcomes[0]
+      assert.deepEqual({kind:outcome.kind,reason:outcome.reason,actor:outcome.actor_id,at:outcome.occurred_at},{kind:'declined',reason:'Budget not approved',actor:client.id,at:at+seconds*1000})
+    } else {
+      await h.cmd('proposal.withdraw',{id:p.id,version:(await current(p.id)).version,reason:'Project cancelled by the firm',notice:false})
+      const withdrawal = (await current(p.id)).withdrawals[0]
+      assert.deepEqual({reason:withdrawal.reason,actor:withdrawal.actor_id,at:withdrawal.withdrawn_at},{reason:'Project cancelled by the firm',actor:owner.id,at:at+seconds*1000})
+    }
+    assert.ok(!(await queue()).some(r=>r.id===p.id),kind+' closes the sales action')
+    const beforeDenied = (await h.state()).followupActions
+    for(const [name,input] of [['schedule',{action:'Reopen terminal work',dueDate:'2030-06-04'}],['complete',{action:'Repeat closure'}],['dismiss',{reason:'Repeat dismissal'}],['notify',{}]])await h.cmd('followup.'+name,{id:p.id,...input},h.owner,409)
+    assert.deepEqual((await h.state()).followupActions,beforeDenied,'closed proposals retain history without further actions')
+    terminal.push({id:p.id,...invitation})
+  }
+  const ids=[c.id,e.id,...terminal.map(p=>p.id)]
+  state=await h.state()
+  const project = rows => rows.filter(r=>ids.includes(r.proposal_id)).map(({id,...row})=>row).sort((a,b)=>a.occurred_at-b.occurred_at)
+  assert.deepEqual(project(state.followupActions),expectedActions,'every action, reason, actor, revision and server time matches the independent history')
+  const revisions=state.revisions.filter(r=>ids.includes(r.proposal_id))
+  const expectedRevisions=[[c.id,1,0],[c.id,2,3],[e.id,1,5],...terminal.map((p,i)=>[p.id,1,9+i])].map(([id,revision,seconds])=>({proposal_id:id,revision,prepared_by:owner.email,prepared_at:at+seconds*1000}))
+  const revisionOrder=(a,b)=>a.proposal_id.localeCompare(b.proposal_id)||a.revision-b.revision
+  assert.deepEqual(revisions.map(({proposal_id,revision,prepared_by,prepared_at})=>({proposal_id,revision,prepared_by,prepared_at})).sort(revisionOrder),expectedRevisions.sort(revisionOrder),'creation and revision have independently expected author and server time')
+  const histories=state.proposals.filter(p=>ids.includes(p.id)).map(p=>({id:p.id,acceptance:p.acceptance,outcomes:p.outcomes,withdrawals:p.withdrawals,questions:p.questions}))
+  return {ids,expectedActions,histories,revisions,acceptanceQuestionId,acceptedId:terminal[0].id,questionId:question.id,bounceId:bounce.id,cId:c.id,eId:e.id,invitations:[cInvitation,...terminal],project}
+}

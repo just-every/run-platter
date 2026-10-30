@@ -56,7 +56,7 @@ async function buildPlan(env: Bindings, actor: Actor, input: Record<string, unkn
   return f
  }
  need(opportunityMeta.updateable === true && lineMeta.updateable === true && taskMeta.createable === true, 'Salesforce must permit these object writes', 409)
- field(opportunityMeta, 'Amount', 'updateable', ['currency'])
+ need(opportunityMeta.fields?.some((f: any) => f.name === 'Amount' && f.type === 'currency'), 'Salesforce must expose the opportunity amount', 409)
  const stageField = field(opportunityMeta, 'StageName', 'updateable', ['picklist'])
  const linkField = field(opportunityMeta, linkProperty, 'updateable', ['url', 'string'])
  need(linkField.custom === true && linkField.length >= link.length, 'Choose a writable custom field large enough for the protected staff link', 409)
@@ -75,10 +75,11 @@ async function buildPlan(env: Bindings, actor: Actor, input: Record<string, unkn
   need((line.description ?? '').length <= descriptionLimit, 'Product description exceeds the Salesforce field limit', 409)
   operations.push({ key: '', method: 'PATCH', path: '/sobjects/OpportunityLineItem/' + remote.id, label: 'Opportunity product ' + remote.id, expectedTotalCents: line.lineTotalCents, body: { Quantity: Number(line.quantity), UnitPrice: Number(line.unitPrice), Description: line.description ?? '' } })
  }
- const body: Record<string, unknown> = { Amount: option.cents / 100, [linkProperty]: link }
+ // Salesforce derives the opportunity amount from its products; confirm that total after the writes.
+ const body: Record<string, unknown> = { [linkProperty]: link }
  if (['signed', 'paid', 'won'].includes(facts.status)) body.StageName = wonStage
  if (['declined', 'lost', 'withdrawn'].includes(facts.status)) body.StageName = lostStage
- operations.push({ key: '', method: 'PATCH', path: '/sobjects/Opportunity/' + source.deal_id, label: 'Opportunity amount, protected link and stage', body })
+ operations.push({ key: '', method: 'PATCH', path: '/sobjects/Opportunity/' + source.deal_id, label: 'Opportunity total, protected link and stage', expectedAmountCents: option.cents, body })
  for (const event of facts.events) operations.push({ key: 'salesforce:event:' + row.id + ':' + row.revision + ':' + event.kind, method: 'POST', path: '/sobjects/Task', label: event.kind + ' activity', body: { Subject: 'Platter proposal ' + event.kind, WhatId: source.deal_id, Status: 'Completed', ActivityDate: new Date(event.at).toISOString().slice(0, 10), Description: 'Platter proposal ' + row.id + ', revision ' + row.revision + ': ' + event.kind + ' at ' + new Date(event.at).toISOString() + '. ' + link } })
  for (const operation of operations) if (!operation.key) operation.key = 'salesforce:write:' + row.id + ':' + row.revision + ':' + await hash(canonical(operation.body) + operation.path)
  const remote = canonical({ source: read.source, destination, opportunityMeta, lineMeta, taskMeta, stages })
@@ -95,11 +96,17 @@ async function writeOperation(operation: SyncOperation, secret: any) {
    need(receipt.success === true && Array.isArray(receipt.errors) && receipt.errors.length === 0, 'Salesforce did not confirm activity creation', 409)
    id = identifier(receipt.id)
   }
-  const fields = ['Id', ...Object.keys(operation.body), ...(operation.expectedTotalCents !== undefined ? ['TotalPrice'] : [])]
+  const fields = ['Id', ...Object.keys(operation.body), ...(operation.expectedTotalCents !== undefined ? ['TotalPrice'] : []), ...(operation.expectedAmountCents !== undefined ? ['Amount'] : [])]
   const path = operation.method === 'POST' ? operation.path + '/' + id : operation.path
   const read = await providerJson(base + path + '?fields=' + fields.join(','), secret.token)
   need(read.Id === id && Object.entries(operation.body).every(([key, value]) => typeof value === 'number' ? Number(read[key]) === value : read[key] === value), 'Salesforce returned different written values', 409)
-  if (operation.expectedTotalCents !== undefined) need(Number(read.TotalPrice) * 100 >= operation.expectedTotalCents - 0.00001 && Number(read.TotalPrice) * 100 <= operation.expectedTotalCents + 0.00001, 'Salesforce returned a different product total', 409)
+  const expectedCents = operation.expectedTotalCents ?? operation.expectedAmountCents
+  if (expectedCents !== undefined) {
+   const total = String((operation.expectedTotalCents !== undefined ? read.TotalPrice : read.Amount) ?? '')
+   need(/^\d{1,12}(\.\d{1,2})?$/.test(total), 'Salesforce returned an unsupported product total', 409)
+   const [whole, fraction = ''] = total.split('.')
+   need(Number(whole) * 100 + Number(fraction.padEnd(2, '0')) === expectedCents, 'Salesforce returned a different product or opportunity total', 409)
+  }
   return id
  }, () => operation.path.split('/').at(-1)!)
 }

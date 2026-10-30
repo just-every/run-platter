@@ -649,6 +649,10 @@
       "sha256": "cc811d27185211a1461cb7907c3b87ad2fad272a5558e975b71e80ca6a4dd7d9",
       "executable": false
     },
+    "migrations/core/0100_salesforce_reviewed_sync.sql": {
+      "sha256": "7ee800364a28a11d83851c8947edf5222bb0218385ed99a80fa73c1b68abb043",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -2570,7 +2574,7 @@
       "executable": false
     },
     "src/platter/crm/hubspot-sync-plan.ts": {
-      "sha256": "de65b7132099a4f85c84164d41a191da31393146ef3c24ec29a269dfd3fc56fa",
+      "sha256": "e10934378c0cc52b85bbbdc9591da456fdb5884b6c1c4aa9a97d4462909193de",
       "executable": false
     },
     "src/platter/crm/hubspot-sync.ts": {
@@ -2579,6 +2583,10 @@
     },
     "src/platter/crm/salesforce-draft.ts": {
       "sha256": "19a3dd31bcab62d59867e06f84bbea61315e3b015d18462f648cd4dd50e5e4bf",
+      "executable": false
+    },
+    "src/platter/crm/salesforce-sync.ts": {
+      "sha256": "59f4834d4547ddc229c79e26192e3233eff9a448cd1b7b936ec82e1a7d7de918",
       "executable": false
     },
     "src/platter/delivery-intake.d.mts": {
@@ -3398,7 +3406,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "a9304d9b6ed29387bffb9c66518747a645fe8f90e4ea83c8f5715cea69aecb7e",
+      "sha256": "9aca4c7e73eae5a0a959ac1e4dfa39ccb240d51b69fa5a41f24b9906837814b0",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3486,7 +3494,7 @@
       "executable": false
     },
     "tests/hubspot-archive.mjs": {
-      "sha256": "61c724dad2f9f061831beb9e39fdbfbf7fb3d90fac45ce4384a89f78e667990c",
+      "sha256": "4e7c64fdfabadcefdc09dd0ae28843ea30181fc22cc06825fa82bfcda238fce1",
       "executable": false
     },
     "tests/hubspot-browser.mjs": {
@@ -3583,6 +3591,22 @@
     },
     "tests/revenue-fixture.mjs": {
       "sha256": "3c397d6ac1ada840f0a1d428200d728b17f69a41e9505a675a4051ef7bc674d3",
+      "executable": false
+    },
+    "tests/salesforce-archive.mjs": {
+      "sha256": "bf869d9d408e1dc121971777624e948cb8a108a4bef9e4443acc6170ac18cd66",
+      "executable": false
+    },
+    "tests/salesforce-browser.mjs": {
+      "sha256": "1dacba00e9b74002a5043cb5b84310e5b687fee726631b58f91a55c019e3e20b",
+      "executable": false
+    },
+    "tests/salesforce-sync-fixture.mjs": {
+      "sha256": "df313a7b4f6d5627bd4ab565f16d7f68ab009693d06002b03b699717708092d3",
+      "executable": false
+    },
+    "tests/salesforce-sync-journey.mjs": {
+      "sha256": "46b3d8292c0895a6fc6243dd3db60ec747841749e2acb9fde343ce7d760a9bb5",
       "executable": false
     },
     "tests/signer-replacement-http.mjs": {

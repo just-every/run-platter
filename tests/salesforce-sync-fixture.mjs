@@ -4,7 +4,8 @@ import { salesforceFixture } from './provider-network.mjs'
 export const salesforceMapping = { linkProperty: 'Synthetic_Proposal__c', wonStage: 'Closed Won', lostStage: 'Closed Lost' }
 export function salesforceSyncFixture() {
  const edge = salesforceFixture(), state = edge.state, writes = [], activities = []
- Object.assign(state.opportunity, { StageName: 'Prospecting', Synthetic_Proposal__c: '' })
+ Object.assign(state.opportunity, { Id: 'synthetic-platter-4920', StageName: 'Prospecting', Synthetic_Proposal__c: '' })
+ for (const row of [...state.roles, ...state.lines]) row.OpportunityId = state.opportunity.Id
  const f = (name, type, extra = {}) => ({ name, type, updateable: true, createable: true, calculated: false, length: 32000, ...extra })
  const metadata = {
   Opportunity: { updateable: true, fields: [f('Amount', 'currency'), f('StageName', 'picklist', { picklistValues: ['Prospecting', 'Closed Won', 'Closed Lost'].map(value => ({ value, active: true })) }), f('Synthetic_Proposal__c', 'url', { custom: true })] },
@@ -37,8 +38,8 @@ export function salesforceSyncFixture() {
    const match = url.pathname.match(/\/sobjects\/(Opportunity|OpportunityLineItem)\/([^/]+)$/)
    assert.ok(match)
    const row = match[1] === 'Opportunity' ? state.opportunity : state.lines.find(r => r.Id === match[2])
-   assert.equal(row.Id, match[2]); Object.assign(row, body)
-   if (match[1] === 'OpportunityLineItem') row.TotalPrice = Math.round(row.Quantity * row.UnitPrice * 100) / 100
+   assert.equal(row.Id, match[2]); assert.ok(!Object.hasOwn(body, 'Amount'), 'opportunity totals are derived from products'); Object.assign(row, body)
+   if (match[1] === 'OpportunityLineItem') { row.TotalPrice = Math.round(row.Quantity * row.UnitPrice * 100) / 100; state.opportunity.Amount = Math.round(state.lines.reduce((n, line) => n + line.TotalPrice, 0) * 100) / 100 }
    return new Response(null, { status: 204 })
   }
   assert.equal(req.method, 'POST'); assert.equal(url.pathname, prefix + 'sobjects/Task')
@@ -47,5 +48,5 @@ export function salesforceSyncFixture() {
   if (loseResponse) { loseResponse = false; return new Response(null, { status: 503 }) }
   return Response.json({ id: row.Id, success: true, errors: [] }, { status: 201 })
  }
- return { ...edge, request, writes, activities, metadata, beforeReply(fn) { hook = fn }, loseNextActivityResponse() { loseResponse = true }, wrongNextReadback() { wrongReadback = true } }
+ return { ...edge, selected: { ...edge.selected, opportunityId: state.opportunity.Id }, request, writes, activities, metadata, beforeReply(fn) { hook = fn }, loseNextActivityResponse() { loseResponse = true }, wrongNextReadback() { wrongReadback = true } }
 }

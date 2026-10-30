@@ -7,7 +7,7 @@ import { canonical, readDeal } from './hubspot-draft'
 
 const base = 'https://api.hubapi.com/crm/v3'
 const identifier = (v: unknown) => { const id = text(v, 'a HubSpot identifier', 100); need(/^[A-Za-z0-9_-]+$/.test(id), 'Use a HubSpot identifier'); return id }
-export type SyncOperation = { key: string; method: 'PATCH' | 'POST'; path: string; body: any; label: string; expectedTotalCents?: number }
+export type SyncOperation = { key: string; method: 'PATCH' | 'POST'; path: string; body: any; label: string; expectedTotalCents?: number; expectedAmountCents?: number }
 export async function syncProposal(env: Bindings, actor: Actor, id: unknown) {
  need(administrators.includes(actor.role), 'Only owner and admins review CRM writes', 403)
  const row = await permitted(env.DB, actor, id, 'send')

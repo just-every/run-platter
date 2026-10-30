@@ -74,5 +74,25 @@ export async function salesforceSyncJourney(verified) {
   assert.equal((await apply(await secondReview())).held, 1)
   assert.equal(edge.activities.length, activityCount); assert.equal(edge.writes.slice(writeCount).filter(w => w.method === 'POST').length, 0)
   assert.ok((await h.state()).crmSyncHistory.some(r => r.provider === 'salesforce' && r.status === 'uncertain'))
+  const third = await make(); await h.cmd('proposal.approve', { id: third.id, version: 1, revision: 1 }); await h.cmd('proposal.send', { id: third.id, version: 2 })
+  await h.cmd('proposal.lose', { id: third.id, version: 3, reason: 'Budget' })
+  const thirdRow = (await h.state()).proposals.find(p => p.id === third.id)
+  const lostReview = await h.cmd('crm.salesforce.review', { proposalId: third.id, version: thirdRow.version, ...salesforceMapping })
+  assert.equal((await apply(lostReview)).held, 0); assert.equal(edge.state.opportunity.StageName, 'Closed Lost')
+  assert.ok(edge.activities.some(a => a.Subject === 'Platter proposal lost' && a.Description.includes(third.id)))
+  const fourth = await make(); await h.cmd('proposal.approve', { id: fourth.id, version: 1, revision: 1 }); await h.cmd('proposal.send', { id: fourth.id, version: 2 })
+  const fourthInput = { proposalId: fourth.id, version: 3, ...salesforceMapping }
+  const wrong = await h.cmd('crm.salesforce.review', fourthInput), beforeWrong = edge.writes.length
+  edge.wrongNextReadback(); assert.equal((await apply(wrong)).held, 1)
+  assert.equal(edge.writes.length, beforeWrong + 1, 'a mismatching provider product total stops subsequent writes')
+  assert.equal((await apply(await h.cmd('crm.salesforce.review', fourthInput))).held, 1)
+  assert.equal(edge.writes.length, beforeWrong + 1, 'uncertain product writes cannot be retried under new consent')
+  const fifth = await make(); await h.cmd('proposal.approve', { id: fifth.id, version: 1, revision: 1 }); await h.cmd('proposal.send', { id: fifth.id, version: 2 })
+  const revokeDuring = await h.cmd('crm.salesforce.review', { proposalId: fifth.id, version: 3, ...salesforceMapping }), beforeRevoke = edge.writes.length
+  fired = false
+  edge.beforeReply(async req => { if (!fired && req.method === 'PATCH') { fired = true; await h.cmd('provider.disconnect', { provider: 'salesforce', version: 3 }) } })
+  assert.equal((await apply(revokeDuring)).held, 1); edge.beforeReply()
+  assert.equal(edge.writes.length, beforeRevoke + 1, 'disconnect after the first confirmed request stops every remaining write')
+
  } finally { await h.close() }
 }

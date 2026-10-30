@@ -164,6 +164,10 @@ export async function paypalJourney(){
    const refundPath='/v2/payments/captures/'+target.provider_charge+'/refund',writes=postCalls(fake,refundPath)
    assert.equal(writes.length,1);assert.deepEqual(writes[0].body.amount,{currency_code:'USD',value:'300.00'})
    await h.cmd('payment.refund',input,roles[role]);assert.equal(postCalls(fake,refundPath).length,1)
+   const afterHalf=fake.calls.length
+   await h.cmd('payment.refund',{...input,amount:'300.01',requestId:'synthetic-platter-'+(9065+index)},roles[role],409)
+   await h.cmd('payment.refund',{...input,amount:'100.00'},roles[role],409)
+   assert.equal(fake.calls.length,afterHalf,'Refunds beyond the remainder and changed replay amounts never reach PayPal')
   }
   // A lost acknowledgement reserves the financial action permanently. Refresh reads reconcile it.
   for(const kind of ['create','capture','refund']){

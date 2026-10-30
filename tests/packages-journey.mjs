@@ -240,7 +240,9 @@ export async function combinedPreviewBrowser(browser,screenshots){
   await cmd('proposal.approve',{id:multi.id,version:configured.version,revision:configured.revision});const sentMulti=await cmd('proposal.send',{id:multi.id,version:configured.version+1})
   for(const recipient of sentMulti.recipients){
    const recipientContext=await browser.newContext({viewport:{width:1440,height:1000},javaScriptEnabled:false});clients.push(recipientContext)
-   const recipientPage=await recipientContext.newPage();await recipientPage.goto(app.origin+new URL(recipient.shareUrl).pathname+selected);await verify(recipientPage,multi.id,recipient.email);await check(recipientPage)
+   const recipientPage=await recipientContext.newPage();await recipientPage.goto(app.origin+new URL(recipient.shareUrl).pathname+selected);await verify(recipientPage,multi.id,recipient.email)
+   await recipientPage.getByLabel('Review sections for').selectOption('premium');await recipientPage.getByRole('button',{name:'Review package',exact:true}).click()
+   await recipientPage.getByRole('checkbox',{name:/Add Rush delivery/}).check();await recipientPage.getByLabel('Quantity for Rush delivery').fill('4');await recipientPage.getByRole('button',{name:'Review package',exact:true}).click();await check(recipientPage)
    assert.equal(await recipientPage.getByLabel(recipient.id==='first'?'Signer one reference':'Signer two reference',{exact:true}).count(),1);assert.equal(await recipientPage.getByLabel(recipient.id==='first'?'Signer two reference':'Signer one reference',{exact:true}).count(),0)
    await capture(recipientPage,recipient.id+'-sent')
   }

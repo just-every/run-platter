@@ -610,6 +610,30 @@ test('MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss
      await page.setViewportSize({width:390,height:900});await capture('personal-zones-and-ties',390)
     }
 
+    await page.setViewportSize({width,height:900})
+    await page.goto(app.origin+'/app/proposal?id='+made.id)
+    const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Next sales action',exact:true})})
+    assert.ok((await panel.innerText()).includes('Avery confirmed the location by email.'))
+    await panel.getByLabel('Next action',{exact:true}).fill('Reopen the production review')
+    await panel.getByLabel('Due date',{exact:true}).fill('2027-03-12')
+    await panel.getByRole('button',{name:'Save sales follow-up',exact:true}).click()
+    assert.equal(await page.getByRole('button',{name:'Complete sales follow-up',exact:true}).count(),1)
+    if(width===1440){
+     const state=await (await context.request.get(app.origin+'/api/platter/state')).json()
+     const history=state.followupActions.filter(r=>r.proposal_id===made.id)
+     assert.deepEqual(history.map(r=>[r.kind,r.action,r.due_date]),[
+      ['scheduled','Call Avery about the production dates','2020-03-10'],
+      ['completed','Called Avery and agreed on the production dates.','2020-03-10'],
+      ['scheduled','Confirm the location','2027-03-11'],
+      ['dismissed','Avery confirmed the location by email.','2027-03-11'],
+      ['scheduled','Reopen the production review','2027-03-12'],
+     ])
+     assert.ok(history.every(r=>r.actor_id===state.actor.id&&Number.isSafeInteger(r.occurred_at)&&r.occurred_at>0))
+     assert.equal(await panel.locator('button').evaluateAll(nodes=>nodes.every(n=>n.textContent.trim())),true,'follow-up controls have visible labels')
+     assert.equal(await panel.locator('input,textarea,button,p,h2,label,li').evaluateAll(nodes=>nodes.every(n=>parseFloat(getComputedStyle(n).fontSize)>=13)),true,'follow-up text is at least 13 pixels')
+    }
+    await capture('reopened')
+    if(screenshots)await panel.screenshot({path:join(screenshots,`FOLLOW-009-history-${width}.png`)})
    }finally{await context.close();await app.close();app=undefined;await edge.close();edge=undefined}
   }
  }finally{await browser?.close();await app?.close();await edge?.close()}

@@ -20,6 +20,7 @@ export function xeroFixture() {
   const body=request.method==='GET'?undefined:await request.json(),call={path:url.pathname,method:request.method,tenant:request.headers.get('xero-tenant-id'),body}
   calls.push(call)
   if(request.headers.get('authorization')!=='Bearer '+token)return new Response(null,{status:401})
+  if(state.fail==='revoked')return new Response(null,{status:401})
   if(state.observe)await state.observe(call)
   if(state.before)await state.before(call)
   if(url.pathname==='/connections')return Response.json(state.organizations.map(tenantId=>({tenantId,tenantType:'ORGANISATION'})))

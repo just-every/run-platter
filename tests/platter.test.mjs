@@ -3738,13 +3738,26 @@ test('ACCT-002 reviewed Xero deposits preserve exact money, authority, unique ma
   await h.cmd('xero.review',{id:a.p.id},h.owner,409)
   await chooseXero(h,edge)
   const choices=await h.cmd('xero.review',{id:a.p.id});assert.deepEqual(choices.contacts,[]);assert.deepEqual(choices.accounts.map(r=>r.Code),['200'])
+  const secret=await h.db.prepare("SELECT sealed FROM p_connection_secrets WHERE connection_id='workspace:xero'").first()
+  assert.ok(secret.sealed&&!secret.sealed.includes(edge.token),'the verified organization credential is sealed at rest')
   let review=await reviewXero(h,a.p.id)
+  const tick=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+  const reviewedAt=(await h.db.prepare('SELECT created_at FROM p_xero_reviews WHERE id=?').bind(review.id).first()).created_at
+  await tick(reviewedAt+900001)
+  const staleCalls=edge.calls.length;await issueXero(h,review,h.owner,409);assert.equal(edge.calls.length,staleCalls,'expired review authorizes no provider request')
+  review=await reviewXero(h,a.p.id)
   await h.cmd('xero.authority',{authority:'platter',version:1,consent:true})
   const authorityCalls=edge.calls.length;await issueXero(h,review,h.owner,409);assert.equal(edge.calls.length,authorityCalls)
   await chooseXero(h,edge,h.owner,2,1)
   review=await reviewXero(h,a.p.id)
   assert.equal(review.source.invoice.LineItems[0].UnitAmount,2000.01)
   await h.cmd('xero.issue',{id:review.id,digest:'changed',consent:true},h.owner,409)
+  edge.state.fail='revoked'
+  const revoked=await issueXero(h,review,h.owner,409)
+  assert.ok(!JSON.stringify(revoked).includes(edge.token),'revoked credential errors expose no credential')
+  assert.equal(edge.state.contacts.length,0);assert.equal(edge.state.invoices.length,0)
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_xero_jobs').first()).n,0,'provider credential refusal makes no retained write claim')
+  edge.state.fail=''
   const email='synthetic-platter-11006'+String.fromCharCode(64)+'example.test'
   await h.send('/auth/invite',{email,displayName:'Synthetic reviewer',role:'member',returnTo:'/app'},h.owner)
   const member=await h.signIn(email),person=(await h.state()).teamPeople.find(p=>p.email===email)
@@ -3775,6 +3788,8 @@ test('ACCT-002 reviewed Xero deposits preserve exact money, authority, unique ma
   const change=edge.accountId+'-other';edge.state.organizations.push(change);await h.cmd('provider.connect',{provider:'xero',version:3,organizationId:change,token:edge.token,consent:true},h.owner,409)
   const second=await acceptXeroDeposit(h,'Synthetic matched contact',a.client.id),matched=await reviewXero(h,second.p.id,h.owner,{contactId:edge.state.contacts[0].ContactID})
   await issueXero(h,matched);assert.equal(edge.state.contacts.length,1);assert.equal(edge.state.invoices.length,2)
+  await tick(reviewedAt+86400000)
+  assert.equal(edge.state.invoices.length,2,'future milestone and recurring schedule rows never issue invoices')
   const uncertain=await acceptXeroDeposit(h,'Synthetic uncertain invoice',a.client.id),uncertainReview=await reviewXero(h,uncertain.p.id,h.owner,{contactId:edge.state.contacts[0].ContactID})
   edge.state.fail='invoice-timeout';const held=await issueXero(h,uncertainReview);assert.equal(held.job.status,'held');assert.equal(edge.state.invoices.length,3)
   const afterTimeout=edge.calls.length;await issueXero(h,uncertainReview,h.owner,409);await h.cmd('xero.review',{id:uncertain.p.id},h.owner,409);assert.equal(edge.calls.length,afterTimeout);edge.state.fail=''
@@ -3795,4 +3810,14 @@ test('ACCT-002 reviewed Xero deposits preserve exact money, authority, unique ma
   assert.deepEqual(await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(a.p.id).first(),row,'Xero issuance and unsafe attempts cannot change the accepted agreement')
   assert.ok(!JSON.stringify((await h.state()).xero).includes(edge.token),'accounting state exposes no credential')
  }finally{await h.close()}
+ const legacy=await harness({outboundService:edge.outboundService})
+ try{
+  const deposit=await acceptXeroDeposit(legacy,'Synthetic retained CSV')
+  await legacy.cmd('invoice.export',{id:deposit.p.id})
+  await connectXero(legacy,edge)
+  const before=await legacy.db.prepare('SELECT * FROM p_invoices').all(),writes=edge.state.invoices.length
+  await legacy.cmd('xero.authority',{authority:'xero',version:0,accountId:edge.accountId,connectionVersion:1,consent:true},legacy.owner,409)
+  assert.deepEqual(await legacy.db.prepare('SELECT * FROM p_invoices').all(),before,'conflicting authority leaves retained CSV bytes unchanged')
+  assert.equal(edge.state.invoices.length,writes)
+ }finally{await legacy.close()}
 })

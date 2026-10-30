@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "1272d2f13c880525df56ebce96c50ffb745687ac197088cfb78e2d7414ca9f74",
+      "sha256": "c44536038acfddafe7581637084969574c013958c47feccd84b4990dc7e5c21b",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2454,7 +2454,7 @@
       "executable": false
     },
     "src/platter/accounting/xero-jobs.ts": {
-      "sha256": "526c249f99eeab83557c44403c9035ea6495ebe992993c8f8b0666feb654a82d",
+      "sha256": "ff740d3981d578d558e1fc1dce76549b2a56df41683a79c8c5c7987bc0072c34",
       "executable": false
     },
     "src/platter/accounting/xero.ts": {
@@ -3558,7 +3558,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "bfa478c57e8b93d660283029d020aecae07bf7b8125e4f513310debf7500a648",
+      "sha256": "69589288058d1ddf9d7b7effb7d863441126ab07fe348926ad85a7d3c1a169b7",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3570,7 +3570,7 @@
       "executable": false
     },
     "tests/provider-network.mjs": {
-      "sha256": "14383731f6677d59994b99b757962df0ae3817291b9fb358ccd676d96744f00f",
+      "sha256": "c9618e011f14b67f8fa012f6bf2bf530160175fe6fb41fe8442532599cf5fae0",
       "executable": false
     },
     "tests/recipients-browser.mjs": {

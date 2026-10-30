@@ -42,9 +42,9 @@ export async function xeroCommand(env: Bindings, a: Actor, name: string, p: Reco
   need(Number(p.version) === (old?.version ?? 0), 'Invoice authority changed. Reload.', 409)
   need(!await db.prepare('SELECT 1 FROM p_xero_jobs LIMIT 1').first(), 'Invoice authority and organization are locked after the first retained request', 409)
   let accountId = ''
-  if (choice === 'xero') { const { connection } = await providerCredential(env, connectionId); need(!connection.broken_at && p.accountId === connection.account_id && Number(p.connectionVersion) === connection.version, 'Review the current verified Xero organization', 409); accountId = connection.account_id }
+  if (choice === 'xero') { need(!await db.prepare('SELECT 1 FROM p_invoices LIMIT 1').first(), 'Retained deposit exports already use Platter invoice authority. Reconcile them before choosing Xero.', 409); const { connection } = await providerCredential(env, connectionId); need(!connection.broken_at && p.accountId === connection.account_id && Number(p.connectionVersion) === connection.version, 'Review the current verified Xero organization', 409); accountId = connection.account_id }
   const g = { sql: 'COALESCE((SELECT version FROM p_invoice_authority WHERE singleton=1),0)=? AND NOT EXISTS(SELECT 1 FROM p_xero_jobs)', values: [old?.version ?? 0] as any[] }
-  if (choice === 'xero') { g.sql += " AND EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id='workspace:xero' AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL)"; g.values.push(accountId, Number(p.connectionVersion)) }
+  if (choice === 'xero') { g.sql += " AND NOT EXISTS(SELECT 1 FROM p_invoices) AND EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id='workspace:xero' AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL)"; g.values.push(accountId, Number(p.connectionVersion)) }
   await commit(db, a, [db.prepare('INSERT INTO p_invoice_authority VALUES(1,?,?,?,?,?) ON CONFLICT(singleton) DO UPDATE SET authority=excluded.authority,account_id=excluded.account_id,version=excluded.version,selected_by=excluded.selected_by,selected_at=excluded.selected_at').bind(choice, accountId, (old?.version ?? 0) + 1, a.id, at)], false, g)
   return { authority: choice }
  }

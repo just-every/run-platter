@@ -35,7 +35,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 27 | Two client signers in order, each with a mailbox code | `SIGN-001` partial; `SIGN-004` partial | partial |
 | 28 | ESIGN consent, drawn and typed signatures | `SIGN-003` partial | partial |
 | 29 | Certificate of completion with document hash | `SIGN-005` partial | partial |
-| 30 | Emailed to all, filed to Google Drive, Salesforce Closed Won | `AUTO-002` partial; `CRM-002` missing | partial |
+| 30 | Emailed to all, filed to Google Drive, Salesforce Closed Won | `AUTO-002` partial; `CRM-002` partial | partial |
 | 31 | Stripe ACH deposit, fee and payout cleared in QuickBooks Online, balance $0.00 | `PAY-001` partial; `ACCT-001` missing; `ACCT-006` missing | partial |
 | 32 | One invoice per amount, created on its issue day; net 15 | `ACCT-004` partial; `ACCT-007` missing; `PAY-008` missing | partial |
 | 33 | Card declined, the client told why, ACH from the same invoice link | `PAY-004` missing; `PAY-005` missing | missing |

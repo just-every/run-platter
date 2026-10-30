@@ -19,6 +19,11 @@ export async function openCredential(env:Bindings,id:string,sealed:string){
  const plaintext=await crypto.subtle.decrypt({name:'AES-GCM',iv:bytes(envelope.iv),additionalData:new TextEncoder().encode(id)},await encryptionKey(env),bytes(envelope.data))
  return JSON.parse(new TextDecoder().decode(plaintext))
 }
+export function salesforceInstanceOrigin(value: string) {
+ const url = new URL(value)
+ need(url.protocol === 'https:' && /\.(?:salesforce|force)\.com$/.test(url.hostname) && !url.username && !url.password && !url.port, 'Salesforce returned an invalid instance')
+ return url.origin
+}
 export async function providerCredential(env:Bindings,id:string){
  const row=await env.DB.prepare("SELECT c.*,s.sealed FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.status='connected'").bind(id).first<any>()
  need(row,'Connect this provider again before using it',409)
@@ -71,7 +76,7 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
   need((typeof value==='string'&&value.length>0)||(typeof value==='number'&&Number.isSafeInteger(value)&&value>0),'HubSpot did not confirm the portal');accountId=text(String(value),'the verified HubSpot portal',200)
  }else if(provider==='salesforce'){
   const result=await providerJson('https://login.salesforce.com/services/oauth2/userinfo',token);accountId=text(result.organization_id,'the verified Salesforce organization',200);need(typeof result.user_id==='string'&&result.user_id.length>0,'Salesforce did not confirm the authorized user')
-  if(result.urls?.rest){const url=new URL(result.urls.rest);need(url.protocol==='https:'&&/\.(?:salesforce|force)\.com$/.test(url.hostname)&&!url.username&&!url.password,'Salesforce returned an invalid instance');instanceOrigin=url.origin}
+  if(result.urls?.rest)instanceOrigin=salesforceInstanceOrigin(result.urls.rest)
  }else if(provider==='google_drive'){
   const result=await providerJson('https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress,permissionId)',token);accountId=text(result.user?.permissionId,'the verified Drive account',200);need(typeof result.user?.emailAddress==='string','Drive did not confirm the account')
  }else if(provider==='teams'){

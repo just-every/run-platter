@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 14 | 101 | 44 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 14 | 101 | 48 | 163 |
 
 Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -1518,15 +1518,15 @@ Core · target · **partial** · Register R-2
 
 #### CRM-002 — Salesforce two-way opportunity sync
 
-Core · target · **missing** · Register R-2
+Core · target · **partial** · Register R-2
 
 **Requirement.** The owner or an admin connects Salesforce. Proposals start from an opportunity with account, contacts and price-book products, and Platter writes back opportunity line items, amount, stage, the proposal link and activity, under the same rules as `CRM-001`. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#crm-002).
 
 **Acceptance.**
 1. With a Salesforce API fake: create from an opportunity with price-book products, accept, and see opportunity products, amount and stage updated and the activity logged.
 
-**Evidence.** None.
-**Gap.** No Salesforce connection.
+**Evidence.** `tests/platter.test.mjs` — “CRM-002 reviewed Salesforce opportunity drafts copy exact products and refuse stale source, replay and revoked authority without writes” proves verified instance requests, explicit account and contact selection, two exact priced rows, source IDs, fresh human approval and acceptance, frozen sent and accepted values, changed-source and current-authority refusals, replay and erasure guards. `tests/site.test.mjs` loads `tests/site-documents.mjs` — “CRM-002 native reviewed Salesforce opportunity creates an independent collection-off draft with exact price-book products”. `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority” retains exact Salesforce provenance and independent priced values while excluding pending reviews and credentials.
+**Gap.** Conservative standing-scope default: only current owners and admins explicitly review and apply an opportunity source to an independent USD draft, with collection off and ordinary fresh human approval and sending. Broader member and delegated access and ct approval of that authority default remain. Opportunity product, amount, stage, proposal-link and activity writes, unattended lifecycle synchronization under FOLLOW-007, unsupported currencies and scheduled or recurring products, and live-provider qualification remain unproved. Missing, ambiguous, inactive or inconsistent source data is held for manual preparation. FOLLOW-007 still requires ct consent, scope and public-door assertions before standing-grant execution. Configured-recipient execution and the recorded SEND-003 and SIGN-004 authority holds are unchanged.
 
 #### CRM-003 — Orbit two-way deal sync
 

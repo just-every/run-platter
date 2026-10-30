@@ -880,6 +880,61 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
  }finally{await browser?.close();await app?.close()}
 })
 
+test('CRM-002 native reviewed Salesforce opportunity creates an independent collection-off draft with exact price-book products', { timeout: 120000 }, async () => {
+ const { harness } = await import('./harness.mjs'), { browserEdge } = await import('./browser-edge.mjs'), { salesforceFixture } = await import('./provider-network.mjs')
+ const edge = await browserEdge(), provider = salesforceFixture()
+ let h, browser
+ try {
+  h = await harness({ entry: './dist/server/index.js', assetsDirectory: './dist/client', origin: edge.origin, outboundService: provider.request }); edge.attach(h)
+  browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ignoreHTTPSErrors: true })
+  try {
+   const [name, value] = h.owner.split('='); await context.addCookies([{ name, value, url: h.origin }])
+   const page = await context.newPage()
+   await page.goto(h.origin + '/setup'); await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Finish setup' }).click()
+   await page.goto(h.origin + '/app/settings')
+   const connect = page.locator('form').filter({ has: page.getByRole('button', { name: 'Connect Salesforce', exact: true }) })
+   await connect.getByLabel('Salesforce access token', { exact: true }).fill('synthetic-platter-4707'); await connect.getByRole('checkbox').check(); await connect.getByRole('button', { name: 'Connect Salesforce', exact: true }).click()
+   assert.equal((await h.state()).connections.find(c => c.provider === 'salesforce').status, 'connected')
+   await page.goto(h.origin + '/app')
+   const panel = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Start from Salesforce', exact: true }) })
+   await panel.getByLabel('Salesforce opportunity ID', { exact: true }).fill(provider.selected.opportunityId)
+   await panel.getByLabel('Draft scope (optional)', { exact: true }).fill('A separately reviewed Salesforce scope.')
+   await panel.getByRole('button', { name: 'Read Salesforce opportunity', exact: true }).click()
+   assert.equal(await panel.getByLabel('Account from opportunity').inputValue(), ''); assert.equal(await panel.getByLabel('Contact from opportunity').inputValue(), '')
+   assert.equal((await h.state()).proposals.length, 0)
+   await panel.getByLabel('Account from opportunity').selectOption(provider.selected.companyId); await panel.getByLabel('Contact from opportunity').selectOption(provider.selected.contactId)
+   await panel.getByRole('button', { name: 'Review selected opportunity', exact: true }).click()
+   const review = panel.getByRole('article', { name: 'Reviewed Salesforce draft' })
+   assert.match(await review.innerText(), /Synthetic Salesforce account/); assert.match(await review.innerText(), /Taylor Reed/)
+   assert.match(await review.innerText(), /2\.5 × \$120\.50 USD/); assert.match(await review.innerText(), /3 × \$19\.99 USD/); assert.match(await review.innerText(), /\$361\.22 USD/)
+   assert.match(await review.innerText(), /synthetic-platter-4715/); assert.match(await review.innerText(), /synthetic-platter-4726/)
+   assert.equal((await h.state()).proposals.length, 0, 'review alone creates no draft or approval')
+   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+   assert.ok(await panel.locator('label, button, p, dt, dd').evaluateAll(nodes => nodes.every(node => parseFloat(getComputedStyle(node).fontSize) >= 13)), 'review controls and source text remain readable')
+   const capture = async (locator, label) => {
+    if (!process.env.PLATTER_SCREENSHOTS) return
+    await mkdir(process.env.PLATTER_SCREENSHOTS, { recursive: true })
+    for (const width of [1440, 390]) { await page.setViewportSize({ width, height: 900 }); await locator.scrollIntoViewIfNeeded(); await locator.screenshot({ path: join(process.env.PLATTER_SCREENSHOTS, `CRM-002-${label}-${width}.png`) }) }
+    await page.setViewportSize({ width: 1440, height: 900 })
+   }
+   await capture(panel, 'review')
+   await review.getByRole('checkbox').check(); await review.getByRole('button', { name: 'Create reviewed draft', exact: true }).click()
+   await page.waitForURL(/\/app\/proposal\?id=/)
+   const current = (await h.state()).proposals[0]
+   assert.equal(current.scope, 'A separately reviewed Salesforce scope.'); assert.equal(current.title, 'Synthetic Salesforce engagement'); assert.equal(current.options[0].cents, 36122); assert.equal(current.collection.enabled, false)
+   assert.equal(current.status, 'draft'); assert.equal(current.approved_by, null)
+   assert.equal(await page.getByRole('button', { name: 'Approve this revision', exact: true }).count(), 1); assert.equal(await page.getByRole('button', { name: 'Send approved proposal', exact: true }).count(), 0)
+   const source = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Copied Salesforce source', exact: true }) })
+   assert.match(await source.innerText(), /synthetic-platter-4705/); assert.match(await source.innerText(), /no synchronization or sending authority/)
+   await capture(source, 'copied-source')
+   const calls = provider.calls.length; provider.state.lines[0].UnitPrice = 999; await page.reload()
+   assert.equal(provider.calls.length, calls, 'loading the copied draft never synchronizes Salesforce')
+   assert.equal((await h.state()).proposals[0].options[0].cents, 36122)
+  } finally { await context.close() }
+ } finally { await browser?.close(); await h?.close(); await edge.close() }
+})
+
 test('CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows', { timeout: 120000 }, async () => {
  const { harness } = await import('./harness.mjs'), { browserEdge } = await import('./browser-edge.mjs'), { hubspotSyncFixture } = await import('./hubspot-sync-fixture.mjs')
  const edge = await browserEdge(), provider = hubspotSyncFixture()

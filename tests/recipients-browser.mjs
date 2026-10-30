@@ -209,6 +209,24 @@ export async function recipientsBrowser(width=1440){
   assert.ok(!(await revokedEmbed.text()).includes('Revocable viewing agreement'))
   assert.equal((await secondSigner.goto(app.origin+secondLinks.signer)).status(),410)
   assert.equal(await secondSigner.getByRole('heading',{name:'Proposal withdrawn',exact:true}).count(),1)
+  const withdrawnState=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals.find(r=>r.id===second.id)
+  const voidHistory=withdrawnState.recipientSignatureHistory
+  assert.equal(voidHistory.length,1);assert.equal(voidHistory[0].void_reason,'Partly signed offer cancelled')
+  await page.goto(app.origin+'/app/proposal?id='+second.id)
+  await page.getByRole('button',{name:'Prepare negotiated revision',exact:true}).click()
+  await page.getByRole('button',{name:'Approve this revision',exact:true}).click();await page.getByRole('button',{name:'Send approved proposal',exact:true}).click()
+  const reissued=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals.find(r=>r.id===second.id)
+  assert.equal(reissued.revision,withdrawnState.revision+1);assert.deepEqual(reissued.recipientSignatureHistory,voidHistory)
+  assert.equal(reissued.recipientSignatures.length,0,'a void historical signature cannot satisfy the new revision')
+  assert.match(await panel.getByLabel('Signature history').innerText(),new RegExp('Revision '+withdrawnState.revision+' · Client signer'))
+  assert.match(await panel.getByLabel('Signature history').innerText(),/Void: Partly signed offer cancelled/)
+  await capture('reissued-void-history')
+  for(const path of Object.values(secondLinks))assert.equal((await context.request.get(app.origin+path)).status(),410)
+  const reissuedLinks=Object.fromEntries(reissued.recipientLinks.map(r=>[r.slot_id,'/p/'+r.token]))
+  assert.equal((await secondSigner.request.get(app.origin+reissuedLinks.signer+'/data.json')).status(),401)
+  const freshSigner=await verify({id:'signer',email:address(1007)},second.id,reissuedLinks)
+  assert.equal(await freshSigner.getByRole('button',{name:'Accept proposal',exact:true}).count(),1)
+
 
  }finally{
   for(const ctx of clients)await ctx.close()

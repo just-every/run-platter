@@ -9,8 +9,8 @@ import { invitationMail } from './invitation-mail'
 export type Recipient = {id:string;name:string;email:string|null;role:'signer'|'approver'|'viewer'|'cc'|'countersigner';group:number}
 export function recipientPlan(row:any):Recipient[]{return typeof row.recipient_plan==='string'?JSON.parse(row.recipient_plan):row.recipient_plan??[]}
 export const requiredRecipient=(r:Recipient)=>['signer','approver','countersigner'].includes(r.role)
-export async function recipientSignatures(db:D1Database,id:string,revision:number){
- return (await db.prepare('SELECT s.*,v.voided_at,v.reason AS void_reason FROM p_recipient_signatures s LEFT JOIN p_void_signatures v ON v.proposal_id=s.proposal_id AND v.revision=s.revision WHERE s.proposal_id=? AND s.revision=? ORDER BY s.signed_at,s.slot_id').bind(id,revision).all<any>()).results
+export async function recipientSignatures(db:D1Database,id:string,revision?:number){
+ return (await db.prepare('SELECT s.*,v.voided_at,v.reason AS void_reason FROM p_recipient_signatures s LEFT JOIN p_void_signatures v ON v.proposal_id=s.proposal_id AND v.revision=s.revision WHERE s.proposal_id=? AND (? IS NULL OR s.revision=?) ORDER BY s.revision DESC,s.signed_at,s.slot_id').bind(id,revision??null,revision??null).all<any>()).results
 }
 export function recipientInput(input:any,a:Actor):Recipient[]{
  need(Array.isArray(input)&&input.length>0,'Add at least one signer')

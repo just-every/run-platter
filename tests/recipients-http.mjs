@@ -321,6 +321,9 @@ export async function recipientWithdrawalHttp(h){
  assert.deepEqual(mail.map(r=>r.recipient).sort(),[address(1001),address(1002),h.auth.OWNER_EMAIL,address(1003),address(1004),address(1005),address(1006)].sort())
  assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(p.id).all()).results,before)
  assert.ok((await h.db.prepare('SELECT voided_at FROM p_void_signatures WHERE proposal_id=? AND revision=?').bind(p.id,p.revision).first()).voided_at)
+ const receipt=(await h.state()).proposals.find(r=>r.id===p.id),voidHistory=receipt.recipientSignatures
+ assert.equal(voidHistory.length,1);assert.equal(voidHistory[0].slot_id,'ceo');assert.equal(voidHistory[0].voided_at,receipt.withdrawals[0].withdrawn_at);assert.equal(voidHistory[0].void_reason,'Offer withdrawn')
+
  for(const [id,path] of Object.entries(p.links))for(const door of ['', '/data.json','/download.pdf?optionId=one','/agreement.pdf','/certificate.json','/certificate.pdf','/payment.json','/payment-status.json','/payment-consent.json','/action?name=accept','/action?name=recipient.approve','/action?name=code.request','/action?name=code.verify','/attachments/synthetic-platter-1','/media/synthetic-platter-1']){
   const r=await h.send(path+door,door.includes('/action')||door.includes('/payment')?{code:'123456',consent:true,optionId:'one',name:'Signer'}:undefined,sessions[id])
   assert.equal(r.status,410,id+' '+door);for(const content of [p.offer.title,p.offer.scope,p.offer.optionOne,'2500'])assert.ok(!r.text.includes(content),door+' leaks no proposal')
@@ -342,6 +345,9 @@ export async function recipientWithdrawalHttp(h){
   assert.equal((await h.send(p.links[oldId]+'/data.json',undefined,sessions[oldId])).status,410,'reissue never revives a withdrawn link')
  }
  assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures WHERE proposal_id=?').bind(p.id).all()).results,before,'reissue retains the earlier void signature')
+ assert.deepEqual((await h.state()).proposals.find(r=>r.id===p.id).recipientSignatureHistory,voidHistory,'the owner still reads the void history after reissue')
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+ const page=await h.send('/app/proposal?id='+p.id,undefined,h.owner);assert.equal(page.status,200);assert.match(page.text,new RegExp('Revision '+p.revision+' · Synthetic signer'));assert.match(page.text,/Void: Offer withdrawn/)
 }
 export async function recipientExpiryHttp(h){
  const worker=await h.mf.getWorker(),fire=async at=>worker.scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})

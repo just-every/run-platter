@@ -1,5 +1,7 @@
 # Agent access
 
+The door runtime and conformance CLI are pinned to released rer 0.2.93 (Base `2f77cdb6d8dfaa82903c2839600e23b76631a537`).
+
 Platter's company-agent door supports finding proposals and templates, preparing priced drafts, revising them, reading status and requesting a person to send an exact revision. It uses the same native proposal rights as its sponsor. It does not send, approve, sign, refund or change access.
 
 Open **Agent access** to create an owner-bound local preparation key. Save the once-shown key privately. Keys expire after 30 days, require the owner's current native account version and stop immediately when revoked. They never travel in backups. A REST integration key cannot enter this preparation door.

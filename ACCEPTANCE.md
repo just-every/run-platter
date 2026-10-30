@@ -2275,7 +2275,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-002, BASE
 2. Each tool returns the native action’s proposal state, error and event type.
 3. The registry documents every listed record URI, event and specialist prompt.
 
-**Evidence.** `agent-surface.json`; `tests/agent-native-journey.mjs`; `rer verify` agent-door conformance — 796/796 points on the declared preparation surface
+**Evidence.** `agent-surface.json`; `tests/agent-native-journey.mjs`; `rer verify` agent-door conformance — 873/873 points on the declared preparation surface with released rer 0.2.93
 **Gap.** The core preparation registry is implemented; remaining native product verbs in the Agent surface tool table are not exposed. Undeclared families: resources, events, prompts and subscriptions. Broader role-parity and stranger-specialist work remain.
 
 #### SURFACE-002 — Proposal classes from business facts
@@ -2294,7 +2294,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-006, BASE
 7. Irreversible erasure/restore replacement computes destructive with item count; W-9/identity/bank/card records add sensitive with record count and kind.
 8. Running automation/connector changes compute live with service identity; an argument or record-text claim cannot change any computed class.
 
-**Evidence.** `agent-surface.json`; `tests/agent-native-journey.mjs`; `rer verify` agent-door conformance — 796/796 points on the declared preparation surface
+**Evidence.** `agent-surface.json`; `tests/agent-native-journey.mjs`; `rer verify` agent-door conformance — 873/873 points on the declared preparation surface with released rer 0.2.93
 **Gap.** The implemented preparation and read tools compute standard from their internal-record effect. External, money, commitment, accounts, gated, access, security, destructive, sensitive and live tools remain outside this preparation registry; their classifiers and journeys remain required before exposure.
 
 #### SURFACE-003 — Exact proposal decisions and custody
@@ -2309,7 +2309,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-007, BASE
 3. Under all-autonomous policy a permitted agent offer/signature decision carries its own commitment attribution.
 4. A restored proposal or schedule gains no earlier recipient, provider or execution authority.
 
-**Evidence.** `agent-surface.json`; `tests/agent-native-journey.mjs`; `rer verify` agent-door conformance — 796/796 points on the declared preparation surface
+**Evidence.** `agent-surface.json`; `tests/agent-native-journey.mjs`; `rer verify` agent-door conformance — 873/873 points on the declared preparation surface with released rer 0.2.93
 **Gap.** Version-bound preparation and send-review requests prove policy, review, attribution and replay. Native sending, approval/signature decisions and restored execution remain unproved through the company door. Undeclared queued lifecycle, multi-sponsor and resource-refresh families remain partial.
 
 #### SURFACE-004 — A seeded service-firm week through MCP
@@ -2325,7 +2325,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-005, BASE
 4. Before the company policy is complete, the first call changes no proposal and returns the setup question; an all-class answer covers every declared class.
 5. Every run preserves truthful preparer/decider attribution and the same role scope as the sponsoring person.
 
-**Evidence.** `agent-surface.json`; `tests/agent-native-journey.mjs`; `rer verify` agent-door conformance — 796/796 points on the declared preparation surface
+**Evidence.** `agent-surface.json`; `tests/agent-native-journey.mjs`; `rer verify` agent-door conformance — 873/873 points on the declared preparation surface with released rer 0.2.93
 **Gap.** The declared proposal preparation journey passes autonomous and held policies, Pause, consent refusal, replay and audit. The complete service-firm week, provider edges, client signing/payment, handoff and renewal remain unimplemented through MCP. Mail edges, timed lifecycle and stranger-specialist completion remain partial.
 
 ## Later

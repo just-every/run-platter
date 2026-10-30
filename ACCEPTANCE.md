@@ -8,12 +8,12 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 14 | 100 | 45 | 159 |
+| Core | 15 | 99 | 45 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 14 | 100 | 49 | 163 |
+| Full target | 15 | 99 | 49 | 163 |
 
-Judged from the code and tests at commit `52bd1e33eaaa50896b53665dd35a94f717d8d352` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
+Judged from the code and tests at commit `2b2210889f2e3e6c7b1947b6f3b8412f031f7627` (30 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. Existing ct judgments and demotions are retained; this round updates EDIT-011 only. SEND-008 and EDIT-011 are builder completion claims pending guarded landing and ct judgment. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
 ## Core
 
@@ -347,15 +347,15 @@ Core · target · **done** · Cites BASE-INPUT-003, BASE-DATA-001 · Rules D-1
 
 #### EDIT-011 — Large-proposal performance budget
 
-Core · target · **partial** · Rules D-1
+Core · target · **done** · Rules D-1
 
 **Requirement.** The editor and client page stay fast on the proposals agencies actually send. The reference document is 40 US Letter pages with 30 images (2400-pixel JPEGs of about 500 KB each) and four pricing tables of 15 lines. Measured in Chromium at 1440 by 900 pixels with the CPU throttled 4×: the editor opens from navigation to editable (the first block accepts input) in at most 3 seconds; keystroke-to-paint latency over 200 keystrokes typed into a block on page 30 has a p95 of at most 100 ms; a drag reorder of a section completes, from drop to repainted order, in at most 300 ms; and a pricing-table quantity edit shows the server-confirmed total in at most 500 ms. The client page of the same proposal at 390 pixels with the same throttle reaches largest contentful paint in at most 2.5 seconds and loads images below the fold lazily. A measure over budget is a failing acceptance run. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#edit-011).
 
 **Acceptance.**
 1. A browser journey creates the reference proposal through the public API, applies the 4× throttle, opens it at 1440 pixels and records time to editable, the p95 of 200 keystroke-to-paint intervals (Event Timing API), one drag reorder and one quantity edit, then opens the client page at 390 pixels and records largest contentful paint; the run reports each measured value and fails if any exceeds its budget.
 
-**Evidence.** `tests/editor-budget.mjs` — “Forty-page reference proposal with 4x CPU editor and phone client budgets”; `.github/workflows/verify.yml`; `tests/platter.test.mjs`
-**Gap.** Delivered: The cited HTTP quantity-edit journey checks server-confirmed totals, retained document content, approval invalidation and bounds/scope/version refusals. Missing “EDIT-011 complete forty-page 4×-CPU performance journey”: after a successful application build, complete the reference editor-to-phone workflow, including a measured drag drop and repainted order, server-confirmed quantity timing, phone LCP/lazy images, PDF page/image counts and the final report of every timing budget. The judged local executions stopped at the drag-drop wait without a completed report; push Verify skips the separately dispatched budget job. No numerical budget exceedance is inferred.
+**Evidence.** `tests/editor-budget.mjs` — “Forty-page reference proposal with 4x CPU editor and phone client budgets” (real input, native drop, repaint, saved order and totals, lazy image acquisition and exact PDF pages and images); `tests/platter.test.mjs` — “EDIT-011 server-confirmed quantity edits retain document content, clear approval and enforce bounds, scope and exact version”; `tests/site.test.mjs` — “EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths” (registered through `tests/site-documents.mjs`); `.github/workflows/verify.yml`
+**Gap.** None.
 
 #### EDIT-012 — Duplicate a proposal for another client
 

@@ -32,7 +32,7 @@ export function savePersonalTemplate(state: any, p: any): string {
   + hidden('templateId', t.id) + hidden('templateVersion', t.version) + hidden('name', t.name)
   + (t.shared?folderSelect(state,'template',t.folder_id)+'<label><input type="checkbox" name="shareConsent" value="yes">I authorize sharing with the selected folder audience if it widens access.</label>':'')
   + `<button class="secondary">Replace ${escape(t.name)} with this revision</button>`)).join('')
- return panel('Save a personal template', '<p>Keep this displayed revision’s content, packages, attachments, PDF-download choice and expiry settings for future drafts. Approvals, client details and signing links are not copied.</p>'
+ return panel('Save a personal template', '<p>Keep this displayed revision’s content, packages, attachments, PDF-download choice and expiry settings for future drafts. Variable patterns refill from the new client and sender; source values, approvals and signing links are not copied.</p>'
   + form('template.save', proposalPath(p.id), source + field('Template name', 'name', p.title, 'required maxlength="200"') + '<button>Save personal template</button>')
   + (resourceEditors.includes(state.actor.role)?form('template.save',proposalPath(p.id),source+hidden('shared','yes')+field('Shared template name','name',p.title,'required maxlength="200"')+folderSelect(state,'template')+'<label><input type="checkbox" name="shareConsent" value="yes" required>I authorize sharing this content with the selected audience.</label><button>Save shared template</button>'):'')
   + (replace ? `<details><summary>Replace an existing personal template</summary>${replace}</details>` : ''))

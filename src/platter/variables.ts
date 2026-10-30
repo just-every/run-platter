@@ -21,6 +21,19 @@ export function mergeFields(value:any):MergeFields|undefined{
 }
 const replace=(text:string,values:Record<string,string>)=>text.replace(variableToken,(original,key)=>Object.hasOwn(values,key)?values[key]:original)
 export function editableVariableFields(row:any){return {clientId:row.client_id,title:row.title,scope:row.scope,terms:row.terms??'',depositPercent:row.deposit_bps/100,packages:editablePackages(typeof row.options==='string'?JSON.parse(row.options):row.options),pricingTables:pricingInput(typeof row.options==='string'?JSON.parse(row.options):row.options),recipientPlan:typeof row.recipient_plan==='string'?JSON.parse(row.recipient_plan):row.recipient_plan??[],sectionConditions:row.section_conditions??{},document:typeof row.document==='string'?JSON.parse(row.document):row.document,paymentTerms:editableTerms(row)}}
+/** Templates keep reusable patterns without a source person's resolved values. */
+export function unfilledVariableFields(row:any){
+ const fields=structuredClone(editableVariableFields(row)),merge=mergeFields(fields.document?.merge)
+ if(!merge)return fields
+ for(const [path,pattern]of Object.entries(merge.patterns)){
+  const keys=path.slice(1).split('/');let parent:any=fields
+  for(const key of keys.slice(0,-1)){parent=parent?.[key];if(!parent)break}
+  // Numeric inputs need a valid inert price until a destination fills the pattern.
+  if(parent&&typeof parent==='object')parent[keys.at(-1)!]=/(?:price|priceOne|priceTwo|unitPrice|quantity)$/i.test(path)?'0.01':pattern
+ }
+ fields.document.merge={patterns:merge.patterns,values:{},...(merge.conditions?{conditions:merge.conditions}:{})}
+ return fields
+}
 async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFields['deal']){
  const c=await env.DB.prepare('SELECT * FROM p_clients WHERE id=?').bind(clientId).first<any>();need(c,'Client not found',404)
  const profile=JSON.parse(c.variable_fields??'{}'),sender=await env.DB.prepare('SELECT display_name FROM oa_operators WHERE id=?').bind(a.id).first<any>(),name=sender?.display_name??''

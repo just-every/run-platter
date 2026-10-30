@@ -3,11 +3,13 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { installedApp } from './site-harness.mjs'
+import { pdfPages } from './pdf-document.mjs'
+import { templateClients, variableTemplateFields, templateExpected } from './template-variables-fixture.mjs'
 
 export async function templatesJourney() {
  const screenshots = process.env.PLATTER_SCREENSHOTS
  if (screenshots) await mkdir(screenshots, { recursive: true })
- const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
+ const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--use-mock-keychain', '--password-store=basic', '--no-sandbox'] })
  try {
   for (const width of [1440, 390]) {
    const app = await installedApp(), context = await browser.newContext({ viewport: { width, height: 900 } })
@@ -113,7 +115,89 @@ export async function templatesJourney() {
     const accepted = (await state()).proposals.find(p => p.id === thirdId)
     assert.equal(accepted.acceptance.totalCents, 240000); assert.equal(accepted.acceptance.depositCents, 72000)
     await page.goto(app.origin + '/app/proposal?id=' + thirdId); await capture('accepted')
+    await variableTemplateJourney({ page, context, app, browser, state, cmd, width, screenshots })
    } finally { await clientContext?.close(); await context.close(); await app.close() }
   }
  } finally { await browser.close() }
+}
+
+async function variableTemplateJourney({ page, context, app, browser, state, cmd, width, screenshots }) {
+ const clients=[]
+ for(const input of templateClients)clients.push(await cmd('client.save',input))
+ const fields=variableTemplateFields(clients[0].id),source=await cmd('proposal.prepare',fields)
+ const capture=async(target,name)=>{
+  await target.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))})
+  assert.ok(await target.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Variable template fits at '+width)
+  if(screenshots)await target.screenshot({path:join(screenshots,'EDIT-002-variables-'+name+'-'+width+'.png'),fullPage:true})
+ }
+ await page.goto(app.origin+'/app/proposal?id='+source.id)
+ await page.getByLabel('Template name',{exact:true}).fill('Synthetic variable campaign')
+ await page.getByRole('button',{name:'Save personal template',exact:true}).click()
+ const template=(await state()).templates.find(t=>t.name==='Synthetic variable campaign')
+ for(const value of ['Synthetic source agency','Sage Source','SourceOnly','97.00','Jordan Northstar'])assert.ok(!JSON.stringify(template.snapshot).includes(value),value)
+ const start=async(clientId)=>{
+  await page.goto(app.origin+'/app')
+  const form=page.locator('form').filter({has:page.getByRole('button',{name:'Start from Synthetic variable campaign',exact:true})})
+  await form.getByLabel('Client for Synthetic variable campaign',{exact:true}).selectOption(clientId)
+  await form.getByRole('button',{name:'Start from Synthetic variable campaign',exact:true}).click()
+  return (await state()).proposals.find(p=>p.id===new URL(page.url()).searchParams.get('id'))
+ }
+ const earlier=[]
+ for(const [i,client]of clients.slice(1).entries()){
+  const draft=await start(client.id),expected=templateExpected[i]
+  assert.equal(await page.getByLabel('Proposal title',{exact:true}).inputValue(),expected.title)
+  assert.equal(await page.locator('textarea[name=scope]').inputValue(),expected.scope)
+  assert.equal(await page.locator('textarea[name=terms]').inputValue(),'Prepared by Jordan Northstar.')
+  assert.deepEqual(draft.options.map(o=>o.cents),expected.prices)
+  assert.equal(draft.approved_by,null);assert.equal(draft.collectionPolicy.enabled,false)
+  earlier.push(draft)
+  await capture(page,i===0?'west-draft':'east-draft')
+ }
+ await cmd('proposal.variables',{id:source.id,version:1,fields:{scope:'Expanded {{Contact.Name}} at {{Client.Address}}; region {{Custom.Region}}.',terms:'Prepared by {{Sender.Name}}. Note {{Custom.Note}}.',pricingTables:fields.pricingTables.map((t,i)=>({...t,lines:t.lines.map(l=>({...l,quantity:i===0?'4':'3'}))}))}})
+ await page.goto(app.origin+'/app/proposal?id='+source.id)
+ await page.getByText('Replace an existing personal template',{exact:true}).click()
+ await page.getByRole('button',{name:'Replace Synthetic variable campaign with this revision',exact:true}).click()
+ const third=await start(clients[1].id)
+ assert.equal(third.scope,'Expanded Wren West at 42 West Street; region West.')
+ assert.deepEqual(third.options.map(o=>o.cents),[50000,37500])
+ assert.deepEqual((await state()).proposals.filter(p=>earlier.some(d=>d.id===p.id)).sort((a,b)=>a.id.localeCompare(b.id)),earlier.toSorted((a,b)=>a.id.localeCompare(b.id)))
+ assert.match(await page.locator('main').innerText(),/Unfilled variables: Custom.Note/)
+ await capture(page,'missing-variable')
+ await page.getByLabel('Custom.Note',{exact:true}).fill('Reviewed West scope')
+ await page.getByRole('button',{name:'Fill proposal variables',exact:true}).click()
+ assert.equal(await page.locator('textarea[name=terms]').inputValue(),'Prepared by Jordan Northstar. Note Reviewed West scope.')
+ await page.getByRole('link',{name:'Preview client page',exact:true}).click()
+ if(width===390){await page.getByLabel('Preview width').selectOption('390');await page.getByRole('button',{name:'Change preview width',exact:true}).click()}
+ const preview=await page.frameLocator('iframe').locator('main').innerText()
+ for(const text of [third.scope,'Reviewed West scope','500.00'])assert.ok(preview.includes(text),text)
+ await capture(page,'preview')
+ await page.goto(app.origin+'/app/proposal?id='+third.id)
+ await page.getByRole('button',{name:'Approve this revision',exact:true}).click()
+ await page.getByRole('button',{name:'Send approved proposal',exact:true}).click()
+ const path=await page.getByRole('link',{name:'Open client proposal',exact:true}).getAttribute('href')
+ const clientContext=await browser.newContext({viewport:{width,height:900}})
+ try{
+  const clientPage=await clientContext.newPage()
+  await clientPage.goto(app.origin+path)
+  await clientPage.getByRole('button',{name:'Send verification code',exact:true}).click()
+  const code=(await state()).outbox.find(m=>m.proposal_id===third.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+  await clientPage.getByLabel('Email verification code').fill(code)
+  await clientPage.getByRole('button',{name:'Verify email',exact:true}).click()
+  const clientText=await clientPage.locator('main').innerText()
+  for(const text of [third.scope,'Reviewed West scope','500.00'])assert.ok(clientText.includes(text),text)
+  const pdf=await clientContext.request.get(app.origin+path+'/download.pdf?optionId=one')
+  assert.equal(pdf.status(),200)
+  const written=(await pdfPages(await pdf.body())).join(' ').replace(/\s+/g,' ')
+  for(const text of [third.scope,'Reviewed West scope','500.00'])assert.ok(written.includes(text),text)
+  await capture(clientPage,'client')
+  await clientPage.getByRole('radio',{name:/Essential campaign/}).check()
+  await clientPage.getByLabel('Your full name').fill('Wren West')
+  await clientPage.getByRole('checkbox').check()
+  await clientPage.getByRole('button',{name:'Accept proposal',exact:true}).click()
+  assert.equal(await clientPage.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1)
+  const accepted=(await state()).proposals.find(p=>p.id===third.id)
+  assert.equal(accepted.acceptance.totalCents,50000);assert.equal(accepted.acceptance.depositCents,15000)
+  assert.equal(accepted.scope,third.scope)
+  await capture(clientPage,'accepted')
+ }finally{await clientContext.close()}
 }

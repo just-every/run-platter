@@ -4,6 +4,11 @@ CREATE TABLE p_payment_records_new(id TEXT PRIMARY KEY,proposal_id TEXT NOT NULL
 INSERT INTO p_payment_records_new SELECT * FROM p_payment_records;
 DROP TABLE p_payment_records;
 ALTER TABLE p_payment_records_new RENAME TO p_payment_records;
+-- A rebuilt parent leaves stale deferred counters in SQLite. Assert the entire
+-- foreign-key graph before clearing that counter; any real violation aborts.
+INSERT INTO p_guard(ok) SELECT CASE WHEN COUNT(*)=0 THEN 1 ELSE 0 END FROM pragma_foreign_key_check;
+DELETE FROM p_guard;
+PRAGMA defer_foreign_keys = OFF;
 CREATE TABLE p_paypal_selection(proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),merchant_id TEXT NOT NULL,connection_version INTEGER NOT NULL);
 -- Selection history is portable. Execution grants and invitation bindings are local.
 CREATE TABLE p_paypal_authority(proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),merchant_id TEXT NOT NULL,connection_version INTEGER NOT NULL,actor_id TEXT NOT NULL,actor_version INTEGER NOT NULL,actor_role TEXT NOT NULL,member_version INTEGER NOT NULL);

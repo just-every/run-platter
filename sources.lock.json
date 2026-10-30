@@ -646,7 +646,7 @@
       "executable": false
     },
     "migrations/core/0099_paypal_collection.sql": {
-      "sha256": "e4dbf0b9aba86ace4f1568599220c92af2ff5ef3a90f6a6341558c427eafd0f9",
+      "sha256": "6c554a10d58c7cbbea3ea4a31e5f09bdbb2d12dec29b1bd41968378c082d8cb6",
       "executable": false
     },
     "ONBOARDING.md": {

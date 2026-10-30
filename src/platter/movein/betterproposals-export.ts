@@ -62,6 +62,9 @@ export async function betterProposalsExport(uploads: UploadedDocument[], choices
   bindings,contacts:contacts.map(c=>({...c,held:held.has(c.id),ambiguous:ambiguous.has(c.id)})),
   notes:[...prepared.report.notes,'Only explicitly reviewed contact bindings are adopted. Ambiguous identities and unbound documents stay held.',
    'API enrichment, template and library conversion, priced catalog adoption, open-document reissue and recipient roles are not imported.']}
+ const reportBytes=Buffer.from(canonicalJson({choices,report}))
+ const reportArtifact=prepared.source.artifacts.find(a=>a.name==='reviewed-report-choices.json')!
+ Object.assign(reportArtifact,{sha256:sha256(reportBytes),size:reportBytes.length,original:{status:'available',base64:reportBytes.toString('base64')}})
  const reviewBytes=Buffer.from(canonicalJson({provider:'betterproposals',review,report}))
  prepared.source.records=[...sourceRecords,...prepared.source.records]
  prepared.source.artifacts.push(...business.source.artifacts,{name:'uploads/'+csv.sha256+'/'+csv.filename,sha256:csv.sha256,size:csv.bytes.length,original:{status:'available',base64:Buffer.from(csv.bytes).toString('base64')}},

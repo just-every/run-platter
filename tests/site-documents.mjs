@@ -946,6 +946,7 @@ test('MIG-003 and MIG-007 owner uploads exported ZIPs, reviews report ambiguity,
   assert.equal(await retained.getByText('Read-only document; contact review pending',{exact:true}).count(),1)
   const download=await context.request.get(app.origin+'/api/platter/imported-original?document='+hash(bp.pdfs[0].bytes))
   assert.equal(download.status(),200);assert.deepEqual(await download.body(),bp.pdfs[0].bytes)
+  assert.ok(download.headers()['content-disposition'].includes('filename="proposal-1.pdf"'))
   await section.getByRole('button',{name:'Open document journal',exact:true}).click()
   assert.match(await section.innerText(),/35 import changes recorded/)
   const csvLink=section.getByRole('link',{name:'Download contacts.csv',exact:true}),csvDownload=await context.request.get(app.origin+await csvLink.getAttribute('href'))

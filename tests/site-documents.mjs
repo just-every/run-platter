@@ -971,6 +971,7 @@ test('PAY-007 billing controls record and reconcile two received payments to a f
    assert.equal(await milestone.getByRole('button',{name:'Allocate received payment'}).count(),0)
    const current=await h.state();assert.equal(current.paymentAllocations.length,2);assert.equal(current.paymentSchedules[0].rows[0].remainingCents,0)
    assert.deepEqual(current.paymentRecords.map(x=>[x.method,x.received_on,x.unallocatedCents]).sort(),[['check','2030-01-15',0],['wire','2030-01-15',0]])
+   await (await import('./offline-accounting-browser.mjs')).offlineInvoiceBrowser({h,page,browser,panel,milestone,capture})
   }finally{await context.close()}
  }finally{await browser?.close();await h.close()}
 })

@@ -3729,7 +3729,9 @@ test('PAY-007 received offline money reconciles frozen dated milestones once and
  const afterPdf=await h.mf.dispatchFetch(h.origin+agreement.path+'/agreement.pdf',{headers:{cookie:agreement.cookie}});assert.deepEqual(new Uint8Array(await afterPdf.arrayBuffer()),agreementBytes)
  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_invoices').first()).n,0,'informational schedule reconciliation never issues a provider invoice')
  assert.deepEqual((await h.state(sales.cookie)).paymentAllocations,[]);assert.deepEqual((await h.state(sales.cookie)).paymentSchedules,[])
+ await (await import('./payment-allocation-fixture.mjs')).scheduledReceiptJourney(h,billing,sales)
  await offlineAccountingJourney(h,fake,billing,sales)
+ await (await import('./offline-accounting-fixture.mjs')).offlineInvoiceJourney(h,fake,sales)
  await refuse('payment.allocate',race,billing.cookie,403)
  await refuse('payment.record',{...duplicate,requestId:crypto.randomUUID()},billing.cookie,403)
  }finally{await h.close()}

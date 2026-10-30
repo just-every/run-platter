@@ -1,5 +1,7 @@
+import { shareOfflineInvoice } from './offline-invoice-view'
+import { prepareOfflineInvoice, issueOfflineInvoice } from './offline-invoice-issue'
 import { offlineAccountingCommand } from './offline-accounting'
-import { allocatePayment, financeRoles, paymentRequestId } from './payment-allocations'
+import { allocatePayment, completePaymentMilestone, financeRoles, paymentRequestId } from './payment-allocations'
 import { permitted } from './permissions'
 import type { Bindings } from '../auth.server'
 import { providerCredential, providerJson } from './connections'
@@ -19,7 +21,11 @@ async function chargeFor(env:Bindings,id:string){
 export async function paymentCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  need(finance.includes(a.role),'Only owner, admins and billing manage payments and refunds',403)
  const db=env.DB
+ if(name==='payment.invoice-share')return shareOfflineInvoice(env,a,p)
+ if(name==='payment.invoice-prepare')return prepareOfflineInvoice(env,a,p)
+ if(name==='payment.invoice-issue')return issueOfflineInvoice(env,a,p)
  if(['payment.invoice-link','payment.accounting-sync'].includes(name))return offlineAccountingCommand(env,a,name,p)
+ if(name==='payment.milestone-complete')return completePaymentMilestone(env,a,p)
  if(name==='payment.allocate')return allocatePayment(env,a,p)
  if(name==='payment.record'){
   const id=(await permitted(db,a,p.id)).id,accepted=await db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(id).first<any>();need(accepted,'Accept the proposal before recording payment',409)

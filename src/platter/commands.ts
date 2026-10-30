@@ -4,7 +4,7 @@ import { hubspotDraftCommand } from './crm/hubspot-draft'
 import { archiveCommand } from './archiving/jobs'
 import { clientLocale, saveClientLocale } from './locales'
 import { hasTaxable, taxRequest, optionTax, resolveTax, saveTaxRate, validateTaxOptions, type TaxSnapshot } from './taxes'
-import { resolveVariables, editableVariableFields, missingMerge, clientVariableFields } from './variables'
+import { resolveVariables, editableVariableFields, missingMerge, pendingPriceFields, clientVariableFields } from './variables'
 import { recipientCommand, recipientInvitations, recipientInput } from './recipients'
 import { unfilledVariables } from './api/variables'
 import { stakeholderRecipient } from './tracking/index'
@@ -69,7 +69,7 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
  const terms=p.terms??'';need(typeof terms==='string'&&terms.length<=10000,'Terms must be text up to 10000 characters')
  const options=p.packages===undefined?null:packageInputs(p.packages,tables)
  const conditions=sectionConditions(p.sectionConditions??Object.fromEntries(['scope','terms'].filter(k=>p[k+'Option']).map(k=>[k,p[k+'Option']==='variable'?'variable:'+String(p[k+'Variable']??'')+'='+String(p[k+'VariableValue']??''):p[k+'Option']])),options??[{id:'one'},{id:'two'}])
- const rawPriced=pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables)
+ const rawPriced=pricedOptions(options??[{id:'one',label:text(p.optionOne,'the first option',200),cents:price('one',p.priceOne)},{id:'two',label:text(p.optionTwo,'the second option',200),cents:price('two',p.priceTwo)}],tables,pendingPriceFields(p.document))
  const priced=rawPriced.map(o=>tax?{...o,tax}:o);validateTaxOptions(priced,schedule)
  return{payment_terms:schedule,document:proposalDocument(p.document,priced,String(p.clientId??'')),section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:priced}
 }
@@ -206,7 +206,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='proposal.approve'||name==='proposal.send'){
   const old=await proposal(db,p.id);exact(old,p)
   const pending=await pendingNegotiation(db,old.id);if(name==='proposal.send'){
-   if(clientLocale(old)==='es'){need(!old.recipient_plan||old.recipient_plan==='[]','Spanish currently requires a single client mailbox',409);need(!await db.prepare('SELECT 1 FROM p_collection_policy WHERE proposal_id=?').bind(old.id).first(),'Turn off collection before sending in Spanish',409);need(!p.mailRepliesConsent||p.mailRepliesConsent==='no','Spanish invitation reply disclosure is not available',409)}const offered=snapshot(negotiatedView(old,pending)).options;need(!hasTaxable(offered)||optionTax(offered),'Set explicit owner-configured tax addresses before sending taxable items.',409);const missing=[...new Set([...unfilledVariables(snapshot(negotiatedView(old,pending))),...missingMerge(negotiatedView(old,pending))])];need(!missing.length,'Fill variables before sending: '+missing.join(', '),409)}assertDiscountDates(snapshot(negotiatedView(old,pending)).options,at)
+   if(clientLocale(old)==='es'){need(!old.recipient_plan||old.recipient_plan==='[]','Spanish currently requires a single client mailbox',409);need(!await db.prepare('SELECT 1 FROM p_collection_policy WHERE proposal_id=?').bind(old.id).first(),'Turn off collection before sending in Spanish',409);need(!p.mailRepliesConsent||p.mailRepliesConsent==='no','Spanish invitation reply disclosure is not available',409)}const offered=snapshot(negotiatedView(old,pending)).options;need(!hasTaxable(offered)||optionTax(offered),'Set explicit owner-configured tax addresses before sending taxable items.',409);const missing=[...new Set([...unfilledVariables(snapshot(negotiatedView(old,pending))),...missingMerge(negotiatedView(old,pending))])];need(!missing.length,'Fill variables before sending: '+missing.join(', '),409);need(!offered.some((o:any)=>o.pricingPending),'Fill price variables before sending',409)}assertDiscountDates(snapshot(negotiatedView(old,pending)).options,at)
   const smsOnly=name==='proposal.send'&&smsOnlyDelivery(env,p,negotiatedView(old,pending))
   if(pending)return negotiationCommand(env,a,name,p,old)
   need(['draft','approved','sent'].includes(old.status),'Only an open proposal can be sent',409);const approval=await approvalPlan(db,old,a);need(approval.complete,'Approve this revision before sending',409);const token=secret(),client=await db.prepare('SELECT c.*,COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(old.id,old.client_id).first<any>(),shareUrl=env.AUTH_ORIGIN+'/p/'+token

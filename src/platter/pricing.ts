@@ -5,6 +5,7 @@ import { calendarDate } from './expiry-time'
 import { dollars, need, text } from './model'
 
 export interface PriceLine {
+ pricingPending?:true;
  incomeAccount?:string; taxable?:boolean; taxCode?:string; catalogId?:string; recurrence?:Recurrence; name: string; description: string; quantity: string; unit: string; unitPrice: string; group: string; lineTotalCents: number; grossCents?:number; discountBps?:number; discountFixedCents?:number; groupDiscountBps?:number; groupDiscountFixedCents?:number
 }
 export interface PriceTable {
@@ -24,16 +25,17 @@ export function tableInputs(input: unknown): any[] {
  return tables
 }
 
-export function pricedOptions(options: { id: string; label: string; cents: number; discountBps?:number; discountFixedCents?:number; concealDiscount?:boolean; discountExpiresOn?:string }[], input: unknown) {
+/** Draft totals stay pending until their numeric bindings can be validated together. */
+export function pricedOptions(options: { id: string; label: string; cents: number; discountBps?:number; discountFixedCents?:number; concealDiscount?:boolean; discountExpiresOn?:string }[], input: unknown, pendingFields=new Set<string>()) {
  const tables=tableInputs(input)
  const priced = options.map(option => ({ ...option, tables: [] as PriceTable[] }))
- for (const table of tables) {
+ for (const [tableIndex,table] of tables.entries()) {
   need(object(table), 'Invalid pricing table')
   const option = priced.find(option => option.id === table.optionId)
   need(option, 'Choose a package for each pricing table')
   need(Array.isArray(table.lines) && table.lines.length > 0, 'A pricing table needs at least one line')
   const groups = new Map<string, number>()
-  const lines: PriceLine[] = table.lines.map((line: unknown) => {
+  const lines: PriceLine[] = table.lines.map((line: unknown,lineIndex:number) => {
    need(object(line), 'Invalid pricing line')
    const quantity = String(line.quantity ?? '')
    need(/^\d{1,7}(\.\d{1,3})?$/.test(quantity), 'Quantity must be positive with at most three decimal places')
@@ -41,7 +43,8 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
    const mills = BigInt(whole) * 1000n + BigInt(fraction.padEnd(3, '0'))
    need(mills > 0n && mills <= 1000000000n, 'Quantity must be from 0.001 to 1,000,000')
    const cents = dollars(line.unitPrice)
-   const recurring=recurrenceInput(line),grossCents = boundedTotal(((mills * BigInt(cents) + 500n) / 1000n)*BigInt(recurring.recurrence?.term??1)),discountBps=percentBps(line.discountPercent,'a line discount'),discountFixedCents=fixedDiscount(line.discountAmount),groupDiscountBps=percentBps(line.groupDiscountPercent,'a group discount'),groupDiscountFixedCents=fixedDiscount(line.groupDiscountAmount),lineTotalCents=scopedNet(grossCents,discountBps,discountFixedCents)
+   const pending=pendingFields.has('/pricingTables/'+tableIndex+'/lines/'+lineIndex+'/unitPrice')||pendingFields.has('/pricingTables/'+tableIndex+'/lines/'+lineIndex+'/quantity')
+   const recurring=recurrenceInput(line),grossCents = pending?0:boundedTotal(((mills * BigInt(cents) + 500n) / 1000n)*BigInt(recurring.recurrence?.term??1)),discountBps=percentBps(line.discountPercent,'a line discount'),discountFixedCents=fixedDiscount(line.discountAmount),groupDiscountBps=percentBps(line.groupDiscountPercent,'a group discount'),groupDiscountFixedCents=fixedDiscount(line.groupDiscountAmount),lineTotalCents=pending?0:scopedNet(grossCents,discountBps,discountFixedCents)
    const description = line.description ?? '', group = line.group ?? ''
    need(typeof description === 'string' && description.length <= 2000, 'Description must be text up to 2000 characters')
    need(typeof group === 'string' && group.length <= 200, 'Group must be text up to 200 characters')
@@ -49,7 +52,7 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
    groups.set(group.trim(), boundedTotal(BigInt(groups.get(group.trim()) ?? 0) + BigInt(lineTotalCents)))
    const catalogId=line.catalogId===undefined||line.catalogId===''?undefined:text(line.catalogId,'a catalog reference',200)
    const incomeAccount=line.incomeAccount?text(line.incomeAccount,'an income account',100):undefined
-   return { ...(incomeAccount?{incomeAccount}:{}),...taxFlags(line),...(catalogId?{catalogId}:{}),...recurring,name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{grossCents,discountBps,discountFixedCents,groupDiscountBps,groupDiscountFixedCents}:{}) }
+   return { ...(pending?{pricingPending:true as const}:{}),...(incomeAccount?{incomeAccount}:{}),...taxFlags(line),...(catalogId?{catalogId}:{}),...recurring,name, description, quantity, unit, unitPrice: (cents / 100).toFixed(2), group: group.trim(), lineTotalCents,...(discountBps||discountFixedCents||groupDiscountBps||groupDiscountFixedCents?{grossCents,discountBps,discountFixedCents,groupDiscountBps,groupDiscountFixedCents}:{}) }
   })
   let thresholdBps=Math.max(0,...lines.map(l=>l.grossCents?Math.ceil((l.grossCents-l.lineTotalCents)*10000/l.grossCents):0))
   for(const group of groups.keys()){
@@ -57,17 +60,18 @@ export function pricedOptions(options: { id: string; label: string; cents: numbe
    if(!rules.length)continue
    need(group.length>0,'Name a group before discounting it')
    const rule=rules[0];need(rules.every(l=>l.groupDiscountBps===rule.groupDiscountBps&&l.groupDiscountFixedCents===rule.groupDiscountFixedCents),'Use the same discount for each entry in a group')
-   const amounts=members.map(l=>l.lineTotalCents),net=scopedNet(amounts.reduce((n,v)=>n+v,0),rule.groupDiscountBps??0,rule.groupDiscountFixedCents??0),allocation=allocateNet(amounts,net)
+   const amounts=members.map(l=>l.lineTotalCents),net=members.some(l=>l.pricingPending)?0:scopedNet(amounts.reduce((n,v)=>n+v,0),rule.groupDiscountBps??0,rule.groupDiscountFixedCents??0),allocation=allocateNet(amounts,net)
    thresholdBps=Math.max(thresholdBps,amounts.reduce((n,v)=>n+v,0)?Math.ceil((amounts.reduce((n,v)=>n+v,0)-net)*10000/amounts.reduce((n,v)=>n+v,0)):0)
    members.forEach((line,i)=>{line.grossCents??=line.lineTotalCents;line.lineTotalCents=allocation[i]});groups.set(group,net)
   }
   const subtotalCents = boundedTotal(lines.reduce((sum, line) => sum + BigInt(line.lineTotalCents), 0n))
   option.tables.push({ ...(thresholdBps?{thresholdBps}:{}),name: text(table.name, 'a table name'), lines, groups: [...groups].map(([name, subtotalCents]) => ({ name, subtotalCents })), subtotalCents })
  }
- return priced.map(({ tables, ...option }) => {
-  const {discountBps=0,discountFixedCents=0,...publicOption}=option,gross=tables.length?boundedTotal(tables.reduce((sum,table)=>sum+BigInt(table.subtotalCents),0n)):option.cents,cents=scopedNet(gross,discountBps,discountFixedCents),pricingGrossCents=tables.reduce((n,t)=>n+t.lines.reduce((m,l)=>m+(l.grossCents??l.lineTotalCents),0),0)
-  need(cents>0,'Package total after discount must be at least $0.01')
-  return {...publicOption,cents,...(tables.length?{tables}:{}),...(pricingGrossCents>gross?{pricingGrossCents}:{}),...(discountBps||discountFixedCents?{discount:{bps:discountBps,grossCents:gross,cents:gross-cents,...(discountFixedCents?{fixedCents:discountFixedCents}:{})}}:{})}
+ return priced.map(({ tables, ...option },optionIndex) => {
+  const pending=tables.some(t=>t.lines.some(l=>l.pricingPending))||!tables.length&&(pendingFields.has('/packages/'+optionIndex+'/price')||pendingFields.has(optionIndex===0?'/priceOne':'/priceTwo'))
+  const {discountBps=0,discountFixedCents=0,...publicOption}=option,gross=tables.length?boundedTotal(tables.reduce((sum,table)=>sum+BigInt(table.subtotalCents),0n)):option.cents,cents=pending?0:scopedNet(gross,discountBps,discountFixedCents),pricingGrossCents=tables.reduce((n,t)=>n+t.lines.reduce((m,l)=>m+(l.grossCents??l.lineTotalCents),0),0)
+  need(pending||cents>0,'Package total after discount must be at least $0.01')
+  return {...publicOption,...(pending?{pricingPending:true as const}:{}),cents,...(tables.length?{tables}:{}),...(pricingGrossCents>gross?{pricingGrossCents}:{}),...(discountBps||discountFixedCents?{discount:{bps:discountBps,grossCents:gross,cents:gross-cents,...(discountFixedCents?{fixedCents:discountFixedCents}:{})}}:{})}
  })
 }
 

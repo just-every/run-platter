@@ -97,6 +97,15 @@ export function clientVariableFields(value:any){
  for(const [key,v]of Object.entries(custom)){need(/^[A-Za-z][A-Za-z0-9_]{0,50}$/.test(key)&&typeof v==='string'&&v.length<=1000,'Use named plain text custom fields');result.custom[key]=v}
  return result
 }
+/** Defer only totals that depend on a currently unfilled numeric input. */
+export function pendingPriceFields(document:any){
+ const merge=mergeFields(document?.merge),pending=new Set<string>()
+ for(const [path,pattern]of Object.entries(merge?.patterns??{})){
+  if(!/^\/(?:packages\/\d+\/price|pricingTables\/\d+\/lines\/\d+\/(?:unitPrice|quantity)|priceOne|priceTwo)$/.test(path))continue
+  if(variableNames(pattern).some(name=>!Object.hasOwn(merge!.values,name)))pending.add(path)
+ }
+ return pending
+}
 export function missingMerge(row:any){const doc=typeof row.document==='string'?JSON.parse(row.document):row.document,merge=mergeFields(doc?.merge);return merge?[...new Set([...variableNames(Object.values(merge.patterns)),...(merge.conditions??[])])].filter(k=>!Object.hasOwn(merge.values,k)):[]}
 
 export const variableCondition=(value:string)=>/^variable:([A-Za-z][A-Za-z0-9_.]{0,99})=(.{0,200})$/.exec(value)

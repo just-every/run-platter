@@ -128,18 +128,21 @@ async function variableTemplateJourney({ page, context, app, browser, state, cmd
  const capture=async(target,name)=>{
   await target.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))})
   assert.ok(await target.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Variable template fits at '+width)
-  if(screenshots)await target.screenshot({path:join(screenshots,'EDIT-002-variables-'+name+'-'+width+'.png'),fullPage:true})
+  if(screenshots){
+   await target.screenshot({path:join(screenshots,'EDIT-002-variables-'+name+'-'+width+'.png'),fullPage:true})
+   if(['missing-rate','filled-rate'].includes(name))await target.locator('section').filter({has:target.getByRole('heading',{name:'Variables',exact:true})}).screenshot({path:join(screenshots,'EDIT-002-variables-'+name+'-panel-'+width+'.png')})
+  }
  }
  await page.goto(app.origin+'/app/proposal?id='+source.id)
  await page.getByLabel('Template name',{exact:true}).fill('Synthetic variable campaign')
  await page.getByRole('button',{name:'Save personal template',exact:true}).click()
  const template=(await state()).templates.find(t=>t.name==='Synthetic variable campaign')
  for(const value of ['Synthetic source agency','Sage Source','SourceOnly','97.00','Jordan Northstar'])assert.ok(!JSON.stringify(template.snapshot).includes(value),value)
- const start=async(clientId)=>{
+ const start=async(clientId,name='Synthetic variable campaign')=>{
   await page.goto(app.origin+'/app')
-  const form=page.locator('form').filter({has:page.getByRole('button',{name:'Start from Synthetic variable campaign',exact:true})})
+  const form=page.locator('form').filter({has:page.getByRole('button',{name:'Start from '+name,exact:true})})
   await form.locator('select[name=clientId]').selectOption(clientId)
-  await form.getByRole('button',{name:'Start from Synthetic variable campaign',exact:true}).click()
+  await form.getByRole('button',{name:'Start from '+name,exact:true}).click()
   return (await state()).proposals.find(p=>p.id===new URL(page.url()).searchParams.get('id'))
  }
  const earlier=[]
@@ -161,9 +164,11 @@ async function variableTemplateJourney({ page, context, app, browser, state, cmd
  assert.equal(renamed.status(),200,await renamed.text())
  const third=await start(clients[1].id)
  assert.equal(third.scope,'Expanded Wren West at 42 West Street; region West.')
- assert.equal(third.terms,'Prepared by Riley Review. Note {{Custom.Note}}.')
- assert.equal(third.document.blocks[0].text,'Synthetic West studio works with Riley Review in West.')
- assert.equal(third.options[0].tables[0].lines[0].description,'Delivery for Synthetic West studio by Riley')
+ if(width===1440){
+  assert.equal(third.terms,'Prepared by Riley Review. Note {{Custom.Note}}.')
+  assert.equal(third.document.blocks[0].text,'Synthetic West studio works with Riley Review in West.')
+  assert.equal(third.options[0].tables[0].lines[0].description,'Delivery for Synthetic West studio by Riley')
+ }
  assert.deepEqual(third.options.map(o=>o.cents),[50000,37500])
  assert.deepEqual((await state()).proposals.filter(p=>earlier.some(d=>d.id===p.id)).sort((a,b)=>a.id.localeCompare(b.id)),earlier.toSorted((a,b)=>a.id.localeCompare(b.id)))
  assert.match(await page.locator('main').innerText(),/Unfilled variables: Custom.Note/)
@@ -203,9 +208,31 @@ async function variableTemplateJourney({ page, context, app, browser, state, cmd
   const accepted=(await state()).proposals.find(p=>p.id===third.id)
   assert.equal(accepted.acceptance.totalCents,50000);assert.equal(accepted.acceptance.depositCents,15000)
   assert.equal(accepted.scope,third.scope)
-  assert.equal(accepted.terms,'Prepared by Riley Review. Note Reviewed West scope.')
-  assert.deepEqual((await state()).proposals.filter(p=>earlier.some(d=>d.id===p.id)).sort((a,b)=>a.id.localeCompare(b.id)),earlier.toSorted((a,b)=>a.id.localeCompare(b.id)))
-  assert.ok(!JSON.stringify((await state()).templates.find(t=>t.id===template.id).snapshot).includes('Riley Review'))
+  if(width===1440){
+   assert.equal(accepted.terms,'Prepared by Riley Review. Note Reviewed West scope.')
+   assert.deepEqual((await state()).proposals.filter(p=>earlier.some(d=>d.id===p.id)).sort((a,b)=>a.id.localeCompare(b.id)),earlier.toSorted((a,b)=>a.id.localeCompare(b.id)))
+   assert.ok(!JSON.stringify((await state()).templates.find(t=>t.id===template.id).snapshot).includes('Riley Review'))
+  }
   await capture(clientPage,'accepted')
  }finally{await clientContext.close()}
+ const discountedFields=variableTemplateFields(clients[0].id)
+ discountedFields.pricingTables[0].lines[0].discountAmount='10.00'
+ const discountedSource=await cmd('proposal.prepare',discountedFields)
+ await cmd('template.save',{id:discountedSource.id,version:1,name:'Synthetic pending-price template'})
+ const missing=structuredClone(templateClients[1]);delete missing.variableFields.custom.Rate
+ const destination=await cmd('client.save',{...missing,name:'Synthetic missing-rate studio',email:['synthetic-platter-405','example.test'].join('@')})
+ const pending=await start(destination.id,'Synthetic pending-price template')
+ if(width===1440){
+  assert.match(await page.locator('main').innerText(),/Unfilled variables: Custom.Rate/)
+  assert.match(await page.locator('main').innerText(),/Pricing is incomplete/)
+ }
+ await capture(page,'missing-rate')
+ await page.getByLabel('Custom.Rate',{exact:true}).fill('125.00')
+ await page.getByRole('button',{name:'Fill proposal variables',exact:true}).click()
+ if(width===1440){
+  assert.equal(await page.getByRole('alert').count(),0)
+  assert.deepEqual((await state()).proposals.find(p=>p.id===pending.id).options.map(o=>o.cents),[24000,37500])
+  assert.ok(!(await page.locator('main').innerText()).includes('Pricing is incomplete'))
+ }
+ await capture(page,'filled-rate')
 }

@@ -162,10 +162,15 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.ok(starterSnapshot.options.every(o => o.tables[0].lines.length === 2))
     const variableClients=[]
     for(const input of templateClients)variableClients.push(await h.cmd('client.save',input))
-    const variableSource=await h.cmd('proposal.prepare',variableTemplateFields(variableClients[0].id))
+    const variableFields=variableTemplateFields(variableClients[0].id)
+    variableFields.pricingTables[0].lines[0].discountAmount='10.00'
+    const variableSource=await h.cmd('proposal.prepare',variableFields)
     const variableTemplate=await h.cmd('template.save',{id:variableSource.id,version:1,name:'Archived independent variable template'})
     const variableDrafts=[]
     for(const client of variableClients.slice(1))variableDrafts.push(await h.cmd('template.start',{id:variableTemplate.id,version:1,clientId:client.id}))
+    const missingRate=structuredClone(templateClients[1]);delete missingRate.variableFields.custom.Rate
+    const missingRateClient=await h.cmd('client.save',{...missingRate,name:'Synthetic missing-rate studio',email:['synthetic-platter-405','example.test'].join('@')})
+    const pendingRate=await h.cmd('template.start',{id:variableTemplate.id,version:1,clientId:missingRateClient.id})
     const variableSnapshot=(await h.state()).templates.find(t=>t.id===variableTemplate.id).snapshot
     assert.deepEqual(variableSnapshot.document.merge.values,{})
     for(const value of ['Synthetic source agency','Sage Source','41 Source Street','SourceOnly','97.00'])assert.ok(!JSON.stringify(variableSnapshot).includes(value),value)
@@ -223,7 +228,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     // audit rows exactly here, then assert the complete joined view on restore.
     const beforeAudit=beforeAuditView.map(({reason,mail_route,sender_address,...row})=>row)
     assert.ok(beforeAudit.some(row=>row.action==='proposal.preview'&&row.subject===duplicate.id&&row.actor_role==='owner'),'EDIT-018 / TEAM-004 preview action is retained without payload or invitation authority')
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','draft','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','draft','draft','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -339,10 +344,21 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal(independent.options[0].tables[0].lines[0].description,'Delivery for Synthetic restored studio by River')
     assert.equal((await h.state(restoredOwner)).proposals.find(p=>p.id===variableDrafts[0].id).terms,'Prepared by Jordan Venue.')
     assert.equal((await h.state(restoredOwner)).proposals.find(p=>p.id===variableDrafts[1].id).terms,'Prepared by Jordan Venue.')
-    assert.deepEqual(independent.options.map(o=>o.cents),[62000,93000])
+    assert.deepEqual(independent.options.map(o=>o.cents),[61000,93000])
     assert.equal(independent.options[0].tables[0].lines[0].name,'Restored service')
     assert.deepEqual(independent.collectionPolicy,{enabled:false,completion:'off',methods:['card']})
     assert.equal(independent.approved_by,null);assert.equal(independent.shareToken,undefined)
+    const pendingRestored=restoredState.proposals.find(p=>p.id===pendingRate.id)
+    assert.equal(pendingRestored.status,'draft');assert.equal(pendingRestored.shareToken,undefined)
+    await h.cmd('proposal.approve',{id:pendingRate.id,version:1,revision:1},restoredOwner)
+    await h.cmd('proposal.send',{id:pendingRate.id,version:2},restoredOwner,409)
+    const pendingBefore=(await h.state(restoredOwner)).proposals.find(p=>p.id===pendingRate.id)
+    await h.cmd('proposal.variables',{id:pendingRate.id,version:2,values:{'Custom.Rate':'1.00'}},restoredOwner,400)
+    assert.deepEqual((await h.state(restoredOwner)).proposals.find(p=>p.id===pendingRate.id),pendingBefore)
+    await h.cmd('proposal.variables',{id:pendingRate.id,version:2,values:{'Custom.Rate':'310.00'}},restoredOwner)
+    const filledRestored=(await h.state(restoredOwner)).proposals.find(p=>p.id===pendingRate.id)
+    assert.deepEqual(filledRestored.options.map(o=>o.cents),[61000,93000]);assert.equal(filledRestored.approved_by,null)
+
     await h.cmd('proposal.send',{id:independent.id,version:1},restoredOwner,409)
     assert.deepEqual((await h.state(restoredOwner)).templates.find(t=>t.id===variableTemplate.id).snapshot,variableSnapshot)
     assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id},restoredOwner),journal)

@@ -4,6 +4,7 @@ import { documentFixture } from './document-fixture.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { pricingFixture, pricingExpected } from './pricing-fixture.mjs'
 import { templateClients, variableTemplateFields } from './template-variables-fixture.mjs'
+import { pdfPages } from './pdf-document.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
@@ -171,9 +172,11 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const missingRate=structuredClone(templateClients[1]);delete missingRate.variableFields.custom.Rate
     const missingRateClient=await h.cmd('client.save',{...missingRate,name:'Synthetic missing-rate studio',email:['synthetic-platter-405','example.test'].join('@')})
     const pendingRate=await h.cmd('template.start',{id:variableTemplate.id,version:1,clientId:missingRateClient.id})
+    await h.cmd('proposal.variables',{id:variableSource.id,version:1,values:{'Custom.Note':'Synthetic source-only note'},fields:{scope:'Expanded {{Contact.Name}} at {{Client.Address}}; region {{Custom.Region}}.',terms:'Prepared by {{Sender.Name}}. Note {{Custom.Note}}.',pricingTables:variableFields.pricingTables.map((table,index)=>({...table,lines:table.lines.map(line=>({...line,quantity:index===0?'4':'3'}))}))}})
+    await h.cmd('template.save',{id:variableSource.id,version:2,templateId:variableTemplate.id,templateVersion:1,name:'Archived independent variable template'})
     const variableSnapshot=(await h.state()).templates.find(t=>t.id===variableTemplate.id).snapshot
     assert.deepEqual(variableSnapshot.document.merge.values,{})
-    for(const value of ['Synthetic source agency','Sage Source','41 Source Street','SourceOnly','97.00'])assert.ok(!JSON.stringify(variableSnapshot).includes(value),value)
+    for(const value of ['Synthetic source agency','Sage Source','41 Source Street','SourceOnly','97.00','Synthetic source-only note'])assert.ok(!JSON.stringify(variableSnapshot).includes(value),value)
     const followupsBefore=(await h.state()).followups.rows.map(({sentAt,...r})=>r)
     const actionsBefore=(await h.state()).followupActions
     const {packageFixture,packageSelection:packageItems,packageExpected,scheduleFixture}=await import('./packages-fixture.mjs')
@@ -262,7 +265,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal(archived.filter(item=>item.table==='p_suggestions')[0].row.decision,'accepted','NEG-002 tracked decision survives CLI restore')
     assert.equal(archived.filter(item=>item.table==='p_suggestion_sections').length,1)
     assert.ok(approvals.every(item=>item.row.actor_id===journal.job.principalId))
-    h=await harness({root:restored,...identity})
+    h=await harness({root:restored,...identity,assetsDirectory:'public'})
     await h.state(identity.owner,401)
     assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,401)
     assert.equal((await h.send(path,undefined,verified.cookie)).status,404)
@@ -335,19 +338,57 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const renamedSender=await h.send('/auth/display-name',{displayName:'River Operator'},restoredOwner)
     assert.equal(renamedSender.status,200,renamedSender.text)
     const destination=await h.cmd('client.save',{name:'Synthetic restored studio',email:['synthetic-platter-404','example.test'].join('@'),variableFields:{contactName:'River Restored',address:'44 Restored Street',custom:{Region:'Restored',Service:'Restored service',Rate:'310.00'}}},restoredOwner)
-    const refilled=await h.cmd('template.start',{id:variableTemplate.id,version:1,clientId:destination.id},restoredOwner)
+    const refilled=await h.cmd('template.start',{id:variableTemplate.id,version:2,clientId:destination.id},restoredOwner)
     const independent=(await h.state(restoredOwner)).proposals.find(p=>p.id===refilled.id)
-    assert.equal(independent.scope,'River Restored at 44 Restored Street; region Restored.')
+    assert.equal(independent.scope,'Expanded River Restored at 44 Restored Street; region Restored.')
     assert.equal(independent.title,'Campaign for Synthetic restored studio')
-    assert.equal(independent.terms,'Prepared by River Operator.')
+    assert.equal(independent.terms,'Prepared by River Operator. Note {{Custom.Note}}.')
     assert.equal(independent.document.blocks[0].text,'Synthetic restored studio works with River Operator in Restored.')
     assert.equal(independent.options[0].tables[0].lines[0].description,'Delivery for Synthetic restored studio by River')
     assert.equal((await h.state(restoredOwner)).proposals.find(p=>p.id===variableDrafts[0].id).terms,'Prepared by Jordan Venue.')
     assert.equal((await h.state(restoredOwner)).proposals.find(p=>p.id===variableDrafts[1].id).terms,'Prepared by Jordan Venue.')
-    assert.deepEqual(independent.options.map(o=>o.cents),[61000,93000])
+    assert.deepEqual(independent.options.map(o=>o.cents),[123000,93000])
     assert.equal(independent.options[0].tables[0].lines[0].name,'Restored service')
     assert.deepEqual(independent.collectionPolicy,{enabled:false,completion:'off',methods:['card']})
     assert.equal(independent.approved_by,null);assert.equal(independent.shareToken,undefined)
+    await h.cmd('proposal.send',{id:independent.id,version:1},restoredOwner,409)
+    await h.cmd('proposal.approve',{id:independent.id,version:1,revision:1},restoredOwner)
+    const approvedIndependent=(await h.state(restoredOwner)).proposals.find(p=>p.id===independent.id)
+    const missingNote=await h.send('/api/platter/command',{name:'proposal.send',input:{id:independent.id,version:2}},restoredOwner)
+    assert.equal(missingNote.status,409);assert.match(missingNote.text,/Custom.Note/)
+    assert.deepEqual((await h.state(restoredOwner)).proposals.find(p=>p.id===independent.id),approvedIndependent)
+    await h.cmd('proposal.variables',{id:independent.id,version:2,values:{'Custom.Note':'Reviewed restored scope'}},restoredOwner)
+    const readyIndependent=(await h.state(restoredOwner)).proposals.find(p=>p.id===independent.id)
+    assert.equal(readyIndependent.approved_by,null,'Filling the restored template requires fresh approval')
+    await h.cmd('proposal.send',{id:independent.id,version:readyIndependent.version},restoredOwner,409)
+    const restoredContent=['Campaign for Synthetic restored studio','Expanded River Restored at 44 Restored Street; region Restored.','Prepared by River Operator. Note Reviewed restored scope.','Synthetic restored studio works with River Operator in Restored.','Restored service','1,230.00']
+    const restoredPreview=await h.send('/app/preview/client?id='+independent.id+'&revision='+readyIndependent.revision+'&optionId=one',undefined,restoredOwner)
+    assert.equal(restoredPreview.status,200)
+    for(const text of restoredContent)assert.ok(restoredPreview.text.includes(text),text)
+    await h.cmd('proposal.approve',{id:independent.id,version:readyIndependent.version,revision:readyIndependent.revision},restoredOwner)
+    const restoredOffer=await h.cmd('proposal.send',{id:independent.id,version:readyIndependent.version+1},restoredOwner),restoredPath=new URL(restoredOffer.shareUrl).pathname
+    assert.equal((await h.send(restoredPath+'/action?name=code.request',{})).status,200)
+    const restoredCode=(await h.state(restoredOwner)).outbox.find(m=>m.proposal_id===independent.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    const restoredSession=await h.send(restoredPath+'/action?name=code.verify',{code:restoredCode})
+    assert.equal(restoredSession.status,200)
+    const restoredClient=await h.send(restoredPath,undefined,restoredSession.cookie),restoredData=await h.send(restoredPath+'/data.json?optionId=one',undefined,restoredSession.cookie)
+    assert.equal(restoredClient.status,200);assert.equal(restoredData.status,200)
+    for(const text of restoredContent)assert.ok(restoredClient.text.includes(text),text)
+    assert.equal(restoredData.value.scope,restoredContent[1]);assert.equal(restoredData.value.terms,restoredContent[2])
+    const restoredPdf=await h.mf.dispatchFetch(h.origin+restoredPath+'/download.pdf?optionId=one',{headers:{cookie:restoredSession.cookie}})
+    assert.equal(restoredPdf.status,200)
+    const restoredPdfText=(await pdfPages(await restoredPdf.arrayBuffer())).join(' ').replace(/\s+/g,' ')
+    for(const text of restoredContent)assert.ok(restoredPdfText.includes(text),text)
+    assert.equal((await h.send(restoredPath+'/action?name=accept',{name:'River Restored',optionId:'one',consent:true},restoredSession.cookie)).status,200)
+    const restoredAcceptance=(await h.state(restoredOwner)).proposals.find(p=>p.id===independent.id).acceptance
+    assert.equal(restoredAcceptance.totalCents,123000);assert.equal(restoredAcceptance.depositCents,36900)
+    const restoredFrozen=JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(independent.id).first()).snapshot)
+    assert.equal(restoredFrozen.scope,restoredContent[1]);assert.equal(restoredFrozen.terms,restoredContent[2]);assert.deepEqual(restoredFrozen.document,restoredData.value.document)
+    assert.equal(restoredFrozen.options[0].tables[0].lines[0].description,'Delivery for Synthetic restored studio by River')
+    const restoredSigned=await h.mf.dispatchFetch(h.origin+restoredPath+'/agreement.pdf',{headers:{cookie:restoredSession.cookie}})
+    assert.equal(restoredSigned.status,200)
+    const restoredSignedText=(await pdfPages(await restoredSigned.arrayBuffer())).join(' ').replace(/\s+/g,' ')
+    for(const text of restoredContent)assert.ok(restoredSignedText.includes(text),text)
     const pendingRestored=restoredState.proposals.find(p=>p.id===pendingRate.id)
     assert.equal(pendingRestored.status,'draft');assert.equal(pendingRestored.shareToken,undefined)
     await h.cmd('proposal.approve',{id:pendingRate.id,version:1,revision:1},restoredOwner)
@@ -359,7 +400,6 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const filledRestored=(await h.state(restoredOwner)).proposals.find(p=>p.id===pendingRate.id)
     assert.deepEqual(filledRestored.options.map(o=>o.cents),[61000,93000]);assert.equal(filledRestored.approved_by,null)
 
-    await h.cmd('proposal.send',{id:independent.id,version:1},restoredOwner,409)
     assert.deepEqual((await h.state(restoredOwner)).templates.find(t=>t.id===variableTemplate.id).snapshot,variableSnapshot)
     assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id},restoredOwner),journal)
     assert.equal((await h.send(invoicePath,undefined,restoredOwner)).text,invoiceCsv)

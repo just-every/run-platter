@@ -202,12 +202,13 @@ async function generalVariableTemplates(h, member) {
  const noSourceValues = t => {
   const stored = JSON.stringify(t.snapshot)
   assert.ok(!stored.includes(clients[0].id), 'Template must not retain the source Client field binding')
-  for (const value of ['Synthetic source agency', 'Sage Source', '41 Source Street', 'SourceOnly', 'Source service', '97.00', 'Jordan Venue'])
+  for (const value of ['Synthetic source agency', 'Sage Source', '41 Source Street', 'SourceOnly', 'Source service', '97.00', 'Jordan Venue', 'Synthetic source-only note'])
    assert.ok(!stored.includes(value), 'Template must not retain resolved source value: ' + value)
   assert.deepEqual(t.snapshot.document.merge.values, {})
   assert.equal(t.snapshot.document.merge.deal, undefined)
  }
  noSourceValues(await saved())
+ const originalTemplate = await saved()
  const drafts = []
  for (const [index, client] of clients.slice(1).entries()) {
   const draft = await h.cmd('template.start', { id: template.id, version: 1, clientId: client.id })
@@ -222,9 +223,11 @@ async function generalVariableTemplates(h, member) {
   assert.equal(p.approved_by, null); assert.equal(p.acceptance, undefined); assert.equal(p.shareToken, undefined)
   drafts.push(p)
  }
- await h.cmd('proposal.variables', { id: source.id, version: 1, fields: { scope: 'Expanded {{Contact.Name}} at {{Client.Address}}; region {{Custom.Region}}.', terms: 'Prepared by {{Sender.Name}}. Note {{Custom.Note}}.', pricingTables: fields.pricingTables.map((t, i) => ({ ...t, lines: t.lines.map(l => ({ ...l, quantity: i === 0 ? '4' : '3' })) })) } })
+ assert.deepEqual(await saved(), originalTemplate, 'Starting different clients does not fill values into the template')
+ await h.cmd('proposal.variables', { id: source.id, version: 1, values: { 'Custom.Note': 'Synthetic source-only note' }, fields: { scope: 'Expanded {{Contact.Name}} at {{Client.Address}}; region {{Custom.Region}}.', terms: 'Prepared by {{Sender.Name}}. Note {{Custom.Note}}.', pricingTables: fields.pricingTables.map((t, i) => ({ ...t, lines: t.lines.map(l => ({ ...l, quantity: i === 0 ? '4' : '3' })) })) } })
  await h.cmd('template.save', { id: source.id, version: 2, name: 'Synthetic variable campaign', templateId: template.id, templateVersion: 1 })
  noSourceValues(await saved())
+ const replacedTemplate = await saved()
  const third = await h.cmd('template.start', { id: template.id, version: 2, clientId: clients[1].id }, member)
  let p = await get(third.id)
  assert.equal(p.scope, 'Expanded Wren West at 42 West Street; region West.')
@@ -235,9 +238,12 @@ async function generalVariableTemplates(h, member) {
  assert.equal(p.prepared_by, (await h.state(member)).actor.email)
  assert.deepEqual(await Promise.all(drafts.map(d => get(d.id))), drafts, 'Replacing a template leaves both earlier clients and prices unchanged')
  await h.cmd('proposal.approve', { id: p.id, version: p.version, revision: p.revision })
- const before = await get(p.id), refused = await h.send('/api/platter/command', { name: 'proposal.send', input: { id: p.id, version: before.version } }, member)
+ const sendState = () => Promise.all(['p_proposals','p_revisions','p_shares','p_acceptances','p_mail','p_audit'].map(table => h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all().then(r => r.results)))
+ const before = await get(p.id), beforeSend = await sendState()
+ const refused = await h.send('/api/platter/command', { name: 'proposal.send', input: { id: p.id, version: before.version } }, member)
  assert.equal(refused.status, 409); assert.match(refused.text, /Custom.Note/)
  assert.deepEqual(await get(p.id), before, 'Missing-variable refusal writes no proposal or invitation')
+ assert.deepEqual(await sendState(), beforeSend, 'Refused sending changes no revision, signing link, agreement, mail or audit')
  await h.cmd('proposal.variables', { id: p.id, version: before.version, values: { 'Custom.Note': 'Reviewed West scope' } }, member)
  p = await get(p.id); assert.equal(p.approved_by, null)
  await h.cmd('proposal.send', { id: p.id, version: p.version }, member, 409)
@@ -261,6 +267,11 @@ async function generalVariableTemplates(h, member) {
  assert.equal(accepted.acceptance.totalCents, 50000); assert.equal(accepted.acceptance.depositCents, 15000)
  const frozen = JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot)
  assert.equal(frozen.scope, p.scope); assert.equal(frozen.terms, p.terms); assert.deepEqual(frozen.document, client.value.document)
+ assert.equal(frozen.title, 'Campaign for Synthetic West studio')
+ assert.equal(frozen.options[0].tables[0].lines[0].name, 'West service')
+ assert.equal(frozen.options[0].tables[0].lines[0].description, 'Delivery for Synthetic West studio by Casey')
+ assert.equal(frozen.options[0].tables[0].lines[0].quantity, '4')
+ assert.equal(frozen.options[0].cents, 50000)
  const signed = await h.mf.dispatchFetch(h.origin + path + '/agreement.pdf', { headers: { cookie: verified.cookie } })
  assert.equal(signed.status, 200)
  const signedText = (await pdfPages(await signed.arrayBuffer())).join(' ').replace(/\s+/g, ' ')
@@ -269,6 +280,7 @@ async function generalVariableTemplates(h, member) {
  assert.deepEqual(await get(p.id), accepted)
  assert.deepEqual(await Promise.all(drafts.map(d => get(d.id))), drafts)
  noSourceValues(await saved())
+ assert.deepEqual(await saved(), replacedTemplate, 'Filling, approving, sending and accepting a draft never populate or rewrite its template')
  // Saving variable prices must retain valid fixed discounts without evaluating unresolved prices.
  const discountedFields=variableTemplateFields(clients[0].id)
  discountedFields.pricingTables[0].lines[0].discountAmount='10.00'

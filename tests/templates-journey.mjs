@@ -138,7 +138,7 @@ async function variableTemplateJourney({ page, context, app, browser, state, cmd
  const start=async(clientId)=>{
   await page.goto(app.origin+'/app')
   const form=page.locator('form').filter({has:page.getByRole('button',{name:'Start from Synthetic variable campaign',exact:true})})
-  await form.getByLabel('Client for Synthetic variable campaign',{exact:true}).selectOption(clientId)
+  await form.locator('select[name=clientId]').selectOption(clientId)
   await form.getByRole('button',{name:'Start from Synthetic variable campaign',exact:true}).click()
   return (await state()).proposals.find(p=>p.id===new URL(page.url()).searchParams.get('id'))
  }

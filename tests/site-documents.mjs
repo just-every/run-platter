@@ -543,7 +543,7 @@ test('APPROVE-004 maximum quantities, currency isolation and stable legal review
  const approvalScreens=process.env.PLATTER_APPROVAL_SCREENSHOTS??process.env.PLATTER_SCREENSHOTS
  try{
   app=await installedApp({scheduled:true})
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   owner=await browser.newContext({viewport:{width:1440,height:900}})
   const command=async(context,name,input,status=200)=>{
    const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}})

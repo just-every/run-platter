@@ -20,9 +20,11 @@ export function captureTemplateRecipients(content:any,a:Actor,preassignedOwner:u
  need(a.role==='owner','Only the current owner manages template recipient definitions',403)
  const clean=recipientInput(plan,a)
  need(new Set(clean.map(r=>r.name.toLowerCase())).size===clean.length,'Template role names must be distinct')
- const assigned=preassignedOwner===undefined?previous?.roles.find(r=>r.preassignedOwnerId)?.id??'':String(preassignedOwner)
+ const previousAssignment=previous?.roles.find(r=>r.preassignedOwnerId)
+ const assigned=preassignedOwner===undefined?previousAssignment?.id??'':String(preassignedOwner)
+ const assignedOwnerId=preassignedOwner===undefined?previousAssignment?.preassignedOwnerId??null:a.id
  need(!assigned||clean.some(r=>r.id===assigned&&r.role==='countersigner'),'Preassign only an owner countersigner')
- const roles:TemplateRole[]=clean.map(({email,...r})=>({...r,identity:'mailbox',preassignedOwnerId:r.id===assigned?a.id:null}))
+ const roles:TemplateRole[]=clean.map(({email,...r})=>({...r,identity:'mailbox',preassignedOwnerId:r.id===assigned?assignedOwnerId:null}))
  const assignments:Record<string,string>={}
  for(const b of documentOf(content).blocks.filter(b=>b.type==='signature'||b.type==='field')){
   const id=b.recipientRole==='slot'?b.recipientId:clean.find(r=>r.role==='signer')?.id

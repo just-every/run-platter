@@ -3006,7 +3006,7 @@
       "executable": false
     },
     "src/platter/template-recipients.ts": {
-      "sha256": "c3797d8c54c6611c99f1e4f38cf9772be0ac20e583dce1eeed992da8fc3b414b",
+      "sha256": "8d3e1194ee8d2fe7d654e585e84a93675d696287e990c7b69340d8c6eafea169",
       "executable": false
     },
     "src/platter/templates.ts": {
@@ -3646,7 +3646,7 @@
       "executable": false
     },
     "tests/templates-http.mjs": {
-      "sha256": "e8540c3725292a09a1265bf081171c387cd65c4eacc14622528523cd24e8a0ab",
+      "sha256": "efff898d2c6aefa52cf2c72b30b062d9331c75df8149f178727600004f968fc9",
       "executable": false
     },
     "tests/templates-journey.mjs": {

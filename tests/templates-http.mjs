@@ -279,4 +279,15 @@ async function templateRolesHttp(h,member) {
  await unchanged(()=>h.cmd('template.start',{id:shared.id,version:1,clientId:client.id},successor,409))
  await unchanged(()=>h.cmd('proposal.duplicate',{id:copy.id,version:2},successor,409))
  await unchanged(async()=>{const r=await h.send('/api/platter/agent/command',{name:'template.recipients',input:{id:shared.id,version:1}},'',{authorization:'Bearer '+key.token});assert.equal(r.status,401)})
+ const saved=(await h.state(successor)).templates.find(t=>t.id===shared.id).snapshot.template_recipients
+ const groups=saved.roles.map(r=>({...r,group:r.group+1}))
+ await h.cmd('template.recipients',{id:shared.id,version:1,roles:groups},successor)
+ const retained=(await h.state(successor)).templates.find(t=>t.id===shared.id).snapshot.template_recipients
+ assert.deepEqual(retained,{...saved,roles:groups},'An unrelated edit preserves the explicitly preassigned person after ownership changes')
+ await unchanged(()=>h.cmd('template.start',{id:shared.id,version:2,clientId:client.id},successor,409))
+ await h.cmd('template.recipients',{id:shared.id,version:2,preassignedOwner:'owner'},successor)
+ const reviewed=await h.cmd('template.start',{id:shared.id,version:3,clientId:client.id},successor)
+ const reviewedDraft=(await h.state(successor)).proposals.find(p=>p.id===reviewed.id)
+ assert.deepEqual(plan(reviewedDraft).map(r=>[r.id,r.group,r.email]),[['client',2,null],['cfo',3,null],['owner',4,person.email]])
+ assert.equal(reviewedDraft.template_recipients.roles.find(r=>r.id==='owner').preassignedOwnerId,person.id)
 }

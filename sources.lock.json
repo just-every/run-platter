@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "eadd115c8e2b4ca383a231e6b002948c7581909b00c82cdc871b3d681651bbad",
+      "sha256": "f36af428332b830561eb925817f73cc748391648954fdf6ea892888c751b072d",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "9998e9bb1450a87e74a9f998f600ae3922e5b0ed53130792b5d7940bbb2ea3f8",
+      "sha256": "1c6e86b05627ccc0bb42f92de37426625262657d7488e65b66aa7f3a30285b32",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2738,7 +2738,7 @@
       "executable": false
     },
     "src/platter/mailboxes.ts": {
-      "sha256": "69809dd1d1fc1832e8bb5cfa4d6a27e6000e25e0964077a32e9d84291af182f3",
+      "sha256": "e8c76e2193c0ceb8ef52421f5d2daa4f1da9adc29094fb96a51ebd7338330302",
       "executable": false
     },
     "src/platter/mcp.ts": {
@@ -3522,7 +3522,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "62c66f7f58e5aab72d9c80d3244bd0746b42e8e1993cc2fdc123f5700c9d02ae",
+      "sha256": "6fdb578cb1d26a8064b483e658eeb8fd5966a541ab4ba394e09f58aed51efc90",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {

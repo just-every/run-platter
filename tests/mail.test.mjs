@@ -856,7 +856,7 @@ test('FOLLOW-008 / TEAM-001 manual reminders require live send scope, editable t
 })
 
 test('SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh', {timeout:120000}, async()=>{
- let race=null,h;const sent=[]
+ let race=null,h;const sent=[],fallback=[]
  h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-6600',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-6601',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-6602'},outboundService:async request=>{
   const url=new URL(request.url)
   if(url.hostname==='oauth2.googleapis.com'){
@@ -866,7 +866,7 @@ test('SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdra
   }
   if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-6605',email:'race-mailbox@synthetic-platter.example',email_verified:true})
   if(url.hostname==='gmail.googleapis.com'){const raw=Buffer.from((await request.json()).raw,'base64url').toString('utf8');assert.match(raw,/^From: race-mailbox@synthetic-platter.example\r\n/);sent.push(Buffer.from(raw.match(/Subject: =\?UTF-8\?B\?([^?]+)\?=/)[1],'base64').toString('utf8'));return Response.json({id:'synthetic-platter-'+(6700+sent.length)})}
-  assert.equal(url.hostname,'api.resend.com');return Response.json({id:'synthetic-platter-6606'})
+  assert.equal(url.hostname,'api.resend.com');fallback.push((await request.json()).subject);return Response.json({id:'synthetic-platter-6606'})
  }})
  try{
   await finishSetup(h);await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'})
@@ -894,6 +894,24 @@ test('SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdra
    assert.equal(race,null);assert.equal(sent.filter(s=>s.startsWith('Refused reminder')).length,before,action+' is rechecked after provider refresh, with no reminder or fallback')
    const row=(await h.state()).proposals.find(r=>r.id===p.id);assert.equal(row.reminderRuns.length,1);assert.equal(row.reminderRuns[0].transport_status,'withheld');assert.ok(row.mailAttributions.some(m=>m.outcome==='withheld'))
   }
+  // Erasure during a provider refresh cancels the claimed message as well as future work.
+  await h.cmd('member.set',{operatorId:person.id,version:1,role:'sales',teams:[]})
+  const currentSender=await h.signIn(address)
+  const renewed=await h.send('/api/platter/mailbox/authorize',{provider:'gmail',consent:true},currentSender),renewedState=new URL(renewed.headers.get('location')).searchParams.get('state')
+  assert.equal((await h.send('/api/platter/mailbox/callback?'+new URLSearchParams({state:renewedState,code:'synthetic-platter-erasure-reconnect'}),undefined,currentSender)).status,303)
+  const eraseClient=await h.cmd('client.save',{name:'Synthetic erasure during refresh',email:['synthetic-platter-erasure-refresh','example.test'].join('@')})
+  const erased=await h.cmd('proposal.prepare',{...offer,title:'Synthetic erased reminder',clientId:eraseClient.id},currentSender)
+  await h.cmd('reminder.configure',{id:erased.id,version:1,enabled:false,timeZone:'America/Los_Angeles'},currentSender)
+  const erasedLink=await h.cmd('proposal.send',{id:erased.id,version:2},currentSender)
+  let claimedMailId,claimedRunId
+  race=async()=>{const claimed=await h.db.prepare("SELECT m.id,r.id AS run_id,m.status FROM p_mail m JOIN p_reminder_transport t ON t.mail_id=m.id JOIN p_reminder_runs r ON r.id=t.run_id WHERE r.request_id='synthetic-platter-erased-reminder'").first();assert.equal(claimed.status,'sending');claimedMailId=claimed.id;claimedRunId=claimed.run_id;const review=await h.cmd('privacy.review',{id:eraseClient.id});await h.cmd('privacy.erase',{id:eraseClient.id,...review.privacyReview,confirmName:'Synthetic erasure during refresh',consent:'yes'})}
+  const beforeErasedSends=[...sent],beforeFallback=[...fallback]
+  await h.cmd('reminder.send',{id:erased.id,requestId:'synthetic-platter-erased-reminder',subject:'Refused erased reminder',message:'Must not leave either mail route'},currentSender,403)
+  assert.equal(race,null);assert.deepEqual(sent,beforeErasedSends);assert.deepEqual(fallback,beforeFallback)
+  const erasedState=await h.state();assert.ok(!erasedState.proposals.some(p=>p.id===erased.id));assert.equal(erasedState.privacy.receipts.filter(r=>r.clientId===eraseClient.id).length,1)
+  assert.equal((await h.send(new URL(erasedLink.shareUrl).pathname)).status,404)
+  for(const table of ['p_mail','p_mail_attributions','p_reminder_runs'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table+' WHERE proposal_id=?').bind(erased.id).first()).n,0)
+  assert.equal(await h.db.prepare('SELECT mail_id FROM p_reminder_transport WHERE mail_id=? OR run_id=?').bind(claimedMailId,claimedRunId).first(),null)
  }finally{await h.close()}
 })
 

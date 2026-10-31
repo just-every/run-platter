@@ -5,16 +5,16 @@ import { canonicalJson, sha256, type Json, type SourceArtifact, type SourceBundl
 import { extractText, getDocumentProxy } from 'unpdf'
 import { parseBusinessCsv } from './business-csv'
 import { fail } from './errors'
-import { mappedProposifyReport, type DocumentReview } from './proposify-export'
+import { mappedProposifyReport, proposifyOmissions, type DocumentReview } from './proposify-export'
 
 export const documentNamespace = 'platter.exported-documents.v1'
 export type UploadedDocument = { filename: string; sha256: string; bytes: Uint8Array }
 const normalized = (text: string) => text.trim().replace(/\s+/g, ' ').toLowerCase()
 type Pdf = { id: string; sha256: string; filename: string; title: string; client: string; date: string; pages: number;
  signatureEvidence: { kind: string; page: number; text: string }[]; sources: string[]; base64: string }
-type ReportRow = { id: string; source: string; line: number; title: string; client: string; date: string; fields: Record<string,string>; candidates: string[]; selected: string | null; evidence?: Record<string,string> }
+type ReportRow = { id: string; source: string; line: number; title: string; client: string; date: string; fields: Record<string,string>; candidates: string[]; selected: string | null; evidence?: Record<string,string>; requiresChoice?: boolean }
 export async function documentSource(uploads: UploadedDocument[], choices: Record<string,string>, moveinId: string, review?: DocumentReview) {
- const artifacts: SourceArtifact[] = [], pdfs = new Map<string,Pdf>(), rows: ReportRow[] = [], seenReports = new Set<string>(), unmapped: string[] = []
+ const artifacts: SourceArtifact[] = [], pdfs = new Map<string,Pdf>(), rows: ReportRow[] = [], seenReports = new Set<string>(), unmapped: string[] = review?[...proposifyOmissions]:[]
  let expanded = 0, duplicateDocuments = 0, mappingRequired = false
  const reportColumns: string[] = []
  const artifact = (name: string, bytes: Uint8Array) => {
@@ -84,12 +84,13 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
  if(review?.templateDocument&&!documents.some(p=>p.id===review.templateDocument&&!p.signatureEvidence.length))fail('invalid_template_source',409,'Identify a separate unsigned template PDF; signed-source originals cannot become templates')
  for (const row of rows) {
   row.candidates=documents.filter(p=>p.id!==review?.templateDocument&&normalized(p.title)===normalized(row.title)&&(!p.client||normalized(p.client)===normalized(row.client))&&(!p.date||p.date===row.date)).map(p=>p.id)
+  if(review&&row.candidates.length===0){row.candidates=documents.filter(p=>p.id!==review.templateDocument).map(p=>p.id);row.requiresChoice=true}
   if (Object.hasOwn(choices,row.id) && choices[row.id]!=='unmapped' && !row.candidates.includes(choices[row.id])) fail('invalid_report_choice',409,'Choose a PDF offered for this report row')
-  row.selected=choices[row.id]==='unmapped'?null:choices[row.id] || (row.candidates.length===1?row.candidates[0]:null)
+  row.selected=choices[row.id]==='unmapped'?null:choices[row.id] || (row.candidates.length===1&&!row.requiresChoice?row.candidates[0]:null)
  }
  if (Object.keys(choices).some(key=>!rows.some(row=>row.id===key))) fail('invalid_report_choice',409,'Preview the current report rows again')
  const selected=rows.filter(r=>r.selected).map(r=>r.selected)
- const conflicts=rows.filter(r=>r.candidates.length>1&&!Object.hasOwn(choices,r.id))
+ const conflicts=rows.filter(r=>(r.candidates.length>1||r.requiresChoice)&&!Object.hasOwn(choices,r.id))
  if (new Set(selected).size!==selected.length) fail('duplicate_report_choice',409,'Each PDF can match only one report row; mark extra rows unmapped')
  if(review?.templateDocument&&rows.some(r=>normalized(r.title)===normalized(documents.find(p=>p.id===review.templateDocument)!.title)))fail('invalid_template_source',409,'The template must be separate from the report proposals')
  const report={provider:review?'proposify':'generic',reportColumns,mappingRequired,configuration:review??null,templates:review?.templateDocument?[{id:review.templateDocument,label:'rebuild in the editor'}]:[],arrived:documents.filter(p=>p.signatureEvidence.length).length,

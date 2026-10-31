@@ -1,3 +1,4 @@
+import { bulkDraftPage } from './bulk-drafts'
 import { crmSettings, crmCardPage } from './crm-settings'
 import { crmStartPanel, crmSourcePanel } from './crm-start'
 import { archivePanel } from './archiving'
@@ -37,13 +38,14 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
     let above = ''
     let layout = ''
     switch (url.pathname) {
+      case '/app/bulk-drafts': title='Bulk drafts'; content=bulkDraftPage(state,url.searchParams,feedback); break
       case '/app/catalog': title='Catalog'; content=catalogPage(state); break
       case '/app/library': title='Content library'; content=libraryPage(state,url.searchParams); break
       case '/app/team': title='Team'; content=teamPage(state)+foldersPanel(state)+connectionsPanel(state,true); break
       case '/app/approvals': title='Approvals'; content=approvalsPage(state); break
       case '/app/settings': title = 'Vendor documents'; above = eyebrow('Settings · defaults for new proposals'); content = clientLanguageSettings(state)+trackingPanel(state)+vendorSettings(state)+workspacePanel(state)+connectionsPanel(state,false)+archivePanel(state)+collaborationSettings(state)+crmSettings(state,feedback); break
       case '/app/crm-card': title='HubSpot deal'; content=crmCardPage(state,url.searchParams,feedback)+crmStartPanel(state,feedback,url.searchParams); break
-      case '/app': title = 'Proposals'; above = eyebrow(`Pipeline · ${count((state.proposals ?? []).length, 'proposal')} · ${count((state.clients ?? []).length, 'client')}`); layout = 'proposals-page'; content = proposalsPage(state, url.searchParams, composerRefusal)+crmStartPanel(state,feedback); break
+      case '/app': title = 'Proposals'; above = eyebrow(`Pipeline · ${count((state.proposals ?? []).length, 'proposal')} · ${count((state.clients ?? []).length, 'client')}`); layout = 'proposals-page'; content = proposalsPage(state, url.searchParams, composerRefusal)+crmStartPanel(state,feedback)+(state.actor.role==='owner'?'<details class="quiet-disclosure"><summary>Start multiple drafts</summary><p>Review a CSV using one template.</p><a href="/app/bulk-drafts">Open bulk drafts</a></details>':''); break
       case '/app/proposal': {
         const id = url.searchParams.get('id') ?? ''
         title = state.proposals?.find((p: any) => String(p.id) === id)?.title ?? 'Proposal'; above = proposalEyebrow(state, id); layout = 'proposal-page'

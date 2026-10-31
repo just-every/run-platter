@@ -1129,3 +1129,36 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('RENEW-001 public CLI imported business bulk drafts retain exact inactive batch and draft custody', {timeout:180000},async()=>{
+ const {bulkFixture,bulkApply}=await import('./bulk-drafts-fixture.mjs')
+ const temporary=await mkdtemp(join(tmpdir(),'platter-bulk-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored');let h
+ try{
+  for(const root of [source,restored])await checkout(root)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source})
+  const fixture=await bulkFixture(h),review=await h.cmd('bulk.preview',fixture.input),partial=await h.cmd('bulk.apply',bulkApply(review))
+  assert.equal(partial.completed,5)
+  const tables=['p_bulk_batches','p_bulk_rows','p_bulk_bindings','p_proposals','p_revisions','p_template_sources','p_proposal_defaults','p_expiry','p_personal_templates']
+  const before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
+  await h.close();h=undefined
+  const archive=join(temporary,'bulk.rer');await command(source,['export','--output',archive,'--no-queue'])
+  const records=(await readFile(archive,'utf8')).split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
+  assert.equal(records.filter(r=>r.table==='p_bulk_authority').length,0)
+  await command(restored,['import','--input',archive,'--yes','--no-queue'])
+  h=await harness({root:restored,unclaimed:true})
+  for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table],table+' retains exact custody')
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_bulk_authority').first()).n,0)
+  const owner=await h.signIn(h.auth.OWNER_EMAIL),history=await h.cmd('bulk.inspect',{id:review.id},owner)
+  assert.equal(history.active,false);assert.equal(history.completed,5);assert.equal(history.held,5)
+  assert.equal(history.csv,fixture.csv);assert.deepEqual(history.rows,partial.rows)
+  await h.cmd('bulk.apply',bulkApply(review),owner,409)
+  // Replaying the saved preview request also cannot activate restored progress.
+  assert.equal((await h.cmd('bulk.preview',fixture.input,owner)).active,false)
+  const count=(await h.db.prepare('SELECT COUNT(*) AS n FROM p_proposals').first()).n
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T12:00:00Z'),cron:'*/15 * * * *'})
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_proposals').first()).n,count)
+  for(const table of ['p_shares','p_reminder_authority','p_collection_policy','p_mail'])assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM '+table).first()).n,0)
+  console.log('PROBE RENEW-001 custody: public archive export and import -> exact CSV, batch rows and five drafts; 30 pending rows inactive, no restored execution')
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

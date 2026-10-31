@@ -85,6 +85,14 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   return { id, version }
  }
 
+ const plan=await templateDraftPlan(env,a,input)
+ await commit(db,a,plan.writes,false,plan.guard)
+ return {id:plan.id,revision:1,version:1}
+}
+
+/** Shared independent draft writes; callers compose their own atomic source guard. */
+export async function templateDraftPlan(env:Bindings,a:Actor,input:Record<string,unknown>,overrides?:{id?:string;values?:Record<string,string>;content?:(content:any)=>Promise<any>}){
+ const db=env.DB,at=await currentTime(db)
  const clientId = text(input.clientId ?? input.starterClientId, 'a client')
  const client = await db.prepare('SELECT id,name,email FROM p_clients WHERE id=?').bind(clientId).first<{ id: string; name: string; email: string }>()
  need(client, 'Client not found', 404)
@@ -94,17 +102,18 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  const personal = starter ? null : template as any
  const access=starter?{sql:'1',values:[]}:await folderGuard(db,a,personal.folder_id,'template')
  let content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
- if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...editableVariableFields(content),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan}}
+ if(documentOf(content).merge||overrides?.values){const fill=await resolveVariables(env,a,{...editableVariableFields(content),clientId,...(input.deal?{variableDeal:input.deal}:{}),...(overrides?.values?{variableValues:overrides.values}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan}}
+ if(overrides?.content)content=await overrides.content(content)
  const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)
  need(content.currency === 'USD', 'Personal templates require USD content', 409)
- const id = crypto.randomUUID(), title = input.title === undefined || input.title === '' ? content.title : text(input.title, 'a title')
+ const id = overrides?.id ?? crypto.randomUUID(), title = input.title === undefined || input.title === '' ? content.title : text(input.title, 'a title')
  const templateLocks=starter?[]:(await db.prepare('SELECT section FROM p_template_locks WHERE template_id=? UNION ALL SELECT section FROM p_template_block_locks WHERE template_id=?').bind(template.id,template.id).all<any>()).results.map(l=>l.section)
  need(!templateLocks.includes('title')||title===content.title,'The template title is locked',403)
  const attachments = copyAttachments(content.attachments ?? [])
  const row = { ...content, options:withoutTaxAddresses(content.options), document:bindDocument(content.document,clientId), id, client_id: clientId, title, revision: 1, attachments }
  const preparer = a.role === 'agent' ? `agent:${a.keyId}` : a.email
- await commit(db, a, [
+ const writes = [
   db.prepare(`INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,
    prepared_by,created_at,currency,sales_owner_id,sales_owner_name,attachments)
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
@@ -119,11 +128,12 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   db.prepare('INSERT INTO p_pdf_settings(proposal_id,enabled) VALUES(?,?)').bind(id, template.pdf_enabled),
   db.prepare('INSERT INTO p_expiry(proposal_id,mode,period_days,expires_on,time_zone,warning_days) VALUES(?,?,?,?,?,?)').bind(id, expiry.mode, expiry.period_days, expiry.expires_on, expiry.time_zone, expiry.warning_days),
   ...sections.map(section => db.prepare(`INSERT INTO ${section.startsWith('block:')?'p_block_suggestion_sections':'p_suggestion_sections'}(proposal_id,revision,section) VALUES(?,1,?)`).bind(id, section)),
- ], false, {
+ ]
+ const guard = {
   sql: (starter ? '' : 'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND (owner_id=? OR shared=1) AND version=?) AND ') + 'EXISTS(SELECT 1 FROM p_clients WHERE id=?) AND '+access.sql,
   values: [...(starter ? [] : [template.id, a.id, template.version]), clientId,...access.values],
- })
- return { id, revision: 1, version: 1 }
+ }
+ return { id, row, resolved, template, writes, guard, templateLocks }
 }
 
 async function templateDeliveryCommand(db:D1Database,a:Actor,p:Record<string,unknown>,at:number){

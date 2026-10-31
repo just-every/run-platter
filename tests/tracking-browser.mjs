@@ -12,7 +12,13 @@ export async function trackingBrowser(){
    app=await installedApp();const owner=await browser.newContext({viewport:{width,height:900}}),client=await browser.newContext({viewport:{width,height:900},userAgent:width===390?'iPhone Mobile':'Desktop'})
    try{
     const page=await owner.newPage(),command=async(name,input)=>{const r=await owner.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
-    const capture=async(p,name)=>{await p.evaluate(()=>document.fonts.ready);assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(process.env.PLATTER_SCREENSHOTS){await p.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`TRACK-${name}-${width}.png`),fullPage:true});if(['settings','timeline'].includes(name))await p.locator('section.panel').filter({has:p.getByRole('heading',{name:name==='settings'?'Engagement privacy':'Engagement timeline',exact:true})}).screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`TRACK-${name}-panel-${width}.png`)})}}
+    const capture=async(p,name)=>{
+     // A form submission can replace the document before its styles and fonts settle.
+     await p.waitForLoadState('load')
+     await p.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))})
+     const layout=await p.evaluate(()=>({width:innerWidth,scrollWidth:document.documentElement.scrollWidth}))
+     assert.ok(layout.scrollWidth<=layout.width,`${name} at ${width}px overflows: ${JSON.stringify(layout)}`)
+     if(process.env.PLATTER_SCREENSHOTS){await p.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`TRACK-${name}-${width}.png`),fullPage:true});if(['settings','timeline'].includes(name))await p.locator('section.panel').filter({has:p.getByRole('heading',{name:name==='settings'?'Engagement privacy':'Engagement timeline',exact:true})}).screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`TRACK-${name}-panel-${width}.png`)})}}
     assert.equal((await owner.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
     await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
     await page.goto(app.origin+'/app/settings');await page.getByLabel('Measure client views').selectOption('yes');await page.getByLabel('Open alerts',{exact:true}).selectOption('yes');await page.getByLabel('I authorize measuring client views and the selected alerts.').check();await page.getByRole('button',{name:'Save engagement settings'}).click();assert.equal(await page.getByLabel('Retention in days').inputValue(),'90');await capture(page,'settings')

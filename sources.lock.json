@@ -2974,7 +2974,7 @@
       "executable": false
     },
     "src/platter/signer-methods.ts": {
-      "sha256": "43824407c0302829183176484867dcadc279dc85ae9fc81a34c595c526440132",
+      "sha256": "7a85a63588aaec8bda6ab2e650c1446de5d5e2320f37fa3557a99eb32287909d",
       "executable": false
     },
     "src/platter/signer-replacement.ts": {
@@ -3546,7 +3546,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "1d0ddbcb133c9d48714c5ba8ed0a76b123782d408831b03a0fd14db8f89eda60",
+      "sha256": "b8423ebaf73d573c84652c6868dbbcc3d3638e807ae48fb9e4dabd3092913086",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {
@@ -3610,11 +3610,11 @@
       "executable": false
     },
     "tests/signer-delegation-browser.mjs": {
-      "sha256": "026b1e5c5f40bf1d697696e21de9788eba3f5c5935ccbfba9ee659837656f2fb",
+      "sha256": "8ad93a48f1054405038a13f7034ef70070f284469be6850ce022be3cf38674b0",
       "executable": false
     },
     "tests/signer-delegation-http.mjs": {
-      "sha256": "624431a9a528fd60f83fc70c669eeb47c0f13bf9cb07655c104029609aeb51be",
+      "sha256": "5ae6736c715362df3f39101ee5116e87dd6869d1d42c2a3bc9e5c7d82ebc279b",
       "executable": false
     },
     "tests/signer-replacement-http.mjs": {

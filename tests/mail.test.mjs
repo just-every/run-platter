@@ -1783,6 +1783,23 @@ test('SIGN-009 delegation sends one delegate invitation and owner notice despite
   assert.equal(messages.length,undoOffset+1);assert.equal(messages.at(-1).to[0],['synthetic-platter-9901','example.test'].join('@'));assert.ok(messages.at(-1).text.includes(new URL(undo.shareUrl).pathname))
   assert.equal((await h.send(delegatePath+'/action?name=accept',{name:'Synthetic COO',optionId:'one',consent:true},delegateSession.cookie)).status,410)
   assert.equal(messages.length,undoOffset+1)
+  const freshOriginal=new URL(undo.shareUrl).pathname,originalSession=await delegationVerify(h,freshOriginal)
+  assert.equal((await h.send(freshOriginal+'/action?name=delegate',input,originalSession.cookie)).status,200)
+  const firstChainRow=await p.get(),firstChainPath='/p/'+firstChainRow.shareToken,firstChainSession=await delegationVerify(h,firstChainPath),chainOffset=messages.length
+  const nextInput={...input,recipient:['synthetic-platter-9954','example.test'].join('@'),delegateName:'Synthetic director'}
+  assert.equal((await h.send(firstChainPath+'/action?name=delegate',nextInput,firstChainSession.cookie)).status,200)
+  assert.equal(messages.length,chainOffset+2)
+  assert.deepEqual(messages.slice(chainOffset).map(m=>m.to).flat().sort(),[nextInput.recipient,h.auth.OWNER_EMAIL].sort())
+  let chainRow=await p.get(),count=messages.length
+  const undoNested=await h.cmd('signer.delegation.undo',{id:p.id,version:chainRow.version,delegationId:chainRow.delegation.currentId})
+  assert.equal(messages.length,count+1);assert.equal(messages.at(-1).to[0],input.recipient)
+  assert.ok(messages.at(-1).text.includes(new URL(undoNested.shareUrl).pathname));assert.ok(!messages.at(-1).text.includes(firstChainPath))
+  chainRow=await p.get();assert.equal(chainRow.delegation.currentId,firstChainRow.delegation.currentId);count=messages.length
+  const undoChain=await h.cmd('signer.delegation.undo',{id:p.id,version:chainRow.version,delegationId:chainRow.delegation.currentId})
+  assert.equal(messages.length,count+1);assert.equal(messages.at(-1).to[0],['synthetic-platter-9901','example.test'].join('@'))
+  assert.ok(messages.at(-1).text.includes(new URL(undoChain.shareUrl).pathname))
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+  assert.equal(messages.length,count+1,'nested undo notices never replay')
   const {recipientFixture,roles,verifyRecipient,decision}=await import('./recipients-http.mjs')
   const multi=await recipientFixture(h,'Synthetic configured delegate notices',roles(h.auth.OWNER_EMAIL)),multiGet=async()=>(await h.state()).proposals.find(r=>r.id===multi.id)
   await h.cmd('signer.delegation.configure',{id:multi.id,version:(await multiGet()).version,enabled:true})

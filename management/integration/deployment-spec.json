@@ -618,6 +618,12 @@
       "name": "0102_delegation_slots.sql",
       "sha256": "9e19c2d17c7911936e0636d0e4e8f5985d6e247564f3ac733dca106003f2039e",
       "sql": "-- Preserve the delegated recipient slot independently of its mutable mailbox.\nALTER TABLE p_signer_delegations ADD COLUMN slot_id TEXT NOT NULL DEFAULT 'client';\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0103_delegation_lineage.sql",
+      "sha256": "f446ec9621e4105cb98e06a9c22601acb70c047cb09f6de965b3a502e16ba30e",
+      "sql": "-- Retain the preceding transfer so owner undo can unwind unsigned delegations.\n-- Historical facts remain unchanged when their predecessor was not recorded.\nALTER TABLE p_signer_delegations ADD COLUMN previous_delegation_id TEXT;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

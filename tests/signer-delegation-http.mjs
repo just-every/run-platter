@@ -115,6 +115,31 @@ export async function delegationHttp(){
   const undoResults=await Promise.all([h.send('/api/platter/command',{name:'signer.delegation.undo',input:{id:undoRace.id,version:undoRow.version,delegationId:undoRow.delegation.currentId}},h.owner),h.send(undoPath+'/action?name=accept',{name:'Synthetic COO',optionId:'one',consent:true},undoSession.cookie)])
   assert.equal(undoResults.filter(r=>r.status===200).length,1);assert.ok(undoResults.every(r=>[200,409,410].includes(r.status)))
   await refused('/api/platter/command',{name:'client.erase',input:{id:p.offer.clientId,confirmName:'Synthetic Platter leadership'}},h.owner,409)
+  // Delegates can discover another signer; the owner can unwind each unsigned
+  // transfer without reviving any previous invitation or verification.
+  const chain=await delegationFixture(h);await chain.configure(true)
+  const chainOriginal=await delegationVerify(h,chain.path),firstInput={...input,recipient:address(9950)}
+  assert.equal((await h.send(chain.path+'/action?name=delegate',firstInput,chainOriginal.cookie)).status,200)
+  const firstRow=await chain.get(),firstPath='/p/'+firstRow.shareToken,firstSession=await delegationVerify(h,firstPath)
+  assert.equal((await h.send(firstPath+'/action?name=delegate',{...input,recipient:address(9951)},firstSession.cookie)).status,200)
+  let chainRow=await chain.get();const lastPath='/p/'+chainRow.shareToken,lastSession=await delegationVerify(h,lastPath)
+  const undoLast=await h.cmd('signer.delegation.undo',{id:chain.id,version:chainRow.version,delegationId:chainRow.delegation.currentId})
+  chainRow=await chain.get()
+  assert.equal(chainRow.delegation.currentId,firstRow.delegation.currentId,'undo restores the earlier unsigned delegation for owner review')
+  const backToDelegate=new URL(undoLast.shareUrl).pathname
+  assert.notEqual(backToDelegate,firstPath)
+  for(const [path,cookie]of [[chain.path,chainOriginal.cookie],[firstPath,firstSession.cookie],[lastPath,lastSession.cookie]])assert.equal((await h.send(path+'/data.json',undefined,cookie)).status,410)
+  assert.equal((await h.send(backToDelegate+'/data.json',undefined,firstSession.cookie)).status,401)
+  const backSession=await delegationVerify(h,backToDelegate)
+  const undoFirst=await h.cmd('signer.delegation.undo',{id:chain.id,version:chainRow.version,delegationId:chainRow.delegation.currentId}),backToOriginal=new URL(undoFirst.shareUrl).pathname
+  assert.notEqual(backToOriginal,chain.path);assert.equal((await h.send(backToDelegate+'/data.json',undefined,backSession.cookie)).status,410)
+  assert.equal((await h.send(backToOriginal+'/data.json',undefined,chainOriginal.cookie)).status,401)
+  const originalAgain=await delegationVerify(h,backToOriginal)
+  assert.equal((await h.send(backToOriginal+'/action?name=accept',{name:'Synthetic CEO',optionId:'one',consent:true},originalAgain.cookie)).status,200)
+  const chainCertificate=await h.send(backToOriginal+'/certificate.json',undefined,originalAgain.cookie)
+  assert.equal(chainCertificate.status,200);assert.equal(chainCertificate.value.delegations.length,2)
+  assert.ok(chainCertificate.value.delegations.every(d=>d.undone_at>0));assert.equal(chainCertificate.value.signers[0].email,address(9901))
+  console.log('PROBE SIGN-009 nested undo: A delegates to B, B to C, owner undoes twice -> fresh B then fresh A invitations, old capabilities refused and both undo facts retained')
   await configuredDelegationHttp(h)
   await templateDelegationHttp(h,member)
   const revoked=await delegationFixture(h);await revoked.configure(true);const revokedSession=await delegationVerify(h,revoked.path)

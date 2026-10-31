@@ -593,14 +593,21 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   await h.cmd('signer.delegation.configure',{id:real.id,version:rowBeforeDelegation.version,enabled:true})
   assert.equal((await h.send(replacementPath+'/action?name=delegate',{revision:1,delegateName:'Synthetic Platter CTO',recipient:['synthetic-platter-9904','example.test'].join('@')},verified.cookie)).status,200)
   const delegatedRow=(await h.state()).proposals.find(r=>r.id===real.id),delegatedPath='/p/'+delegatedRow.shareToken
-  await delegationVerify(h,delegatedPath)
-  const undo=await h.cmd('signer.delegation.undo',{id:real.id,version:delegatedRow.version,delegationId:delegatedRow.delegation.currentId})
+  const delegatedSession=await delegationVerify(h,delegatedPath)
+  assert.equal((await h.send(delegatedPath+'/action?name=delegate',{revision:1,delegateName:'Synthetic Platter director',recipient:['synthetic-platter-9952','example.test'].join('@')},delegatedSession.cookie)).status,200)
+  const nestedRow=(await h.state()).proposals.find(r=>r.id===real.id),nestedPath='/p/'+nestedRow.shareToken
+  await delegationVerify(h,nestedPath)
+  const nestedUndo=await h.cmd('signer.delegation.undo',{id:real.id,version:nestedRow.version,delegationId:nestedRow.delegation.currentId})
+  const unwindRow=(await h.state()).proposals.find(r=>r.id===real.id)
+  assert.equal(unwindRow.delegation.currentId,delegatedRow.delegation.currentId)
+  const unwindPath=new URL(nestedUndo.shareUrl).pathname;await delegationVerify(h,unwindPath)
+  const undo=await h.cmd('signer.delegation.undo',{id:real.id,version:unwindRow.version,delegationId:unwindRow.delegation.currentId})
   replacementPath=new URL(undo.shareUrl).pathname
   assert.notEqual(replacementPath,initialReplacementPath)
   verified.cookie=(await delegationVerify(h,replacementPath)).cookie
   retained=(await h.state()).proposals.find(r=>r.id===real.id).invitationMessages
   const delegationFacts=(await h.db.prepare('SELECT * FROM p_signer_delegations WHERE proposal_id=? ORDER BY delegated_at,id').bind(real.id).all()).results
-  assert.equal(delegationFacts.length,1);assert.ok(delegationFacts[0].undone_at)
+  assert.equal(delegationFacts.length,2);assert.ok(delegationFacts.every(f=>f.undone_at));assert.equal(delegationFacts[1].previous_delegation_id,delegationFacts[0].id)
   assert.equal((await h.send(replacementPath+'/action?name=accept',{name:'Northstar COO',optionId:'two',consent:true},verified.cookie)).status,200)
   const certificate=await h.send(replacementPath+'/certificate.json',undefined,verified.cookie);assert.equal(certificate.status,200,certificate.text)
   assert.equal(certificate.value.language,'es');assert.equal(certificate.value.signers[0].language,'es')
@@ -646,7 +653,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const signatures=(await h.db.prepare('SELECT * FROM p_recipient_signatures ORDER BY proposal_id,revision,slot_id').all()).results
   const voids=(await h.db.prepare('SELECT * FROM p_void_signatures ORDER BY proposal_id,revision').all()).results
   assert.equal(signatures.length,4);assert.equal(voids.length,1)
-  const allInvitationHistory=[...retained,...(await h.state()).proposals.find(r=>r.id===multi.id).invitationMessages,...(await h.state()).proposals.find(r=>r.id===voided.id).invitationMessages];assert.equal(allInvitationHistory.length,11)
+  const allInvitationHistory=[...retained,...(await h.state()).proposals.find(r=>r.id===multi.id).invitationMessages,...(await h.state()).proposals.find(r=>r.id===voided.id).invitationMessages];assert.equal(allInvitationHistory.length,13)
 
   await h.close();h=null
   const archive=join(temporary,'source.rer')
@@ -655,7 +662,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.ok(!bytes.includes('Test-only message never in the agreement package'))
   assert.ok(!bytes.includes('[Test] Archive rehearsal only'))
   assert.ok(!bytes.includes(new URL(invitation.shareUrl).pathname))
-  assert.ok(!bytes.includes(replacementPath));assert.ok(!bytes.includes(initialReplacementPath));assert.ok(!bytes.includes(delegatedPath))
+  assert.ok(!bytes.includes(replacementPath));assert.ok(!bytes.includes(initialReplacementPath));assert.ok(!bytes.includes(delegatedPath));assert.ok(!bytes.includes(nestedPath));assert.ok(!bytes.includes(unwindPath))
   assert.equal(records.filter(item=>item.table==='p_delegation_authority').length,0)
   assert.deepEqual(records.filter(item=>item.table==='p_signer_delegations').map(item=>item.row).sort((a,b)=>a.id.localeCompare(b.id)),[...delegationFacts,...multiDelegationFacts].sort((a,b)=>a.id.localeCompare(b.id)))
   assert.ok(!bytes.includes(oldMultiCfo))
@@ -680,7 +687,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.deepEqual(await h.db.prepare('SELECT language FROM p_signature_facts WHERE proposal_id=?').bind(real.id).first(),languageFacts)
   assert.equal((await h.send(new URL(invitation.shareUrl).pathname)).status,404)
   assert.equal((await h.send(replacementPath)).status,404)
-  for(const path of [initialReplacementPath,delegatedPath])assert.equal((await h.send(path)).status,404)
+  for(const path of [initialReplacementPath,delegatedPath,nestedPath,unwindPath])assert.equal((await h.send(path)).status,404)
   assert.equal(after.proposals.find(r=>r.id===real.id).delegation.enabled,false)
   assert.equal(after.proposals.find(r=>r.id===multi.id).delegation.enabled,false)
   assert.equal(after.proposals.find(r=>r.id===delegationDraft.id).delegation.enabled,false)

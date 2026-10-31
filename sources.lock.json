@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "2f8c1332a6c3c83290a96eafec82511045430615330708cce44711c90bf65abc",
+      "sha256": "e56f1de453199ae83abd42484a09fc916f144ba76510fa0d5e302f16561bc6bf",
       "executable": false
     },
     "deploy-demo.json": {
@@ -250,7 +250,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "dead0114758371ddf5aa83b091f357cc9dbd94529b4f3043764d7184205f9f50",
+      "sha256": "8231a1f9813244646d24b17b1daa34618328f6fb1c35d38e8afe0eeb2a379885",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -2978,7 +2978,7 @@
       "executable": false
     },
     "src/platter/signer-delegation.ts": {
-      "sha256": "ab4845fe6945f09756936a139e522ec67500f256ca11d39c256b289a2784b494",
+      "sha256": "5b47a95b68ac79935e3d39d379c164fc3067e69ec27f5de633196cf6f26f2f0a",
       "executable": false
     },
     "src/platter/signer-methods.ts": {
@@ -3422,7 +3422,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "3dd536950cfe0fca6c6a3ecf045aefff7ab8cf1e1111f4843693bd5f45cbc49b",
+      "sha256": "38926cde2db02fd29bdb99fa9e70caf127805c9b538ea7e7f3cc236150923cd5",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3554,7 +3554,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "b9fe444860d1892129abe02581e5bbf1cdfb41ce960b754e7600ecd6c2e6e98f",
+      "sha256": "d90671dde109a3ec4c32f8b98df602aff541ac09382089435dbbbf7f632ad003",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {
@@ -3618,11 +3618,11 @@
       "executable": false
     },
     "tests/signer-delegation-browser.mjs": {
-      "sha256": "41dca3d8ce09579049ab62107fcd9c3c97f4fbbaf2c4e865bfd2c6a877d9c9ea",
+      "sha256": "f81677fa62bfd3803cf544a61398f972c36ab65639ad9e327fc6c0f171c47000",
       "executable": false
     },
     "tests/signer-delegation-http.mjs": {
-      "sha256": "22f94a82bc63433f1ff084b8791ba277ace96607d47130e9daf4fc6b504b2a92",
+      "sha256": "427532a59d0adc9d3ec53081151b627af61bb23421fa9a12785c1dfe02216cfd",
       "executable": false
     },
     "tests/signer-replacement-http.mjs": {

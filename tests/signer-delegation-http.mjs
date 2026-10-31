@@ -114,6 +114,18 @@ export async function delegationHttp(){
   const undoResults=await Promise.all([h.send('/api/platter/command',{name:'signer.delegation.undo',input:{id:undoRace.id,version:undoRow.version,delegationId:undoRow.delegation.currentId}},h.owner),h.send(undoPath+'/action?name=accept',{name:'Synthetic COO',optionId:'one',consent:true},undoSession.cookie)])
   assert.equal(undoResults.filter(r=>r.status===200).length,1);assert.ok(undoResults.every(r=>[200,409,410].includes(r.status)))
   await refused('/api/platter/command',{name:'client.erase',input:{id:p.offer.clientId,confirmName:'Synthetic Platter leadership'}},h.owner,409)
+  const revoked=await delegationFixture(h);await revoked.configure(true);const revokedSession=await delegationVerify(h,revoked.path)
+  const originalOwner=(await h.state()).actor,successorId=(await h.state(member)).actor.id,freshOwner=await h.signIn(h.auth.OWNER_EMAIL)
+  assert.equal((await h.send('/auth/operator/role',{operatorId:successorId,role:'owner'},freshOwner)).status,200)
+  const successor=await h.signIn(address(9903))
+  assert.equal((await h.send('/auth/operator/role',{operatorId:originalOwner.id,role:'admin'},successor)).status,200)
+  await refused(revoked.path+'/action?name=delegate',input,revokedSession.cookie,409)
+  assert.equal((await h.send('/auth/operator/role',{operatorId:originalOwner.id,role:'owner'},successor)).status,200)
+  // Reinstating a person never resurrects an old delegation grant.
+  await refused(revoked.path+'/action?name=delegate',input,revokedSession.cookie,409)
+  const reinstated=await h.signIn(h.auth.OWNER_EMAIL),reinstatedRow=(await h.state(reinstated)).proposals.find(r=>r.id===revoked.id)
+  await h.cmd('signer.delegation.configure',{id:revoked.id,version:reinstatedRow.version,enabled:true},reinstated)
+  assert.equal((await h.send(revoked.path+'/action?name=delegate',input,revokedSession.cookie)).status,200)
   console.log('PROBE SIGN-009 scope: verified recipient delegation, new verification, undo and acceptance -> fresh invitations, exact frozen offer and retained certificate facts')
   console.log('PROBE SIGN-009 authority: disabled, unverified, stale, expired, withdrawn, accepted and signing race -> refused without writes or duplicate notice')
  }finally{await h.close()}

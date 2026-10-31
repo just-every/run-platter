@@ -8,10 +8,8 @@ export async function delegationBrowser(widths=[1440]){
  const browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM_EXECUTABLE,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
  const screenshots=process.env.PLATTER_SCREENSHOTS;if(screenshots)await mkdir(screenshots,{recursive:true})
  try{for(const width of widths){
-  console.log('SIGN-009 browser: starting compiled app at '+width)
   const app=await installedApp(),owner=await browser.newContext({viewport:{width,height:1000}}),client=await browser.newContext({viewport:{width,height:1000}})
   try{
-   console.log('SIGN-009 browser: compiled app ready at '+width)
    const page=await owner.newPage(),recipient=await client.newPage()
    const cmd=async(name,input)=>{const r=await owner.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
    const state=async()=>{const r=await owner.request.get(app.origin+'/api/platter/state');assert.equal(r.status(),200);return r.json()}
@@ -29,14 +27,14 @@ export async function delegationBrowser(widths=[1440]){
    await page.goto(app.origin+'/app/settings')
    const settings=page.locator('section.panel').filter({has:page.getByRole('heading',{name:'Signer delegation Settings',exact:true})})
    await settings.getByRole('button',{name:'Enable delegation',exact:true}).click();assert.match(await settings.innerText(),/Delegation is on/);await capture(page,'settings')
-   await recipient.reload();console.log('SIGN-009 browser: enabled, recipient refreshed at '+width)
+   await recipient.reload()
    const delegate=async()=>{await recipient.getByLabel('Delegate full name').fill('Synthetic COO');await recipient.getByLabel('Delegate email').fill(address(9902));await recipient.getByRole('button',{name:'Delegate signing',exact:true}).click();assert.equal(await recipient.getByRole('heading',{name:'Signing delegated',exact:true}).count(),1)}
-   await delegate();console.log('SIGN-009 browser: delegated at '+width);await capture(recipient,'delegated')
+   await delegate();await capture(recipient,'delegated')
    assert.equal((await recipient.goto(sent.shareUrl)).status(),410);assert.ok(!(await recipient.locator('body').innerText()).includes(offer.scope))
    let path='/p/'+(await get()).shareToken;await recipient.goto(app.origin+path)
    assert.ok(!(await recipient.locator('body').innerText()).includes(offer.scope));assert.equal(await recipient.getByRole('button',{name:'Accept proposal',exact:true}).count(),0);await capture(recipient,'identity-required')
-   await verify(path);console.log('SIGN-009 browser: delegate verified at '+width);assert.ok((await recipient.locator('body').innerText()).includes(offer.scope));await capture(recipient,'delegate-review')
-   console.log('SIGN-009 browser: owner undo next at '+width);await page.goto(app.origin+'/app/proposal?id='+p.id);const history=page.locator('section.panel').filter({has:page.getByRole('heading',{name:'Signer delegation',exact:true})})
+   await verify(path);assert.ok((await recipient.locator('body').innerText()).includes(offer.scope));await capture(recipient,'delegate-review')
+   await page.goto(app.origin+'/app/proposal?id='+p.id);const history=page.locator('section.panel').filter({has:page.getByRole('heading',{name:'Signer delegation',exact:true})})
    await history.getByRole('button',{name:'Undo delegation',exact:true}).click();assert.match(await history.innerText(),/Undone/);await capture(page,'undo')
    assert.equal((await recipient.goto(app.origin+path)).status(),410)
    path='/p/'+(await get()).shareToken;assert.notEqual(path,new URL(sent.shareUrl).pathname);await verify(path);await delegate()

@@ -27,8 +27,9 @@ async function deposit(db: D1Database, id: unknown) {
  need(!await db.prepare('SELECT 1 FROM p_collection_intents WHERE proposal_id=?').bind(row.proposal_id).first(), 'Provider collection agreements cannot use this matching path', 409)
  return { ...row, client_name: accepted.clientName ?? row.client_name, acceptance_digest: await hash(row.snapshot) }
 }
-function guard(connection: any, row: any) {
- return { sql: `EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id
+type ReviewBinding = { id: string; digest: string }
+function guard(connection: any, row: any, review?: ReviewBinding) {
+ const checked = { sql: `EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id
   WHERE c.id=? AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL)
   AND NOT EXISTS(SELECT 1 FROM p_accounting_company WHERE account_id!=?)
   AND EXISTS(SELECT 1 FROM p_invoices i JOIN p_acceptances a ON a.proposal_id=i.proposal_id
@@ -37,6 +38,12 @@ function guard(connection: any, row: any) {
    AND NOT EXISTS(SELECT 1 FROM p_collection_policy WHERE proposal_id=p.id)
    AND NOT EXISTS(SELECT 1 FROM p_collection_intents WHERE proposal_id=p.id))`,
   values: [connectionId, connection.account_id, connection.version, connection.account_id, row.deposit_id, row.proposal_id, row.revision, row.snapshot, row.deposit_cents, row.currency, row.csv] as any[] }
+ if (review) {
+  checked.sql += ` AND EXISTS(SELECT 1 FROM p_invoice_match_reviews WHERE id=? AND digest=? AND applied_at IS NULL
+   AND created_at>MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))-900000)`
+  checked.values.push(review.id, review.digest, Date.now())
+ }
+ return checked
 }
 async function connectionFor(env: Bindings, input: Record<string, unknown>, account?: string, version?: number) {
  const { connection, secret } = await providerCredential(env, connectionId)
@@ -46,8 +53,8 @@ async function connectionFor(env: Bindings, input: Record<string, unknown>, acco
  need(!lock || lock.account_id === connection.account_id, 'Retained accounting requests lock this installation to its verified company', 409)
  return { connection, secret }
 }
-async function readSource(env: Bindings, actor: Actor, connection: any, token: string, row: any, externalId: string) {
- const check = () => commit(env.DB, actor, [], true, guard(connection, row))
+async function readSource(env: Bindings, actor: Actor, connection: any, token: string, row: any, externalId: string, review?: ReviewBinding) {
+ const check = () => commit(env.DB, actor, [], true, guard(connection, row, review))
  await check()
  const base = 'https://quickbooks.api.intuit.com/v3/company/' + encodeURIComponent(connection.account_id)
  const response = await providerJson(base + '/invoice/' + encodeURIComponent(externalId), token)
@@ -92,11 +99,9 @@ export async function invoiceMatchingCommand(env: Bindings, actor: Actor, name: 
   need(row.deposit_id === review.deposit_id && row.revision === review.revision && row.acceptance_digest === review.acceptance_digest && row.deposit_cents === review.deposit_cents && row.currency === review.currency, 'The accepted deposit changed; review again', 409)
   const { connection, secret } = await connectionFor(env, input, review.account_id, review.connection_version)
   need(!await db.prepare('SELECT 1 FROM p_invoice_matches WHERE deposit_id=? OR (account_id=? AND external_id=?)').bind(row.deposit_id, review.account_id, review.external_id).first(), 'This deposit or external invoice is already matched', 409)
-  const source = await readSource(env, actor, connection, secret.token, row, review.external_id)
+  const source = await readSource(env, actor, connection, secret.token, row, review.external_id, review)
   need(canonical(source) === review.source_json && matches(source, row, review.customer_id).length === 0, 'The provider invoice changed after review; read it again', 409)
-  const checked = guard(connection, row)
-  checked.sql += ' AND EXISTS(SELECT 1 FROM p_invoice_match_reviews WHERE id=? AND digest=? AND applied_at IS NULL)'
-  checked.values.push(review.id, review.digest)
+  const checked = guard(connection, row, review)
   await commit(db, actor, [
    db.prepare("INSERT INTO p_invoice_matches(id,proposal_id,deposit_id,revision,provider,account_id,connection_version,customer_id,external_id,deposit_cents,currency,acceptance_digest,source_json,digest,reviewed_by,reviewed_at,matched_by,matched_at) VALUES(?,?,?,?,'quickbooks',?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(review.id, row.proposal_id, row.deposit_id, row.revision, review.account_id, review.connection_version, review.customer_id, review.external_id, review.deposit_cents, review.currency, review.acceptance_digest, review.source_json, review.digest, actor.id, review.created_at, actor.id, at),
    db.prepare('UPDATE p_invoice_match_reviews SET applied_at=? WHERE id=?').bind(at, review.id),

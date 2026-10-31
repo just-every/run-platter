@@ -3911,6 +3911,15 @@ test('ACCT-004 reviewed QuickBooks deposit matches survive replay and reconnecti
   await connectInvoice(h,4)
   const staleCalls=fake.calls.length;await apply(ownerReview,h.owner,409);assert.equal(fake.calls.length,staleCalls)
   const expired=await h.cmd('invoice.match.review',{...otherInput,connectionVersion:5});await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T15:16:00Z'),cron:'*/15 * * * *'});await apply(expired,h.owner,409)
+  const expiring=await h.cmd('invoice.match.review',{...otherInput,connectionVersion:5}),beforeExpiry=await records(),expiryCalls=fake.calls.length
+  let advanced=false;fake.beforeReply(async request=>{if(!advanced&&request.url.includes('/invoice/')){advanced=true;await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T15:32:00Z'),cron:'*/15 * * * *'})}})
+  await apply(expiring,h.owner,409);fake.beforeReply(undefined)
+  assert.equal(fake.calls.length,expiryCalls+1,'expired review authority stops the next customer read')
+  assert.deepEqual(await records(),beforeExpiry,'expiry during a provider request cannot retain a match or consume the capture')
+  const lastMoment=await h.cmd('invoice.match.review',{...otherInput,connectionVersion:5}),beforeLastMoment=await records()
+  fake.beforeReply(async request=>{if(request.url.includes('/customer/'))await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T15:48:00Z'),cron:'*/15 * * * *'})})
+  await apply(lastMoment,h.owner,409);fake.beforeReply(undefined)
+  assert.deepEqual(await records(),beforeLastMoment,'expiry on the final provider response prevents the retained match')
   await h.cmd('client.erase',{id:first.client.id,confirmName:'Synthetic deposit client'},h.owner,409)
   const erased=await h.cmd('client.save',{name:'Unused invoice person',email:['synthetic-platter-4707','example.test'].join('@')});await h.cmd('client.erase',{id:erased.id,confirmName:'Unused invoice person'})
   await apply({...expired,id:erased.id},h.owner,409);assert.equal(await h.db.prepare('SELECT id FROM p_clients WHERE id=?').bind(erased.id).first(),null,'review replay cannot recreate an erased person')
@@ -3919,6 +3928,7 @@ test('ACCT-004 reviewed QuickBooks deposit matches survive replay and reconnecti
   const adminMatch=(await h.send('/api/platter/invoice-reconciliation',undefined,member)).value.deposits.find(row=>row.proposal_id===other.p.id).match
   assert.equal(adminMatch.matched_by,person.id);assert.equal(adminMatch.deposit_cents,105000)
   const audit=(await h.send('/api/platter/audit?action=invoice.match.apply',undefined,h.owner)).value.rows;assert.equal(audit.length,2);assert.ok(audit.some(row=>row.subject===retained.id));assert.ok(audit.some(row=>row.subject===adminMatch.id&&row.actor_role==='admin'))
+  console.log('PROBE ACCT-004 expiry: apply while either provider response crosses the review deadline -> 409, no retained match or consumed capture; expired authority stops the next read')
   assert.ok(fake.calls.every(call=>call.method==='GET'));console.log('PROBE ACCT-004 matching: public review and apply -> one exact USD 105000-cent deposit match; unsafe cases unchanged')
   console.log('PROBE ACCT-004 inspection: public inspection after edits -> amount, currency and customer mismatches; retained money and match unchanged')
   console.log('PROBE ACCT-004 authority: disconnect, reconnect, demotion, stale capture and expiry -> no unconsented read or match write')

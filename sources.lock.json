@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "fbe8d25fbcab6d6583e8e1b0f5163e5b952d0b3b8bdb3bd397011917f30826d9",
+      "sha256": "869483a42f67a099149c42a4947a731dfdd0315eb95c328fb4edae6640e3fe2c",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2454,7 +2454,7 @@
       "executable": false
     },
     "src/platter/accounting/invoice-matching.ts": {
-      "sha256": "3dc362221bdf9b0c0e361d75396278cd6a2db0aeb8a7730810e9ca3a9b6f8566",
+      "sha256": "38ed09b91db82903ae6a8a36f01735a479659e5997ddbf3ecda863208eed2504",
       "executable": false
     },
     "src/platter/api/index.ts": {
@@ -3570,7 +3570,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "b99514a3b0cc2b46c6e949ebde02e247f85509dad6e93922c909622bfd5e37c5",
+      "sha256": "6fe6b1ed244bd1712bd3fd7a989a1e3e7ad50160e5ce2526ae624c7d1145e5ad",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

@@ -1758,3 +1758,67 @@ test('SIGN-005 completion mail attaches the retained PDFs to both parties once, 
   }finally{release();await h.close()}
  }
 })
+
+test('PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete or uncertain mail without replay', {timeout:180000}, async()=>{
+ const {depositEdge,preparedNoticeDeposit}=await import('./collection-journey.mjs')
+ const edge=depositEdge(),h=await harness({origin:'https://platter.example',assetsDirectory:'public',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-10001'},outboundService:edge.outboundService})
+ let release
+ try{
+  await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-10002',publishableKey:'synthetic-platter-10006',consent:true})
+  const p=await preparedNoticeDeposit(h);await p.authorize();edge.fail(p.saved)
+  let entered
+  const arrived=new Promise(resolve=>{entered=resolve}),waiting=new Promise(resolve=>{release=resolve})
+  edge.mailHook=async message=>{if(message.to[0]!==h.auth.OWNER_EMAIL){entered();await waiting}}
+  const first=h.send(p.path+'/payment-status.json',{},p.cookie)
+  await arrived
+  const rows=(await h.db.prepare('SELECT * FROM p_payment_failure_deliveries').all()).results
+  assert.equal(rows.filter(r=>r.status==='sending').length,1,'Delivery is claimed before the provider request')
+  await Promise.all([h.send(p.path+'/payment-status.json',{},p.cookie),(await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})])
+  release();assert.equal((await first).status,200);edge.mailHook=null
+  const messages=edge.mail.filter(m=>m.subject==='Deposit payment failed')
+  assert.equal(messages.length,2);assert.deepEqual(messages.flatMap(m=>m.to).sort(),[h.auth.OWNER_EMAIL,(await h.db.prepare('SELECT email FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).email].sort())
+  for(const message of messages){assert.equal(message.text,'The one-time deposit payment of 600.00 USD failed. The payment method has insufficient funds.\nNo automatic retry or future charge is authorized. Contact the firm to arrange payment.');assert.doesNotMatch(JSON.stringify(message),/private diagnostic|client_secret/)}
+  assert.deepEqual((await h.db.prepare('SELECT party,status FROM p_payment_failure_deliveries ORDER BY party').all()).results,[{party:'client',status:'accepted'},{party:'firm',status:'accepted'}])
+  edge.uncertain=true;edge.fail(p.saved,'expired_card','synthetic-platter-uncertain-attempt')
+  assert.equal((await h.send(p.path+'/payment-status.json',{},p.cookie)).status,200)
+  const sent=edge.mail.length;await h.send(p.path+'/payment-status.json',{},p.cookie);await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'});assert.equal(edge.mail.length,sent,'Uncertain sends never replay')
+  assert.equal((await h.db.prepare("SELECT count(*) n FROM p_payment_failure_deliveries WHERE status='uncertain'").first()).n,2)
+  assert.equal(edge.calls.filter(c=>c.path==='/v1/payment_intents'&&c.method==='POST').length,1,'Notices create no additional payment or automatic retry')
+ }finally{release?.();await h.close()}
+ // Refreshing a connected mailbox is a real asynchronous boundary before any notice send.
+ for(const scenario of ['revoked','account','recipient','invitation','paid','authority']){
+  const edge=depositEdge(),h=await harness({origin:'https://platter.example',assetsDirectory:'public',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-10011',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-10012',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-10013'},outboundService:edge.outboundService})
+  edge.ownerEmail=h.auth.OWNER_EMAIL
+  try{
+   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-10014',publishableKey:'synthetic-platter-10015',consent:true})
+   const p=await preparedNoticeDeposit(h)
+   const other=await h.cmd('agent.create',{label:'Failure notice refusal'})
+   const before=(await h.db.prepare('SELECT count(*) n FROM p_payment_failure_authority').first()).n
+   assert.equal((await h.send('/api/platter/agent/command',{name:'payment.failure-notices',input:{id:p.id,version:1,enabled:true,consent:true}},'',{authorization:'Bearer '+other.token})).status,403)
+   assert.equal((await h.db.prepare('SELECT count(*) n FROM p_payment_failure_authority').first()).n,before)
+   await p.authorize()
+   const current=(await h.state()).paymentFailureNotices.find(row=>row.id===p.id)
+   await h.cmd('payment.failure-notices',{id:p.id,version:current.version-1,enabled:false},h.owner,409)
+   const start=await h.send('/api/platter/mailbox/authorize',{provider:'gmail',consent:true},h.owner),state=new URL(start.headers.get('location')).searchParams.get('state')
+   assert.equal((await h.send('/api/platter/mailbox/callback?'+new URLSearchParams({state,code:'synthetic-platter-10016'}),undefined,h.owner)).status,303)
+   edge.fail(p.saved)
+   let changed=false
+   edge.oauthHook=async()=>{
+    if(changed)return;changed=true
+    if(scenario==='revoked')await h.db.prepare('DELETE FROM p_payment_failure_authority WHERE proposal_id=?').bind(p.id).run()
+    if(scenario==='account')await h.db.prepare("UPDATE p_connections SET account_id='synthetic-platter-replaced-account',version=version+1 WHERE id='workspace:stripe'").run()
+    if(scenario==='recipient')await h.db.prepare('UPDATE p_clients SET email=? WHERE id=(SELECT client_id FROM p_proposals WHERE id=?)').bind(h.auth.MAIL_FROM,p.id).run()
+    if(scenario==='invitation')await h.db.prepare('UPDATE p_shares SET token=? WHERE proposal_id=?').bind('synthetic-platter-replaced-invitation',p.id).run()
+    if(scenario==='paid')await h.cmd('payment.record',{id:p.id,amount:'600',method:'check',receivedOn:'2026-10-31',reference:'synthetic-platter-10017',consent:true})
+    if(scenario==='authority')await h.db.prepare("UPDATE oa_operators SET version=version+1 WHERE role='owner'").run()
+   }
+   const sent=edge.mail.length,result=await h.send(p.path+'/payment-status.json',{},p.cookie);assert.equal(result.status,200,result.text)
+   assert.ok(changed,scenario+' reaches mailbox refresh')
+   assert.equal(edge.mail.length,sent,scenario+' prevents provider notice delivery')
+   assert.ok((await h.db.prepare('SELECT status FROM p_payment_failure_deliveries WHERE failure_id IN (SELECT id FROM p_payment_failures WHERE proposal_id=?)').bind(p.id).all()).results.every(r=>r.status==='withheld'))
+   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})
+   assert.equal(edge.mail.length,sent,scenario+' remains held on scheduler replay')
+   assert.equal((await h.db.prepare('SELECT count(*) n FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).n,1)
+  }finally{await h.close()}
+ }
+})

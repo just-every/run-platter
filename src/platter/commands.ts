@@ -1,3 +1,4 @@
+import { failureNoticeCommand } from './payment-failure-notices'
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
@@ -132,6 +133,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='proposal.folder')return fileProposal(db,a,p)
  if(name==='folder.save')return folderCommand(db,a,p)
  if(name==='payment.surcharge')return surchargeCommand(db,a,p)
+ if(name==='payment.failure-notices')return failureNoticeCommand(env,a,p)
  if(name==='payment.collection')return collectionPolicyCommand(env,a,name,p)
  if(name.startsWith('payment.'))return paymentCommand(env,a,name,p)
  if(name.startsWith('archive.'))return archiveCommand(env,a,name,p)

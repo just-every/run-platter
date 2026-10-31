@@ -1,3 +1,4 @@
+import { failureNoticeAuthority } from './payment-failure-notices'
 import { completionAuthority } from './completion-mail'
 import { mailboxMime, type MailAttachment } from '../mail.server.mjs'
 import { reminderPolicy, reminderQuiet } from './reminders'
@@ -77,6 +78,7 @@ export async function mailboxCallback(env:Bindings,a:Actor,url:URL){
 }
 export async function sendingActor(env:Bindings,row:any){
  await completionAuthority(env,row)
+ await failureNoticeAuthority(env,row)
  if(!row.sender_id)return null
  const a=await actorById(env.DB,row.sender_id);need(a&&senders.includes(a.role),'The sender no longer has permission to send',403)
  const proposal=await permitted(env.DB,a,row.proposal_id,'send')

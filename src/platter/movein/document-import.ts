@@ -4,6 +4,8 @@ import { planD1Import, createD1ImportJob, applyD1ImportBatches, undoD1Import, re
  canonicalJson, sha256, d1RequestContext, type D1ImportContext, type ImportMapping } from '../../modules/import-kit/src/d1/index.ts'
 import { documentSource, documentNamespace, type UploadedDocument } from './document-source'
 import { documentDestination, documentTargets } from './document-targets'
+import { betterProposalsExport, betterProposalsReview } from './betterproposals-export'
+import { businessImportConflicts } from './business-import'
 import { fail, requiredText } from './errors'
 import type { Actor } from './index'
 
@@ -11,14 +13,15 @@ const ownerSql = "EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND role='owner' 
 export async function documentOwner(db: D1Database, actor: Actor) {
  if (actor.role!=='owner' || !await db.prepare('SELECT 1 WHERE '+ownerSql).bind(actor.id).first()) fail('owner_required',403)
 }
-const context=(db:D1Database,actor:Actor):D1ImportContext=>d1RequestContext({
+const undoBusinessGuard=" AND NOT EXISTS(SELECT 1 FROM p_document_business_outputs o LEFT JOIN p_contacts c ON o.kind='contacts' AND c.id=o.target_id LEFT JOIN p_companies co ON o.kind='companies' AND co.id=o.target_id LEFT JOIN p_import_business_revisions r ON r.kind=o.kind AND r.target_id=o.target_id WHERE o.movein_id=? AND (o.data_json IS NOT CASE WHEN o.kind='contacts' THEN c.data_json ELSE co.data_json END OR o.revision IS NOT r.revision OR COALESCE(c.version,co.version) IS NOT 1))"
+const context=(db:D1Database,actor:Actor,moveinId:string):D1ImportContext=>d1RequestContext({
  destination:documentDestination,namespace:documentNamespace,mappingVersion:'exported-documents-v1',
  storage:{database:db,targets:documentTargets},batchSize:5,maxBatches:1,
- authorization:{principalId:actor.id,predicate:()=>({sql:ownerSql,params:[actor.id]})},
+ authorization:{principalId:actor.id,predicate:action=>({sql:ownerSql+(action==='undo'?" AND NOT EXISTS(SELECT 1 FROM p_imported_document_links l JOIN p_imported_documents d ON d.id=l.document_id WHERE json_extract(d.data_json,'$.moveinId')=?) AND NOT EXISTS(SELECT 1 FROM p_contacts c JOIN p_companies co ON co.id=c.company_id WHERE json_extract(co.data_json,'$.movein_source.moveinId')=? AND COALESCE(json_extract(c.data_json,'$.movein_source.moveinId'),'')!=?)"+undoBusinessGuard:""),params:[actor.id,...(action==='undo'?[moveinId,moveinId,moveinId,moveinId]:[])]})},
 })
 const mapping:ImportMapping={version:'exported-documents-v1',map(record){
  const payload=record.payload as any
- return {effects:[{targetKind:'documents',targetId:record.sourceId,value:payload.value}]}
+ return {effects:[{targetKind:record.kind,targetId:record.sourceId,value:payload.value}]}
 }}
 async function session(db:D1Database,actor:Actor,id:unknown) {
  await documentOwner(db,actor)
@@ -47,10 +50,11 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
  await documentOwner(db,actor)
  try {
   if (name==='document-import.create') {
-   const id=randomUUID(),label=String(input.label??'Document move-in').trim()
+   const id=randomUUID(),label=String(input.label??'Document move-in').trim(),sourceKind=String(input.sourceKind??'documents')
+   if(!['documents','betterproposals'].includes(sourceKind))fail('invalid_input',400,'Choose an available exported-file source')
    if (!label || label.length>150) fail('invalid_input',400,'Name the move-in in 150 characters or fewer')
    await db.batch([db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN '+ownerSql+' THEN 1 ELSE 0 END').bind(actor.id),
-    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label) VALUES(?,?,?)').bind(id,actor.id,label)])
+    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label,source_kind) VALUES(?,?,?,?)').bind(id,actor.id,label,sourceKind)])
    return {id}
   }
   const movein=await session(db,actor,input.id),id=movein.id
@@ -61,7 +65,7 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    const prior=await db.prepare('SELECT * FROM p_document_uploads WHERE movein_id=? AND sha256=?').bind(id,hash).first<any>()
    if (prior) { if(prior.size!==size)fail('upload_conflict',409);return {sha256:hash,received:prior.received,complete:Boolean(prior.complete)} }
    const total=await db.prepare('SELECT COALESCE(SUM(size),0) AS bytes,COUNT(*) AS count FROM p_document_uploads WHERE movein_id=?').bind(id).first<any>()
-   if(total.bytes+size>20*1024*1024||total.count>=30)fail('upload_limit',413,'Use up to 30 files and 20 MiB per move-in')
+   if(total.bytes+size>20*1024*1024||total.count>=(movein.source_kind==='betterproposals'?31:30))fail('upload_limit',413,'Use up to 30 PDFs and one contacts CSV, within 20 MiB per move-in')
    await db.batch([assertion(db,actor,id),db.prepare('INSERT INTO p_document_uploads(movein_id,sha256,filename,size) VALUES(?,?,?,?)').bind(id,hash,filename,size)])
    return {sha256:hash,received:0,complete:false}
   }
@@ -92,29 +96,32 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    await db.batch([assertion(db,actor,id),db.prepare('UPDATE p_document_uploads SET complete=1 WHERE movein_id=? AND sha256=?').bind(id,hash)])
    return {received:upload.size,complete:true}
   }
-  const kit=context(db,actor)
+  const kit=context(db,actor,id)
   if (name==='document-import.preview'||name==='document-import.apply') {
-   const selected=choices(input)
+   const selected=choices(input),review=movein.source_kind==='betterproposals'?betterProposalsReview(input):{}
    if(movein.fingerprint) {
-    if(name==='document-import.preview'||input.fingerprint!==movein.fingerprint||canonicalJson(selected)!==movein.choices_json)fail('review_fingerprint_mismatch',409,'Continue the exact reviewed import from its history')
+    if(name==='document-import.preview'||input.fingerprint!==movein.fingerprint||canonicalJson(selected)!==movein.choices_json||canonicalJson(review)!==movein.review_json)fail('review_fingerprint_mismatch',409,'Continue the exact reviewed import from its history')
     if(movein.job_id)return {id,job:await applyD1ImportBatches(movein.job_id,kit),report:JSON.parse(movein.report_json)}
    }
-   const prepared=await documentSource(await uploaded(db,id),selected,id)
+   const files=await uploaded(db,id)
+   const prepared=movein.source_kind==='betterproposals'?await betterProposalsExport(files,selected,id,review as ReturnType<typeof betterProposalsReview>):await documentSource(files,selected,id)
    const plan=await planD1Import(prepared.source,mapping,kit)
    // A second import never replaces an already retained original or its attribution.
    const prior=await db.prepare('SELECT id FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?').bind(documentDestination,actor.id,id).first<any>()
    const existing:string[]=[]
    if(!prior)for(const p of prepared.documents)if(await db.prepare('SELECT 1 FROM p_imported_documents WHERE id=?').bind(p.id).first())existing.push(p.id)
    if(existing.length) {
-    prepared.report.held+=existing.length
-    prepared.report.arrived-=prepared.documents.filter(p=>existing.includes(p.id)&&p.signatureEvidence.length).length
+    const newlyHeld=prepared.source.records.filter(r=>existing.includes(r.sourceId)&&(r.payload as any).value.disposition==='retained-agreement').length
+    prepared.report.held+=newlyHeld
+    prepared.report.arrived-=newlyHeld
    }
-   const canApply=prepared.canApply&&existing.length===0
-   if(name==='document-import.preview')return {id,kind:'Document move-in',fingerprint:plan.fingerprint,...prepared,source:undefined,canApply,choices:selected,existing}
+   const businessConflicts=movein.source_kind==='betterproposals'?await businessImportConflicts(db,plan,Boolean(prior)):[]
+   const canApply=prepared.canApply&&existing.length===0&&businessConflicts.length===0
+   if(name==='document-import.preview')return {id,kind:'Document move-in',fingerprint:plan.fingerprint,...prepared,source:undefined,canApply,choices:selected,existing,businessConflicts}
    if(input.fingerprint!==plan.fingerprint)fail('review_fingerprint_mismatch',409,'Preview the exact uploaded bytes and report choices again')
    if(!canApply)fail('document_import_needs_review',409,'Resolve ambiguous report matches and existing-document conflicts before applying')
    await db.batch([db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN '+ownerSql+' AND EXISTS(SELECT 1 FROM p_document_moveins WHERE id=? AND (fingerprint IS NULL OR fingerprint=?)) THEN 1 ELSE 0 END').bind(actor.id,id,plan.fingerprint),
-    db.prepare('UPDATE p_document_moveins SET fingerprint=?,choices_json=?,report_json=? WHERE id=?').bind(plan.fingerprint,canonicalJson(selected),canonicalJson(prepared.report),id)])
+    db.prepare('UPDATE p_document_moveins SET fingerprint=?,choices_json=?,report_json=?,review_json=? WHERE id=?').bind(plan.fingerprint,canonicalJson(selected),canonicalJson(prepared.report),canonicalJson(review),id)])
    const job=await createD1ImportJob(plan,{...kit,reviewedFingerprint:plan.fingerprint,operationKey:id})
    await db.prepare('UPDATE p_document_moveins SET job_id=? WHERE id=? AND fingerprint=?').bind(job.id,id,plan.fingerprint).run()
    return {id,job:await applyD1ImportBatches(job.id,kit),report:prepared.report}
@@ -131,7 +138,7 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
  }catch(error){
   if(error&&typeof error==='object'&&'status' in error)throw error
   const message=error instanceof Error?error.message:''
-  if(/CONFLICT|GUARD|UNIQUE constraint|FOREIGN KEY constraint|CHECK constraint/.test(message))fail('import_conflict',409,'The import conflicts with current records or authority. Later changes and dependent proposals are preserved.')
+  if(/CONFLICT|GUARD|UNIQUE constraint|FOREIGN KEY constraint|CHECK constraint|UNDO_REQUIRES|REVERSAL_MODE_CONFLICT|IMPORT_ALREADY_REVERSING/.test(message))fail('import_conflict',409,'The import conflicts with current records or authority. Later changes and dependent proposals are preserved.')
   if(/IMPORT_PLAN_TOO_LARGE|IMPORT_D1_.*LIMIT/.test(message))fail('import_limit',413,'This move-in exceeds the reviewed import limit. Use smaller files or fewer documents in a separate move-in.')
   throw error
  }

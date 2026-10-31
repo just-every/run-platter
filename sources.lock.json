@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "b9db1bda6d65e12a16a541af0eb287867739eedf4b072ed62b4f4abbff290967",
+      "sha256": "09612ef5609b00e843f985b667c1cf5b8853443395c08b447fc6854cfb404b56",
       "executable": false
     },
     "deploy-demo.json": {
@@ -146,7 +146,7 @@
       "executable": false
     },
     "docs/MOVE-IN.md": {
-      "sha256": "e2f031f40463bf1b88918d1df1e22f6efab602a9ca348dd9fa11656c056b091c",
+      "sha256": "b0802765ce102cfabc97f078dbbc2aeb80233223c118f993e7f8a78e7668344e",
       "executable": false
     },
     "docs/notifications.md": {
@@ -643,6 +643,10 @@
     },
     "migrations/core/0098_sms_reenable.sql": {
       "sha256": "cbebdc3767ad5463c708c3ddac223639549305289aad9a1f12678d1b2c92d62b",
+      "executable": false
+    },
+    "migrations/core/0099_betterproposals_export.sql": {
+      "sha256": "0a1e457dcb4310bcb10d08701e68d194a0bc208add1a4549107a3cbf5b166a38",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -2749,12 +2753,16 @@
       "sha256": "ef9d777f19de0def624eec04c01cdc63e47fd631bdfa3cb9f9d5db736408c5ac",
       "executable": false
     },
+    "src/platter/movein/betterproposals-export.ts": {
+      "sha256": "ca09859d218ab9ec7568c3abb64eeacc2047fb24131159140518fd7a28f7cd96",
+      "executable": false
+    },
     "src/platter/movein/business-csv.ts": {
       "sha256": "2c1a33c92d5ae91e8f0b24ddfa81d76c1ea334870a25b1efcab40493eb931bf9",
       "executable": false
     },
     "src/platter/movein/business-import.ts": {
-      "sha256": "0d6318fbbe43f59e80946fdb0fbf71e39342c358d2d51b86e232051f9bed9193",
+      "sha256": "e901213ef52813d125e1f9c51cd95258f3676e5aa65a396d3a2cfd3fdb288aac",
       "executable": false
     },
     "src/platter/movein/business-model.ts": {
@@ -2794,7 +2802,7 @@
       "executable": false
     },
     "src/platter/movein/document-import.ts": {
-      "sha256": "7fcb05015709bc5c56b4ab548c0ae6c35eeec2dc58ab6e8a2430a365a7e333fd",
+      "sha256": "b704d5b98272d85df76d6dd7d702d4e93e281a65878fefd08b4cb7df8cfb3545",
       "executable": false
     },
     "src/platter/movein/document-source.ts": {
@@ -2802,7 +2810,7 @@
       "executable": false
     },
     "src/platter/movein/document-targets.ts": {
-      "sha256": "56a15532c98e95fbdc6274106bfb55754395a55a9cae942779983eae3f32d78b",
+      "sha256": "9fd828f6200e8030329c72216b885c81690660da61f94300840ef2e63d4bb32c",
       "executable": false
     },
     "src/platter/movein/errors.ts": {
@@ -3118,7 +3126,7 @@
       "executable": false
     },
     "src/platter/ui/document-movein.ts": {
-      "sha256": "34dab72ce5402ddf0b60b2b7df1162bb5fe00e3fc7fcc72cf56796190011fef9",
+      "sha256": "d2267557d679dff30cb1a17777543f2d481494cdafb9489208c8cdce908e8376",
       "executable": false
     },
     "src/platter/ui/duplicate.ts": {
@@ -3394,7 +3402,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "b4844d3f006018707a5bc4d3993e932bdc51c23a4ffb6ba251188910a57aa62e",
+      "sha256": "2c36449ea4b4902ed7305dfd5ca8d02719309465ea1322b029980caaaa3ae4ea",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3402,7 +3410,7 @@
       "executable": false
     },
     "tests/business-import-fixture.mjs": {
-      "sha256": "68508e6099444976dcf32d9835d988420e7f34481641e90aa03c7257397731e7",
+      "sha256": "6bd1a3d19eecb72650dc91d5f4b17049475ecefc059562fbd6edaec2d45cb92c",
       "executable": false
     },
     "tests/catalog-browser.mjs": {
@@ -3470,7 +3478,7 @@
       "executable": false
     },
     "tests/document-movein-fixture.mjs": {
-      "sha256": "95792ef031e4a99f029d59156fef5ceca668a7db322cdde6418ffc582e18ce57",
+      "sha256": "7fe9bf31435efac0a4b46fcf750e1387452b446a0f8d65982f60fca1a2a8ebaf",
       "executable": false
     },
     "tests/drive-fixture.mjs": {
@@ -3546,7 +3554,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "a579b64a95d3f9a61eb1a852cbebbd58531d8245009e854b2add2a37107d8178",
+      "sha256": "fdbd2611f56afee447b2d769e75355e4b91ac2249adedc1e4a3a248a1a8931bc",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3598,7 +3606,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "5e35232a9189dcd85d6be1c27854da85e4df6e9d0741dc39707d8087695d924d",
+      "sha256": "55656c9267202763eaa814d5dd09717c3d4bdb164fe974152befa758c5ca3b8b",
       "executable": false
     },
     "tests/site-harness.mjs": {

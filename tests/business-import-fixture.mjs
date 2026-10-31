@@ -31,3 +31,13 @@ export async function fileHost(request,calls=[]){
  }
  throw Error('Unexpected external request')
 }
+
+export function betterProposalsContacts() {
+ const csv='Contact ID,Given name,Family name,Company ID,Company,Job title,Telephone,Billing,Service,Exempt,Source note\r\n'+
+  'bp-contact-1,Avery,Vale,bp-company-1,  Cedar Studio  ,Finance Director,+44 020 1234,14 Cedar Road,22 Service Road,Yes,Keep exact facts\r\n'+
+  'bp-contact-2,Morgan,Park,bp-company-1,  Cedar Studio  ,Operations,+44 020 4567,14 Cedar Road,22 Service Road,Yes,Second supplied contact\r\n'+
+  'bp-contact-3,Robin,Quinn,bp-company-2,Willow Studio,Buyer,+44 020 8901,3 Willow Lane,4 Field Lane,No,Ambiguous first identity\r\n'+
+  'bp-contact-4,Robin,Quinn,bp-company-2,Willow Studio,Buyer,+44 020 8902,3 Willow Lane,4 Field Lane,No,Ambiguous second identity\r\n'
+ const mapping={delimiter:',',columns:{contact_id:'Contact ID',first_name:'Given name',last_name:'Family name',company_id:'Company ID',company_name:'Company',title:'Job title',phone:'Telephone',billing_address:'Billing',service_address:'Service',tax_exempt:'Exempt'},companyIds:{}}
+ return {csv,mapping}
+}

@@ -942,7 +942,7 @@ test('AUTO-002 Settings authorizes Drive archiving and shows completed and held 
 })
 async function documentFonts(page){await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))})}
 
-test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in', {timeout:180000},async()=>{
+test('MIG-003 and MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in', {timeout:180000},async()=>{
  const {moveinFixture,hash}=await import('./document-movein-fixture.mjs'),fixture=await moveinFixture()
  let app,browser
  try{
@@ -955,7 +955,8 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
    for(const width of [1440,390]){
     await page.setViewportSize({width,height:1000})
     await page.evaluate(async()=>{await document.fonts.ready})
-    await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,'MIG-007-'+phase+'-'+width+'.png'),fullPage:true})
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'move-in fits this viewport')
+    await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,(phase.startsWith('betterproposals')?'MIG-003-':'MIG-007-')+phase+'-'+width+'.png'),fullPage:true})
    }
    await page.setViewportSize({width:1440,height:1000})
   }
@@ -1003,6 +1004,52 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
   await section.getByRole('button',{name:'Undo document move-in',exact:true}).click()
   assert.equal(await page.getByRole('heading',{name:'Retained imported originals',exact:true}).count(),0)
   assert.match(await section.innerText(),/Import undone/)
+  const {betterProposalsFixture}=await import('./document-movein-fixture.mjs'),bp=await betterProposalsFixture()
+  await page.getByLabel('Export source',{exact:true}).selectOption('betterproposals')
+  await page.getByLabel('Move-in name',{exact:true}).fill('Synthetic Better Proposals review')
+  await page.getByRole('button',{name:'Start document move-in',exact:true}).click()
+  section=page.locator('section').filter({has:page.getByRole('heading',{name:'Synthetic Better Proposals review',exact:true})})
+  await section.getByLabel('Exported files').setInputFiles([...bp.pdfs,bp.contacts].map(f=>({name:f.filename,mimeType:f.filename.endsWith('.pdf')?'application/pdf':'text/csv',buffer:f.bytes})))
+  await section.getByRole('button',{name:'Upload or resume files',exact:true}).click()
+  await page.waitForFunction(()=>Array.from(document.querySelectorAll('[data-document-upload]')).every(f=>!f.querySelector('input[type=file]').files.length))
+  await section.getByLabel('Contacts CSV',{exact:true}).selectOption(bp.review.contactsFile)
+  await section.getByLabel('Reviewed contact mapping',{exact:true}).fill(JSON.stringify(bp.review.mapping))
+  await section.getByRole('button',{name:'Preview document move-in',exact:true}).click()
+  assert.match(await section.innerText(),/Arrived agreements\s+0\s+Held for review\s+30/)
+  assert.match(await section.innerText(),/Contacts arrived\s+2\s+Contacts held\s+2/)
+  await section.locator('[name="contact:bp-contact-3"]').selectOption('include')
+  for(const [doc,contact] of Object.entries(bp.review.bindings))await section.locator('select[name="bind:'+doc+'"]').selectOption(contact)
+  await section.getByRole('button',{name:'Review contact bindings',exact:true}).click()
+  assert.match(await section.innerText(),/Arrived agreements\s+23\s+Held for review\s+7\s+Unmapped items\s+1/)
+  assert.match(await section.innerText(),/Contacts arrived\s+3\s+Contacts held\s+1\s+Companies arrived\s+2/)
+  assert.match(await section.innerText(),/Finance Director.*\+44 020 1234/)
+  await capture('betterproposals-review')
+  await section.getByRole('button',{name:'Apply reviewed document move-in',exact:true}).click()
+  for(let i=0;await section.getByRole('button',{name:'Continue document move-in',exact:true}).count();i++){
+   assert.ok(i<20,'browser import makes bounded progress')
+   await section.getByRole('button',{name:'Continue document move-in',exact:true}).click()
+  }
+  assert.equal(await retained.getByRole('link',{name:'Download original PDF',exact:true}).count(),30)
+  assert.equal(await retained.getByText('Read-only retained agreement',{exact:true}).count(),23)
+  assert.equal(await retained.getByText('Read-only open document; reissue pending',{exact:true}).count(),6)
+  assert.equal(await retained.getByText('Read-only document; contact review pending',{exact:true}).count(),1)
+  const download=await context.request.get(app.origin+'/api/platter/imported-original?document='+hash(bp.pdfs[0].bytes))
+  assert.equal(download.status(),200);assert.deepEqual(await download.body(),bp.pdfs[0].bytes)
+  await section.getByRole('button',{name:'Open document journal',exact:true}).click()
+  assert.match(await section.innerText(),/35 import changes recorded/)
+  const csvLink=section.getByRole('link',{name:'Download contacts.csv',exact:true}),csvDownload=await context.request.get(app.origin+await csvLink.getAttribute('href'))
+  assert.equal(csvDownload.status(),200);assert.deepEqual(await csvDownload.body(),bp.contacts.bytes)
+  await capture('betterproposals-journal')
+  await section.getByRole('button',{name:'Undo document move-in',exact:true}).click()
+  for(let i=0;await section.getByRole('button',{name:'Continue document undo',exact:true}).count();i++){
+   assert.ok(i<20,'browser undo makes bounded progress')
+   await section.getByRole('button',{name:'Continue document undo',exact:true}).click()
+  }
+  assert.equal(await page.getByRole('heading',{name:'Retained imported originals',exact:true}).count(),0)
+  assert.match(await section.innerText(),/Import undone/)
+  const undone=await context.request.get(app.origin+'/api/platter/state')
+  assert.deepEqual((await undone.json()).businessRecords,{companies:[],contacts:[],catalog:[]})
+  await capture('betterproposals-undone')
   await context.close()
  }finally{await browser?.close();await app?.close()}
 })

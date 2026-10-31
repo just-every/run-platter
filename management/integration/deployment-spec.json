@@ -594,6 +594,12 @@
       "name": "0098_sms_reenable.sql",
       "sha256": "cbebdc3767ad5463c708c3ddac223639549305289aad9a1f12678d1b2c92d62b",
       "sql": "-- Provider opt-in receipts are history, never consent or sending authority.\nCREATE TABLE p_sms_provider_optins (\n id TEXT PRIMARY KEY, phone TEXT NOT NULL, transport_hash TEXT NOT NULL, received_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_reenable_eligibility (\n phone TEXT PRIMARY KEY, event_id TEXT NOT NULL REFERENCES p_sms_provider_optins(id), stopped_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_reenable_history (\n id TEXT PRIMARY KEY, phone TEXT NOT NULL, proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n assent_id TEXT NOT NULL REFERENCES p_sms_assents(id), actor_id TEXT NOT NULL,\n provider_event_id TEXT NOT NULL REFERENCES p_sms_provider_optins(id), stopped_at INTEGER NOT NULL,\n source TEXT NOT NULL, reenabled_at INTEGER NOT NULL\n);\nCREATE TRIGGER p_frozen_sms_provider_optin BEFORE UPDATE ON p_sms_provider_optins BEGIN SELECT RAISE(ABORT,'Provider opt-in history is immutable'); END;\nCREATE TRIGGER p_frozen_sms_reenable BEFORE UPDATE ON p_sms_reenable_history BEGIN SELECT RAISE(ABORT,'SMS re-enablement history is immutable'); END;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0099_signer_delegation.sql",
+      "sha256": "90d27ea997ac2e52db9df9d013b2146399f15bad71a1740bc9a157f866ad5d32",
+      "sql": "-- Delegation facts are retained business history; authority stays installation-local.\nCREATE TABLE p_signer_delegations (\n id TEXT PRIMARY KEY,\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n revision INTEGER NOT NULL,\n old_recipient TEXT NOT NULL,\n new_recipient TEXT NOT NULL,\n delegate_name TEXT NOT NULL,\n delegated_at INTEGER NOT NULL,\n signing_position INTEGER NOT NULL CHECK(signing_position>0),\n required_method TEXT NOT NULL,\n undone_at INTEGER,\n undone_by TEXT\n);\nCREATE TABLE p_delegation_authority (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),\n revision INTEGER NOT NULL,\n owner_id TEXT NOT NULL,\n authorized_at INTEGER NOT NULL\n);\nALTER TABLE p_shares ADD COLUMN verification_required INTEGER NOT NULL DEFAULT 0 CHECK(verification_required IN (0,1));\nALTER TABLE p_shares ADD COLUMN delegation_id TEXT;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

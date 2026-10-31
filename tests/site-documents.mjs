@@ -1137,3 +1137,5 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
   assert.equal(await history.getByRole('button').count(),0)
  }finally{await context?.close();await browser?.close();await app?.close()}
 })
+
+test('SIGN-009 compiled Settings and recipient controls delegate, undo and verify before completion', {timeout:120000},async()=>{const {delegationBrowser}=await import('./signer-delegation-browser.mjs');await delegationBrowser()})

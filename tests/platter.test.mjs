@@ -3833,3 +3833,5 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
  } finally { await h.close() }
  await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
 })
+
+test('SIGN-009 owner-enabled delegation requires fresh identity, preserves the offer and records undo through signing races', {timeout:120000},async()=>{const {delegationHttp}=await import('./signer-delegation-http.mjs');await delegationHttp()})

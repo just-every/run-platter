@@ -6,7 +6,8 @@ The tools cover structured preparation, built-in and saved template starts,
 and revisions, including authored scope and terms. Supplied class labels and
 instructions in authored text cannot override these facts.
 
-Native JSON command responses expose the same metadata as JSON in the
+Native JSON responses from `/api/platter/command` and the legacy drafting
+endpoint `/api/platter/agent/command` expose the same metadata as JSON in the
 `x-platter-action-facts` response header, preserving the native response body.
 This covers preparation, template starts, duplication, draft revision and
 negotiation, editor autosave, document, quantity and variable edits, revision

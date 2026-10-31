@@ -118,7 +118,7 @@
       "executable": false
     },
     "docs/agent-classification.md": {
-      "sha256": "7f345d54c958bd724a0d4c42a3798118478554a169da7938999453614a3b8c51",
+      "sha256": "9cd8bfdb2b18a4381a9850af6b43712aab829dab8a8f5249316cafa2fb63d8fd",
       "executable": false
     },
     "docs/BACKUP-RESTORE.md": {
@@ -3558,7 +3558,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "398a14d6b779cb39a3e0353d87ce3806f38a0192524198808ae78980ac2a2102",
+      "sha256": "2766b860432a637e12f0b7c59ab7341234eea41a90510a3d64451b8c583a7248",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

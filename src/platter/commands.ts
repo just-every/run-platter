@@ -1,3 +1,4 @@
+import { authorizeBrandCommand, brandCommand, brandId, copyBrandMedia } from './brands'
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
@@ -74,6 +75,8 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
  return{payment_terms:schedule,document:proposalDocument(p.document,priced,String(p.clientId??'')),section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:priced}
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
+ await authorizeBrandCommand(db,a,name,p)
+ if(name.startsWith('brand.'))return brandCommand(db,a,name,p)
  await authorizeCommand(db,a,name,p)
  if(name==='crm.card.configure')return configureHubspotCard(env,a,p)
  if(name.startsWith('crm.sync.'))return hubspotSyncCommand(env,a,name,p)
@@ -158,7 +161,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='suggestions.allow'||name==='suggestion.resolve')return suggestionCommand(env,a,name,p)
  if(name==='proposal.restore'){const fields=await restoreFields(db,a,p);return command(env,a,'proposal.revise',fields,fields.restoredAttachments,undefined,Number(p.revision),fields.restoredTax)}
  if(name==='client.save'){
-  need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email,variable_fields) VALUES(?,?,?,?)').bind(id,text(p.name,'a client name'),email(p.email),JSON.stringify(clientVariableFields(p.variableFields??Object.fromEntries(['contactName','firstName','lastName','title','address'].filter(key=>p[key]!==undefined).map(key=>[key,p[key]])))))]);return{id}
+  need(a.role!=='agent','A person adds clients',403);const id=crypto.randomUUID();await commit(db,a,[db.prepare('INSERT INTO p_clients(id,name,email,variable_fields,brand_id) VALUES(?,?,?,?,?)').bind(id,text(p.name,'a client name'),email(p.email),JSON.stringify(clientVariableFields(p.variableFields??Object.fromEntries(['contactName','firstName','lastName','title','address'].filter(key=>p[key]!==undefined).map(key=>[key,p[key]])))),brandId(a))]);return{id}
  }
  if(name==='client.erase'){
   need(a.role==='owner','Only the owner erases clients',403);const id=text(p.id,'a client'),c=await db.prepare('SELECT * FROM p_clients WHERE id=?').bind(id).first<any>();need(c,'Client not found',404);need(p.confirmName===c.name,'Type the exact client name to confirm erasure');
@@ -189,15 +192,15 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='proposal.prepare'||name==='proposal.revise'){
   p=(await resolveVariables(env,a,p)).fields
   const f=proposalFields(p,tax);need(!f.payment_terms?.retainer||!f.options.some((o:any)=>o.tables?.some((t:any)=>t.lines.some((l:any)=>l.recurrence))||o.optionalItems?.some((i:any)=>i.recurrence)),'Use recurring pricing lines instead of an additional schedule retainer');if(name==='proposal.prepare'&&f.payment_terms)need(['owner','admin','manager'].includes(a.role),'Only owner, admins and scoped managers set payment schedules',403);if(f.payment_terms?.depositFixedCents!=null)need(f.options.every((o:any)=>o.cents>=f.payment_terms.depositFixedCents),'Fixed deposit must fit every package');need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(f.client_id).first(),'Client not found',404)
-  const old=name==='proposal.revise'?await proposal(db,p.id):null;await validateDocumentMedia(db,f.document,old?.id);if(old){exact(old,p);need(['draft','approved'].includes(old.status),'Sent and accepted proposals are frozen',409)}
+  const old=name==='proposal.revise'?await proposal(db,p.id):null;await validateDocumentMedia(db,f.document,old?.id,brandId(a));if(old){exact(old,p);need(['draft','approved'].includes(old.status),'Sent and accepted proposals are frozen',409)}
   if(p.recipientPlan!==undefined&&JSON.stringify(p.recipientPlan)!==JSON.stringify(JSON.parse(old?.recipient_plan??'[]')))need(a.role==='owner','Only the current owner changes recipient role slots',403)
-  const id=old?.id??crypto.randomUUID(),revision=(old?.revision??0)+1,currency=old?.currency??'USD',attachments=old?restoredAttachments??JSON.parse(old.attachments):await vendorDocuments(db),row={id,...f,recipient_plan:p.recipientPlan===undefined?old?.recipient_plan??'[]':JSON.stringify(Array.isArray(p.recipientPlan)&&!p.recipientPlan.length?[]:recipientInput(p.recipientPlan,a)),revision,currency,attachments};const writes:D1PreparedStatement[]=[]
+  const id=old?.id??crypto.randomUUID(),revision=(old?.revision??0)+1,currency=old?.currency??'USD',attachments=old?restoredAttachments??JSON.parse(old.attachments):brandId(a)==='default'?await vendorDocuments(db):[],row={id,...f,recipient_plan:p.recipientPlan===undefined?old?.recipient_plan??'[]':JSON.stringify(Array.isArray(p.recipientPlan)&&!p.recipientPlan.length?[]:recipientInput(p.recipientPlan,a)),revision,currency,attachments};const writes:D1PreparedStatement[]=[]
   if(old){writes.push(db.prepare("UPDATE p_proposals SET client_id=?,title=?,scope=?,terms=?,attachments=?,version=version+1,revision=?,status='draft',deposit_bps=?,options=?,prepared_by=?,approved_by=NULL,approved_at=NULL WHERE id=?").bind(f.client_id,f.title,f.scope,f.terms,JSON.stringify(attachments),revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,id),db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(id))}
   else writes.push(db.prepare("INSERT INTO p_proposals(id,client_id,title,scope,version,revision,status,deposit_bps,options,prepared_by,created_at,currency,sales_owner_id,sales_owner_name,terms,attachments) VALUES(?,?,?,?,1,?,'draft',?,?,?,?,?,?,?,?,?)").bind(id,f.client_id,f.title,f.scope,revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency,a.id,a.email,f.terms,JSON.stringify(attachments)))
   writes.push(db.prepare('UPDATE p_proposals SET recipient_plan=? WHERE id=?').bind(row.recipient_plan,id))
   writes.push(db.prepare('UPDATE p_proposals SET section_conditions=?,document=?,payment_terms=? WHERE id=?').bind(JSON.stringify(f.section_conditions),JSON.stringify(f.document),f.payment_terms?JSON.stringify(f.payment_terms):null,id))
   writes.push(db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,?,?,?,?,?)').bind(id,revision,JSON.stringify(snapshot(row)),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency))
-  if(!old)writes.push(...await defaultStatements(db,id))
+  if(!old)writes.push(...copyBrandMedia(db,a,id,f.document),...await defaultStatements(db,id))
   if(old)writes.push(copyCosts(db,id,costSourceRevision??old.revision,id,revision),...await detachChangedLibraryCopies(db,id,f.document,f.options))
   if(internalCosts)writes.push(...patchCosts(db,id,revision,internalCosts))
   await commit(db,a,writes,false,old?{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))",values:[id,old.version]}:undefined);return{id,revision,version:(old?.version??0)+1}

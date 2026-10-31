@@ -1,3 +1,4 @@
+import { brandRecord } from './brands'
 import { libraryBlock, libraryMatches as matches, libraryKind } from './library-content'
 import { pricedOptions, pricingInput, editablePackages, packageInputs } from './pricing'
 import { documentOf, proposalDocument } from './documents/blocks'
@@ -30,7 +31,7 @@ export async function insertLibrary(db:D1Database,a:Actor,p:Record<string,unknow
  need(['owner','admin','manager','sales','content_editor'].includes(a.role),'Your role cannot insert library content',403)
  const row=await permitted(db,a,p.id,'edit');exact(row,p)
  const ref=typeof p.itemRef==='string'?p.itemRef.split(':'):[],itemId=p.itemId??ref[0],itemVersion=p.itemVersion??ref[1]
- const item=await db.prepare('SELECT * FROM p_library_items WHERE id=?').bind(text(itemId,'a library item')).first<any>();need(item,'Library item not found',404)
+ const item=await db.prepare('SELECT * FROM p_library_items WHERE id=?').bind(text(itemId,'a library item')).first<any>();need(item,'Library item not found',404);await brandRecord(db,a,'library',item.id)
  need(item.version===Number(itemVersion),'Library item changed. Reload before inserting.',409)
  const access=await folderGuard(db,a,item.folder_id,'library')
  need(['linked','detached'].includes(String(p.mode)),'Choose a linked or detached copy')

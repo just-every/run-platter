@@ -1,3 +1,4 @@
+import { brandId, brandRecord, brandAccess, copyBrandMedia } from './brands'
 import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields } from './variables'
 import { proposalFields } from './commands'
@@ -46,6 +47,7 @@ async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false)
  need(!String(id).startsWith('starter:'), 'Start a draft to customize a built-in starter; save your changes as a personal template', 403)
  const row = await db.prepare('SELECT * FROM p_personal_templates WHERE id=?').bind(text(id, 'a template')).first<any>()
  need(row, 'Template not found', 404)
+ await brandRecord(db,a,'template',row.id)
  need(row.shared===1?(!editing||resourceEditors.includes(a.role)):row.owner_id===a.id,'This template is unavailable for this action',403)
  await folderGuard(db,a,row.folder_id,'template')
  return row
@@ -86,7 +88,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   const writes = existing
    ? [db.prepare('UPDATE p_personal_templates SET name=?,snapshot=?,pdf_enabled=?,expiry=?,suggestion_sections=?,version=version+1,updated_at=? WHERE id=? AND version=?').bind(...values, at, id, existing.version)]
    : [db.prepare('INSERT INTO p_personal_templates(name,snapshot,pdf_enabled,expiry,suggestion_sections,id,owner_id,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,1,?,?)').bind(...values, id, a.id, at, at)]
-  writes.push(db.prepare('UPDATE p_personal_templates SET shared=?,folder_id=? WHERE id=?').bind(shared?1:0,folderId,id))
+  if(!existing)writes.push(db.prepare('UPDATE p_personal_templates SET brand_id=? WHERE id=?').bind(brandId(a),id))
+ writes.push(db.prepare('UPDATE p_personal_templates SET shared=?,folder_id=? WHERE id=?').bind(shared?1:0,folderId,id))
   writes.push(db.prepare('INSERT OR IGNORE INTO p_template_locks(template_id,section) SELECT ?,section FROM p_proposal_locks WHERE proposal_id=?').bind(id,source.id))
   writes.push(db.prepare('INSERT OR IGNORE INTO p_template_block_locks(template_id,section) SELECT ?,section FROM p_proposal_block_locks WHERE proposal_id=?').bind(id,source.id))
   const mediaIds=documentMediaIds(documentOf(displayed))
@@ -100,14 +103,14 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  }
 
  const clientId = text(input.clientId ?? input.starterClientId, 'a client')
- const client = await db.prepare('SELECT id,name,email FROM p_clients WHERE id=?').bind(clientId).first<{ id: string; name: string; email: string }>()
- need(client, 'Client not found', 404)
+ const client = await brandRecord(db, a, 'client', clientId)
  const starter = starterTemplate(input.id, client, a)
  const template = starter ? { id: starter.id, version: starter.version, pdf_enabled: 1 } : await ownTemplate(db, a, input.id)
  exact(template, input)
  const personal = starter ? null : template as any
  const access=starter?{sql:'1',values:[]}:await folderGuard(db,a,personal.folder_id,'template')
- let content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
+ let content = starter ? { ...starter.content, attachments: brandId(a)==='default'?await vendorDocuments(db):[] } : JSON.parse(personal.snapshot)
+ if(starter){const kit=JSON.parse((await brandAccess(db,a)).kit);if(Object.keys(kit).length)content.document={...documentOf(content),brand:kit}}
  if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...editableVariableFields(content),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan}}
  const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)
@@ -126,7 +129,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) VALUES(?,?,?)').bind(id,template.id,template.version),
   ...(!starter?[db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_template_locks WHERE template_id=?').bind(id,template.id),db.prepare('INSERT INTO p_proposal_block_locks(proposal_id,section) SELECT ?,section FROM p_template_block_locks WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_template_document_media WHERE template_id=?').bind(id,template.id)]:[]),
-  ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify(resolved.settings)),
+  ...(starter?copyBrandMedia(db,a,id,documentOf(row)):[startTemplateCosts(db,template.id,id)]),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify(resolved.settings)),
   db.prepare('UPDATE p_proposals SET recipient_plan=? WHERE id=?').bind(JSON.stringify(row.recipient_plan??[]),id),
   db.prepare('UPDATE p_proposals SET section_conditions=?,document=?,payment_terms=? WHERE id=?').bind(JSON.stringify(row.section_conditions ?? {}),JSON.stringify(documentOf(row)),row.payment_terms?JSON.stringify(row.payment_terms):null, id),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)').bind(id, JSON.stringify(snapshot(row)), preparer, at, 'USD'),
@@ -134,8 +137,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   db.prepare('INSERT INTO p_expiry(proposal_id,mode,period_days,expires_on,time_zone,warning_days) VALUES(?,?,?,?,?,?)').bind(id, expiry.mode, expiry.period_days, expiry.expires_on, expiry.time_zone, expiry.warning_days),
   ...sections.map(section => db.prepare(`INSERT INTO ${section.startsWith('block:')?'p_block_suggestion_sections':'p_suggestion_sections'}(proposal_id,revision,section) VALUES(?,1,?)`).bind(id, section)),
  ], false, {
-  sql: (starter ? '' : 'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND (owner_id=? OR shared=1) AND version=?) AND ') + 'EXISTS(SELECT 1 FROM p_clients WHERE id=?) AND '+access.sql,
-  values: [...(starter ? [] : [template.id, a.id, template.version]), clientId,...access.values],
+  sql: (starter ? '' : 'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND (owner_id=? OR shared=1) AND version=?) AND ') + 'EXISTS(SELECT 1 FROM p_clients WHERE id=? AND brand_id=?) AND '+access.sql,
+  values: [...(starter ? [] : [template.id, a.id, template.version]), clientId,brandId(a),...access.values],
  })
  return { id, revision: 1, version: 1 }
 }

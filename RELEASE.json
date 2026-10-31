@@ -269,6 +269,10 @@
     {
       "id": "0090_client_locale.sql",
       "buyerSteps": "None. Adds owner-selected English or Spanish client language while retaining historical agreement language without inference."
+    },
+    {
+      "id": "0100_brands.sql",
+      "buyerSteps": "None. Existing records stay in the default brand; secondary brands support guarded unsent draft preparation only."
     }
   ],
   "breaking": false,

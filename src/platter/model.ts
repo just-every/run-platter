@@ -2,7 +2,7 @@ import { paymentTerms } from './payment-terms'
 import { documentFields } from './documents/blocks'
 import { sectionConditions } from './conditional'
 import { copyAttachments } from './attachments'
-export interface Actor { id:string; email:string; role:'owner'|'admin'|'manager'|'sales'|'content_editor'|'viewer'|'billing'|'member'|'agent'; keyId?:string; memberVersion?:number; permission?:{sql:string;values:any[]} }
+export interface Actor { id:string; email:string; role:'owner'|'admin'|'manager'|'sales'|'content_editor'|'viewer'|'billing'|'member'|'agent'; brandId?:string; brandPermission?:{sql:string;values:any[]}; keyId?:string; memberVersion?:number; permission?:{sql:string;values:any[]} }
 export const fail = (message:string,status=400):never => { throw Object.assign(new Error(message),{status}) }
 export function need(value:unknown,message:string,status=400):asserts value { if(!value)fail(message,status) }
 export function text(value:unknown,label:string,max=200) { need(typeof value==='string'&&value.trim().length>0&&value.length<=max,`Enter ${label} (up to ${max} characters)`);return value.trim() }
@@ -15,8 +15,8 @@ export function authority(db:D1Database,a:Actor,owner=false){
  if(owner)need(['owner','admin'].includes(a.role)||a.permission,'Scoped proposal authority required',403)
  const sql=a.role==='agent'?`EXISTS(SELECT 1 FROM p_agent_keys k JOIN oa_operators o ON o.id=k.owner_id WHERE k.id=? AND k.owner_id=? AND k.revoked_at IS NULL AND k.expires_at>? AND o.role='owner' AND o.status='active' AND o.version=k.owner_version)`:`EXISTS(SELECT 1 FROM oa_operators o LEFT JOIN p_members m ON m.operator_id=o.id WHERE o.id=? AND o.status='active' AND ${a.role==='owner'?"o.role='owner'": "o.role IN ('member','admin') AND CASE WHEN o.role='admin' THEN 'admin' ELSE COALESCE(m.role,'sales') END=? AND COALESCE(m.version,0)=?"})`
  const values:any[]=a.role==='agent'?[a.keyId!,a.id,Date.now()]:a.role==='owner'?[a.id]:[a.id,a.role,a.memberVersion??0]
- const permission=a.permission
- return db.prepare(`INSERT INTO p_guard(ok) VALUES((${sql})${permission?' AND ('+permission.sql+')':''})`).bind(...values,...(permission?.values??[]))
+ const permission=a.permission,brand=a.brandPermission
+ return db.prepare(`INSERT INTO p_guard(ok) VALUES((${sql})${permission?' AND ('+permission.sql+')':''}${brand?' AND ('+brand.sql+')':''})`).bind(...values,...(permission?.values??[]),...(brand?.values??[]))
 }
 export async function commit(db:D1Database,a:Actor,writes:D1PreparedStatement[],owner=false,guard?:{sql:string,values:any[]}){
  try{await db.batch([authority(db,a,owner),...(guard?[db.prepare(`INSERT INTO p_guard(ok) VALUES((${guard.sql}))`).bind(...guard.values)]:[]),...writes,db.prepare('DELETE FROM p_guard')])}catch(e){if(String(e).includes('CHECK constraint')||String(e).includes('UNIQUE constraint')||String(e).includes('FOREIGN KEY'))fail('The record changed or is already in use. Reload before continuing.',409);throw e}

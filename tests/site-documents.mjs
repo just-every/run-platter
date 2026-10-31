@@ -1138,3 +1138,59 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
   assert.equal(await history.getByRole('button').count(),0)
  }finally{await context?.close();await browser?.close();await app?.close()}
 })
+
+
+test('TEAM-003 owner prepares separate brands and membership through Settings with independent draft kits', {timeout:120000},async()=>{
+ let app,browser
+ try{
+  app=await installedApp()
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  const context=await browser.newContext({viewport:{width:1440,height:900}}),page=await context.newPage()
+  try{
+   assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic brand owner'},maxRedirects:0})).status(),303)
+   await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+   const command=async(name,input)=>{const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
+   const ownerState=await (await context.request.get(app.origin+'/api/platter/state')).json()
+   const clientA=await command('client.save',{name:'Brand A client',email:'synthetic-platter-brand-a'+String.fromCharCode(64)+'example.test'})
+   await page.goto(app.origin+'/app/settings')
+   const brands=page.locator('section.panel').filter({has:page.getByRole('heading',{name:'Brands',exact:true})})
+   await brands.locator('summary').filter({hasText:/^Create brand$/}).click()
+   const create=brands.locator('form').filter({has:page.getByRole('button',{name:'Create brand',exact:true})})
+   await create.getByLabel('Brand name',{exact:true}).fill('Brand B')
+   await create.getByLabel('Accent color').fill('#173f65');await create.getByLabel('Default cover heading').fill('Separate studio')
+   await create.getByRole('button',{name:'Create brand',exact:true}).click()
+   await page.getByLabel('Working brand',{exact:true}).selectOption({label:'Brand B'});await page.getByRole('button',{name:'Switch brand'}).click()
+   assert.equal(await page.getByLabel('Working brand',{exact:true}).inputValue(),(await (await context.request.get(app.origin+'/api/platter/state')).json()).activeBrand)
+   await page.getByText('Brand membership',{exact:true}).click()
+   await page.getByLabel('Confirmed person').selectOption(ownerState.actor.id)
+   await page.getByRole('button',{name:'Save membership'}).click()
+   const screenshots=process.env.PLATTER_SCREENSHOTS
+   if(screenshots){await mkdir(screenshots,{recursive:true});await page.screenshot({path:join(screenshots,'TEAM-003-settings-1440.png'),fullPage:true});await page.setViewportSize({width:390,height:900});await page.screenshot({path:join(screenshots,'TEAM-003-settings-390.png'),fullPage:true});await page.setViewportSize({width:1440,height:900})}
+   const clientB=await command('client.save',{name:'Brand B client',email:'synthetic-platter-brand-b'+String.fromCharCode(64)+'example.test'})
+   await page.goto(app.origin+'/app')
+   assert.deepEqual(await page.locator('select[name="clientId"]').first().locator('option').evaluateAll(nodes=>nodes.filter(n=>n.value).map(n=>n.value)),[clientB.id])
+   await page.locator('select[name="clientId"]').first().selectOption(clientB.id)
+   for(const [name,value] of Object.entries({title:'Brand B unsent draft',scope:'A private brand preparation.',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'}))await page.locator('[name="'+name+'"]').first().fill(value)
+   await page.getByRole('button',{name:'Prepare proposal',exact:true}).click()
+   await page.getByRole('link',{name:'Brand B unsent draft',exact:true}).click()
+   await page.getByRole('heading',{name:'Brand B unsent draft',exact:true}).waitFor()
+   const s=await (await context.request.get(app.origin+'/api/platter/state')).json(),p=s.proposals[0]
+   assert.equal(await page.getByRole('button',{name:'Approve this revision',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Send proposal',exact:true}).count(),0)
+   assert.equal(p.document.brand.name,'Brand B');assert.equal(p.document.brand.accent,'#173f65');assert.deepEqual(s.clients.map(c=>c.id),[clientB.id]);assert.ok(!s.clients.some(c=>c.id===clientA.id))
+   assert.ok(await page.locator('.eyebrow').filter({hasText:/Working brand: Brand B/i}).count())
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+   if(screenshots){await page.screenshot({path:join(screenshots,'TEAM-003-draft-1440.png'),fullPage:true});await page.setViewportSize({width:390,height:900});await page.screenshot({path:join(screenshots,'TEAM-003-draft-390.png'),fullPage:true});await page.setViewportSize({width:1440,height:900})}
+   await page.goto(app.origin+'/app/settings');await page.getByText('Copy a document kit',{exact:true}).click()
+   const capture=page.locator('form').filter({has:page.getByRole('button',{name:'Copy document kit',exact:true})})
+   await capture.getByLabel('Source draft').selectOption(p.id+':'+p.version);await capture.getByRole('checkbox').check();await capture.getByRole('button',{name:'Copy document kit'}).click()
+   assert.deepEqual((await (await context.request.get(app.origin+'/api/platter/state')).json()).brands.find(b=>b.id===s.activeBrand).kit,p.document.brand)
+   await page.getByText('Edit working brand kit',{exact:true}).click()
+   const edit=page.locator('form').filter({has:page.getByRole('button',{name:'Save brand kit',exact:true})})
+   await edit.getByLabel('Brand name',{exact:true}).fill('Brand B next kit');await edit.getByRole('button',{name:'Save brand kit'}).click()
+   const after=await (await context.request.get(app.origin+'/api/platter/state')).json()
+   assert.equal(after.proposals[0].document.brand.name,'Brand B')
+   await page.getByLabel('Working brand',{exact:true}).selectOption('default');await page.getByRole('button',{name:'Switch brand'}).click()
+   await page.goto(app.origin+'/app');assert.equal(await page.getByRole('link',{name:'Brand B unsent draft',exact:true}).count(),0)
+  }finally{await context.close()}
+ }finally{await browser?.close();await app?.close()}
+})

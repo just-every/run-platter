@@ -1,3 +1,4 @@
+import { brandId } from '../brands'
 import { fillVariables } from './variables'
 import { currentTime } from '../expiry-time'
 import type { Bindings } from '../../auth.server'
@@ -24,7 +25,7 @@ async function keys(env:Bindings,a:Actor,p:Record<string,unknown>){
 const proposalQuery=`SELECT p.id,p.title,p.revision,p.version,
  CASE WHEN EXISTS(SELECT 1 FROM p_withdrawals w WHERE w.proposal_id=p.id AND w.revision=p.revision) THEN 'withdrawn'
  WHEN p.status='sent' AND EXISTS(SELECT 1 FROM p_expiry ex WHERE ex.proposal_id=p.id AND ex.deadline_at<=?) THEN 'expired'
- ELSE p.status END AS status,p.currency FROM p_proposals p`
+ ELSE p.status END AS status,p.currency FROM p_proposals p WHERE p.brand_id='default'`
 const proposals=async(env:Bindings)=> (await env.DB.prepare(proposalQuery+' ORDER BY p.created_at,p.id').bind(await currentTime(env.DB)).all()).results
 export const routes:Route[]=[
  {method:'GET',path:'/openapi.json',scope:'public',summary:'OpenAPI description',handle:async()=>description()},
@@ -70,6 +71,7 @@ export async function publicApi(request:Request,env:Bindings):Promise<Response|n
     actor=await principal(request,env,true,true);need(JSON.parse(key.scopes).includes(route.scope),'API key lacks scope '+route.scope,403)
    }
   }
+  need(brandId(actor)==='default','Machine access and provider configuration for secondary brands are unavailable',403)
   let p:Record<string,unknown>={}
   if(request.method==='POST'){need(request.headers.get('content-type')?.includes('application/json'),'Use JSON',415);const raw=await request.text();need(new TextEncoder().encode(raw).length<=150000,'Request too large',413);try{p=JSON.parse(raw)}catch{need(false,'Invalid JSON')};need(p&&typeof p==='object'&&!Array.isArray(p),'Expected an object')}
   if(route.path==='/reference')return reference()

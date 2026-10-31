@@ -612,6 +612,12 @@
       "name": "0101_delegation_owner_version.sql",
       "sha256": "dafe362a2ae4b8aca6db0fa1a9bf3fb1f8797b854e2a53295b73f75b5c62281f",
       "sql": "-- Older grants carry no authority across a native identity-version change.\nALTER TABLE p_delegation_authority ADD COLUMN owner_version INTEGER;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0102_delegation_slots.sql",
+      "sha256": "9e19c2d17c7911936e0636d0e4e8f5985d6e247564f3ac733dca106003f2039e",
+      "sql": "-- Preserve the delegated recipient slot independently of its mutable mailbox.\nALTER TABLE p_signer_delegations ADD COLUMN slot_id TEXT NOT NULL DEFAULT 'client';\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

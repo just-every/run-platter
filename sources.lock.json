@@ -2918,7 +2918,7 @@
       "executable": false
     },
     "src/platter/recipients.ts": {
-      "sha256": "baa3ccdd4cefa31bc141ba4c56614cf18cb37d625fb6c11869270bfce6b20962",
+      "sha256": "bc6a041e9ce2b296519821450274aa4fbbb665308a0cd4850c1b422407b5f5ec",
       "executable": false
     },
     "src/platter/recurring.ts": {
@@ -3622,7 +3622,7 @@
       "executable": false
     },
     "tests/signer-delegation-http.mjs": {
-      "sha256": "22f94a82bc63433f1ff084b8791ba277ace96607d47130e9daf4fc6b504b2a92",
+      "sha256": "9c6fb4c270d60732ccbd8f42cc61ca5fde365a589ffd2590e28b8c3b08ae7561",
       "executable": false
     },
     "tests/signer-replacement-http.mjs": {

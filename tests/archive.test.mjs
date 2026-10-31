@@ -1145,3 +1145,53 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('ACCT-004 public CLI preserves business invoice matching evidence without credentials or review authority', {timeout:180000},async()=>{
+ const {invoiceFixture,invoiceAccount,invoiceCustomer,invoiceExternal,invoiceToken,connectInvoice,acceptedDeposit,reviewInvoice,inspectInvoice}=await import('./invoice-matching-fixture.mjs')
+ const temporary=await mkdtemp(join(tmpdir(),'platter-invoice-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=invoiceFixture();let h
+ try{
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService})
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T15:00:00Z'),cron:'*/15 * * * *'})
+  await connectInvoice(h)
+  const accepted=await acceptedDeposit(h),review=await reviewInvoice(h,accepted.p.id)
+  await h.cmd('invoice.match.apply',{id:review.id,digest:review.digest,consent:true})
+  await inspectInvoice(h,review.id)
+  fake.invoice.TotalAmt=1100;await inspectInvoice(h,review.id)
+  const second=await acceptedDeposit(h,{clientId:accepted.client.id,title:'Unapplied reviewed deposit'});fake.invoice.Id='synthetic-platter-4706';fake.invoice.TotalAmt=1050
+  const pending=await h.cmd('invoice.match.review',{id:second.p.id,accountId:invoiceAccount,connectionVersion:1,externalId:fake.invoice.Id,customerId:invoiceCustomer,consent:true})
+  const tables=['p_accounting_company','p_invoice_matches','p_invoice_inspections','p_acceptances','p_invoices'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
+  const history=(await h.send('/api/platter/invoice-reconciliation',undefined,h.owner)).value
+  assert.equal(history.deposits.find(row=>row.match).match.external_id,invoiceExternal);assert.equal(before.p_invoice_matches[0].deposit_cents,105000)
+  const oldOwner=h.owner;await h.close();h=undefined
+  const archive=join(temporary,'invoice.rer');await command(source,['export','--output',archive,'--no-queue'])
+  const contents=await readFile(archive,'utf8'),records=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
+  assert.ok(!contents.includes(invoiceToken));assert.ok(!contents.includes('synthetic-platter-4799'));assert.ok(!contents.includes('PrimaryEmailAddr'))
+  for(const table of ['p_invoice_match_reviews','p_connection_secrets','p_shares'])assert.equal(records.filter(r=>r.table===table).length,0,table+' is not portable authority')
+  await command(restored,['import','--input',archive,'--yes','--no-queue'])
+  const restoredFake=invoiceFixture();h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:restoredFake.outboundService})
+  for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results,before[table],table+' retains exact immutable facts')
+  for(const table of ['p_invoice_match_reviews','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  assert.equal((await h.send('/api/platter/invoice-reconciliation',undefined,oldOwner)).status,401)
+  const owner=await h.signIn(h.auth.OWNER_EMAIL)
+  assert.deepEqual((await h.send('/api/platter/invoice-reconciliation',undefined,owner)).value,history)
+  assert.equal((await h.state(owner)).connections.find(c=>c.provider==='quickbooks').status,'needs_reconnection')
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T15:00:00Z'),cron:'*/15 * * * *'})
+  assert.equal(restoredFake.calls.length,0,'restoring and reading history never synchronizes')
+  await h.cmd('invoice.match.apply',{id:pending.id,digest:pending.digest,consent:true},owner,409)
+  await h.cmd('invoice.match.inspect',{id:review.id,accountId:invoiceAccount,connectionVersion:1,consent:true},owner,409)
+  await h.cmd('provider.connect',{provider:'quickbooks',version:1,realmId:'synthetic-platter-foreign',token:invoiceToken,consent:true},owner,409)
+  assert.equal(restoredFake.calls.length,0,'restored company lock prevents account switching without outbound requests')
+  await connectInvoice(h,1,owner);assert.equal(restoredFake.calls.length,1)
+  await h.cmd('invoice.match.apply',{id:pending.id,digest:pending.digest,consent:true},owner,409)
+  await h.cmd('invoice.match.inspect',{id:review.id,accountId:invoiceAccount,connectionVersion:2,consent:false},owner,400)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T15:01:00Z'),cron:'*/15 * * * *'})
+  assert.equal(restoredFake.calls.length,1,'reconnection never replays captured consent or activates synchronization')
+  const fresh=await inspectInvoice(h,review.id,owner,2);assert.deepEqual(fresh.mismatches,[])
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_invoice_matches ORDER BY 1').all()).results,before.p_invoice_matches)
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_acceptances ORDER BY 1').all()).results,before.p_acceptances)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_invoice_inspections').first()).n,3)
+  console.log('PROBE ACCT-004 archive: public CLI export and import -> exact match and mismatch evidence; credentials and review captures absent; no restore sync')
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

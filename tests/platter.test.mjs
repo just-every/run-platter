@@ -3833,3 +3833,94 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
  } finally { await h.close() }
  await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
 })
+
+test('ACCT-004 reviewed QuickBooks deposit matches survive replay and reconnection, flag provider edits and refuse stale or foreign authority',async()=>{
+ const {invoiceFixture,invoiceAccount,invoiceCustomer,invoiceExternal,invoiceToken,connectInvoice,acceptedDeposit,reviewInvoice,inspectInvoice}=await import('./invoice-matching-fixture.mjs')
+ const fake=invoiceFixture(),h=await harness({outboundService:fake.outboundService})
+ try{
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T15:00:00Z'),cron:'*/15 * * * *'})
+  await connectInvoice(h)
+  const first=await acceptedDeposit(h),second=await acceptedDeposit(h,{clientId:first.client.id,title:'Second deposit'})
+  const tables=['p_accounting_company','p_invoice_match_reviews','p_invoice_matches','p_invoice_inspections','p_acceptances','p_invoices','p_payment_records'],records=async()=>Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results])))
+  const baseline=await records(),beforeCalls=fake.calls.length
+  await h.cmd('invoice.match.review',{id:first.p.id,accountId:invoiceAccount,connectionVersion:1,externalId:invoiceExternal,customerId:invoiceCustomer,consent:false},h.owner,400)
+  await h.cmd('invoice.match.review',{id:first.p.id,accountId:'synthetic-platter-foreign',connectionVersion:1,externalId:invoiceExternal,customerId:invoiceCustomer,consent:true},h.owner,409)
+  assert.equal(fake.calls.length,beforeCalls)
+  const input={id:first.p.id,accountId:invoiceAccount,connectionVersion:1,externalId:invoiceExternal,customerId:invoiceCustomer,consent:true}
+  for(const change of [{externalId:'synthetic-platter-wrong'},{customerId:'synthetic-platter-wrong'}])await h.cmd('invoice.match.review',{...input,...change},h.owner,409)
+  for(const value of [{Invoice:[fake.invoice,fake.invoice]},{QueryResponse:{Invoice:[fake.invoice]}}]){fake.response(value);await h.cmd('invoice.match.review',input,h.owner,409)}fake.response(undefined)
+  for(const [field,value] of [['TotalAmt',1050.01],['CurrencyRef',{value:'EUR'}]]){const original=fake.invoice[field];fake.invoice[field]=value;await h.cmd('invoice.match.review',input,h.owner,409);fake.invoice[field]=original}
+  assert.deepEqual(await records(),baseline,'unsafe initial reads retain no company lock, review, match, payment or changed export')
+  const review=await reviewInvoice(h,first.p.id)
+  assert.equal(review.depositCents,105000);assert.equal(review.revision,1);assert.equal(review.depositId,first.deposit.id);assert.equal(review.source.invoice.id,invoiceExternal);assert.equal(review.source.customer.id,invoiceCustomer);assert.equal(review.source.accountId,invoiceAccount)
+  assert.ok(fake.calls.some(c=>c.url.endsWith('/invoice/'+invoiceExternal)));assert.ok(fake.calls.some(c=>c.url.endsWith('/customer/'+invoiceCustomer)))
+  const apply=(r,cookie=h.owner,status=200)=>h.cmd('invoice.match.apply',{id:r.id,digest:r.digest,consent:true},cookie,status)
+  const afterReview=await records()
+  await h.cmd('invoice.match.apply',{id:review.id,digest:review.digest,consent:false},h.owner,400)
+  await apply({...review,digest:'synthetic-platter-changed'},h.owner,409)
+  fake.invoice.SyncToken='2';await apply(review,h.owner,409);fake.invoice.SyncToken='1'
+  assert.deepEqual(await records(),afterReview,'changed response snapshots cannot be applied')
+  const competing=await reviewInvoice(h,second.p.id)
+  const replies=await Promise.all([review,competing].map(r=>h.send('/api/platter/command',{name:'invoice.match.apply',input:{id:r.id,digest:r.digest,consent:true}},h.owner)))
+  assert.deepEqual(replies.map(r=>r.status).sort(),[200,409]);const winner=replies.findIndex(r=>r.status===200),chosen=[first,second][winner],matchedReview=[review,competing][winner]
+  await apply(matchedReview,h.owner,409);await apply([review,competing][1-winner],h.owner,409)
+  let history=(await h.send('/api/platter/invoice-reconciliation',undefined,h.owner)).value
+  const matched=history.deposits.find(row=>row.match),retained=structuredClone(matched.match)
+  assert.equal(matched.id,chosen.deposit.id);assert.equal(retained.deposit_cents,105000);assert.equal(retained.external_id,invoiceExternal);assert.equal(retained.customer_id,invoiceCustomer);assert.equal(retained.account_id,invoiceAccount)
+  assert.equal(history.deposits.filter(row=>row.match).length,1);assert.equal((await h.state()).paymentRecords.length,0)
+  await h.cmd('invoice.match.review',{...input,id:[first,second][1-winner].p.id},h.owner,409)
+  const equal=await inspectInvoice(h,retained.id);assert.deepEqual(equal.mismatches,[])
+  fake.invoice.TotalAmt=1100;fake.invoice.CurrencyRef.value='EUR';fake.invoice.CustomerRef.value='synthetic-platter-foreign-customer';fake.invoice.SyncToken='2'
+  const changed=await inspectInvoice(h,retained.id);assert.deepEqual(changed.mismatches,['amount','currency','customer']);assert.equal(changed.source.invoice.totalCents,110000)
+  history=(await h.send('/api/platter/invoice-reconciliation',undefined,h.owner)).value
+  assert.deepEqual(history.deposits.find(row=>row.match).match,retained);assert.equal(history.deposits.find(row=>row.match).inspections.length,2)
+  for(const table of ['p_acceptances','p_invoices','p_payment_records'])assert.deepEqual((await records())[table],baseline[table],table+' remains byte-exact after mismatches')
+  assert.equal(history.deposits.find(row=>row.match).receipts.length,0)
+  assert.doesNotMatch(JSON.stringify(history),new RegExp(invoiceToken+'|synthetic-platter-4799|PrimaryEmailAddr|Credentials|PrivateNote'))
+  fake.invoice.TotalAmt=1050;fake.invoice.CurrencyRef.value='USD';fake.invoice.CustomerRef.value=invoiceCustomer;fake.invoice.SyncToken='1'
+  const beforeDisconnect=await records();await h.cmd('provider.disconnect',{provider:'quickbooks',version:1})
+  const disconnectedCalls=fake.calls.length
+  await h.cmd('invoice.match.inspect',{id:retained.id,accountId:invoiceAccount,connectionVersion:1,consent:true},h.owner,409)
+  assert.equal(fake.calls.length,disconnectedCalls);assert.deepEqual(await records(),beforeDisconnect)
+  await h.cmd('provider.connect',{provider:'quickbooks',version:2,realmId:'synthetic-platter-foreign',token:invoiceToken,consent:true},h.owner,409)
+  assert.equal(fake.calls.length,disconnectedCalls,'locked company refusal occurs before provider requests')
+  await connectInvoice(h,2)
+  const reconnectCalls=fake.calls.length
+  await h.cmd('invoice.match.inspect',{id:retained.id,accountId:invoiceAccount,connectionVersion:3,consent:false},h.owner,400)
+  await h.cmd('invoice.match.inspect',{id:retained.id,accountId:invoiceAccount,connectionVersion:1,consent:true},h.owner,409)
+  assert.equal(fake.calls.length,reconnectCalls);await inspectInvoice(h,retained.id,h.owner,3);await inspectInvoice(h,retained.id,h.owner,3)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_invoice_matches').first()).n,1)
+  const memberEmail=['synthetic-platter-4705','example.test'].join('@')
+  await h.send('/auth/invite',{email:memberEmail,displayName:'Invoice administrator',role:'member',returnTo:'/app'},h.owner)
+  const member=await h.signIn(memberEmail),person=(await h.state()).teamPeople.find(row=>row.email===memberEmail)
+  const noCall=fake.calls.length
+  await h.cmd('invoice.match.review',{...input,connectionVersion:3},member,403)
+  assert.equal((await h.send('/api/platter/invoice-reconciliation',undefined,member)).status,403);assert.equal((await h.state(member)).invoiceReconciliation,undefined);assert.equal(fake.calls.length,noCall)
+  await h.cmd('member.set',{operatorId:person.id,version:0,role:'admin',teams:[]})
+  // A different provider invoice can serve the other deposit only after its own review.
+  fake.invoice.Id='synthetic-platter-4706'
+  const other=[first,second][1-winner],otherInput={...input,id:other.p.id,externalId:fake.invoice.Id,connectionVersion:3}
+  const adminReview=await h.cmd('invoice.match.review',otherInput,member),raceBaseline=await records()
+  let demoted=false
+  fake.beforeReply(async request=>{if(!demoted&&request.url.includes('/invoice/')){demoted=true;await h.cmd('member.set',{operatorId:person.id,version:1,role:'sales',teams:[]})}})
+  const callsBeforeDemotion=fake.calls.length;await apply(adminReview,member,409);fake.beforeReply(undefined)
+  assert.equal(fake.calls.length,callsBeforeDemotion+1,'authority loss stops the next customer request');assert.deepEqual(await records(),raceBaseline,'demotion during read retains nothing')
+  const ownerReview=await h.cmd('invoice.match.review',otherInput)
+  let disconnected=false;fake.beforeReply(async request=>{if(!disconnected&&request.url.includes('/customer/')){disconnected=true;await h.cmd('provider.disconnect',{provider:'quickbooks',version:3})}})
+  const sourceBaseline=await records();await apply(ownerReview,h.owner,409);fake.beforeReply(undefined);assert.deepEqual(await records(),sourceBaseline)
+  await connectInvoice(h,4)
+  const staleCalls=fake.calls.length;await apply(ownerReview,h.owner,409);assert.equal(fake.calls.length,staleCalls)
+  const expired=await h.cmd('invoice.match.review',{...otherInput,connectionVersion:5});await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T15:16:00Z'),cron:'*/15 * * * *'});await apply(expired,h.owner,409)
+  await h.cmd('client.erase',{id:first.client.id,confirmName:'Synthetic deposit client'},h.owner,409)
+  const erased=await h.cmd('client.save',{name:'Unused invoice person',email:['synthetic-platter-4707','example.test'].join('@')});await h.cmd('client.erase',{id:erased.id,confirmName:'Unused invoice person'})
+  await apply({...expired,id:erased.id},h.owner,409);assert.equal(await h.db.prepare('SELECT id FROM p_clients WHERE id=?').bind(erased.id).first(),null,'review replay cannot recreate an erased person')
+  await h.cmd('member.set',{operatorId:person.id,version:2,role:'admin',teams:[]})
+  const adminFresh=await h.cmd('invoice.match.review',{...otherInput,connectionVersion:5},member);await apply(adminFresh,member)
+  const adminMatch=(await h.send('/api/platter/invoice-reconciliation',undefined,member)).value.deposits.find(row=>row.proposal_id===other.p.id).match
+  assert.equal(adminMatch.matched_by,person.id);assert.equal(adminMatch.deposit_cents,105000)
+  const audit=(await h.send('/api/platter/audit?action=invoice.match.apply',undefined,h.owner)).value.rows;assert.equal(audit.length,2);assert.ok(audit.some(row=>row.subject===retained.id));assert.ok(audit.some(row=>row.subject===adminMatch.id&&row.actor_role==='admin'))
+  assert.ok(fake.calls.every(call=>call.method==='GET'));console.log('PROBE ACCT-004 matching: public review and apply -> one exact USD 105000-cent deposit match; unsafe cases unchanged')
+  console.log('PROBE ACCT-004 inspection: public inspection after edits -> amount, currency and customer mismatches; retained money and match unchanged')
+  console.log('PROBE ACCT-004 authority: disconnect, reconnect, demotion, stale capture and expiry -> no unconsented read or match write')
+ }finally{await h.close()}
+})

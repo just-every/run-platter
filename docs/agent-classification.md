@@ -17,6 +17,13 @@ and each offered optional item counts once. Quantity and selection do not
 multiply those counts. Template facts retain the version originally copied.
 Amounts, private cost keys and authored text are absent from the metadata.
 
+The MCP `request_send` tool also reports standard facts: one affected proposal
+and one internal send-request item. Its reference comes from the saved request,
+including the version originally requested. Repeating that pending request,
+even after human approval of the same revision, retains the same reference and
+counts one item. This queues owner review and sends no invitation. Stale,
+sent-offer and forged-class attempts return no classification facts.
+
 Native scheduling, completion and dismissal of an internal sales follow-up
 report one affected proposal and one follow-up item. Their revision and version
 refer to the proposal checked by the successful write transaction. They do not

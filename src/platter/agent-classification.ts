@@ -2,11 +2,26 @@ import { need } from './model'
 
 interface DraftResult { id: string; revision: number; version: number }
 
+export interface SendRequestFacts {
+ proposal_id: string
+ revision: number
+ requested_version: number
+}
+
 export function standardClassification(proposal: DraftResult, facts: Record<string, number>, basis: string) {
  return {
   classification: { classes: ['standard'], basis, proposal, facts },
   companyPolicy: { evaluated: false, decision: null },
  }
+}
+
+/** The internal review queue is not the external action its owner may later take. */
+export function sendRequestClassification(request: SendRequestFacts) {
+ return standardClassification(
+  { id: request.proposal_id, revision: request.revision, version: request.requested_version },
+  { affectedProposalCount: 1, sendRequestItemCount: 1, itemCount: 1 },
+  'validated saved send request',
+ )
 }
 
 /** Facts about the exact native revision, after native validation and version guards.

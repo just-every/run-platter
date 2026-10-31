@@ -4,7 +4,7 @@ import { state } from './state'
 import { need, type Actor } from './model'
 import { requestSend } from './send-requests'
 import { recordAudit } from './audit'
-import { draftClassification } from './agent-classification'
+import { draftClassification, sendRequestClassification } from './agent-classification'
 
 const headers = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' }
 const versions = ['2025-03-26', '2025-06-18']
@@ -122,7 +122,8 @@ export async function handleMcp(request: Request, env: Bindings, actor: Actor): 
  try {
   const value = await callTool(env, actor, tool.name, input)
   await recordAudit(env.DB, actor, `mcp.${tool.name}`, String((value as any)?.id ?? input.id ?? 'proposals'))
-  const metadata = ['prepare_proposal', 'prepare_from_template', 'revise_proposal'].includes(tool.name)
+  const metadata = tool.name === 'request_send' ? sendRequestClassification((value as any).request)
+   : ['prepare_proposal', 'prepare_from_template', 'revise_proposal'].includes(tool.name)
    ? await draftClassification(env.DB, value) : undefined
   return result({ content: [{ type: 'text', text: JSON.stringify(value) }], ...(metadata ? { _meta: metadata } : {}) })
  } catch (error) {

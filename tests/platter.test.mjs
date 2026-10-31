@@ -453,7 +453,16 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  let current=await call('read_proposal',{id:p.id});assert.equal(current.status,'draft');assert.equal(current.prepared_by,'agent:'+key.id);assert.ok(!current.shareToken)
  assert.ok((await call('search_proposals',{query:'photography',status:'draft',limit:1})).proposals.some(x=>x.id===p.id))
  const engagement=await call('read_engagement',{id:p.id});assert.equal(engagement.viewTracking.available,false);assert.equal(engagement.sectionReading.available,false);assert.equal(engagement.acceptance,null);assert.equal(engagement.delivery,null)
- const before=await h.state(),requested=await call('request_send',{id:p.id,revision:1}),again=await call('request_send',{id:p.id,revision:1})
+ const queuedCall=async(id,revision,version)=>{
+  const result=await rpc('tools/call',{name:'request_send',arguments:{id,revision}})
+  assert.ok(!result.isError,JSON.stringify(result))
+  assert.deepEqual(result._meta,{
+   classification:{classes:['standard'],basis:'validated saved send request',proposal:{id,revision,version},facts:{affectedProposalCount:1,sendRequestItemCount:1,itemCount:1}},
+   companyPolicy:{evaluated:false,decision:null},
+  })
+  return JSON.parse(result.content[0].text)
+ }
+ const before=await h.state(),requested=await queuedCall(p.id,1,1),again=await queuedCall(p.id,1,1)
  assert.equal(again.request.id,requested.request.id)
  const queued=await h.send('/api/platter/send-requests',undefined,h.owner);assert.equal(queued.status,200);assert.equal(queued.value.requests.length,1);assert.equal(queued.value.requests[0].actionable,1)
  const after=await h.state();assert.deepEqual(after.proposals,before.proposals);assert.deepEqual(after.outbox,before.outbox)
@@ -464,10 +473,20 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  await h.cmd('send-request.resolve',{id:requested.request.id,status:'fulfilled'},h.owner,409)
  const changed=await call('revise_proposal',{...offer,depositPercent:25,clientId:client.id,id:p.id,version:1,scope:'A revised campaign plan'})
  assert.equal(changed.revision,2);assert.equal((await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests[0].actionable,0)
- const stale=await rpc('tools/call',{name:'request_send',arguments:{id:p.id,revision:1}});assert.equal(stale.isError,true)
+ const stale=await rpc('tools/call',{name:'request_send',arguments:{id:p.id,revision:1}});assert.equal(stale.isError,true);assert.equal(stale._meta,undefined)
+ const pendingRequests=(await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests
+ const forgedRequest=await transport('tools/call',{name:'request_send',arguments:{id:p.id,revision:2,class:'standard',companyPolicy:{decision:'allow'}}})
+ assert.equal(forgedRequest.value.error.code,-32602);assert.equal(forgedRequest.value.result,undefined)
+ assert.deepEqual((await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests,pendingRequests)
  await h.cmd('send-request.resolve',{id:requested.request.id,status:'dismissed'})
- const next=await call('request_send',{id:p.id,revision:2})
- await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const sent=await h.cmd('proposal.send',{id:p.id,version:3})
+ const next=await queuedCall(p.id,2,2)
+ await h.cmd('proposal.approve',{id:p.id,version:2,revision:2})
+ const approvedState=await h.state(),approvedRequest=await queuedCall(p.id,2,2)
+ assert.deepEqual(approvedRequest,next,'Repeating after approval retains the original request and its recorded version')
+ assert.deepEqual((await h.state()).proposals,approvedState.proposals);assert.deepEqual((await h.state()).outbox,approvedState.outbox)
+ const sent=await h.cmd('proposal.send',{id:p.id,version:3})
+ const sentRequest=await rpc('tools/call',{name:'request_send',arguments:{id:p.id,revision:2}})
+ assert.equal(sentRequest.isError,true);assert.equal(sentRequest._meta,undefined)
  await h.cmd('send-request.resolve',{id:next.request.id,status:'fulfilled'})
  await h.cmd('tracking.settings',{enabled:'yes',alerts:'yes',retentionDays:90,quietMinutes:30,consent:'yes'});await h.send(new URL(sent.shareUrl).pathname)
  const privateEngagement=await call('read_engagement',{id:p.id});assert.equal(privateEngagement.viewTracking.available,false);assert.match(privateEngagement.viewTracking.reason,/only.*owner/);assert.ok(!JSON.stringify(privateEngagement).includes('avery@northstar.example'));assert.equal((await h.state()).tracking.views.length,1)

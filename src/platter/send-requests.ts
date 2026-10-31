@@ -1,5 +1,6 @@
 import { commit, need, proposal, type Actor } from './model'
 import { recordAudit } from './audit'
+import type { SendRequestFacts } from './agent-classification'
 
 export async function requestSend(db: D1Database, actor: Actor, input: Record<string, any>) {
  const current = await proposal(db, input.id)
@@ -7,7 +8,8 @@ export async function requestSend(db: D1Database, actor: Actor, input: Record<st
  const guard = { sql: "EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND revision=? AND status IN ('draft','approved'))", values: [current.id, input.revision] }
  await commit(db, actor, [db.prepare("INSERT INTO p_send_requests(id,proposal_id,revision,requested_version,owner_id,agent_key_id,requested_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(proposal_id,revision,agent_key_id) WHERE status='pending' DO NOTHING")
   .bind(crypto.randomUUID(), current.id, current.revision, current.version, actor.id, actor.keyId!, Date.now())], false, guard)
- const request = await db.prepare("SELECT * FROM p_send_requests WHERE proposal_id=? AND revision=? AND agent_key_id=? AND status='pending'").bind(current.id, current.revision, actor.keyId!).first()
+ const request = await db.prepare("SELECT * FROM p_send_requests WHERE proposal_id=? AND revision=? AND agent_key_id=? AND status='pending'").bind(current.id, current.revision, actor.keyId!).first<SendRequestFacts>()
+ need(request, 'Saved send request not found. Reload before trying again.', 409)
  return { request, message: 'Queued for owner review. Approval and sending remain owner actions.' }
 }
 

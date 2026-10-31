@@ -1,4 +1,3 @@
-import type { Bindings } from '../auth.server'
 import { commit, hash, need, text, type Actor } from './model'
 import { documentOf, proposalDocument } from './documents/blocks'
 import { proposalFields } from './commands'
@@ -41,11 +40,12 @@ export async function draftSourceCommand(db: D1Database, a: Actor, name: string,
  const source=await db.prepare('SELECT 1 FROM p_draft_sources WHERE id=? AND owner_id=? AND version=?').bind(sourceId,a.id,version).first()
  need(source,'Select the current source version',409)
  await commit(db,a,[db.prepare('DELETE FROM p_draft_source_consent WHERE key_id=? AND source_id=?').bind(keyId,sourceId),...(grant ? [db.prepare('INSERT INTO p_draft_source_consent(key_id,source_id,source_version,consented_at) VALUES(?,?,?,?)').bind(keyId,sourceId,version,Date.now())] : [])],true,{sql:'EXISTS(SELECT 1 FROM p_draft_sources WHERE id=? AND owner_id=? AND version=?) AND EXISTS(SELECT 1 FROM p_agent_keys WHERE id=? AND revoked_at IS NULL AND expires_at>?)',values:[sourceId,a.id,version,keyId,Date.now()]})
- return {saved:true,active:grant}
+ return {saved:true,active:grant,id:sourceId+':'+version+':'+keyId+':'+(grant?'allow':'revoke')}
 }
 const data = (v:any,keys:string[]) => need(v && typeof v==='object' && !Array.isArray(v) && Object.keys(v).every(k=>keys.includes(k)), 'Unsupported prepared content; review it outside this action')
 export async function sourcedPreparation(db: D1Database, a: Actor, input: Record<string,unknown>, content:any) {
  need(a.role==='agent'&&a.keyId,'A consented agent key prepares sourced content',403)
+ need(['scope','packages','pricingTables','depositPercent','optionOne','priceOne','optionTwo','priceTwo'].every(key=>input[key]===undefined),'Use only sourced sections and selected catalog rows for this preparation')
  const p=input.sourceDraft as any
  data(p,['sourceId','sourceVersion','sourceSha256','sections','packages'])
  const sourceId=text(p.sourceId,'a source'),source=await db.prepare('SELECT v.* FROM p_draft_sources s JOIN p_draft_source_versions v ON v.source_id=s.id AND v.version=s.version WHERE s.id=? AND s.owner_id=? AND s.version=?').bind(sourceId,a.id,Number(p.sourceVersion)).first<any>()

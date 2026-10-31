@@ -1,3 +1,4 @@
+import { sourceBrowser } from './draft-source-browser.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { localeBrowser } from './locale-browser.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
@@ -11,6 +12,8 @@ import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { pdfPages } from './pdf-document.mjs'
 import { builtSite, installedApp } from './site-harness.mjs'
+
+test('AI-001 owner uploads and inspects private numbered sources, explicitly binds a key and inspects MCP draft citations', {timeout:120000},()=>sourceBrowser())
 
 test('EDIT-017 owner-selected Spanish invitation, verification, consent and completion preserve authored English through the compiled client', {timeout:120000},()=>localeBrowser())
 

@@ -81,3 +81,52 @@ returns the same request. Editing the proposal makes the old request visibly sta
 The owner can dismiss it, or mark it fulfilled only after that same revision was
 actually sent. Requests and their opaque key provenance travel in business archives;
 the credentials themselves never do.
+
+
+## Sourced preparation from private notes
+
+The owner can upload UTF-8 plain text under **Settings → Draft sources**.
+Each original retains its exact text, SHA-256 and stable line numbers, including
+empty lines. Uploading a new version preserves earlier originals and requires
+fresh consent. Only the owner can inspect originals, including older versions.
+
+Select a current agent key and explicitly allow it to bind prepared content to
+that exact source version. The key receives source references and available
+one-off, untaxed catalog entries through `search_templates`; it cannot retrieve
+raw notes. Preparation accepts content prepared outside Platter. Platter makes
+no model calls and does not infer the truth of a summary from a citation.
+
+Call the existing `prepare_proposal` MCP tool with `clientId`, `templateId`,
+`templateVersion`, an optional `title`, and `sourceDraft`:
+
+```json
+{
+  "sourceId": "selected-source-id",
+  "sourceVersion": 1,
+  "sourceSha256": "exact-sha256-from-owner",
+  "sections": [{
+    "id": "discovery", "title": "Discovery", "text": "Reviewed scope text.",
+    "citation": {"startLine": 2, "endLine": 3, "sha256": "exact-lines-sha256"}
+  }],
+  "packages": [{
+    "id": "essential", "label": "Essential",
+    "lines": [{"catalogId": "selected-catalog-id", "catalogVersion": 1, "quantity": "2"}]
+  }]
+}
+```
+
+A citation's hash covers the selected lines joined with a single newline.
+The source hash covers the exact UTF-8 original, retaining original line endings.
+Every generated scope section needs a valid line range and hash. Every priced
+row needs an explicit current catalog version and positive quantity. Prices
+come from those catalog records; supplied prices, unmatched records, taxed or
+recurring items, fixed-page templates, unresolved variables, recipient plans
+and payment schedules are held for manual preparation. Notes confer no authority.
+
+The result is an independent, single-client draft with collection off. Template
+terms, branding and delivery defaults are copied; reminders remain inactive.
+Scope citations and catalog provenance describe the prepared revision; later
+human edits do not rewrite that history. Review both the cited source and the
+prepared wording before approving or sending. Key revocation and source-consent
+revocation stop subsequent preparations. Backups retain private originals and
+provenance, while restored keys and source-binding consent remain absent.

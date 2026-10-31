@@ -19,7 +19,7 @@ export async function seedSourcedDraft(h) {
  const key=await h.cmd('agent.create',{label:'Synthetic source helper'})
  const sections=[{id:'discovery',title:'Discovery',text:'Run two discovery workshops.',citation:{startLine:2,endLine:2,sha256:sourceHash('Two discovery workshops are requested.')}},{id:'delivery',title:'Delivery',text:'Deliver three campaign assets.',citation:{startLine:4,endLine:4,sha256:sourceHash('Deliver three campaign assets.')}}]
  const input={clientId:client.id,title:'Synthetic sourced proposal',templateId:saved.id,templateVersion:template.version,sourceDraft:{sourceId:source.id,sourceVersion:source.version,sourceSha256:source.sha256,sections,packages:[{id:'essential',label:'Essential',lines:[{catalogId:first.id,catalogVersion:1,quantity:'2'},{catalogId:second.id,catalogVersion:1,quantity:'1.5'}]},{id:'campaign',label:'Campaign',lines:[{catalogId:first.id,catalogVersion:1,quantity:'4'},{catalogId:second.id,catalogVersion:1,quantity:'3'}]}]}}
- return {client,source,first,second,key,input,baseline,templateId:saved.id}
+ return {client,source,first,second,key,input,baseline,template,templateId:saved.id}
 }
 export async function sourcedMcp(h,key,name,input) {
  return h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:'synthetic-platter-9906',method:'tools/call',params:{name,arguments:input}},'',{authorization:'Bearer '+key.token})

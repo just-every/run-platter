@@ -1,5 +1,6 @@
 // SMS assent and suppression are business history; invitation and sender authority stay local.
 // Auth identities retain approval authors. Credentials, invitations and messages stay local.
+// Decision-time roles and approval bases travel as business history, never as execution grants.
 export default {
  product: 'proposals/platter',
  includeTables: ['oa_operators','oa_bootstrap','oa_invitation_cancellations'],

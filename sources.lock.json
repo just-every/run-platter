@@ -2554,7 +2554,7 @@
       "executable": false
     },
     "src/platter/commands.ts": {
-      "sha256": "8ba0d46ce2fd5baecd6acdaec52ba75ee08193374754583c91d554d9cc06145d",
+      "sha256": "e785274373109a9286e349e5f79970f0d64453b9d8b249e409367bcf1cb17455",
       "executable": false
     },
     "src/platter/completion-mail.ts": {
@@ -3178,7 +3178,7 @@
       "executable": false
     },
     "src/platter/ui/invitation-mail.ts": {
-      "sha256": "b4bb6a64cc60fd0c1cdea0effdfc6b307c2097051fffae230f7622ad32f6e372",
+      "sha256": "bc164c59d3aa4898b398fdad6a2f7f2f6937725bd29315833f072ae2324c266d",
       "executable": false
     },
     "src/platter/ui/library.ts": {
@@ -3618,11 +3618,11 @@
       "executable": false
     },
     "tests/signer-delegation-browser.mjs": {
-      "sha256": "25ba6d0102e3f58ed641fa917fee9af24fa375f3cce662a849573958afb75070",
+      "sha256": "41dca3d8ce09579049ab62107fcd9c3c97f4fbbaf2c4e865bfd2c6a877d9c9ea",
       "executable": false
     },
     "tests/signer-delegation-http.mjs": {
-      "sha256": "1531bdb0e9bb6491080b52ab514fdaceeeba7de0b29115637b9c0d44b98afb0a",
+      "sha256": "22f94a82bc63433f1ff084b8791ba277ace96607d47130e9daf4fc6b504b2a92",
       "executable": false
     },
     "tests/signer-replacement-http.mjs": {

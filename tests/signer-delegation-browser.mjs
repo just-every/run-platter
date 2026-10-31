@@ -10,6 +10,7 @@ export async function delegationBrowser(widths=[1440]){
  try{for(const width of widths){
   const app=await installedApp(),owner=await browser.newContext({viewport:{width,height:1000}}),client=await browser.newContext({viewport:{width,height:1000}})
   try{
+   console.log('SIGN-009 compiled app ready at width '+width)
    const page=await owner.newPage(),recipient=await client.newPage()
    const cmd=async(name,input)=>{const r=await owner.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
    const state=async()=>{const r=await owner.request.get(app.origin+'/api/platter/state');assert.equal(r.status(),200);return r.json()}
@@ -80,6 +81,6 @@ export async function delegationBrowser(widths=[1440]){
    assert.equal(multiFacts.delegations[0].slot_id,'cfo');assert.equal(multiFacts.delegations[0].signing_position,2)
    for(const screen of [page,recipient])assert.deepEqual(await screen.locator('button,a[role="button"]').evaluateAll(nodes=>nodes.filter(n=>!n.textContent.trim()&&!n.querySelector('[data-tooltip]')&&!n.hasAttribute('data-tooltip')).map(n=>n.outerHTML)),[])
    console.log('PROBE SIGN-009 browser '+width+': Settings enable, recipient delegate, verification, owner undo and completed certificate -> passed')
-  }finally{await client.close();await owner.close();await app.close()}
+  }catch(error){console.error('SIGN-009 browser failure',error);throw error}finally{await client.close();await owner.close();await app.close()}
  }}finally{await browser.close()}
 }

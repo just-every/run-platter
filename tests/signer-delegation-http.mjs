@@ -82,6 +82,7 @@ export async function delegationHttp(){
   const changed=await delegationFixture(h);await changed.configure(true);const changedSession=await delegationVerify(h,changed.path)
   await h.cmd('proposal.negotiate',{...changed.offer,id:changed.id,version:(await changed.get()).version,scope:'synthetic-platter-next-offer'})
   await refused(changed.path+'/action?name=delegate',input,changedSession.cookie,409)
+  const changedRow=await changed.get();await refused('/api/platter/command',{name:'proposal.send',input:{id:changed.id,version:changedRow.version,delegationConsent:true}},h.owner,409)
   const {recipientFixture,roles,verifyRecipient}=await import('./recipients-http.mjs')
   const configured=await recipientFixture(h,'Synthetic Platter configured delegation refusal',roles(h.auth.OWNER_EMAIL)),configuredCookie=await verifyRecipient(h,configured.links.ceo)
   await refused(configured.links.ceo+'/action?name=delegate',{...input,revision:configured.revision},configuredCookie,409)

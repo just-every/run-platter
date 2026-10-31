@@ -171,13 +171,15 @@ export async function importedOriginal(db:D1Database,actor:Actor,query:URLSearch
   if(file?.original.status!=='retained')fail('original_not_found',404)
   bytes=Buffer.from(file.original.base64,'base64')
   if(sha256(bytes)!==data.sha256)fail('original_integrity',409,'Original file integrity check failed')
-  filename='retained-document.pdf'
+  filename=String(data.filename).split('/').at(-1)||'retained-document.pdf'
  }else{
   const journal=await documentImportCommand(db,actor,'document-import.journal',{id:query.get('id')}) as any
   const file=journal.originals.find((o:any)=>o.name===query.get('name'))
   if(file?.original.status!=='retained')fail('original_not_found',404)
   bytes=Buffer.from(file.original.base64,'base64')
+  filename=String(file.name).split('/').at(-1)||filename
  }
  await documentOwner(db,actor)
- return new Response(new Uint8Array(bytes),{headers:{'content-type':query.has('document')?'application/pdf':'application/octet-stream','content-disposition':'attachment; filename="'+filename+'"','cache-control':'no-store','x-content-type-options':'nosniff'}})
+ const ascii=filename.replace(/[^a-zA-Z0-9._ -]/g,'_'),encoded=encodeURIComponent(filename).replace(/['()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase())
+ return new Response(new Uint8Array(bytes),{headers:{'content-type':query.has('document')?'application/pdf':'application/octet-stream','content-disposition':'attachment; filename="'+ascii+'"; filename*=UTF-8\'\''+encoded,'cache-control':'no-store','x-content-type-options':'nosniff'}})
 }

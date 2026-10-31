@@ -3763,9 +3763,11 @@ test('MIG-003 and MIG-007 exported document move-in resumes across sessions, hol
   assert.deepEqual(doc.signatureEvidence,i<24?[{kind:'signature-page',page:2,text:'Signature page'}]:[])
   const response=await h.mf.dispatchFetch(h.origin+'/api/platter/imported-original?document='+doc.id,{headers:{cookie:resumed}})
   assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),file.bytes)
+  assert.ok(response.headers.get('content-disposition').includes('filename="'+file.filename+'"'))
  }
  const bpJournal=await h.cmd('document-import.journal',{id:bpId},resumed)
  assert.equal(bpJournal.provenance.length,35)
+ assert.deepEqual(JSON.parse(Buffer.from(bpJournal.originals.find(o=>o.name==='reviewed-report-choices.json').original.base64,'base64')).report,bpJournal.report)
  assert.deepEqual(Buffer.from(bpJournal.originals.find(o=>o.name==='contacts.csv').original.base64,'base64'),bp.contacts.bytes)
  assert.deepEqual(JSON.parse(Buffer.from(bpJournal.originals.find(o=>o.name==='betterproposals-review.json').original.base64,'base64')).review,bp.review)
  const duplicateId=await startBetterProposals(h,bp,resumed),duplicateReview=await h.cmd('document-import.preview',{id:duplicateId,...bp.review},resumed)

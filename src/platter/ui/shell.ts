@@ -24,7 +24,7 @@ export function document(title: string, contents: string, options: FrameOptions 
   const { actor, path, feedback, client } = options
   const zone = options.zone ?? 'UTC'
   const current = path?.split('?')[0]
-  const links = tabs.filter(([href]) => actor?.role === 'owner' || href === '/app' || ['owner','admin'].includes(actor?.role)&&['/app/team','/app/approvals','/app/audit','/app/settings'].includes(href) || actor?.role!=='agent'&&href==='/app/team')
+  const links = tabs.filter(([href]) => actor?.role === 'owner' || href === '/app' || ['owner','admin'].includes(actor?.role)&&['/app/team','/app/approvals','/app/audit','/app/settings'].includes(href) || actor?.role!=='agent'&&['/app/team','/app/settings'].includes(href))
     .map(([href, label]) => `<a href="${href}"${(current === href || href === '/app' && path?.startsWith('/app/proposal')) ? ' aria-current="page"' : ''}>${label}</a>`).join('')
   const person = actor ? `<div class="topbar-end">${clock(Date.now(), zone)}<p class="identity" title="${escape(actor.email)} · ${escape(actor.role)}"><span class="avatar" aria-hidden="true">${escape(initials(options.name ?? '', String(actor.email)))}</span><span class="who">${escape(actor.email)} · ${escape(actor.role)}</span></p></div>` : ui('<span class="client-tag">Client proposal</span>')
   const styleHash=options.styles?createHash('sha256').update(options.styles).digest('base64'):''

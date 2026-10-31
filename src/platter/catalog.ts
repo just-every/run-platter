@@ -1,3 +1,4 @@
+import { brandId, brandScope, brandRecord } from './brands'
 import { recurrenceInput, catalogInterval } from './recurring'
 import { taxFlags } from './taxes'
 import { costReaders, flatCostKey, type CostPatch } from './internal-pricing'
@@ -9,7 +10,7 @@ export const catalogEditors=['owner','admin','manager']
 export const catalogReaders=[...catalogEditors,'sales','content_editor','billing']
 export async function catalogState(db:D1Database,a:Actor){
  if(!catalogReaders.includes(a.role))return []
- const rows=(await db.prepare('SELECT * FROM p_priced_catalog ORDER BY name,id').all<any>()).results
+ const access=brandScope(a,'r'),rows=(await db.prepare('SELECT r.* FROM p_priced_catalog r WHERE '+access.sql+' ORDER BY name,id').bind(...access.values).all<any>()).results
  return rows.map(({unit_cost_cents,source_id,source_version,...row})=>({...row,...(a.role==='owner'?{source_id,source_version}:{}),...(costReaders.includes(a.role)?{unitCostCents:unit_cost_cents}:{})}))
 }
 export function catalogValues(p:Record<string,any>,old?:any){
@@ -26,13 +27,13 @@ export async function saveCatalog(db:D1Database,a:Actor,p:Record<string,unknown>
  if(p.id)need(old,'Catalog item not found',404);if(old)exact(old,p)
  const item=catalogValues(p,old),at=Date.now()
  const values=[item.sku,item.name,item.description,item.unit,item.unitCents,item.unitCostCents,item.defaultRecurrence,item.taxable?1:0,item.taxCode,item.incomeAccount,a.id,at]
- await commit(db,a,[old?db.prepare('UPDATE p_priced_catalog SET sku=?,name=?,description=?,unit=?,unit_cents=?,unit_cost_cents=?,default_recurrence=?,taxable=?,tax_code=?,income_account=?,updated_by=?,updated_at=?,version=version+1 WHERE id=?').bind(...values,id):db.prepare('INSERT INTO p_priced_catalog(sku,name,description,unit,unit_cents,unit_cost_cents,default_recurrence,taxable,tax_code,income_account,updated_by,updated_at,id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(...values,id)],false,old?{sql:'EXISTS(SELECT 1 FROM p_priced_catalog WHERE id=? AND version=?)',values:[id,old.version]}:undefined)
+ await commit(db,a,[old?db.prepare('UPDATE p_priced_catalog SET sku=?,name=?,description=?,unit=?,unit_cents=?,unit_cost_cents=?,default_recurrence=?,taxable=?,tax_code=?,income_account=?,updated_by=?,updated_at=?,version=version+1 WHERE id=?').bind(...values,id):db.prepare('INSERT INTO p_priced_catalog(sku,name,description,unit,unit_cents,unit_cost_cents,default_recurrence,taxable,tax_code,income_account,updated_by,updated_at,id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(...values,id),...(!old?[db.prepare('UPDATE p_priced_catalog SET brand_id=? WHERE id=?').bind(brandId(a),id)]:[])],false,old?{sql:'EXISTS(SELECT 1 FROM p_priced_catalog WHERE id=? AND version=?)',values:[id,old.version]}:undefined)
  return{id,version:(old?.version??0)+1}
 }
 export async function catalogInsertion(db:D1Database,a:Actor,p:Record<string,unknown>){
  const original=await permitted(db,a,p.id,'edit');exact(original,p)
  const row=negotiatedView(original,await pendingNegotiation(db,original.id));need(['draft','approved'].includes(row.status),'Add catalog items to an unsent draft',409);need(row.currency==='USD','USD catalog prices do not convert historical agreements',409)
- const item=await db.prepare('SELECT * FROM p_priced_catalog WHERE id=?').bind(text(p.catalogId,'a catalog item')).first<any>();need(item,'Catalog item not found',404);need(item.version===Number(p.catalogVersion),'Catalog item changed. Reload before choosing its price.',409)
+ const item=await db.prepare('SELECT * FROM p_priced_catalog WHERE id=?').bind(text(p.catalogId,'a catalog item')).first<any>();need(item,'Catalog item not found',404);await brandRecord(db,a,'catalog',item.id);need(item.version===Number(p.catalogVersion),'Catalog item changed. Reload before choosing its price.',409)
  const recurring=recurrenceInput({interval:item.default_recurrence,term:p.term,startsOn:p.startsOn})
  const publicOffer=snapshot(row),options=publicOffer.options,option=options.find((o:any)=>o.id===p.optionId);need(option,'Choose a package')
  const tables=pricingInput(options),existing=option.tables??[],line={catalogId:item.id,incomeAccount:item.income_account,...taxFlags({taxable:Boolean(item.taxable),taxCode:item.tax_code}),...recurring,name:item.name,description:item.description,unit:item.unit,quantity:String(p.quantity??'1'),unitPrice:(item.unit_cents/100).toFixed(2)},baseline=existing.length?[]:[{name:'Original package amount',description:'',unit:'project',quantity:'1',unitPrice:((option.discount?.grossCents??option.cents)/100).toFixed(2)}],tableName='Catalog items'

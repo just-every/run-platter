@@ -1,3 +1,4 @@
+import { brandScope, brandAccess } from './brands'
 import { proposalFolderScope } from './folders'
 import { commit, need, proposal, text, type Actor } from './model'
 export const roles = ['admin','manager','sales','content_editor','viewer','billing'] as const
@@ -19,9 +20,9 @@ function baseScope(a:Actor,right:Right,alias='p'):{sql:string;values:any[]} {
  }
  return {sql:`(${own} OR EXISTS(SELECT 1 FROM p_collaborators c WHERE c.proposal_id=${alias}.id AND c.operator_id=?))`,values:[...values,a.id]}
 }
-export function scope(a:Actor,right:Right,alias='p'){const base=baseScope(a,right,alias);if(base.sql==='0')return base;const folder=proposalFolderScope(a,alias);return {sql:'('+base.sql+') AND ('+folder.sql+')',values:[...base.values,...folder.values]}}
+export function scope(a:Actor,right:Right,alias='p'){const base=baseScope(a,right,alias);if(base.sql==='0')return base;const folder=proposalFolderScope(a,alias),brand=brandScope(a,alias);return {sql:'('+base.sql+') AND ('+folder.sql+') AND ('+brand.sql+')',values:[...base.values,...folder.values,...brand.values]}}
 export async function permitted(db:D1Database,a:Actor,id:unknown,right:Right='view') {
- const s=scope(a,right);need(s.sql!=='0','Your role cannot perform this action',403);const row=await proposal(db,id)
+ await brandAccess(db,a);const s=scope(a,right);need(s.sql!=='0','Your role cannot perform this action',403);const row=await proposal(db,id)
  need(await db.prepare(`SELECT id FROM p_proposals p WHERE id=? AND (${s.sql})`).bind(row.id,...s.values).first(),'This proposal is outside your permissions',403)
  // Keep the scope live inside the eventual write transaction as well.
  a.permission={sql:`EXISTS(SELECT 1 FROM p_proposals p WHERE id=? AND (${s.sql}))`,values:[row.id,...s.values]}

@@ -1,3 +1,4 @@
+import { brandFixture, brandOffer, kit } from './brand-fixture.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import {previewBusiness} from './approval-preview-fixture.mjs'
 import { collectionLifecycle, collectionFees, collectionMethodInheritance } from './collection-journey.mjs'
@@ -3832,4 +3833,60 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
   const expired = await review(); await h.mf.getWorker().then(w => w.scheduled({ scheduledTime: new Date(Date.now() + 901000), cron: '*/15 * * * *' })); await apply(expired, h.owner, 409)
  } finally { await h.close() }
  await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
+})
+
+test('TEAM-003 brands isolate draft custody, intersect live roles and scopes, and refuse execution and revoked membership before commit', {timeout:120000},async()=>{
+ const h=await harness({entry:'tests/brand-worker.ts',assetsDirectory:'public'})
+ try{
+  const fixture=await brandFixture(h),{a,pa,ta,la,ca,b,client,pb,tb,lb,cb}=fixture,people={}
+  for(const name of ['a','b','both']){
+   const email='synthetic-platter-150-'+name+String.fromCharCode(64)+'example.test'
+   await h.send('/auth/invite',{email,displayName:'Brand person '+name,role:'member',returnTo:'/app'},h.owner)
+   const cookie=await h.signIn(email),id=(await h.state(cookie)).actor.id;people[name]={cookie,id}
+   if(name==='b')await h.cmd('brand.member',{brandId:'default',operatorId:id,member:false})
+   if(name!=='a')await h.cmd('brand.member',{brandId:b.id,operatorId:id,member:true})
+   if(name!=='a')await h.cmd('brand.select',{brandId:b.id},cookie)
+  }
+  for(const name of ['b','both']){
+   const actor=people[name],s=await h.state(actor.cookie)
+   assert.deepEqual(s.brands.map(r=>r.id).sort(),(name==='b'?[b.id]:['default',b.id]).sort())
+   assert.deepEqual(s.libraryItems.map(r=>r.id),[lb.id]);assert.deepEqual(s.templates.map(r=>r.id),[tb.id]);assert.deepEqual(s.clients.map(r=>r.id),[client.id]);assert.deepEqual(s.catalogItems.map(r=>r.id),[cb.id]);assert.deepEqual(s.proposals,[],'membership does not override proposal scope')
+   await h.cmd('template.start',{id:ta.id,version:1,clientId:client.id},actor.cookie,403)
+   await h.cmd('proposal.duplicate',{id:pa.id,version:1,clientId:client.id},actor.cookie,403)
+   assert.equal((await h.send('/app/proposal?id='+pa.id,undefined,actor.cookie)).status,403)
+   assert.equal((await h.send('/api/platter/document-media/'+pa.id+'/synthetic-platter-1504',undefined,actor.cookie)).status,403)
+   await h.cmd('proposal.prepare',{...brandOffer,clientId:a.id},actor.cookie,403)
+  }
+  assert.deepEqual((await h.state(people.a.cookie)).libraryItems.map(r=>r.id),[la.id])
+  await h.cmd('brand.select',{brandId:b.id},people.a.cookie,403)
+  await h.cmd('brand.member',{brandId:b.id,operatorId:people.a.id,member:true},people.b.cookie,403)
+  await h.cmd('brand.member',{brandId:b.id,operatorId:'synthetic-platter-unconfirmed',member:true},h.owner,400)
+  const key=await h.cmd('agent.create',{label:'Default brand only'})
+  await h.cmd('brand.select',{brandId:b.id})
+  const before=(await h.db.prepare('SELECT * FROM p_revisions ORDER BY rowid').all()).results
+  await h.cmd('brand.save',{id:b.id,version:1,name:'Brand B revised',kit:{...kit,name:'Revised B'}})
+  assert.deepEqual((await h.state()).proposals.find(r=>r.id===pb.id).document.brand,kit)
+  const fresh=await h.cmd('proposal.prepare',{...brandOffer,clientId:client.id})
+  assert.equal((await h.state()).proposals.find(r=>r.id===fresh.id).document.brand.name,'Revised B')
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_revisions ORDER BY rowid LIMIT ?').bind(before.length).all()).results,before)
+  await h.cmd('template.start',{id:tb.id,version:1,clientId:a.id},h.owner,403)
+  await h.cmd('catalog.insert',{id:pb.id,version:1,catalogId:ca.id,catalogVersion:1,optionId:'one'},h.owner,403)
+  await h.cmd('library.insert',{id:pb.id,version:1,itemRef:la.id+':1',mode:'detached',consent:true},h.owner,403)
+  await h.cmd('proposal.send',{id:pb.id,version:1},h.owner,409)
+  await h.cmd('proposal.approve',{id:pb.id,version:1,revision:1},h.owner,409)
+  await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-1505',consent:true},h.owner,409)
+  const machine=await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token});assert.equal(machine.status,200);assert.deepEqual(machine.value.proposals.map(r=>r.id),[pa.id]);assert.ok(!machine.text.includes('Private B content'))
+  const machineWrite=await h.send('/api/platter/agent/command',{name:'proposal.prepare',input:{...brandOffer,clientId:client.id}},'',{authorization:'Bearer '+key.token});assert.equal(machineWrite.status,403)
+  await h.cmd('proposal.share',{id:pb.id,operatorId:people.b.id})
+  assert.deepEqual((await h.state(people.b.cookie)).proposals.map(r=>r.id),[pb.id])
+  const counts=async()=>(await h.db.prepare('SELECT (SELECT COUNT(*) FROM p_proposals) AS proposals,(SELECT COUNT(*) FROM p_revisions) AS revisions,(SELECT COUNT(*) FROM p_audit) AS audit').first())
+  const originalCounts=await counts()
+  await h.cmd('proposal.prepare',{...brandOffer,clientId:client.id},people.b.cookie,409,{'x-test-revoke-person':people.b.id,'x-test-revoke-brand':b.id})
+  assert.deepEqual(await counts(),originalCounts,'revocation immediately before the batch writes nothing')
+  assert.deepEqual((await h.state(people.b.cookie)).proposals,[])
+  await h.cmd('template.start',{id:tb.id,version:1,clientId:client.id},people.b.cookie,403)
+  await h.cmd('brand.select',{brandId:'default'},people.b.cookie,403)
+  await h.cmd('brand.select',{brandId:'default'},people.both.cookie)
+  assert.deepEqual((await h.state(people.both.cookie)).libraryItems.map(r=>r.id),[la.id])
+ }finally{await h.close()}
 })

@@ -1,3 +1,4 @@
+import { publicIntakeResponse } from './public-submissions'
 import { hubspotCardData, hubspotCardResponse } from './crm/hubspot-card'
 import { crmDraftSources } from './crm/hubspot-draft'
 import { archiveState } from './archiving/jobs'
@@ -62,7 +63,7 @@ const headers={'cache-control':'no-store','x-content-type-options':'nosniff','re
 const json=(v:unknown,status=200)=>Response.json(v,{status,headers})
 const pages=new Set(['/app/crm-card','/app','/app/proposal','/app/clients','/app/import','/app/access','/app/audit','/app/settings','/app/team','/app/approvals','/app/library','/app/catalog'])
 async function body(request:Request,maxBytes=150000){const raw=await request.text();need(new TextEncoder().encode(raw).length<=maxBytes,'Request too large',413);if(request.headers.get('content-type')?.includes('application/json')){let v;try{v=JSON.parse(raw)}catch{fail('Invalid JSON')}need(v&&typeof v==='object'&&!Array.isArray(v),'Expected an object');return v as Record<string,unknown>}need(request.headers.get('content-type')?.includes('application/x-www-form-urlencoded'),'Use JSON or a form',415);return Object.fromEntries(new URLSearchParams(raw))}
-export async function platterResponse(request:Request,original:Bindings):Promise<Response|null>{const env=runtimeBindings(original),url=new URL(request.url),path=url.pathname,isClient=path.startsWith('/p/'),isAgent=path.startsWith('/api/platter/agent/');if(!isClient&&!path.startsWith('/api/platter/')&&path!=='/app'&&!path.startsWith('/app/'))return null
+export async function platterResponse(request:Request,original:Bindings):Promise<Response|null>{const env=runtimeBindings(original),url=new URL(request.url),path=url.pathname,isClient=path.startsWith('/p/'),isIntake=path.startsWith('/intake/'),isAgent=path.startsWith('/api/platter/agent/');if(!isClient&&!isIntake&&!path.startsWith('/api/platter/')&&path!=='/app'&&!path.startsWith('/app/'))return null
  let actor:Actor|undefined;const requestedBack=new URL(url.searchParams.get('returnTo')||'/app',env.AUTH_ORIGIN);const back=requestedBack.origin===env.AUTH_ORIGIN&&pages.has(requestedBack.pathname)?requestedBack.pathname+requestedBack.search:'/app';let context:any,submitted:Record<string,unknown>|undefined
  try{
   const api=await publicApi(request,env);if(api)return api
@@ -72,6 +73,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   if(path==='/api/platter/question-replies')return await questionReplyResponse(request,env)
   if(path==='/api/platter/mail/events')return await deliveryWebhook(request,env)
   if(request.method==='POST'&&!isAgent)need(request.headers.get('origin')===env.AUTH_ORIGIN&&request.headers.get('sec-fetch-site')!=='cross-site','Cross-site request refused',403)
+  if(isIntake)return await publicIntakeResponse(request,env,body)
   if(isClient){const match=path.match(/^\/p\/([a-f0-9]{64})(\/stakeholder|\/engagement|\/action|\/agreement\.pdf|\/certificate\.json|\/certificate\.pdf|\/payment\.json|\/payment-consent\.json|\/payment-status\.json|\/download\.pdf|\/data\.json|\/attachments\/([\w-]+)|\/media\/([\w-]+))?$/);need(match,'Invitation not found',404);const withdrawn=await env.DB.prepare('SELECT contact_email,client_locale FROM p_withdrawn_links WHERE token=?').bind(match[1]).first<{contact_email:string;client_locale:string}>();if(withdrawn)return path.endsWith('.json')?json({error:'Proposal withdrawn',contact:withdrawn.contact_email},410):withdrawnPage(withdrawn.contact_email,clientLocale(withdrawn));const replaced=await env.DB.prepare('SELECT lang.locale AS client_locale FROM p_replaced_links l JOIN p_proposals p ON p.id=l.proposal_id LEFT JOIN p_client_locales lang ON lang.proposal_id=p.id WHERE l.token=?').bind(match[1]).first();if(replaced)return path.endsWith('.json')?json({error:'This signer invitation was replaced'},410):replacedInvitationPage(clientLocale(replaced));context=await clientContext(env,match[1],request)
    if(match[2]==='/stakeholder'){need(request.method==='POST','Use stakeholder identification',405);return await stakeholderResponse(env,context,await body(request))}
    if(match[2]==='/engagement'){need(request.method==='POST','Use a tracking event',405);return json(await readingEvent(env,context,await body(request)))}

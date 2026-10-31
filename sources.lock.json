@@ -2754,7 +2754,7 @@
       "executable": false
     },
     "src/platter/movein/betterproposals-export.ts": {
-      "sha256": "ca09859d218ab9ec7568c3abb64eeacc2047fb24131159140518fd7a28f7cd96",
+      "sha256": "2371b70d7d990c894c462da0ad6d7496e5f055ca7a1b190c98c328becf94a68a",
       "executable": false
     },
     "src/platter/movein/business-csv.ts": {
@@ -2802,7 +2802,7 @@
       "executable": false
     },
     "src/platter/movein/document-import.ts": {
-      "sha256": "b704d5b98272d85df76d6dd7d702d4e93e281a65878fefd08b4cb7df8cfb3545",
+      "sha256": "902f5aa46b71499a338dea20c1dab35ece3c2429f825e48e043a4f97ddd31608",
       "executable": false
     },
     "src/platter/movein/document-source.ts": {
@@ -3558,7 +3558,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "fdbd2611f56afee447b2d769e75355e4b91ac2249adedc1e4a3a248a1a8931bc",
+      "sha256": "7f840ed99db2fddb587923163392fd0ae0d7afe72ca5575425d527b8ede623bb",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3610,7 +3610,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "06ab819e793db17af06de49e84597c721923d6c76e42760897fc69279293dc9b",
+      "sha256": "cd0e624cbef525c3d8797c5fbc472c49d45f0199f77a4d6de24f07cea09e411e",
       "executable": false
     },
     "tests/site-harness.mjs": {

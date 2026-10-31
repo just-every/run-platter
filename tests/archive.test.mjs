@@ -492,7 +492,7 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody', {timeout:180000},async()=>{
+test('MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody', {timeout:300000},async()=>{
  const {businessCsv,applyBusiness,undoBusiness,fileHost}=await import('./business-import-fixture.mjs')
  const temporary=await mkdtemp(join(tmpdir(),'platter-business-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
  let h

@@ -3879,6 +3879,13 @@ test('SEND-009 reviewed public intake verifies two visitors into independent uns
  const sent=await h.cmd('proposal.send',{id:first.proposal_id,version:freshDraft.version+1})
  assert.ok(sent.shareUrl);assert.equal((await h.send(new URL(sent.shareUrl).pathname+'/action?name=accept',{name:'Visitor',optionId:'studio',consent:true})).status,401)
  assert.equal((await h.state()).proposals.find(r=>r.id===first.proposal_id).expiry.sentAt,at)
+ // Turning workspace approval off never lets an unattended visitor submission reach a client.
+ await h.cmd('approval.policy',{version:(await h.state()).approvalSettings.policy.version,required:false,defaultRole:'owner'})
+ const unfenced=state.publicSubmissions[1],lone=(await h.state()).proposals.find(r=>r.id===unfenced.proposal_id)
+ await h.cmd('proposal.send',{id:lone.id,version:lone.version},h.owner,409)
+ assert.equal((await h.state()).proposals.find(r=>r.id===lone.id).status,'draft')
+ await h.cmd('proposal.approve',{id:lone.id,version:lone.version,revision:lone.revision})
+ assert.ok((await h.cmd('proposal.send',{id:lone.id,version:lone.version+1})).shareUrl)
  const capped=await publishIntake(h,template,{submissionCap:1})
  const [a,b]=await Promise.all([intakeChallenge(h,capped.path,visitor(9904)),intakeChallenge(h,capped.path,visitor(9905))])
  const race=await Promise.all([h.send(capped.path+'/submit',a),h.send(capped.path+'/submit',b)])

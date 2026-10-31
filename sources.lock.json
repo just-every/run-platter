@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "692484efa6c7fec245d55f4a3a2f72793add08a41736aead7991d849fe99eead",
+      "sha256": "2732aaa9cbac8e4517bdc38de4b3219b2e16bad86d08a382b6974f86655fd459",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2474,7 +2474,7 @@
       "executable": false
     },
     "src/platter/approvals.ts": {
-      "sha256": "aa675508caa3b73eb58b4446ea0081d2b45a8e91bfaf6d5f2fc94290db5c0fea",
+      "sha256": "11add00a0b2454fb5323f38e3c474628dac52df7d2899677d01c47f2895b6f8f",
       "executable": false
     },
     "src/platter/archive-policy.d.mts": {
@@ -3570,7 +3570,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "3311260a1f0118de347446667cf0bc3662b41577695ef2489afd52f9180976ce",
+      "sha256": "79f41d703c3ae3f32790eb4f517ddcc097ff643b336fc200f764430dbb759ebc",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

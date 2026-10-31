@@ -198,6 +198,16 @@ export async function configuredDelegationHttp(h){
  const cfoPath=new URL(undoneCfo.shareUrl).pathname
  assert.equal((await decision(h,cfoPath,await verifyRecipient(h,cfoPath))).status,200)
  assert.equal((await decision(h,parallel.links.owner,await verifyRecipient(h,parallel.links.owner))).status,200)
+ // Reissuing invitations keeps an unsigned delegation, its fresh-verification rule and its Undo.
+ const reissue=await recipientFixture(h,'Synthetic configured reissue after delegation',roles(h.auth.OWNER_EMAIL)),reissueGet=async()=>(await h.state()).proposals.find(r=>r.id===reissue.id)
+ await h.cmd('signer.delegation.configure',{id:reissue.id,version:(await reissueGet()).version,enabled:true})
+ assert.equal((await h.send(reissue.links.cfo+'/action?name=delegate',{revision:reissue.revision,recipient:address(9926),delegateName:'Synthetic reissue delegate'},await verifyRecipient(h,reissue.links.cfo))).status,200)
+ const delegated=await reissueGet(),delegatedId=delegated.delegation.history[0].id
+ await h.cmd('proposal.send',{id:reissue.id,version:delegated.version})
+ const reissued=await reissueGet(),cfoShare=await h.db.prepare("SELECT * FROM p_shares WHERE proposal_id=? AND slot_id='cfo'").bind(reissue.id).first()
+ assert.equal(cfoShare.recipient,address(9926));assert.equal(cfoShare.delegation_id,delegatedId);assert.equal(cfoShare.verification_required,1)
+ assert.deepEqual(reissued.delegation.currentIds,[delegatedId])
+ await h.cmd('signer.delegation.undo',{id:reissue.id,version:reissued.version,delegationId:delegatedId})
  for(const action of ['delegate','undo']){
   const race=await recipientFixture(h,'Synthetic configured '+action+' race',roles(h.auth.OWNER_EMAIL)),raceGet=async()=>(await h.state()).proposals.find(r=>r.id===race.id)
   await h.cmd('signer.delegation.configure',{id:race.id,version:(await raceGet()).version,enabled:true})

@@ -99,13 +99,15 @@ export async function recipientInvitations(env:Bindings,a:Actor,input:Record<str
  const signatures=await recipientSignatures(env.DB,row.id,row.revision)
  need(!signatures.some(s=>!s.voided_at),'Withdraw this partly signed revision before issuing fresh invitations',409)
  const links=plan.filter(r=>r.email).map(r=>({...r,token:secret()}))
+ // A live delegation survives reissue: its fact and fresh-verification requirement stay with the slot.
+ const carried=new Map((await env.DB.prepare('SELECT slot_id,delegation_id,verification_required FROM p_shares WHERE proposal_id=? AND revision=? AND delegation_id IS NOT NULL').bind(row.id,row.revision).all<any>()).results.map(s=>[s.slot_id,s]))
  const writes:D1PreparedStatement[]=[
   env.DB.prepare('INSERT INTO p_replaced_links(token,proposal_id,revision) SELECT token,proposal_id,revision FROM p_shares WHERE proposal_id=? ON CONFLICT DO NOTHING').bind(row.id),
   env.DB.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(row.id),
  ]
  for(const r of links){
   const url=env.AUTH_ORIGIN+'/p/'+r.token
-  writes.push(env.DB.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient,slot_id,signing_position) VALUES(?,?,?,?,?,?)').bind(row.id,row.revision,r.token,r.email,r.id,r.group),...invitationMail(env,a,input,row,r.email!,url,at))
+  writes.push(env.DB.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient,slot_id,signing_position,delegation_id,verification_required) VALUES(?,?,?,?,?,?,?,?)').bind(row.id,row.revision,r.token,r.email,r.id,r.group,carried.get(r.id)?.delegation_id??null,carried.get(r.id)?.verification_required??0),...invitationMail(env,a,input,row,r.email!,url,at))
  }
  return {writes,links:links.map(({token,...r})=>({...r,shareUrl:env.AUTH_ORIGIN+'/p/'+token}))}
 }

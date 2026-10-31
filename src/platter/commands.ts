@@ -1,3 +1,4 @@
+import { requestDeposit } from './deposit-requests'
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
@@ -202,6 +203,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   if(internalCosts)writes.push(...patchCosts(db,id,revision,internalCosts))
   await commit(db,a,writes,false,old?{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))",values:[id,old.version]}:undefined);return{id,revision,version:(old?.version??0)+1}
  }
+ if(name==='deposit.request')return requestDeposit(env,a,p)
  if(name==='invoice.export')return exportInvoice(db,a,p)
  if(name==='proposal.approve'||name==='proposal.send'){
   const old=await proposal(db,p.id);exact(old,p)

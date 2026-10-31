@@ -1,3 +1,4 @@
+import { recordDepositDelivery } from './deposit-requests'
 import { completionAttachments, queueReadyCompletionMail } from './completion-mail'
 import { clientText, type ClientLocale } from './locales'
 import { prepareClientReply } from './client-mail-replies'
@@ -21,6 +22,7 @@ export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string
  for(const row of rows){
   if(!sender&&(!row.sender_id||!await env.DB.prepare("SELECT id FROM p_connections WHERE operator_id=? AND provider IN ('gmail','microsoft') AND status='connected' AND broken_at IS NULL").bind(row.sender_id).first()))continue
   const claimed=await env.DB.prepare("UPDATE p_mail SET status='sending' WHERE id=? AND status='pending'").bind(row.id).run();if(!claimed.meta.changes)continue
+  await recordDepositDelivery(env,row,'sending')
   let route='installation',address=env.MAIL_FROM??'',fallback=false
   try{
    let actor=await sendingActor(env,row)
@@ -44,12 +46,14 @@ export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string
    }
    const status=result?.status==='accepted'?'accepted':'uncertain'
    await env.DB.batch([env.DB.prepare("UPDATE p_mail SET status=?,provider=?,provider_message_id=? WHERE id=?").bind(status,route==='installation'?env.MAIL_PROVIDER??null:route,result?.providerMessageId??null,row.id),env.DB.prepare("UPDATE p_bounce_notices SET closed_at=? WHERE closed_at IS NULL AND id IN (SELECT notice_id FROM p_bounce_notice_transport WHERE correction_mail_id=?) AND ?='accepted'").bind(Date.now(),row.id,status)])
+   await recordDepositDelivery(env,row,status,route,result?.providerMessageId)
    await recordSender(env,row,route,address,status,fallback)
   }catch(error){
    const outcome=(error as any)?.status===403?'withheld':'uncertain'
    await env.DB.prepare('UPDATE p_mail SET status=?,provider=?,held_reason=? WHERE id=?').bind('uncertain',route==='installation'?env.MAIL_PROVIDER??null:route,outcome==='withheld'?'sender_not_authorized':null,row.id).run()
+   await recordDepositDelivery(env,row,outcome,route)
    await recordSender(env,row,route,address,outcome,fallback)
-   if(outcome==='withheld'&&!await env.DB.prepare('SELECT 1 FROM p_completion_mail WHERE mail_id=?').bind(row.id).first())throw error
+   if(outcome==='withheld'&&!await env.DB.prepare('SELECT 1 FROM p_completion_mail WHERE mail_id=? UNION ALL SELECT 1 FROM p_deposit_requests WHERE mail_id=?').bind(row.id,row.id).first())throw error
   }
  }
 }

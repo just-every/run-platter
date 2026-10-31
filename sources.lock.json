@@ -2666,7 +2666,7 @@
       "executable": false
     },
     "src/platter/draft-sources.ts": {
-      "sha256": "f0aeccdb9242e888db7b4c6938f519b29dd319f6e8fa7e1935b6ce102260ae87",
+      "sha256": "a4413f46b040f9b7fd0a3fb3c86c89a35441c1f503e1aab8724bdc0780364256",
       "executable": false
     },
     "src/platter/duplicate.ts": {
@@ -3494,11 +3494,11 @@
       "executable": false
     },
     "tests/draft-source-browser.mjs": {
-      "sha256": "27abb61bd02fecc0d1c050723f77ad07837d4650af6777e465ffe1e264a00877",
+      "sha256": "e8133ca1f445438b98f3ba377cd262fd18e32a3d2a513e461dcadae03148e587",
       "executable": false
     },
     "tests/draft-source-fixture.mjs": {
-      "sha256": "3943c1f01d3e1d0a4f51d18532d5b1071dc8dc78aa4f29dd2cd9ed67c90172ff",
+      "sha256": "ca593d70f77a68423605973dabc7474d226366d405fb657ec0a6deed92020656",
       "executable": false
     },
     "tests/drive-fixture.mjs": {
@@ -3574,7 +3574,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "951ae7e328df8de2dc6fd50e67ad60cbc93e0c5e6eab413894c2351f2c5fe0b2",
+      "sha256": "a24a81d7f4964d9190bfd0304abf171ad2f7e17c37f821b2aba1653efec809e1",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

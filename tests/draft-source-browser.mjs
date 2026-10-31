@@ -14,7 +14,7 @@ export async function sourceBrowser(width=1440) {
   await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
   const client=await cmd('client.save',{name:'Synthetic source client',email:['synthetic-platter-9910','example.test'].join('@')}),key=await cmd('agent.create',{label:'Synthetic browser source key'})
   const catalog=await cmd('catalog.save',{sku:'synthetic-platter-9911',name:'Discovery workshop',description:'Facilitated session',unit:'each',unitPrice:'123.45'})
-  const base=await cmd('proposal.prepare',{clientId:client.id,title:'Synthetic browser template',scope:'Template scope',terms:'Human review is required.',depositPercent:'25',packages:[{id:'base',label:'Base',price:'900'}]}),template=await cmd('template.save',{id:base.id,version:1,name:'Synthetic browser template'})
+  const base=await cmd('proposal.prepare',{clientId:client.id,title:'Synthetic browser template',scope:'Template scope',terms:'Human review is required.',depositPercent:'25',packages:[{id:'base',label:'Base',price:'900'}],pricingTables:[{optionId:'base',name:'Original template price',lines:[{name:'Original template service',quantity:'1',unit:'each',unitPrice:'900'}]}],document:{version:1,blocks:[{id:'template-pricing',type:'pricing',title:'Proposed investment',text:'',optionId:'base',tableIndex:0}]}}),template=await cmd('template.save',{id:base.id,version:1,name:'Synthetic browser template'})
   await page.goto(app.origin+'/app/settings')
   const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Draft sources',exact:true})}),upload=panel.locator('form').first()
   await upload.getByLabel('Source title').fill('Synthetic browser notes');await upload.getByLabel('Plain text notes or transcript').setInputFiles({name:'synthetic-platter-9912.txt',mimeType:'text/plain',buffer:Buffer.from(originalNotes)});await upload.getByRole('button',{name:'Upload private source'}).click()
@@ -32,6 +32,9 @@ export async function sourceBrowser(width=1440) {
   assert.equal(await page.locator('textarea[name="scope"]').inputValue(),'Discovery\nRun two discovery workshops.\n\nDelivery\nDeliver three campaign assets.')
   const provenance=page.locator('section').filter({has:page.getByRole('heading',{name:'Prepared source references',exact:true})});assert.match(await provenance.innerText(),/discovery: lines 2–2/);assert.match(await provenance.innerText(),/delivery: lines 4–4/);await screenshot('references',provenance)
   assert.ok(!(await page.locator('main').innerText()).includes('synthetic-platter-9904'))
+  await page.goto(app.origin+'/app/preview/client?id='+created.id+'&revision=1')
+  const pricing=page.locator('[data-document-block="template-pricing"]')
+  assert.match(await pricing.innerText(),/Discovery workshop/);assert.match(await pricing.innerText(),/246\.90/);assert.ok(!(await pricing.innerText()).includes('Original template service'));await screenshot('template-pricing')
   await page.goto(app.origin+'/app/settings');await details.locator('summary').click();await details.getByRole('button',{name:'Revoke source binding'}).click();assert.equal(await details.getByRole('button',{name:'Revoke source binding'}).count(),0)
   const denied=await (await prepare()).json();assert.equal(denied.result.isError,true);assert.match(denied.result.content[0].text,/no consent/)
  }finally{await context?.close();await browser?.close();await app?.close()}

@@ -5,7 +5,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { richLibraryPropagation, richLibrarySource } from './library-fixture.mjs'
 import { documentFixture } from './document-fixture.mjs'
 import { templatesHttp } from './templates-http.mjs'
-import { followupJourney } from './followup-journey.mjs'
+import { followupJourney, followupLifecycle } from './followup-journey.mjs'
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
@@ -1041,7 +1041,12 @@ test('EDIT-018 / EDIT-022 member-only exact-revision previews share selection ma
  const final=(await h.state()).proposals.find(row=>row.id===p.id);assert.equal(final.acceptance.totalCents,430003);assert.equal(final.acceptance.depositCents,143320);assert.equal(final.scope,'New negotiated scope for preview.')
 }))
 
-test('FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal',()=>run(h=>followupJourney(h,{offer,verified})))
+test('FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal',async()=>{
+ await run(h=>followupJourney(h,{offer,verified}))
+ const {resendEvents}=await import('./delivery-provider.mjs'),events=resendEvents(),messages=[];let submitted=0
+ const h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9901',MAIL_WEBHOOK_KEY:events.key},outboundService:async request=>{const id='synthetic-platter-'+(9910+ ++submitted);messages.push({...await request.json(),id});return Response.json({id})}})
+ try{await followupLifecycle(h,events,messages)}finally{await h.close()}
+})
 
 test('EDIT-009 conditional sections match selected preview, client, PDF and immutable agreement; revisions, copies and negotiations retain rules',async()=>{
  const h=await harness({assetsDirectory:'public'});try{

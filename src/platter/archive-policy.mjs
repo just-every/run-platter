@@ -1,4 +1,5 @@
 // Reviewed Proposify source facts and fixed-page lineage are business history, never execution grants.
+// Imported source facts and dependencies retain history; billing schedules confer no execution authority.
 // SMS assent and suppression are business history; invitation and sender authority stay local.
 // Auth identities retain approval authors. Credentials, invitations and messages stay local.
 export default {

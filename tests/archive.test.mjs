@@ -508,17 +508,22 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   const {proposifyFixture,applyProposify,fixedTemplate}=await import('./document-movein-fixture.mjs'),proposify=await proposifyFixture()
   const sourceMovein=await applyProposify(h,proposify),fixed=await fixedTemplate(h,sourceMovein),reversible=await fixedTemplate(h,sourceMovein)
   const sourceJournal=await h.cmd('document-import.journal',{id:sourceMovein.id}),applications=(await h.state()).documentMoveins.find(m=>m.id===sourceMovein.id).applications
-  const documentJournal=await h.cmd('document-import.journal',{id:movein.id}),beforeDocuments=(await h.state()).importedDocuments
+  const beforeDocuments=(await h.state()).importedDocuments
+  const {sourceExportFixture,applySourceExport}=await import('./document-movein-fixture.mjs'),exportFixture=await sourceExportFixture('ignition')
+  const exportMovein=await applySourceExport(h,exportFixture),exportJournal=await h.cmd('document-import.journal',{id:exportMovein.id}),beforeFacts=(await h.state()).importedSourceFacts
+  assert.equal(exportMovein.resumed,true)
+  const documentJournal=await h.cmd('document-import.journal',{id:movein.id}),beforeAllDocuments=(await h.state()).importedDocuments
   const nativeClient=await h.cmd('client.save',{name:'Synthetic retained dependency',email:['synthetic-retained-dependency','example.invalid'].join('@')})
   const dependency=await h.cmd('proposal.prepare',{clientId:nativeClient.id,title:'Synthetic retained dependency',scope:'Synthetic retained dependency',optionOne:'One',priceOne:'100',optionTwo:'Two',priceTwo:'200',depositPercent:'25'})
   await h.db.prepare('INSERT INTO p_imported_document_links(document_id,proposal_id) VALUES(?,?)').bind(hash(documentFixture.originals[0]),dependency.id).run()
+  await h.db.prepare('INSERT INTO p_imported_source_dependencies(fact_id,proposal_id) VALUES(?,?)').bind('ignition:billingSchedules:b-1',dependency.id).run()
   const before=(await h.state()).businessRecords,journal=await h.cmd('business-import.journal',{id:catalog.job.id})
   const identity={auth:h.auth,owner:h.owner};await h.close();h=null
   const file=join(temporary,'business.rer');await command(source,['export','--output',file,'--no-queue']);await command(restored,['import','--input',file,'--yes','--no-queue'])
   h=await harness({root:restored,...identity,...options})
   const cookie=await h.signIn(identity.auth.OWNER_EMAIL)
   assert.deepEqual((await h.state(cookie)).businessRecords,before)
-  assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments)
+  assert.deepEqual((await h.state(cookie)).importedDocuments,beforeAllDocuments)
   assert.deepEqual((await h.state(cookie)).documentMoveins.find(m=>m.id===sourceMovein.id).applications,applications)
   const restoredSourceJournal=await h.cmd('document-import.journal',{id:sourceMovein.id},cookie)
   assert.deepEqual(restoredSourceJournal,sourceJournal,'restored source bytes, choices and provenance stay exact')
@@ -534,6 +539,24 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   const guarded=(await h.state(cookie)).importedDocuments
   await h.cmd('document-import.undo',{id:sourceMovein.id},cookie,409)
   assert.deepEqual((await h.state(cookie)).importedDocuments,guarded)
+  assert.deepEqual((await h.state(cookie)).importedSourceFacts,beforeFacts)
+  const restoredExportJournal=await h.cmd('document-import.journal',{id:exportMovein.id},cookie)
+  assert.deepEqual(restoredExportJournal.originals,exportJournal.originals)
+  assert.deepEqual(restoredExportJournal.provenance,exportJournal.provenance)
+  assert.deepEqual(restoredExportJournal.report,exportJournal.report)
+  for(const bytes of exportFixture.originals){const response=await h.mf.dispatchFetch(h.origin+'/api/platter/imported-original?document='+hash(bytes),{headers:{cookie}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)}
+  const invoices=(await h.db.prepare('SELECT * FROM p_invoices').all()).results
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2027-02-01T12:00:00Z'),cron:'*/15 * * * *'})
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_invoices').all()).results,invoices)
+  assert.ok((await h.state(cookie)).importedSourceFacts.every(f=>f.execution==='source-evidence-only'))
+  await h.cmd('document-import.undo',{id:exportMovein.id},cookie,409)
+  assert.deepEqual((await h.state(cookie)).importedSourceFacts,beforeFacts)
+  await h.db.prepare('DELETE FROM p_imported_source_dependencies WHERE fact_id=?').bind('ignition:billingSchedules:b-1').run()
+  let sourceUndo=await h.cmd('document-import.undo',{id:exportMovein.id},cookie)
+  while(sourceUndo.job.state!=='undone')sourceUndo=await h.cmd('document-import.undo',{id:exportMovein.id},cookie)
+  assert.deepEqual((await h.state(cookie)).importedSourceFacts,[])
+  assert.ok((await h.cmd('document-import.journal',{id:exportMovein.id},cookie)).provenance.every(p=>p.reversed))
+  console.log('PROBE MIG-004 restore: public CLI archive -> exact source facts and original bytes, inactive schedules and working dependency-safe undo')
   const restoredDocumentJournal=await h.cmd('document-import.journal',{id:movein.id},cookie)
   assert.deepEqual(restoredDocumentJournal.originals,documentJournal.originals)
   assert.deepEqual(restoredDocumentJournal.provenance,documentJournal.provenance)

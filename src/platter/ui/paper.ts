@@ -2,7 +2,7 @@ import { ui } from '../locales'
 import { recipientPlan } from '../recipients'
 import { offerSelection, selectionItems } from '../selection'
 import { hasExpandedSelection, itemChoices, selectedSummary, selectionChoices } from './packages'
-import { date, escape, field, hidden, money, panel, proposalPath } from './shared'
+import { date, escape, field, form, hidden, money, panel, proposalPath } from './shared'
 
 // SIGN-008 screens: record a client-signed copy, and label how an agreement was accepted.
 export function paperAcceptanceForm(state: any, p: any, params = new URLSearchParams()): string {
@@ -26,4 +26,13 @@ export function acceptanceMethod(a: any, signedCopyBase?: string): string {
   if (a.method !== 'upload') return ui('<dt>Acceptance method</dt><dd>Platter e-signature after ')+(a.verificationMethod==='SMS code'?'text-code verification':ui('mailbox verification'))+'</dd>'
   const copy = a.signedCopy && signedCopyBase ? `<dt>Signed copy</dt><dd><a href="${signedCopyBase}${encodeURIComponent(a.signedCopy.id)}">${escape(a.signedCopy.filename)} · ${escape(a.signedCopy.size)} bytes</a></dd>` : ''
   return ui`<dt>Acceptance method</dt><dd>Accepted by upload: signed outside Platter. Platter did not verify this signature.</dd><dt>Signed on</dt><dd>${escape(a.signedOn)}</dd>${copy}<dt>Attested by</dt><dd>${escape(a.attestedBy)} · ${date(a.attestedAt)}</dd>`
+}
+
+
+export function depositRequestPanel(state:any,p:any):string {
+ if(state.actor?.role!=='owner'||p.acceptance?.method!=='upload')return ''
+ const history=(p.depositRequests??[]).map((r:any)=>`<dl><dt>Request identity</dt><dd>${escape(r.id)}</dd><dt>Accepted revision</dt><dd>${escape(r.revision)}</dd><dt>Invited mailbox</dt><dd>${escape(r.recipient)}</dd><dt>Deposit requested</dt><dd>${money(r.deposit_cents,r.currency)}</dd><dt>Authorized at</dt><dd>${date(r.authorized_at)}</dd><dt>Delivery outcome</dt><dd>${escape(r.status)} · ${date(r.updated_at)}${r.provider?' · '+escape(r.provider):''}${r.provider_message_id?' · '+escape(r.provider_message_id):''}</dd></dl>`).join('')
+ const b=p.depositRequestReview
+ const authorize=b&&!p.depositRequests?.length?`<p>Request ${money(b.depositCents,b.currency)} from ${escape(b.recipient)} for accepted revision ${escape(b.revision)}. This sends an informational request once. No charge, payment link or additional invoice is created.</p>`+form('deposit.request',proposalPath(p.id),hidden('id',p.id)+hidden('version',p.version)+['revision','acceptedAt','recipient','depositCents','invitationHash'].map(k=>hidden(k,b[k])).join('')+'<label class="choice"><input type="checkbox" name="consent" value="yes" required><span>I authorize this deposit request to the invited mailbox for the frozen amount shown.</span></label><button>Send deposit request</button>'):''
+ return panel('Deposit request',history+authorize+(!b&&!history?'<p>A current matching invitation and a tax-free, one-off agreement with collection off are required.</p>':'')+'<p>The signed copy remains owner-attested. Platter did not verify the signature. Uncertain delivery is held for review and is never sent again automatically.</p>')
 }

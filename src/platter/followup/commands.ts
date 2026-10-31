@@ -4,8 +4,9 @@ import { commit, need, proposal, text, type Actor } from '../model'
 import { calendarDate, currentTime } from '../expiry-time'
 import { queueMail, dispatchMail } from '../mail'
 import { state } from '../state'
+import { standardClassification } from '../agent-classification'
 
-export async function followupCommand(env:Bindings,a:Actor,name:string,input:Record<string,unknown>) {
+export async function followupCommand(env:Bindings,a:Actor,name:string,input:Record<string,unknown>,completed?:(metadata:ReturnType<typeof standardClassification>)=>void) {
  need(['owner','admin','manager','sales'].includes(a.role),'Only the owner manages sales follow-ups',403)
  const db=env.DB,offer=await proposal(db,input.id),p=negotiatedView(offer,await pendingNegotiation(db,offer.id)),at=await currentTime(db)
  need(!await db.prepare('SELECT proposal_id FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()&&p.status!=='withdrawn','This proposal is closed',409)
@@ -25,5 +26,10 @@ export async function followupCommand(env:Bindings,a:Actor,name:string,input:Rec
  const kind=scheduling?'scheduled':name==='followup.complete'?'completed':'dismissed'
  const writes=[db.prepare(`INSERT INTO p_followups(proposal_id,revision,action,due_date,closed_at,resolution,actor_id,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(proposal_id) DO UPDATE SET revision=excluded.revision,action=excluded.action,due_date=excluded.due_date,closed_at=excluded.closed_at,resolution=excluded.resolution,actor_id=excluded.actor_id,updated_at=excluded.updated_at`).bind(p.id,p.revision,scheduling?action:current!.action,dueDate,scheduling?null:at,scheduling?null:action,a.id,at),db.prepare('INSERT INTO p_followup_actions(id,proposal_id,revision,kind,action,due_date,actor_id,occurred_at) VALUES(?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),p.id,p.revision,kind,action,dueDate,a.id,at)]
  await commit(db,a,writes,true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=?) AND NOT EXISTS(SELECT 1 FROM p_acceptances WHERE proposal_id=?) AND NOT EXISTS(SELECT 1 FROM p_withdrawals WHERE proposal_id=? AND revision=?) AND (? OR NOT EXISTS(SELECT 1 FROM p_followups WHERE proposal_id=? AND revision=? AND closed_at IS NOT NULL))",values:[offer.id,offer.version,offer.revision,p.id,p.id,p.revision,scheduling?1:0,p.id,p.revision]})
+ completed?.(standardClassification(
+  {id:p.id,revision:p.revision,version:offer.version},
+  {affectedProposalCount:1,followupItemCount:1,itemCount:1},
+  'validated saved follow-up',
+ ))
  return {id:p.id,kind}
 }

@@ -2,6 +2,13 @@ import { need } from './model'
 
 interface DraftResult { id: string; revision: number; version: number }
 
+export function standardClassification(proposal: DraftResult, facts: Record<string, number>, basis: string) {
+ return {
+  classification: { classes: ['standard'], basis, proposal, facts },
+  companyPolicy: { evaluated: false, decision: null },
+ }
+}
+
 /** Facts about the exact native revision, after native validation and version guards.
  * Count every offered priced row and optional item once, regardless of quantity
  * or client selection. A flat package is one priced row; table packages count
@@ -22,13 +29,16 @@ export async function draftClassification(db: D1Database, result: DraftResult) {
  }
  const template = await db.prepare('SELECT template_id AS id,template_version AS version FROM p_template_sources WHERE proposal_id=?')
   .bind(result.id).first<{ id: string; version: number }>()
+ const metadata = standardClassification(
+  { id: result.id, revision: result.revision, version: result.version },
+  { affectedProposalCount: 1, pricedRowCount, optionalItemCount, itemCount: pricedRowCount + optionalItemCount },
+  'validated saved revision',
+ )
  return {
+  ...metadata,
   classification: {
-   classes: ['standard'], basis: 'validated saved revision',
-   proposal: { id: result.id, revision: result.revision, version: result.version },
+   ...metadata.classification,
    ...(template ? { template } : {}),
-   facts: { affectedProposalCount: 1, pricedRowCount, optionalItemCount, itemCount: pricedRowCount + optionalItemCount },
   },
-  companyPolicy: { evaluated: false, decision: null },
  }
 }

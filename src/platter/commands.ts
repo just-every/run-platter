@@ -32,6 +32,7 @@ import { paymentCommand } from './payments'
 import { connectionCommand } from './connections'
 import { defaultStatements, workspaceCommand } from './workspace'
 import { saveCost, copyCosts, patchCosts, type CostPatch } from './internal-pricing'
+import { draftClassification, type standardClassification } from './agent-classification'
 import { libraryCommand } from './library'
 import { approvalCommand, approvalPlan } from './approvals'
 import { authorizeCommand, teamCommand } from './permissions'
@@ -73,6 +74,19 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
  const priced=rawPriced.map(o=>tax?{...o,tax}:o);validateTaxOptions(priced,schedule)
  return{payment_terms:schedule,document:proposalDocument(p.document,priced,String(p.clientId??'')),section_conditions:conditions,terms,client_id:text(p.clientId,'a client'),title:text(p.title,'a title'),scope:text(p.scope,'the scope',10000),deposit_bps:Math.round(deposit*100),options:priced}
 }
+/** Native results stay intact; descriptive facts never grant execution authority. */
+export async function classifiedCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>) {
+ let metadata:ReturnType<typeof standardClassification>|undefined
+ if(['followup.schedule','followup.complete','followup.dismiss'].includes(name)){
+  await authorizeCommand(env.DB,a,name,p)
+  const result=await followupCommand(env,a,name,p,value=>{metadata=value})
+  return {result,metadata}
+ }
+ const result=await command(env,a,name,p)
+ if(['proposal.prepare','proposal.revise','template.start','proposal.duplicate','proposal.autosave','proposal.quantity','proposal.document','proposal.variables','proposal.restore','proposal.negotiate','pricing.cost'].includes(name))metadata=await draftClassification(env.DB,result)
+ return {result,metadata}
+}
+
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
  if(name==='crm.card.configure')return configureHubspotCard(env,a,p)

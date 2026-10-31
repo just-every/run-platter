@@ -50,7 +50,7 @@ import { inZone, escape } from './ui/shared'
 import { installationZone } from './reports/report-state'
 import { runtimeBindings,type Bindings } from '../auth.server'
 import { principal,credentialCommand } from './credentials'
-import { command } from './commands'
+import { command, classifiedCommand } from './commands'
 import { importCommand, documentImportCommand, importedOriginal } from './movein'
 import { state } from './state'
 import { pipeline } from './pipeline'
@@ -135,10 +135,13 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   }else if(['/app/action','/api/platter/command','/api/platter/agent/command'].includes(path)){
    const p=await body(request,path==='/app/action'&&url.searchParams.get('name')?.startsWith('business-import.')?6_200_000:150000),name=path==='/app/action'?url.searchParams.get('name')??'':String(p.name??''),input=path==='/app/action'?p:p.input as Record<string,unknown>;need(input&&typeof input==='object'&&!Array.isArray(input),'Provide an input object');submitted=input
    if(isAgent)need(['proposal.prepare','proposal.revise'].includes(name),'Agents only prepare proposal drafts',403)
-   let result=name==='member.invite'?await inviteMember(env,actor,input,request):name==='send-request.resolve'?await resolveSendRequest(env.DB,actor,input):name.startsWith('agent.')?await credentialCommand(env.DB,actor,name,input):name.startsWith('document-import.')?await documentImportCommand(env.DB,actor,name,input):name.startsWith('import.')?await importCommand(env.DB,actor,name,input):await command(env,actor,name,input)
+   const completed=name==='member.invite'?{result:await inviteMember(env,actor,input,request)}:name==='send-request.resolve'?{result:await resolveSendRequest(env.DB,actor,input)}:name.startsWith('agent.')?{result:await credentialCommand(env.DB,actor,name,input)}:name.startsWith('document-import.')?{result:await documentImportCommand(env.DB,actor,name,input)}:name.startsWith('import.')?{result:await importCommand(env.DB,actor,name,input)}:path==='/app/action'?{result:await command(env,actor,name,input)}:await classifiedCommand(env,actor,name,input)
+   let result=completed.result
    const subject=String(name==='member.zone'?actor.id:name==='workspace.defaults'?'installation':(result as any)?.job?.id??(result as any)?.id??input.id??'clients');if(name!=='dispute.authorize'&&!name.startsWith('question.')&&name!=='proposal.withdraw'&&name!=='proposal.lose'&&name!=='proposal.test-mail')await recordAudit(env.DB,actor,name,subject)
    if(path==='/app/action'){if(['notification.route','notification.route.remove'].includes(name))return new Response(null,{status:303,headers:{...headers,location:back}});if(name==='document-import.create')return new Response(null,{status:303,headers:{...headers,location:'/app/import'}});if(name==='proposal.duplicate'||name==='template.start'||name==='crm.deal.apply')return new Response(null,{status:303,headers:{...headers,location:'/app/proposal?id='+encodeURIComponent(String((result as any).id))}});if(name.startsWith('document-import.'))result={...result as any,documentMovein:true};if(name.startsWith('business-import.'))result={...result as any,businessInput:input};if(['import.preview','import.apply'].includes(name))result={...result as any,csv:input.csv};const returnPath=back==='/app/proposal'?back+'?id='+encodeURIComponent(String(input.id??(result as any)?.id??'')):back;return renderApp(await state(env,actor),returnPath,{message:name==='dispute.submit'?String(result.message??'This submission is already recorded. Check its status below.'):name==='member.invite'?String(result.message??'Invitation sent. The selected role and teams apply only after verified acceptance.'):name==='payment.refund'?String(result.message??'Refund request already recorded. Check its status below.'):name==='proposal.test-mail'?'Test queued to your sign-in address. No client invitation was sent.':'Saved.',result})}
-   return json(result)
+   const response=json(result)
+   if('metadata' in completed&&completed.metadata)response.headers.set('x-platter-action-facts',JSON.stringify(completed.metadata))
+   return response
   }
   return path.startsWith('/app')?renderMissing():json({error:'Not found'},404)
  }catch(error){const status=Number((error as any)?.status)||500;const message=status<500?(error as Error).message:'The change could not be completed. Reload and try again.';if(status>=500)console.error(error)

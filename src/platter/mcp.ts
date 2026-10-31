@@ -17,6 +17,7 @@ const fields = {
  depositPercent: { type: 'number', exclusiveMinimum: 0, maximum: 100 },
  optionOne: string, priceOne: { type: ['string', 'number'] },
  optionTwo: string, priceTwo: { type: ['string', 'number'] },
+ terms: { type: 'string', maxLength: 10000 },
 }
 const schema = (properties: Record<string, any>, required: string[] = []) => ({ type: 'object', properties, required, additionalProperties: false, ...(Object.hasOwn(properties,'packages')?{anyOf:[{required:['packages']},{required:['optionOne','priceOne','optionTwo','priceTwo']}]}:{}) })
 const draftRequired=['clientId','title','scope','depositPercent']

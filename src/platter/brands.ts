@@ -85,7 +85,8 @@ export async function authorizeBrandCommand(db:D1Database,a:Actor,name:string,p:
  if(p.catalogId)await brandRecord(db,a,'catalog',p.catalogId)
  if(p.itemId)await brandRecord(db,a,'library',p.itemId)
  if(p.templateId&&!String(p.templateId).startsWith('starter:'))await brandRecord(db,a,'template',p.templateId)
- if(p.folderId)await brandRecord(db,a,'folder',p.folderId)
+ // Only native filing commands carry Platter folder ids; archive.configure uses a Drive provider id.
+ if(p.folderId&&['template.save','library.save','proposal.folder'].includes(name))await brandRecord(db,a,'folder',p.folderId)
  if(p.id){
   const kind=name==='client.erase'?'client':name==='template.start'||name==='template.delivery'||name==='template.locks'?'template':name==='catalog.save'?'catalog':name==='library.save'?'library':name==='folder.save'?'folder':name.startsWith('proposal.')||name==='template.save'?'proposal':null
   // Missing proposals belong to the native permission gate, which checks role

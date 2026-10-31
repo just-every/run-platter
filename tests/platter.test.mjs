@@ -541,6 +541,7 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  const unchanged=await beforeRefusals()
  for(const [name,args,error] of [
   ['revise_proposal',{...smaller,id:prepared.native.id,version:3},/changed|Reload|409/i],
+  ['revise_proposal',{...structured,id:p.id,version:4},/frozen|409/i],
   ['prepare_from_template',startInput,/changed|Reload|409/i],
   ['prepare_proposal',{...structured,pricingTables:[{...tables[0],lines:[{...tables[0].lines[0],quantity:'0'}]}]},/Quantity/],
   ['prepare_proposal',{...structured,packages:[{...packages[0],optionalItems:[{...extras[0],quantity:99}]}]},/quantity/i],
@@ -563,6 +564,10 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  const updatedStart=await classified('prepare_from_template',{...startInput,templateVersion:2})
  assert.deepEqual(updatedStart.classification.template,{id:template.id,version:2});assert.deepEqual(updatedStart.classification.facts,four)
  assert.deepEqual((await saved(started.native.id)).options,priced.options,'Later template edits cannot change earlier draft facts')
+ const templateRevision=await classified('revise_proposal',{...smaller,id:started.native.id,version:1})
+ assert.deepEqual(templateRevision.classification.template,{id:template.id,version:1},'A draft revision retains the template version originally copied, not the current template')
+ assert.deepEqual(templateRevision.classification.facts,four)
+ assert.deepEqual(templateRevision.native,{id:started.native.id,revision:2,version:2})
  const starter=await classified('prepare_from_template',{templateId:'starter:agency',templateVersion:1,clientId:client.id})
  assert.deepEqual(starter.classification.template,{id:'starter:agency',version:1})
  assert.deepEqual(starter.classification.facts,{affectedProposalCount:1,pricedRowCount:4,optionalItemCount:0,itemCount:4})
@@ -582,7 +587,10 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  for(const action of ['mcp.search_proposals','mcp.prepare_proposal','mcp.read_proposal','mcp.read_engagement','mcp.request_send','mcp.revise_proposal'])assert.ok(audit.some(row=>row.action===action&&row.actor_role==='agent'),action)
  await h.cmd('agent.revoke',{id:key.id});assert.equal((await transport('ping')).status,401)
  const revokedState=await beforeRefusals()
- assert.equal((await transport('tools/call',{name:'prepare_proposal',arguments:structured})).status,401)
+ for(const [name,args] of [['prepare_proposal',structured],['prepare_from_template',{...startInput,templateVersion:2}],['revise_proposal',{...smaller,id:prepared.native.id,version:4}]]){
+  const refused=await transport('tools/call',{name,arguments:args})
+  assert.equal(refused.status,401);assert.equal(refused.value.result,undefined)
+ }
  assert.deepEqual(await beforeRefusals(),revokedState)
 }))
 

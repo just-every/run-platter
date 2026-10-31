@@ -505,10 +505,11 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   const catalog=await applyBusiness(h,{kind:'catalog',format:'pandadoc',csv:await businessCsv('pandadoc-catalog.csv')})
   const {moveinFixture,applyMovein,hash}=await import('./document-movein-fixture.mjs'),documentFixture=await moveinFixture()
   const movein=await applyMovein(h,documentFixture)
+  const beforeDocuments=(await h.state()).importedDocuments
   const {sourceExportFixture,applySourceExport}=await import('./document-movein-fixture.mjs'),exportFixture=await sourceExportFixture('ignition')
   const sourceMovein=await applySourceExport(h,exportFixture),sourceJournal=await h.cmd('document-import.journal',{id:sourceMovein.id}),beforeFacts=(await h.state()).importedSourceFacts
   assert.equal(sourceMovein.resumed,true)
-  const documentJournal=await h.cmd('document-import.journal',{id:movein.id}),beforeDocuments=(await h.state()).importedDocuments
+  const documentJournal=await h.cmd('document-import.journal',{id:movein.id}),beforeAllDocuments=(await h.state()).importedDocuments
   const nativeClient=await h.cmd('client.save',{name:'Synthetic retained dependency',email:h.auth.OWNER_EMAIL})
   const dependency=await h.cmd('proposal.prepare',{clientId:nativeClient.id,title:'Synthetic retained dependency',scope:'Synthetic retained dependency',optionOne:'One',priceOne:'100',optionTwo:'Two',priceTwo:'200',depositPercent:'25'})
   await h.db.prepare('INSERT INTO p_imported_document_links(document_id,proposal_id) VALUES(?,?)').bind(hash(documentFixture.originals[0]),dependency.id).run()
@@ -519,7 +520,7 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   h=await harness({root:restored,...identity,...options})
   const cookie=await h.signIn(identity.auth.OWNER_EMAIL)
   assert.deepEqual((await h.state(cookie)).businessRecords,before)
-  assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments)
+  assert.deepEqual((await h.state(cookie)).importedDocuments,beforeAllDocuments)
   assert.deepEqual((await h.state(cookie)).importedSourceFacts,beforeFacts)
   const restoredSourceJournal=await h.cmd('document-import.journal',{id:sourceMovein.id},cookie)
   assert.deepEqual(restoredSourceJournal.originals,sourceJournal.originals)

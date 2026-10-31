@@ -611,13 +611,28 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const {recipientFixture,roles,verifyRecipient,decision}=await import('./recipients-http.mjs')
   const multi=await recipientFixture(h,'Retained multiple signatures',roles(h.auth.OWNER_EMAIL)),sessions={}
   for(const [id,path] of Object.entries(multi.links))sessions[id]=await verifyRecipient(h,path)
+  const oldMultiCfo=multi.links.cfo
   for(const id of ['ceo','cfo','owner']){
+   if(id==='cfo'){
+    const row=(await h.state()).proposals.find(r=>r.id===multi.id)
+    await h.cmd('signer.delegation.configure',{id:multi.id,version:row.version,enabled:true})
+    assert.equal((await h.send(multi.links.cfo+'/action?name=delegate',{revision:multi.revision,delegateName:'Synthetic retained CFO',recipient:['synthetic-platter-9916','example.test'].join('@')},sessions.cfo)).status,200)
+    multi.links.cfo='/p/'+(await h.db.prepare("SELECT token FROM p_shares WHERE proposal_id=? AND slot_id='cfo'").bind(multi.id).first()).token
+    sessions.cfo=await verifyRecipient(h,multi.links.cfo)
+   }
    const response=await h.mf.dispatchFetch(h.origin+multi.links[id]+'/action?name=accept',{method:'POST',cf:{city:'Austin',region:'Texas',country:'US'},headers:{origin:h.origin,cookie:sessions[id],'content-type':'application/json','user-agent':'Synthetic Platter archive 2401'},body:JSON.stringify({name:'Synthetic signer',optionId:'one',consent:true})})
    assert.equal(response.status,200,await response.text())
   }
   const multiCertificate=await h.send(multi.links.owner+'/certificate.json',undefined,sessions.owner)
   assert.equal(multiCertificate.status,200,multiCertificate.text)
   assert.deepEqual(multiCertificate.value.signers.map(s=>s.slotId),['ceo','cfo','owner'])
+  assert.equal(multiCertificate.value.signers[1].email,['synthetic-platter-9916','example.test'].join('@'))
+  assert.equal(multiCertificate.value.delegations[0].slot_id,'cfo');assert.equal(multiCertificate.value.delegations[0].signing_position,2)
+  const multiDelegationFacts=(await h.db.prepare('SELECT * FROM p_signer_delegations WHERE proposal_id=? ORDER BY delegated_at,id').bind(multi.id).all()).results
+  let delegationTemplate=await h.cmd('template.save',{id:multi.id,version:(await h.state()).proposals.find(r=>r.id===multi.id).version,name:'Synthetic retained delegation template'})
+  delegationTemplate=await h.cmd('template.delegation',{id:delegationTemplate.id,version:delegationTemplate.version,enabled:true})
+  const delegationDraft=await h.cmd('template.start',{id:delegationTemplate.id,version:delegationTemplate.version,clientId:multi.offer.clientId})
+  assert.equal((await h.state()).proposals.find(r=>r.id===delegationDraft.id).delegation.enabled,false)
   assert.ok(multiCertificate.value.signers.every(s=>s.location==='Austin, Texas, US'&&s.userAgent==='Synthetic Platter archive 2401'))
   const multiArtifacts=await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(multi.id).first()
   const multiCompletion=(await h.db.prepare('SELECT * FROM p_completion_mail WHERE proposal_id=? ORDER BY party').bind(multi.id).all()).results
@@ -631,7 +646,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const signatures=(await h.db.prepare('SELECT * FROM p_recipient_signatures ORDER BY proposal_id,revision,slot_id').all()).results
   const voids=(await h.db.prepare('SELECT * FROM p_void_signatures ORDER BY proposal_id,revision').all()).results
   assert.equal(signatures.length,4);assert.equal(voids.length,1)
-  const allInvitationHistory=[...retained,...(await h.state()).proposals.find(r=>r.id===multi.id).invitationMessages,...(await h.state()).proposals.find(r=>r.id===voided.id).invitationMessages];assert.equal(allInvitationHistory.length,10)
+  const allInvitationHistory=[...retained,...(await h.state()).proposals.find(r=>r.id===multi.id).invitationMessages,...(await h.state()).proposals.find(r=>r.id===voided.id).invitationMessages];assert.equal(allInvitationHistory.length,11)
 
   await h.close();h=null
   const archive=join(temporary,'source.rer')
@@ -642,7 +657,8 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.ok(!bytes.includes(new URL(invitation.shareUrl).pathname))
   assert.ok(!bytes.includes(replacementPath));assert.ok(!bytes.includes(initialReplacementPath));assert.ok(!bytes.includes(delegatedPath))
   assert.equal(records.filter(item=>item.table==='p_delegation_authority').length,0)
-  assert.deepEqual(records.filter(item=>item.table==='p_signer_delegations').map(item=>item.row),delegationFacts)
+  assert.deepEqual(records.filter(item=>item.table==='p_signer_delegations').map(item=>item.row).sort((a,b)=>a.id.localeCompare(b.id)),[...delegationFacts,...multiDelegationFacts].sort((a,b)=>a.id.localeCompare(b.id)))
+  assert.ok(!bytes.includes(oldMultiCfo))
   for(const path of [...Object.values(multi.links),...Object.values(voided.links),new URL(shared.shareUrl).pathname])assert.ok(!bytes.includes(path),'archive contains no recipient capability')
   assert.equal(records.filter(item=>item.table==='p_shares').length,0)
   assert.deepEqual(records.filter(item=>item.table==='p_recipient_signatures').map(item=>item.row).sort((a,b)=>a.proposal_id.localeCompare(b.proposal_id)||a.revision-b.revision||a.slot_id.localeCompare(b.slot_id)),signatures)
@@ -666,6 +682,12 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.equal((await h.send(replacementPath)).status,404)
   for(const path of [initialReplacementPath,delegatedPath])assert.equal((await h.send(path)).status,404)
   assert.equal(after.proposals.find(r=>r.id===real.id).delegation.enabled,false)
+  assert.equal(after.proposals.find(r=>r.id===multi.id).delegation.enabled,false)
+  assert.equal(after.proposals.find(r=>r.id===delegationDraft.id).delegation.enabled,false)
+  assert.equal(after.proposals.find(r=>r.id===delegationDraft.id).deliveryDefaults.delegationEnabled,true)
+  assert.equal(after.templates.find(t=>t.id===delegationTemplate.id).deliveryDefaults.delegationEnabled,true)
+  assert.equal((await h.send(oldMultiCfo)).status,404)
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_signer_delegations WHERE proposal_id=? ORDER BY delegated_at,id').bind(multi.id).all()).results,multiDelegationFacts)
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_signer_delegations WHERE proposal_id=? ORDER BY delegated_at,id').bind(real.id).all()).results,delegationFacts)
   assert.deepEqual(after.proposals.find(row=>row.id===real.id).signerReplacements,replacements)
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(real.id).all()).results,artifacts)
@@ -681,6 +703,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.equal((await h.db.prepare('SELECT count(*) n FROM p_completion_authority').first()).n,0,'restored multi-party history grants no completion execution')
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_recipient_signatures ORDER BY proposal_id,revision,slot_id').all()).results,signatures)
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_void_signatures ORDER BY proposal_id,revision').all()).results,voids)
+  assert.ok(!bytes.includes(oldMultiCfo))
   for(const path of [...Object.values(multi.links),...Object.values(voided.links),new URL(shared.shareUrl).pathname])assert.equal((await h.send(path)).status,404)
   assert.equal((await h.db.prepare('SELECT count(*) n FROM p_shares').first()).n,0)
   assert.equal((await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n,0)

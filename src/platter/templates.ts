@@ -52,10 +52,19 @@ async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false)
 }
 
 export async function templateCommand(env: Bindings, a: Actor, name: string, input: Record<string, unknown>) {
- need(name === 'template.save' || name === 'template.start' || name === 'template.delivery', 'Unknown template command', 404)
+ need(name === 'template.save' || name === 'template.start' || name === 'template.delivery' || name === 'template.delegation', 'Unknown template command', 404)
  need(['owner','admin','manager','sales','content_editor'].includes(a.role) || (a.role === 'agent' && name === 'template.start'), 'A person saves personal templates', 403)
  const db = env.DB, at = await currentTime(db)
  if(name==='template.delivery')return templateDeliveryCommand(db,a,input,at)
+ if(name==='template.delegation'){
+  need(a.role==='owner','Only the current owner configures template delegation',403)
+  const row=await ownTemplate(db,a,input.id,true);exact(row,input)
+  need([true,false,'yes','no'].includes(input.enabled as any),'Choose whether template delegation is on')
+  const enabled=input.enabled===true||input.enabled==='yes',access=await folderGuard(db,a,row.folder_id,'template')
+  const saved=await db.prepare('SELECT settings FROM p_template_defaults WHERE template_id=?').bind(row.id).first<any>(),settings=saved?JSON.parse(saved.settings):(await resolveTemplateDelivery(db)).settings
+  await commit(db,a,[db.prepare('INSERT INTO p_template_defaults(template_id,settings) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET settings=excluded.settings').bind(row.id,JSON.stringify({...settings,delegationEnabled:enabled})),db.prepare('UPDATE p_personal_templates SET version=version+1,updated_at=? WHERE id=?').bind(at,row.id)],false,{sql:'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?) AND '+access.sql,values:[row.id,row.version,...access.values]})
+  return {id:row.id,version:row.version+1}
+ }
  if (name === 'template.save') {
   const source = await proposal(db, input.id)
   exact(source, input)

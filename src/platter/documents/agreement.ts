@@ -25,7 +25,7 @@ export async function agreementArtifact(env:Bindings,id:string,kind:string,autho
   const bytes=await offerPdf(frozen,a.option_id,fonts,frozen.selection?.items??[],asset=>mediaBytes(db,frozen,asset),undefined,signer)
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes.buffer as ArrayBuffer)),b=>b.toString(16).padStart(2,'0')).join('')
   const replacements=(await db.prepare('SELECT revision,old_recipient,new_recipient,actor_id,actor_email,replaced_at,reason,signing_position,required_method FROM p_signer_replacements WHERE proposal_id=? AND revision=? ORDER BY replaced_at,id').bind(id,a.revision).all<any>()).results
-  const delegations=(await db.prepare('SELECT revision,old_recipient,new_recipient,delegate_name,delegated_at,signing_position,required_method,undone_at,undone_by FROM p_signer_delegations WHERE proposal_id=? AND revision=? ORDER BY delegated_at,id').bind(id,a.revision).all<any>()).results
+  const delegations=(await db.prepare('SELECT revision,slot_id,old_recipient,new_recipient,delegate_name,delegated_at,signing_position,required_method,undone_at,undone_by FROM p_signer_delegations WHERE proposal_id=? AND revision=? ORDER BY delegated_at,id').bind(id,a.revision).all<any>()).results
   const signers=frozen.signatures?.map((s:any)=>({...s,acceptedAt:s.signedAt}))??[signer]
   const facts={...(a.language?{language:a.language}:{}),replacements,...(delegations.length?{delegations}:{}),schemaVersion:1,proposalId:id,revision:a.revision,documentSha256:digest,signers,location:signer.location??'not recorded',userAgent:signer.userAgent??'not recorded',attachments:frozen.attachments??[]}
   const pdf=await PdfText.create(a.revision,fonts,'Certificate of completion')

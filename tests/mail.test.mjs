@@ -1765,7 +1765,7 @@ test('SIGN-005 completion mail attaches the retained PDFs to both parties once, 
 })
 
 test('SIGN-009 delegation sends one delegate invitation and owner notice despite concurrent requests and replay', {timeout:120000},async()=>{
- const messages=[],h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9991'},outboundService:async request=>{messages.push(await request.json());return Response.json({id:'synthetic-platter-'+messages.length})}})
+ const messages=[],h=await harness({assetsDirectory:'public',origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9991'},outboundService:async request=>{messages.push(await request.json());return Response.json({id:'synthetic-platter-'+messages.length})}})
  try{
   const {delegationFixture,delegationVerify}=await import('./signer-delegation-http.mjs'),p=await delegationFixture(h),input={revision:1,delegateName:'Synthetic COO',recipient:['synthetic-platter-9902','example.test'].join('@')}
   await p.configure(true);const session=await delegationVerify(h,p.path),offset=messages.length
@@ -1783,6 +1783,22 @@ test('SIGN-009 delegation sends one delegate invitation and owner notice despite
   assert.equal(messages.length,undoOffset+1);assert.equal(messages.at(-1).to[0],['synthetic-platter-9901','example.test'].join('@'));assert.ok(messages.at(-1).text.includes(new URL(undo.shareUrl).pathname))
   assert.equal((await h.send(delegatePath+'/action?name=accept',{name:'Synthetic COO',optionId:'one',consent:true},delegateSession.cookie)).status,410)
   assert.equal(messages.length,undoOffset+1)
+  const {recipientFixture,roles,verifyRecipient,decision}=await import('./recipients-http.mjs')
+  const multi=await recipientFixture(h,'Synthetic configured delegate notices',roles(h.auth.OWNER_EMAIL)),multiGet=async()=>(await h.state()).proposals.find(r=>r.id===multi.id)
+  await h.cmd('signer.delegation.configure',{id:multi.id,version:(await multiGet()).version,enabled:true})
+  const cfo=await verifyRecipient(h,multi.links.cfo),multiOffset=messages.length
+  const attempts=await Promise.all([h.send(multi.links.cfo+'/action?name=delegate',{...input,revision:multi.revision},cfo),h.send(multi.links.cfo+'/action?name=delegate',{...input,revision:multi.revision},cfo)])
+  assert.equal(attempts.filter(r=>r.status===200).length,1);assert.ok(attempts.every(r=>[200,409,410].includes(r.status)))
+  assert.equal(messages.length,multiOffset+2);assert.deepEqual(messages.slice(multiOffset).map(m=>m.to).flat().sort(),[input.recipient,h.auth.OWNER_EMAIL].sort())
+  const delegated='/p/'+(await h.db.prepare("SELECT token FROM p_shares WHERE proposal_id=? AND slot_id='cfo'").bind(multi.id).first()).token
+  assert.equal((await h.send(multi.links.cfo+'/action?name=delegate',{...input,revision:multi.revision},cfo)).status,410)
+  assert.equal(messages.length,multiOffset+2)
+  const verifiedCeo=await verifyRecipient(h,multi.links.ceo),verifiedDelegate=await verifyRecipient(h,delegated),verifiedOwner=await verifyRecipient(h,multi.links.owner)
+  assert.equal((await decision(h,multi.links.ceo,verifiedCeo)).status,200);assert.equal((await decision(h,delegated,verifiedDelegate)).status,200)
+  const completionOffset=messages.length;assert.equal((await decision(h,multi.links.owner,verifiedOwner)).status,200)
+  const complete=messages.slice(completionOffset).filter(m=>m.subject.startsWith('Agreement complete:'))
+  assert.deepEqual(complete.map(m=>m.to).flat().sort(),[roles(h.auth.OWNER_EMAIL)[0].email,input.recipient,h.auth.OWNER_EMAIL].sort(),'only current recipient mailboxes receive completion')
+  assert.equal((await decision(h,multi.links.owner,verifiedOwner)).status,200);assert.equal(messages.length,completionOffset+complete.length)
   console.log('PROBE SIGN-009 mail: concurrent delegate submissions and scheduled replay -> one invitation, one owner notice; undo -> one fresh original-recipient invitation')
  }finally{await h.close()}
 })

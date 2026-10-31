@@ -273,6 +273,14 @@
     {
       "id": "0101_approval_request_details.sql",
       "buyerSteps": "None. Retains exact-revision approval request trigger summaries and revocation details without restoring outbound authority."
+    },
+    {
+      "id": "0102_bulk_drafts.sql",
+      "buyerSteps": "None. Adds reviewed bulk draft batches, independent row receipts and local-only creation authority."
+    },
+    {
+      "id": "0103_bulk_erasure_receipts.sql",
+      "buyerSteps": "None. Clears erased-client preview captures while retaining inactive replay identities and completed draft receipts."
     }
   ],
   "breaking": false,

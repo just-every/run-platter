@@ -8,7 +8,7 @@ const columns = ['client_id', 'name', 'email']
 
 // Adapted from Run Lanyard's CSV source reader, using Base's import-kit custody.
 // RFC 4180 quoting, including embedded newlines; locations use physical lines.
-function parse(text: string): { cells: string[]; line: number }[] {
+export function parse(text: string): { cells: string[]; line: number }[] {
   const rows: { cells: string[]; line: number }[] = []
   let cells: string[] = [], cell = '', state: 'plain' | 'quoted' | 'closed' = 'plain', line = 1, start = 1
   const push = () => { cells.push(cell); rows.push({ cells, line: start }); cells = []; cell = ''; state = 'plain' }

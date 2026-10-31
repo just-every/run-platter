@@ -1,3 +1,4 @@
+import { bulkDraftCommand } from './bulk-drafts'
 import { xeroCommand } from './accounting/xero-jobs'
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
@@ -91,6 +92,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   need(!tax||!current||current.currency==='USD','Historical AUD proposals keep their original GST-free form',409)
   need(!tax||!current||p.clientId===undefined||p.clientId===current.client_id||request!==undefined,'Supply explicit tax addresses for the new client',409)
  }
+ if(name.startsWith('bulk.'))return bulkDraftCommand(env,a,name,p)
  if(name.startsWith('recipient.'))return recipientCommand(env,a,name,p)
  if(name==='tracking.recipient')return stakeholderRecipient(env,a,p)
  if(name.startsWith('tracking.'))return trackingCommand(env,a,name,p)

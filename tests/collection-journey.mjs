@@ -142,6 +142,7 @@ export async function preparedNoticeDeposit(h,completion='required',approver=h.o
  const p=await signedDeposit(h,completion,['card'],undefined,approver)
  const start=await h.send(p.path+'/payment.json',{method:'card',consent:true},p.cookie);assert.equal(start.status,200,start.text)
  const saved=await h.db.prepare('SELECT * FROM p_collection_intents WHERE proposal_id=?').bind(p.id).first()
+ await h.cmd('payment.failure-notices',{id:p.id,version:0,enabled:true,consent:true},h.owner,409)
  assert.equal((await h.send(p.path+'/payment-consent.json',{consent:true,cents:saved.cents},p.cookie)).status,200)
  const authorize=async(enabled=true,cookie=h.owner,status=200)=>{
   const version=(await h.db.prepare('SELECT version FROM p_payment_failure_settings WHERE proposal_id=?').bind(p.id).first())?.version??0
@@ -154,6 +155,9 @@ export async function failureNoticesJourney(h,edge){
  const signature=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()
  const download=async()=>{const r=await h.mf.dispatchFetch(h.origin+p.path+'/agreement.pdf',{headers:{cookie:p.cookie}});assert.equal(r.status,200);return Buffer.from(await r.arrayBuffer())}
  const original=await download()
+ edge.fail(p.saved);assert.equal((await refresh()).status,200)
+ assert.equal((await h.db.prepare('SELECT count(*) n FROM p_payment_failures').first()).n,0,'A failure without explicit owner authority sends nothing')
+ delete edge.intents.get(p.saved.provider_intent).latest_charge
  await p.authorize()
  assert.equal((await refresh()).status,200)
  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_payment_failures').first()).n,0,'Initial payment-method status is not a failure')

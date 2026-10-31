@@ -492,7 +492,7 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody', {timeout:180000},async()=>{
+test('MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody', {timeout:300000},async()=>{
  const {businessCsv,applyBusiness,undoBusiness,fileHost}=await import('./business-import-fixture.mjs')
  const temporary=await mkdtemp(join(tmpdir(),'platter-business-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
  let h
@@ -505,8 +505,11 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   const catalog=await applyBusiness(h,{kind:'catalog',format:'pandadoc',csv:await businessCsv('pandadoc-catalog.csv')})
   const {moveinFixture,applyMovein,hash}=await import('./document-movein-fixture.mjs'),documentFixture=await moveinFixture()
   const movein=await applyMovein(h,documentFixture)
+  const {proposifyFixture,applyProposify,fixedTemplate}=await import('./document-movein-fixture.mjs'),proposify=await proposifyFixture()
+  const sourceMovein=await applyProposify(h,proposify),fixed=await fixedTemplate(h,sourceMovein),reversible=await fixedTemplate(h,sourceMovein)
+  const sourceJournal=await h.cmd('document-import.journal',{id:sourceMovein.id}),applications=(await h.state()).documentMoveins.find(m=>m.id===sourceMovein.id).applications
   const documentJournal=await h.cmd('document-import.journal',{id:movein.id}),beforeDocuments=(await h.state()).importedDocuments
-  const nativeClient=await h.cmd('client.save',{name:'Synthetic retained dependency',email:h.auth.OWNER_EMAIL})
+  const nativeClient=await h.cmd('client.save',{name:'Synthetic retained dependency',email:['synthetic-retained-dependency','example.invalid'].join('@')})
   const dependency=await h.cmd('proposal.prepare',{clientId:nativeClient.id,title:'Synthetic retained dependency',scope:'Synthetic retained dependency',optionOne:'One',priceOne:'100',optionTwo:'Two',priceTwo:'200',depositPercent:'25'})
   await h.db.prepare('INSERT INTO p_imported_document_links(document_id,proposal_id) VALUES(?,?)').bind(hash(documentFixture.originals[0]),dependency.id).run()
   const before=(await h.state()).businessRecords,journal=await h.cmd('business-import.journal',{id:catalog.job.id})
@@ -516,6 +519,21 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   const cookie=await h.signIn(identity.auth.OWNER_EMAIL)
   assert.deepEqual((await h.state(cookie)).businessRecords,before)
   assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments)
+  assert.deepEqual((await h.state(cookie)).documentMoveins.find(m=>m.id===sourceMovein.id).applications,applications)
+  const restoredSourceJournal=await h.cmd('document-import.journal',{id:sourceMovein.id},cookie)
+  assert.deepEqual(restoredSourceJournal,sourceJournal,'restored source bytes, choices and provenance stay exact')
+  for(const bytes of [...proposify.originals,proposify.template]){const response=await h.mf.dispatchFetch(h.origin+'/api/platter/imported-original?document='+hash(bytes),{headers:{cookie}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)}
+  const template=(await h.state(cookie)).templates.find(t=>t.id===fixed.applied.templateId)
+  const child=await h.cmd('template.start',{id:template.id,version:template.version,clientId:fixed.client.id,title:'Synthetic restored template draft'},cookie)
+  const usable=(await h.state(cookie)).proposals.find(p=>p.id===child.id)
+  assert.equal(usable.status,'draft');assert.equal(usable.options[0].cents,72525);assert.equal(usable.document.fixedPdf.source,'proposify')
+  const fixedOriginal=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+child.id+'/'+usable.document.fixedPdf.fileId,{headers:{cookie}})
+  assert.equal(fixedOriginal.status,200);assert.deepEqual(Buffer.from(await fixedOriginal.arrayBuffer()),proposify.template)
+  await h.cmd('document-import.template-undo',{id:sourceMovein.id,applicationId:fixed.applied.applicationId},cookie,409)
+  await h.cmd('document-import.template-undo',{id:sourceMovein.id,applicationId:reversible.applied.applicationId},cookie)
+  const guarded=(await h.state(cookie)).importedDocuments
+  await h.cmd('document-import.undo',{id:sourceMovein.id},cookie,409)
+  assert.deepEqual((await h.state(cookie)).importedDocuments,guarded)
   const restoredDocumentJournal=await h.cmd('document-import.journal',{id:movein.id},cookie)
   assert.deepEqual(restoredDocumentJournal.originals,documentJournal.originals)
   assert.deepEqual(restoredDocumentJournal.provenance,documentJournal.provenance)
@@ -530,7 +548,7 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments)
   await h.db.prepare('DELETE FROM p_imported_document_links WHERE document_id=?').bind(originalId).run()
   await h.cmd('document-import.undo',{id:movein.id},cookie)
-  assert.deepEqual((await h.state(cookie)).importedDocuments,[])
+  assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments.filter(d=>d.moveinId===sourceMovein.id))
   assert.ok((await h.cmd('document-import.journal',{id:movein.id},cookie)).provenance.every(p=>p.reversed))
   const after=await h.cmd('business-import.journal',{id:catalog.job.id},cookie)
   assert.deepEqual(after.originals,journal.originals);assert.deepEqual(after.provenance,journal.provenance)
@@ -895,6 +913,9 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.equal((await h.send(failedDeposit.path+'/payment-status.json',{},failedDeposit.cookie)).status,200)
   assert.equal((await h.db.prepare('SELECT count(*) n FROM p_payment_failure_deliveries').first()).n,2)
   for(const table of tables)before[table]=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results
+  const {nativeMigrationPreflight}=await import('../node_modules/@runeditrun/rer/cli/portability-migrations.mjs')
+  await nativeMigrationPreflight({root:source,db:h.db,binding:'DB'})
+  console.log('Migration ledger preflight passed on the fully migrated source')
   await h.close();h=undefined
   const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'));assert.ok(!bytes.includes('synthetic-platter-7107'))
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')

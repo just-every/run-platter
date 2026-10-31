@@ -79,8 +79,8 @@ export async function failureNoticeAuthority(env:Bindings,row:any){
  need(g&&row.proposal_id===g.proposal_id&&row.proposal_revision===g.revision&&row.sender_id===g.owner_id&&row.recipient===(delivery.party==='client'?g.recipient:g.firm_email),'Deposit notice authority changed; hold this delivery for review',403)
  return g
 }
-export async function recordFailureDelivery(env:Bindings,mailId:string,status:string){
- await env.DB.prepare('UPDATE p_payment_failure_deliveries SET status=?,updated_at=? WHERE mail_id=?').bind(status,await currentTime(env.DB),mailId).run()
+export function failureDeliveryStatement(env:Bindings,mailId:string,status:string){
+ return env.DB.prepare('UPDATE p_payment_failure_deliveries SET status=?,updated_at=? WHERE mail_id=? AND EXISTS(SELECT 1 FROM p_mail WHERE id=? AND status=?)').bind(status,Date.now(),mailId,mailId,status==='withheld'?'uncertain':status)
 }
 export async function failureHistory(db:D1Database,id:string){
  return (await db.prepare(`SELECT f.provider_attempt AS attempt,f.reason,f.attempted_at AS attemptedAt,f.observed_at AS observedAt,

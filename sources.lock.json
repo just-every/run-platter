@@ -254,7 +254,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "a38b46db3cb7bdff58d233329ff7fbeb0644b76dab8028e0a3207e3dc11368eb",
+      "sha256": "e69eaa521f026f3621f82eb708406cb8a10f9679750b909956da9039101f2461",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -2822,7 +2822,7 @@
       "executable": false
     },
     "src/platter/movein/qwilr-ignition-export.ts": {
-      "sha256": "7be88ef2ba254ebbb57ba62759a2a5cb56b26d6c3bdd09602fd834b6e25411d3",
+      "sha256": "6a251c4ea5b8f01ced816e349b22e81a44ea951abb1762c39f75bf7c665e1e1c",
       "executable": false
     },
     "src/platter/movein/schema.sql": {
@@ -3130,7 +3130,7 @@
       "executable": false
     },
     "src/platter/ui/document-movein.ts": {
-      "sha256": "65ba5489e07f797ce74a39dec2d6495a16d7b62323c2c4f7380eaf87a314bbb4",
+      "sha256": "c13e483aabf80559250a3ec120b8701cbdfb7861b3fbef0aa959848aefeb305d",
       "executable": false
     },
     "src/platter/ui/duplicate.ts": {
@@ -3410,7 +3410,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "fc018087d991da5fb384d14075b62f5bf9f033e8041aa538fe682c3e52f30863",
+      "sha256": "9cb22cfd8fc2b5acd8b02556589e70555fae31a654ee43b558e041cb938fa7eb",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3486,7 +3486,7 @@
       "executable": false
     },
     "tests/document-movein-fixture.mjs": {
-      "sha256": "9c51b4debc7169e71c8f8cd6c2e25257e8b1c5a566b3f25e8b4acd550231721e",
+      "sha256": "45fa1c5937548c621a7a2cb16b3324bc7d07e88e64ccdad3ddef09c9c21dac7b",
       "executable": false
     },
     "tests/drive-fixture.mjs": {

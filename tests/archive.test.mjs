@@ -611,6 +611,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.equal((await h.send(replacementPath+'/action?name=accept',{name:'Northstar COO',optionId:'two',consent:true},verified.cookie)).status,200)
   const certificate=await h.send(replacementPath+'/certificate.json',undefined,verified.cookie);assert.equal(certificate.status,200,certificate.text)
   assert.equal(certificate.value.language,'es');assert.equal(certificate.value.signers[0].language,'es')
+  assert.equal(certificate.value.delegations[1].previous_delegation_id,certificate.value.delegations[0].id)
   const languageFacts=await h.db.prepare('SELECT language FROM p_signature_facts WHERE proposal_id=?').bind(real.id).first()
   const acceptedLanguage=(await h.state()).proposals.find(row=>row.id===real.id).acceptance
   const artifacts=(await h.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(real.id).all()).results

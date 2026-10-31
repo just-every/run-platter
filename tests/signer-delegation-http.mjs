@@ -139,6 +139,10 @@ export async function delegationHttp(){
   const chainCertificate=await h.send(backToOriginal+'/certificate.json',undefined,originalAgain.cookie)
   assert.equal(chainCertificate.status,200);assert.equal(chainCertificate.value.delegations.length,2)
   assert.ok(chainCertificate.value.delegations.every(d=>d.undone_at>0));assert.equal(chainCertificate.value.signers[0].email,address(9901))
+  const certifiedChain=chainCertificate.value.delegations
+  assert.equal(certifiedChain[0].id,firstRow.delegation.currentId);assert.equal(certifiedChain[0].previous_delegation_id,null)
+  assert.equal(certifiedChain[1].previous_delegation_id,certifiedChain[0].id)
+  assert.equal((await h.send(backToOriginal+'/certificate.json',undefined,originalAgain.cookie)).text,chainCertificate.text,'the completed chain certificate is immutable')
   console.log('PROBE SIGN-009 nested undo: A delegates to B, B to C, owner undoes twice -> fresh B then fresh A invitations, old capabilities refused and both undo facts retained')
   await configuredDelegationHttp(h)
   await templateDelegationHttp(h,member)

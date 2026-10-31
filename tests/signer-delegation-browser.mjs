@@ -50,7 +50,7 @@ export async function delegationBrowser(widths=[1440]){
    path='/p/'+(await get()).shareToken;await verify(path)
    await recipient.getByRole('radio',{name:/Studio/}).check();await recipient.getByLabel('Your full name').fill('Synthetic COO');await recipient.getByRole('checkbox').check();await recipient.getByRole('button',{name:'Accept proposal',exact:true}).click()
    assert.equal(await recipient.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1);await capture(recipient,'accepted')
-   const cert=await client.request.get(app.origin+path+'/certificate.json');assert.equal(cert.status(),200);const facts=await cert.json();assert.equal(facts.delegations.length,3);assert.equal(facts.signers[0].email,address(9902));assert.ok(facts.delegations.some(d=>d.undone_at))
+   const cert=await client.request.get(app.origin+path+'/certificate.json');assert.equal(cert.status(),200);const facts=await cert.json();assert.equal(facts.delegations.length,3);assert.equal(facts.delegations[1].previous_delegation_id,facts.delegations[0].id);assert.equal(facts.signers[0].email,address(9902));assert.ok(facts.delegations.some(d=>d.undone_at))
    await page.goto(app.origin+'/app/proposal?id='+p.id);assert.equal(await history.getByRole('button',{name:'Undo delegation',exact:true}).count(),0)
    const rolePlan=[{id:'ceo',name:'CEO',email:address(9940),role:'signer',group:1},{id:'cfo',name:'CFO',email:address(9941),role:'signer',group:2},{id:'owner',name:'Owner',email:(await state()).actor.email,role:'countersigner',group:3}]
    const source=await cmd('proposal.prepare',{...offer,title:'Synthetic leadership template'})

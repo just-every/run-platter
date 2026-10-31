@@ -462,7 +462,7 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
   })
   return JSON.parse(result.content[0].text)
  }
- const before=await h.state(),requested=await queuedCall(p.id,1,1),again=await queuedCall(p.id,1,1)
+ const before=await h.state(),[requested,again]=await Promise.all([queuedCall(p.id,1,1),queuedCall(p.id,1,1)])
  assert.equal(again.request.id,requested.request.id)
  const queued=await h.send('/api/platter/send-requests',undefined,h.owner);assert.equal(queued.status,200);assert.equal(queued.value.requests.length,1);assert.equal(queued.value.requests[0].actionable,1)
  const after=await h.state();assert.deepEqual(after.proposals,before.proposals);assert.deepEqual(after.outbox,before.outbox)
@@ -556,7 +556,7 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  const nativeStart=await h.cmd('template.start',{id:template.id,version:1,clientId:client.id})
  await assertNative(started.native.id,nativeStart.id)
  await h.cmd('template.save',{id:revised.native.id,version:4,name:'Synthetic Platter revised template',templateId:template.id,templateVersion:1})
- const beforeRefusals=async()=>Object.fromEntries(await Promise.all(['p_proposals','p_revisions','p_approvals','p_shares','p_mail'].map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results])))
+ const beforeRefusals=async()=>Object.fromEntries(await Promise.all(['p_proposals','p_revisions','p_approvals','p_shares','p_mail','p_send_requests'].map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results])))
  const unchanged=await beforeRefusals()
  for(const [name,args,error] of [
   ['revise_proposal',{...smaller,id:prepared.native.id,version:3},/changed|Reload|409/i],
@@ -684,7 +684,7 @@ test('AI-003 MCP client searches, drafts, reads engagement and queues exact revi
  for(const action of ['mcp.search_proposals','mcp.prepare_proposal','mcp.read_proposal','mcp.read_engagement','mcp.request_send','mcp.revise_proposal'])assert.ok(audit.some(row=>row.action===action&&row.actor_role==='agent'),action)
  await h.cmd('agent.revoke',{id:key.id});assert.equal((await transport('ping')).status,401)
  const revokedState=await beforeRefusals()
- for(const [name,args] of [['prepare_proposal',structured],['prepare_from_template',{...startInput,templateVersion:2}],['revise_proposal',{...smaller,id:prepared.native.id,version:4}]]){
+ for(const [name,args] of [['prepare_proposal',structured],['prepare_from_template',{...startInput,templateVersion:2}],['revise_proposal',{...smaller,id:prepared.native.id,version:4}],['request_send',{id:prepared.native.id,revision:3}]]){
   const refused=await transport('tools/call',{name,arguments:args})
   assert.equal(refused.status,401);assert.equal(refused.value.result,undefined)
  }

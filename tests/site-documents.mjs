@@ -1137,3 +1137,7 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
   assert.equal(await history.getByRole('button').count(),0)
  }finally{await context?.close();await browser?.close();await app?.close()}
 })
+
+test('ACCT-004 Settings review, explicit customer matching and read-only mismatch inspection through the compiled app', {timeout:120000},async()=>{
+ await (await import('./invoice-matching-browser.mjs')).invoiceMatchingBrowser()
+})

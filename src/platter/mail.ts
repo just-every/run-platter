@@ -1,4 +1,4 @@
-import { recordFailureDelivery } from './payment-failure-notices'
+import { failureDeliveryStatement } from './payment-failure-notices'
 import { completionAttachments, queueReadyCompletionMail } from './completion-mail'
 import { clientText, type ClientLocale } from './locales'
 import { prepareClientReply } from './client-mail-replies'
@@ -21,8 +21,7 @@ export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string
  const rows=(await env.DB.prepare("SELECT * FROM p_mail WHERE proposal_id=? AND status='pending' AND (? IS NULL OR id=?)").bind(proposalId,mailId??null,mailId??null).all<any>()).results
  for(const row of rows){
   if(!sender&&(!row.sender_id||!await env.DB.prepare("SELECT id FROM p_connections WHERE operator_id=? AND provider IN ('gmail','microsoft') AND status='connected' AND broken_at IS NULL").bind(row.sender_id).first()))continue
-  const claimed=await env.DB.prepare("UPDATE p_mail SET status='sending' WHERE id=? AND status='pending'").bind(row.id).run();if(!claimed.meta.changes)continue
-  await recordFailureDelivery(env,row.id,'sending')
+  const [claimed]=await env.DB.batch([env.DB.prepare("UPDATE p_mail SET status='sending' WHERE id=? AND status='pending'").bind(row.id),failureDeliveryStatement(env,row.id,'sending')]);if(!claimed.meta.changes)continue
   let route='installation',address=env.MAIL_FROM??'',fallback=false
   try{
    let actor=await sendingActor(env,row)
@@ -41,17 +40,15 @@ export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string
    if(!result){
     route='installation';address=env.MAIL_FROM??''
     await sendingActor(env,row)
-    if(!sender){await env.DB.prepare("UPDATE p_mail SET status='pending' WHERE id=?").bind(row.id).run();await recordFailureDelivery(env,row.id,'pending');continue}
+    if(!sender){await env.DB.batch([env.DB.prepare("UPDATE p_mail SET status='pending' WHERE id=?").bind(row.id),failureDeliveryStatement(env,row.id,'pending')]);continue}
     result=await demoEffect(()=>sender.send({from:env.MAIL_FROM!,to:[row.recipient],deliveryId:row.id,subject:row.subject,text:row.body,html:row.body.replace(/[&<>]/g,(c:string)=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]!)),headers:{},...(attachments?{attachments}:{}),...(replyTo?{replyTo}:{})}),()=>({provider:'demo',status:'accepted' as const,providerMessageId:null}))
    }
    const status=result?.status==='accepted'?'accepted':'uncertain'
-   await env.DB.batch([env.DB.prepare("UPDATE p_mail SET status=?,provider=?,provider_message_id=? WHERE id=?").bind(status,route==='installation'?env.MAIL_PROVIDER??null:route,result?.providerMessageId??null,row.id),env.DB.prepare("UPDATE p_bounce_notices SET closed_at=? WHERE closed_at IS NULL AND id IN (SELECT notice_id FROM p_bounce_notice_transport WHERE correction_mail_id=?) AND ?='accepted'").bind(Date.now(),row.id,status)])
-   await recordFailureDelivery(env,row.id,status)
+   await env.DB.batch([env.DB.prepare("UPDATE p_mail SET status=?,provider=?,provider_message_id=? WHERE id=?").bind(status,route==='installation'?env.MAIL_PROVIDER??null:route,result?.providerMessageId??null,row.id),env.DB.prepare("UPDATE p_bounce_notices SET closed_at=? WHERE closed_at IS NULL AND id IN (SELECT notice_id FROM p_bounce_notice_transport WHERE correction_mail_id=?) AND ?='accepted'").bind(Date.now(),row.id,status),failureDeliveryStatement(env,row.id,status)])
    await recordSender(env,row,route,address,status,fallback)
   }catch(error){
    const outcome=(error as any)?.status===403?'withheld':'uncertain'
-   await env.DB.prepare('UPDATE p_mail SET status=?,provider=?,held_reason=? WHERE id=?').bind('uncertain',route==='installation'?env.MAIL_PROVIDER??null:route,outcome==='withheld'?'sender_not_authorized':null,row.id).run()
-   await recordFailureDelivery(env,row.id,outcome)
+   await env.DB.batch([env.DB.prepare('UPDATE p_mail SET status=?,provider=?,held_reason=? WHERE id=?').bind('uncertain',route==='installation'?env.MAIL_PROVIDER??null:route,outcome==='withheld'?'sender_not_authorized':null,row.id),failureDeliveryStatement(env,row.id,outcome)])
    await recordSender(env,row,route,address,outcome,fallback)
    if(outcome==='withheld'&&!await env.DB.prepare('SELECT 1 FROM p_completion_mail WHERE mail_id=? UNION ALL SELECT 1 FROM p_payment_failure_deliveries WHERE mail_id=?').bind(row.id,row.id).first())throw error
   }

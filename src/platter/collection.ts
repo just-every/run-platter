@@ -1,3 +1,4 @@
+import { recordPaymentFailure, failureHistory } from './payment-failure-notices'
 import { currentTime } from './expiry-time'
 import { queueReadyCompletionMail } from './completion-mail'
 import { dispatchMail } from './mail'
@@ -7,11 +8,11 @@ import { providerCredential } from './connections'
 import { collectionPolicy } from './collection-policy'
 import { need, fail } from './model'
 
-export async function collectionView(db:D1Database,id:string,accepted?:any){
+export async function collectionView(db:D1Database,id:string,accepted?:any,showFailures=false){
  const frozen=accepted?JSON.parse(accepted.snapshot).collectionPolicy:null
  const policy=accepted?(frozen??{enabled:false,completion:'off',methods:[]}):await collectionPolicy(db,id)
  const intent=await db.prepare('SELECT method,status,cents,deposit_cents,fee_cents,billing_state,currency,authorization,authorized_at,provider_mandate FROM p_collection_intents WHERE proposal_id=? AND revision=?').bind(id,accepted?.revision??0).first<any>()
- return {...policy,payment:intent,agreementState:!accepted?'unsigned':!policy.enabled||policy.completion==='due'||accepted.deposit_cents===0||intent?.status==='succeeded'&&Boolean(intent.authorized_at)?'complete':'waiting_for_payment',complete:!policy.enabled||policy.completion==='due'||accepted?.deposit_cents===0||intent?.status==='succeeded'&&Boolean(intent.authorized_at)}
+ return {...policy,payment:intent,failures:showFailures?await failureHistory(db,id):[],agreementState:!accepted?'unsigned':!policy.enabled||policy.completion==='due'||accepted.deposit_cents===0||intent?.status==='succeeded'&&Boolean(intent.authorized_at)?'complete':'waiting_for_payment',complete:!policy.enabled||policy.completion==='due'||accepted?.deposit_cents===0||intent?.status==='succeeded'&&Boolean(intent.authorized_at)}
 }
 
 async function stripe(token:string,path:string,body?:URLSearchParams,idempotency?:string){
@@ -32,7 +33,7 @@ async function boundClient(env:Bindings,c:any){
 }
 
 export async function clientCollection(env:Bindings,c:any,input:Record<string,unknown>,refresh=false){
- const {accepted,policy}=await boundClient(env,c),db=env.DB,{secret}=await providerCredential(env,'workspace:stripe')
+ const {accepted,policy}=await boundClient(env,c),db=env.DB,{secret,connection}=await providerCredential(env,'workspace:stripe')
  let saved=await db.prepare('SELECT * FROM p_collection_intents WHERE proposal_id=? AND revision=?').bind(accepted.proposal_id,accepted.revision).first<any>()
  const method=String(input.method??saved?.method??'card')
  need(policy.methods.includes(method),'This payment method is not offered',400)
@@ -67,6 +68,7 @@ export async function clientCollection(env:Bindings,c:any,input:Record<string,un
  const intent=await stripe(secret.token,'payment_intents/'+encodeURIComponent(saved.provider_intent)+'?expand[]=latest_charge')
  need(intent.id===saved.provider_intent&&intent.amount===saved.cents&&intent.currency===saved.currency.toLowerCase()&&intent.metadata?.platter_proposal_id===accepted.proposal_id&&intent.metadata?.platter_revision===String(accepted.revision),'Stripe deposit binding changed. Contact the firm.',409)
  await boundClient(env,c)
+ need(await db.prepare("SELECT 1 FROM p_connections WHERE id='workspace:stripe' AND version=? AND account_id=? AND status='connected' AND broken_at IS NULL").bind(connection.version,saved.account_id).first(),'The Stripe connection changed. Refresh with the firm.',409)
  const mandate=intent.latest_charge?.payment_method_details?.us_bank_account?.mandate
  if(intent.status==='succeeded'){
   const charge=intent.latest_charge
@@ -76,6 +78,7 @@ export async function clientCollection(env:Bindings,c:any,input:Record<string,un
  }
  await db.prepare('UPDATE p_collection_intents SET status=?,provider_mandate=COALESCE(?,provider_mandate),updated_at=? WHERE id=? AND (status!=\'succeeded\' OR ?=\'succeeded\')').bind(intent.status,typeof mandate==='string'?mandate:null,Date.now(),saved.id,intent.status).run()
  const status=(await db.prepare('SELECT status FROM p_collection_intents WHERE id=?').bind(saved.id).first<{status:string}>())!.status
+ if(status!=='succeeded'){await recordPaymentFailure(env,saved,intent);await dispatchMail(env,accepted.proposal_id)}
  if(status==='succeeded'){await queueReadyCompletionMail(env,accepted.proposal_id);await dispatchMail(env,accepted.proposal_id)}
  return {quote:{depositCents:saved.deposit_cents,feeCents:saved.fee_cents,cents:saved.cents},status,complete:policy.completion==='due'||status==='succeeded'&&Boolean(saved.authorized_at),...(refresh||status==='succeeded'?{}:{clientSecret:intent.client_secret,publishableKey:secret.publishableKey,methods:policy.methods,method:saved.method}),authorization:saved.authorization}
 }

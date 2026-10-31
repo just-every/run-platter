@@ -49,7 +49,7 @@ export async function collectionBrowser({real=false}={}){
  const screenshots=process.env.PLATTER_SCREENSHOTS,log=real?captureRuntimeLog():null
  try{
   if(screenshots)await mkdir(screenshots,{recursive:true})
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--use-mock-keychain','--password-store=basic',...(process.platform==='linux'?['--no-sandbox']:[])]})
   for(const width of [1440,390]){
    const h=await harness({entry:'dist/server/index.js',assetsDirectory:'./dist/client',outboundService}),context=await browser.newContext({viewport:{width,height:900}})
    let page
@@ -89,7 +89,19 @@ export async function collectionBrowser({real=false}={}){
       }
      }else{
       const start=await h.send(p.path+'/payment.json',{method:'card',consent:'yes'},p.cookie);assert.equal(start.status,200)
-      await page.reload();assert.match(await page.locator('main').innerText(),completion==='required'?/waiting for payment/:/Proposal accepted/);await capture(completion+'-declined')
+      const deposit=await h.db.prepare('SELECT * FROM p_collection_intents WHERE proposal_id=?').bind(p.id).first()
+      await h.send(p.path+'/payment-consent.json',{consent:true,cents:deposit.cents},p.cookie)
+      await page.goto(h.origin+'/app/settings')
+      const noticeForm=page.locator('form[action*="payment.failure-notices"]').filter({has:page.locator('input[name="id"][value="'+p.id+'"]')})
+      if(width===1440)assert.equal((await h.db.prepare('SELECT count(*) n FROM p_payment_failure_authority WHERE proposal_id=?').bind(p.id).first()).n,0,'Opening settings grants no notice authority')
+      await noticeForm.getByRole('checkbox').check();await noticeForm.getByRole('button',{name:'Authorize failure notices'}).click()
+      await capture(completion+'-notice-settings')
+      const failed=intents.get(deposit.provider_intent)
+      failed.latest_charge={id:'synthetic-platter-failed-'+deposit.id,payment_intent:failed.id,amount:failed.amount,currency:failed.currency,status:'failed',paid:false,created:Math.floor(Date.now()/1000),failure_code:'card_declined'}
+      failed.last_payment_error={charge:failed.latest_charge.id,decline_code:'insufficient_funds',message:'Synthetic private provider diagnostic'}
+      await page.goto(h.origin+p.path);await page.getByRole('button',{name:'Refresh payment status'}).click()
+      if(width===1440){assert.match(await page.locator('main').innerText(),/insufficient funds/);assert.equal(await page.getByRole('heading',{name:'Deposit attempt history'}).count(),1);assert.doesNotMatch(await page.locator('main').innerText(),/private provider diagnostic/)}
+      assert.match(await page.locator('main').innerText(),completion==='required'?/waiting for payment/:/Proposal accepted/);await capture(completion+'-declined')
       if(completion==='required'){
        const saved=await h.db.prepare('SELECT provider_intent,cents FROM p_collection_intents WHERE proposal_id=?').bind(p.id).first(),v=intents.get(saved.provider_intent);await h.send(p.path+'/payment-consent.json',{consent:true,cents:saved.cents},p.cookie);v.status='succeeded';v.latest_charge={id:'synthetic-platter-charge-'+saved.provider_intent,amount:v.amount,currency:v.currency,status:'succeeded',paid:true}
        await page.getByRole('button',{name:'Refresh payment status'}).click();assert.equal(await page.getByRole('heading',{name:'Deposit paid',exact:true}).count(),1);assert.equal(await page.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1);await capture('required-paid')

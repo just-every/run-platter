@@ -1,6 +1,6 @@
 import { acceptRevenue } from './revenue-fixture.mjs'
 import {previewBusiness} from './approval-preview-fixture.mjs'
-import { collectionLifecycle, collectionFees, collectionMethodInheritance } from './collection-journey.mjs'
+import { collectionLifecycle, collectionFees, collectionMethodInheritance, depositEdge, failureNoticesJourney } from './collection-journey.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { richLibraryPropagation, richLibrarySource } from './library-fixture.mjs'
 import { documentFixture } from './document-fixture.mjs'
@@ -2898,9 +2898,11 @@ async function collectionHarness(){
 }
 
 test('deposit signatures survive declines, required acceptance waits for Stripe success and due acceptance stays complete',async()=>{
- const {h,intents}=await collectionHarness()
+ const edge=depositEdge(),h=await harness({assetsDirectory:'public',outboundService:edge.outboundService}),intents=edge.intents
+ await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-1',publishableKey:'synthetic-platter-2',consent:true})
  try{
   await collectionLifecycle(h,async(id,outcome)=>{const intent=intents.get(id);intent.status=outcome==='success'?'succeeded':'requires_payment_method';if(outcome==='success')intent.latest_charge={id:'synthetic-platter-charge-'+id,paid:true,status:'succeeded',amount:intent.amount,currency:intent.currency}})
+  await failureNoticesJourney(h,edge)
  }finally{await h.close()}
 })
 

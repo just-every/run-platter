@@ -19,14 +19,14 @@ const fields = {
 }
 const schema = (properties: Record<string, any>, required: string[] = []) => ({ type: 'object', properties, required, additionalProperties: false, ...(Object.hasOwn(properties,'packages')?{anyOf:[{required:['packages']},{required:['optionOne','priceOne','optionTwo','priceTwo']}]}:{}) })
 const draftRequired=['clientId','title','scope','depositPercent']
-const draftingFields={...fields,packages:{type:'array',minItems:1,items:{type:'object',description:'Package id, label, price, optionalItems: id, label, unitPrice, min, max, quantity and editable. Prices and optional-item totals are always calculated by the server.'}},pricingTables:{type:'array',items:{type:'object',description:'Tables with an offered package optionId, name, and lines: name, description, quantity (positive decimal up to 3 places), unit, unitPrice (USD up to 2 places), group. Server rounds each extended line half up to cents and recomputes totals.'}}}
+const draftingFields={...fields,templateId:string,templateVersion:integer,sourceDraft:{type:'object',description:'Externally prepared content only, with per-key source-binding consent. sourceId, sourceVersion, sourceSha256; sections: id, title, text, citation: startLine, endLine, sha256 of the selected lines joined with newline; packages: id, label, lines: catalogId, catalogVersion, quantity. No source retrieval or model generation. Unsupported, unmatched, recurring and taxed items are held.'},packages:{type:'array',minItems:1,items:{type:'object',description:'Package id, label, price, optionalItems: id, label, unitPrice, min, max, quantity and editable. Prices and optional-item totals are always calculated by the server.'}},pricingTables:{type:'array',items:{type:'object',description:'Tables with an offered package optionId, name, and lines: name, description, quantity (positive decimal up to 3 places), unit, unitPrice (USD up to 2 places), group. Server rounds each extended line half up to cents and recomputes totals.'}}}
 const tools = [
  { name: 'search_proposals', description: 'Search current proposals by title, scope or client. Includes matching existing clients for preparing a draft; at most 100 results of each kind.', inputSchema: schema({ query: { type: 'string', maxLength: 200 }, status: { type: 'string', enum: ['draft', 'approved', 'sent', 'accepted'] }, limit: { type: 'integer', minimum: 1, maximum: 100 } }) },
  { name: 'search_templates', description: 'Find built-in starter templates and personal templates belonging to this key’s owner. Use the returned id and version to prepare an independent draft.', inputSchema: schema({ query: { type: 'string', maxLength: 200 } }) },
  { name: 'prepare_from_template', description: 'Prepare an independent draft from a built-in starter or a personal template belonging to this key’s owner. This never approves or sends it.', inputSchema: schema({ templateId: string, templateVersion: integer, clientId: string, title: string }, ['templateId', 'templateVersion', 'clientId']) },
  { name: 'read_proposal', description: 'Read a current proposal, revision, version, approval and recorded delivery/acceptance status. No invitation credentials are returned.', inputSchema: schema({ id: string }, ['id']) },
  { name: 'read_engagement', description: 'Read recorded delivery and acceptance status. View detail is owner-only and unavailable to agent keys. Section reading analytics are unavailable; delivery acceptance does not prove reading.', inputSchema: schema({ id: string }, ['id']) },
- { name: 'prepare_proposal', description: 'Prepare a structured package draft (or a legacy two-option draft) for an existing client. The owner must review, approve and send it.', inputSchema: schema(draftingFields, draftRequired) },
+ { name: 'prepare_proposal', description: 'Prepare a structured package draft (or a legacy two-option draft) for an existing client. The owner must review, approve and send it.', inputSchema: {...schema(draftingFields),anyOf:[{required:draftRequired},{required:['clientId','templateId','templateVersion','sourceDraft']}]} },
  { name: 'revise_proposal', description: 'Revise the current draft or approved proposal using its version. This creates a draft revision and clears approval. Sent and accepted offers cannot be edited by an agent.', inputSchema: schema({ ...draftingFields, id: string, version: integer }, [...draftRequired, 'id', 'version']) },
  { name: 'request_send', description: 'Queue the exact current draft or approved revision for its key owner to review. Repeating an active request returns that request. This never approves or sends mail.', inputSchema: schema({ id: string, revision: integer }, ['id', 'revision']) },
 ]
@@ -34,7 +34,7 @@ const tools = [
 function validArguments(input: unknown, definition: ReturnType<typeof schema>) {
  need(object(input), 'Tool arguments must be an object')
  need(Object.keys(input).every(key => Object.hasOwn(definition.properties, key)), 'Unknown tool argument')
- need(definition.required.every(key => Object.hasOwn(input, key)), 'Missing required tool argument')
+ need((input.sourceDraft!==undefined?['clientId','templateId','templateVersion','sourceDraft']:definition.required).every(key => Object.hasOwn(input, key)), 'Missing required tool argument')
  for (const [key, value] of Object.entries(input)) {
   const s = definition.properties[key], types = Array.isArray(s.type) ? s.type : [s.type]
   need(types.some((type: string) => type === 'array' ? Array.isArray(value) : type === 'integer' ? Number.isSafeInteger(value) : type === 'number' ? typeof value === 'number' && Number.isFinite(value) : typeof value === type), `Invalid ${key}`)
@@ -52,7 +52,7 @@ async function callTool(env: Bindings, actor: Actor, name: string, input: Record
  const current = await state(env, actor)
  if (name === 'search_templates') {
   const query = (input.query ?? '').toLocaleLowerCase()
-  return { templates: [...current.starterTemplates, ...current.templates].filter(t => t.name.toLocaleLowerCase().includes(query)).map(t => ({ id: t.id, name: t.name, version: t.version })) }
+  return { sourceReferences:current.draftSources,catalog:current.sourcedCatalog, templates: [...current.starterTemplates, ...current.templates].filter(t => t.name.toLocaleLowerCase().includes(query)).map(t => ({ id: t.id, name: t.name, version: t.version })) }
  }
  if (name === 'search_proposals') {
   const query = (input.query ?? '').toLocaleLowerCase(), limit = input.limit ?? 50
@@ -65,7 +65,7 @@ async function callTool(env: Bindings, actor: Actor, name: string, input: Record
  need(found, 'Proposal not found', 404)
  if (name === 'read_proposal') {
   const { shareToken: _shareToken, ...safe } = found
-  return safe
+  return {...safe,sourceReferences:current.draftProvenance?.find((row:any)=>row.proposal_id===found.id)??null}
  }
  return { id: found.id, revision: found.revision, status: found.status, delivery: found.delivery ?? null, acceptance: found.acceptance ?? null,
   viewTracking: { available: false, reason: 'View detail is available only to the signed-in owner.' }, sectionReading: { available: false, reason: 'Section-level reading analytics are not implemented.' } }

@@ -1,3 +1,4 @@
+import { sourcedPreparation } from './draft-sources'
 import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields } from './variables'
 import { proposalFields } from './commands'
@@ -95,6 +96,11 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  const access=starter?{sql:'1',values:[]}:await folderGuard(db,a,personal.folder_id,'template')
  let content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
  if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...editableVariableFields(content),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan}}
+ const sourced=input.sourceDraft===undefined?null:await sourcedPreparation(db,a,{...input,clientId},content)
+ if(sourced){
+  if(personal)await assertTemplateLocks(db,personal,sourced.content)
+  content=sourced.content
+ }
  const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)
  need(content.currency === 'USD', 'Personal templates require USD content', 409)
@@ -109,10 +115,11 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
    prepared_by,created_at,currency,sales_owner_id,sales_owner_name,attachments)
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
    .bind(id, clientId, title, row.scope, row.terms ?? '', row.deposit_bps, JSON.stringify(row.options), preparer, at, 'USD', a.id, a.email, JSON.stringify(attachments)),
+  ...(sourced?sourced.writes(id):[]),
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) VALUES(?,?,?)').bind(id,template.id,template.version),
   ...(!starter?[db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_template_locks WHERE template_id=?').bind(id,template.id),db.prepare('INSERT INTO p_proposal_block_locks(proposal_id,section) SELECT ?,section FROM p_template_block_locks WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_template_document_media WHERE template_id=?').bind(id,template.id)]:[]),
-  ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify(resolved.settings)),
+  ...(!starter&&!sourced?[startTemplateCosts(db,template.id,id)]:[]),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify(resolved.settings)),
   db.prepare('UPDATE p_proposals SET recipient_plan=? WHERE id=?').bind(JSON.stringify(row.recipient_plan??[]),id),
   db.prepare('UPDATE p_proposals SET section_conditions=?,document=?,payment_terms=? WHERE id=?').bind(JSON.stringify(row.section_conditions ?? {}),JSON.stringify(documentOf(row)),row.payment_terms?JSON.stringify(row.payment_terms):null, id),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)').bind(id, JSON.stringify(snapshot(row)), preparer, at, 'USD'),
@@ -120,8 +127,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   db.prepare('INSERT INTO p_expiry(proposal_id,mode,period_days,expires_on,time_zone,warning_days) VALUES(?,?,?,?,?,?)').bind(id, expiry.mode, expiry.period_days, expiry.expires_on, expiry.time_zone, expiry.warning_days),
   ...sections.map(section => db.prepare(`INSERT INTO ${section.startsWith('block:')?'p_block_suggestion_sections':'p_suggestion_sections'}(proposal_id,revision,section) VALUES(?,1,?)`).bind(id, section)),
  ], false, {
-  sql: (starter ? '' : 'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND (owner_id=? OR shared=1) AND version=?) AND ') + 'EXISTS(SELECT 1 FROM p_clients WHERE id=?) AND '+access.sql,
-  values: [...(starter ? [] : [template.id, a.id, template.version]), clientId,...access.values],
+  sql: (starter ? '' : 'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND (owner_id=? OR shared=1) AND version=?) AND ') + 'EXISTS(SELECT 1 FROM p_clients WHERE id=?) AND '+access.sql+(sourced?' AND '+sourced.guard.sql:''),
+  values: [...(starter ? [] : [template.id, a.id, template.version]), clientId,...access.values,...(sourced?sourced.guard.values:[])],
  })
  return { id, revision: 1, version: 1 }
 }

@@ -1,3 +1,4 @@
+import { draftSourceCommand } from './draft-sources'
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
@@ -75,6 +76,8 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
+ if(name.startsWith('draft-source.'))return draftSourceCommand(db,a,name,p)
+ if(p.sourceDraft!==undefined)need(name==='proposal.prepare'&&p.templateId,'Sourced content requires a selected template preparation',409)
  if(name==='crm.card.configure')return configureHubspotCard(env,a,p)
  if(name.startsWith('crm.sync.'))return hubspotSyncCommand(env,a,name,p)
  if(name.startsWith('crm.deal.'))return hubspotDraftCommand(env,a,name,p)
@@ -141,7 +144,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name.startsWith('library.'))return libraryCommand(db,a,name,p)
  if(name==='proposal.test-mail')return sendTestMail(env,a,p)
  if(name.startsWith('template.'))return templateCommand(env,a,name,p)
- if(name==='proposal.prepare'&&p.templateId!==undefined)return templateCommand(env,a,'template.start',{id:p.templateId,version:p.templateVersion,clientId:p.clientId,...(p.title?{title:p.title}:{})})
+ if(name==='proposal.prepare'&&p.templateId!==undefined)return templateCommand(env,a,'template.start',{id:p.templateId,version:p.templateVersion,clientId:p.clientId,...(p.sourceDraft!==undefined?{sourceDraft:p.sourceDraft}:{}),...(p.title?{title:p.title}:{})})
  if(name.startsWith('followup.'))return followupCommand(env,a,name,p)
  if(name==='proposal.duplicate')return duplicateProposal(env,a,p)
  if(name==='outcome.settings')return saveOutcomeSettings(db,a,p)

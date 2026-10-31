@@ -3833,3 +3833,59 @@ test('CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance an
  } finally { await h.close() }
  await (await import('./hubspot-sync-journey.mjs')).reviewedSyncJourney(verified)
 })
+
+test('AI-001 owner uploads immutable notes and consented MCP prepares cited catalog drafts with stale and revoked no-write refusals',()=>run(async h=>{
+ const {seedSourcedDraft,sourcedMcp,mcpValue,allowSource,originalNotes,sourceHash,uploadSource}=await import('./draft-source-fixture.mjs')
+ const seed=await seedSourcedDraft(h),{source,input,key}=seed
+ const original=await h.send('/api/platter/draft-source?id='+source.id,undefined,h.owner)
+ assert.equal(original.status,200);assert.equal(original.value.original,originalNotes);assert.equal(source.sha256,sourceHash(originalNotes));assert.deepEqual(original.value.lines.map(l=>l.line),[1,2,3,4,5,6]);assert.equal(original.value.lines[2].text,'')
+ const snapshot=async()=>Promise.all(['p_proposals','p_revisions','p_draft_provenance','p_proposal_defaults','p_mail','p_audit'].map(async table=>(await h.db.prepare('SELECT COUNT(*) AS n FROM '+table).first()).n))
+ const refused=async(request,pattern)=>{const before=await snapshot(),response=await request();assert.match(response.text,pattern);assert.deepEqual(await snapshot(),before,'refused preparation must leave proposals, provenance and mail unchanged');return response}
+ await refused(()=>sourcedMcp(h,key,'prepare_proposal',input),/no consent/)
+ await allowSource(h,seed)
+ const listing=mcpValue(await sourcedMcp(h,key,'search_templates',{}))
+ assert.deepEqual(listing.sourceReferences.map(s=>[s.id,s.version,s.lineCount]),[[source.id,1,6]]);assert.equal(listing.catalog.find(c=>c.id===seed.first.id).unitCents,12345);assert.ok(!JSON.stringify(listing).includes('unitCost'))
+ const changed=structuredClone(input);changed.sourceDraft.sections[0].citation.startLine=3
+ await refused(()=>sourcedMcp(h,key,'prepare_proposal',changed),/outside|does not match/)
+ changed.sourceDraft.sections[0].citation={startLine:2,endLine:2,sha256:'0'.repeat(64)}
+ await refused(()=>sourcedMcp(h,key,'prepare_proposal',changed),/does not match/)
+ const unmatched=structuredClone(input);unmatched.sourceDraft.packages[0].lines[0].catalogId='synthetic-platter-unmatched'
+ await refused(()=>sourcedMcp(h,key,'prepare_proposal',unmatched),/unmatched/)
+ const unsupported=structuredClone(input);unsupported.sourceDraft.packages[0].lines[0].unitPrice='0.01'
+ await refused(()=>sourcedMcp(h,key,'prepare_proposal',unsupported),/Unsupported prepared content/)
+ const created=mcpValue(await sourcedMcp(h,key,'prepare_proposal',input)),state=await h.state(),proposal=state.proposals.find(p=>p.id===created.id)
+ assert.deepEqual([proposal.status,proposal.revision,proposal.version],['draft',1,1]);assert.deepEqual(proposal.options.map(p=>p.cents),[36692,73383]);assert.deepEqual(proposal.options.map(p=>p.tables[0].lines.map(l=>[l.name,l.quantity,l.unitPrice,l.lineTotalCents])),[[['Discovery workshop','2','123.45',24690],['Campaign production','1.5','80.01',12002]],[['Discovery workshop','4','123.45',49380],['Campaign production','3','80.01',24003]]])
+ assert.equal(proposal.scope,'Discovery\nRun two discovery workshops.\n\nDelivery\nDeliver three campaign assets.');assert.equal(proposal.terms,'Firm-authored delivery terms');assert.deepEqual(proposal.document.blocks.map(b=>[b.id,b.title,b.text]),[['discovery','Discovery','Run two discovery workshops.'],['delivery','Delivery','Deliver three campaign assets.']]);assert.equal(proposal.collection.completion,'off');assert.equal(proposal.reminderSettings,null);assert.deepEqual(proposal.recipientPlan??[],[]);assert.equal(proposal.deliveryDefaults.remindersEnabled,true);assert.deepEqual(proposal.deliveryDefaults.reminderDays,[2,5]);assert.equal(proposal.expiry.days,30);assert.equal(proposal.expiry.warningDays,2)
+ assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_reminder_authority WHERE proposal_id=?').bind(created.id).first()).n,0)
+ const provenance=state.draftProvenance.find(row=>row.proposal_id===created.id)
+ assert.deepEqual(provenance.sections.map(r=>[r.sectionId,r.startLine,r.endLine,r.sourceVersion]),[['discovery',2,2,1],['delivery',4,4,1]]);assert.deepEqual(provenance.catalog.map(r=>[r.catalogVersion,r.quantity,r.unitCents]),[[1,'2',12345],[1,'1.5',8001],[1,'4',12345],[1,'3',8001]])
+ assert.equal((await h.send('/api/platter/draft-source?id='+source.id)).status,401)
+ await h.send('/auth/invite',{email:['synthetic-platter-9907','example.test'].join('@'),displayName:'Synthetic source colleague',role:'member',returnTo:'/app'},h.owner)
+ const sales=await h.signIn(['synthetic-platter-9907','example.test'].join('@'))
+ assert.equal((await h.send('/api/platter/draft-source?id='+source.id,undefined,sales)).status,403)
+ assert.ok(!(await h.send('/app/settings',undefined,sales)).text.includes('Private source'))
+ const agentContext=await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})
+ assert.equal(agentContext.status,200);assert.ok(!agentContext.text.includes('synthetic-platter-9904'));assert.ok(!agentContext.text.includes('unit_cost_cents'))
+ const read=mcpValue(await sourcedMcp(h,key,'read_proposal',{id:created.id}));assert.equal(read.sourceReferences.sections[1].startLine,4);assert.ok(!JSON.stringify(read).includes('synthetic-platter-9904'))
+ await refused(()=>sourcedMcp(h,key,'proposal.send',{id:created.id}),/cannot approve, send, sign or refund/)
+ await allowSource(h,seed,false)
+ await refused(()=>sourcedMcp(h,key,'prepare_proposal',input),/no consent/)
+ await allowSource(h,seed)
+ await h.cmd('catalog.save',{id:seed.first.id,version:1,sku:'synthetic-platter-9903',name:'Changed workshop',description:'New catalog content',unit:'each',unitPrice:'999.99'})
+ await refused(()=>sourcedMcp(h,key,'prepare_proposal',input),/unmatched|version changed/)
+ assert.deepEqual((await h.state()).proposals.find(p=>p.id===created.id).options,proposal.options,'catalog edits never change the independently copied draft')
+ const next=await uploadSource(h,originalNotes+'Another note.',source)
+ assert.equal(next.version,2);assert.equal((await h.send('/api/platter/draft-source?id='+source.id+'&version=1',undefined,h.owner)).value.original,originalNotes)
+ const fresh=structuredClone(input);fresh.sourceDraft.sourceVersion=2;fresh.sourceDraft.sourceSha256=next.sha256;fresh.sourceDraft.packages.forEach(p=>p.lines.forEach(l=>{if(l.catalogId===seed.first.id)l.catalogVersion=2}))
+ await refused(()=>sourcedMcp(h,key,'prepare_proposal',input),/current exact source version/)
+ await refused(()=>sourcedMcp(h,key,'prepare_proposal',fresh),/no consent/)
+ await allowSource(h,{...seed,source:next});const copy=mcpValue(await sourcedMcp(h,key,'prepare_proposal',fresh));assert.notEqual(copy.id,created.id)
+ assert.equal((await h.state()).proposals.find(p=>p.id===seed.baseline.id).scope,'Original template scope')
+ await h.cmd('agent.revoke',{id:key.id});const revoked=await refused(()=>sourcedMcp(h,key,'prepare_proposal',fresh),/expired or revoked/);assert.equal(revoked.status,401)
+ await h.cmd('proposal.approve',{id:created.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:created.id,version:2}),path=new URL(share.shareUrl).pathname,cookie=await verified(h,path)
+ for(const suffix of ['', '/data.json']){const response=await h.send(path+suffix,undefined,cookie);assert.equal(response.status,200,response.text);assert.ok(!response.text.includes('synthetic-platter-9904'));assert.ok(!response.text.includes(source.id));assert.ok(!response.text.includes('source_sha256'))}
+ // Erased unused clients cannot be resurrected by replaying prepared content.
+ const erased=await h.cmd('client.save',{name:'Synthetic erased client',email:['synthetic-platter-9908','example.test'].join('@')});await h.cmd('client.erase',{id:erased.id,confirmName:'Synthetic erased client'})
+ const newKey=await h.cmd('agent.create',{label:'Synthetic erasure replay'});await allowSource(h,{...seed,key:newKey,source:next})
+ const replay=await refused(()=>sourcedMcp(h,newKey,'prepare_proposal',{...fresh,clientId:erased.id}),/Client not found/);assert.equal(replay.status,200)
+}))

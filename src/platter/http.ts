@@ -1,3 +1,5 @@
+import { originalSourcePage } from './ui/draft-sources'
+import { sourceOriginal } from './draft-sources'
 import { hubspotCardData, hubspotCardResponse } from './crm/hubspot-card'
 import { crmDraftSources } from './crm/hubspot-draft'
 import { archiveState } from './archiving/jobs'
@@ -60,7 +62,7 @@ import { renderApp,renderClient,renderMissing } from './ui'
 import { need,fail,type Actor } from './model'
 const headers={'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}
 const json=(v:unknown,status=200)=>Response.json(v,{status,headers})
-const pages=new Set(['/app/crm-card','/app','/app/proposal','/app/clients','/app/import','/app/access','/app/audit','/app/settings','/app/team','/app/approvals','/app/library','/app/catalog'])
+const pages=new Set(['/app/draft-source','/app/crm-card','/app','/app/proposal','/app/clients','/app/import','/app/access','/app/audit','/app/settings','/app/team','/app/approvals','/app/library','/app/catalog'])
 async function body(request:Request,maxBytes=150000){const raw=await request.text();need(new TextEncoder().encode(raw).length<=maxBytes,'Request too large',413);if(request.headers.get('content-type')?.includes('application/json')){let v;try{v=JSON.parse(raw)}catch{fail('Invalid JSON')}need(v&&typeof v==='object'&&!Array.isArray(v),'Expected an object');return v as Record<string,unknown>}need(request.headers.get('content-type')?.includes('application/x-www-form-urlencoded'),'Use JSON or a form',415);return Object.fromEntries(new URLSearchParams(raw))}
 export async function platterResponse(request:Request,original:Bindings):Promise<Response|null>{const env=runtimeBindings(original),url=new URL(request.url),path=url.pathname,isClient=path.startsWith('/p/'),isAgent=path.startsWith('/api/platter/agent/');if(!isClient&&!path.startsWith('/api/platter/')&&path!=='/app'&&!path.startsWith('/app/'))return null
  let actor:Actor|undefined;const requestedBack=new URL(url.searchParams.get('returnTo')||'/app',env.AUTH_ORIGIN);const back=requestedBack.origin===env.AUTH_ORIGIN&&pages.has(requestedBack.pathname)?requestedBack.pathname+requestedBack.search:'/app';let context:any,submitted:Record<string,unknown>|undefined
@@ -100,12 +102,24 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   }
   if(path==='/app/preview'||path.startsWith('/app/preview/')){need(request.method==='GET','Preview actions cannot be submitted',403);await permitted(env.DB,actor,url.searchParams.get('id'));const response=await previewResponse(request,env);await recordAudit(env.DB,actor,path.startsWith('/app/preview/client/attachments/')?'attachment.download':'proposal.preview',path.startsWith('/app/preview/client/attachments/')?path.split('/').at(-1)!:String(url.searchParams.get('id')));return response}
   if(path==='/api/platter/agent/mcp')return handleMcp(request,env,actor)
+  if(path==='/app/draft-source'){
+   if(request.method==='GET')return document('Private source original',originalSourcePage(await sourceOriginal(env.DB,actor,url.searchParams.get('id')??'',url.searchParams.get('version'))),{actor,path})
+   need(actor.role==='owner','Only the owner uploads source originals',403)
+   const data=await request.formData(),file=data.get('file')
+   need(file instanceof File&&file.size>0&&file.size<=64000&&/\.txt$/i.test(file.name),'Upload a plain text file up to 64 KB')
+   let original='';try{original=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(await file.arrayBuffer())}catch{fail('Use a UTF-8 plain text file')}
+   const result=await command(env,actor,'draft-source.upload',{...Object.fromEntries(data),original})
+   await recordAudit(env.DB,actor,'draft-source.upload',result.id)
+   return request.headers.get('accept')==='application/json'?json(result):renderApp(await state(env,actor),'/app/settings',{message:'Private source saved. Review the numbered original before allowing a key to bind it.'})
+  }
   if(path==='/app/document-import'){need(request.method==='POST','Use a document upload',405);const result=await importDocument(env,actor,await request.formData());await recordAudit(env.DB,actor,'document.import',result.id);return request.headers.get('accept')==='application/json'?json(result):new Response(null,{status:303,headers:{...headers,location:'/app/proposal?id='+encodeURIComponent(result.id)}})}
   if(path==='/api/platter/document-export'){need(['GET','POST'].includes(request.method),'Use a document download',405);const id=String(url.searchParams.get('id'));const result=await exportDocument(env,actor,id,String(url.searchParams.get('format')),url.searchParams.get('optionId')??undefined,url.searchParams.get('size')??'letter',request.method==='POST'?await body(request,30*1024*1024):undefined);await recordAudit(env.DB,actor,'document.export',id);return result}
   if(request.method==='POST'&&path==='/app/document-media'){need(request.headers.get('content-type')?.includes('multipart/form-data'),'Use a media upload form',415);const result=await uploadDocumentMedia(env.DB,actor,await request.formData());await recordAudit(env.DB,actor,'document.media.upload',result.id);return request.headers.get('accept')==='application/json'?json(result):new Response(null,{status:303,headers:{...headers,location:'/app/proposal?id='+encodeURIComponent(result.id)+'&mediaUploaded=1'}})}
   if(request.method==='POST'&&path==='/app/attachment'){need(request.headers.get('content-type')?.includes('multipart/form-data'),'Use a file upload form',415);const data=await request.formData();if(!data.get('kind'))await permitted(env.DB,actor,data.get('id'),'edit');const result=await attachmentUpload(env.DB,actor,data);await recordAudit(env.DB,actor,data.get('kind')?'vendor-document.save':'attachment.upload',String(result.id??data.get('kind')));return renderApp(await state(env,actor),result.id?'/app/proposal?id='+encodeURIComponent(result.id):'/app/settings',{message:result.id?'Document saved. Review the revision before approving.':'Document saved. Existing revisions retain their files.'})}
   if(request.method==='POST'&&path==='/app/paper-acceptance'){need(request.headers.get('content-type')?.includes('multipart/form-data'),'Use a file upload form',415);const result=await paperAcceptance(env.DB,actor,await request.formData());await recordAudit(env.DB,actor,'acceptance.upload',result.id);return renderApp(await state(env,actor),'/app/proposal?id='+encodeURIComponent(result.id),{message:'Accepted by upload. The deposit invoice is ready to export.'})}
   if(request.method==='GET'){
+   if(path==='/api/platter/draft-source')return json(await sourceOriginal(env.DB,actor,url.searchParams.get('id')??'',url.searchParams.get('version')))
+
    const media=path.match(/^\/api\/platter\/document-media\/([\w-]+)\/([\w-]+)$/);if(media){const row=await permitted(env.DB,actor,media[1]);return await documentMedia(env.DB,negotiatedView(row,await pendingNegotiation(env.DB,row.id)),media[2])}
    const dispute=path.match(/^\/api\/platter\/disputes\/([^/]+)\/evidence\.pdf$/);if(dispute){const response=await disputePdf(env,actor,decodeURIComponent(dispute[1]),url.searchParams.get('submission'),url.searchParams.get('packet'));await recordAudit(env.DB,actor,'dispute.evidence',decodeURIComponent(dispute[1]));return response}
    if(path==='/api/platter/agreement.pdf'||path==='/api/platter/certificate.pdf'||path==='/api/platter/certificate.json')return await agreementArtifact(env,String(url.searchParams.get('id')),path.split('/').at(-1)!,{actor})

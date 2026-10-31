@@ -80,6 +80,37 @@ export async function sourceExportJourney() {
  h.state=(cookie=h.owner,status=200)=>originalState(cookie,status)
  try {
  for(const provider of ['ignition','qwilr']) {
+  // A title-only suggestion must not replace the PDF named by the source export.
+  const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica)
+  pdf.setTitle('Shared proposal');pdf.setSubject('Different synthetic client')
+  pdf.addPage().drawText('Different synthetic client agreement',{x:40,y:700,size:16,font})
+  const wrongOriginal=Buffer.from(await pdf.save())
+  const source=provider==='ignition'?{
+   'clients.csv':'Client ID,Client Name\nc-review,Synthetic intended client',
+   'proposals.csv':'Proposal ID,Proposal Name,Client ID,Created Date,Status,Currency,Value,PDF\np-review,Shared proposal,c-review,2026-01-15,Accepted,USD,100.00,alpha.pdf',
+  }:{'proposals.csv':'Page ID,Title,Client,Date,Status,Currency,Value,PDF\np-review,Shared proposal,Synthetic intended client,2026-01-15,Accepted,USD,100.00,alpha.pdf'}
+  const missing=await h.cmd('document-import.create',{label:'Synthetic missing named PDF',sourceProvider:provider})
+  await uploadMovein(h,missing.id,{filename:'missing-named-pdf.zip',bytes:Buffer.from(zipSync({'beta.pdf':wrongOriginal,...Object.fromEntries(Object.entries(source).map(([name,text])=>[name,strToU8(text)]))}))})
+  const bindingKey='binding:'+provider+':proposals:p-review:document'
+  const initialMissing=await h.cmd('document-import.preview',{id:missing.id})
+  const suggestion=initialMissing.report.exports.bindings.find(b=>b.key===bindingKey)
+  assert.deepEqual(suggestion.candidates.map(c=>c.id),[hash(wrongOriginal)])
+  assert.equal(suggestion.selected,null,'a different client same-title PDF is only a suggestion')
+  assert.equal(suggestion.reviewed,false,'a missing named PDF requires explicit review')
+  assert.equal(initialMissing.canApply,false)
+  const beforeMissing=await h.state()
+  await h.cmd('document-import.apply',{id:missing.id,fingerprint:initialMissing.fingerprint},h.owner,409)
+  const afterMissing=await h.state()
+  for(const key of ['importedSourceFacts','importedDocuments','businessRecords','proposals'])assert.deepEqual(afterMissing[key],beforeMissing[key],'unreviewed missing PDF changes no business records')
+  const omittedChoices={[bindingKey]:'unmapped'}
+  const reviewedMissing=await h.cmd('document-import.preview',{id:missing.id,choices:omittedChoices})
+  assert.equal(reviewedMissing.canApply,true)
+  let omitted=await h.cmd('document-import.apply',{id:missing.id,choices:omittedChoices,fingerprint:reviewedMissing.fingerprint})
+  while(omitted.job.state!=='completed')omitted=await h.cmd('document-import.continue',{id:missing.id})
+  assert.equal((await h.state()).importedSourceFacts.find(f=>f.id===provider+':proposals:p-review').bindings.document,null,'explicit omission never links the suggested other client PDF')
+  let missingUndo=await h.cmd('document-import.undo',{id:missing.id})
+  while(missingUndo.job.state!=='undone')missingUndo=await h.cmd('document-import.undo',{id:missing.id})
+  console.log('PROBE MIG-004 finding A '+provider+': missing alpha.pdf plus different-client same-title beta.pdf -> unreviewed suggestion, apply 409 with unchanged records; explicit omission applies without a document binding')
   const fixture=await sourceExportFixture(provider),{id}=await h.cmd('document-import.create',{label:'Synthetic '+provider+' review',sourceProvider:provider})
   for(const file of fixture.zips)await uploadMovein(h,id,file)
   const initial=await h.cmd('document-import.preview',{id})

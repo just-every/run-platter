@@ -93,3 +93,9 @@ export function variableVisible(condition:string,values:Record<string,string>={}
 export function copiedContactFields(contact:{name:string;firstName:string;lastName:string;title:string},address:string){
  return clientVariableFields({contactName:contact.name,firstName:contact.firstName,lastName:contact.lastName,title:contact.title,address})
 }
+
+/** Template starts include both retained bindings and never-filled authored tokens. */
+export function templateVariableNames(row:any){
+ const document=typeof row.document==='string'?JSON.parse(row.document):row.document
+ return [...new Set([...variableNames(row),...variableNames(Object.values(document?.merge?.patterns??{})),...(document?.merge?.conditions??[])])].sort()
+}

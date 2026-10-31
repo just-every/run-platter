@@ -1137,3 +1137,8 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
   assert.equal(await history.getByRole('button').count(),0)
  }finally{await context?.close();await browser?.close();await app?.close()}
 })
+
+test('RENEW-001 compiled reviewed CSV preview, draft creation and reopened resume keep held rows unsent', {timeout:120000},async()=>{
+ const {bulkDraftBrowser}=await import('./bulk-drafts-browser.mjs')
+ await bulkDraftBrowser(1440)
+})

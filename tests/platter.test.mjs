@@ -3947,3 +3947,4 @@ test('ACCT-002 reviewed Xero deposits preserve exact money, authority, unique ma
   assert.equal(edge.state.invoices.length,writes)
  }finally{await legacy.close()}
 })
+test('SIGN-009 owner-enabled delegation requires fresh identity, preserves the offer and records undo through signing races', {timeout:120000},async()=>{const {delegationHttp}=await import('./signer-delegation-http.mjs');await delegationHttp()})

@@ -4,6 +4,7 @@ import { state } from './state'
 import { need, type Actor } from './model'
 import { requestSend } from './send-requests'
 import { recordAudit } from './audit'
+import { agentRegistry, compatibilityTools, registryResource, registryUri } from './agent-registry'
 
 const headers = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' }
 const versions = ['2025-03-26', '2025-06-18']
@@ -101,13 +102,23 @@ export async function handleMcp(request: Request, env: Bindings, actor: Actor): 
  }
  if (message.method === 'initialize') {
   if (typeof params.protocolVersion !== 'string' || !object(params.capabilities) || !object(params.clientInfo) || typeof params.clientInfo.name !== 'string' || typeof params.clientInfo.version !== 'string') return rpcError(-32602, 'Provide protocolVersion, capabilities and clientInfo')
-  return result({ protocolVersion: versions.includes(params.protocolVersion) ? params.protocolVersion : versions[1], capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'platter', version: '1.0.0' }, instructions: 'Tools use the current structured proposal model with built-in starters and the key owner’s personal templates. Reading analytics are unavailable. Only the owner approves and sends proposals.' })
+  return result({ protocolVersion: versions.includes(params.protocolVersion) ? params.protocolVersion : versions[1], capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false }, prompts: { listChanged: false } }, serverInfo: { name: 'platter', version: '1.0.0' }, instructions: 'Read platter://registry for canonical mappings, unavailable jobs and held authority. Tools use the current structured proposal model with built-in starters and the key owner’s personal templates. Reading analytics are unavailable. Only the owner approves and sends proposals.' })
  }
  if (message.method === 'ping') return result({})
  if (message.method === 'tools/list') {
   if (params.cursor !== undefined) return rpcError(-32602, 'This tool list has no pagination cursor')
-  return result({ tools })
+  return result({ tools: tools.map(tool => ({ ...tool, _meta: { 'io.runeditrun.platter.registry': compatibilityTools[tool.name as keyof typeof compatibilityTools] } })) })
  }
+ // Discovery is static and deliberately bypasses state(): no business records are loaded.
+ if (['resources/list', 'resources/templates/list', 'prompts/list'].includes(message.method)) {
+  if (params.cursor !== undefined) return rpcError(-32602, 'This discovery list has no pagination cursor')
+  return result(message.method === 'resources/list' ? { resources: [registryResource] } : message.method === 'resources/templates/list' ? { resourceTemplates: [] } : { prompts: [] })
+ }
+ if (message.method === 'resources/read') {
+  if (params.uri !== registryUri) return rpcError(-32002, 'Business-record resource readers are unavailable')
+  return result({ contents: [{ uri: registryUri, mimeType: 'application/json', text: JSON.stringify(agentRegistry) }] })
+ }
+ if (message.method === 'prompts/get') return rpcError(-32602, 'Specialist prompts are unavailable')
  if (message.method !== 'tools/call') return rpcError(-32601, 'Method not found')
  if (typeof params.name !== 'string') return rpcError(-32602, 'Provide a tool name')
  const tool = tools.find(candidate => candidate.name === params.name)

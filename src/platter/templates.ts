@@ -89,8 +89,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  }
 
  const clientId = text(input.clientId ?? input.starterClientId, 'a client')
- const client = await db.prepare('SELECT id,name,email FROM p_clients WHERE id=?').bind(clientId).first<{ id: string; name: string; email: string }>()
- need(client, 'Client not found', 404)
+ const client = await brandRecord(db,a,'client',clientId)
  const starter = starterTemplate(input.id, client, a)
  const template = starter ? { id: starter.id, version: starter.version, pdf_enabled: 1 } : await ownTemplate(db, a, input.id)
  exact(template, input)
@@ -124,8 +123,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   db.prepare('INSERT INTO p_expiry(proposal_id,mode,period_days,expires_on,time_zone,warning_days) VALUES(?,?,?,?,?,?)').bind(id, expiry.mode, expiry.period_days, expiry.expires_on, expiry.time_zone, expiry.warning_days),
   ...sections.map(section => db.prepare(`INSERT INTO ${section.startsWith('block:')?'p_block_suggestion_sections':'p_suggestion_sections'}(proposal_id,revision,section) VALUES(?,1,?)`).bind(id, section)),
  ], false, {
-  sql: (starter ? '' : 'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND (owner_id=? OR shared=1) AND version=?) AND ') + 'EXISTS(SELECT 1 FROM p_clients WHERE id=?) AND '+access.sql,
-  values: [...(starter ? [] : [template.id, a.id, template.version]), clientId,...access.values],
+  sql: (starter ? '' : 'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND (owner_id=? OR shared=1) AND version=?) AND ') + 'EXISTS(SELECT 1 FROM p_clients WHERE id=? AND brand_id=?) AND '+access.sql,
+  values: [...(starter ? [] : [template.id, a.id, template.version]), clientId,brandId(a),...access.values],
  })
  return { id, revision: 1, version: 1 }
 }

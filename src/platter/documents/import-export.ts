@@ -14,6 +14,7 @@ import { mediaBytes } from './media'
 import { offerPdf } from './offer-pdf'
 import { pdfFonts } from './pdf-fonts'
 import { readWord, writeWord } from './word'
+import { brandId, brandScope } from '../brands'
 
 /** Imports are explicit revision edits. Original uploaded PDFs never become editable content. */
 export async function importDocument(env:Bindings,a:Actor,data:FormData){
@@ -33,7 +34,7 @@ export async function importDocument(env:Bindings,a:Actor,data:FormData){
  }else{
   need(/\.docx$/i.test(file.name),'Upload a .docx or .pdf file')
   const imported=readWord(bytes);report.unknown=imported.unknown;report.missing=imported.missing
-  const catalog=[...(await db.prepare('SELECT id,sku,name FROM p_priced_catalog').all<any>()).results,...(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)}))]
+  const access=brandScope(a,'c'),catalog=[...(await db.prepare('SELECT c.id,c.sku,c.name FROM p_priced_catalog c WHERE '+access.sql).bind(...access.values).all<any>()).results,...(brandId(a)==='default'?(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)})):[])]
   const tables=fields.pricingTables,optionId=String(data.get('optionId')??fields.packages[0].id),option=fields.packages.find((o:any)=>o.id===optionId);need(option,'Choose an offered package')
   const parts:any[]=[]
   for(const part of imported.parts){

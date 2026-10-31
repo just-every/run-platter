@@ -3844,6 +3844,7 @@ test('TEAM-003 brands isolate draft custody, intersect live roles and scopes, an
  const h=await harness({entry:'tests/brand-worker.ts',assetsDirectory:'public'})
  try{
   const fixture=await brandFixture(h),{a,pa,ta,la,ca,b,client,pb,tb,lb,cb}=fixture,people={}
+  const counts=async()=>(await h.db.prepare('SELECT (SELECT COUNT(*) FROM p_proposals) AS proposals,(SELECT COUNT(*) FROM p_revisions) AS revisions,(SELECT COUNT(*) FROM p_audit) AS audit').first())
   for(const name of ['a','b','both']){
    const email='synthetic-platter-150-'+name+String.fromCharCode(64)+'example.test'
    await h.send('/auth/invite',{email,displayName:'Brand person '+name,role:'member',returnTo:'/app'},h.owner)
@@ -3861,6 +3862,9 @@ test('TEAM-003 brands isolate draft custody, intersect live roles and scopes, an
    assert.equal((await h.send('/app/proposal?id='+pa.id,undefined,actor.cookie)).status,403)
    assert.equal((await h.send('/api/platter/document-media/'+pa.id+'/synthetic-platter-1504',undefined,actor.cookie)).status,403)
    await h.cmd('proposal.prepare',{...brandOffer,clientId:a.id},actor.cookie,403)
+   const beforeStart=await counts()
+   for(const id of ['starter:agency',tb.id])await h.cmd('template.start',{id,version:1,starterClientId:a.id},actor.cookie,403)
+   assert.deepEqual(await counts(),beforeStart,'the alternate client field cannot create a cross-brand draft or audit entry')
   }
   assert.deepEqual((await h.state(people.a.cookie)).libraryItems.map(r=>r.id),[la.id])
   await h.cmd('brand.select',{brandId:b.id},people.a.cookie,403)
@@ -3886,7 +3890,30 @@ test('TEAM-003 brands isolate draft custody, intersect live roles and scopes, an
   const machineWrite=await h.send('/api/platter/agent/command',{name:'proposal.prepare',input:{...brandOffer,clientId:client.id}},'',{authorization:'Bearer '+key.token});assert.equal(machineWrite.status,403)
   await h.cmd('proposal.share',{id:pb.id,operatorId:people.b.id})
   assert.deepEqual((await h.state(people.b.cookie)).proposals.map(r=>r.id),[pb.id])
-  const counts=async()=>(await h.db.prepare('SELECT (SELECT COUNT(*) FROM p_proposals) AS proposals,(SELECT COUNT(*) FROM p_revisions) AS revisions,(SELECT COUNT(*) FROM p_audit) AS audit').first())
+  for(const id of ['starter:agency',tb.id]){
+   const started=await h.cmd('template.start',{id,version:1,starterClientId:client.id},people.b.cookie),row=(await h.state(people.b.cookie)).proposals.find(p=>p.id===started.id)
+   assert.equal(row.client_id,client.id);assert.equal(row.brand_id,b.id);assert.equal(row.document.brand.name,id===tb.id?kit.name:'Revised B')
+  }
+  await h.cmd('brand.select',{brandId:'default'})
+  const {applyBusiness}=await import('./business-import-fixture.mjs'),{wordFixture,uploadDocument}=await import('./document-import-fixture.mjs'),{unzipSync,zipSync,strFromU8,strToU8}=await import('fflate')
+  const legacyId='synthetic-platter-1509',legacySku='synthetic-platter-1509-sku'
+  await applyBusiness(h,{kind:'catalog',format:'platter',csv:'id,sku,name,description,price,currency,unit\n'+legacyId+','+legacySku+',Synthetic legacy service,,99,USD,each'})
+  const word=unzipSync(await wordFixture({headings:0,rows:3,images:0,tokens:false})),skus=['synthetic-platter-1501','synthetic-platter-1502',legacySku]
+  let xml=strFromU8(word['word/document.xml'])
+  for(let i=0;i<skus.length;i++)xml=xml.replace('SKU'+(i+1),skus[i]).replace('Synthetic product '+(i+1),'')
+  word['word/document.xml']=strToU8(xml)
+  const bytes=zipSync(word)
+  {
+   const draft=await h.cmd('proposal.prepare',{...brandOffer,clientId:a.id},people.a.cookie),imported=await uploadDocument(h,draft.id,1,bytes,'synthetic-platter-1509.docx',{},200,people.a.cookie)
+   const row=(await h.state(people.a.cookie)).proposals.find(p=>p.id===draft.id),lines=row.options[0].tables[0].lines
+   assert.deepEqual(lines.map(l=>l.catalogId??null),[ca.id,null,legacyId]);assert.deepEqual(lines.map(l=>l.name),['Brand A service',skus[1],'Synthetic legacy service']);assert.deepEqual(imported.report.unmatched,[skus[1]])
+   assert.deepEqual(lines.map(l=>[l.quantity,l.unitPrice,l.lineTotalCents]),[['1','10.00',1000],['2','11.00',2200],['3','12.00',3600]])
+   const exported=await h.mf.dispatchFetch(h.origin+'/api/platter/document-export?id='+draft.id+'&format=docx',{headers:{cookie:people.a.cookie}})
+   assert.equal(exported.status,200)
+   const output=strFromU8(unzipSync(new Uint8Array(await exported.arrayBuffer()))['word/document.xml'])
+   assert.ok(output.includes('Brand A service'));assert.ok(!output.includes('Brand B service'))
+  }
+  await h.cmd('brand.select',{brandId:b.id})
   const originalCounts=await counts()
   await h.cmd('proposal.prepare',{...brandOffer,clientId:client.id},people.b.cookie,409,{'x-test-revoke-person':people.b.id,'x-test-revoke-brand':b.id})
   assert.deepEqual(await counts(),originalCounts,'revocation immediately before the batch writes nothing')

@@ -61,8 +61,10 @@ export function exportedFacts(provider: ExportProvider, files: Csv[], documents:
    bind(fact,field,candidates,exact)
   }
   if(fact.kind==='proposals') {
-   const candidates=documents.filter(d=>d.filename===fact.fields.document||d.filename.split('/').at(-1)===fact.fields.document||normalized(d.title)===normalized(fact.fields.title))
-   bind(fact,'document',candidates.map(d=>({id:d.id,label:d.filename+' · '+d.title})),candidates.length===1?candidates[0].id:undefined)
+   const named=documents.filter(d=>d.filename===fact.fields.document||d.filename.split('/').at(-1)===fact.fields.document)
+   const candidates=documents.filter(d=>named.includes(d)||normalized(d.title)===normalized(fact.fields.title))
+   // Title matches are suggestions; only a unique named file can bind without review.
+   bind(fact,'document',candidates.map(d=>({id:d.id,label:d.filename+' · '+d.title})),named.length===1&&candidates.length===1?named[0].id:undefined)
   }
  }
  for(const fact of facts) {

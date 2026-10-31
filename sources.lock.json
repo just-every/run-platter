@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "7d3268c17f68cef60e5dc458e25d922edb9ffab8b1ef6e961471b26deb2bcafe",
+      "sha256": "88a6640b2d647690762470bcacb017aa1184a59b6209c715793a33044696843b",
       "executable": false
     },
     "deploy-demo.json": {
@@ -146,7 +146,7 @@
       "executable": false
     },
     "docs/MOVE-IN-EXPORTS.md": {
-      "sha256": "47b4731d47704227dc31287faebaef66ace3d9b20d2a09afcdadde8249b2fd16",
+      "sha256": "6a7327c8c1ec549c3575ac01c52a33447008488667ba9a914c6c9f3dc1173858",
       "executable": false
     },
     "docs/MOVE-IN.md": {
@@ -1314,7 +1314,7 @@
       "executable": false
     },
     "RELEASE.json": {
-      "sha256": "4286f4934438784369a2cf4be3217a18a5b93968edf44841f32105aa1ca8cece",
+      "sha256": "84b32aecc3adf1f2134f9f787f86f0fdd0cdb5400dbe6bf473445f7ef5ee2b90",
       "executable": false
     },
     "rer-project.json": {
@@ -2822,7 +2822,7 @@
       "executable": false
     },
     "src/platter/movein/qwilr-ignition-export.ts": {
-      "sha256": "6a251c4ea5b8f01ced816e349b22e81a44ea951abb1762c39f75bf7c665e1e1c",
+      "sha256": "584b703fd76f88172bd92ae029182c26eaa3ef58d52d12639e0a92954060d7ac",
       "executable": false
     },
     "src/platter/movein/schema.sql": {
@@ -3482,7 +3482,7 @@
       "executable": false
     },
     "tests/document-movein-fixture.mjs": {
-      "sha256": "45fa1c5937548c621a7a2cb16b3324bc7d07e88e64ccdad3ddef09c9c21dac7b",
+      "sha256": "606dd9627a4c226f4a54c1bfaacfef9e90787fcb38810dd315d088a3313a569a",
       "executable": false
     },
     "tests/drive-fixture.mjs": {

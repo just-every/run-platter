@@ -35,8 +35,10 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
  }
  const selected:any[]=[];for(const rule of rules)if(await holds(rule))selected.push(rule)
  const agent=String(row.prepared_by).startsWith('agent:')||String(first?.prepared_by).startsWith('agent:')
+ // Public intake drafts, like agent drafts, always need a person's approval even when the workspace policy is off.
+ const intake=[row.prepared_by,first?.prepared_by].includes('public intake'),fenced=agent||intake
  const steps=selected.map(r=>({id:r.id,name:r.name,approvers:r.approvers as string[],any:false}))
- if(!steps.length&&(policy.required||agent))steps.push({id:'default',name:agent&&!policy.required?'Person approval for agent draft':'Default approval',approvers:agent&&!policy.required?['role:owner','role:admin','role:manager']:['role:'+policy.default_role],any:agent&&!policy.required})
+ if(!steps.length&&(policy.required||fenced))steps.push({id:'default',name:fenced&&!policy.required?'Person approval for '+(agent?'agent':'public intake')+' draft':'Default approval',approvers:fenced&&!policy.required?['role:owner','role:admin','role:manager']:['role:'+policy.default_role],any:fenced&&!policy.required})
  const plan=await hash(JSON.stringify({version:policy.version,steps,revision:row.revision})),history=(await db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=? AND revision=? ORDER BY occurred_at,id').bind(row.id,row.revision).all<any>()).results,decisions=history.filter(d=>d.plan===plan)
  const legacy=policy.version===0&&row.approved_by&&steps.length===1&&steps[0].id==='default'
  let prior=true,rejected=history.some(d=>d.decision==='rejected')

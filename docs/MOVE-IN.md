@@ -43,6 +43,40 @@ provider enrichment and qualification of every incumbent's exports remain
 unfinished. CSV image handling keeps the existing explicit failure and owner
 choice to apply without images.
 
+## Better Proposals exported files (`MIG-003`)
+
+Choose **Better Proposals exported files** as the export source when starting a
+move-in. Upload up to 30 downloaded proposal PDFs and a contacts CSV, within the
+same 20-MiB total limit. Select the contacts file and explicitly review its
+column mapping. For example, a file with Contact ID, Given name, Family name,
+Company ID, Company, Job title and Telephone columns can use:
+
+```json
+{"delimiter":",","columns":{"contact_id":"Contact ID","first_name":"Given name","last_name":"Family name","company_id":"Company ID","company_name":"Company","title":"Job title","phone":"Telephone"},"companyIds":{}}
+```
+
+The original CSV and every supplied column remain in custody. Company IDs are
+explicit; names never merge contacts. The preview holds ambiguous identities
+until you retain a specific source contact or leave it held. Review each PDF's
+contact binding explicitly, or leave the document held without a binding. Open
+documents remain read-only even when bound. Signature-page text is source
+evidence and does not establish signature validity.
+
+**Review contact bindings**, then **Apply reviewed document move-in** to bind the
+exact files, columns, identity choices and PDF bindings. The report separately
+lists arrived agreements, held documents, retained and held contacts, companies
+and unmapped columns. Continue the bounded import from its saved history after
+signing in again. Repeated apply never creates duplicate outputs. The journal
+retains the original PDFs and CSV, reviewed choices and source provenance.
+
+One undo covers the document and contact outputs. A dependent proposal or later
+contact edit refuses undo before any output is removed; unchanged outputs reverse
+in dependency order. Completed custody and working undo survive an RER archive.
+This owner-only file path creates no invitations, signing or sending authority,
+provider calls or image requests. API import and enrichment, template and library
+conversion, priced catalog adoption, open-document reissue, recipient roles and
+full incumbent qualification remain unfinished.
+
 ## Companies, contacts and catalog (`MIG-006`)
 
 Use **Move in companies, contacts and catalog** on Import. Choose the record

@@ -1523,6 +1523,11 @@ test('SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates ret
   assert.equal((await h.send(path+'/action?name=code.request',{})).status,429,'ten generations cannot be exceeded')
   assert.equal(texts.length,10)
   const code=texts.at(-1).Body.match(/\b\d{6}\b/)[0],verified=await h.send(path+'/action?name=code.verify',{code});assert.equal(verified.status,200,verified.text)
+  const textsBeforeDelegation=texts.length,mailBeforeDelegation=(await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n
+  await h.cmd('signer.delegation.configure',{id,version:row.version,enabled:true},h.owner,409)
+  assert.equal((await h.send(path+'/action?name=delegate',{revision:1,delegateName:'Synthetic COO',recipient:['synthetic-platter-9902','example.test'].join('@')},verified.cookie)).status,409)
+  assert.equal(texts.length,textsBeforeDelegation);assert.equal((await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n,mailBeforeDelegation)
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_signer_delegations WHERE proposal_id=?').bind(id).first()).n,0)
   assert.equal((await h.send(path+'/action?name=code.verify',{code})).status,401,'the code is single use')
   assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},verified.cookie)).status,200)
   assert.equal((await h.db.prepare('SELECT method FROM p_signature_facts WHERE proposal_id=?').bind(id).first()).method,'SMS code')

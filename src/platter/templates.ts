@@ -28,6 +28,20 @@ export async function templateState(db: D1Database, a: Actor) {
  return rows.map(row => ({reminderTemplateId:messages.some(m=>m.template_id===row.id)?messages.find(m=>m.template_id===row.id).message_id:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}').reminderTemplateId??null,deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:a.role==='agent'?agentDeliveryDefaults(JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}')):JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, attachmentText:(JSON.parse(row.snapshot).attachments??[]).map((f:any)=>search.find(s=>s.file_id===f.id)?.content??'').join('\n'),snapshot:JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
 }
 
+/** A reviewed fixed-page move-in saves independent content, never approval or sending authority. */
+export async function independentFixedTemplate(db:D1Database,a:Actor,row:any,name:string,at:number) {
+ const {id:_id,client_id:_client,revision:_revision,...content}=snapshot(row)
+ content.document=bindDocument(content.document)
+ content.options=withoutTaxAddresses(content.options)
+ const id=crypto.randomUUID(),serialized=JSON.stringify(content),mediaIds=documentMediaIds(documentOf(content))
+ const savedExpiry=await db.prepare('SELECT mode,period_days,expires_on,time_zone,warning_days FROM p_expiry WHERE proposal_id=?').bind(row.id).first<any>()
+ const expiry=savedExpiry??{mode:'never',period_days:null,expires_on:null,time_zone:await installationZone(db),warning_days:null}
+ const writes=[db.prepare('INSERT INTO p_personal_templates(id,owner_id,name,version,snapshot,pdf_enabled,expiry,suggestion_sections,created_at,updated_at) VALUES(?,?,?,1,?,1,?,?,?,?)').bind(id,a.id,name,serialized,JSON.stringify(expiry),'[]',at,at),
+  ...templateDefaults(db,row.id,id),...saveTemplateCosts(db,row.id,row.revision-1,id),
+  db.prepare('INSERT INTO p_template_document_media(template_id,file_id) SELECT ?,file_id FROM p_document_media WHERE proposal_id=? AND file_id IN ('+mediaIds.map(()=>'?').join(',')+')').bind(id,row.id,...mediaIds)]
+ return {id,snapshot:serialized,writes}
+}
+
 async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false) {
  need(!String(id).startsWith('starter:'), 'Start a draft to customize a built-in starter; save your changes as a personal template', 403)
  const row = await db.prepare('SELECT * FROM p_personal_templates WHERE id=?').bind(text(id, 'a template')).first<any>()

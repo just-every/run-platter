@@ -597,7 +597,13 @@
     },
     {
       "binding": "DB",
-      "name": "0099_signer_delegation.sql",
+      "name": "0099_proposify_exports.sql",
+      "sha256": "ecd782cd1f2eba5b939270d28ee0f614eae8261171827c75ca6fb8517d4cb338",
+      "sql": "ALTER TABLE p_document_moveins ADD COLUMN provider TEXT NOT NULL DEFAULT 'generic';\nALTER TABLE p_document_moveins ADD COLUMN configuration_json TEXT NOT NULL DEFAULT '{}';\n\n-- Reviewed fixed-page outputs retain lineage, without importing execution authority.\nCREATE TABLE p_proposify_applications (\n id TEXT PRIMARY KEY,\n movein_id TEXT NOT NULL REFERENCES p_document_moveins(id),\n document_id TEXT NOT NULL,\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n template_id TEXT NOT NULL,\n fingerprint TEXT NOT NULL UNIQUE,\n source_sha256 TEXT NOT NULL,\n previous_document TEXT NOT NULL,\n applied_document TEXT NOT NULL,\n applied_version INTEGER NOT NULL,\n applied_revision INTEGER NOT NULL,\n template_snapshot TEXT NOT NULL,\n created_at INTEGER NOT NULL,\n reversed_at INTEGER,\n UNIQUE(document_id,proposal_id)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0100_signer_delegation.sql",
       "sha256": "90d27ea997ac2e52db9df9d013b2146399f15bad71a1740bc9a157f866ad5d32",
       "sql": "-- Delegation facts are retained business history; authority stays installation-local.\nCREATE TABLE p_signer_delegations (\n id TEXT PRIMARY KEY,\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n revision INTEGER NOT NULL,\n old_recipient TEXT NOT NULL,\n new_recipient TEXT NOT NULL,\n delegate_name TEXT NOT NULL,\n delegated_at INTEGER NOT NULL,\n signing_position INTEGER NOT NULL CHECK(signing_position>0),\n required_method TEXT NOT NULL,\n undone_at INTEGER,\n undone_by TEXT\n);\nCREATE TABLE p_delegation_authority (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),\n revision INTEGER NOT NULL,\n owner_id TEXT NOT NULL,\n authorized_at INTEGER NOT NULL\n);\nALTER TABLE p_shares ADD COLUMN verification_required INTEGER NOT NULL DEFAULT 0 CHECK(verification_required IN (0,1));\nALTER TABLE p_shares ADD COLUMN delegation_id TEXT;\n"
     }

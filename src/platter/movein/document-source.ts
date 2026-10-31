@@ -5,6 +5,7 @@ import { canonicalJson, sha256, type Json, type SourceArtifact, type SourceBundl
 import { extractText, getDocumentProxy } from 'unpdf'
 import { parseBusinessCsv } from './business-csv'
 import { fail } from './errors'
+import { exportedFacts, type ExportProvider, type ExportMapping } from './qwilr-ignition-export'
 
 export const documentNamespace = 'platter.exported-documents.v1'
 export type UploadedDocument = { filename: string; sha256: string; bytes: Uint8Array }
@@ -12,8 +13,9 @@ const normalized = (text: string) => text.trim().replace(/\s+/g, ' ').toLowerCas
 type Pdf = { id: string; sha256: string; filename: string; title: string; client: string; date: string; pages: number;
  signatureEvidence: { kind: string; page: number; text: string }[]; sources: string[]; base64: string }
 type ReportRow = { id: string; source: string; line: number; title: string; client: string; date: string; fields: Record<string,string>; candidates: string[]; selected: string | null }
-export async function documentSource(uploads: UploadedDocument[], choices: Record<string,string>, moveinId: string) {
+export async function documentSource(uploads: UploadedDocument[], choices: Record<string,string>, moveinId: string, provider: ExportProvider = 'generic', mapping: ExportMapping = {}) {
  const artifacts: SourceArtifact[] = [], pdfs = new Map<string,Pdf>(), rows: ReportRow[] = [], seenReports = new Set<string>(), unmapped: string[] = []
+ const exportFiles: {name:string;source:string;bytes:Uint8Array}[]=[]
  let expanded = 0, duplicateDocuments = 0
  const artifact = (name: string, bytes: Uint8Array) => {
   artifacts.push({ name, sha256: sha256(bytes), size: bytes.length, original: { status: 'available', base64: Buffer.from(bytes).toString('base64') } })
@@ -45,6 +47,10 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
   } else if (/\.csv$/i.test(filename)) {
    if (seenReports.has(sha256(bytes))) return
    seenReports.add(sha256(bytes))
+   if(provider!=='generic') {
+    artifact('exports/'+sha256(bytes)+'.csv',bytes)
+    exportFiles.push({name:filename,source,bytes});return
+   }
    const parsed = parseBusinessCsv(Buffer.from(bytes).toString('utf8'),',')
    const aliases = {title:['title','document name','proposal name','name'],client:['client','client name'],date:['date','created date','created on']}
    const columns = Object.fromEntries(Object.entries(aliases).map(([key,names])=>[key,parsed.headers.findIndex(h=>names.includes(normalized(h)))]))
@@ -75,22 +81,23 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
   if (Object.hasOwn(choices,row.id) && choices[row.id]!=='unmapped' && !row.candidates.includes(choices[row.id])) fail('invalid_report_choice',409,'Choose a PDF offered for this report row')
   row.selected=choices[row.id]==='unmapped'?null:choices[row.id] || (row.candidates.length===1?row.candidates[0]:null)
  }
- if (Object.keys(choices).some(key=>!rows.some(row=>row.id===key))) fail('invalid_report_choice',409,'Preview the current report rows again')
+ const exported=exportedFacts(provider,exportFiles,documents,choices,mapping,moveinId)
+ if (Object.keys(choices).some(key=>!rows.some(row=>row.id===key)&&!exported.usedChoices.has(key))) fail('invalid_report_choice',409,'Preview the current report rows again')
  const selected=rows.filter(r=>r.selected).map(r=>r.selected)
  const conflicts=rows.filter(r=>r.candidates.length>1&&!Object.hasOwn(choices,r.id))
  if (new Set(selected).size!==selected.length) fail('duplicate_report_choice',409,'Each PDF can match only one report row; mark extra rows unmapped')
- const report={arrived:documents.filter(p=>p.signatureEvidence.length).length,
-  held:documents.filter(p=>!p.signatureEvidence.length).length+conflicts.length,
-  unmapped:unmapped.length+rows.filter(r=>!r.selected&&!conflicts.includes(r)).length,
-  duplicateDocuments,unmappedItems:unmapped,rows,
-  notes:['Signature pages and certificates are source evidence, not validated signatures.','Open documents are retained read-only for review; reissue and editable conversion are not available here.','Attachments, roles, formulas, omitted images, comments, analytics and audit events beyond the supplied certificate are not reconstructed.']}
+ const report={exports:provider==='generic'?null:exported.report,arrived:documents.filter(p=>p.signatureEvidence.length).length,
+  held:documents.filter(p=>!p.signatureEvidence.length).length+conflicts.length+exported.report.held+exported.report.issues.length,
+  unmapped:unmapped.length+exported.report.omitted+exported.report.unmapped.length+rows.filter(r=>!r.selected&&!conflicts.includes(r)).length,
+  duplicateDocuments,unmappedItems:[...unmapped,...exported.report.unmapped,...exported.report.issues],rows,
+  notes:[...(provider==='generic'?[]:['Source billing schedules are non-executable evidence. No subscription, invoice, charge or provider call is created.','PDF-only content remains fixed; open proposals are held read-only.']), 'Signature pages and certificates are source evidence, not validated signatures.','Open documents are retained read-only for review; reissue and editable conversion are not available here.','Attachments, roles, formulas, omitted images, comments, analytics and audit events beyond the supplied certificate are not reconstructed.']}
  artifact('reviewed-report-choices.json',Buffer.from(canonicalJson({choices,report})))
  const source: SourceBundle={artifacts,diagnostics:conflicts.map(r=>({severity:'error',code:'ambiguous_report',message:'Choose a PDF for report row '+r.line,location:{artifact:r.source,row:r.line}})),
-  records:documents.map(p=>{
+  records:[...exported.records,...documents.map(p=>{
    const {base64,...metadata}=p
-   const value={...metadata,moveinId,disposition:p.signatureEvidence.length?'retained-agreement':'held-open-document',report:rows.find(r=>r.selected===p.id)?.fields??null}
+   const value={...metadata,moveinId,...(provider==='generic'?{}:{sourceProvider:provider,contentMode:'fixed-pdf',sourceFacts:exported.report.facts.filter(f=>f.bindings.document===p.id).map(f=>f.id)}),disposition:p.signatureEvidence.length?'retained-agreement':'held-open-document',report:rows.find(r=>r.selected===p.id)?.fields??null}
    const payload={value}
    return {namespace:documentNamespace,kind:'documents',sourceId:p.id,payload:payload as unknown as Json,payloadHash:sha256(canonicalJson(payload)),artifactHash:p.sha256,location:{artifact:'documents/'+p.sha256+'.pdf'}}
-  })}
- return {source,documents:documents.map(({base64,...p})=>p),report,canApply:conflicts.length===0}
+  })]}
+ return {source,documents:documents.map(({base64,...p})=>p),report,canApply:conflicts.length===0&&exported.canApply}
 }

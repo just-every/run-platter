@@ -6,7 +6,7 @@ import { capturesMail } from '../mail'
 import { providerCredential } from '../connections'
 import { actorById } from '../credentials'
 import { approvalPlan } from '../approvals'
-import { permitted } from '../permissions'
+import { administrators, permitted } from '../permissions'
 import { negotiatedView, pendingNegotiation } from '../negotiation'
 import { need } from '../model'
 
@@ -29,6 +29,8 @@ export async function chatJson(url:string,token:string,body?:unknown) {
  const value=JSON.parse(raw);need(value&&value.ok!==false,'Chat provider refused the request',409);return value
 }
 export async function routeAvailable(env:Bindings,r:any) {
+ const authorizer=await actorById(env.DB,r.configured_by)
+ if(!authorizer||!administrators.includes(authorizer.role))return false
  return Boolean(await env.DB.prepare("SELECT 1 FROM p_notification_route_authority a JOIN p_connections c ON c.id=? WHERE a.route_id=? AND c.status='connected' AND c.version=? AND c.broken_at IS NULL AND EXISTS(SELECT 1 FROM p_connection_secrets s WHERE s.connection_id=c.id) AND EXISTS(SELECT 1 FROM p_notification_routes r WHERE r.id=a.route_id AND (r.operator_id IS NULL OR EXISTS(SELECT 1 FROM oa_operators o WHERE o.id=r.operator_id AND o.status='active' AND o.email=r.recipient_email)))").bind('workspace:'+r.provider,r.id,r.connection_version).first())
 }
 export async function flushNotifications(env:Bindings) {

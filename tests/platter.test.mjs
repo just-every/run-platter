@@ -3895,5 +3895,31 @@ test('TEAM-003 brands isolate draft custody, intersect live roles and scopes, an
   await h.cmd('brand.select',{brandId:'default'},people.b.cookie,403)
   await h.cmd('brand.select',{brandId:'default'},people.both.cookie)
   assert.deepEqual((await h.state(people.both.cookie)).libraryItems.map(r=>r.id),[la.id])
+  // Resolve the client alias before enforcing custody for both template doors.
+  await h.cmd('brand.member',{brandId:b.id,operatorId:people.b.id,member:true})
+  const custody=async()=>Object.fromEntries(await Promise.all(['p_clients','p_proposals','p_revisions','p_template_sources','p_document_media','p_audit'].map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results])))
+  const baseline=await custody()
+  for(const templateId of ['starter:agency',tb.id]){
+   const refused=await h.send('/api/platter/command',{name:'template.start',input:{id:templateId,version:1,starterClientId:a.id}},people.b.cookie)
+   assert.equal(refused.status,403,'a client alias cannot cross brand custody: '+refused.text)
+   assert.deepEqual(await custody(),baseline,'a refused start retains all draft, revision, media and audit records')
+  }
+  const started=await h.cmd('template.start',{id:'starter:agency',version:1,starterClientId:client.id},people.b.cookie)
+  const local=(await h.state(people.b.cookie)).proposals.find(r=>r.id===started.id)
+  assert.equal(local.client_id,client.id);assert.deepEqual(local.document.brand,{...kit,name:'Revised B'})
+  const saved=await h.cmd('template.start',{id:tb.id,version:1,starterClientId:client.id},people.b.cookie)
+  assert.equal((await h.state(people.b.cookie)).proposals.find(r=>r.id===saved.id).client_id,client.id)
+  // A SKU supplied in a Word table must not reveal another brand's name or ID.
+  const {wordFixture,uploadDocument}=await import('./document-import-fixture.mjs'),{unzipSync,zipSync,strToU8,strFromU8}=await import('fflate')
+  const files=unzipSync(await wordFixture({headings:0,rows:2,images:0,tokens:false}))
+  files['word/document.xml']=strToU8(strFromU8(files['word/document.xml']).replace('>Name<','>Reference<').replace('>SKU1<','>synthetic-platter-1502<').replace('>SKU2<','>synthetic-platter-1501<'))
+  const destination=await h.cmd('proposal.prepare',{...brandOffer,clientId:a.id},people.a.cookie)
+  const imported=await uploadDocument(h,destination.id,1,zipSync(files),'synthetic-platter-1506.docx',{},200,people.a.cookie)
+  assert.deepEqual(imported.report.unmatched,['synthetic-platter-1502'])
+  const importedDraft=(await h.state(people.a.cookie)).proposals.find(r=>r.id===destination.id),lines=importedDraft.options[0].tables[0].lines
+  assert.equal(lines[0].name,'synthetic-platter-1502');assert.equal(lines[0].catalogId,undefined)
+  assert.equal(lines[1].name,'Brand A service');assert.equal(lines[1].catalogId,ca.id)
+  assert.ok(!JSON.stringify({imported,importedDraft}).includes(cb.id),'the upload and draft omit the private catalog identifier')
+  assert.ok(!JSON.stringify({imported,importedDraft}).includes('Brand B service'),'the upload and draft omit the private catalog name')
  }finally{await h.close()}
 })

@@ -2642,7 +2642,7 @@
       "executable": false
     },
     "src/platter/documents/import-export.ts": {
-      "sha256": "2eb811b9e2ceff60cbd54eadde528c75339ba5bb375b4d71046ff0e9094536c1",
+      "sha256": "edd4967cb278d4a66b6bc703bbd07c7c5ae6c48fced9cc846a44111e2f5a7778",
       "executable": false
     },
     "src/platter/documents/media.ts": {
@@ -3010,7 +3010,7 @@
       "executable": false
     },
     "src/platter/templates.ts": {
-      "sha256": "312af5d1e5263e0848729ea1efbb0f25ed3d62d831e993616f5087931824ffab",
+      "sha256": "a0215e1300763cd818817611bffdbb4c77839474995178b53864785aa23f88e0",
       "executable": false
     },
     "src/platter/test-mail.ts": {
@@ -3570,7 +3570,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "8eeb2d02858a6fcb62985474ecc9d022c2fc2693167d591b8b6236b8153a8be9",
+      "sha256": "452393dd911993b9c06f16ad625d9cb92b9f3fd219a1b66d093fa254c0a03411",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

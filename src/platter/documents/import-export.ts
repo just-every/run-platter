@@ -1,3 +1,4 @@
+import { brandId, brandScope, defaultBrand } from '../brands'
 import fontkit from '@pdf-lib/fontkit'
 import { document as htmlDocument } from '../ui/shell'
 import { escape } from '../ui/shared'
@@ -33,7 +34,9 @@ export async function importDocument(env:Bindings,a:Actor,data:FormData){
  }else{
   need(/\.docx$/i.test(file.name),'Upload a .docx or .pdf file')
   const imported=readWord(bytes);report.unknown=imported.unknown;report.missing=imported.missing
-  const catalog=[...(await db.prepare('SELECT id,sku,name FROM p_priced_catalog').all<any>()).results,...(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)}))]
+  const access=brandScope(a,'c')
+  // Legacy business imports belong to the default brand; native rows use live brand custody.
+  const catalog=[...(await db.prepare('SELECT c.id,c.sku,c.name FROM p_priced_catalog c WHERE '+access.sql).bind(...access.values).all<any>()).results,...(brandId(a)===defaultBrand?(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)})):[])]
   const tables=fields.pricingTables,optionId=String(data.get('optionId')??fields.packages[0].id),option=fields.packages.find((o:any)=>o.id===optionId);need(option,'Choose an offered package')
   const parts:any[]=[]
   for(const part of imported.parts){

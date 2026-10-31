@@ -9,13 +9,14 @@ CREATE TRIGGER p_brand_confirm_person AFTER UPDATE OF status ON oa_operators WHE
  INSERT OR IGNORE INTO p_brand_members VALUES('default',NEW.id);
 END;
 CREATE TABLE p_brand_choices(operator_id TEXT PRIMARY KEY REFERENCES oa_operators(id),brand_id TEXT NOT NULL REFERENCES p_brands(id));
-ALTER TABLE p_clients ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default' REFERENCES p_brands(id);
-ALTER TABLE p_proposals ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default' REFERENCES p_brands(id);
-ALTER TABLE p_personal_templates ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default' REFERENCES p_brands(id);
-ALTER TABLE p_library_items ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default' REFERENCES p_brands(id);
-ALTER TABLE p_priced_catalog ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default' REFERENCES p_brands(id);
-ALTER TABLE p_resource_folders ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default' REFERENCES p_brands(id);
-ALTER TABLE p_proposal_folders ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default' REFERENCES p_brands(id);
-CREATE TRIGGER p_proposal_brand AFTER INSERT ON p_proposals BEGIN
+ALTER TABLE p_clients ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE p_proposals ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE p_personal_templates ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE p_library_items ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE p_priced_catalog ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE p_resource_folders ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE p_proposal_folders ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default';
+CREATE TRIGGER p_proposal_brand AFTER INSERT ON p_proposals WHEN NEW.brand_id!=(SELECT brand_id FROM p_clients WHERE id=NEW.client_id) BEGIN
  UPDATE p_proposals SET brand_id=(SELECT brand_id FROM p_clients WHERE id=NEW.client_id) WHERE id=NEW.id;
 END;
+CREATE TABLE p_brand_media(brand_id TEXT NOT NULL REFERENCES p_brands(id),file_id TEXT NOT NULL REFERENCES p_attachment_files(id),PRIMARY KEY(brand_id,file_id));

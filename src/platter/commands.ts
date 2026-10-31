@@ -1,4 +1,4 @@
-import { authorizeBrandCommand, brandCommand, brandId } from './brands'
+import { authorizeBrandCommand, brandCommand, brandId, copyBrandMedia } from './brands'
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
@@ -192,7 +192,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='proposal.prepare'||name==='proposal.revise'){
   p=(await resolveVariables(env,a,p)).fields
   const f=proposalFields(p,tax);need(!f.payment_terms?.retainer||!f.options.some((o:any)=>o.tables?.some((t:any)=>t.lines.some((l:any)=>l.recurrence))||o.optionalItems?.some((i:any)=>i.recurrence)),'Use recurring pricing lines instead of an additional schedule retainer');if(name==='proposal.prepare'&&f.payment_terms)need(['owner','admin','manager'].includes(a.role),'Only owner, admins and scoped managers set payment schedules',403);if(f.payment_terms?.depositFixedCents!=null)need(f.options.every((o:any)=>o.cents>=f.payment_terms.depositFixedCents),'Fixed deposit must fit every package');need(await db.prepare('SELECT id FROM p_clients WHERE id=?').bind(f.client_id).first(),'Client not found',404)
-  const old=name==='proposal.revise'?await proposal(db,p.id):null;await validateDocumentMedia(db,f.document,old?.id);if(old){exact(old,p);need(['draft','approved'].includes(old.status),'Sent and accepted proposals are frozen',409)}
+  const old=name==='proposal.revise'?await proposal(db,p.id):null;await validateDocumentMedia(db,f.document,old?.id,brandId(a));if(old){exact(old,p);need(['draft','approved'].includes(old.status),'Sent and accepted proposals are frozen',409)}
   if(p.recipientPlan!==undefined&&JSON.stringify(p.recipientPlan)!==JSON.stringify(JSON.parse(old?.recipient_plan??'[]')))need(a.role==='owner','Only the current owner changes recipient role slots',403)
   const id=old?.id??crypto.randomUUID(),revision=(old?.revision??0)+1,currency=old?.currency??'USD',attachments=old?restoredAttachments??JSON.parse(old.attachments):brandId(a)==='default'?await vendorDocuments(db):[],row={id,...f,recipient_plan:p.recipientPlan===undefined?old?.recipient_plan??'[]':JSON.stringify(Array.isArray(p.recipientPlan)&&!p.recipientPlan.length?[]:recipientInput(p.recipientPlan,a)),revision,currency,attachments};const writes:D1PreparedStatement[]=[]
   if(old){writes.push(db.prepare("UPDATE p_proposals SET client_id=?,title=?,scope=?,terms=?,attachments=?,version=version+1,revision=?,status='draft',deposit_bps=?,options=?,prepared_by=?,approved_by=NULL,approved_at=NULL WHERE id=?").bind(f.client_id,f.title,f.scope,f.terms,JSON.stringify(attachments),revision,f.deposit_bps,JSON.stringify(f.options),a.role==='agent'?`agent:${a.keyId}`:a.email,id),db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(id))}
@@ -200,7 +200,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   writes.push(db.prepare('UPDATE p_proposals SET recipient_plan=? WHERE id=?').bind(row.recipient_plan,id))
   writes.push(db.prepare('UPDATE p_proposals SET section_conditions=?,document=?,payment_terms=? WHERE id=?').bind(JSON.stringify(f.section_conditions),JSON.stringify(f.document),f.payment_terms?JSON.stringify(f.payment_terms):null,id))
   writes.push(db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,?,?,?,?,?)').bind(id,revision,JSON.stringify(snapshot(row)),a.role==='agent'?`agent:${a.keyId}`:a.email,at,currency))
-  if(!old)writes.push(...await defaultStatements(db,id))
+  if(!old)writes.push(...copyBrandMedia(db,a,id,f.document),...await defaultStatements(db,id))
   if(old)writes.push(copyCosts(db,id,costSourceRevision??old.revision,id,revision),...await detachChangedLibraryCopies(db,id,f.document,f.options))
   if(internalCosts)writes.push(...patchCosts(db,id,revision,internalCosts))
   await commit(db,a,writes,false,old?{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved'))",values:[id,old.version]}:undefined);return{id,revision,version:(old?.version??0)+1}

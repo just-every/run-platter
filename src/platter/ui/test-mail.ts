@@ -1,6 +1,7 @@
 import { date, escape, field, form, hidden, panel, proposalPath, type Feedback } from './shared'
 
 export function testMailPanel(state: any, p: any, feedback?: Feedback) {
+ if(state.activeBrand&&state.activeBrand!=='default')return ''
  if (!['owner', 'member'].includes(state.actor?.role)) return ''
  const retry = feedback?.command === 'proposal.test-mail' && feedback.input?.id === p.id ? feedback.input : undefined
  const composer = ['draft', 'approved'].includes(p.status) ? form('proposal.test-mail', proposalPath(p.id),

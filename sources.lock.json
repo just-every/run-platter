@@ -646,7 +646,7 @@
       "executable": false
     },
     "migrations/core/0099_brands.sql": {
-      "sha256": "bcb6ef5244c72a116c78a68f572bc453f1aaa716dfe07b9edcce4a6cb6cccf5d",
+      "sha256": "e30d4bca9b0a85fe7eb1d5f6fd1f3519a0b2ebcbf44b378bd6a54a935164be16",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -2506,7 +2506,7 @@
       "executable": false
     },
     "src/platter/brands.ts": {
-      "sha256": "f0e8d4709ad4bf0728e17d9b0cb917d7d8807f9a13435ce42c43a5fd0fe851ba",
+      "sha256": "c75652770f10b4aa3df475a086834e8397097011fa739bb817362e4ae80e72d6",
       "executable": false
     },
     "src/platter/business-records.ts": {
@@ -2546,7 +2546,7 @@
       "executable": false
     },
     "src/platter/commands.ts": {
-      "sha256": "bb964fe838b8805f8f935f9263d6db5f50ead253b78dd3810d68d7725e8f93ad",
+      "sha256": "1641385f9ffee3bc93c4f00dc46c9c79b64c43c667c6c4646c44ef1d8a2885e8",
       "executable": false
     },
     "src/platter/completion-mail.ts": {
@@ -2646,7 +2646,7 @@
       "executable": false
     },
     "src/platter/documents/media.ts": {
-      "sha256": "b92fcb5dd086ccca45bd09b39fa9e84666890abcc304d2f4c07c99b216f82f42",
+      "sha256": "a8cc80bbb636a59efe5b6ce7a06f79130618a458da6aa2d67d58e010a67e33fa",
       "executable": false
     },
     "src/platter/documents/offer-pdf.ts": {
@@ -2682,7 +2682,7 @@
       "executable": false
     },
     "src/platter/folders.ts": {
-      "sha256": "3f489fd1da87b445b644be64774b3a3ef002e4dcb255fb3a444b8c05e7f7390f",
+      "sha256": "77ba98df4643f6d5cf1d9102feb7ea7b5c06494da753e6058477b424eda0e16d",
       "executable": false
     },
     "src/platter/followup/commands.ts": {
@@ -2998,7 +2998,7 @@
       "executable": false
     },
     "src/platter/state.ts": {
-      "sha256": "02f672d9a6a2f1c6d80958ffd09f4f5951a1350e2d26db69402dce41fae2f56d",
+      "sha256": "6d105cf24a046b39f2d5f56b5036c5e15bd6fa84242e2ce5e6fbfba1c4f58555",
       "executable": false
     },
     "src/platter/suggestions.ts": {
@@ -3010,7 +3010,7 @@
       "executable": false
     },
     "src/platter/templates.ts": {
-      "sha256": "7a0cecdb56402073d530719b3b0f3fdfea6a1add9691687b51ad4a90164a951d",
+      "sha256": "312af5d1e5263e0848729ea1efbb0f25ed3d62d831e993616f5087931824ffab",
       "executable": false
     },
     "src/platter/test-mail.ts": {
@@ -3054,7 +3054,7 @@
       "executable": false
     },
     "src/platter/ui/brands.ts": {
-      "sha256": "0baa693ed6f51dc2fbc7ae051c2c14644472887a8d97af2a2355529697e91e72",
+      "sha256": "5a411ed7fc36686727920c99c84f29a08955e112ba96eac5c52bab588e3024ef",
       "executable": false
     },
     "src/platter/ui/business-import.ts": {
@@ -3158,7 +3158,7 @@
       "executable": false
     },
     "src/platter/ui/index.ts": {
-      "sha256": "81b0bda6de6ddb98938b0fde35a9b6cd5c84c81ea6623eca929fd2b659b40c40",
+      "sha256": "fcabab07ef0e2a0eda477e2515baacfc718dfd770f00f0a7de01e1d799439c1e",
       "executable": false
     },
     "src/platter/ui/internal-pricing.ts": {
@@ -3206,7 +3206,7 @@
       "executable": false
     },
     "src/platter/ui/proposals.ts": {
-      "sha256": "ad7e9f159d089e77de32a1c48e5ba76c7043f82f633de4cb47f9f16c966f17f4",
+      "sha256": "d4cbbf417c0c2eeb70a89c6f95e8c531bee864ffca546e33894d40eeae02b78e",
       "executable": false
     },
     "src/platter/ui/questions.ts": {
@@ -3242,7 +3242,7 @@
       "executable": false
     },
     "src/platter/ui/shell.ts": {
-      "sha256": "2f21f380176e0803558d223e2612dc6f583ff0fa4dbb5bf07ef8814868560682",
+      "sha256": "d2661617aeba7eb4c62fb2ab8e91affa0cb686a2b83edeb6c1faf4473574a6bd",
       "executable": false
     },
     "src/platter/ui/sms.ts": {
@@ -3266,7 +3266,7 @@
       "executable": false
     },
     "src/platter/ui/test-mail.ts": {
-      "sha256": "7943e21135d68b45ba61793a9019e39c99dc92e2c5576ace01ad2070f1e3056a",
+      "sha256": "1afb03c98ada290c77567800351fa82e9bb552cde80e9a0c1e8d6f8f251aac20",
       "executable": false
     },
     "src/platter/ui/tracking.ts": {
@@ -3410,11 +3410,11 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "30bcac2344f4b077ecaffc506f6a5f466f6eb965fe17ebf05bf53ea8e3d500e1",
+      "sha256": "ba91502ae53456dff25dc87450a65e97c3f1c03d84e6c7c177e22c175734fb42",
       "executable": false
     },
     "tests/brand-fixture.mjs": {
-      "sha256": "da41e0f1724f18da2f0d61f889af8ef44acb509917c26bfeab369d7cb2eeeb06",
+      "sha256": "bdaca18ef881601a4c019ee4f156fc9098e0bea0a8b5cb9f581b83f187644028",
       "executable": false
     },
     "tests/brand-worker.ts": {
@@ -3570,7 +3570,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "4ae69aa6135826fe94495e328c4225ec71c523415f510433a2597fc15c52630f",
+      "sha256": "8eeb2d02858a6fcb62985474ecc9d022c2fc2693167d591b8b6236b8153a8be9",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3622,7 +3622,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "b451156d3c52f085b889a65b4cf36092baffef30ef0308e506fe1351d958c2ff",
+      "sha256": "d48ca33654d425fbfc989aaa1579ce61d875e454db76e753042ca3ba98077204",
       "executable": false
     },
     "tests/site-harness.mjs": {

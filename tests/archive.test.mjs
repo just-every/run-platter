@@ -913,6 +913,9 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.equal((await h.send(failedDeposit.path+'/payment-status.json',{},failedDeposit.cookie)).status,200)
   assert.equal((await h.db.prepare('SELECT count(*) n FROM p_payment_failure_deliveries').first()).n,2)
   for(const table of tables)before[table]=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results
+  const {nativeMigrationPreflight}=await import('../node_modules/@runeditrun/rer/cli/portability-migrations.mjs')
+  await nativeMigrationPreflight({root:source,db:h.db,binding:'DB'})
+  console.log('Migration ledger preflight passed on the fully migrated source')
   await h.close();h=undefined
   const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'));assert.ok(!bytes.includes('synthetic-platter-7107'))
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')

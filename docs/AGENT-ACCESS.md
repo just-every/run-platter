@@ -124,7 +124,7 @@ recurring items, fixed-page templates, unresolved variables, recipient plans
 and payment schedules are held for manual preparation. Notes confer no authority.
 
 The result is an independent, single-client draft with collection off. Template
-terms, branding and delivery defaults are copied; reminders remain inactive.
+terms, document blocks, Client fields, branding and delivery defaults are copied; reminders remain inactive.
 Scope citations and catalog provenance describe the prepared revision; later
 human edits do not rewrite that history. Review both the cited source and the
 prepared wording before approving or sending. Key revocation and source-consent

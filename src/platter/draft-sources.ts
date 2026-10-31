@@ -81,7 +81,7 @@ export async function sourcedPreparation(db: D1Database, a: Actor, input: Record
   packages.push({id,label,price:'1'});tables.push({optionId:id,name:label,lines})
  }
  const scope=blocks.map(b=>b.title+'\n'+b.text).join('\n\n')
- const fields=proposalFields({clientId:input.clientId,title:input.title??content.title,scope,terms:content.terms??'',depositPercent:content.deposit_bps/100,packages,pricingTables:tables,document:proposalDocument({version:1,blocks,brand:documentOf(content).brand})})
+ const fields=proposalFields({clientId:input.clientId,title:input.title??content.title,scope,terms:content.terms??'',depositPercent:content.deposit_bps/100,packages,pricingTables:tables,document:proposalDocument({...documentOf(content),blocks:[...documentOf(content).blocks,...blocks]})})
  const next={...content,...fields,recipient_plan:[],payment_terms:null,section_conditions:{}}
  const fullGuard={sql:guard.sql+' AND '+checks.join(' AND '),values:[...guard.values,...values]}
  return {content:next,guard:fullGuard,writes:(id:string)=>[db.prepare('INSERT INTO p_draft_provenance(proposal_id,revision,source_id,source_version,source_sha256,references_json,catalog_json,key_id,prepared_at) VALUES(?,1,?,?,?,?,?,?,?)').bind(id,sourceId,source.version,source.sha256,JSON.stringify(references),JSON.stringify(catalog),a.keyId!,Date.now())]}

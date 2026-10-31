@@ -13,7 +13,7 @@ export async function seedSourcedDraft(h) {
  const source=await uploadSource(h)
  const first=await h.cmd('catalog.save',{sku:'synthetic-platter-9903',name:'Discovery workshop',description:'Facilitated session',unit:'each',unitPrice:'123.45',unitCost:'77.77'})
  const second=await h.cmd('catalog.save',{sku:'synthetic-platter-9905',name:'Campaign production',description:'Production work',unit:'hour',unitPrice:'80.01'})
- const baseline=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic native template',scope:'Original template scope',terms:'Firm-authored delivery terms',depositPercent:'25',packages:[{id:'base',label:'Base',price:'900'}]})
+ const baseline=await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic native template',scope:'Original template scope',document:{version:1,blocks:[{id:'firm-introduction',type:'text',title:'Firm introduction',text:'Firm-authored introduction retained verbatim.'},{id:'client-po',type:'field',title:'Client purchase order',text:'',recipientRole:'client',fieldKind:'text',required:true}]},terms:'Firm-authored delivery terms',depositPercent:'25',packages:[{id:'base',label:'Base',price:'900'}]})
  const saved=await h.cmd('template.save',{id:baseline.id,version:1,name:'Synthetic sourced template'})
  const template=await h.cmd('template.delivery',{id:saved.id,version:saved.version,remindersSource:'override',expirySource:'override',warningSource:'override',remindersEnabled:true,reminderDays:[2,5],beforeExpiryDays:[3],reminderCap:3,expiryDays:30,warningDays:2})
  const key=await h.cmd('agent.create',{label:'Synthetic source helper'})

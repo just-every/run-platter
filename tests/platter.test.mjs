@@ -719,6 +719,9 @@ test('SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by uplo
  assert.ok(repeated.every(x=>x.requestId===requested.requestId));assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_deposit_requests').first()).n,1);assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_mail WHERE id=?').bind(history[0].mail_id).first()).n,1)
  const originalAgain=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+p.id+'/'+a.signedCopy.id,{headers:{cookie:h.owner}});assert.deepEqual(new Uint8Array(await originalAgain.arrayBuffer()),signed)
  assert.deepEqual((await h.state()).proposals.find(x=>x.id===p.id).acceptance,a,'requesting a deposit cannot alter the accepted agreement')
+ const retainedBeforeErasure=await unchanged(),retainedClient=(await h.state()).clients.find(x=>x.id===accepted.client_id)
+ await h.cmd('client.erase',{id:retainedClient.id,confirmName:retainedClient.name},h.owner,409);assert.deepEqual(await unchanged(),retainedBeforeErasure,'retained agreement and deposit history cannot be erased or replayed through client erasure')
+ assert.ok(!(await h.send(path+'/data.json')).text.includes(requested.requestId),'unverified data reads contain no request identity')
  const invoice=await h.cmd('invoice.export',{id:p.id});r=await h.send('/api/platter/invoices/'+invoice.id+'.csv',undefined,h.owner);assert.equal(r.status,200);assert.match(r.text,/1050\.00/);assert.match(r.text,/Deposit: Northstar brand photography/)
  const other=await h.cmd('proposal.prepare',{...offer,clientId:(await h.state()).clients[0].id,title:'E-signed shoot'});await h.cmd('proposal.approve',{id:other.id,version:1,revision:1});const share=await h.cmd('proposal.send',{id:other.id,version:2}),otherPath=new URL(share.shareUrl).pathname
  assert.ok(!(await h.send(otherPath,undefined,cookie)).text.includes(requested.requestId),'another invitation cannot expose this deposit request')
@@ -728,7 +731,7 @@ test('SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by uplo
  assert.equal((await h.state()).proposals.find(x=>x.id===other.id).acceptance.method,'platter')
  await h.cmd('proposal.share',{id:p.id,operatorId:(await h.state(member)).actor.id})
  assert.equal((await h.state(member)).proposals.find(x=>x.id===p.id).acceptance.signedCopy.id,a.signedCopy.id)
- const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows;assert.ok(audit.some(x=>x.action==='acceptance.upload'&&x.subject===p.id&&x.actor_id&&x.occurred_at),'TEAM-004 acceptance.upload')
+ const audit=(await h.send('/api/platter/audit',undefined,h.owner)).value.rows;assert.ok(audit.some(x=>x.action==='deposit.request'&&x.subject===p.id&&x.actor_id===history[0].authorized_by),'deposit consent has an owner audit');assert.ok(audit.some(x=>x.action==='acceptance.upload'&&x.subject===p.id&&x.actor_id&&x.occurred_at),'TEAM-004 acceptance.upload')
 }))
 test('FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures',{timeout:60000},()=>run(async h=>{
  assert.equal((await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{host:new URL(h.origin).host,origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})).status,303)

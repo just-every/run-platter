@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { planD1Import, createD1ImportJob, applyD1ImportBatches, undoD1Import, readD1ImportJob, readD1ImportOriginals,
  canonicalJson, sha256, d1RequestContext, type D1ImportContext, type ImportMapping } from '../../modules/import-kit/src/d1/index.ts'
+import { exportMapping, type ExportProvider } from './qwilr-ignition-export'
 import { proposifyReview, proposifyTemplateCommand } from './proposify-export'
 import { documentSource, documentNamespace, type UploadedDocument } from './document-source'
 import { documentDestination, documentTargets } from './document-targets'
@@ -19,7 +20,7 @@ const context=(db:D1Database,actor:Actor,undoId?:string):D1ImportContext=>d1Requ
 })
 const mapping:ImportMapping={version:'exported-documents-v1',map(record){
  const payload=record.payload as any
- return {effects:[{targetKind:'documents',targetId:record.sourceId,value:payload.value}]}
+ return {effects:payload.effects??[{targetKind:'documents',targetId:record.sourceId,value:payload.value}]}
 }}
 async function session(db:D1Database,actor:Actor,id:unknown) {
  await documentOwner(db,actor)
@@ -50,10 +51,11 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
   if (name==='document-import.create') {
    const id=randomUUID(),label=String(input.label??'Document move-in').trim()
    if (!label || label.length>150) fail('invalid_input',400,'Name the move-in in 150 characters or fewer')
-   const provider=String(input.provider??'generic')
+   const provider=String(input.provider??(input.sourceProvider==='proposify'?'proposify':'generic')),sourceProvider=String(input.sourceProvider==='proposify'?'generic':input.sourceProvider??'generic')
+   if(!['generic','qwilr','ignition'].includes(sourceProvider)||provider==='proposify'&&sourceProvider!=='generic')fail('invalid_export_provider',400)
    if(!['generic','proposify'].includes(provider))fail('invalid_import_provider',400)
    await db.batch([db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN '+ownerSql+' THEN 1 ELSE 0 END').bind(actor.id),
-    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label,provider) VALUES(?,?,?,?)').bind(id,actor.id,label,provider)])
+    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label,provider,source_provider) VALUES(?,?,?,?,?)').bind(id,actor.id,label,provider,sourceProvider)])
    return {id}
   }
   const movein=await session(db,actor,input.id),id=movein.id
@@ -98,12 +100,12 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
   const kit=context(db,actor)
   if(name.startsWith('document-import.template-'))return proposifyTemplateCommand(db,actor,name,input,movein,kit)
   if (name==='document-import.preview'||name==='document-import.apply') {
-   const selected=choices(input),review=movein.provider==='proposify'?proposifyReview(input):undefined
+   const selected=choices(input),review=movein.provider==='proposify'?proposifyReview(input):undefined,mappingOptions=exportMapping(input.mapping??{})
    if(movein.fingerprint) {
-    if(name==='document-import.preview'||input.fingerprint!==movein.fingerprint||canonicalJson(selected)!==movein.choices_json||canonicalJson(review??{})!==movein.configuration_json)fail('review_fingerprint_mismatch',409,'Continue the exact reviewed import from its history')
+    if(name==='document-import.preview'||input.fingerprint!==movein.fingerprint||canonicalJson(selected)!==movein.choices_json||canonicalJson(review??{})!==movein.configuration_json||canonicalJson(mappingOptions)!==movein.mapping_json)fail('review_fingerprint_mismatch',409,'Continue the exact reviewed import from its history')
     if(movein.job_id)return {id,job:await applyD1ImportBatches(movein.job_id,kit),report:JSON.parse(movein.report_json)}
    }
-   const prepared=await documentSource(await uploaded(db,id),selected,id,review)
+   const prepared=await documentSource(await uploaded(db,id),selected,id,review,movein.source_provider as ExportProvider,mappingOptions)
    const plan=await planD1Import(prepared.source,mapping,kit)
    // A second import never replaces an already retained original or its attribution.
    const prior=await db.prepare('SELECT id FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?').bind(documentDestination,actor.id,id).first<any>()
@@ -118,7 +120,7 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    if(input.fingerprint!==plan.fingerprint)fail('review_fingerprint_mismatch',409,'Preview the exact uploaded bytes and report choices again')
    if(!canApply)fail('document_import_needs_review',409,'Resolve ambiguous report matches and existing-document conflicts before applying')
    await db.batch([db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN '+ownerSql+' AND EXISTS(SELECT 1 FROM p_document_moveins WHERE id=? AND (fingerprint IS NULL OR fingerprint=?)) THEN 1 ELSE 0 END').bind(actor.id,id,plan.fingerprint),
-    db.prepare('UPDATE p_document_moveins SET fingerprint=?,choices_json=?,report_json=?,configuration_json=? WHERE id=?').bind(plan.fingerprint,canonicalJson(selected),canonicalJson(prepared.report),canonicalJson(review??{}),id)])
+    db.prepare('UPDATE p_document_moveins SET fingerprint=?,choices_json=?,report_json=?,configuration_json=?,mapping_json=? WHERE id=?').bind(plan.fingerprint,canonicalJson(selected),canonicalJson(prepared.report),canonicalJson(review??{}),canonicalJson(mappingOptions),id)])
    const job=await createD1ImportJob(plan,{...kit,reviewedFingerprint:plan.fingerprint,operationKey:id})
    await db.prepare('UPDATE p_document_moveins SET job_id=? WHERE id=? AND fingerprint=?').bind(job.id,id,plan.fingerprint).run()
    return {id,job:await applyD1ImportBatches(job.id,kit),report:prepared.report}
@@ -144,12 +146,13 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
  }
 }
 export async function documentMoveinState(db:D1Database,actor:Actor) {
- if(actor.role!=='owner')return {documentMoveins:[],importedDocuments:[]}
+ if(actor.role!=='owner')return {documentMoveins:[],importedDocuments:[],importedSourceFacts:[]}
  await documentOwner(db,actor)
  const moves=(await db.prepare('SELECT m.*,j.state,j.checkpoint,j.total FROM p_document_moveins m LEFT JOIN ik_jobs j ON j.id=m.job_id WHERE owner_id=? ORDER BY m.rowid DESC').bind(actor.id).all<any>()).results
  for(const move of moves){move.applications=(await db.prepare('SELECT id,proposal_id,template_id,source_sha256,reversed_at FROM p_proposify_applications WHERE movein_id=? ORDER BY created_at').bind(move.id).all()).results;move.uploads=(await db.prepare('SELECT sha256,filename,size,received,complete FROM p_document_uploads WHERE movein_id=? ORDER BY rowid').bind(move.id).all()).results}
  const documents=(await db.prepare("SELECT d.data_json FROM p_imported_documents d JOIN p_document_moveins m ON m.id=json_extract(d.data_json,'$.moveinId') WHERE m.owner_id=? ORDER BY d.id").bind(actor.id).all<{data_json:string}>()).results.map(r=>JSON.parse(r.data_json))
- return {documentMoveins:moves,importedDocuments:documents}
+ const facts=(await db.prepare("SELECT f.data_json FROM p_imported_source_facts f JOIN p_document_moveins m ON m.id=json_extract(f.data_json,'$.moveinId') WHERE m.owner_id=? ORDER BY f.id").bind(actor.id).all<{data_json:string}>()).results.map(r=>JSON.parse(r.data_json))
+ return {documentMoveins:moves,importedDocuments:documents,importedSourceFacts:facts}
 }
 export async function importedOriginal(db:D1Database,actor:Actor,query:URLSearchParams) {
  await documentOwner(db,actor)

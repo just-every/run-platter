@@ -1,3 +1,4 @@
+import { delegationCommand } from './signer-delegation'
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
@@ -93,6 +94,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='tracking.recipient')return stakeholderRecipient(env,a,p)
  if(name.startsWith('tracking.'))return trackingCommand(env,a,name,p)
  if(name.startsWith('collaboration.'))return collaborationCommand(env,a,name,p)
+ if(name.startsWith('signer.delegation.'))return delegationCommand(env,a,name,p)
  if(name==='signer.replace')return replaceSigner(env,a,p)
  if(name==='signer.method')return signerMethodCommand(env,a,p)
  if(name.startsWith('sms.'))return smsCommand(env,a,name,p)

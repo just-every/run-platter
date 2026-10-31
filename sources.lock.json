@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "8a7a17c3f9693450407dea49ec991723e4886f9f4ccd36700e7125064d87cc9f",
+      "sha256": "04481f497f460c580789d689d2aea30b98c5bd1f0c0a9dea789f2d0241d27730",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2738,7 +2738,7 @@
       "executable": false
     },
     "src/platter/mail.ts": {
-      "sha256": "6963d263675ca2f55257c161b3cc7ed517e04368ee60f413e074438b609f9e07",
+      "sha256": "669a1823c3a08edef72953fa67bdbd25ae9598d84e80d5cf449dcfeec9ef649e",
       "executable": false
     },
     "src/platter/mailboxes.ts": {
@@ -2874,7 +2874,7 @@
       "executable": false
     },
     "src/platter/payment-failure-notices.ts": {
-      "sha256": "5de82df00e4cb3dc958039648b0a1983257f96fd86292b26419a218adf52d713",
+      "sha256": "57e5b961c2a6257337a2ead6caf2170cf64696121b0fa3cb69585bd79fecf6d1",
       "executable": false
     },
     "src/platter/payment-terms.ts": {
@@ -3546,7 +3546,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "e767c34eb6f3ccb00e41778af92695febaa4d1dd0b589c97d5125de2d6d5510c",
+      "sha256": "36881f9c352b2ab9d1b3b9f8936c8e865b8c7f9c00c06d96eb2a55a7af59428c",
       "executable": false
     },
     "tests/mobile-client-journey.mjs": {

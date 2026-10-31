@@ -82,6 +82,17 @@ export async function failureNoticeAuthority(env:Bindings,row:any){
 export function failureDeliveryStatement(env:Bindings,mailId:string,status:string){
  return env.DB.prepare('UPDATE p_payment_failure_deliveries SET status=?,updated_at=? WHERE mail_id=? AND EXISTS(SELECT 1 FROM p_mail WHERE id=? AND status=?)').bind(status,Date.now(),mailId,mailId,status==='withheld'?'uncertain':status)
 }
+// A stopped worker cannot establish whether the provider accepted its in-flight mail.
+// Retain an uncertain receipt once the bounded send could no longer be running.
+export async function holdInterruptedFailureNotices(env:Bindings){
+ const at=Date.now(),before=at-20*60*1000
+ await env.DB.batch([
+  env.DB.prepare(`UPDATE p_mail SET status='uncertain',held_reason='delivery_interrupted'
+   WHERE status='sending' AND id IN (SELECT mail_id FROM p_payment_failure_deliveries WHERE status='sending' AND updated_at<?)`).bind(before),
+  env.DB.prepare(`UPDATE p_payment_failure_deliveries SET status='uncertain',updated_at=?
+   WHERE status='sending' AND updated_at<? AND mail_id IN (SELECT id FROM p_mail WHERE status='uncertain' AND held_reason='delivery_interrupted')`).bind(at,before),
+ ])
+}
 export async function failureHistory(db:D1Database,id:string){
  return (await db.prepare(`SELECT f.provider_attempt AS attempt,f.reason,f.attempted_at AS attemptedAt,f.observed_at AS observedAt,
  (SELECT status FROM p_payment_failure_deliveries d WHERE d.failure_id=f.id AND d.party='client') AS clientStatus,

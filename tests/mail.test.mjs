@@ -1759,7 +1759,7 @@ test('SIGN-005 completion mail attaches the retained PDFs to both parties once, 
  }
 })
 
-test('PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete or uncertain mail without replay', {timeout:180000}, async()=>{
+test('PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete, uncertain or interrupted mail without replay', {timeout:180000}, async()=>{
  const {depositEdge,preparedNoticeDeposit}=await import('./collection-journey.mjs')
  const edge=depositEdge(),h=await harness({origin:'https://platter.example',assetsDirectory:'public',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-10001'},outboundService:edge.outboundService})
  let release
@@ -1785,6 +1785,38 @@ test('PAY-005 confirmed deposit attempts notify both parties once and hold revok
   assert.equal((await h.db.prepare("SELECT count(*) n FROM p_payment_failure_deliveries WHERE status='uncertain'").first()).n,2)
   assert.equal(edge.calls.filter(c=>c.path==='/v1/payment_intents'&&c.method==='POST').length,1,'Notices create no additional payment or automatic retry')
  }finally{release?.();await h.close()}
+ // A provider can accept mail before an interrupted worker saves the receipt.
+ {
+  const edge=depositEdge(),h=await harness({origin:'https://platter.example',assetsDirectory:'public',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-10201'},outboundService:edge.outboundService})
+  try{
+   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-10202',publishableKey:'synthetic-platter-10203',consent:true})
+   const p=await preparedNoticeDeposit(h);await p.authorize();edge.fail(p.saved)
+   await h.db.prepare(`CREATE TRIGGER synthetic_notice_interruption BEFORE UPDATE OF status ON p_mail
+    WHEN OLD.proposal_id='${p.id}' AND OLD.status='sending' AND NEW.status IN ('accepted','uncertain')
+    BEGIN SELECT RAISE(FAIL,'Synthetic interrupted receipt write'); END`).run()
+   const result=await h.send(p.path+'/payment-status.json',{},p.cookie)
+   assert.notEqual(result.status,200,'An interrupted receipt is not reported as a completed refresh')
+   const notices=()=>edge.mail.filter(m=>m.subject==='Deposit payment failed')
+   assert.equal(notices().length,1,'The provider accepted one notice before receipt persistence stopped')
+   const claimed=await h.db.prepare("SELECT d.mail_id,d.status FROM p_payment_failure_deliveries d JOIN p_mail m ON m.id=d.mail_id WHERE m.proposal_id=? AND m.status='sending'").bind(p.id).first()
+   assert.equal(claimed.status,'sending')
+   await h.db.prepare('DROP TRIGGER synthetic_notice_interruption').run()
+   // Model a worker that never resumes, after its provider timeout has elapsed.
+   await h.db.prepare('UPDATE p_payment_failure_deliveries SET updated_at=0 WHERE mail_id=?').bind(claimed.mail_id).run()
+   const cron=()=>h.mf.getWorker().then(worker=>worker.scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'}))
+   await cron()
+   const held=await h.db.prepare('SELECT m.status,m.held_reason,d.status AS history_status FROM p_mail m JOIN p_payment_failure_deliveries d ON d.mail_id=m.id WHERE m.id=?').bind(claimed.mail_id).first()
+   assert.deepEqual(held,{status:'uncertain',held_reason:'delivery_interrupted',history_status:'uncertain'})
+   assert.equal(notices().length,2,'Only the untouched notice is delivered during recovery')
+   assert.deepEqual(notices().flatMap(m=>m.to).sort(),[h.auth.OWNER_EMAIL,(await h.db.prepare('SELECT email FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).email].sort())
+   await h.send(p.path+'/payment-status.json',{},p.cookie);await cron()
+   assert.equal(notices().length,2,'Refresh and scheduler replay never resend the interrupted delivery')
+   const history=(await h.state()).proposals.find(row=>row.id===p.id).collection.failures
+   assert.equal(history.length,1)
+   assert.deepEqual([history[0].clientStatus,history[0].firmStatus].sort(),['accepted','uncertain'])
+   assert.match((await h.send(p.path,undefined,p.cookie)).text,/Held for review/)
+  }finally{await h.close()}
+ }
  // Refreshing a connected mailbox is a real asynchronous boundary before any notice send.
  for(const scenario of ['revoked','account','recipient','invitation','paid','authority']){
   const edge=depositEdge(),h=await harness({origin:'https://platter.example',assetsDirectory:'public',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-10011',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-10012',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-10013'},outboundService:edge.outboundService})
@@ -1805,7 +1837,7 @@ test('PAY-005 confirmed deposit attempts notify both parties once and hold revok
    let changed=false
    edge.oauthHook=async()=>{
     if(changed)return;changed=true
-    if(scenario==='revoked')await h.db.prepare('DELETE FROM p_payment_failure_authority WHERE proposal_id=?').bind(p.id).run()
+    if(scenario==='revoked')await p.authorize(false)
     if(scenario==='account')await h.db.prepare("UPDATE p_connections SET account_id='synthetic-platter-replaced-account',version=version+1 WHERE id='workspace:stripe'").run()
     if(scenario==='recipient')await h.db.prepare('UPDATE p_clients SET email=? WHERE id=(SELECT client_id FROM p_proposals WHERE id=?)').bind(h.auth.MAIL_FROM,p.id).run()
     if(scenario==='invitation')await h.db.prepare('UPDATE p_shares SET token=? WHERE proposal_id=?').bind('synthetic-platter-replaced-invitation',p.id).run()

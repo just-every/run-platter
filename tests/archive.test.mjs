@@ -1122,44 +1122,153 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority', {timeout:180000},async()=>{
- const {driveFixture,driveToken,driveSettings,connectDrive,completeDriveAgreement}=await import('./drive-fixture.mjs')
- const temporary=await mkdtemp(join(tmpdir(),'platter-drive-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=driveFixture();let h
+test('PORT-002 / AUTO-002 populated product archive retains exact document archive history, content, money and mappings without execution authority', {timeout:240000},async()=>{
+ const {driveFixture,driveAccount,driveRoot,driveToken,driveSettings,connectDrive,completeDriveAgreement}=await import('./drive-fixture.mjs')
+ const temporary=await mkdtemp(join(tmpdir(),'platter-product-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=driveFixture();let h
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex')
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
   h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectDrive(h)
-  const completed=await completeDriveAgreement(h)
+  await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?)').bind(Date.parse('2099-01-15T12:00:00Z')).run()
+  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+  const client=await h.cmd('client.save',{name:'Synthetic archive studio',email:['synthetic-platter-139','example.test'].join('@')})
+  const catalog=await h.cmd('catalog.save',{name:'Archived workshop',sku:'synthetic-platter-139',description:'Two hours of reviewed work',unit:'hour',unitPrice:'125',unitCost:'40',defaultRecurrence:'one-off',taxable:'no',incomeAccount:'synthetic-platter-income'})
+  const library=await h.cmd('library.save',{title:'Archived case study',kind:'case_study',content:'A retained studio outcome.'})
+  const proposal=await h.cmd('proposal.prepare',{clientId:client.id,title:'Populated archive agreement',scope:'Reviewed archive scope',optionOne:'Studio',priceOne:'100',optionTwo:'Campaign',priceTwo:'200',depositPercent:'25'})
+  await h.cmd('catalog.insert',{id:proposal.id,version:1,catalogId:catalog.id,catalogVersion:1,optionId:'one',quantity:'2'})
+  await h.cmd('library.insert',{id:proposal.id,version:2,itemId:library.id,itemVersion:1,mode:'detached',consent:true})
+  const imageBytes=await readFile('public/brand/apple-touch-icon.png'),videoBytes=await readFile('fixtures/editor/synthetic-platter-1.webm'),media=[]
+  for(const [filename,type,bytes]of [['synthetic-platter-139.png','image/png',imageBytes],['synthetic-platter-139.webm','video/webm',videoBytes]]){
+   const form=new FormData();form.set('id',proposal.id);form.set('version','3');form.set('consent','yes');form.set('file',new File([bytes],filename,{type}))
+   const request=new Request(h.origin+'/app/document-media',{method:'POST',headers:{origin:h.origin,cookie:h.owner,accept:'application/json'},body:form})
+   const response=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});assert.equal(response.status,200);media.push((await response.json()).media)
+  }
+  const document=(await h.state()).proposals.find(p=>p.id===proposal.id).document
+  document.blocks.push({id:'archive-image',type:'image',title:'Retained image',text:'Original image',assetId:media[0].id,alt:'Synthetic archive image'},{id:'archive-video',type:'video',title:'Retained video',text:'Original video',assetId:media[1].id,posterId:media[0].id,alt:'Synthetic archive video'})
+  await h.cmd('proposal.document',{id:proposal.id,version:3,document})
+  const template=await h.cmd('template.save',{id:proposal.id,version:4,name:'Populated archive template'})
+  await h.cmd('proposal.approve',{id:proposal.id,version:4,revision:4})
+  const path=new URL((await h.cmd('proposal.send',{id:proposal.id,version:5})).shareUrl).pathname
+  assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+  const code=(await h.state()).outbox.find(m=>m.proposal_id===proposal.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+  const verified=await h.send(path+'/action?name=code.verify',{code});assert.equal(verified.status,200)
+  const acceptance={name:'Synthetic archive signer',optionId:'one',consent:true}
+  assert.equal((await h.send(path+'/action?name=accept',acceptance,verified.cookie)).status,200)
+  const completed={proposal,client,path,cookie:verified.cookie}
+  // The selected original 100 dollars plus two 125-dollar hours books 350 dollars.
+  const invoice=await h.cmd('invoice.export',{id:proposal.id}),invoicePath='/api/platter/invoices/'+invoice.id+'.csv'
+  const invoiceCsv=(await h.send(invoicePath,undefined,h.owner)).text
+  assert.match(invoiceCsv,/87\.50,200,No Tax,USD/)
+  await h.cmd('payment.record',{id:proposal.id,amount:'87.50',receivedOn:'2099-01-15',method:'wire',reference:'synthetic-platter-offline-139',consent:false},h.owner,400)
+  assert.deepEqual((await h.state()).paymentRecords,[],'unconfirmed money is never recorded')
+  const payment=await h.cmd('payment.record',{id:proposal.id,amount:'87.50',receivedOn:'2099-01-15',method:'wire',reference:'synthetic-platter-offline-139',consent:true})
+  const filters='view=recorded-revenue&currency=USD&q=Populated%20archive%20agreement&receivedFrom=2099-01-01&receivedTo=2099-03-31'
+  const expectedTotals=[{currency:'USD',count:1,valueCents:35000,oneOffCents:35000,firstYearCents:35000,receivedCents:8750,refundedCents:0,netReceivedCents:8750,uncertainRefundCents:0,exportedDepositCents:8750}]
+  const revenue=(await h.send('/api/platter/pipeline?'+filters,undefined,h.owner)).value
+  assert.deepEqual(revenue.totals,expectedTotals)
+  const reportCsv=(await h.send('/api/platter/pipeline.csv?'+filters,undefined,h.owner)).text
   await h.cmd('archive.dispatch',{})
-  const queued=await completeDriveAgreement(h,'Queued archive history',completed.client.id)
+  const queued=await completeDriveAgreement(h,'Queued archive history',client.id)
   const tables=['p_archive_settings','p_archive_jobs','p_archive_files','p_archive_folders','p_agreement_artifacts'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
   assert.deepEqual(before.p_archive_jobs.map(j=>j.status).sort(),['complete','queued'])
   const artifacts={}
   for(const kind of ['agreement','certificate']){
    const response=await h.mf.dispatchFetch(h.origin+completed.path+'/'+kind+'.pdf',{headers:{cookie:completed.cookie}});assert.equal(response.status,200);artifacts[kind]=Buffer.from(await response.arrayBuffer())
   }
+  const {pdfPages}=await import('./pdf-document.mjs')
+  const agreementText=(await pdfPages(artifacts.agreement)).join(' '),certificateText=(await pdfPages(artifacts.certificate)).join(' ')
+  assert.match(agreementText,/Signed agreement, revision 4/);assert.match(agreementText,/Total: USD 350\.00/);assert.match(agreementText,/Signed by: Synthetic archive signer/)
+  assert.match(certificateText,/Certificate of completion/);assert.match(certificateText,/Verification method: mailbox code/);assert.match(certificateText,/Synthetic archive signer/)
   const certificate=(await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).value
+  assert.equal(certificate.documentSha256,hash(artifacts.agreement));assert.equal(certificate.signers[0].method,'mailbox code')
+  const mappings=(await h.send('/api/platter/archives',undefined,h.owner)).value
+  for(const kind of ['agreement','certificate']){
+   const mapping=before.p_archive_files.find(f=>f.kind===kind)
+   assert.equal(mapping.proposal_id,proposal.id);assert.equal(mapping.status,'complete');assert.equal(mapping.sha256,hash(artifacts[kind]))
+   assert.deepEqual(fake.files.get(mapping.provider_id).bytes,artifacts[kind],'the retained mapping names the actual uploaded bytes')
+  }
+  const agent=await h.cmd('agent.create',{label:'Synthetic archive excluded key'})
+  const restKey=(await h.send('/api/platter/v1/keys',{label:'Synthetic archive excluded REST key',scopes:['proposals.read']},h.owner)).value
+  const webhook=(await h.send('/api/platter/v1/webhooks',{url:'https://hooks.example.com/synthetic-platter-139',consent:true},h.owner)).value
+  assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+agent.token})).status,200)
+  assert.equal((await h.send('/api/platter/v1/proposals',undefined,'',{authorization:'Bearer '+restKey.token})).status,200)
+  const beforeState=await h.state(),ownerCookie=h.owner
+  assert.ok(beforeState.outbox.length>0,'queued invitation and verification mail really exists before export')
+  const shares=(await h.db.prepare('SELECT * FROM p_shares').all()).results
+  assert.ok(shares.some(s=>s.session_hash&&s.session_verified_at),'live verification and client session facts exist before export')
+  const sessionHashes=(await h.db.prepare('SELECT token_hash FROM oa_sessions').all()).results.map(r=>r.token_hash)
+  assert.ok(sessionHashes.length>0,'a native owner session exists before export')
+  const secretRows=(await h.db.prepare('SELECT * FROM p_connection_secrets').all()).results
+  assert.equal(secretRows.length,1)
   await h.close();h=undefined
-  const archive=join(temporary,'drive.rer');await command(source,['export','--output',archive])
-  const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(driveToken))
-  const records=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
-  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0)
+  const archive=join(temporary,'product.rer');await command(source,['export','--output',archive])
+  const contents=await readFile(archive,'utf8'),parts=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part')
+  const records=parts.flatMap(p=>p.items).filter(r=>r.kind==='row'),rows=table=>records.filter(r=>r.table===table).map(r=>r.row)
+  const one=(table,predicate)=>{const found=rows(table).filter(predicate);assert.equal(found.length,1,table+' has one expected populated record');return found[0]}
+  // Independently inventory the exported records, original media and materialized artifacts.
+  assert.equal(one('p_personal_templates',r=>r.id===template.id).name,'Populated archive template')
+  assert.equal(one('p_library_items',r=>r.id===library.id).content,'A retained studio outcome.')
+  const priced=one('p_priced_catalog',r=>r.id===catalog.id);assert.equal(priced.sku,'synthetic-platter-139');assert.equal(priced.unit_cents,12500);assert.equal(priced.unit_cost_cents,4000)
+  const accepted=one('p_acceptances',r=>r.proposal_id===proposal.id);assert.equal(accepted.total_cents,35000);assert.equal(accepted.deposit_cents,8750);assert.equal(accepted.currency,'USD')
+  const snapshot=JSON.parse(accepted.snapshot);assert.equal(snapshot.title,'Populated archive agreement');assert.equal(snapshot.options.find(o=>o.id==='one').cents,35000)
+  const receipt=one('p_payment_records',r=>r.id===payment.id);assert.equal(receipt.proposal_id,proposal.id);assert.equal(receipt.method,'wire');assert.equal(receipt.cents,8750);assert.equal(receipt.received_on,'2099-01-15');assert.equal(receipt.reference,'synthetic-platter-offline-139')
+  assert.equal(one('p_invoices',r=>r.id===invoice.id).csv,invoiceCsv)
+  const stored=one('p_agreement_artifacts',r=>r.proposal_id===proposal.id)
+  for(const [kind,column]of [['agreement','document'],['certificate','certificate']])assert.deepEqual(Buffer.from(stored[column].blob,'base64'),artifacts[kind])
+  assert.equal(JSON.parse(stored.facts).documentSha256,hash(artifacts.agreement))
+  for(const [index,bytes]of [imageBytes,videoBytes].entries()){
+   const file=one('p_attachment_files',r=>r.id===media[index].id);assert.equal(file.size,bytes.length);assert.equal(file.sha256,hash(bytes))
+   const original=Buffer.concat(rows('p_attachment_chunks').filter(r=>r.file_id===file.id).sort((a,b)=>a.part-b.part).map(r=>Buffer.from(r.bytes_base64,'base64')))
+   assert.deepEqual(original,bytes);assert.equal(one('p_document_media',r=>r.proposal_id===proposal.id&&r.file_id===file.id).file_id,file.id)
+   assert.equal(one('p_template_document_media',r=>r.template_id===template.id&&r.file_id===file.id).file_id,file.id)
+  }
+  const connection=one('p_connections',r=>r.id==='workspace:google_drive');assert.equal(connection.account_id,driveAccount);assert.equal(connection.provider,'google_drive')
+  const folder=one('p_archive_folders',r=>r.client_id===client.id);assert.equal(folder.account_id,driveAccount);assert.equal(folder.root_folder,driveRoot);assert.equal(fake.files.get(folder.provider_id).parents[0],driveRoot)
+  for(const kind of ['agreement','certificate']){
+   const mapping=one('p_archive_files',r=>r.proposal_id===proposal.id&&r.kind===kind)
+   assert.equal(mapping.folder_id,folder.provider_id);assert.equal(mapping.sha256,hash(artifacts[kind]));assert.deepEqual(fake.files.get(mapping.provider_id).bytes,artifacts[kind])
+  }
+  const decoded=parts.flatMap(p=>p.items).map(item=>JSON.stringify(item)+'\n'+Object.entries(item.row??item).flatMap(([key,value])=>value&&typeof value==='object'&&value.blob?[Buffer.from(value.blob,'base64').toString('latin1')]:['bytes_base64','data'].includes(key)&&typeof value==='string'?[Buffer.from(value,'base64').toString('latin1')]:[]).join('\n')).join('\n')
+  const excludedTables=['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets','p_agent_keys','p_rest_keys','p_webhook_secrets','oa_sessions','oa_tokens','oa_invitations','p_member_invitations','p_shares','p_mail','rer_mail_development_outbox','p_completion_authority']
+  for(const table of excludedTables)assert.equal(rows(table).length,0,table+' never exports local authority or queued mail')
+  const secrets=[...sessionHashes,hash(agent.token),hash(restKey.token),driveToken,agent.token,restKey.token,webhook.secret,ownerCookie.split('=')[1],verified.cookie.split('=')[1],...shares.flatMap(s=>[s.token,s.session_hash,s.code_hash]).filter(Boolean),...secretRows.flatMap(r=>Object.values(r).filter(v=>typeof v==='string'&&v.length>100))]
+  for(const secret of secrets)for(const view of [contents,decoded])assert.ok(!view.includes(secret),'decoded archive excludes live capability bytes')
+  for(const mail of beforeState.outbox)assert.ok(!decoded.includes(mail.body),'queued mail body is never product history')
   await command(restored,['import','--input',archive,'--yes'])
   const restoredFake=driveFixture();h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:restoredFake.outboundService})
   for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table],table+' retains exact history')
-  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
-  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'});assert.equal(restoredFake.calls.length,0)
-  const owner=await h.signIn(h.auth.OWNER_EMAIL)
+  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets','p_agent_keys','p_rest_keys','p_shares','p_mail'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2099-01-15T12:00:00Z'),cron:'*/15 * * * *'});assert.equal(restoredFake.calls.length,0)
+  assert.equal((await h.send('/api/platter/state',undefined,ownerCookie)).status,401)
+  for(const [door,token]of [['/api/platter/agent/context',agent.token],['/api/platter/v1/proposals',restKey.token]])assert.equal((await h.send(door,undefined,'',{authorization:'Bearer '+token})).status,401)
+  for(const suffix of ['', '/agreement.pdf','/certificate.json'])assert.equal((await h.send(path+suffix,undefined,verified.cookie)).status,404)
+  for(const [action,input]of [['code.verify',{code}],['accept',acceptance]])assert.equal((await h.send(path+'/action?name='+action,input,verified.cookie)).status,404)
+  const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
+  assert.deepEqual(after.templates,beforeState.templates);assert.deepEqual(after.libraryItems,beforeState.libraryItems);assert.deepEqual(after.catalogItems,beforeState.catalogItems);assert.deepEqual(after.paymentRecords,beforeState.paymentRecords)
   for(const kind of ['agreement','certificate']){
-   const response=await h.mf.dispatchFetch(h.origin+'/api/platter/'+kind+'.pdf?id='+completed.proposal.id,{headers:{cookie:owner}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),artifacts[kind])
+   const response=await h.mf.dispatchFetch(h.origin+'/api/platter/'+kind+'.pdf?id='+proposal.id,{headers:{cookie:owner}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),artifacts[kind])
   }
-  assert.deepEqual((await h.send('/api/platter/certificate.json?id='+completed.proposal.id,undefined,owner)).value,certificate)
+  assert.deepEqual((await h.send('/api/platter/certificate.json?id='+proposal.id,undefined,owner)).value,certificate)
+  for(const [index,bytes]of [imageBytes,videoBytes].entries()){
+   const response=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+proposal.id+'/'+media[index].id,{headers:{cookie:owner}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)
+  }
+  assert.equal((await h.send(invoicePath,undefined,owner)).text,invoiceCsv);assert.equal((await h.cmd('invoice.export',{id:proposal.id},owner)).id,invoice.id)
+  const restoredRevenue=(await h.send('/api/platter/pipeline?'+filters,undefined,owner)).value
+  assert.deepEqual(restoredRevenue.totals,expectedTotals);assert.deepEqual(restoredRevenue.rows,revenue.rows)
+  assert.equal((await h.send('/api/platter/pipeline.csv?'+filters,undefined,owner)).text,reportCsv)
   const history=(await h.send('/api/platter/archives',undefined,owner)).value;assert.equal(history.settings.active,false);assert.ok(history.jobs.every(j=>!j.executable))
+  assert.deepEqual(history.jobs.map(({executable,...j})=>j).sort((a,b)=>a.proposal_id.localeCompare(b.proposal_id)),mappings.jobs.map(({executable,...j})=>j).sort((a,b)=>a.proposal_id.localeCompare(b.proposal_id)))
+  assert.equal(after.connections.find(c=>c.provider==='google_drive').status,'needs_reconnection')
   assert.equal((await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).status,404)
   // Even reconnecting and explicitly authorizing future agreements cannot replay imported jobs.
   await h.cmd('provider.connect',{provider:'google_drive',version:1,token:driveToken,consent:true},owner)
   await h.cmd('archive.configure',{...driveSettings,version:1,connectionVersion:2},owner)
   const calls=restoredFake.calls.length;await h.cmd('archive.dispatch',{},owner);assert.equal(restoredFake.calls.length,calls)
   await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2099-01-16T12:00:00Z'),cron:'*/15 * * * *'});assert.equal(restoredFake.calls.length,calls)
+  assert.deepEqual((await h.state(owner)).paymentRecords,beforeState.paymentRecords,'replayed capabilities and scheduled processing cannot change money')
+  console.log('PROBE PORT-002 1: populated CLI export and restore -> templates, library, catalog, two media originals, exact signed artifacts, 8750-cent deposit and offline receipt, report totals and actual Drive mappings reconciled')
+  console.log('PROBE PORT-002 2: decoded CLI archive and restored public doors -> no credentials, invitations, sessions, verification state or queued mail; old capabilities refused; scheduled processing made no provider calls')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

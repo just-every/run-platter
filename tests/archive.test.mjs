@@ -1145,3 +1145,51 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
+
+test('SEND-009 public CLI preserves business intake provenance and exact inactive drafts without restoring publication, verification or mail authority', {timeout:180000},async()=>{
+ const {intakeTemplate,publishIntake,visitor,intakeChallenge}=await import('./public-intake-fixture.mjs')
+ const temporary=await mkdtemp(join(tmpdir(),'platter-intake-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
+ let h
+ try {
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  h=await harness({root:source})
+  const at=Date.parse('2031-06-01T15:00:00Z');await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+  const {template}=await intakeTemplate(h),form=await publishIntake(h,template,{submissionCap:5})
+  const first=await intakeChallenge(h,form.path,visitor(9920,{items:[{id:'prints',quantity:3}]}))
+  assert.equal((await h.send(form.path+'/submit',first)).status,201)
+  const pending=await intakeChallenge(h,form.path,visitor(9921))
+  const unused=await h.cmd('public-intake.review',(await import('./public-intake-fixture.mjs')).intakeReview(template))
+  const tables=['p_public_forms','p_public_submissions','p_proposals','p_revisions','p_template_sources','p_proposal_defaults','p_expiry','p_clients','p_personal_templates']
+  const records=async()=>Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY '+(table==='p_clients'||table==='p_proposals'||table==='p_personal_templates'||table==='p_public_forms'?'id':table==='p_revisions'?'proposal_id,revision':'proposal_id')).all()).results])))
+  const before=await records(),identity={auth:h.auth}
+  const mailBefore=(await h.state()).publicIntakeMail;assert.equal(mailBefore.length,2)
+  await h.close();h=null
+  const archive=join(temporary,'public-intake.rer'),again=join(temporary,'again.rer')
+  await command(source,['export','--output',archive,'--no-queue'])
+  const bytes=await readFile(archive,'utf8')
+  for(const secret of [first.challenge,pending.challenge,mailBefore.find(m=>m.recipient===visitor(9921).email).body])assert.ok(!bytes.includes(secret),'verification capability and live code are not in the public CLI archive')
+  const rows=text=>text.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(r=>r.items).filter(r=>r.kind==='row')
+  const archived=rows(bytes)
+  for(const table of ['p_public_form_authority','p_public_form_reviews','p_public_intake_challenges','p_public_intake_mail'])assert.equal(archived.filter(r=>r.table===table).length,0)
+  for(const table of tables)assert.deepEqual(archived.filter(r=>r.table===table).map(r=>r.row).sort((a,b)=>String(a.id??a.proposal_id).localeCompare(String(b.id??b.proposal_id))),before[table],table+' business records survive exactly')
+  await command(restored,['import','--input',archive,'--yes','--no-queue'])
+  await command(restored,['export','--output',again,'--no-queue'])
+  assert.deepEqual(rows(await readFile(again,'utf8')),archived)
+  h=await harness({root:restored,unclaimed:true,...identity})
+  const owner=await h.signIn(identity.auth.OWNER_EMAIL),state=await h.state(owner)
+  assert.deepEqual(await records(),before)
+  assert.equal(state.publicForms[0].active,0);assert.equal(state.publicSubmissions.length,1)
+  const draft=state.proposals.find(p=>p.id===state.publicSubmissions[0].proposal_id)
+  assert.equal(draft.status,'draft');assert.equal(draft.options[0].cents,230000);assert.equal(JSON.parse(draft.payment_terms).depositFixedCents,50000)
+  assert.equal(draft.collection.completion,'off');assert.equal(draft.reminderSettings,null);assert.equal(draft.approved_by,null);assert.equal(draft.shareToken,undefined)
+  assert.deepEqual(state.publicIntakeMail,[])
+  assert.equal((await h.send(form.path)).status,410)
+  assert.equal((await h.send(form.path+'/submit',pending)).status,410)
+  await h.cmd('public-intake.publish',{id:unused.id,digest:unused.digest,consent:true},owner,409)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(at+3600000),cron:'*/15 * * * *'})
+  assert.deepEqual(await records(),before,'restored jobs cannot change business history or create another draft')
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_mail').first()).n,0)
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_reminder_authority').first()).n,0)
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})

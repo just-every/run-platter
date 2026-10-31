@@ -56,7 +56,7 @@ import { refreshVendorDocuments } from './attachment-commands'
 import type { Bindings } from '../auth.server'
 import { createPortability } from '@runeditrun/rer/modules/portability'
 import archivePolicy from './archive-policy.mjs'
-import { need,fail,text,email,dollars,exact,commit,proposal,snapshot,secret,type Actor } from './model'
+import { need,fail,text,email,dollars,exact,hash,commit,proposal,snapshot,secret,type Actor } from './model'
 import { dispatchMail } from './mail'
 import { exportInvoice } from './invoices'
 import { suggestionCommand } from './suggestions'
@@ -166,7 +166,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   need(a.role==='owner','Only the owner erases clients',403);const id=text(p.id,'a client'),c=await db.prepare('SELECT * FROM p_clients WHERE id=?').bind(id).first<any>();need(c,'Client not found',404);need(p.confirmName===c.name,'Type the exact client name to confirm erasure');
   const unused=`NOT EXISTS(SELECT 1 FROM p_proposals WHERE client_id=?) AND NOT EXISTS(SELECT 1 FROM p_import_client_revisions WHERE client_id=?)`
   const check=await db.prepare(`SELECT (${unused}) AS ok`).bind(id,id).first<any>();need(check?.ok,'Clients with proposal or import history must be retained. Undo an unused import first.',409)
-  const portability=await createPortability({db,policy:archivePolicy});await commit(db,a,[...await portability.erasureStatements('p_clients',{id}),...await portability.invalidateTransfersStatements(),db.prepare("DELETE FROM p_crm_draft_reviews WHERE json_extract(source_json,'$.contact.email')=? OR json_extract(client_json,'$.id')=?").bind(c.email,id),db.prepare('DELETE FROM p_clients WHERE id=?').bind(id)],true,{sql:unused,values:[id,id]});return{erased:true}
+  const portability=await createPortability({db,policy:archivePolicy});await commit(db,a,[...await portability.erasureStatements('p_clients',{id}),...await portability.invalidateTransfersStatements(),db.prepare('DELETE FROM p_public_intake_mail WHERE recipient=?').bind(c.email),db.prepare('DELETE FROM p_public_intake_challenges WHERE mailbox=?').bind(await hash(c.email)),db.prepare("DELETE FROM p_crm_draft_reviews WHERE json_extract(source_json,'$.contact.email')=? OR json_extract(client_json,'$.id')=?").bind(c.email,id),db.prepare('DELETE FROM p_clients WHERE id=?').bind(id)],true,{sql:unused,values:[id,id]});return{erased:true}
  }
  if(name==='proposal.negotiate'||name==='proposal.revise'){
   const current=await proposal(db,p.id)

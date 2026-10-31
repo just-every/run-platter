@@ -10,7 +10,7 @@ import { documentOf, bindDocument } from './documents/blocks'
 import { publicIntakePage } from './ui/public-submissions'
 
 const yes = (v: unknown) => v === true || v === 'yes'
-const parse = (v: any) => typeof v === 'string' ? JSON.parse(v) : v
+const parse = (v: any) => { if(typeof v!=='string')return v; try{return JSON.parse(v)}catch{need(false,'Use valid JSON choices')} }
 const pick = (v: any, keys: string[]) => Object.fromEntries(keys.filter(k => v[k] !== undefined).map(k => [k, v[k]]))
 function list(value: unknown, label: string): string[] {
  const values = typeof value === 'string' ? parse(value) : value
@@ -36,7 +36,7 @@ function project(source: any, input: Record<string, any>) {
  const options: any[] = ids.map(id => {
   const o = source.options.find((o: any) => o.id === id)
   need(o, 'Choose a template package')
-  need(!o.tax && !o.recurrence && !o.discount && !o.discountExpiresOn, 'Taxed, recurring and package-discount pricing needs manual preparation', 409)
+  need(!o.tax && !o.taxable && !o.recurrence && !o.discount && !o.discountExpiresOn, 'Taxed, recurring and package-discount pricing needs manual preparation', 409)
   const optionalIds = list(input.optionalIds?.[id] ?? Object.keys(input).filter(k => k.startsWith('optional:'+id+':') && yes(input[k])).map(k => k.slice(('optional:'+id+':').length)), 'optional items')
   const optionalItems = optionalIds.map(itemId => {
    const item = o.optionalItems?.find((v: any) => v.id === itemId)
@@ -110,16 +110,18 @@ async function atomic(db: D1Database,form: any,at: number,writes:D1PreparedState
  catch(error) { if (/constraint/i.test(String(error))) need(false,'This submission changed or the public form is unavailable',409); throw error }
 }
 function submission(projection:any,input:Record<string,any>) {
- const allowed = ['name','email','company','optionId','items',...projection.document.blocks.filter((b:any)=>b.type==='field').map((b:any)=>'field:'+b.id)]
- need(Object.keys(input).every(k=>allowed.includes(k)||/^add\./.test(k)||/^qty\./.test(k)), 'Visitors cannot change prices, terms or unreviewed fields')
+ const allowed = ['name','email','company','optionId','items',...projection.options.flatMap((o:any)=>(o.optionalItems??[]).flatMap((i:any)=>['add.'+o.id+'.'+i.id,'qty.'+o.id+'.'+i.id])),...projection.document.blocks.filter((b:any)=>b.type==='field').map((b:any)=>'field:'+b.id)]
+ need(Object.keys(input).every(k=>allowed.includes(k)), 'Visitors cannot change prices, terms or unreviewed fields')
  const visitor={name:text(input.name,'your name'),email:email(input.email),company:text(input.company,'your company'),fields:{} as Record<string,any>}
- const raw=selectionItems(input)
+ const prefix='add.'+String(input.optionId)+'.'
+ need(Object.keys(input).filter(k=>k.startsWith('add.')).every(k=>k.startsWith(prefix)),'Choose optional items only for your selected package')
+ const raw=input.items!==undefined?selectionItems(input):Object.keys(input).filter(k=>k.startsWith(prefix)).map(k=>({id:k.slice(prefix.length),quantity:input['qty.'+k.slice(4)]}))
  need(Array.isArray(raw)&&raw.every((i:any)=>i&&typeof i==='object'&&Object.keys(i).every(k=>['id','quantity'].includes(k))), 'Visitors cannot change item prices')
  const selection=offerSelection(projection.options,projection.deposit_bps,input.optionId,raw,{payment_terms:projection.payment_terms})
  for(const block of projection.document.blocks.filter((b:any)=>b.type==='field')) {
   const value=input['field:'+block.id]??''
   if(block.fieldKind==='checkbox'){need([true,false,'yes','no',''].includes(value),'Choose a checkbox value');visitor.fields[block.id]=yes(value);need(!block.required||yes(value),'Complete '+block.title)}
-  else {need(typeof value==='string'&&value.length<=1000,'Use a short field value');need(!block.required||value.trim(),'Complete '+block.title);if(block.fieldKind==='date'&&value)need(/^\d{4}-\d{2}-\d{2}$/.test(value)&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value,'Enter a valid date');visitor.fields[block.id]=value.trim()}
+  else {need(typeof value==='string'&&value.length<=1000,'Use a short field value');need(!block.required||value.trim(),'Complete '+block.title);if(block.fieldKind==='date'&&value)need(/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value+'T00:00:00Z'))&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value,'Enter a valid date');visitor.fields[block.id]=value.trim()}
  }
  return {visitor,selection}
 }
@@ -130,7 +132,7 @@ export async function publicIntakeResponse(request:Request,env:Bindings,readBody
  const db=env.DB,at=await currentTime(db),form=await live(db,match[1],at),projection=parse(form.projection)
  if(request.method==='GET') {
   need(!match[2]||match[2]==='data.json','Method not allowed',405)
-  return match[2]?Response.json({projection,submissionCap:form.submission_cap,expiresAt:form.expires_at},{headers:{'cache-control':'no-store','referrer-policy':'no-referrer'}}):publicIntakePage(form.id,projection)
+  return match[2]?Response.json({projection,submissionCap:form.submission_cap,expiresAt:form.expires_at},{headers:{'cache-control':'no-store','referrer-policy':'same-origin'}}):publicIntakePage(form.id,projection)
  }
  need(request.method==='POST'&&['challenge','submit'].includes(match[2]??''),'Method not allowed',405)
  const input=await readBody(request,30000),json=request.headers.get('content-type')?.includes('application/json')
@@ -163,10 +165,11 @@ export async function publicIntakeResponse(request:Request,env:Bindings,readBody
  const id=crypto.randomUUID(),existing=await db.prepare('SELECT id FROM p_clients WHERE email=?').bind(visitor.email).first<any>()
  // Existing client records are never overwritten or disclosed to a visitor.
  const clientId=existing?.id??crypto.randomUUID(),delivery=parse(form.delivery),expiry=delivery.expiry,deadline=expiryDeadline(expiry.mode,expiry.period_days,expiry.expires_on,at,expiry.time_zone)
- const option={...selected.option,optionalItems:[],tables:[...(selected.option.tables??[]),...(selected.items.length?[{name:'Selected optional items',subtotalCents:selected.items.reduce((n:number,i:any)=>n+i.totalCents,0),groups:[],lines:selected.items.map((i:any)=>({name:i.label,description:'',quantity:String(i.quantity),unit:'each',unitPrice:(i.unitCents/100).toFixed(2),group:'',lineTotalCents:i.totalCents}))}]:[])]}
+ const baseTables=selected.option.tables?.length?selected.option.tables:selected.items.length?[{name:'Package',subtotalCents:selected.baseCents,groups:[],lines:[{name:selected.option.label,description:'',quantity:'1',unit:'package',unitPrice:(selected.baseCents/100).toFixed(2),group:'',lineTotalCents:selected.baseCents}]}]:[]
+ const option={...selected.option,optionalItems:[],tables:[...baseTables,...(selected.items.length?[{name:'Selected optional items',subtotalCents:selected.items.reduce((n:number,i:any)=>n+i.totalCents,0),groups:[],lines:selected.items.map((i:any)=>({name:i.label,description:'',quantity:String(i.quantity),unit:'each',unitPrice:(i.unitCents/100).toFixed(2),group:'',lineTotalCents:i.totalCents}))}]:[])]}
  const row={...projection,id,client_id:clientId,revision:1,options:[option],document:bindDocument(projection.document,clientId)}
  await atomic(db,form,at,[
-  ...(existing?[]:[db.prepare('INSERT INTO p_clients(id,name,email,variable_fields) VALUES(?,?,?,?)').bind(clientId,visitor.company,visitor.email,JSON.stringify({'Client.Name':visitor.name,'Client.Company':visitor.company}))]),
+  ...(existing?[]:[db.prepare('INSERT INTO p_clients(id,name,email,variable_fields) VALUES(?,?,?,?)').bind(clientId,visitor.company,visitor.email,JSON.stringify({contactName:visitor.name,custom:{}}))]),
   db.prepare("INSERT INTO p_proposals(id,client_id,title,scope,terms,version,revision,status,deposit_bps,options,prepared_by,created_at,currency,sales_owner_id,sales_owner_name,document,payment_terms) VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?,?)").bind(id,clientId,row.title,row.scope,row.terms,row.deposit_bps,JSON.stringify(row.options),'public intake',at,'USD',form.owner_id,'Owner',JSON.stringify(row.document),row.payment_terms?JSON.stringify(row.payment_terms):null),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)').bind(id,JSON.stringify(snapshot(row)),'public intake',at,'USD'),
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) VALUES(?,?,?)').bind(id,form.template_id,form.template_version),

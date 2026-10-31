@@ -3845,10 +3845,12 @@ test('SEND-009 reviewed public intake verifies two visitors into independent uns
  await h.cmd('public-intake.review',intakeReview(template),member,403)
  await h.cmd('public-intake.review',intakeReview(template,{version:0}),h.owner,409)
  const form=await publishIntake(h,template)
+ assert.equal((await h.state(member)).publicSubmissions,undefined)
+ assert.equal((await h.state(member)).publicIntakeMail,undefined)
  await h.cmd('public-intake.publish',{id:form.review.id,digest:form.review.digest,consent:true},h.owner,409)
  const page=await h.send(form.path),data=await h.send(form.path+'/data.json')
  assert.equal(page.status,200);assert.equal(data.status,200)
- for(const secret of [client.id,client.name,client.email,'Private unselected terms sentinel','unit_cost_cents','incomeAccount','attachments','fileId'])assert.ok(!page.text.includes(secret)&&!data.text.includes(secret),'public projection omits '+secret)
+ for(const secret of [client.id,client.name,client.email,'Private unselected terms sentinel','unit_cost_cents','incomeAccount','attachments','fileId','78431'])assert.ok(!page.text.includes(secret)&&!data.text.includes(secret),'public projection omits '+secret)
  const baseline=(await h.state()).proposals.length
  for(const unsafe of [visitor(9902,{price:1}),visitor(9902,{items:[{id:'prints',quantity:2,unitCents:1}]}),visitor(9902,{items:[{id:'prints',quantity:6}]}),visitor(9902,{'field:brief':''}),visitor(9902,{'field:private':'injected'})])assert.equal((await h.send(form.path+'/challenge',unsafe)).status,400)
  assert.equal((await h.state()).proposals.length,baseline)
@@ -3864,11 +3866,15 @@ test('SEND-009 reviewed public intake verifies two visitors into independent uns
  for(const draft of drafts){assert.equal(draft.status,'draft');assert.equal(draft.approved_by,null);assert.equal(draft.shareToken,undefined);assert.equal(draft.collection.completion,'off');assert.equal(draft.reminderSettings,null);assert.equal(draft.expiry.sentAt,at);assert.equal(draft.expiry.date,'2031-06-08');assert.equal(draft.expiry.deadlineAt,Date.parse('2031-06-08T00:00:00Z'));assert.equal(JSON.parse(draft.payment_terms).depositFixedCents,50000);assert.ok(draft.deliveryDefaults.remindersEnabled)}
  assert.deepEqual(state.publicSubmissions.map(r=>r.visitor.name).sort(),['Visitor 9902','Visitor 9903'])
  assert.equal((await h.send(form.path)).status,410)
+ const priced=drafts.find(d=>d.options[0].cents===220000)
+ await h.cmd('proposal.revise',{id:priced.id,version:1,clientId:priced.client_id,title:priced.title,scope:'Human-reviewed independent scope',depositPercent:25})
+ assert.equal((await h.state()).proposals.find(d=>d.id===priced.id).options[0].cents,220000,'ordinary draft edits preserve the base package and chosen optional prices')
  const first=state.publicSubmissions[0]
- await h.cmd('proposal.send',{id:first.proposal_id,version:1},h.owner,409)
+ const freshDraft=(await h.state()).proposals.find(d=>d.id===first.proposal_id)
+ await h.cmd('proposal.send',{id:first.proposal_id,version:freshDraft.version},h.owner,409)
  // A fresh human can still approve and send; public verification grants no signing authority.
- await h.cmd('proposal.approve',{id:first.proposal_id,version:1,revision:1})
- const sent=await h.cmd('proposal.send',{id:first.proposal_id,version:2})
+ await h.cmd('proposal.approve',{id:first.proposal_id,version:freshDraft.version,revision:freshDraft.revision})
+ const sent=await h.cmd('proposal.send',{id:first.proposal_id,version:freshDraft.version+1})
  assert.ok(sent.shareUrl);assert.equal((await h.send(new URL(sent.shareUrl).pathname+'/action?name=accept',{name:'Visitor',optionId:'studio',consent:true})).status,401)
  assert.equal((await h.state()).proposals.find(r=>r.id===first.proposal_id).expiry.sentAt,at)
  const capped=await publishIntake(h,template,{submissionCap:1})
@@ -3902,7 +3908,30 @@ test('SEND-009 reviewed public intake verifies two visitors into independent uns
  const unresolved=await h.cmd('proposal.prepare',{...source,title:'Request {{Client.Unknown}}'})
  const unresolvedTemplate=await h.cmd('template.save',{id:unresolved.id,version:1,name:'Unresolved'})
  await h.cmd('public-intake.review',intakeReview(unresolvedTemplate),h.owner,409)
+ const unused=await h.cmd('client.save',{name:'Erase pending intake',email:mailbox(9913)})
+ const captured=await intakeChallenge(h,newForm.path,visitor(9913))
+ await h.cmd('client.erase',{id:unused.id,confirmName:'Erase pending intake'})
+ assert.equal((await h.send(newForm.path+'/submit',captured)).status,401)
+ assert.ok(!(await h.state()).clients.some(c=>c.email===mailbox(9913)),'an erased person cannot be recreated from a captured pending request')
  const altered=await h.cmd('public-intake.review',intakeReview(current))
  await h.cmd('public-intake.publish',{id:altered.id,digest:'synthetic-platter-altered',consent:true},h.owner,409)
  assert.equal((await h.send(newForm.path+'/challenge',visitor(9912), '',{origin:'https://elsewhere.example'})).status,403)
+ for(let generation=0;generation<10;generation++){
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(at+720000+generation*60000),cron:'*/15 * * * *'})
+  await intakeChallenge(h,newForm.path,visitor(9915))
+ }
+ await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(at+1380000),cron:'*/15 * * * *'})
+ assert.equal((await h.send(newForm.path+'/challenge',visitor(9915))).status,429)
+ const ownerBefore=(await h.state()).actor,successorBefore=(await h.state(member)).actor
+ const revoked=await intakeChallenge(h,newForm.path,visitor(9916)),beforeRevocation=(await h.state()).proposals.length
+ const freshOwner=await h.signIn(ownerBefore.email)
+ assert.equal((await h.send('/auth/operator/role',{operatorId:successorBefore.id,role:'owner'},freshOwner)).status,200)
+ const successor=await h.signIn(successorBefore.email)
+ assert.equal((await h.send('/auth/operator/role',{operatorId:ownerBefore.id,role:'admin'},successor)).status,200)
+ assert.equal((await h.send(newForm.path)).status,410)
+ assert.equal((await h.send(newForm.path+'/submit',revoked)).status,410)
+ assert.equal((await h.state(successor)).proposals.length,beforeRevocation)
+ assert.equal((await h.send('/auth/operator/role',{operatorId:ownerBefore.id,role:'owner'},successor)).status,200)
+ assert.equal((await h.send(newForm.path)).status,410,'re-promotion cannot revive a prior publication grant')
+
 }))

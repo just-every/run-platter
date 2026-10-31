@@ -1,3 +1,4 @@
+import {publicIntakeBrowser} from './public-intake-browser.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { localeBrowser } from './locale-browser.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
@@ -1137,3 +1138,5 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
   assert.equal(await history.getByRole('button').count(),0)
  }finally{await context?.close();await browser?.close();await app?.close()}
 })
+
+test('SEND-009 owner reviews and publishes public intake, two visitors verify independent unsent drafts through the compiled browser', {timeout:120000},()=>publicIntakeBrowser())

@@ -251,6 +251,10 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     h=await harness({root:restored,...identity})
     await h.state(identity.owner,401)
     assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,401)
+    const restoredDrafts=(await h.db.prepare('SELECT * FROM p_proposals ORDER BY id').all()).results
+    const restoredMcp=await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'prepare_from_template',arguments:{templateId:'starter:agency',templateVersion:1,clientId:client.id}}},'',{authorization:'Bearer '+key.token})
+    assert.equal(restoredMcp.status,401);assert.equal(restoredMcp.value.result,undefined)
+    assert.deepEqual((await h.db.prepare('SELECT * FROM p_proposals ORDER BY id').all()).results,restoredDrafts,'Restored keys cannot create classified MCP drafts')
     assert.equal((await h.send(path,undefined,verified.cookie)).status,404)
     const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
     const restoredState=await h.state(restoredOwner)

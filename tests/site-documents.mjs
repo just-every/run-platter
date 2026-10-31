@@ -943,7 +943,7 @@ test('AUTO-002 Settings authorizes Drive archiving and shows completed and held 
 })
 async function documentFonts(page){await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))})}
 
-test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in', {timeout:180000},async()=>{
+test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in', {timeout:300000},async()=>{
  const {moveinFixture,hash}=await import('./document-movein-fixture.mjs'),fixture=await moveinFixture()
  let app,browser
  try{
@@ -1004,6 +1004,7 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
   await section.getByRole('button',{name:'Undo document move-in',exact:true}).click()
   assert.equal(await page.getByRole('heading',{name:'Retained imported originals',exact:true}).count(),0)
   assert.match(await section.innerText(),/Import undone/)
+  const {proposifyBrowser}=await import('./document-movein-fixture.mjs');await proposifyBrowser(page,context,app)
   await context.close()
  }finally{await browser?.close();await app?.close()}
 })

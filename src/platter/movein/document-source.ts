@@ -5,16 +5,18 @@ import { canonicalJson, sha256, type Json, type SourceArtifact, type SourceBundl
 import { extractText, getDocumentProxy } from 'unpdf'
 import { parseBusinessCsv } from './business-csv'
 import { fail } from './errors'
+import { mappedProposifyReport, proposifyOmissions, type DocumentReview } from './proposify-export'
 
 export const documentNamespace = 'platter.exported-documents.v1'
 export type UploadedDocument = { filename: string; sha256: string; bytes: Uint8Array }
 const normalized = (text: string) => text.trim().replace(/\s+/g, ' ').toLowerCase()
 type Pdf = { id: string; sha256: string; filename: string; title: string; client: string; date: string; pages: number;
  signatureEvidence: { kind: string; page: number; text: string }[]; sources: string[]; base64: string }
-type ReportRow = { id: string; source: string; line: number; title: string; client: string; date: string; fields: Record<string,string>; candidates: string[]; selected: string | null }
-export async function documentSource(uploads: UploadedDocument[], choices: Record<string,string>, moveinId: string) {
- const artifacts: SourceArtifact[] = [], pdfs = new Map<string,Pdf>(), rows: ReportRow[] = [], seenReports = new Set<string>(), unmapped: string[] = []
- let expanded = 0, duplicateDocuments = 0
+type ReportRow = { id: string; source: string; line: number; title: string; client: string; date: string; fields: Record<string,string>; candidates: string[]; selected: string | null; evidence?: Record<string,string>; requiresChoice?: boolean }
+export async function documentSource(uploads: UploadedDocument[], choices: Record<string,string>, moveinId: string, review?: DocumentReview) {
+ const artifacts: SourceArtifact[] = [], pdfs = new Map<string,Pdf>(), rows: ReportRow[] = [], seenReports = new Set<string>(), unmapped: string[] = review?[...proposifyOmissions]:[]
+ let expanded = 0, duplicateDocuments = 0, mappingRequired = false
+ const reportColumns: string[] = []
  const artifact = (name: string, bytes: Uint8Array) => {
   artifacts.push({ name, sha256: sha256(bytes), size: bytes.length, original: { status: 'available', base64: Buffer.from(bytes).toString('base64') } })
  }
@@ -46,6 +48,15 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
    if (seenReports.has(sha256(bytes))) return
    seenReports.add(sha256(bytes))
    const parsed = parseBusinessCsv(Buffer.from(bytes).toString('utf8'),',')
+   for (const header of parsed.headers) if (!reportColumns.includes(header)) reportColumns.push(header)
+   if (review) {
+    if (!mappedProposifyReport(parsed.headers,parsed.rows[0].cells,review)) { mappingRequired=true;unmapped.push(source+': explicitly map every Proposify report column');return }
+    for (const [i,row] of parsed.rows.entries()) {
+     const evidence=mappedProposifyReport(parsed.headers,row.cells,review)!
+     rows.push({id:sha256(bytes)+':'+(i+1),source,line:row.line,title:evidence.title,client:evidence.client,date:evidence.createdDate,evidence,fields:Object.fromEntries(parsed.headers.map((h,i)=>[h,row.cells[i]])),candidates:[],selected:null})
+    }
+    return
+   }
    const aliases = {title:['title','document name','proposal name','name'],client:['client','client name'],date:['date','created date','created on']}
    const columns = Object.fromEntries(Object.entries(aliases).map(([key,names])=>[key,parsed.headers.findIndex(h=>names.includes(normalized(h)))]))
    if (Object.values(columns).some(i=>i<0)) { unmapped.push(source+': report needs Title, Client and Date columns'); return }
@@ -70,27 +81,30 @@ export async function documentSource(uploads: UploadedDocument[], choices: Recor
   } else await read(upload.filename,upload.bytes,upload.filename)
  }
  const documents=[...pdfs.values()].sort((a,b)=>a.id.localeCompare(b.id))
+ if(review?.templateDocument&&!documents.some(p=>p.id===review.templateDocument&&!p.signatureEvidence.length))fail('invalid_template_source',409,'Identify a separate unsigned template PDF; signed-source originals cannot become templates')
  for (const row of rows) {
-  row.candidates=documents.filter(p=>normalized(p.title)===normalized(row.title)&&(!p.client||normalized(p.client)===normalized(row.client))&&(!p.date||p.date===row.date)).map(p=>p.id)
+  row.candidates=documents.filter(p=>p.id!==review?.templateDocument&&normalized(p.title)===normalized(row.title)&&(!p.client||normalized(p.client)===normalized(row.client))&&(!p.date||p.date===row.date)).map(p=>p.id)
+  if(review&&row.candidates.length===0){row.candidates=documents.filter(p=>p.id!==review.templateDocument).map(p=>p.id);row.requiresChoice=true}
   if (Object.hasOwn(choices,row.id) && choices[row.id]!=='unmapped' && !row.candidates.includes(choices[row.id])) fail('invalid_report_choice',409,'Choose a PDF offered for this report row')
-  row.selected=choices[row.id]==='unmapped'?null:choices[row.id] || (row.candidates.length===1?row.candidates[0]:null)
+  row.selected=choices[row.id]==='unmapped'?null:choices[row.id] || (row.candidates.length===1&&!row.requiresChoice?row.candidates[0]:null)
  }
  if (Object.keys(choices).some(key=>!rows.some(row=>row.id===key))) fail('invalid_report_choice',409,'Preview the current report rows again')
  const selected=rows.filter(r=>r.selected).map(r=>r.selected)
- const conflicts=rows.filter(r=>r.candidates.length>1&&!Object.hasOwn(choices,r.id))
+ const conflicts=rows.filter(r=>(r.candidates.length>1||r.requiresChoice)&&!Object.hasOwn(choices,r.id))
  if (new Set(selected).size!==selected.length) fail('duplicate_report_choice',409,'Each PDF can match only one report row; mark extra rows unmapped')
- const report={arrived:documents.filter(p=>p.signatureEvidence.length).length,
+ if(review?.templateDocument&&rows.some(r=>normalized(r.title)===normalized(documents.find(p=>p.id===review.templateDocument)!.title)))fail('invalid_template_source',409,'The template must be separate from the report proposals')
+ const report={provider:review?'proposify':'generic',reportColumns,mappingRequired,configuration:review??null,templates:review?.templateDocument?[{id:review.templateDocument,label:'rebuild in the editor'}]:[],arrived:documents.filter(p=>p.signatureEvidence.length).length,
   held:documents.filter(p=>!p.signatureEvidence.length).length+conflicts.length,
   unmapped:unmapped.length+rows.filter(r=>!r.selected&&!conflicts.includes(r)).length,
   duplicateDocuments,unmappedItems:unmapped,rows,
   notes:['Signature pages and certificates are source evidence, not validated signatures.','Open documents are retained read-only for review; reissue and editable conversion are not available here.','Attachments, roles, formulas, omitted images, comments, analytics and audit events beyond the supplied certificate are not reconstructed.']}
- artifact('reviewed-report-choices.json',Buffer.from(canonicalJson({choices,report})))
+ artifact('reviewed-report-choices.json',Buffer.from(canonicalJson({choices,report,review:review??null})))
  const source: SourceBundle={artifacts,diagnostics:conflicts.map(r=>({severity:'error',code:'ambiguous_report',message:'Choose a PDF for report row '+r.line,location:{artifact:r.source,row:r.line}})),
   records:documents.map(p=>{
    const {base64,...metadata}=p
-   const value={...metadata,moveinId,disposition:p.signatureEvidence.length?'retained-agreement':'held-open-document',report:rows.find(r=>r.selected===p.id)?.fields??null}
+   const value={...metadata,moveinId,provider:review?'proposify':'generic',disposition:p.id===review?.templateDocument?'held-template':p.signatureEvidence.length?'retained-agreement':'held-open-document',report:rows.find(r=>r.selected===p.id)?.fields??null,...(review?{sourceEvidence:rows.find(r=>r.selected===p.id)?.evidence??null}:{})}
    const payload={value}
    return {namespace:documentNamespace,kind:'documents',sourceId:p.id,payload:payload as unknown as Json,payloadHash:sha256(canonicalJson(payload)),artifactHash:p.sha256,location:{artifact:'documents/'+p.sha256+'.pdf'}}
   })}
- return {source,documents:documents.map(({base64,...p})=>p),report,canApply:conflicts.length===0}
+ return {source,documents:documents.map(({base64,...p})=>p),report,canApply:conflicts.length===0&&!mappingRequired}
 }

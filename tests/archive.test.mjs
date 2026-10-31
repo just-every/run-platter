@@ -1104,13 +1104,14 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority', {timeout:180000},async()=>{
+test('AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority', {timeout:360000},async()=>{
  const {driveFixture,driveToken,driveSettings,connectDrive,completeDriveAgreement}=await import('./drive-fixture.mjs')
+ const {xeroFixture}=await import('./provider-network.mjs'),{connectXero,chooseXero,acceptXeroDeposit,reviewXero,issueXero}=await import('./xero-fixture.mjs'),xero=xeroFixture()
  const temporary=await mkdtemp(join(tmpdir(),'platter-drive-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=driveFixture();let h
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectDrive(h)
+  h=await harness({root:source,assetsDirectory:'public',outboundService:request=>new URL(request.url).hostname==='api.xero.com'?xero.outboundService(request):fake.outboundService(request)});await connectDrive(h)
   const completed=await completeDriveAgreement(h)
   await h.cmd('archive.dispatch',{})
   const queued=await completeDriveAgreement(h,'Queued archive history',completed.client.id)
@@ -1121,17 +1122,33 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
    const response=await h.mf.dispatchFetch(h.origin+completed.path+'/'+kind+'.pdf',{headers:{cookie:completed.cookie}});assert.equal(response.status,200);artifacts[kind]=Buffer.from(await response.arrayBuffer())
   }
   const certificate=(await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).value
+  await connectXero(h,xero);await chooseXero(h,xero)
+  const deposit=await acceptXeroDeposit(h),review=await reviewXero(h,deposit.p.id);await issueXero(h,review)
+  const nextDeposit=await acceptXeroDeposit(h,'Synthetic pending review',deposit.client.id),unusedReview=await reviewXero(h,nextDeposit.p.id,h.owner,{contactId:xero.state.contacts[0].ContactID})
+  const xeroTables=['p_invoice_authority','p_xero_contacts','p_xero_jobs'],xeroBefore=Object.fromEntries(await Promise.all(xeroTables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
+  // Include completion artifacts materialized by the additional accounting agreements.
+  for(const table of tables)before[table]=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results
+  assert.equal((await h.state()).archiving.settings.active,true,'Drive configuration remains authorized at export')
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_archive_authority').first()).n,1,'export exercises live configuration authority')
+  assert.ok((await h.db.prepare('SELECT COUNT(*) AS n FROM p_archive_job_authority').first()).n>0,'export exercises live job authority')
   await h.close();h=undefined
   const archive=join(temporary,'drive.rer');await command(source,['export','--output',archive])
-  const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(driveToken))
+  const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(driveToken));assert.ok(!contents.includes(xero.token))
   const records=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
-  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0)
+  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets','p_xero_reviews','p_xero_execution'])assert.equal(records.filter(r=>r.table===table).length,0)
   await command(restored,['import','--input',archive,'--yes'])
-  const restoredFake=driveFixture();h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:restoredFake.outboundService})
-  for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table],table+' retains exact history')
-  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  const restoredFake=driveFixture(),restoredXero=xeroFixture();h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:request=>new URL(request.url).hostname==='api.xero.com'?restoredXero.outboundService(request):restoredFake.outboundService(request)})
+  for(const table of tables){const rows=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results;assert.equal(rows.length,before[table].length,table+' retains every record');assert.deepEqual(rows,before[table],table+' retains exact history')}
+  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets','p_xero_reviews','p_xero_execution'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'});assert.equal(restoredFake.calls.length,0)
   const owner=await h.signIn(h.auth.OWNER_EMAIL)
+  for(const table of xeroTables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,xeroBefore[table],table+' preserves exact Xero custody')
+  assert.ok((await h.state(owner)).xero.jobs.every(j=>!j.executable));assert.equal(restoredXero.calls.length,0)
+  await connectXero(h,restoredXero,owner,1)
+  const noReplay=restoredXero.calls.length
+  await issueXero(h,review,owner,409);await issueXero(h,unusedReview,owner,409)
+  await h.cmd('xero.review',{id:deposit.p.id},owner,409)
+  assert.equal(restoredXero.calls.length,noReplay,'reconnection cannot revive a restored request or review')
   for(const kind of ['agreement','certificate']){
    const response=await h.mf.dispatchFetch(h.origin+'/api/platter/'+kind+'.pdf?id='+completed.proposal.id,{headers:{cookie:owner}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),artifacts[kind])
   }

@@ -1137,3 +1137,4 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
   assert.equal(await history.getByRole('button').count(),0)
  }finally{await context?.close();await browser?.close();await app?.close()}
 })
+test('ACCT-002 Settings reviews the exact deposit and explicitly issues one Xero invoice', {timeout:120000}, async()=>{await (await import('./xero-browser.mjs')).xeroBrowser()})

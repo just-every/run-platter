@@ -553,7 +553,7 @@ test('FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect rev
 })
 
 
-test('MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting', {timeout:120000}, async()=>{
+test('MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting', {timeout:240000}, async()=>{
  const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs')
  let app,browser,edge
  try{
@@ -613,6 +613,8 @@ test('MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss
    }finally{await context.close();await app.close();app=undefined;await edge.close();edge=undefined}
   }
  }finally{await browser?.close();await app?.close();await edge?.close()}
+ const {followupReportingBrowser}=await import('./followup-reporting-browser.mjs')
+ await followupReportingBrowser()
 })
 
 test('SEND-006 desktop and phone rehearse to self, then edit invitations, fresh links and negotiated sends with exact retained history', {timeout:180000},async()=>{

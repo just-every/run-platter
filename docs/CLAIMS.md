@@ -38,7 +38,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 30 | Emailed to all, filed to Google Drive, Salesforce Closed Won | `AUTO-002` partial; `CRM-002` missing | partial |
 | 31 | Stripe ACH deposit, fee and payout cleared in QuickBooks Online, balance $0.00 | `PAY-001` partial; `ACCT-001` missing; `ACCT-006` missing | partial |
 | 32 | One invoice per amount, created on its issue day; net 15 | `ACCT-004` partial; `ACCT-007` missing; `PAY-008` missing | partial |
-| 33 | Card declined, the client told why, ACH from the same invoice link | `PAY-004` missing; `PAY-005` missing | missing |
+| 33 | Card declined, the client told why, ACH from the same invoice link | `PAY-004` missing; `PAY-005` partial | partial |
 | 34 | The agent’s exception card carries evidence; money and outbound corrections follow company policy | `AGENT-005` partial; `AGENT-009` partial | partial |
 | 35 | Reconciled: 1 amount, 1 invoice, 2 attempts, 0 mismatches | `ACCT-004` partial | partial |
 | 36 | Out-of-scope request priced as its own change order; the original agreement unchanged | `AGENT-006` missing; `PROP-002` partial | partial |
@@ -48,4 +48,4 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 40 | Catalog CSV with bundles as packages; bulk PDFs kept with their certificates | `MIG-001` missing; `CAT-001` partial | partial |
 | 41 | Planned move-in support for Proposify, Better Proposals, Qwilr and Ignition | `MIG-002` missing; `MIG-003` missing; `MIG-004` missing | missing |
 
-Claims: 41; 1 done, 36 partial, 4 missing.
+Claims: 41; 1 done, 37 partial, 3 missing.

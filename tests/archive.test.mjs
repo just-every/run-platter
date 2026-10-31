@@ -967,8 +967,11 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
 
 
 test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority', {timeout:300000},async()=>{
+ const {depositEdge,preparedNoticeDeposit}=await import('./collection-journey.mjs')
+ const failureEdge=depositEdge()
  const fixed=Date.parse('2032-03-01T12:00:00Z'),sourceTexts=[];let rejected=false
- const sourceEdge=async request=>{const url=new URL(request.url);if(url.hostname==='slack.com'&&rejected)return Response.json({ok:false,error:'token_revoked'});if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-7105'});if(url.pathname==='/v1.0/chats/synthetic-platter-7106')return Response.json({chatType:'oneOnOne',members:[{email:h.auth.OWNER_EMAIL},{userId:'synthetic-platter-7105'}]});if(url.hostname==='api.twilio.com'){sourceTexts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(7112+sourceTexts.length)},{status:201})}return Response.json({ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})}
+ failureEdge.now=fixed
+ const sourceEdge=async request=>{const url=new URL(request.url);if(['api.stripe.com','api.resend.com'].includes(url.hostname))return failureEdge.outboundService(request);if(url.hostname==='slack.com'&&rejected)return Response.json({ok:false,error:'token_revoked'});if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-7105'});if(url.pathname==='/v1.0/chats/synthetic-platter-7106')return Response.json({chatType:'oneOnOne',members:[{email:h.auth.OWNER_EMAIL},{userId:'synthetic-platter-7105'}]});if(url.hostname==='api.twilio.com'){sourceTexts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(7112+sourceTexts.length)},{status:201})}return Response.json({ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})}
  const temporary=await mkdtemp(join(tmpdir(),'platter-notification-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored');let h
  try{
   for(const path of [source,restored])await checkout(path)
@@ -1066,7 +1069,7 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   await h.cmd('expiry.set',{id:future.id,version:1,mode:'days',days:30,warningDays:1})
   await h.cmd('notification.expiry',{id:future.id,version:2,consent:true})
   await h.cmd('proposal.approve',{id:future.id,version:3,revision:1});await h.cmd('proposal.send',{id:future.id,version:4})
-  const tables=['p_connections','p_sms_provider_optins','p_sms_reenable_history','p_sms_assents','p_sms_revocations','p_sms_code_runs','p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_sender_notice_events','p_renewal_notice_settings','p_renewal_followups','p_template_notice_defaults','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
+  const tables=['p_payment_failures','p_payment_failure_deliveries','p_payment_failure_settings','p_collection_intents','p_connections','p_sms_provider_optins','p_sms_reenable_history','p_sms_assents','p_sms_revocations','p_sms_code_runs','p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_sender_notice_events','p_renewal_notice_settings','p_renewal_followups','p_template_notice_defaults','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
   assert.equal(before.p_sms_assents.length,3);assert.equal(before.p_sms_provider_optins.length,1);assert.equal(before.p_sms_reenable_history.length,1);assert.equal(before.p_sms_runs.filter(r=>r.kind==='completion').length,1)
   for(const table of ['p_sms_revocations','p_sms_code_runs','p_sms_optouts'])assert.equal(before[table].length,1,table+' has real history')
   assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,10,'the scheduler signature notice, explicit manager request and revoked request history are retained')
@@ -1075,6 +1078,11 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const expiryEventsBefore=before.p_sender_notice_events.slice()
   const {prepareSenderNoticeArchive,assertSenderNoticeRestore}=await import('./sender-notice-archive.mjs')
   const renewalReceipt=await prepareSenderNoticeArchive(h,client)
+  await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-10101',publishableKey:'synthetic-platter-10102',consent:true})
+  failureEdge.now=fixed+2*86400000+60000
+  const failedDeposit=await preparedNoticeDeposit(h,'required',previewed.manager.cookie);await failedDeposit.authorize();failureEdge.fail(failedDeposit.saved)
+  assert.equal((await h.send(failedDeposit.path+'/payment-status.json',{},failedDeposit.cookie)).status,200)
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_payment_failure_deliveries').first()).n,2)
   for(const table of tables)before[table]=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results
   assert.equal(before.p_sender_notice_runs.filter(r=>r.kind==='renewal').length,1)
   const archivePolicy=(await h.state()).approvalSettings.policy
@@ -1084,7 +1092,7 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
   assert.deepEqual(records.filter(r=>r.table==='p_audit'&&previewed.audit.some(a=>a.id===r.row.id)).map(r=>r.row).sort((a,b)=>a.id.localeCompare(b.id)),previewed.audit.map(({mail_route,sender_address,reason,...row})=>row).sort((a,b)=>a.id.localeCompare(b.id)),'the exact manager preview audit is exported through the public CLI')
   for(const table of ['oa_sessions','oa_tokens','p_shares'])assert.equal(records.filter(r=>r.table===table).length,0,'preview audit custody carries no native session or invitation authority')
-  for(const table of ['p_sms_reenable_eligibility','p_sms_completion_authority','p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_renewal_notice_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0,table+' stays local')
+  for(const table of ['p_payment_failure_authority','p_sms_reenable_eligibility','p_sms_completion_authority','p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_renewal_notice_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0,table+' stays local')
   await command(restored,['import','--input',archive,'--yes'])
   const calls=[];h=await harness({root:restored,origin:'https://platter.example',unclaimed:true,assetsDirectory:'public',auth:{AUTH_LOCAL:'false',TWILIO_ACCOUNT_SID:'synthetic-platter-7110',TWILIO_AUTH_TOKEN:'synthetic-platter-7111',TWILIO_FROM:'+15005550006'},outboundService:request=>{calls.push(request.url);if(new URL(request.url).pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-7100'});throw Error('Unexpected restored provider request')}})
   for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results,before[table],table+' retains exact business history')
@@ -1092,9 +1100,14 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.deepEqual((await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(previewed.proposal.id).all()).results,previewDecisions)
   const replayedOptIn=await h.mf.dispatchFetch(callbackUrl,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','x-twilio-signature':optInSignature},body:optIn.toString()});assert.equal(replayedOptIn.status,200);await replayedOptIn.text()
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sms_reenable_eligibility').first()).n,0,'restored provider receipt replay never creates eligibility')
-  for(const table of ['p_sms_reenable_eligibility','p_sms_completion_authority','p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_renewal_notice_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  for(const table of ['p_payment_failure_authority','p_sms_reenable_eligibility','p_sms_completion_authority','p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_renewal_notice_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(fixed+30*86400000),cron:'*/15 * * * *'})
   const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
+  const restoredFailure=(await h.state(restoredOwner)).proposals.find(p=>p.id===failedDeposit.id)
+  assert.equal(restoredFailure.collection.failures.length,1)
+  assert.equal(restoredFailure.collection.failures[0].reason,'The payment method has insufficient funds.')
+  assert.equal((await h.state(restoredOwner)).paymentFailureNotices.find(p=>p.id===failedDeposit.id).authorized,0)
+  assert.equal((await h.send(failedDeposit.path+'/payment-status.json',{},failedDeposit.cookie)).status,404,'Retained failed attempts cannot restore client access or notice execution')
   const restoredPreviewAudit=(await h.send('/api/platter/audit?action=proposal.preview&subject='+previewed.proposal.id,undefined,restoredOwner)).value.rows
   assert.deepEqual(restoredPreviewAudit,previewed.audit,'actor, scoped subject and original server time survive public CLI restore exactly; refusals add no preview audit')
   const restoredRequest=(await h.cmd('notification.requests',{id:revoked.id},restoredOwner)).requests[0];assert.deepEqual(restoredRequest.trigger,retainedRequest.trigger);assert.equal(restoredRequest.revoked_at,retainedRequest.revoked_at);assert.equal(restoredRequest.current,false)

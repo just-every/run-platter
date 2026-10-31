@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 15 | 100 | 44 | 159 |
+| Core | 15 | 101 | 43 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 15 | 100 | 48 | 163 |
+| Full target | 15 | 101 | 47 | 163 |
 
 Judged from the code and tests at commit `8f4ff0320aaafd58b41dabcf9e39bc60db7dc646` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. FOLLOW-002 retains main’s partial judgment; replayed boundary, tie-order and production-auth tests add evidence pending a fresh ct judgment. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. EDIT-009 is a builder completion claim with independently filled West and East variable conditions, pending exact-candidate Verify and guarded landing. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. APPROVE-003 retains main’s partial judgment and existing Gap; the replayed native default-role matrix, owner/admin policy audit, browser controls and exact archive custody assertions add evidence pending a fresh ct judgment. APPROVE-001 now retains additional saved-rule, parallel-decision and archive assertions; its current partial judgment is preserved rather than accepting the older candidate completion claim. FOLLOW-010 source proof is replayed from candidate `3457720b3bf75b5e3fcd51eab0b9fb80c7ba6b6b` (original candidate `dfebdf12c6de8e7b642f62846f7ac88ba7527138`). FOLLOW-010 retains main’s partial judgment; the replayed reporting journeys add a builder completion claim pending guarded landing and ct judgment. PORT-002 retains main’s partial judgment; the replayed populated archive and credential-isolation assertions add evidence pending a fresh ct judgment. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -1347,15 +1347,15 @@ Core · target · **missing** · Rules D-1
 
 #### PAY-005 — Failed-payment retries and notices
 
-Core · target · **missing** · Rules D-1
+Core · target · **partial** · Rules D-1
 
 **Requirement.** When a payment fails, the client and firm are told with the reason; Platter retries on an owner-set schedule only where the client's authorization allows it, and stops a retry once the amount is paid by any route. Each attempt is on the timeline. Detailed mapping and custody rules are in [proposal behavior](docs/contract-behavior.md#pay-005).
 
 **Acceptance.**
 1. Fail a milestone charge; both parties are notified; a retry runs after the set delay; pay by check (`PAY-007`) before the next retry and see it canceled.
 
-**Evidence.** None.
-**Gap.** No retries or notices.
+**Evidence.** `tests/platter.test.mjs` — “deposit signatures survive declines, required acceptance waits for Stripe success and due acceptance stays complete”; `tests/collection-journey.mjs` — “failureNoticesJourney”; `tests/mail.test.mjs` — “PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete or uncertain mail without replay”; `tests/site.test.mjs` and `tests/collection-browser.mjs` — “deposit collection settings, retained signatures, required and due completion at desktop and phone widths”; `tests/archive.test.mjs` — “APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority”
+**Gap.** Delivered: Explicit owner consent enables once-only client and owner notices for ordinary mailbox-verified, tax-free USD single-client deposits. A provider-read failed charge must identify the current account, accepted revision, exact authorized amount and attempt. Initial payment-method status, browser claims and ambiguous responses notify nobody. Allowlisted reasons and delivery outcomes survive restore; current authority and invitation are rechecked before dispatch, confirmed payment suppresses obsolete notices, and uncertain mail never replays. Missing: Milestone and recurring failures, owner-set retry schedules, future-charge authorization, automatic retries, cancellation after offline payment, SMS, other processors and live-provider qualification. Conservative owner-only authority remains the standing interim floor; configured-recipient execution remains omitted. Existing SEND-003 and SIGN-004 judgment holds and PAY-001, PAY-002, PAY-003, PAY-004 and PAY-008 real-key holds remain unchanged.
 
 #### PAY-006 — Refunds and disputes
 

@@ -972,8 +972,9 @@ test('APPROVE-002 explicit requests deliver exact revision previews by email and
   await h.send('/auth/invite',{email:billingEmail,role:'member',displayName:'Synthetic finance'},h.owner)
   const billingCookie=await h.signIn(billingEmail),billing=(await h.state(billingCookie)).actor
   await h.cmd('member.set',{operatorId:billing.id,version:0,role:'billing',teams:[]})
-  const totalRule=await h.cmd('approval.rule',{version:0,name:'Value review',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:owner']})
-  const discountRule=await h.cmd('approval.rule',{version:1,name:'Discount review',position:1,condition:{kind:'discountOver',bps:1500},approvers:['person:'+billing.id]})
+  let policyVersion=(await h.state()).approvalSettings.policy.version
+  const totalRule=await h.cmd('approval.rule',{version:policyVersion++,name:'Value review',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:owner']})
+  const discountRule=await h.cmd('approval.rule',{version:policyVersion++,name:'Discount review',position:1,condition:{kind:'discountOver',bps:1500},approvers:['person:'+billing.id]})
   const routed=await h.cmd('proposal.prepare',{...offer,clientId:h.client.id,currency:'USD',packages:[{id:'main',label:'Campaign',price:'30000',discountPercent:'20'}]})
   const firstInput=await approvalRequestInput(h,{id:routed.id,version:1,consent:true}),firstRequest=await h.cmd('notification.request',firstInput)
   const valueMail=h.messages.at(-1);assert.deepEqual(valueMail.to,[h.auth.OWNER_EMAIL]);assert.match(valueMail.text,/Triggered by: Highest offered gross total USD 30000.00 exceeds USD 25000.00\./)
@@ -988,7 +989,7 @@ test('APPROVE-002 explicit requests deliver exact revision previews by email and
   const nextRow=(await h.cmd('notification.requests',{id:routed.id})).requests.find(row=>row.id===nextRequest.requests[0]);assert.equal(nextRow.approver_id,billing.id);assert.equal(nextRow.current,true)
   await h.cmd('notification.decide',{requestId:nextRow.id,version:2,decision:'approved',note:'Discount checked'},billingCookie)
   assert.equal((await h.state()).proposals.find(row=>row.id===routed.id).status,'approved')
-  await h.cmd('approval.rule.delete',{id:totalRule.id,version:2});await h.cmd('approval.rule.delete',{id:discountRule.id,version:3})
+  await h.cmd('approval.rule.delete',{id:totalRule.id,version:policyVersion++});await h.cmd('approval.rule.delete',{id:discountRule.id,version:policyVersion++})
   // Each supported trigger is recorded from the requested revision, with
   // independently written expected outcomes rather than rendered input values.
   const source=await h.cmd('template.start',{id:'starter:consultancy',version:1,clientId:h.client.id})
@@ -1001,7 +1002,6 @@ test('APPROVE-002 explicit requests deliver exact revision previews by email and
    [{kind:'termsEdited'},'Legal terms changed from revision 1.',source.id],
    [{kind:'template'},'Proposal started from template “Consultancy”.',source.id]
   ]
-  let policyVersion=4
   for(const [condition,expected,proposalId] of cases){
    const rule=await h.cmd('approval.rule',{version:policyVersion++,name:'Synthetic trigger review',position:0,condition,approvers:['role:owner']})
    const target=proposalId??(condition.kind==='marginBelow'?await h.cmd('proposal.prepare',{...offer,clientId:h.client.id,packages:[{id:'one',label:'Studio',price:'2400',optionalItems:[{id:'rush',label:'Rush',unitPrice:'100',min:1,max:1,quantity:1,editable:false}]},{id:'two',label:'Campaign',price:'4200'}]}):await h.prepare('Recorded trigger')).id,targetRow=(await h.state()).proposals.find(row=>row.id===target)
@@ -1110,7 +1110,7 @@ test('AUTO-003 signed events reach Slack channels and approval requests reach ve
   const p=await h.prepare('Signed event'),request=await h.cmd('notification.request',await approvalRequestInput(h,{id:p.id,version:1,consent:true}))
   assert.equal(h.chats.length,1)
   assert.equal(h.chats[0].url,'https://graph.microsoft.com/v1.0/chats/synthetic-platter-7006/messages')
-  assert.deepEqual(h.chats[0].value,{body:{contentType:'text',content:'Approval requested\nApproval required: Default approval\nRevision 1\nPreview: '+h.origin+'/app/preview?id='+p.id+'&revision=1\nReview and decide: '+h.origin+'/app/proposal?id='+p.id+'\nA signed-in approver must explicitly approve or reject with a note. Request id: '+request.requests[0]}})
+  assert.deepEqual(h.chats[0].value,{body:{contentType:'text',content:'Approval requested\nApproval required: Default approval\nTriggered by: Approval is required for every proposal.\nRevision 1\nPreview: '+h.origin+'/app/preview?id='+p.id+'&revision=1\nReview and decide: '+h.origin+'/app/proposal?id='+p.id+'\nA signed-in approver must explicitly approve or reject with a note. Request id: '+request.requests[0]}})
   const preview='/app/preview?id='+p.id+'&revision=1'
   assert.equal((await h.send(preview)).status,401)
   assert.equal((await h.send(preview,undefined,h.owner)).status,200)

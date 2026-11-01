@@ -29,6 +29,7 @@ export const depositRequests=async(db:D1Database,id:string)=>(await db.prepare('
 
 /** The review contains no invitation token and cannot itself authorize delivery. */
 export async function depositRequestReview(db:D1Database,id:string) {
+ if(await db.prepare('SELECT 1 FROM p_deposit_requests WHERE proposal_id=?').bind(id).first())return null
  try {const b=await binding(db,id);return {revision:b.revision,acceptedAt:b.accepted_at,recipient:b.recipient,depositCents:b.deposit_cents,currency:b.currency,invitationHash:b.invitationHash}}
  catch(error){if((error as any)?.status===409)return null;throw error}
 }

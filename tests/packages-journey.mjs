@@ -106,7 +106,9 @@ export async function packagesJourney() {
    assert.ok((await frame.locator('main').innerText()).includes(rushTerms));await capture(page,'item-condition-preview')
 
   }finally{await clientContext?.close();await context.close();await app.close()}
- }}finally{await browser.close()}
+ }
+ const {paperDepositBrowserJourney}=await import('./deposit-request-browser.mjs');await paperDepositBrowserJourney(browser,screenshots)
+ }finally{await browser.close()}
 }
 
 // Extend the package sanity journey at one assertion width; record the same screens on a phone.

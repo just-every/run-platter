@@ -1676,6 +1676,7 @@ test('COLLAB-002 scoped colleagues comment, receive consented generic email and 
 })
 
 test('SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports', {timeout:240000}, async()=>{
+ const {paperDepositMailJourney}=await import('./deposit-request-journey.mjs');await paperDepositMailJourney()
  const {createHash}=await import('node:crypto')
  for(const provider of ['resend','sendgrid','cloudflare','gmail','microsoft','local']){
   const sent=[];let fail=false,stall=false,revokeDuringRefresh=false,release,entered

@@ -3602,7 +3602,7 @@
       "executable": false
     },
     "tests/packages-journey.mjs": {
-      "sha256": "1706746f55b49acee03f8129df209b65a6dbe76d5dc93261e39e1cf193182a41",
+      "sha256": "2879ba3daf1f03e8b29f69b12d1d9d9bf6cf45903876479a17f89c7b0219bbfc",
       "executable": false
     },
     "tests/pdf-document.mjs": {

@@ -1054,7 +1054,7 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-MAIL-001
 5. A fourth proposal accepted on 10 March with expiry on 15 March gets no expiry notice.
 6. A sales member's change to the workspace lead times is refused (403).
 
-**Evidence.** `tests/mail.test.mjs`
+**Evidence.** `tests/mail.test.mjs`; `tests/site-documents.mjs`; `tests/archive.test`; `tests/sender-notice-journey.mjs`; `tests/sender-notice-archive.mjs`
 **Gap.** Recorded sender notices and dated follow-ups exist. Default-on execution without separate activation, watchers/preferences, template and sender settings, declined-offer proof and actual renewal offers remain unproved; stored thirty-day settings do not execute renewals. RL-102 resolves the policy, without changing partial status.
 
 #### FOLLOW-004 — Client questions and comments

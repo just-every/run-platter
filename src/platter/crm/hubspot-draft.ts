@@ -1,5 +1,6 @@
 import type { Bindings } from '../../auth.server'
-import { providerCredential, providerJson } from '../connections'
+import { providerCredential } from '../connections'
+import { hubspotJson } from './hubspot-request'
 import { proposalFields } from '../commands'
 import { currentTime } from '../expiry-time'
 import { commit, email, hash, need, snapshot, text, type Actor } from '../model'
@@ -21,8 +22,8 @@ function associations(deal: any, kind: string) {
  need(new Set(ids).size === ids.length, 'The deal has ambiguous associated records', 409)
  return ids as string[]
 }
-async function sourceRecord(kind: string, id: string, properties: string, token: string) {
- const row = await providerJson(base + kind + '/' + encodeURIComponent(id) + '?properties=' + properties, token)
+async function sourceRecord(env: Bindings, connection: any, kind: string, id: string, properties: string, token: string) {
+ const row = await hubspotJson(env, connection, token, base + kind + '/' + encodeURIComponent(id) + '?properties=' + properties)
  need(String(row.id) === id && !row.archived && row.properties && !Array.isArray(row.properties), 'The provider did not confirm the selected record', 409)
  return row
 }
@@ -31,11 +32,11 @@ export async function readDeal(env: Bindings, input: Record<string, unknown>) {
  need(!connection.broken_at, 'Reconnect HubSpot before reading deals', 409)
  need(input.accountId === undefined || input.accountId === connection.account_id, 'This card belongs to another HubSpot account', 409)
  const dealId = identifier(input.dealId)
- const deal = await providerJson(base + 'deals/' + encodeURIComponent(dealId) + '?properties=dealname,description,amount,deal_currency_code&associations=companies,contacts,line_items', secret.token)
+ const deal = await hubspotJson(env, connection, secret.token, base + 'deals/' + encodeURIComponent(dealId) + '?properties=dealname,description,amount,deal_currency_code&associations=companies,contacts,line_items')
  need(String(deal.id) === dealId && !deal.archived && deal.properties, 'The provider did not confirm this deal', 409)
  const companies = associations(deal, 'companies'), contacts = associations(deal, 'contacts'), lineIds = associations(deal, 'line_items')
- const companyRows = await Promise.all(companies.map(id => sourceRecord('companies', id, 'name,address,city,state,zip,country', secret.token)))
- const contactRows = await Promise.all(contacts.map(id => sourceRecord('contacts', id, 'firstname,lastname,email,jobtitle', secret.token)))
+ const companyRows = await Promise.all(companies.map(id => sourceRecord(env, connection, 'companies', id, 'name,address,city,state,zip,country', secret.token)))
+ const contactRows = await Promise.all(contacts.map(id => sourceRecord(env, connection, 'contacts', id, 'firstname,lastname,email,jobtitle', secret.token)))
  const choices = { dealId, companies: companyRows.map(r => ({ id: String(r.id), name: optional(r.properties.name) })), contacts: contactRows.map(r => ({ id: String(r.id), name: [r.properties.firstname, r.properties.lastname].filter(Boolean).join(' '), email: optional(r.properties.email, 254) })) }
  if (!input.companyId || !input.contactId) return { connection, choices }
  const company = companyRows.find(r => String(r.id) === identifier(input.companyId)), contact = contactRows.find(r => String(r.id) === identifier(input.contactId))
@@ -43,7 +44,7 @@ export async function readDeal(env: Bindings, input: Record<string, unknown>) {
  const cp = contact.properties, dp = deal.properties
  need(dp.deal_currency_code === 'USD', 'Only explicitly USD deals can start a draft', 409)
  const lines = await Promise.all(lineIds.map(async id => {
-  const row = await sourceRecord('line_items', id, 'name,description,quantity,price,amount,discount,hs_discount_percentage,recurringbillingfrequency,hs_recurring_billing_period,hs_line_item_currency_code,hs_tax_rate', secret.token), p = row.properties
+  const row = await sourceRecord(env, connection, 'line_items', id, 'name,description,quantity,price,amount,discount,hs_discount_percentage,recurringbillingfrequency,hs_recurring_billing_period,hs_line_item_currency_code,hs_tax_rate', secret.token), p = row.properties
   need(!p.hs_line_item_currency_code || p.hs_line_item_currency_code === 'USD', 'Only USD line items can start a draft', 409)
   need([p.discount, p.hs_discount_percentage, p.hs_tax_rate].every(v => v == null || v === '' || Number(v) === 0) && [p.recurringbillingfrequency, p.hs_recurring_billing_period].every(v => v == null || v === '' || v === 'one_time'), 'Discounted, taxed or recurring source items need manual preparation', 409)
   need(typeof p.quantity === 'string' && /^\d{1,7}(\.\d{1,3})?$/.test(p.quantity) && Number(p.quantity) > 0, 'The source quantity is missing or unsupported', 409)

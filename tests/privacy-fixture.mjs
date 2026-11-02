@@ -30,6 +30,17 @@ export async function privacyFixture(h, edge) {
  await h.cmd('tracking.settings',{enabled:'yes',alerts:'yes',retentionDays:90,quietMinutes:30,consent:'yes'})
  for(const invite of invites.slice(0,2)){
   const viewed=await h.send(invite.path,undefined,invite.cookie);assert.equal(viewed.status,200)
+  const current=(await h.state()).proposals.find(p=>p.id===invite.id),viewId=current.engagementDetails.views.at(-1).id
+  invite.viewId=viewId
+  assert.equal((await h.send(invite.path+'/engagement',{viewId,readings:{pricing:1},optionId:'one',choiceSequence:1,items:[]},invite.cookie)).status,200)
+  const personalFile=current.attachments.find(f=>!f.kind)
+  if(personalFile){const opened=await h.mf.dispatchFetch(h.origin+invite.path+'/attachments/'+personalFile.id+'?viewId='+viewId,{headers:{cookie:invite.cookie}});assert.equal(opened.status,200);await opened.arrayBuffer()}
+  const stakeholderAddress=['synthetic-platter-stakeholder-'+invites.indexOf(invite),'example.test'].join('@')
+  const challenge=await h.send(invite.path+'/stakeholder',{name:'Synthetic forwarded reader',email:stakeholderAddress,consent:'yes'},invite.cookie);assert.equal(challenge.status,200,challenge.text)
+  if(invite.id===first.id){
+   const challengeId=challenge.text.match(/name="challengeId" value="([^"]+)"/)[1],code=(await h.state()).outbox.find(m=>m.recipient===stakeholderAddress&&m.subject==='Verify your stakeholder mailbox').body.match(/\b\d{6}\b/)[0]
+   const identified=await h.send(invite.path+'/stakeholder',{challengeId,code},invite.cookie);assert.equal(identified.status,200,identified.text)
+  }
   const question=await h.send(invite.path+'/action?name=question.create',{revision:invite.revision,section:'scope',text:'synthetic-platter-private-question'},invite.cookie);assert.equal(question.status,200,question.text)
   const q=(await h.state()).proposals.find(p=>p.id===invite.id).questions[0]
   await h.cmd('question.answer',{id:invite.id,questionId:q.id,text:'synthetic-platter-private-answer'})
@@ -44,7 +55,7 @@ export async function privacyFixture(h, edge) {
  return {client,first,second,retained,invites,artifacts,retainedFile,sourceReview:review}
 }
 export async function privacyInventory(h) {
- const tables=['p_clients','p_proposals','p_revisions','p_acceptances','p_questions','p_question_answers','p_internal_threads','p_views','p_tracking_alerts','p_tracking_reading','p_tracking_choices','p_tracking_attachment_opens','p_tracking_stakeholders','p_shares','p_mail','p_crm_draft_sources','p_crm_draft_reviews','p_privacy_receipts','p_erased_clients','rer_portability_state']
+ const tables=['p_attachment_files','p_attachment_chunks','p_vendor_documents','p_clients','p_proposals','p_revisions','p_acceptances','p_questions','p_question_answers','p_internal_threads','p_views','p_tracking_alerts','p_tracking_reading','p_tracking_choices','p_tracking_attachment_opens','p_tracking_stakeholders','p_tracking_challenges','p_shares','p_mail','p_crm_draft_sources','p_crm_draft_reviews','p_privacy_receipts','p_erased_clients','rer_portability_state']
  const result={}
  for(const table of tables) result[table]=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results
  return result
@@ -55,7 +66,7 @@ export async function assertPrivacyErased(h,fixture,receipt) {
  const affected=[fixture.first.id,fixture.second.id,fixture.retained.id]
  assert.deepEqual(state.proposals.filter(p=>affected.includes(p.id)).map(p=>p.id),[fixture.retained.id])
  assert.equal(state.tracking.views.length,0);assert.equal(state.tracking.alerts.length,0)
- for(const table of ['p_questions','p_question_answers','p_internal_threads','p_mail','p_shares','p_crm_draft_reviews','p_tracking_reading','p_tracking_choices','p_tracking_attachment_opens']){const direct=['p_questions','p_internal_threads','p_mail','p_shares'].includes(table),query=h.db.prepare('SELECT count(*) AS n FROM '+table+(direct?' WHERE proposal_id IN (SELECT value FROM json_each(?))':''));assert.equal((await (direct?query.bind(JSON.stringify(affected)):query).first()).n,0,table+' is erased independently of the receipt counts')}
+ for(const table of ['p_questions','p_question_answers','p_internal_threads','p_mail','p_shares','p_crm_draft_reviews','p_tracking_reading','p_tracking_choices','p_tracking_attachment_opens','p_tracking_stakeholders','p_tracking_challenges']){const direct=['p_questions','p_internal_threads','p_mail','p_shares'].includes(table),query=h.db.prepare('SELECT count(*) AS n FROM '+table+(direct?' WHERE proposal_id IN (SELECT value FROM json_each(?))':''));assert.equal((await (direct?query.bind(JSON.stringify(affected)):query).first()).n,0,table+' is erased independently of the receipt counts')}
  const files=(await h.db.prepare('SELECT * FROM p_attachment_files').all()).results
  assert.deepEqual(files.map(f=>f.sha256),[digest(fixture.retainedFile)],'only the retained original file survives')
  const retained=(await h.state()).proposals.find(p=>p.id===fixture.retained.id),file=retained.attachments[0]
@@ -70,6 +81,7 @@ export async function assertPrivacyErased(h,fixture,receipt) {
  }
  for(const invite of fixture.invites){
   for(const suffix of ['','/data.json','/agreement.pdf'])assert.equal((await h.send(invite.path+suffix,undefined,invite.cookie)).status,404,'erased invitation cannot expose '+suffix)
+  if(invite.viewId)assert.equal((await h.send(invite.path+'/engagement',{viewId:invite.viewId,readings:{pricing:1},optionId:'one'},invite.cookie)).status,404,'captured reading events cannot resurrect engagement')
   assert.equal((await h.send(invite.path+'/action?name=accept',{name:'Replay',optionId:'one',consent:true},invite.cookie)).status,404)
  }
  return state

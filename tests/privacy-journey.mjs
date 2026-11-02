@@ -14,6 +14,7 @@ export async function privacyJourney(){
   const id=fixture.client.id,review=await h.cmd('privacy.review',{id}),input={id,...review.privacyReview,confirmName:fixture.client.name,consent:'yes'}
   const before=await privacyInventory(h),accepted=before.p_acceptances[0],revisions=before.p_revisions.filter(r=>r.proposal_id===fixture.retained.id)
   assert.equal(before.p_views.length,2);assert.equal(before.p_questions.length,2);assert.equal(before.p_internal_threads.length,2);assert.equal(before.p_crm_draft_sources.length,1)
+  assert.equal(before.p_tracking_reading.length,2);assert.equal(before.p_tracking_choices.length,2);assert.equal(before.p_tracking_attachment_opens.length,1);assert.equal(before.p_tracking_stakeholders.length,1);assert.equal(before.p_tracking_challenges.length,1)
   const address=['synthetic-platter-privacy-member','example.test'].join('@')
   assert.equal((await h.send('/auth/invite',{email:address,displayName:'Synthetic privacy member',role:'member',returnTo:'/app'},h.owner)).status,202)
   const member=await h.signIn(address)

@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "91683220b005e1a8c769254b6791d658a10c74db13f3ad54d5bd94b7a211bc86",
+      "sha256": "020a63a78998ebce744c19659b65290c68f58dba6a947e07e30cdcfffa0626b4",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2470,11 +2470,11 @@
       "executable": false
     },
     "src/platter/accounting/jobs.ts": {
-      "sha256": "c1ebcf9620e94f5f89c823489a48b11fce7b1e47cf7a64058c1fe14b9ed54474",
+      "sha256": "6a71136110bd2363844e10bd5128f1d63297f8b1d4bd7be7fb6c1c28be7c196f",
       "executable": false
     },
     "src/platter/accounting/quickbooks.ts": {
-      "sha256": "94518ff51192f2460f0198eaf2984c94a0e13bea71c1a88d53577f66118a9763",
+      "sha256": "0f37b669452ad787e897fb8d75688c163efdddc787efa2fc91b95615e1d50121",
       "executable": false
     },
     "src/platter/accounting/xero-jobs.ts": {
@@ -3462,7 +3462,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "554389135d23a815e34db6b48c8e2dcb4915f9a90e81582c2e2c6526bb1cc2ef",
+      "sha256": "5cdf4c35738d2fb09bb67b4558f4882ee14f59b48146661d697b9981fadd161e",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3626,7 +3626,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "ef9b89bd6c3fe05ce5a3b87b64b46cabd33f2f8eaef782f3d7020dbd1507df7c",
+      "sha256": "f5da2675b4e02f5fabfa4f80eb2ed357077b55230ae180e8fcd37774127f8f6c",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3638,7 +3638,11 @@
       "executable": false
     },
     "tests/provider-network.mjs": {
-      "sha256": "0530e979ede64373a1b9e4c52b671322aec775119388e8ba22d5bf76b85bf3a4",
+      "sha256": "894fa9ed7a11fa9caeef37ab41857aa186c834eb34f2ab8904a8ef77dc84ef33",
+      "executable": false
+    },
+    "tests/quickbooks-browser.mjs": {
+      "sha256": "2672933712511cc2a979a404086e85ec604db31bdc693cfd8030584484bb7eab",
       "executable": false
     },
     "tests/recipients-browser.mjs": {
@@ -3678,7 +3682,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "21c16eb6a2945caedafd8839d6949243cef5ce13cdb9fcf8d725749ea62d1ee2",
+      "sha256": "00d0b8c05f06e24e86babfc681fdb0457fd4d4a4c2de48debac75e8fc27941c5",
       "executable": false
     },
     "tests/site-harness.mjs": {

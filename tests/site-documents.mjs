@@ -1,3 +1,4 @@
+import { quickbooksBrowser } from './quickbooks-browser.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { localeBrowser } from './locale-browser.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
@@ -11,6 +12,8 @@ import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { pdfPages } from './pdf-document.mjs'
 import { builtSite, installedApp } from './site-harness.mjs'
+
+test('ACCT-001 owner reviews exact QuickBooks deposits in Settings and retains once-only invoice history', {timeout:120000}, ()=>quickbooksBrowser())
 
 test('EDIT-017 owner-selected Spanish invitation, verification, consent and completion preserve authored English through the compiled client', {timeout:120000},()=>localeBrowser())
 

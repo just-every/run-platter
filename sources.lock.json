@@ -1326,7 +1326,7 @@
       "executable": false
     },
     "RELEASE.json": {
-      "sha256": "ce2fce6600660186fb58eb919099dd684ea43ef3cddbca0045684f249db2c608",
+      "sha256": "137cf8265ed8716829e1cdc9b567306b36a9f959ca5bb6ad45ee84e052ba9a4a",
       "executable": false
     },
     "rer-project.json": {
@@ -2834,7 +2834,7 @@
       "executable": false
     },
     "src/platter/movein/document-import.ts": {
-      "sha256": "3bd1cb2b06c3c1a83831803e8eee85438c5034f26099d86239e0032c58f48b52",
+      "sha256": "a94de48dac787e639ffd74fc2e32189b6e0b23a77b5139055f6862fc16107a31",
       "executable": false
     },
     "src/platter/movein/document-source.ts": {
@@ -3166,7 +3166,7 @@
       "executable": false
     },
     "src/platter/ui/document-movein.ts": {
-      "sha256": "1d439f388ae5409bcf6af056ca54d26f87f5ddaba7695661ac6c257d755e4f12",
+      "sha256": "a976c5661bbb89c9a50932826f68b70d5eaeb6b4cc00556f6c184a4253ac4000",
       "executable": false
     },
     "src/platter/ui/duplicate.ts": {

@@ -277,6 +277,10 @@
     {
       "id": "0102_betterproposals_export.sql",
       "buyerSteps": "Apply migrations/core/0102_betterproposals_export.sql after existing core migrations. No manual data changes; existing document imports retain their documents source kind."
+    },
+    {
+      "id": "0103_pandadoc_content.sql",
+      "buyerSteps": "Apply migrations/core/0103_pandadoc_content.sql after existing core migrations. No manual data changes; existing move-ins retain the documents content kind. Adds reviewed PandaDoc source custody and insert-only undo journals without granting send, sign or payment authority."
     }
   ],
   "breaking": false,

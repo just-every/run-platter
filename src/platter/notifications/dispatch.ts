@@ -33,6 +33,16 @@ export async function chatJson(url:string,token:string,body?:unknown) {
  const raw=await response.text();need(raw.length<=262144,'Chat provider response too large',409)
  const value=JSON.parse(raw);need(value&&value.ok!==false,'Chat provider refused the request',409);return value
 }
+// Only provider-confirmed rejection proves a Slack write had no effect.
+async function slackMessage(token:string,body:unknown){
+ const response=await fetch('https://slack.com/api/chat.postMessage',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(body),redirect:'manual',signal:AbortSignal.timeout(30000)})
+ const rejected=()=>{throw Object.assign(new Error('Slack rejected the message without posting it.'),{noEffect:true})}
+ need(response.ok,'Slack delivery is uncertain',409)
+ const raw=await response.text();need(raw.length<=262144,'Slack delivery is uncertain',409)
+ const value=JSON.parse(raw)
+ if(value?.ok===false&&['channel_not_found','not_in_channel','is_archived','restricted_action','missing_scope','invalid_auth','token_revoked','account_inactive','no_permission','ratelimited'].includes(value.error))rejected()
+ need(value?.ok===true,'Slack delivery is uncertain',409)
+}
 export async function routeAvailable(env:Bindings,r:any) {
  const authorizer=await actorById(env.DB,r.configured_by)
  if(!authorizer||!administrators.includes(authorizer.role))return false
@@ -43,6 +53,8 @@ export async function flushNotifications(env:Bindings) {
  for(const row of rows){
   let body=row.body
   const allowed=async()=>{
+   const {childAuthorized}=await import('../automations/rules')
+   if(!await childAuthorized(env,'notification',row.id))return false
    if(row.event_key.startsWith('collab:')){const { activeCollaboration }=await import('../collaboration');if(!await activeCollaboration(env,row))return false}
    if(row.watcher_id&&!await activeWatcher(env,row))return false
    if(row.event_key.startsWith('expiry:')){const { activeExpiryNotice }=await import('./expiry');if(!await activeExpiryNotice(env,row))return false}
@@ -52,23 +64,28 @@ export async function flushNotifications(env:Bindings) {
   }
   if(!await allowed()){await db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE id=? AND status='pending'").bind(row.id).run();continue}
   const claimed=await db.prepare("UPDATE p_notification_outbox SET status='sending' WHERE id=? AND status='pending'").bind(row.id).run();if(!claimed.meta.changes)continue
+  const attempt=crypto.randomUUID()
+  await db.prepare("INSERT INTO p_notification_attempts(id,outbox_id,started_at,outcome) VALUES(?,?,?,'sending')").bind(attempt,row.id,Date.now()).run()
   try{
-   if(capturesMail(env)){await db.prepare("UPDATE p_notification_outbox SET status='local' WHERE id=?").bind(row.id).run();continue}
+   if(capturesMail(env)){await db.prepare("UPDATE p_notification_outbox SET status='local' WHERE id=?").bind(row.id).run();await db.prepare("UPDATE p_notification_attempts SET outcome='withheld',completed_at=?,reason='Local capture; no provider delivery' WHERE id=?").bind(Date.now(),attempt).run();continue}
    if(row.route_id){
     const r=await db.prepare('SELECT * FROM p_notification_routes WHERE id=?').bind(row.route_id).first<any>(),{secret}=await providerCredential(env,'workspace:'+r.provider)
     let destination=r.destination
     if(r.provider==='slack'&&r.kind==='direct')destination=(await chatJson('https://slack.com/api/conversations.open',secret.token,{users:r.destination})).channel?.id
     need(destination,'The direct conversation is unavailable',409)
-    if(!await allowed()){await db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE id=?").bind(row.id).run();continue}
-    await demoEffect(()=>r.provider==='slack'?chatJson('https://slack.com/api/chat.postMessage',secret.token,{channel:destination,text:row.subject+'\n'+body,unfurl_links:false,unfurl_media:false}):chatJson('https://graph.microsoft.com/v1.0/chats/'+encodeURIComponent(destination)+'/messages',secret.token,{body:{contentType:'text',content:row.subject+'\n'+body}}),()=>({}))
+    if(!await allowed()){await db.batch([db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE id=?").bind(row.id),db.prepare("UPDATE p_notification_attempts SET outcome='withheld',completed_at=?,reason='Current delivery authority was revoked' WHERE id=?").bind(Date.now(),attempt)]);continue}
+    await demoEffect(()=>r.provider==='slack'?slackMessage(secret.token,{channel:destination,text:row.subject+'\n'+body,unfurl_links:false,unfurl_media:false}):chatJson('https://graph.microsoft.com/v1.0/chats/'+encodeURIComponent(destination)+'/messages',secret.token,{body:{contentType:'text',content:row.subject+'\n'+body}}),()=>({}))
    }else{
     const mail=operatorMail(env);need(mail,'Configure installation mail before sending notifications',409)
-    if(!await allowed()){await db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE id=?").bind(row.id).run();continue}
+    if(!await allowed()){await db.batch([db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE id=?").bind(row.id),db.prepare("UPDATE p_notification_attempts SET outcome='withheld',completed_at=?,reason='Current delivery authority was revoked' WHERE id=?").bind(Date.now(),attempt)]);continue}
     const receipt=await demoEffect(()=>mail.send({from:env.MAIL_FROM!,to:[row.recipient],deliveryId:row.id,subject:row.subject,text:body,html:body.replace(/[&<>]/g,(c:string)=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]!)),headers:{}}),()=>({status:'accepted'}))
     need(receipt.status==='accepted','Mail delivery is uncertain',409)
    }
-   await db.prepare("UPDATE p_notification_outbox SET status='sent' WHERE id=?").bind(row.id).run()
-  }catch{await db.prepare("UPDATE p_notification_outbox SET status='uncertain' WHERE id=?").bind(row.id).run()}
+   await db.batch([db.prepare("UPDATE p_notification_outbox SET status='sent' WHERE id=?").bind(row.id),db.prepare("UPDATE p_notification_attempts SET outcome='success',completed_at=? WHERE id=?").bind(Date.now(),attempt)])
+  }catch(error){
+   const failed=(error as any)?.noEffect===true
+   await db.batch([db.prepare('UPDATE p_notification_outbox SET status=? WHERE id=?').bind(failed?'withheld':'uncertain',row.id),db.prepare('UPDATE p_notification_attempts SET outcome=?,reason=?,completed_at=? WHERE id=?').bind(failed?'failed':'uncertain',failed?'Slack rejected the message without posting it. An authorized manual retry is available.':'Delivery outcome is uncertain. Reconcile with the provider; no retry is permitted.',Date.now(),attempt)])
+  }
  }
 }
 export function notificationWrite(env:Bindings,key:string,id:string,subject:string,body:string,at:number,recipient:string|null=null,request:string|null=null,route:string|null=null){

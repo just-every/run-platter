@@ -61,3 +61,9 @@ export async function runCompletionMail(env:Bindings){
  const rows=(await env.DB.prepare("SELECT DISTINCT m.proposal_id FROM p_mail m JOIN p_completion_mail c ON c.mail_id=m.id JOIN p_completion_authority g ON g.proposal_id=c.proposal_id WHERE m.status='pending' LIMIT 10").all<{proposal_id:string}>()).results
  for(const row of rows)try{await dispatchMail(env,row.proposal_id)}catch{ /* Revoked authority remains held, without provider contact. */ }
 }
+
+// The request row and this one notification are committed in the same transaction.
+export function signingRequestMail(env:Bindings,row:any,contact:string,at:number){
+ return [queueMail(env,row.id,contact,'Electronic-record consent withdrawn: '+row.title,
+  'The verified client has withdrawn electronic-record consent and requested paper.\nProposal: '+row.title+'\nRevision: '+row.revision+'\nClient: '+row.clientEmail+'\nRequested at: '+new Date(at).toISOString()+'\nSigning on this offer revision is stopped. Arrange paper delivery directly; any existing signed agreement is unchanged.')]
+}

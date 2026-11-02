@@ -1,5 +1,6 @@
 // Reviewed Proposify source facts and fixed-page lineage are business history, never execution grants.
 // SMS assent and suppression are business history; invitation and sender authority stay local.
+// Signing disclosures and paper requests retain history only; restored invitations and mail remain excluded.
 // Auth identities retain approval authors. Credentials, invitations and messages stay local.
 export default {
  product: 'proposals/platter',

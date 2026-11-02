@@ -30,7 +30,7 @@ const mapping: ImportMapping = {
 }
 type Conflict = { kind: string; id: string; reason: string }
 const tables = { companies: 'p_companies', contacts: 'p_contacts', catalog: 'p_catalog_items' } as const
-async function conflicts(db: D1ImportContext['storage']['database'], plan: ImportPlan, allowExisting: boolean) {
+export async function businessImportConflicts(db: D1ImportContext['storage']['database'], plan: ImportPlan, allowExisting: boolean) {
   const found: Conflict[] = []
   if (!allowExisting) {
     for (const [kind, table] of Object.entries(tables)) {
@@ -75,7 +75,7 @@ export async function businessImportCommand(db: D1Database, who: Actor, name: st
       const plan = await planD1Import(prepared.source, mapping, kit)
       const prior = await kit.storage.database.prepare('SELECT id FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?')
         .bind(businessDestination, who.id, plan.fingerprint).first<{ id: string }>()
-      const existing = await conflicts(kit.storage.database, plan, Boolean(prior))
+      const existing = await businessImportConflicts(kit.storage.database, plan, Boolean(prior))
       const diagnostics = [...plan.diagnostics, ...existing.map(conflict => ({ severity: 'error' as const, code: conflict.reason,
         message: conflict.reason === 'missing_company' ? `Company ID ${conflict.id} does not exist` : `${conflict.kind} ID ${conflict.id} already exists; records are never merged implicitly`, kind: conflict.kind, sourceId: conflict.id }))]
       const canApply = !diagnostics.some(diagnostic => diagnostic.severity === 'error')

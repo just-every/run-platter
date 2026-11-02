@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 export const contentOffer={title:'Content campaign',scope:'Reviewed campaign scope',optionOne:'Essentials',priceOne:'1000',optionTwo:'Premium',priceTwo:'2000',depositPercent:'25'}
 const rush=id=>({id,label:'Rush delivery',unitPrice:'50',quantity:1,min:1,max:5,editable:true})
 const review={id:'review',label:'Review session',unitPrice:'20',quantity:1,min:1,max:1,editable:false}
-export async function contentFixture(h,count=100){
+export async function contentFixture(h,count=100,{approval=true,reason='Recorded client decision'}={}){
  const client=await h.cmd('client.save',{name:'Content fixture client',email:'synthetic-platter-9831'+String.fromCharCode(64)+'example.test'})
  const library=await h.cmd('library.save',{title:'Acme case study',kind:'case_study',content:'Independent campaign outcomes.'})
  const checklist=await h.cmd('library.save',{title:'Delivery checklist',kind:'section',content:'Agreed delivery steps.'})
@@ -18,8 +18,8 @@ export async function contentFixture(h,count=100){
   let p=await h.cmd('template.start',{id:template.id,version:1,clientId:client.id,title:'Content decision '+i})
   p=await h.cmd('proposal.revise',{...contentOffer,id:p.id,version:p.version,clientId:client.id,title:'Content decision '+i,packages:[{id:'one',label:i<30?'Growth':'Essentials',price:'1000',optionalItems:i<25?[rush('rush')]:[]},{id:'two',label:'Premium',price:'2000',optionalItems:[review,...(i<25?[rush('rush-other')]:[])]}]})
   if(i<12||i>=18&&i<26)for(let occurrence=0;occurrence<2;occurrence++)p=await h.cmd('library.insert',{id:p.id,version:p.version,itemId:library.id,itemVersion:1,mode:occurrence?'detached':'linked',consent:true})
-  await h.cmd('proposal.approve',{id:p.id,version:p.version,revision:p.revision})
-  const sent=await h.cmd('proposal.send',{id:p.id,version:p.version+1}),path=new URL(sent.shareUrl).pathname
+  if(approval)await h.cmd('proposal.approve',{id:p.id,version:p.version,revision:p.revision})
+  const sent=await h.cmd('proposal.send',{id:p.id,version:p.version+(approval?1:0)}),path=new URL(sent.shareUrl).pathname
   const won=i<18||i>=40&&i<55||i>=70&&i<90
   if(won&&i!==89){
    assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
@@ -28,7 +28,7 @@ export async function contentFixture(h,count=100){
    const input={name:'Synthetic Client',optionId:i>=12&&i<18?'two':'one',consent:true,items:i<6?[{id:'rush',quantity:i===0?3:1}]:[]}
    const accepted=await h.send(path+'/action?name=accept',input,verified.cookie);assert.equal(accepted.status,200,accepted.text)
    if(i===0){assert.equal((await h.send(path+'/action?name=accept',input,verified.cookie)).status,200)}
-  }else await h.cmd(i===89?'proposal.win':'proposal.lose',{id:p.id,version:p.version+2,reason:'Recorded client decision',notice:false})
+  }else await h.cmd(i===89?'proposal.win':'proposal.lose',{id:p.id,version:p.version+(approval?2:1),reason,notice:false})
   proposals.push({...p,won})
  }
  return {client,library,checklist,templates,proposals}

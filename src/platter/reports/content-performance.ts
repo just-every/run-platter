@@ -1,12 +1,7 @@
-import { documentOf } from '../documents/blocks'
-import { libraryMatches } from '../library-content'
+import { cell } from '../invoices'
+import { placedLibrarySources } from '../library-links'
 import { need, snapshot, type Actor } from '../model'
 
-/** Retain only provenance whose placed content still matches its recorded source. */
-export async function placedLibrarySources(db:D1Database,row:any){
- const blocks=documentOf(row).blocks,options=snapshot(row).options
- return (await db.prepare('SELECT * FROM p_library_uses WHERE proposal_id=? ORDER BY block_id').bind(row.id).all<any>()).results.filter(use=>libraryMatches(blocks.find(b=>b.id===use.block_id),use,options))
-}
 export async function freezeContentOffer(db:D1Database,row:any){
  const source=await db.prepare('SELECT * FROM p_template_sources WHERE proposal_id=?').bind(row.id).first<any>()
  const origin=await db.prepare('SELECT library_known FROM p_content_origins WHERE proposal_id=?').bind(row.id).first<any>()
@@ -42,7 +37,8 @@ export async function contentPerformance(db:D1Database,a:Actor){
   const items=new Map<string,boolean>()
   for(const p of packages)for(const i of p.items)items.set(i.name,Boolean(items.get(i.name)||p.id===d.option_id&&selected.some((s:any)=>s.id===i.id&&s.quantity>0)))
   for(const [name,chosen] of items)add('optional-item',name,name,chosen)
-  for(const item of JSON.parse(d.library_items))add('library',item.id,item.name)
+  const libraryIds=new Set<string>()
+  for(const item of JSON.parse(d.library_items)){if(libraryIds.has(item.id))continue;libraryIds.add(item.id);add('library',item.id,item.name)}
  }
  for(const row of groups.values())row.rate=((row.kind==='package'||row.kind==='optional-item'?row.chosen:row.won)*100/row.offered).toFixed(1)+'%'
  return {decidedCount:decisions.length,unavailableHistory,unavailableTemplate,unavailableLibrary,rows:[...groups.values()]}
@@ -59,9 +55,8 @@ export function filterContentReport(report:Awaited<ReturnType<typeof contentPerf
  })
  return {...report,rows,count:rows.length}
 }
-const csvCell=(v:unknown)=>{const s=String(v);return /[",\r\n]/.test(s)?'"'+s.replaceAll('"','""')+'"':s}
 export function contentCsv(report:ReturnType<typeof filterContentReport>){
- return [['Type','Name','Offered','Won','Lost','Chosen','Rate','Reading time'],...report.rows.map(r=>[r.kind,r.name,r.offered,r.won,r.lost,r.chosen,r.rate,'Unavailable'])].map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n'
+ return [['Type','Name','Offered','Won','Lost','Chosen','Rate','Reading time'],...report.rows.map(r=>[r.kind,r.name,r.offered,r.won,r.lost,r.chosen,r.rate,'Unavailable'])].map(row=>row.map(value=>cell(String(value))).join(',')).join('\r\n')+'\r\n'
 }
 export function contentMail(report:ReturnType<typeof filterContentReport>){
  return ['Platter content performance report',`${report.decidedCount} decided proposals; ${report.count} content rows.\n${report.unavailableHistory} decisions lack frozen history; ${report.unavailableTemplate} lack template attribution; ${report.unavailableLibrary} lack complete library provenance. Reading time is unavailable.\n\n${contentCsv(report)}`] as const

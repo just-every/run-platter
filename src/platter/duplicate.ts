@@ -1,3 +1,4 @@
+import { placedLibrarySources } from './library-links'
 import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields } from './variables'
 import { proposalFields } from './commands'
@@ -27,6 +28,7 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
   ? titleLocked?displayed.title:text(displayed.title.slice(0,193)+' (copy)','a title')
   : text(input.title,'a title')
  need(!titleLocked||title===displayed.title,'The proposal title is locked',403)
+ const origins=await db.prepare('SELECT library_known FROM p_content_origins WHERE proposal_id=?').bind(source.id).first<any>(),librarySources=await placedLibrarySources(db,displayed)
  const id = crypto.randomUUID(), at = await currentTime(db)
  const attachments = copyAttachments(typeof displayed.attachments === 'string' ? JSON.parse(displayed.attachments) : displayed.attachments)
  const sourceOptions = typeof displayed.options === 'string' ? JSON.parse(displayed.options) : displayed.options
@@ -42,7 +44,8 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
    .bind(id, clientId, title, row.scope, row.terms, row.deposit_bps, JSON.stringify(options), a.email, at, row.currency, a.id, a.email, JSON.stringify(attachments)),
   db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_proposal_locks WHERE proposal_id=?').bind(id,source.id),
   db.prepare('INSERT INTO p_proposal_block_locks(proposal_id,section) SELECT ?,section FROM p_proposal_block_locks WHERE proposal_id=?').bind(id,source.id),
-  db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) SELECT ?,template_id,template_version FROM p_template_sources WHERE proposal_id=?').bind(id,source.id),
+  db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version,template_name) SELECT ?,template_id,template_version,template_name FROM p_template_sources WHERE proposal_id=?').bind(id,source.id),
+  db.prepare('INSERT INTO p_content_origins(proposal_id,library_known,library_uses) VALUES(?,?,?)').bind(id,origins?.library_known??0,JSON.stringify(librarySources)),
   copyDocumentMedia(db,source.id,id,documentOf(displayed)),copyCosts(db,source.id,displayed.revision,id,1),copyDefaults(db,source.id,id),
   db.prepare('UPDATE p_proposals SET recipient_plan=? WHERE id=?').bind(JSON.stringify(row.recipient_plan),id),
   db.prepare('UPDATE p_proposals SET section_conditions=?,document=?,payment_terms=? WHERE id=?').bind(typeof row.section_conditions==='string'?row.section_conditions:JSON.stringify(row.section_conditions),JSON.stringify(documentOf(row)),row.payment_terms?JSON.stringify(row.payment_terms):null,id),

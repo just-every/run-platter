@@ -45,7 +45,7 @@ export async function completeDriveAgreement(h,title='Synthetic archive agreemen
  await h.cmd('proposal.approve',{id:proposal.id,version:1,revision:1})
  const shared=await h.cmd('proposal.send',{id:proposal.id,version:2}),path=new URL(shared.shareUrl).pathname
  assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
- const code=(await h.state()).outbox.find(m=>m.proposal_id===proposal.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+ const code=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code' ORDER BY created_at DESC").bind(proposal.id).first()).body.match(/\b\d{6}\b/)[0]
  const verified=await h.send(path+'/action?name=code.verify',{code});assert.equal(verified.status,200)
  const input={name:'Synthetic signer',optionId:'one',consent:true}
  assert.equal((await h.send(path+'/action?name=accept',input,verified.cookie)).status,200)

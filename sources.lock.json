@@ -2722,7 +2722,7 @@
       "executable": false
     },
     "src/platter/http.ts": {
-      "sha256": "08658f1d196e48fe961493e022af817655ba2e1e20b502273f9d6ead2dab6256",
+      "sha256": "1a8c969fe28498df35075deb336650a237763481bb3279fc002187d74b10a3e5",
       "executable": false
     },
     "src/platter/internal-pricing.ts": {

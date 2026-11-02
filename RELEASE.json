@@ -277,6 +277,14 @@
     {
       "id": "0102_betterproposals_export.sql",
       "buyerSteps": "Apply migrations/core/0102_betterproposals_export.sql after existing core migrations. No manual data changes; existing document imports retain their documents source kind."
+    },
+    {
+      "id": "0103_drive_oauth.sql",
+      "buyerSteps": "None. Adds private, single-use Drive OAuth callback state; owners must explicitly authorize app-selected Drive access. Existing held jobs do not restart."
+    },
+    {
+      "id": "0104_reminder_dispatch_lock.sql",
+      "buyerSteps": "None. Serializes scheduled reminder dispatch without changing existing reminder authorization."
     }
   ],
   "breaking": false,

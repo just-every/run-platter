@@ -1,5 +1,6 @@
 import { hubspotCardData, hubspotCardResponse } from './crm/hubspot-card'
 import { crmDraftSources } from './crm/hubspot-draft'
+import { driveAuthorize, driveCallback } from './drive-oauth'
 import { archiveState } from './archiving/jobs'
 import { clientLocale } from './locales'
 import { fixedPagePreview, importDocument, exportDocument } from './documents/import-export'
@@ -87,6 +88,17 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   }
   if(path==='/api/platter/crm/card')return await hubspotCardResponse(env,request)
   actor=await principal(request,env,isAgent)
+  if(path==='/api/platter/drive/authorize'){
+   need(request.method==='POST'&&request.headers.get('origin')===env.AUTH_ORIGIN,'Authorize from this installation',403)
+   const result=await driveAuthorize(env,actor,await body(request))
+   if(request.headers.get('content-type')?.includes('application/x-www-form-urlencoded'))return document('Connect Google Drive','<section><p>Authorize app-selected Drive files and folders. Existing archive work stays held; fresh authorization applies to future completions.</p><a href="'+escape(result.url)+'" rel="noreferrer">Continue to Google</a></section>',{actor,path:'/app/settings'})
+   return new Response(null,{status:303,headers:{...headers,location:result.url}})
+  }
+  if(path==='/api/platter/drive/callback'){
+   need(request.method==='GET','Use the provider callback',405)
+   const id=await driveCallback(env,actor,url);await recordAudit(env.DB,actor,'drive.connected',id)
+   return new Response(null,{status:303,headers:{...headers,location:'/app/settings'}})
+  }
   if(path==='/api/platter/mailbox/authorize'){
    need(request.method==='POST'&&request.headers.get('origin')===env.AUTH_ORIGIN,'Authorize from this installation',403)
    const result=await mailboxAuthorize(env,actor,await body(request))

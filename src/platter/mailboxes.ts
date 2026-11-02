@@ -5,7 +5,7 @@ import { currentTime } from './expiry-time'
 import { approvalPlan } from './approvals'
 import type { Bindings } from '../auth.server'
 import { actorById } from './credentials'
-import { providerCredential, providerJson, sealCredential, openCredential } from './connections'
+import { providerCredential, providerJson, sealCredential, openCredential, credentialRefused, rejectCredential, ProviderCredentialRejected, providerFetch, connectedJson, type ProviderCredential } from './connections'
 import { commit, email, hash, need, secret, text, type Actor } from './model'
 import { permitted, senders } from './permissions'
 
@@ -18,27 +18,33 @@ function config(env:Bindings,provider:string){
  return {clientId,clientSecret,authorize:google?'https://accounts.google.com/o/oauth2/v2/auth':'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',token:google?'https://oauth2.googleapis.com/token':'https://login.microsoftonline.com/common/oauth2/v2.0/token',scopes:google?'openid email https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.settings.basic':'openid email offline_access User.Read Mail.Send',redirect:env.AUTH_ORIGIN+'/api/platter/mailbox/callback'}
 }
 const base64url=(bytes:Uint8Array)=>btoa(Array.from(bytes,c=>String.fromCharCode(c)).join('')).replaceAll('+','-').replaceAll('/','_').replaceAll('=','')
-async function tokenRequest(env:Bindings,provider:string,parameters:Record<string,string>){
+async function tokenRequest(env:Bindings,provider:string,parameters:Record<string,string>,credential?:ProviderCredential){
  const c=config(env,provider),r=await fetch(c.token,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:c.clientId,client_secret:c.clientSecret,...parameters}),redirect:'manual',signal:AbortSignal.timeout(15000)})
- need(r.ok,'The provider refused this mailbox grant',409)
+ if(!r.ok&&credential){
+  let error:string|undefined
+  try{const raw=await r.clone().text();if(raw.length<=32768)error=JSON.parse(raw)?.error}catch{/* Only an explicit provider refusal establishes lost authority. */}
+  if(['invalid_grant','invalid_token','insufficient_scope'].includes(error??'')||error!=='invalid_client'&&await credentialRefused(r))await rejectCredential(env,credential)
+ }
+ need(r.ok,'The provider refused this mailbox grant. Review the held mail before trying again.',409)
  const raw=await r.text();need(raw.length<=32768,'The provider grant response was too large',409)
  let result:any;try{result=JSON.parse(raw)}catch{need(false,'The provider grant response was invalid',409)}
  need(typeof result.access_token==='string'&&result.access_token.length>0&&result.access_token.length<=8192&&!/[\r\n\0]/.test(result.access_token),'The provider did not return a valid mailbox grant',409)
  return result
 }
 function scopes(provider:string,value:unknown){need(typeof value==='string'&&value.split(/\s+/).some(s=>s===sendScope(provider)||(provider==='microsoft'&&s==='https://graph.microsoft.com/Mail.Send')),'The provider grant must allow sending mail',403);return String(value)}
-async function identity(provider:string,token:string,address?:string){
+async function identity(provider:string,token:string,address?:string,credential?:ProviderCredential,env?:Bindings){
+ const read=(url:string)=>credential&&env?connectedJson(env,credential,url):providerJson(url,token)
  if(provider==='gmail'){
-  const info=await providerJson('https://openidconnect.googleapis.com/v1/userinfo',token)
+  const info=await read('https://openidconnect.googleapis.com/v1/userinfo')
   need(info.email_verified===true,'Verify the provider mailbox first',403)
   const primary=email(info.email),chosen=address?email(address):primary
   if(chosen!==primary){
-   const aliases=await providerJson('https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs',token)
+   const aliases=await read('https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs')
    need(Array.isArray(aliases.sendAs)&&aliases.sendAs.some((a:any)=>a.verificationStatus==='accepted'&&String(a.sendAsEmail).toLowerCase()===chosen),'Google has not verified this sending alias',403)
   }
   return {address:chosen,accountId:text(info.sub,'the verified Google account')}
  }
- const info=await providerJson('https://graph.microsoft.com/v1.0/me?$select=id,mail',token),primary=email(info.mail)
+ const info=await read('https://graph.microsoft.com/v1.0/me?$select=id,mail'),primary=email(info.mail)
  need(!address||email(address)===primary,'Use this Microsoft account’s own SMTP mailbox',403)
  return {address:primary,accountId:text(info.id,'the verified Microsoft account')}
 }
@@ -96,18 +102,31 @@ export async function memberMailbox(env:Bindings,a:Actor){
  const row=await env.DB.prepare("SELECT * FROM p_connections WHERE operator_id=? AND provider IN ('gmail','microsoft') AND status='connected' ORDER BY connected_at DESC,id LIMIT 1").bind(a.id).first<any>()
  if(!row)return null
  if(row.broken_at)return {broken:true,connection:row}
+ const stored=await providerCredential(env,row.id),c=stored.connection
  try{
-  const stored=await providerCredential(env,row.id),c=stored.connection,grant=await tokenRequest(env,c.provider,{grant_type:'refresh_token',refresh_token:text(stored.secret.refreshToken,'a renewable provider grant',8192)})
-  scopes(c.provider,grant.scope??stored.secret.scope)
-  const verified=await identity(c.provider,grant.access_token,c.mailbox_email)
-  need(verified.accountId===c.account_id,'The mailbox account changed',403);await unbound(env.DB,a,verified.address)
-  const sealed=await sealCredential(env,c.id,{...stored.secret,token:grant.access_token,refreshToken:grant.refresh_token??stored.secret.refreshToken,scope:grant.scope??stored.secret.scope})
-  await commit(env.DB,a,[env.DB.prepare('UPDATE p_connection_secrets SET sealed=? WHERE connection_id=?').bind(sealed,c.id)],false,{sql:"EXISTS(SELECT 1 FROM p_connections WHERE id=? AND version=? AND status='connected' AND broken_at IS NULL)",values:[c.id,c.version]})
-  return {broken:false,connection:c,token:grant.access_token as string}
- }catch{
-  await env.DB.prepare("UPDATE p_connections SET broken_at=? WHERE id=? AND version=? AND status='connected'").bind(Date.now(),row.id,row.version).run()
-  return {broken:true,connection:row}
+  // The legacy identity-only door cannot acquire sending authority by reuse.
+  if(!stored.secret.refreshToken)await rejectCredential(env,stored)
+  const grant=await tokenRequest(env,c.provider,{grant_type:'refresh_token',refresh_token:text(stored.secret.refreshToken,'a renewable provider grant',8192)},stored)
+  try{scopes(c.provider,grant.scope??stored.secret.scope)}catch{await rejectCredential(env,stored)}
+  const refreshed={...stored,secret:{...stored.secret,token:grant.access_token}}
+  let verified:Awaited<ReturnType<typeof identity>>
+  try{verified=await identity(c.provider,grant.access_token,c.mailbox_email,refreshed,env)}
+  catch(error){if(error instanceof ProviderCredentialRejected)throw error;if((error as any)?.status===403)await rejectCredential(env,stored);throw error}
+  if(verified!.accountId!==c.account_id)await rejectCredential(env,stored)
+  await unbound(env.DB,a,verified!.address)
+  const refreshToken=grant.refresh_token===undefined?stored.secret.refreshToken:text(grant.refresh_token,'a renewable provider grant',8192)
+  need(!/[\r\n\0]/.test(refreshToken),'The provider returned an invalid renewable grant',409)
+  const sealed=await sealCredential(env,c.id,{...stored.secret,token:grant.access_token,refreshToken,scope:grant.scope??stored.secret.scope})
+  // A delayed refresh cannot overwrite a rotated grant, disconnection or replacement.
+  await commit(env.DB,a,[env.DB.prepare('UPDATE p_connection_secrets SET sealed=? WHERE connection_id=?').bind(sealed,c.id)],false,{sql:"EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL AND s.sealed=?)",values:[c.id,c.version,stored.connection.sealed]})
+  return {broken:false,connection:{...c,sealed},token:grant.access_token as string}
+ }catch(error){
+  if(error instanceof ProviderCredentialRejected)return {broken:true,connection:row}
+  if((error as any)?.status===403)throw error
+  // Ambiguous refresh and identity outcomes hold this mail without switching carrier.
+  need(false,'Mailbox refresh is unavailable. Review the held mail before trying again.',409)
  }
+
 }
 export async function sendMailbox(env:Bindings,a:Actor,row:any,mailbox:NonNullable<Awaited<ReturnType<typeof memberMailbox>>>,replyTo?:string,attachments?:MailAttachment[]){
  // Refresh/identity checks can take time. Recheck current sending authority and
@@ -118,16 +137,15 @@ export async function sendMailbox(env:Bindings,a:Actor,row:any,mailbox:NonNullab
  await unbound(env.DB,a,c.mailbox_email)
  const from=email(c.mailbox_email),to=email(row.recipient)
  let response:Response
+ const credential={connection:c,secret:{token:mailbox.token}}
+ try{
  if(c.provider==='gmail'){
   const raw=mailboxMime(from,to,row.subject,row.body,replyTo,attachments)
-  response=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',headers:{authorization:'Bearer '+mailbox.token,'content-type':'application/json'},body:JSON.stringify({raw:base64url(new TextEncoder().encode(raw))}),redirect:'manual',signal:AbortSignal.timeout(15000)})
+  response=await providerFetch(env,credential,'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',headers:{authorization:'Bearer '+mailbox.token,'content-type':'application/json'},body:JSON.stringify({raw:base64url(new TextEncoder().encode(raw))}),redirect:'manual',signal:AbortSignal.timeout(15000)})
  }else{
-  response=await fetch('https://graph.microsoft.com/v1.0/me/sendMail',{method:'POST',headers:{authorization:'Bearer '+mailbox.token,'content-type':'application/json'},body:JSON.stringify({message:{subject:row.subject,body:{contentType:'Text',content:row.body},from:{emailAddress:{address:from}},toRecipients:[{emailAddress:{address:to}}],...(replyTo?{replyTo:[{emailAddress:{address:replyTo}}]}:{}),...(attachments?{attachments:attachments.map(a=>({'@odata.type':'#microsoft.graph.fileAttachment',name:a.filename,contentType:a.contentType,contentBytes:btoa(Array.from(a.content,c=>String.fromCharCode(c)).join(''))}))}:{})},saveToSentItems:true}),redirect:'manual',signal:AbortSignal.timeout(15000)})
+  response=await providerFetch(env,credential,'https://graph.microsoft.com/v1.0/me/sendMail',{method:'POST',headers:{authorization:'Bearer '+mailbox.token,'content-type':'application/json'},body:JSON.stringify({message:{subject:row.subject,body:{contentType:'Text',content:row.body},from:{emailAddress:{address:from}},toRecipients:[{emailAddress:{address:to}}],...(replyTo?{replyTo:[{emailAddress:{address:replyTo}}]}:{}),...(attachments?{attachments:attachments.map(a=>({'@odata.type':'#microsoft.graph.fileAttachment',name:a.filename,contentType:a.contentType,contentBytes:btoa(Array.from(a.content,c=>String.fromCharCode(c)).join(''))}))}:{})},saveToSentItems:true}),redirect:'manual',signal:AbortSignal.timeout(15000)})
  }
- if([401,403].includes(response.status)){
-  await env.DB.prepare('UPDATE p_connections SET broken_at=? WHERE id=? AND version=?').bind(Date.now(),c.id,c.version).run()
-  return {fallback:true as const}
- }
+ }catch(error){if(error instanceof ProviderCredentialRejected)return {fallback:true as const};throw error}
  need(response.ok,'The mailbox sending result is uncertain',409)
  const result=c.provider==='gmail'?await response.json() as any:null
  return {fallback:false as const,status:'accepted' as const,providerMessageId:result?.id??null}

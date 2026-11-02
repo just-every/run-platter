@@ -34,6 +34,8 @@ function renewalContent(accepted:any,kind:string,value:number){
  packages[0].optionalItems=[];packages[0].discountExpiresOn=''
  const tables=pricingInput([chosen])
  const items=frozen.selection?.items??[]
+ // Adding accepted items turns a flat package into table pricing; retain its base fee.
+ if(items.length&&!tables.length)tables.push({optionId:chosen.id,name:chosen.label,lines:[{name:chosen.label,quantity:'1',unit:'package',unitPrice:packages[0].price,description:'',group:''}]})
  if(items.length)tables.push({optionId:chosen.id,name:'Accepted additions',lines:items.map((i:any)=>({name:i.label,quantity:String(i.quantity),unit:'item',unitPrice:(i.unitCents/100).toFixed(2),...(i.recurrence?{recurrence:i.recurrence}:{}),description:'',group:''}))})
  for(const table of tables)for(const line of table.lines){
   if(!line.recurrence)continue

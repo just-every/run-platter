@@ -1441,7 +1441,7 @@ test('ACCT-001 public CLI retains exact QuickBooks accounting custody without cr
  let h
  try {
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:16e6})
   h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService})
   await connectQuickbooks(h,fake)
   const complete=await acceptedQuickbooksAgreement(h,'Retained accounting agreement')

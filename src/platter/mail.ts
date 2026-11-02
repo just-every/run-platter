@@ -25,7 +25,9 @@ export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string
   try{
    let actor=await sendingActor(env,row)
    const attachments=await completionAttachments(env,row)
-   const mailbox=actor?await memberMailbox(env,actor):null
+   let mailbox:Awaited<ReturnType<typeof memberMailbox>>=null
+   try{mailbox=actor?await memberMailbox(env,actor):null}
+   catch(error){await sendingActor(env,row);throw error}
    actor=await sendingActor(env,row)
    const sealedReply=actor?await prepareClientReply(env,actor,row):row.reply_to
    const replyTo=sealedReply?await openReplyAddress(env,sealedReply):undefined

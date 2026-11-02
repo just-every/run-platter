@@ -44,6 +44,8 @@ export interface Bindings {
  MAIL_API_KEY?: string
  QUESTION_REPLY_DOMAIN?: string
  MAIL_WEBHOOK_KEY?: string
+ GOOGLE_DRIVE_CLIENT_ID?: string
+ GOOGLE_DRIVE_CLIENT_SECRET?: string
  GOOGLE_MAIL_CLIENT_ID?: string
  GOOGLE_MAIL_CLIENT_SECRET?: string
  MICROSOFT_MAIL_CLIENT_ID?: string

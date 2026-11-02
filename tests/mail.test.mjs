@@ -588,10 +588,12 @@ test('APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign send
 })
 
 test('SEND-001 / SEND-011 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail', async()=>{
+ let edgeHook
  let address='mailbox@synthetic-platter.example',verified=true,aliasVerified=true,hasSmtp=true,hasScope=true,refused=false,timeout=false,demoteDuringRefresh=false
  const inbound=inboundMailFixture(),calls=[],gmail=[],graph=[],installation=[]
  const h=await harness({origin:'https://platter.example',auth:{...inbound.settings,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5100',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5101',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5102',MICROSOFT_MAIL_CLIENT_ID:'synthetic-platter-5103',MICROSOFT_MAIL_CLIENT_SECRET:'synthetic-platter-5104'},outboundService:async request=>{
   const url=new URL(request.url);calls.push({host:url.hostname,path:url.pathname,method:request.method})
+  if(edgeHook){const response=await edgeHook(request);if(response)return response}
   if(['oauth2.googleapis.com','login.microsoftonline.com'].includes(url.hostname)){
    const body=new URLSearchParams(await request.text())
    if(body.get('grant_type')==='authorization_code'){assert.equal(body.get('redirect_uri'),'https://platter.example/api/platter/mailbox/callback');assert.ok(body.get('code_verifier').length>=43)}
@@ -739,6 +741,7 @@ test('SEND-001 / SEND-011 OAuth mailboxes verify ownership and scopes, refresh, 
   assert.equal((await inbound.deliver(h,currentReply,recipient,'Withdrawn invitation')).status,409)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_mail_replies WHERE proposal_id=?').bind(current.id).first()).n,0)
   assert.doesNotMatch(JSON.stringify(await h.state(people.sales.cookie)),/synthetic-platter-510[256]/)
+  const {mailboxCredentialJourney}=await import('./mailbox-credential-journey.mjs');await mailboxCredentialJourney(h,{connect,send,calls,gmail,installation,setHook:value=>{edgeHook=value},cookie:people.sales.cookie})
  }finally{await h.close()}
 })
 
@@ -906,10 +909,10 @@ test('FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, en
 
 async function notificationFixture(options={}) {
  const beforeMail=typeof options==='function'?options:async()=>{}
- const messages=[],chats=[],providerReads=[];let uncertain=false
+ const messages=[],chats=[],calls=[],providerReads=[];let uncertain=false,hook
  const h=await harness({assetsDirectory:'public',origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7000'},outboundService:async request=>{
   const url=new URL(request.url)
-  providerReads.push(request.url)
+  providerReads.push(request.url);calls.push({url:url.href,method:request.method});if(hook){const response=await hook(request);if(response)return response}
   if(url.hostname==='api.resend.com'){const message=await request.json();await beforeMail(message);messages.push(message);return Response.json({id:'synthetic-platter-7001'})}
   if(url.pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-7002'})
   if(url.pathname==='/api/users.info')return Response.json({ok:true,user:{team_id:'synthetic-platter-7002',profile:{email:h.auth.OWNER_EMAIL}}})
@@ -925,7 +928,7 @@ async function notificationFixture(options={}) {
  const prepare=async title=>h.cmd('proposal.prepare',{...offer,title,clientId:client.id})
  const tick=async at=>(await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
  const connect=async provider=>h.cmd('provider.connect',{provider,version:0,token:'synthetic-platter-7008',consent:true})
- return {...h,messages,chats,providerReads,prepare,tick,connect,client,uncertain:value=>{uncertain=value}}
+ return {...h,messages,chats,providerReads,calls,setHook:value=>{hook=value},prepare,tick,connect,client,uncertain:value=>{uncertain=value}}
 }
 
 test('APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once', {timeout:120000},async()=>{
@@ -1159,6 +1162,7 @@ test('AUTO-003 signed events reach Slack channels and approval requests reach ve
   await h.tick(Date.now()+2*86400000)
   assert.equal(h.providerReads.length,afterDemotion,'a demoted authorizer cannot execute a retained route')
   assert.equal(h.chats.length,beforeRevoke)
+  const {chatCredentialJourney}=await import('./chat-credential-journey.mjs');await chatCredentialJourney(h)
  }finally{await h.close()}
 })
 

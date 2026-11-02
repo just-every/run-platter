@@ -661,6 +661,10 @@
       "sha256": "0a1e457dcb4310bcb10d08701e68d194a0bc208add1a4549107a3cbf5b166a38",
       "executable": false
     },
+    "migrations/core/0103_renewal_drafts.sql": {
+      "sha256": "5a6c602b2a7e04dcce2d5a9bae4eb92b24a206df49c7896c3dcb81e0474b9652",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false
@@ -2506,7 +2510,7 @@
       "executable": false
     },
     "src/platter/archive-policy.mjs": {
-      "sha256": "f7138d0318ba0d8bdf61c5948ba4c98a32dd7e6a6929f3eb93332b0de9d286c5",
+      "sha256": "2827ddcfc13c5268cb4324337f4435578af42dfb1732a8e6562e302eac96bb91",
       "executable": false
     },
     "src/platter/archiving/google-drive.ts": {
@@ -2570,7 +2574,7 @@
       "executable": false
     },
     "src/platter/commands.ts": {
-      "sha256": "8991db32851a277948419698831e17a4a9c42a8eba73205ebd27a931042809e9",
+      "sha256": "0468d889ab6f13b5859016d2e8cdaf0aaadc07eee0f273781e13de225fd2a5be",
       "executable": false
     },
     "src/platter/completion-mail.ts": {
@@ -2910,7 +2914,7 @@
       "executable": false
     },
     "src/platter/permissions.ts": {
-      "sha256": "88926f84794aafb114ceb6af8a520218ec804aa5524c48a61351b6af380c9a8c",
+      "sha256": "853ca779475f60a5aac274559bb16d9fbbb48872fa31c307425e1bcf175a6577",
       "executable": false
     },
     "src/platter/pipeline.ts": {
@@ -2959,6 +2963,10 @@
     },
     "src/platter/reminders.ts": {
       "sha256": "ece390c8c6166b9b1092181628646f88603d3fc98151edfa9231e2d196c37aeb",
+      "executable": false
+    },
+    "src/platter/renewals.ts": {
+      "sha256": "d8a326e02d4bc67481c2d243d891d57bc2998044b233ca4d5f903faeb3d07d2a",
       "executable": false
     },
     "src/platter/reports/pipeline-csv.ts": {
@@ -3030,7 +3038,7 @@
       "executable": false
     },
     "src/platter/state.ts": {
-      "sha256": "810d5f4dc628fea18a4a3f14841c05844b73bdbb38eb38c2d8b91501ea409945",
+      "sha256": "0f8f893e3477c6f5aae87d06368c5ce0847ee09ba36fea833b9530d5d935b5c1",
       "executable": false
     },
     "src/platter/suggestions.ts": {
@@ -3186,7 +3194,7 @@
       "executable": false
     },
     "src/platter/ui/index.ts": {
-      "sha256": "203f2514302e5a99966483b9040ba6e9298ef0e7d3f64a2ca581140c492b5369",
+      "sha256": "7a50491cabceeb23c9d0aca76621bbd3ec2bd7f42f1a8bd935c5b7b141b12907",
       "executable": false
     },
     "src/platter/ui/internal-pricing.ts": {
@@ -3255,6 +3263,10 @@
     },
     "src/platter/ui/reminders.ts": {
       "sha256": "cbe640e1106878f8cd29a2c2914a294cc3d1ae6188ca6262b023bce9ce138120",
+      "executable": false
+    },
+    "src/platter/ui/renewals.ts": {
+      "sha256": "185b55863507d1b99d8412bce39bd83cb1446caa0dda114a96c5e680393e71c0",
       "executable": false
     },
     "src/platter/ui/report-schedules.ts": {
@@ -3346,7 +3358,7 @@
       "executable": false
     },
     "src/server.ts": {
-      "sha256": "023a72ac87953503f38bc9ddd7679588b8092d8960f4a14ee1731ee875f2b8c0",
+      "sha256": "0508219ffdebb7862b963bcea111e6c4c27ae89cc80e626080e5b5db834ec78c",
       "executable": false
     },
     "src/site/docs.ts": {
@@ -3610,7 +3622,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "ef9b89bd6c3fe05ce5a3b87b64b46cabd33f2f8eaef782f3d7020dbd1507df7c",
+      "sha256": "f1f29bae19cf4864016e4e21616dce32096e2da4f7354c002e6041da30d7fe6c",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3647,6 +3659,10 @@
     },
     "tests/reminders-journey.mjs": {
       "sha256": "3fcc357679d6bb6c867046f9e8d127ee7f7847e6e49ec73cd609a140e12fbe30",
+      "executable": false
+    },
+    "tests/renewal-journey.mjs": {
+      "sha256": "67c2434426efa01deebd622f074a8c13ea60df7cab449979a4d7bb07e7827bb6",
       "executable": false
     },
     "tests/revenue-fixture.mjs": {
@@ -3722,7 +3738,7 @@
       "executable": false
     },
     "tests/worker.ts": {
-      "sha256": "d6be2235616cae0687c98f148895f2d085831480c8870512019bace6f91ddcd6",
+      "sha256": "1bc1f5c1dab8d788945bbeb301731ae40dbc2cf5e7776fa0d404c58bf59a0fd7",
       "executable": false
     },
     "tests/xero-browser.mjs": {

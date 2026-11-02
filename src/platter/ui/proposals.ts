@@ -18,7 +18,7 @@ import { paymentsPanel } from './payments'
 import { internalPricingPanel } from './internal-pricing'
 import { approvalPanel } from './approvals'
 import { sharingPanel } from './team'
-import { invitationComposer, invitationTimeline, signerReplacementPanel } from './invitation-mail'
+import { invitationComposer, invitationTimeline, signerReplacementPanel, signerDelegationHistory } from './invitation-mail'
 import { testMailPanel } from './test-mail'
 import { selectedSummary } from './packages'
 import { personalTemplates, savePersonalTemplate, starterTemplatesPanel } from './templates'
@@ -109,6 +109,6 @@ export function proposalPage(state: any, id: string, selection = new URLSearchPa
   if(p.acceptance?.paymentSchedule)dossier.push(schedulePanel(p.acceptance.paymentSchedule,p.currency))
   if (p.acceptance?.selection) dossier.push(selectedSummary(p.acceptance.selection, p.currency))
   if (owner && p.acceptance) dossier.push(panel('Invoice export', form('invoice.export', path, hidden('id', p.id) + '<button>Export invoice CSV</button>') + (p.invoice ? `<p>Invoice ${escape(p.invoice.number)} · Exported ${date(p.invoice.exported_at)}</p><a href="/api/platter/invoices/${encodeURIComponent(p.invoice.id)}.csv">Download deposit invoice CSV</a>` : '')))
-  dossier.push(documentImportPanel(p),variablesPanel(p),recipientsPanel(state,p),signerReplacementPanel(p), invitationComposer(state, p, feedback), invitationTimeline(p), testMailPanel(state, p, feedback), duplicatePanel(state, p), savePersonalTemplate(state, p), ownerQuestions(state, p), deliveryPanel(state, p), p.status === 'withdrawn' ? '' : suggestionsPanel(state, p), historyPanel(state, p, selection))
+  dossier.push(documentImportPanel(p),variablesPanel(p),recipientsPanel(state,p),signerDelegationHistory(state,p),signerReplacementPanel(p), invitationComposer(state, p, feedback), invitationTimeline(p), testMailPanel(state, p, feedback), duplicatePanel(state, p), savePersonalTemplate(state, p), ownerQuestions(state, p), deliveryPanel(state, p), p.status === 'withdrawn' ? '' : suggestionsPanel(state, p), historyPanel(state, p, selection))
   return html + `<div class="dossier">${dossier.join('')}</div>`
 }

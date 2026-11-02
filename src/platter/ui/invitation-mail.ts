@@ -26,3 +26,15 @@ export function signerReplacementPanel(p:any){
  const controls=p.canSend&&p.status==='sent'&&!p.negotiating?`<form method="post" action="${action('signer.replace',proposalPath(p.id))}">${hidden('id',p.id)}${hidden('version',p.version)}${slotSelector}<p>The new signer keeps this signing position and identity requirement. The previous link and verification are revoked. SMS consent and reminders require fresh authorization.</p>${field('Replacement signer email','recipient','','type="email" required maxlength="254"')}${field('Replacement reason','reason','','required maxlength="1000"')}${field('Replacement invitation subject','mailSubject',('Your proposal: '+p.title).slice(0,200),'required maxlength="200"')}<label>Replacement invitation message<textarea name="mailMessage" required maxlength="10000" rows="4">Review your proposal and verify your email before accepting:</textarea></label><button>Replace unsigned signer</button></form>`:p.acceptance?'<p>A signed recipient cannot be replaced.</p>':''
  return controls||rows?panel('Signer replacement',controls+rows):''
 }
+
+export function signerDelegationSettings(state:any){
+ if(state.actor.role!=='owner')return ''
+ const offers=state.proposals.filter((p:any)=>p.status==='sent'&&!p.negotiating&&p.recipient_plan==='[]'&&!p.collectionPolicy?.enabled)
+ return offers.length?panel('Signer delegation Settings','<p>Enable delegation explicitly for each sent offer. Only mailbox-verified recipients can delegate; every new signer must verify before viewing.</p>'+offers.map((p:any)=>`<form method="post" action="${action('signer.delegation.configure','/app/settings')}">${hidden('id',p.id)}${hidden('version',p.version)}${hidden('enabled',p.delegation?.enabled?'no':'yes')}<h3>${escape(p.title)} · Revision ${escape(p.revision)}</h3><p>Delegation is ${p.delegation?.enabled?'on':'off'} for this offer.</p><button class="secondary">${p.delegation?.enabled?'Disable delegation':'Enable delegation'}</button></form>`).join('')):''
+}
+export function signerDelegationHistory(state:any,p:any){
+ const history=p.delegation?.history??[]
+ if(state.actor.role!=='owner')return ''
+ const body=history.map((r:any)=>`<li><p>${escape(r.old_recipient)} delegated to ${escape(r.delegate_name)} · ${escape(r.new_recipient)}</p><p>${date(r.delegated_at)} · Position ${escape(r.signing_position)}</p>${r.undone_at?`<p>Undone ${date(r.undone_at)} by ${escape(r.undone_by)}</p>`:p.status==='sent'&&p.delegation.currentId===r.id?`<form method="post" action="${action('signer.delegation.undo',proposalPath(p.id))}">${hidden('id',p.id)}${hidden('version',p.version)}${hidden('delegationId',r.id)}<button class="secondary">Undo delegation</button></form>`:'<p>This delegation is no longer active.</p>'}</li>`).join('')
+ return panel('Signer delegation','<p><a href="/app/settings">Manage delegation in Settings</a></p>'+(body?'<ol>'+body+'</ol>':''))
+}

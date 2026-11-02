@@ -1,16 +1,23 @@
 import assert from 'node:assert/strict'
 import { harness } from './harness.mjs'
+import { driveFixture,connectDrive } from './drive-fixture.mjs'
 import { hubspotFixture } from './hubspot-fixture.mjs'
 import { privacyFixture,privacyInventory,assertPrivacyErased,digest,privacyOffer } from './privacy-fixture.mjs'
 export async function privacyJourney(){
- const edge=hubspotFixture(),h=await harness({outboundService:edge.request,assetsDirectory:'public'})
+ const edge=hubspotFixture(),drive=driveFixture(),h=await harness({outboundService:request=>new URL(request.url).hostname==='api.hubapi.com'?edge.request(request):drive.outboundService(request),assetsDirectory:'public'})
  try{
-  const fixture=await privacyFixture(h,edge),id=fixture.client.id,review=await h.cmd('privacy.review',{id}),input={id,...review.privacyReview,confirmName:fixture.client.name,consent:'yes'}
+  await connectDrive(h)
+  const fixture=await privacyFixture(h,edge)
+  await h.cmd('archive.dispatch',{})
+  const externalFiles=(await h.db.prepare('SELECT * FROM p_archive_files ORDER BY kind').all()).results
+  assert.equal(externalFiles.length,2);assert.ok(externalFiles.every(f=>f.status==='complete'))
+  const id=fixture.client.id,review=await h.cmd('privacy.review',{id}),input={id,...review.privacyReview,confirmName:fixture.client.name,consent:'yes'}
   const before=await privacyInventory(h),accepted=before.p_acceptances[0],revisions=before.p_revisions.filter(r=>r.proposal_id===fixture.retained.id)
   assert.equal(before.p_views.length,2);assert.equal(before.p_questions.length,2);assert.equal(before.p_internal_threads.length,2);assert.equal(before.p_crm_draft_sources.length,1)
   const address=['synthetic-platter-privacy-member','example.test'].join('@')
   assert.equal((await h.send('/auth/invite',{email:address,displayName:'Synthetic privacy member',role:'member',returnTo:'/app'},h.owner)).status,202)
   const member=await h.signIn(address)
+  await h.cmd('privacy.hold',{id,kind:'legal',held:'yes',reason:'Refused member hold'},member,403)
   await h.cmd('privacy.review',{id},member,403);await h.cmd('privacy.erase',input,member,403)
   assert.deepEqual(await privacyInventory(h),before)
   for(const kind of ['retention','legal']){
@@ -26,10 +33,15 @@ export async function privacyJourney(){
   await h.cmd('collaboration.comment',{id:fixture.first.id,version:3,revision:1,blockId:'scope',text:'synthetic-platter-private-later-discussion'})
   const changed=await privacyInventory(h)
   await h.cmd('privacy.erase',input,h.owner,409);assert.deepEqual(await privacyInventory(h),changed)
-  const current=await h.cmd('privacy.review',{id}),calls=edge.calls.length
+  const current=await h.cmd('privacy.review',{id}),calls=edge.calls.length,driveCalls=drive.calls.length
   const result=await h.cmd('privacy.erase',{...input,...current.privacyReview})
-  assert.equal(edge.calls.length,calls,'erasure makes no provider request')
+  assert.equal(edge.calls.length,calls,'erasure makes no CRM provider request');assert.equal(drive.calls.length,driveCalls,'erasure makes no file-store provider request')
+  assert.deepEqual(new Set(result.receipt.fileStoreRecords.map(r=>r.recordId)),new Set(externalFiles.map(r=>r.provider_id)))
+  assert.ok(result.receipt.fileStoreRecords.every(r=>r.accountId==='synthetic-platter-archive-account'&&r.folderId&&r.sha256&&r.action.includes('operator erasure')))
+  for(const file of externalFiles)assert.equal(digest(drive.files.get(file.provider_id).bytes),file.sha256)
   const after=await assertPrivacyErased(h,fixture,result.receipt)
+  assert.equal(after.proposals.length,1,'no additional proposal can survive or be recreated')
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_mail').first()).n,0,'the complete local outbox is empty after this contact erasure')
   assert.deepEqual((await privacyInventory(h)).p_acceptances,[accepted]);assert.deepEqual((await privacyInventory(h)).p_revisions,revisions)
   assert.equal(result.receipt.retained[0].snapshotSha256,digest(accepted.snapshot))
   assert.deepEqual(after.privacy.receipts,[result.receipt]);assert.equal((await h.state(member)).privacy,undefined)
@@ -37,6 +49,7 @@ export async function privacyJourney(){
   await h.cmd('crm.deal.review',edge.selected,h.owner,409)
   await h.cmd('proposal.prepare',{...privacyOffer,clientId:id,title:'Replay'},h.owner,410)
   const worker=await h.mf.getWorker();await worker.scheduled({scheduledTime:new Date('2030-01-01T15:00:00Z'),cron:'*/15 * * * *'})
+  assert.equal(drive.calls.length,driveCalls,'erased archive jobs cannot execute again')
   assert.equal(edge.calls.length,calls+7,'only explicit source review reads HubSpot; scheduled work sends nothing')
   assert.deepEqual((await h.state()).privacy.receipts,[result.receipt])
  }finally{await h.close()}

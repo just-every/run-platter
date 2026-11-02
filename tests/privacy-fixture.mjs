@@ -52,9 +52,10 @@ export async function privacyInventory(h) {
 export async function assertPrivacyErased(h,fixture,receipt) {
  const state=await h.state(),client=state.clients.find(c=>c.id===fixture.client.id)
  assert.equal(client.name,'Erased contact');assert.equal(client.variable_fields,'{}');assert.notEqual(client.email,fixture.client.email)
- assert.deepEqual(state.proposals.map(p=>p.id),[fixture.retained.id])
+ const affected=[fixture.first.id,fixture.second.id,fixture.retained.id]
+ assert.deepEqual(state.proposals.filter(p=>affected.includes(p.id)).map(p=>p.id),[fixture.retained.id])
  assert.equal(state.tracking.views.length,0);assert.equal(state.tracking.alerts.length,0)
- for(const table of ['p_questions','p_question_answers','p_internal_threads','p_mail','p_shares','p_crm_draft_reviews','p_tracking_reading','p_tracking_choices','p_tracking_attachment_opens'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0,table+' is erased independently of the receipt counts')
+ for(const table of ['p_questions','p_question_answers','p_internal_threads','p_mail','p_shares','p_crm_draft_reviews','p_tracking_reading','p_tracking_choices','p_tracking_attachment_opens']){const direct=['p_questions','p_internal_threads','p_mail','p_shares'].includes(table),query=h.db.prepare('SELECT count(*) AS n FROM '+table+(direct?' WHERE proposal_id IN (SELECT value FROM json_each(?))':''));assert.equal((await (direct?query.bind(JSON.stringify(affected)):query).first()).n,0,table+' is erased independently of the receipt counts')}
  const files=(await h.db.prepare('SELECT * FROM p_attachment_files').all()).results
  assert.deepEqual(files.map(f=>f.sha256),[digest(fixture.retainedFile)],'only the retained original file survives')
  const retained=(await h.state()).proposals.find(p=>p.id===fixture.retained.id),file=retained.attachments[0]
@@ -72,4 +73,8 @@ export async function assertPrivacyErased(h,fixture,receipt) {
   assert.equal((await h.send(invite.path+'/action?name=accept',{name:'Replay',optionId:'one',consent:true},invite.cookie)).status,404)
  }
  return state
+}
+
+export function privacyOwner(h,owner){
+ return {...h,owner,cmd:(name,input,cookie=owner,status=200)=>h.cmd(name,input,cookie,status),state:(cookie=owner,status=200)=>h.state(cookie,status)}
 }

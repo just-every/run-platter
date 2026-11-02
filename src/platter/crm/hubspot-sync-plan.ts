@@ -1,5 +1,6 @@
 import type { Bindings } from '../../auth.server'
-import { providerCredential, providerJson } from '../connections'
+import { providerCredential } from '../connections'
+import { hubspotJson } from './hubspot-request'
 import { need, text, hash, snapshot, type Actor } from '../model'
 import { administrators, permitted } from '../permissions'
 import { trackingSettings } from '../tracking'
@@ -48,8 +49,8 @@ export async function buildSyncPlan(env: Bindings, actor: Actor, input: Record<s
  const pipelineId = identifier(input.pipelineId), wonStage = identifier(input.wonStage), lostStage = identifier(input.lostStage)
  need(wonStage !== lostStage, 'Choose distinct closed stages')
  const [statusMeta, linkMeta, pipelines, deal] = await Promise.all([
-  providerJson(base + '/properties/deals/' + statusProperty, secret.token), providerJson(base + '/properties/deals/' + linkProperty, secret.token),
-  providerJson(base + '/pipelines/deals', secret.token), providerJson(base + '/objects/deals/' + source.deal_id + '?properties=pipeline,dealstage,' + statusProperty + ',' + linkProperty, secret.token),
+  hubspotJson(env, connection, secret.token, base + '/properties/deals/' + statusProperty), hubspotJson(env, connection, secret.token, base + '/properties/deals/' + linkProperty),
+  hubspotJson(env, connection, secret.token, base + '/pipelines/deals'), hubspotJson(env, connection, secret.token, base + '/objects/deals/' + source.deal_id + '?properties=pipeline,dealstage,' + statusProperty + ',' + linkProperty),
  ])
  const facts = await syncFacts(env, row)
  need(statusMeta.name === statusProperty && statusMeta.hubspotDefined === false && !statusMeta.archived && statusMeta.type === 'enumeration' && statusMeta.options?.some((o: any) => o.value === facts.status && !o.hidden) && !statusMeta.modificationMetadata?.readOnlyValue && !statusMeta.calculated, 'Choose a writable status property with the current status option', 409)

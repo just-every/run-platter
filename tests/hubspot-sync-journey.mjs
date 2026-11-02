@@ -92,4 +92,72 @@ export async function reviewedSyncJourney(verified) {
   assert.ok((await h.state()).crmSyncHistory.some(a => a.status === 'uncertain'))
   await h.cmd('crm.card.configure', { enabled: 'no' }); assert.equal((await signedCard(h)).status, 401)
  } finally { await h.close() }
+ await credentialFailureJourney()
+}
+
+async function credentialFailureJourney() {
+ const edge = hubspotSyncFixture()
+ let h, refusal, reconnectDuringRead = false, calls = 0
+ h = await harness({ outboundService: async request => {
+  calls++
+  const url = new URL(request.url)
+  if (reconnectDuringRead && request.method === 'GET' && url.pathname.includes('/objects/deals/')) {
+   reconnectDuringRead = false
+   const connection = (await h.state()).connections.find(c => c.provider === 'hubspot')
+   await h.cmd('provider.connect', { provider: 'hubspot', version: connection.version, token: 'synthetic-platter-4607', consent: true })
+   return new Response(null, { status: 401 })
+  }
+  if (refusal && request.method === refusal.method && url.pathname.includes(refusal.path)) {
+   const current = refusal; refusal = undefined
+   return Response.json({ category: current.category, message: 'synthetic-platter-private-provider-detail' }, { status: current.status })
+  }
+  return edge.request(request)
+ } })
+ try {
+  const connection = async () => (await h.state()).connections.find(c => c.provider === 'hubspot')
+  const reconnect = async () => h.cmd('provider.connect', { provider: 'hubspot', version: (await connection())?.version ?? 0, token: 'synthetic-platter-4607', consent: true })
+  await reconnect(); await configureCard(h)
+  const draftReview = await h.cmd('crm.deal.review', edge.selected)
+  const draft = await h.cmd('crm.deal.apply', { id: draftReview.id, digest: draftReview.digest, consent: true })
+  await h.cmd('proposal.approve', { id: draft.id, version: 1, revision: 1 })
+  await h.cmd('proposal.send', { id: draft.id, version: 2 })
+  const fresh = (status = 200) => h.cmd('crm.sync.review', { proposalId: draft.id, version: 3, ...syncMapping }, h.owner, status)
+  const apply = (r, status = 200) => h.cmd('crm.sync.apply', { id: r.id, digest: r.digest, consent: true }, h.owner, status)
+  const checked = await fresh(), proposalsBefore = (await h.state()).proposals
+  for (const [status, category] of [[429, 'RATE_LIMITS'], [503, 'SERVICE_UNAVAILABLE'], [403, 'FORBIDDEN']]) {
+   refusal = { method: 'GET', path: '/objects/deals/', status, category }
+   await h.cmd('crm.deal.review', edge.selected, h.owner, 409)
+   assert.equal((await connection()).status, 'connected', 'transient errors and unrelated refusals do not invalidate credentials')
+  }
+  refusal = { method: 'GET', path: '/objects/deals/', status: 401, category: 'INVALID_AUTHENTICATION' }
+  const rejected = await h.send('/api/platter/command', { name: 'crm.deal.review', input: edge.selected }, h.owner)
+  assert.equal(rejected.status, 409); assert.ok(!rejected.text.includes('synthetic-platter-private-provider-detail'))
+  assert.equal((await connection()).status, 'broken')
+  const afterRejection = calls
+  await h.cmd('crm.deal.review', edge.selected, h.owner, 409)
+  await apply(checked, 409); assert.equal((await signedCard(h)).status, 401)
+  await h.cmd('proposal.prepare', { clientId: proposalsBefore[0].client_id, title: '{{Deal.Name}}', scope: 'Synthetic copied variables', optionOne: 'Scope', priceOne: '100', optionTwo: 'Other scope', priceTwo: '200', depositPercent: '25', variableDeal: { provider: 'hubspot', id: edge.selected.dealId } }, h.owner, 409)
+  assert.equal(calls, afterRejection, 'confirmed revocation stops further reads, writes and signed card exposure')
+  assert.equal(edge.writes.length, 0); assert.deepEqual((await h.state()).proposals, proposalsBefore)
+  await reconnect(); await configureCard(h)
+  const afterReconnect = calls
+  await apply(checked, 409); assert.equal(calls, afterReconnect, 'reconnection cannot reactivate a reviewed write or read its old source')
+  assert.equal((await signedCard(h)).status, 200)
+  reconnectDuringRead = true
+  await h.cmd('crm.deal.review', edge.selected, h.owner, 409)
+  assert.equal((await connection()).status, 'connected', 'an old credential failure cannot break a concurrent new connection')
+  await configureCard(h)
+  const writeReview = await fresh()
+  refusal = { method: 'PATCH', path: '/objects/line_items/', status: 403, category: 'MISSING_SCOPES' }
+  const held = await apply(writeReview)
+  assert.equal(held.held, 1); assert.equal(held.confirmed, 0); assert.equal(edge.writes.length, 0)
+  assert.equal((await connection()).status, 'broken')
+  assert.deepEqual((await h.state()).proposals, proposalsBefore)
+  assert.equal((await h.state()).crmSyncHistory.at(-1).status, 'uncertain')
+  const afterWriteRefusal = calls
+  await fresh(409)
+  assert.equal((await signedCard(h)).status, 401); assert.equal(calls, afterWriteRefusal)
+  await reconnect(); await apply(writeReview, 409)
+  assert.equal((await apply(await fresh())).held, 1); assert.equal(edge.writes.length, 0, 'fresh credentials never replay a held write')
+ } finally { await h.close() }
 }

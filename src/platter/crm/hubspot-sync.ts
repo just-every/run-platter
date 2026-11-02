@@ -1,7 +1,7 @@
 import type { Bindings } from '../../auth.server'
 import { demoEffect } from '@runeditrun/rer/internal/modules/demo/index.mjs'
 import { actorById } from '../credentials'
-import { providerCredential } from '../connections'
+import { hubspotJson } from './hubspot-request'
 import { currentTime } from '../expiry-time'
 import { commit, hash, need, text, type Actor } from '../model'
 import { canonical } from './hubspot-draft'
@@ -25,12 +25,9 @@ function matchesProperty(key: string, actual: unknown, expected: unknown) {
 function guard(review: any) {
  return { sql: "EXISTS(SELECT 1 FROM p_connections c JOIN p_connection_secrets s ON s.connection_id=c.id WHERE c.id='workspace:hubspot' AND c.account_id=? AND c.version=? AND c.status='connected' AND c.broken_at IS NULL) AND EXISTS(SELECT 1 FROM p_proposals p WHERE p.id=? AND p.version=? AND p.revision=? AND NOT EXISTS(SELECT 1 FROM p_negotiations n WHERE n.proposal_id=p.id))", values: [review.account_id, review.connection_version, review.proposal_id, review.proposal_version, review.revision] as any[] }
 }
-async function writeOperation(operation: SyncOperation, token: string) {
+async function writeOperation(env: Bindings, connection: any, operation: SyncOperation, token: string) {
  return demoEffect(async () => {
-  const response = await fetch(endpoint + operation.path, { method: operation.method, headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify(operation.body), redirect: 'manual' })
-  need(response.ok, 'HubSpot did not confirm this write', 409)
-  const raw = await response.text(); need(raw.length <= 262144, 'HubSpot response was too large', 409)
-  const receipt = JSON.parse(raw)
+  const receipt = await hubspotJson(env, connection, token, endpoint + operation.path, { method: operation.method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(operation.body) })
   need(typeof receipt.id === 'string' && receipt.id.length > 0 && !receipt.archived, 'HubSpot did not identify the written record', 409)
   if (operation.method === 'PATCH') need(receipt.id === operation.path.split('/').at(-1), 'HubSpot wrote another record', 409)
   need(Object.entries(operation.body.properties).every(([k, v]) => matchesProperty(k, receipt.properties?.[k], v)), 'HubSpot returned different values', 409)
@@ -54,7 +51,8 @@ export async function hubspotSyncCommand(env: Bindings, actor: Actor, name: stri
  need(input.consent === true || input.consent === 'yes', 'Explicitly authorize these exact CRM writes')
  const review = await db.prepare('SELECT * FROM p_crm_sync_reviews WHERE id=? AND actor_id=?').bind(text(input.id, 'a CRM review'), actor.id).first<any>()
  need(review && !review.consumed_at && review.created_at > at - 900000, 'Review expired or was already consumed; review again', 409)
- await syncProposal(env, actor, review.proposal_id)
+ const bound = await syncProposal(env, actor, review.proposal_id)
+ need(bound.connection.version === review.connection_version && bound.row.version === review.proposal_version, 'The connection or proposal changed; review again', 409)
  need(review.digest === input.digest && review.actor_role === actor.role && review.actor_version === (actor.memberVersion ?? 0), 'Reviewed bytes or authority changed; review again', 409)
  const plan = JSON.parse(review.plan_json)
  const current = await buildSyncPlan(env, actor, { proposalId: review.proposal_id, version: review.proposal_version, ...plan.mapping })
@@ -79,8 +77,7 @@ export async function hubspotSyncCommand(env: Bindings, actor: Actor, name: stri
    need(liveActor && liveActor.role === review.actor_role && (liveActor.memberVersion ?? 0) === review.actor_version, 'CRM authority changed', 409)
    const live = await syncProposal(env, liveActor, review.proposal_id)
    need(live.connection.version === review.connection_version && live.row.version === review.proposal_version, 'CRM destination or proposal changed', 409)
-   const { secret } = await providerCredential(env, 'workspace:hubspot')
-   const providerId = await writeOperation(operation, secret.token)
+   const providerId = await writeOperation(env, live.connection, operation, live.secret.token)
    await db.prepare("UPDATE p_crm_sync_attempts SET status='confirmed',provider_id=?,confirmed_at=? WHERE id=?").bind(providerId, await currentTime(db), id).run()
    confirmed++
   } catch {

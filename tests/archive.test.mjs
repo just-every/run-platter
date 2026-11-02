@@ -928,6 +928,10 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const completionRefs=(await h.db.prepare('SELECT * FROM p_completion_mail WHERE proposal_id=? ORDER BY party').bind(signed.id).all()).results
   assert.equal(completionRefs.length,2)
   for(const ref of completionRefs)assert.equal((await h.db.prepare('SELECT status FROM p_mail WHERE id=?').bind(ref.mail_id).first()).status,'local')
+  const notice=(await h.state()).proposals.find(row=>row.id===expiry.id)
+  await h.cmd('notification.expiry',{id:expiry.id,version:notice.version,action:'revoke'})
+  const revokedNotice=(await h.state()).proposals.find(row=>row.id===expiry.id)
+  await h.cmd('notification.expiry',{id:expiry.id,version:revokedNotice.version,consent:true})
   await h.cmd('notification.watch',{id:expiry.id,email:true,events:['comment','signed','paid'],consent:true})
   const retainedOwner=h.owner,retainedAuth=h.auth;await h.close()
   const smsOptions={root:source,origin:'https://platter.example',assetsDirectory:'public',auth:{...retainedAuth,AUTH_LOCAL:'false'},outboundService:sourceEdge}
@@ -974,11 +978,12 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   await h.cmd('notification.decide',{requestId:previewed.request.id,version:1,decision:'approved',note:'Reviewed revision one before archive'},previewed.manager.cookie)
   const previewDecisions=(await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(previewed.proposal.id).all()).results
   assert.equal(previewDecisions.length,1);assert.equal(previewDecisions[0].actor_id,previewed.manager.id);assert.equal(previewDecisions[0].revision,1)
-  const tables=['p_connections','p_sms_provider_optins','p_sms_reenable_history','p_sms_assents','p_sms_revocations','p_sms_code_runs','p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
+  const tables=['p_connections','p_sms_provider_optins','p_sms_reenable_history','p_sms_assents','p_sms_revocations','p_sms_code_runs','p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_sender_notice_events','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
   assert.equal(before.p_sms_assents.length,3);assert.equal(before.p_sms_provider_optins.length,1);assert.equal(before.p_sms_reenable_history.length,1);assert.equal(before.p_sms_runs.filter(r=>r.kind==='completion').length,1)
   for(const table of ['p_sms_revocations','p_sms_code_runs','p_sms_optouts'])assert.equal(before[table].length,1,table+' has real history')
   assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,10,'the scheduler signature notice, explicit manager request and revoked request history are retained')
   assert.ok(before.p_approval_requests.find(row=>row.proposal_id===p.id).reminded_at);assert.equal(before.p_approval_requests.find(row=>row.proposal_id===revoked.id).reminded_at,null);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox WHERE request_id=?').bind(requested.requests[0]).first()).n,1,'revocation retains only the initial request and creates no reminder')
+  assert.equal(before.p_sender_notice_events.length,4);assert.ok(before.p_sender_notice_events.some(e=>e.action==='revoked'));
   await h.close();h=undefined
   const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'));assert.ok(!bytes.includes('synthetic-platter-7107'))
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
@@ -998,6 +1003,11 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const restoredPreviewAudit=(await h.send('/api/platter/audit?action=proposal.preview&subject='+previewed.proposal.id,undefined,restoredOwner)).value.rows
   assert.deepEqual(restoredPreviewAudit,previewed.audit,'actor, scoped subject and original server time survive public CLI restore exactly; refusals add no preview audit')
   const restoredRequest=(await h.cmd('notification.requests',{id:revoked.id},restoredOwner)).requests[0];assert.deepEqual(restoredRequest.trigger,retainedRequest.trigger);assert.equal(restoredRequest.revoked_at,retainedRequest.revoked_at);assert.equal(restoredRequest.current,false)
+  const restoredNoticeState=await h.state(restoredOwner)
+  assert.deepEqual(restoredNoticeState.expiryNotices.active,[])
+  assert.deepEqual(restoredNoticeState.expiryNotices.events,before.p_sender_notice_events.slice().sort((a,b)=>a.occurred_at-b.occurred_at||a.id.localeCompare(b.id)))
+  assert.equal((await h.send('/app/proposal?id='+expiry.id,undefined,restoredOwner)).status,200)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sender_notice_authority').first()).n,0,'inspection of restored settings cannot reactivate email')
   const restoredCertificate=await h.send('/api/platter/certificate.json?id='+signed.id,undefined,restoredOwner);assert.equal(restoredCertificate.status,200,restoredCertificate.text);assert.deepEqual(restoredCertificate.value,certificate.value)
   assert.deepEqual(await download('/api/platter/agreement.pdf?id='+signed.id,restoredOwner),documentBytes)
   assert.deepEqual(await download('/api/platter/certificate.pdf?id='+signed.id,restoredOwner),certificateBytes)

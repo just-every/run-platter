@@ -277,6 +277,10 @@
     {
       "id": "0102_betterproposals_export.sql",
       "buyerSteps": "Apply migrations/core/0102_betterproposals_export.sql after existing core migrations. No manual data changes; existing document imports retain their documents source kind."
+    },
+    {
+      "id": "0103_expiry_notice_consent.sql",
+      "buyerSteps": "Apply migrations/core/0103_expiry_notice_consent.sql after existing core migrations. Historical settings remain inactive; authorize expiry notices again for each current proposal."
     }
   ],
   "breaking": false,

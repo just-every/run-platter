@@ -4251,3 +4251,56 @@ test('ACCT-002 reviewed Xero deposits preserve exact money, authority, unique ma
   assert.equal(edge.state.invoices.length,writes)
  }finally{await legacy.close()}
 })
+
+test('AI-003 shared company MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund',()=>run(async h=>{
+ const endpoint='/mcp',key=await h.cmd('agent.create',{label:'MCP assistant'})
+ let sequence=0
+ const transport=async(method,params={},token=key.token,extra={})=>h.send(endpoint,{jsonrpc:'2.0',id:++sequence,method,params},'',{authorization:'Bearer '+token,accept:'application/json, text/event-stream','mcp-protocol-version':'2025-11-25',...extra})
+ const rpc=async(method,params={})=>{const r=await transport(method,params);assert.equal(r.status,200,r.text);assert.ok(!r.value.error,r.text);return r.value.result}
+ const call=async(name,args={})=>{const result=await rpc('tools/call',{name,arguments:{...args,idempotency_key:crypto.randomUUID()}});assert.ok(!result.isError,JSON.stringify(result));return JSON.parse(result.content[0].text)}
+ assert.equal((await h.send(endpoint,{jsonrpc:'2.0',id:1,method:'tools/list'},'',{'mcp-protocol-version':'2025-11-25'})).status,401)
+ const initialized=await rpc('initialize',{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'Platter acceptance MCP client',version:'1'}})
+ assert.equal(initialized.protocolVersion,'2025-11-25');assert.ok(initialized.capabilities.tools)
+ const notified=await h.send(endpoint,{jsonrpc:'2.0',method:'notifications/initialized'},'',{authorization:'Bearer '+key.token,'mcp-protocol-version':'2025-11-25'});assert.equal(notified.status,202);assert.equal(notified.text,'')
+ const listed=await rpc('tools/list');assert.ok(listed.tools.every(t=>t.inputSchema.type==='object'));assert.deepEqual(listed.tools.map(t=>t.name).sort(),['platter.templates.start','platter.proposals.prepare','platter.engagement.read','platter.proposals.read','platter.send_requests.create','platter.proposals.revise','platter.proposals.search','platter.templates.search','platter.workspace.snapshot'].sort())
+ const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
+ const found=await call('platter.proposals.search',{query:'Northstar'});assert.ok(found.clients.some(c=>c.id===client.id));assert.equal(found.proposalCount,0)
+ const p=await call('platter.proposals.prepare',{...offer,depositPercent:25,clientId:client.id})
+ let current=await call('platter.proposals.read',{id:p.id});assert.equal(current.status,'draft');assert.equal(current.prepared_by,'agent:'+key.id);assert.ok(!current.shareToken);assert.equal(current.preparedBy.label,'MCP assistant for Jordan Venue')
+ assert.ok((await call('platter.proposals.search',{query:'photography',status:'draft',limit:1})).proposals.some(x=>x.id===p.id))
+ const engagement=await call('platter.engagement.read',{id:p.id});assert.equal(engagement.viewTracking.available,false);assert.equal(engagement.sectionReading.available,false);assert.equal(engagement.acceptance,null);assert.equal(engagement.delivery,null)
+ const before=await h.state(),requested=await call('platter.send_requests.create',{id:p.id,revision:1}),again=await call('platter.send_requests.create',{id:p.id,revision:1})
+ assert.equal(again.request.id,requested.request.id)
+ const queued=await h.send('/api/platter/send-requests',undefined,h.owner);assert.equal(queued.status,200);assert.equal(queued.value.requests.length,1);assert.equal(queued.value.requests[0].actionable,1)
+ const after=await h.state();assert.deepEqual(after.proposals,before.proposals);assert.deepEqual(after.outbox,before.outbox)
+ for(const name of ['approve','proposal.approve','send','proposal.send','sign','refund']){
+  const refused=await transport('tools/call',{name,arguments:{id:p.id}});assert.equal(refused.status,400);assert.equal(refused.value.error.data.code,'tool_not_found')
+ }
+ await h.cmd('proposal.send',{id:p.id,version:1},h.owner,409)
+ await h.cmd('send-request.resolve',{id:requested.request.id,status:'fulfilled'},h.owner,409)
+ const changed=await call('platter.proposals.revise',{...offer,depositPercent:25,clientId:client.id,id:p.id,version:1,scope:'A revised campaign plan'})
+ assert.equal(changed.revision,2);assert.equal((await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests[0].actionable,0)
+ const stale=await rpc('tools/call',{name:'platter.send_requests.create',arguments:{id:p.id,revision:1,idempotency_key:crypto.randomUUID()}});assert.equal(stale.isError,true)
+ await h.cmd('send-request.resolve',{id:requested.request.id,status:'dismissed'})
+ const next=await call('platter.send_requests.create',{id:p.id,revision:2})
+ await h.cmd('proposal.approve',{id:p.id,version:2,revision:2});const sent=await h.cmd('proposal.send',{id:p.id,version:3})
+ await h.cmd('send-request.resolve',{id:next.request.id,status:'fulfilled'})
+ await h.cmd('tracking.settings',{enabled:'yes',alerts:'yes',retentionDays:90,quietMinutes:30,consent:'yes'});await h.send(new URL(sent.shareUrl).pathname)
+ const privateEngagement=await call('platter.engagement.read',{id:p.id});assert.equal(privateEngagement.viewTracking.available,false);assert.match(privateEngagement.viewTracking.reason,/only.*owner/);assert.ok(!JSON.stringify(privateEngagement).includes('avery@northstar.example'));assert.equal((await h.state()).tracking.views.length,1)
+ current=await call('platter.proposals.read',{id:p.id});assert.equal(current.status,'sent');assert.ok(!JSON.stringify(current).includes(new URL(sent.shareUrl).pathname.slice(3)))
+ const finalQueue=(await h.send('/api/platter/send-requests',undefined,h.owner)).value.requests
+ assert.deepEqual(finalQueue.map(r=>r.status).sort(),['dismissed','fulfilled'])
+ const malformed=await transport('tools/call',{name:'platter.proposals.prepare',arguments:{...offer,depositPercent:25,clientId:client.id,extra:'ignored',idempotency_key:crypto.randomUUID()}});assert.ok(!malformed.value.result.isError);assert.ok(malformed.value.result._meta['com.runeditrun/decision'].classes.every(c=>c.class==='standard'))
+ assert.equal((await transport('tools/list',{},key.token,{origin:'https://foreign.example'})).status,403)
+ assert.equal((await transport('tools/list',{},key.token,{'mcp-protocol-version':'unsupported'})).status,400)
+ assert.equal((await h.send(endpoint,undefined,'',{authorization:'Bearer '+key.token,'mcp-protocol-version':'2025-11-25'})).status,405)
+ await h.send('/auth/invite',{email:'mcp-member@studio.example',displayName:'MCP member',role:'member',returnTo:'/app'},h.owner);const member=await h.signIn('mcp-member@studio.example')
+ assert.equal((await h.send('/api/platter/send-requests',undefined,member)).status,403)
+ await h.cmd('send-request.resolve',{id:next.request.id,status:'dismissed'},member,403)
+ const audit=(await h.send('/api/platter/audit?actor='+encodeURIComponent('agent:'+key.id),undefined,h.owner)).value.rows
+ for(const action of ['mcp.proposals.prepare','mcp.send_requests.create','mcp.proposals.revise'])assert.ok(audit.some(row=>row.action===action&&row.actor_role==='agent'),action)
+ const doorAudit=(await h.send('/agents/api/audit',undefined,h.owner)).value.rows
+ for(const tool of ['platter.proposals.search','platter.proposals.read','platter.engagement.read'])assert.ok(doorAudit.some(row=>row.tool===tool&&row.agent.id===key.id),tool)
+ await h.cmd('agent.revoke',{id:key.id});assert.equal((await transport('tools/list')).status,401)
+}))
+

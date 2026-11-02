@@ -1,3 +1,4 @@
+import { sharedAgentResponse } from '../src/platter/agent/index'
 import { runCompletionMail } from '../src/platter/mail'
 import { runArchives } from '../src/platter/archiving/jobs'
 import { runWebhooks } from '../src/platter/api/webhooks'
@@ -16,6 +17,7 @@ import { runExpiry } from '../src/platter/expiry'
 import { runDueReports } from '../src/platter/reports/schedules'
 import { runtimeBindings } from '../src/auth.server'
 export default {async fetch(request:Request,env:Bindings){
+ const door=await sharedAgentResponse(request,runtimeBindings(env));if(door)return door
  if(new URL(request.url).pathname.startsWith('/auth/')){
   const auth=createOperatorAuth({...memberAuthOptions(env),db:env.DB,config:authConfig(env),clientIp:()=>'127.0.0.1',mailSender:{async send(message:any){await createD1DevelopmentOutbox({db:env.DB}).put(message);return{provider:'development',mode:'development',providerMessageId:null,status:env.AUTH_LOCAL==='true'?'development':'accepted'}}}})
   return withAuthAudit(request,env,async()=>await memberAuthHandler(request,env,auth),auth)

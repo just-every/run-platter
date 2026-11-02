@@ -1,8 +1,8 @@
 import { need, type Actor } from './model'
 
-export async function recordAudit(db: D1Database, actor: Pick<Actor, 'id'> & { role: string; keyId?: string }, action: string, subject: string) {
+export async function recordAudit(db: D1Database, actor: Pick<Actor, 'id'|'agent'> & { role: string; keyId?: string }, action: string, subject: string) {
  await db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)')
-  .bind(crypto.randomUUID(), actor.keyId ? `agent:${actor.keyId}` : actor.id, actor.role, action, subject, Date.now()).run()
+  .bind(crypto.randomUUID(), actor.agent ? `agent:${actor.agent.id}` : actor.keyId ? `agent:${actor.keyId}` : actor.id, actor.agent ? 'agent' : actor.role, action, subject, Date.now()).run()
 }
 export async function auditRows(db: D1Database, actor: Actor, query: URLSearchParams) {
  need(['owner','admin'].includes(actor.role), 'Only the owner reads the audit log', 403)
@@ -29,9 +29,9 @@ export function auditCsv(rows: any[]) {
 }
 /** What the audit page names each id by: proposal titles, client names, people and agent key labels. */
 export async function auditNames(db: D1Database) {
- const [proposals, clients, people, keys] = await Promise.all([
+ const [proposals, clients, people, keys, agents] = await Promise.all([
   db.prepare('SELECT id,title AS name FROM p_proposals').all<any>(), db.prepare('SELECT id,name FROM p_clients').all<any>(),
-  db.prepare("SELECT id,COALESCE(NULLIF(display_name,''),email) AS name FROM oa_operators").all<any>(), db.prepare('SELECT id,label AS name FROM p_agent_keys').all<any>()])
+  db.prepare("SELECT id,COALESCE(NULLIF(display_name,''),email) AS name FROM oa_operators").all<any>(), db.prepare('SELECT id,label AS name FROM p_agent_keys').all<any>(), db.prepare("SELECT id,name||' for '||sponsor_name AS name FROM agent_door_agents").all<any>()])
  const map = (r: { results: any[] }) => new Map<string, string>(r.results.map(x => [String(x.id), String(x.name)]))
- return { proposals: map(proposals), clients: map(clients), people: map(people), keys: map(keys) }
+ return { proposals: map(proposals), clients: map(clients), people: map(people), keys: map({results:[...keys.results,...agents.results]}) }
 }

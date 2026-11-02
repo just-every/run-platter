@@ -1,13 +1,15 @@
 import { commit, need, proposal, type Actor } from './model'
+import { permitted } from './permissions'
 import { recordAudit } from './audit'
 
 export async function requestSend(db: D1Database, actor: Actor, input: Record<string, any>) {
- const current = await proposal(db, input.id)
+ need(actor.role==='owner'||actor.role==='agent','Only the owner queues a sending review',403)
+ const current = await permitted(db, actor, input.id, 'edit')
  need(['draft', 'approved'].includes(current.status) && current.revision === input.revision, 'Request the current draft or approved revision', 409)
  const guard = { sql: "EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND revision=? AND status IN ('draft','approved'))", values: [current.id, input.revision] }
- await commit(db, actor, [db.prepare("INSERT INTO p_send_requests(id,proposal_id,revision,requested_version,owner_id,agent_key_id,requested_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(proposal_id,revision,agent_key_id) WHERE status='pending' DO NOTHING")
-  .bind(crypto.randomUUID(), current.id, current.revision, current.version, actor.id, actor.keyId!, Date.now())], false, guard)
- const request = await db.prepare("SELECT * FROM p_send_requests WHERE proposal_id=? AND revision=? AND agent_key_id=? AND status='pending'").bind(current.id, current.revision, actor.keyId!).first()
+ await commit(db, actor, [db.prepare("INSERT INTO p_send_requests(id,proposal_id,revision,requested_version,owner_id,agent_key_id,requested_at,prepared_by) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(proposal_id,revision,agent_key_id) WHERE status='pending' DO NOTHING")
+  .bind(crypto.randomUUID(), current.id, current.revision, current.version, actor.id, actor.agent?.id ?? actor.keyId!, Date.now(), actor.agent?.label ?? `agent:${actor.keyId}`)], false, guard)
+ const request = await db.prepare("SELECT * FROM p_send_requests WHERE proposal_id=? AND revision=? AND agent_key_id=? AND status='pending'").bind(current.id, current.revision, actor.agent?.id ?? actor.keyId!).first()
  return { request, message: 'Queued for owner review. Approval and sending remain owner actions.' }
 }
 

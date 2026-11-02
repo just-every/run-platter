@@ -1,0 +1,34 @@
+import { need, text } from '../model'
+
+export type QuickBooksAuthority = () => Promise<{ token: string; company: string }>
+export const providerId = (value: unknown) => {
+ const id = text(value, 'a QuickBooks record id', 100)
+ need(/^[A-Za-z0-9_-]+$/.test(id), 'Use a QuickBooks record id')
+ return id
+}
+export async function quickbooks(authorize: QuickBooksAuthority, path: string, body?: unknown, requestId?: string) {
+ const { token, company } = await authorize()
+ const url = new URL('https://quickbooks.api.intuit.com/v3/company/' + encodeURIComponent(company) + path)
+ url.searchParams.set('minorversion', '75')
+ if (requestId) url.searchParams.set('requestid', requestId)
+ const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers: { authorization: 'Bearer ' + token, accept: 'application/json', 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'manual', signal: AbortSignal.timeout(30000) })
+ need(response.ok, 'QuickBooks refused the request. Review the retained accounting history before any further write.', 409)
+ const raw = await response.text()
+ need(raw.length <= 262144, 'QuickBooks returned an oversized response', 409)
+ return JSON.parse(raw)
+}
+export async function customerMatches(authorize: QuickBooksAuthority, name: string) {
+ // The fixed query grammar escapes provider string literals; identifiers never come from input.
+ const escaped = name.replaceAll('\\', '\\\\').replaceAll("'", "\\'")
+ const value = await quickbooks(authorize, '/query?query=' + encodeURIComponent("select * from Customer where DisplayName = '" + escaped + "' maxresults 100"))
+ const customers = value.QueryResponse?.Customer ?? []
+ need(Array.isArray(customers) && customers.length < 100, 'Customer matching needs manual reconciliation in QuickBooks', 409)
+ return customers.map((c: any) => { need(c.Active !== false && c.DisplayName === name, 'QuickBooks returned an unexpected customer match', 409); return { id: providerId(c.Id), name: c.DisplayName } }).sort((a: any, b: any) => a.id.localeCompare(b.id))
+}
+export async function itemMapping(authorize: QuickBooksAuthority, itemId: string, accountId: string) {
+ const item = (await quickbooks(authorize, '/item/' + encodeURIComponent(itemId))).Item
+ const account = (await quickbooks(authorize, '/account/' + encodeURIComponent(accountId))).Account
+ need(item?.Id === itemId && item.Active !== false && ['Service','NonInventory'].includes(item.Type) && item.IncomeAccountRef?.value === accountId, 'Choose an active non-inventory item with this income account', 409)
+ need(account?.Id === accountId && account.Active !== false && account.AccountType === 'Income', 'Choose an active income account', 409)
+ return { itemId, itemName: text(item.Name, 'the item name'), accountId, accountName: text(account.Name, 'the income account name') }
+}

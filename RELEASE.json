@@ -277,6 +277,10 @@
     {
       "id": "0102_betterproposals_export.sql",
       "buyerSteps": "Apply migrations/core/0102_betterproposals_export.sql after existing core migrations. No manual data changes; existing document imports retain their documents source kind."
+    },
+    {
+      "id": "0103_quickbooks_deposits.sql",
+      "buyerSteps": "Apply migrations/core/0103_quickbooks_deposits.sql after existing core migrations. Restored accounting history does not confer synchronization authority; reconnect and review new requests explicitly."
     }
   ],
   "breaking": false,

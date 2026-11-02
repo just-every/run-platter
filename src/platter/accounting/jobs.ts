@@ -10,7 +10,7 @@ const live = `SELECT s.* FROM p_accounting_settings s JOIN p_accounting_authorit
  JOIN oa_operators o ON o.id=s.authorized_by AND o.role='owner' AND o.status='active' AND o.version=g.operator_version
  LEFT JOIN p_members m ON m.operator_id=o.id
  JOIN p_connections c ON c.id='workspace:quickbooks' AND c.status='connected' AND c.broken_at IS NULL AND c.version=s.connection_version AND c.account_id=s.account_id
- JOIN p_connection_secrets secret ON secret.connection_id=c.id WHERE COALESCE(m.version,0)=g.member_version`
+ JOIN p_connection_secrets secret ON secret.connection_id=c.id WHERE COALESCE(m.version,0)=g.member_version AND NOT EXISTS(SELECT 1 FROM p_invoice_authority WHERE authority='xero') AND NOT EXISTS(SELECT 1 FROM p_xero_jobs)`
 async function configuration(env: Bindings) {
  const config = await env.DB.prepare(live).first<any>()
  need(config, 'The owner must authorize the current verified QuickBooks company first', 409)
@@ -70,7 +70,7 @@ export async function accountingCommand(env: Bindings, actor: Actor, name: strin
   const version = (old?.version ?? 0) + 1
   await commit(db, actor, [db.prepare(`INSERT INTO p_accounting_settings VALUES(1,?,'quickbooks',?,?,?,?) ON CONFLICT(singleton) DO UPDATE SET version=excluded.version,account_id=excluded.account_id,connection_version=excluded.connection_version,authorized_by=excluded.authorized_by,authorized_at=excluded.authorized_at`).bind(version, connection.account_id, connection.version, actor.id, at),
    db.prepare('INSERT INTO p_accounting_authority VALUES(1,?,?,?) ON CONFLICT(singleton) DO UPDATE SET version=excluded.version,operator_version=excluded.operator_version,member_version=excluded.member_version').bind(version, await operatorVersion(db, actor.id), actor.memberVersion ?? 0)], true,
-  { sql: `COALESCE((SELECT version FROM p_accounting_settings WHERE singleton=1),0)=? AND NOT EXISTS(SELECT 1 FROM p_accounting_jobs WHERE account_id!=?) AND EXISTS(SELECT 1 FROM p_connections WHERE id='workspace:quickbooks' AND version=? AND account_id=? AND status='connected' AND broken_at IS NULL)`, values: [old?.version ?? 0, connection.account_id, connection.version, connection.account_id] })
+  { sql: `COALESCE((SELECT version FROM p_accounting_settings WHERE singleton=1),0)=? AND NOT EXISTS(SELECT 1 FROM p_accounting_jobs WHERE account_id!=?) AND NOT EXISTS(SELECT 1 FROM p_invoice_authority WHERE authority='xero') AND NOT EXISTS(SELECT 1 FROM p_xero_jobs) AND EXISTS(SELECT 1 FROM p_connections WHERE id='workspace:quickbooks' AND version=? AND account_id=? AND status='connected' AND broken_at IS NULL)`, values: [old?.version ?? 0, connection.account_id, connection.version, connection.account_id] })
   return { version }
  }
  if (name === 'accounting.revoke') { need(actor.role === 'owner', 'Only the owner revokes invoice authority', 403); await commit(db, actor, [db.prepare('DELETE FROM p_accounting_authority')], true); return { revoked: true } }
@@ -98,6 +98,9 @@ export async function accountingCommand(env: Bindings, actor: Actor, name: strin
  const guard = configGuard(config)
  guard.sql += ' AND EXISTS(SELECT 1 FROM p_accounting_reviews WHERE id=? AND consumed_at IS NULL AND expires_at>?) AND EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status=\'accepted\')'
  guard.values.push(review.id, at, plan.proposalId, plan.proposalVersion)
+ // Reserve only the reviewed customer, even when another proposal commits during provider reads.
+ guard.sql += ` AND NOT EXISTS(SELECT 1 FROM p_accounting_customers WHERE account_id=? AND client_id=? AND (status!='complete' OR name!=? OR provider_id IS NOT ? OR ?='new'))`
+ guard.values.push(plan.accountId, plan.clientId, plan.clientName, plan.customer.choice, plan.customer.choice)
  await commit(db, actor, [
   db.prepare('UPDATE p_accounting_reviews SET consumed_at=? WHERE id=?').bind(at, review.id),
   db.prepare(`INSERT INTO p_accounting_jobs(proposal_id,review_id,account_id,client_id,revision,settings_version,connection_version,authorized_by,actor_role,operator_version,member_version,plan,authorized_at,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'queued')`).bind(plan.proposalId, review.id, plan.accountId, plan.clientId, plan.revision, plan.settingsVersion, plan.connectionVersion, actor.id, actor.role, plan.operatorVersion, plan.memberVersion, review.plan, at),
@@ -160,6 +163,7 @@ export async function runAccounting(env: Bindings) {
     customer = { provider_id: id, status: 'complete' }
    } else {
     need(customer.status === 'complete', 'Customer creation is uncertain or already in progress; no blind replay', 409)
+    need(customer.provider_id === plan.customer.choice, 'The retained customer differs from the reviewed QuickBooks customer. Review again.', 409)
     const matches = await customerMatches(authorize,plan.clientName)
     need(matches.some((c: any) => c.id === customer.provider_id), 'The reviewed QuickBooks customer is no longer available', 409)
    }

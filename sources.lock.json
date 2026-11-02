@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "73f7e2468e79aea7b6338326ddf4b56ed1426dc74b86db4b073bb10adbda3bd3",
+      "sha256": "bee0c0075daba532e4e7d4a4da4e6b361e01f5a39c8b44353cac03322a746d0f",
       "executable": false
     },
     "deploy-demo.json": {
@@ -250,7 +250,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "1cdca9e2f3c025bf9fa609398ea82ab4b0369fae871be1198c4d3455b77b34de",
+      "sha256": "5de57f59b665e3d67710be892cbaccbed311bd93c1fc1ac2fcccaf83c1e02e9c",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -663,6 +663,10 @@
     },
     "migrations/core/0103_signer_delegation.sql": {
       "sha256": "90d27ea997ac2e52db9df9d013b2146399f15bad71a1740bc9a157f866ad5d32",
+      "executable": false
+    },
+    "migrations/core/0104_delegation_owner_version.sql": {
+      "sha256": "dafe362a2ae4b8aca6db0fa1a9bf3fb1f8797b854e2a53295b73f75b5c62281f",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -3002,7 +3006,7 @@
       "executable": false
     },
     "src/platter/signer-delegation.ts": {
-      "sha256": "f1634292b85a33727935cc0d8c3e4e6e80ed006f8f6b274963827b9dda3a8f04",
+      "sha256": "cf90f1216cb44284c5452920de226c35f2f29473c2a36389fb4c8521a41b8d11",
       "executable": false
     },
     "src/platter/signer-methods.ts": {
@@ -3454,7 +3458,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "3b2024eee456db08e0d13633632c6bbe7fc55949b903b1b1f2dbfbbf69cd37b0",
+      "sha256": "8a6855a3657453e09dac93deecce83ad34200256ef0f52ff42fe2b985d055754",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3662,11 +3666,11 @@
       "executable": false
     },
     "tests/signer-delegation-browser.mjs": {
-      "sha256": "8ad93a48f1054405038a13f7034ef70070f284469be6850ce022be3cf38674b0",
+      "sha256": "bd1699d8f4fbff043f0628b8abf8c957c7dbe230b3d0d1693bdd07d75a79d20d",
       "executable": false
     },
     "tests/signer-delegation-http.mjs": {
-      "sha256": "5ae6736c715362df3f39101ee5116e87dd6869d1d42c2a3bc9e5c7d82ebc279b",
+      "sha256": "a51accb7e85ea0f6e48892a7ccd29e3f2685f15f3c432b0913fbd313edb79c5b",
       "executable": false
     },
     "tests/signer-replacement-http.mjs": {

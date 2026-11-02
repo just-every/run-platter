@@ -609,6 +609,18 @@
     },
     {
       "binding": "DB",
+      "name": "0101_approval_request_details.sql",
+      "sha256": "95f39a1ec5040aca8f052d94e6451a08e1f879dcc9c39fab5ef608f7750055d7",
+      "sql": "-- Business history survives export; notification authority remains local.\nALTER TABLE p_approval_requests ADD COLUMN trigger_snapshot TEXT;\nALTER TABLE p_approval_requests ADD COLUMN revoked_at INTEGER;\nALTER TABLE p_approval_requests ADD COLUMN revoked_by TEXT;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0102_betterproposals_export.sql",
+      "sha256": "0a1e457dcb4310bcb10d08701e68d194a0bc208add1a4549107a3cbf5b166a38",
+      "sql": "ALTER TABLE p_document_moveins ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'documents';\nALTER TABLE p_document_moveins ADD COLUMN review_json TEXT NOT NULL DEFAULT '{}';\n-- Bindings are business custody, never recipient or sending authority.\nCREATE TABLE p_imported_document_contacts (\n document_id TEXT PRIMARY KEY REFERENCES p_imported_documents(id) ON DELETE RESTRICT,\n contact_id TEXT NOT NULL REFERENCES p_contacts(id) ON DELETE RESTRICT\n);\n-- Exact original business outputs fence every bounded undo batch together.\nCREATE TABLE p_document_business_outputs (\n kind TEXT NOT NULL CHECK(kind IN ('companies','contacts')), target_id TEXT NOT NULL,\n movein_id TEXT NOT NULL REFERENCES p_document_moveins(id), data_json TEXT NOT NULL,\n revision TEXT NOT NULL, PRIMARY KEY(kind,target_id)\n);\n"
+    },
+    {
+      "binding": "DB",
       "name": "0103_signer_delegation.sql",
       "sha256": "90d27ea997ac2e52db9df9d013b2146399f15bad71a1740bc9a157f866ad5d32",
       "sql": "-- Delegation facts are retained business history; authority stays installation-local.\nCREATE TABLE p_signer_delegations (\n id TEXT PRIMARY KEY,\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n revision INTEGER NOT NULL,\n old_recipient TEXT NOT NULL,\n new_recipient TEXT NOT NULL,\n delegate_name TEXT NOT NULL,\n delegated_at INTEGER NOT NULL,\n signing_position INTEGER NOT NULL CHECK(signing_position>0),\n required_method TEXT NOT NULL,\n undone_at INTEGER,\n undone_by TEXT\n);\nCREATE TABLE p_delegation_authority (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),\n revision INTEGER NOT NULL,\n owner_id TEXT NOT NULL,\n authorized_at INTEGER NOT NULL\n);\nALTER TABLE p_shares ADD COLUMN verification_required INTEGER NOT NULL DEFAULT 0 CHECK(verification_required IN (0,1));\nALTER TABLE p_shares ADD COLUMN delegation_id TEXT;\n"

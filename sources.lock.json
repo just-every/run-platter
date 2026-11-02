@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "91683220b005e1a8c769254b6791d658a10c74db13f3ad54d5bd94b7a211bc86",
+      "sha256": "34d0ac794e6b46faf5d06933d382ed86699e8d8e6235ea1c5697d3273f0a406d",
       "executable": false
     },
     "deploy-demo.json": {
@@ -242,7 +242,7 @@
       "executable": false
     },
     "integrations/hubspot/README.md": {
-      "sha256": "b12a35301e95d9fe18bef05496cc74a2ec174caaa699e140e48a72dcaa528fbb",
+      "sha256": "045b709321d5a7fad368dc3a422d38bd46803f906cb4ddc1d38c59b53f7260f5",
       "executable": false
     },
     "LICENSE": {
@@ -3450,7 +3450,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "554389135d23a815e34db6b48c8e2dcb4915f9a90e81582c2e2c6526bb1cc2ef",
+      "sha256": "a15937a7b7e360c84a573149110e7bccbe4e608c03607dd383b038993ddc006d",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3554,7 +3554,7 @@
       "executable": false
     },
     "tests/hubspot-archive.mjs": {
-      "sha256": "4e7c64fdfabadcefdc09dd0ae28843ea30181fc22cc06825fa82bfcda238fce1",
+      "sha256": "8388fd4ca302113561a700e54360c102aba40497e5b71b173ef667064870952c",
       "executable": false
     },
     "tests/hubspot-browser.mjs": {

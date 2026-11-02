@@ -277,6 +277,14 @@
     {
       "id": "0102_betterproposals_export.sql",
       "buyerSteps": "Apply migrations/core/0102_betterproposals_export.sql after existing core migrations. No manual data changes; existing document imports retain their documents source kind."
+    },
+    {
+      "id": "0103_expiry_notice_consent.sql",
+      "buyerSteps": "Apply migrations/core/0103_expiry_notice_consent.sql after existing core migrations. Retained notice choices and history confer no outbound authority; explicitly authorize each proposal after reviewing its current revision and settings."
+    },
+    {
+      "id": "0104_renewal_notices.sql",
+      "buyerSteps": "Apply migrations/core/0104_renewal_notices.sql after existing core migrations. Retained notice choices and history confer no outbound authority; explicitly authorize each proposal after reviewing its current revision and settings."
     }
   ],
   "breaking": false,

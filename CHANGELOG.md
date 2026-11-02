@@ -2,7 +2,7 @@
 
 ## Company-agent preparation door
 
-Adopt the shared core door on rer 0.2.91 for native proposal preparation, search, template starts, status and send-review requests. Signed Business subjects and current native rights govern calls; complete policy, Pause, consent, replay and audit apply to both MCP and the HTTP preparation bridge. Preserve newer main contract judgments and all broader target gaps. Pin trusted delivery to ff70d729948753ffdcceeca94aad063af2dcd979.
+Adopt the shared core door on rer 0.2.93 for native proposal preparation, search, template starts, status and send-review requests. Signed Business subjects and current native rights govern calls; complete policy, Pause, consent, replay and audit apply at `/mcp`. Existing HTTP preparation and compatibility MCP routes retain main’s registry, validation and refusal guarantees. Preserve newer main contract judgments and all broader target gaps. Pin trusted delivery to ff70d729948753ffdcceeca94aad063af2dcd979.
 
 ## 2026-10-16
 

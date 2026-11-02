@@ -250,7 +250,7 @@ test('AI-003 desktop and phone owners review MCP requests, approve/send explicit
     const client=await command('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),key=await command('agent.create',{label:'Campaign drafting assistant'})
     assert.equal((await context.request.put(app.origin+'/agents/api/policy',{headers:{origin:app.origin},data:{document:{schema:'rer-agent-policy/1',catalogue:'rer-agent-classes/1',rules:[{id:'all',class:'*',do:'autonomous'}],spend:{none:true}}}})).status(),200)
     let id=0
-    const rpc=async(method,params={})=>{const r=await context.request.post(app.origin+'/api/platter/agent/mcp',{headers:{authorization:'Bearer '+key.token,accept:'application/json, text/event-stream','mcp-protocol-version':'2025-11-25'},data:{jsonrpc:'2.0',id:++id,method,params}});assert.equal(r.status(),200);const v=await r.json();assert.ok(!v.error);return v.result}
+    const rpc=async(method,params={})=>{const r=await context.request.post(app.origin+'/mcp',{headers:{authorization:'Bearer '+key.token,accept:'application/json, text/event-stream','mcp-protocol-version':'2025-11-25'},data:{jsonrpc:'2.0',id:++id,method,params}});assert.equal(r.status(),200);const v=await r.json();assert.ok(!v.error);return v.result}
     const tool=async(name,args)=>{const r=await rpc('tools/call',{name,arguments:{...args,idempotency_key:crypto.randomUUID()}});assert.ok(!r.isError,JSON.stringify(r));return JSON.parse(r.content[0].text)}
     await rpc('initialize',{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'Browser acceptance MCP client',version:'1'}})
     await page.getByRole('link',{name:'Agent access',exact:true}).click();assert.match(await page.locator('main').innerText(),/No send requests yet/);await capture('empty')
@@ -263,6 +263,7 @@ test('AI-003 desktop and phone owners review MCP requests, approve/send explicit
     const other=await tool('platter.proposals.prepare',{...offer,title:'Winter campaign concept'});await tool('platter.send_requests.create',{id:other.id,revision:1});await tool('platter.proposals.revise',{...offer,id:other.id,version:1,title:'Winter campaign concept',scope:'A changed draft awaits a new owner review.'})
     await page.reload();assert.match(await page.locator('main').innerText(),/Stale request/);await capture('stale')
     await page.getByRole('button',{name:'Dismiss request',exact:true}).click();assert.match(await page.locator('main').innerText(),/dismissed/);assert.equal(await page.getByRole('button',{name:'Dismiss request',exact:true}).count(),0);await capture('dismissed')
+    await page.goto(app.origin+'/agents');await capture('company-policy')
    }finally{await context.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}

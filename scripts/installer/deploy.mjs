@@ -1,5 +1,5 @@
 import { ownerDeploy } from '@runeditrun/rer/deploy';
-import { missing } from '@runeditrun/rer/errors';
+import { RerError } from '@runeditrun/rer/errors';
 
 // Platter's first hosting door explains the account inputs before the shared
 // runner builds or contacts Cloudflare. Secret custody stays with that runner.
@@ -13,7 +13,9 @@ export function platterDeploy(lifecycle) {
   ];
   const absent = credentials.filter(([name]) => !process.env[name]?.trim());
   if (absent.length) {
-   throw missing([
+   // Account access is a required Platter preflight, including dry runs. Keep
+   // it distinct from the runner's deferrable owner/setup missing_input error.
+   throw new RerError('hosting_inputs_missing', [
     'Hosting preflight stopped: Cloudflare account access is missing. Nothing was built or uploaded.',
     ...absent.map(([name, purpose]) => `  - ${name} — ${purpose}.`),
     'For a new installation, also prepare:',
@@ -23,7 +25,7 @@ export function platterDeploy(lifecycle) {
     '  - SESSION_SECRET and SETUP_TOKEN — protect sessions and the initial owner claim; rer generates these when omitted and keeps deployment secrets privately.',
     'Keep credentials in your environment or an owned mode-0600 file passed with --env-file. Never commit them.',
     'Next, supply the missing account inputs and run rer deploy --dry-run again with the same --environment and --env-file options.',
-   ].join('\n'));
+   ].join('\n'), 3);
   }
   return deploy(context);
  }, { declaration: deploy.declaration, managesHostedOwner: deploy.managesHostedOwner });

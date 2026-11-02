@@ -43,7 +43,7 @@ const tasks={
  // Focused local adoption check; the default and every existing CI partition
  // retain their complete tests. The CLI runs production door conformance after
  // this target, as it does after each existing partition.
- agent_door:['node src/base/contract-docs.mjs check','pnpm build','pnpm typecheck',"node --test --test-name-pattern='AI-003 MCP|native auth, CSRF|TEAM-004 current' tests/platter.test.mjs"],
+ agent_door:['node src/base/contract-docs.mjs check','pnpm build','pnpm typecheck',"node --test --test-name-pattern='AI-003.*MCP|native auth, CSRF|TEAM-004 current' tests/platter.test.mjs"],
  runtime:['node src/base/contract-docs.mjs check','pnpm build','pnpm exec rer build --site','pnpm typecheck','PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs'],
  browser_documents_all:['pnpm build','PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 tests/site.test.mjs'],
  browser_documents:['pnpm build',documentCommand('--test-name-pattern'),business.templates,archive.bounce],

@@ -4087,3 +4087,37 @@ test('ACCT-002 reviewed Xero deposits preserve exact money, authority, unique ma
   assert.equal(edge.state.invoices.length,writes)
  }finally{await legacy.close()}
 })
+
+test('AGENT-007 owner compares 200 distinct decided proposals at exact revisions without applying template or price changes', {timeout:240000},()=>run(async h=>{
+ const {learningFixture,learningBusiness,captureStudy}=await import('./template-learning-fixture.mjs')
+ const f=await learningFixture(h),before=await learningBusiness(h),report=await captureStudy(h,f.input)
+ assert.deepEqual(report.cohorts.map(c=>({n:c.sampleSize,won:c.won,lost:c.lost,signed:c.signedWins,recorded:c.recordedWon,rate:c.winRate,insufficient:c.insufficient})),[
+  {n:100,won:30,lost:70,signed:20,recorded:10,rate:.3,insufficient:false},
+  {n:100,won:70,lost:30,signed:50,recorded:20,rate:.7,insufficient:false}])
+ assert.equal(report.sources.length,200);assert.equal(new Set(report.sources.map(s=>s.proposalId)).size,200)
+ assert.deepEqual(new Set(report.sources.map(s=>s.proposalId)),new Set(f.ids))
+ assert.equal(report.descriptive,true);assert.equal(report.recommendation.available,true)
+ assert.deepEqual(report.recommendation.before.map(o=>o.cents),[100000,200000]);assert.deepEqual(report.recommendation.after.map(o=>o.cents),[100000,200000,300000])
+ assert.deepEqual(report.recommendation.operations,[{op:'add',package:{id:'three',label:'Partnership',cents:300000}}])
+ const revised=report.sources.find(s=>s.proposalId===f.ids[0]);assert.equal(revised.revision,3)
+ const source=await h.send('/api/platter/template-learning/source?id='+report.id+'&source='+revised.proposalId,undefined,h.owner);assert.equal(source.status,200);assert.equal(source.value.snapshot.revision,3);assert.equal(source.value.snapshot.options.length,2)
+ assert.equal((await h.send('/api/platter/template-learning/source?id='+report.id+'&source='+f.unrelated,undefined,h.owner)).status,404)
+ const small=await captureStudy(h,{...f.input,comparison:{...f.input.comparison,packageCount:1}})
+ assert.equal(small.cohorts[1].sampleSize,1);assert.equal(small.cohorts[1].insufficient,true);assert.equal(small.recommendation.available,false);assert.deepEqual(small.recommendation.after,[])
+ const zero=await captureStudy(h,{...f.input,comparison:{...f.input.comparison,packageCount:4}});assert.equal(zero.cohorts[1].sampleSize,0);assert.equal(zero.cohorts[1].winRate,null)
+ const reversed=await captureStudy(h,{baseline:f.input.comparison,comparison:f.input.baseline});assert.equal(reversed.recommendation.available,false)
+ const memberEmail=['synthetic-platter-16301','example.test'].join(String.fromCharCode(64));await h.send('/auth/invite',{email:memberEmail,displayName:'Synthetic analyst',role:'admin',returnTo:'/app'},h.owner);const admin=await h.signIn(memberEmail)
+ const key=await h.cmd('agent.create',{label:'Synthetic learning key'})
+ for(const [cookie,headers,status] of [[admin,{},403],['',{},401],['',{authorization:'Bearer '+key.token},401]]){
+  for(const path of ['/app/template-learning?id='+report.id,'/api/platter/template-learning?id='+report.id,'/api/platter/template-learning/source?id='+report.id+'&source='+revised.proposalId])assert.equal((await h.send(path,undefined,cookie,headers)).status,path.startsWith('/app')&&status===401?303:status,path)
+  assert.equal((await h.send('/api/platter/template-learning',f.input,cookie,headers)).status,status)
+ }
+ await h.cmd('agent.revoke',{id:key.id});assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,401)
+ const replay=await captureStudy(h,f.input);assert.deepEqual(replay.cohorts,report.cohorts);assert.deepEqual(replay.sources,report.sources)
+ assert.deepEqual(await learningBusiness(h),before,'analysis and replay preserve complete template, price, proposal, catalog and approval facts')
+ assert.equal((await h.send('/api/platter/template-learning/apply',{id:report.id},h.owner)).status,404)
+ const unused=await h.cmd('client.save',{name:'Synthetic erased observer',email:['synthetic-platter-16302','example.test'].join(String.fromCharCode(64))});await h.cmd('client.erase',{id:unused.id,confirmName:'Synthetic erased observer'})
+ const retained=await h.send('/api/platter/template-learning?id='+report.id,undefined,h.owner);assert.equal(retained.status,200);assert.deepEqual(retained.value,report);assert.ok(!retained.text.includes(unused.id))
+ console.log('PROBE AGENT-007 1: public comparison -> 100 decided per cohort; 30% and 70%; 200 exact sources; only revision three counted for revised sources')
+ console.log('PROBE AGENT-007 2: capture and replay -> complete templates, prices, proposals, catalog and approvals unchanged; admin and agent refused; no apply door')
+}))

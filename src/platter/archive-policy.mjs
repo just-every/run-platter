@@ -1,3 +1,4 @@
+// Immutable template learning results and decision references are history, never execution grants.
 // Reviewed Proposify source facts and fixed-page lineage are business history, never execution grants.
 // SMS assent and suppression are business history; invitation and sender authority stay local.
 // Auth identities retain approval authors. Credentials, invitations and messages stay local.

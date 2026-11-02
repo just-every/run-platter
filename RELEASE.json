@@ -277,6 +277,10 @@
     {
       "id": "0102_betterproposals_export.sql",
       "buyerSteps": "Apply migrations/core/0102_betterproposals_export.sql after existing core migrations. No manual data changes; existing document imports retain their documents source kind."
+    },
+    {
+      "id": "0103_approval_facts.sql",
+      "buyerSteps": "None. Retains prospective approval roles, names and policy bases; historical missing facts remain unrecorded."
     }
   ],
   "breaking": false,

@@ -1252,3 +1252,6 @@ test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct 
  }finally{await context?.close();await browser?.close();await app?.close()}
 })
 test('ACCT-002 Settings reviews the exact deposit and explicitly issues one Xero invoice', {timeout:120000}, async()=>{await (await import('./xero-browser.mjs')).xeroBrowser()})
+test('RENEW-002 Settings authorizes and revokes fixed-term renewal drafting and opens an independent draft',{timeout:120000},async()=>{
+ const {renewalBrowserJourney}=await import('./recurring-browser.mjs');await renewalBrowserJourney()
+})

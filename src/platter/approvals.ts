@@ -62,8 +62,9 @@ export async function approvalPlan(db:D1Database,row:any,a?:Actor){
   return {name:rule.name,kind:c.kind,detail}
  }
  const agent=String(row.prepared_by).startsWith('agent:')||String(first?.prepared_by).startsWith('agent:')
+ const renewal=Boolean(await db.prepare('SELECT 1 FROM p_renewals WHERE draft_id=?').bind(row.id).first())
  const steps=selected.map(r=>({id:r.id,name:r.name,approvers:r.approvers as string[],any:false,trigger:trigger(r)}))
- if(!steps.length&&(policy.required||agent))steps.push({id:'default',name:agent&&!policy.required?'Person approval for agent draft':'Default approval',approvers:agent&&!policy.required?['role:owner','role:admin','role:manager']:['role:'+policy.default_role],any:agent&&!policy.required,trigger:{name:agent&&!policy.required?'Person approval for agent draft':'Default approval',kind:'default',detail:agent?'A person must approve this agent-prepared proposal.':'Approval is required for every proposal.'}})
+ if(!steps.length&&(policy.required||agent||renewal))steps.push({id:'default',name:agent&&!policy.required?'Person approval for agent draft':renewal?'Renewal approval':'Default approval',approvers:agent&&!policy.required?['role:owner','role:admin','role:manager']:['role:'+policy.default_role],any:agent&&!policy.required,trigger:{name:agent&&!policy.required?'Person approval for agent draft':renewal?'Renewal approval':'Default approval',kind:'default',detail:agent?'A person must approve this agent-prepared proposal.':renewal?'A person must approve this renewal proposal.':'Approval is required for every proposal.'}})
  const plan=await hash(JSON.stringify({version:policy.version,steps:steps.map(({trigger,...step})=>step),revision:row.revision})),history=(await db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=? AND revision=? ORDER BY occurred_at,id').bind(row.id,row.revision).all<any>()).results,decisions=history.filter(d=>d.plan===plan)
  const legacy=policy.version===0&&row.approved_by&&steps.length===1&&steps[0].id==='default'
  let prior=true,rejected=history.some(d=>d.decision==='rejected')

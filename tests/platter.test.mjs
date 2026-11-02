@@ -3357,7 +3357,6 @@ test('PRICE-003 recurring fees keep exact schedules, first-year queue value and 
  const {recurringJourney}=await import('./recurring-journey.mjs')
  await recurringJourney(h,{offer,verified})
  }finally{await h.close()}
- const renewal=await harness({assetsDirectory:'public'});try{const {renewalJourney}=await import('./renewal-journey.mjs');await renewalJourney(renewal)}finally{await renewal.close()}
 })
 
 test('AUTO-004 scoped REST drafting, immutable owner keys and human-only authority',async()=>{
@@ -4251,4 +4250,7 @@ test('ACCT-002 reviewed Xero deposits preserve exact money, authority, unique ma
   assert.deepEqual((await legacy.db.prepare('SELECT * FROM p_invoices').all()).results,before,'conflicting authority leaves retained CSV bytes unchanged')
   assert.equal(edge.state.invoices.length,writes)
  }finally{await legacy.close()}
+})
+test('RENEW-002 owner-authorized fixed-term drafts require fresh approval and preserve accepted scope without replay',async()=>{
+ const h=await harness({assetsDirectory:'public'});try{const {renewalJourney}=await import('./renewal-journey.mjs');await renewalJourney(h)}finally{await h.close()}
 })

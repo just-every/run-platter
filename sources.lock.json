@@ -3697,6 +3697,10 @@
       "sha256": "200013ccee3294164067d01e3d3becd521682c20ed0fdfd9c3a234f093563a8a",
       "executable": false
     },
+    "tests/template-learning-browser.mjs": {
+      "sha256": "a46fadf08df2db93c3cc5c9a931b287830235534323185a8df5462b7149f82db",
+      "executable": false
+    },
     "tests/template-learning-fixture.mjs": {
       "sha256": "54b4f474adcafaee35e46d63aceb3817d4df65b85b0581da3614772fa270ef9b",
       "executable": false

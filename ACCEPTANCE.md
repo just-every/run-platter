@@ -2275,8 +2275,8 @@ Agent surface · target · **missing** · From new · Cites BASE-AGENT-002, BASE
 2. Each tool returns the native action’s proposal state, error and event type.
 3. The registry documents every listed record URI, event and specialist prompt.
 
-**Evidence.** None.
-**Gap.** The seed-specific MCP registry, computed-class proof and Base policy-matrix conformance are not implemented.
+**Evidence.** `src/platter/agent-registry.ts`; `src/platter/mcp.ts`; `docs/contract-behavior.md`; `tests/platter.test.mjs` — “AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund” proves authenticated discovery, independently expected canonical mappings, all declared jobs and discovery entries, native draft, read, template and retained-request results, errors and events, unchanged tool inventory, revoked-key refusal and discovery without business-record access, writes or outbound requests.
+**Gap.** The seed-specific MCP registry, computed-class proof and Base policy-matrix conformance are not implemented. Authenticated metadata discovery is now implemented as described in the evidence, but the current main judgment is retained pending fresh acceptance. Complete operational tool and role parity, business-record resource readers, event delivery and specialist execution remain unimplemented. Base company-policy classification and policy-matrix conformance remain held by the pinned Base adoption boundary; declared classes are metadata only. Compatibility tools retain current restrictions and grant no machine approval, send, sign or refund authority. AUTO-004 retains its ct demotion pending fresh acceptance of corrected public status and analytics, negotiated-revision events, all ten receiver deliveries and independently expected documented scopes, plus exact-candidate Verify and guarded landing receipts. No existing hold is released.
 
 #### SURFACE-002 — Proposal classes from business facts
 

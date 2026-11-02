@@ -1415,7 +1415,7 @@ test('REPORT-006 public CLI restores scoped roles and populated schedule history
  const identity={origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-10420'},outboundService:async request=>{calls.push(await request.json());throw new Error('Synthetic receiver response lost')}}
  try{
   for(const root of [source,restored])await checkout(root)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,...identity})
   const colleague=['synthetic-platter-10421','example.com'].join('@')
   await h.send('/auth/invite',{email:colleague,displayName:'Synthetic report colleague',role:'member',returnTo:'/app'},h.owner);await h.signIn(colleague)

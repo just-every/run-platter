@@ -1960,7 +1960,7 @@ Core · target · **missing** · Rules D-1
 **Acceptance.**
 1. Run the `MIG-001` journey against a Better Proposals API fake, then run the no-API journey of `MIG-002` with Better Proposals PDFs and a contacts CSV.
 
-**Evidence.** None.
+**Evidence.** `migrations/core/0102_betterproposals_export.sql`; `tests/platter.test.mjs` — “MIG-003 and MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo” (30 downloaded PDFs and a contacts CSV, exact supplied company and contact facts, explicit column mappings and bindings, held identities, original bytes and signature-page evidence, changed-review refusals, replay, concurrent resume, demotion and dependency-safe undo); `tests/site.test.mjs` loads `tests/site-documents.mjs` — “MIG-003 and MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in” (compiled review, contact bindings, exact downloads, journal and undo at 1440, screens at 1440 and 390); `tests/archive.test.mjs` — “MIG-003, MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody” (exact restored PDFs, contacts CSV, bindings, source-specific provenance, counts and working combined undo).
 **Gap.** No Better Proposals import.
 
 #### MIG-004 — Qwilr and Ignition move-in

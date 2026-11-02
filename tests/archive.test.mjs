@@ -1262,7 +1262,7 @@ test('HAND-001 public CLI retains document archive history for Asana handoff wit
  const temporary=await mkdtemp(join(tmpdir(),'platter-handoff-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=handoffFixture();let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectAsana(h)
   const completed=await completeHandoffAgreement(h);await h.cmd('handoff.dispatch',{})
   const queued=await completeHandoffAgreement(h,'Queued delivery history',completed.client.id)

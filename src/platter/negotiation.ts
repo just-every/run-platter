@@ -1,3 +1,4 @@
+import { freezeContentOffer } from './reports/content-performance'
 import { recipientInvitations, voidSignatureStatement } from './recipients'
 import { assertDiscountDates, discountDeadline } from './discounts'
 import { detachChangedLibraryCopies } from './library-links'
@@ -55,6 +56,7 @@ export async function negotiationCommand(env: Bindings, actor: Actor, name: stri
  const token = secret(), shareUrl = env.AUTH_ORIGIN + '/p/' + token
  const client = await db.prepare('SELECT COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(offer.id,offer.client_id).first<any>()
  await commit(db, actor, [
+  await freezeContentOffer(db,{...offer,...next}),
   db.prepare("UPDATE p_proposals SET title=?,scope=?,terms=?,attachments=?,options=?,deposit_bps=?,revision=?,previous_sent_revision=?,prepared_by=?,approved_by=?,approved_at=?,version=version+1 WHERE id=?").bind(next.title, next.scope, next.terms??'', JSON.stringify(next.attachments??[]), JSON.stringify(next.options), next.deposit_bps, next.revision, offer.revision, pending.prepared_by, pending.approved_by, pending.approved_at, offer.id),
   db.prepare('UPDATE p_proposals SET section_conditions=?,document=?,payment_terms=? WHERE id=?').bind(JSON.stringify(next.section_conditions??{}),JSON.stringify(documentOf(next)),next.payment_terms?JSON.stringify(next.payment_terms):null,offer.id),
   voidSignatureStatement(db,offer.id,offer.revision,at,'Revision replaced'),

@@ -974,6 +974,10 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.equal((await h.send(completedPath+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},completedVerification.cookie)).status,200)
   assert.equal(sourceTexts.length,3);assert.ok(sourceTexts.at(-1).Body.includes(completedShare.shareUrl))
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sms_completion_authority').first()).n,1,'a real completion grant exists before export')
+  const future=await h.cmd('proposal.prepare',{clientId:client.id,title:'Inactive restored future notice',scope:'Still open when the restored notice becomes due',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+  await h.cmd('expiry.set',{id:future.id,version:1,mode:'days',days:30,warningDays:1})
+  await h.cmd('notification.expiry',{id:future.id,version:2,consent:true})
+  await h.cmd('proposal.approve',{id:future.id,version:3,revision:1});await h.cmd('proposal.send',{id:future.id,version:4})
   const previewed=await managerApprovalPreview(h,{clientId:client.id,title:'Archived manager preview',scope:'Exact preview custody',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
   await h.cmd('notification.decide',{requestId:previewed.request.id,version:1,decision:'approved',note:'Reviewed revision one before archive'},previewed.manager.cookie)
   const previewDecisions=(await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(previewed.proposal.id).all()).results
@@ -983,7 +987,7 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   for(const table of ['p_sms_revocations','p_sms_code_runs','p_sms_optouts'])assert.equal(before[table].length,1,table+' has real history')
   assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,10,'the scheduler signature notice, explicit manager request and revoked request history are retained')
   assert.ok(before.p_approval_requests.find(row=>row.proposal_id===p.id).reminded_at);assert.equal(before.p_approval_requests.find(row=>row.proposal_id===revoked.id).reminded_at,null);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox WHERE request_id=?').bind(requested.requests[0]).first()).n,1,'revocation retains only the initial request and creates no reminder')
-  assert.equal(before.p_sender_notice_events.length,4);assert.ok(before.p_sender_notice_events.some(e=>e.action==='revoked'));
+  assert.equal(before.p_sender_notice_events.length,5);assert.ok(before.p_sender_notice_events.some(e=>e.action==='revoked'));
   await h.close();h=undefined
   const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'));assert.ok(!bytes.includes('synthetic-platter-7107'))
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
@@ -998,8 +1002,11 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const replayedOptIn=await h.mf.dispatchFetch(callbackUrl,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','x-twilio-signature':optInSignature},body:optIn.toString()});assert.equal(replayedOptIn.status,200);await replayedOptIn.text()
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sms_reenable_eligibility').first()).n,0,'restored provider receipt replay never creates eligibility')
   for(const table of ['p_sms_reenable_eligibility','p_sms_completion_authority','p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
-  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(fixed+10*86400000),cron:'*/15 * * * *'})
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(fixed+30*86400000),cron:'*/15 * * * *'})
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sender_notice_runs WHERE proposal_id=?').bind(future.id).first()).n,0,'a due but still unexpired restored notice has no execution authority')
   const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
+  const setupResponse=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})
+  assert.equal(setupResponse.status,303);await setupResponse.text()
   const restoredPreviewAudit=(await h.send('/api/platter/audit?action=proposal.preview&subject='+previewed.proposal.id,undefined,restoredOwner)).value.rows
   assert.deepEqual(restoredPreviewAudit,previewed.audit,'actor, scoped subject and original server time survive public CLI restore exactly; refusals add no preview audit')
   const restoredRequest=(await h.cmd('notification.requests',{id:revoked.id},restoredOwner)).requests[0];assert.deepEqual(restoredRequest.trigger,retainedRequest.trigger);assert.equal(restoredRequest.revoked_at,retainedRequest.revoked_at);assert.equal(restoredRequest.current,false)

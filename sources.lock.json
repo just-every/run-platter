@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "7b524cfebb803bc7db724a02872ae29f58f0b7ff21013c77f2fde89cd35c3a91",
+      "sha256": "13ea00d3ceac5cfb618a61e8be8b37802a72784c691c774ab0b05f56b916b3fd",
       "executable": false
     },
     "deploy-demo.json": {
@@ -3454,7 +3454,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "1219f6ad4d9a6a20d9d554ce58062095ea2202ae25b3e60650b673ad39c46a9d",
+      "sha256": "c695cf30ffc8f10d9b8dc1577be06e21328ac49754ece7720f9926fd284ea827",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3670,7 +3670,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "e369bc5840bed1c6ea8a2bb872fbf95a179469b453e9e58d3a80762ec4e9b952",
+      "sha256": "44bb3b27d2a4cdb5652caac65fbe7c0dda60ffe73a9768bc4715871d41110902",
       "executable": false
     },
     "tests/site-harness.mjs": {

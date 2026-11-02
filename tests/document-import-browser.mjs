@@ -37,3 +37,40 @@ export async function documentImportBrowser(width=1440){
   assert.equal(Object.keys(files).filter(k=>k.startsWith(['word','media',''].join('/'))).length,3);assert.deepEqual(files[['word','embeddings','original.pdf'].join('/')],bytes);assert.ok(xml.indexOf('<w:drawing>')<xml.indexOf('Synthetic fixed document'));await capture('fixed-word-export')
  }finally{await context?.close();await browser?.close();await h?.close();await edge?.close()}
 }
+
+export async function pandadocContentBrowser(width=1440){
+ let edge,h,browser,context
+ try{
+  edge=await browserEdge();h=await harness({entry:'dist/server/index.js',assetsDirectory:'./dist/client',origin:edge.origin});edge.attach(h)
+  const {pandadocContentFixture}=await import('./document-import-fixture.mjs'),{applyBusiness}=await import('./business-import-fixture.mjs'),fixture=await pandadocContentFixture()
+  await applyBusiness(h,{kind:'catalog',format:'platter',csv:'id,sku,name,description,price,currency,unit\n'+Array.from({length:5},(_,i)=>'synthetic-platter-'+(510+i)+',SKU'+(i+1)+',Synthetic product '+(i+1)+',,99,USD,each').join('\n')})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']});context=await browser.newContext({viewport:{width,height:1000},ignoreHTTPSErrors:true})
+  const [name,value]=h.owner.split('=');await context.addCookies([{name,value,url:h.origin}]);const page=await context.newPage()
+  await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  const capture=async(label,locator)=>{
+   await page.evaluate(()=>document.fonts.ready)
+   const viewport=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,body:document.body.scrollWidth,outside:[...document.querySelectorAll('body *')].filter(n=>n.getClientRects().length&&n.getBoundingClientRect().right>innerWidth).map(n=>({tag:n.tagName,class:n.className,right:n.getBoundingClientRect().right})).slice(-10)}))
+   assert.ok(viewport.scroll<=viewport.width,'move-in controls fit the viewport: '+JSON.stringify(viewport))
+   const sizes=await locator.locator('button,input,select,p,td,th').evaluateAll(nodes=>nodes.filter(n=>n.getClientRects().length).map(n=>parseFloat(getComputedStyle(n).fontSize)))
+   assert.ok(sizes.every(size=>size>=13),'conversion controls use legible text')
+   if(process.env.PLATTER_SCREENSHOTS){await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true});await locator.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,'MIG-001-'+label+'-'+width+'.png')})}
+  }
+  const start=async(kind,label,files)=>{
+   await page.goto(h.origin+'/app/import');const form=page.locator('form[action*="document-import.create"]')
+   await form.getByLabel('Move-in name',{exact:true}).fill(label);await form.getByLabel('Source content',{exact:true}).selectOption(kind);await form.getByRole('button',{name:'Start document move-in',exact:true}).click()
+   const move=(await h.state()).documentMoveins.find(m=>m.label===label),panel=page.locator('.document-movein-'+move.id)
+   await panel.getByLabel('Exported files',{exact:true}).setInputFiles(files.map(f=>({name:f.filename,mimeType:f.filename.endsWith('.pdf')?'application/pdf':'application/vnd.openxmlformats-officedocument.wordprocessingml.document',buffer:f.bytes})))
+   const {createHash}=await import('node:crypto'),lastHash=createHash('sha256').update(files.at(-1).bytes).digest('hex')
+   const finished=page.waitForResponse(r=>{if(!r.url().endsWith('/api/platter/command')||r.request().method()!=='POST')return false;const body=r.request().postDataJSON();return body.name==='document-import.upload-finish'&&body.input.sha256===lastHash}),reloaded=page.waitForResponse(r=>r.request().isNavigationRequest()&&r.request().method()==='GET'&&new URL(r.url()).pathname==='/app/import')
+   await panel.getByRole('button',{name:'Upload or resume files',exact:true}).click();assert.equal((await finished).status(),200);await reloaded;await page.waitForLoadState('load');await panel.getByRole('button',{name:'Preview document move-in',exact:true}).click();await panel.getByRole('button',{name:'Apply reviewed PandaDoc conversion',exact:true}).waitFor()
+   return {move,panel}
+  }
+  const {move,panel}=await start('pandadoc-template','Synthetic PandaDoc browser templates',[fixture.quote,fixture.fixed])
+  assert.match(await panel.innerText(),/\$280.00/);assert.equal(await panel.getByRole('cell',{name:'Linked',exact:true}).count(),5);assert.equal(await panel.getByRole('cell',{name:'Unmatched',exact:true}).count(),1);assert.match(await panel.innerText(),/Word download needed for editing/);assert.equal((await h.state()).templates.length,0);await capture('review',panel)
+  await panel.getByRole('button',{name:'Apply reviewed PandaDoc conversion',exact:true}).click();assert.equal((await h.state()).templates.length,2)
+  await panel.getByRole('button',{name:'Open document journal',exact:true}).click();const link=panel.getByRole('link',{name:'Download '+fixture.quote.filename,exact:true}),original=await context.request.get(new URL(await link.getAttribute('href'),h.origin).href);assert.equal(original.status(),200);assert.deepEqual(await original.body(),fixture.quote.bytes);await capture('journal',panel)
+  const library=await start('pandadoc-library','Synthetic PandaDoc browser library',[fixture.library]);assert.equal((await h.state()).libraryItems.length,0);await library.panel.getByRole('button',{name:'Apply reviewed PandaDoc conversion',exact:true}).click();assert.equal((await h.state()).libraryItems.length,10);await capture('library',library.panel)
+  await library.panel.getByRole('button',{name:'Undo document move-in',exact:true}).click();assert.equal((await h.state()).libraryItems.length,0)
+  await page.goto(h.origin+'/app/import');await panel.getByRole('button',{name:'Undo document move-in',exact:true}).click();assert.equal((await h.state()).templates.length,0)
+ }finally{await context?.close();await browser?.close();await h?.close();await edge?.close()}
+}

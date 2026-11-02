@@ -3610,7 +3610,7 @@
       "executable": false
     },
     "tests/packages-journey.mjs": {
-      "sha256": "fe1e79f48fa6a594024019855a1e13ef4748e7d2a29d6e14c1680aa3d89c0376",
+      "sha256": "7324154b56e628151daa274e8ebbd2decc46d5ce33c2a89a5e9f8f18993cad7a",
       "executable": false
     },
     "tests/pdf-document.mjs": {

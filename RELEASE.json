@@ -277,6 +277,10 @@
     {
       "id": "0102_betterproposals_export.sql",
       "buyerSteps": "Apply migrations/core/0102_betterproposals_export.sql after existing core migrations. No manual data changes; existing document imports retain their documents source kind."
+    },
+    {
+      "id": "0103_payment_allocations.sql",
+      "buyerSteps": "Apply migrations/core/0103_payment_allocations.sql after existing core migrations. Retains offline receipt request identities and native dated-milestone allocations; existing receipts remain recorded without inferred allocations or execution authority."
     }
   ],
   "breaking": false,

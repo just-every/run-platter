@@ -2490,7 +2490,7 @@
       "executable": false
     },
     "src/platter/api/index.ts": {
-      "sha256": "ec1522844efda9de4efa405258fc24e7c2f4cf33f767d21259928101707f48a9",
+      "sha256": "a29746a80052a01e0dfd19c207ac191075b1d4198685633132ba971b729e28b5",
       "executable": false
     },
     "src/platter/api/schema.ts": {
@@ -3622,7 +3622,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "773c5b06eb3f5c041aad646b6c36394d8104693a8b491d7a35fabebe090e2ab7",
+      "sha256": "6facbe30d9470695b9b3f68b3b81d3818efbc2a212d35859985ea81c2548fddb",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

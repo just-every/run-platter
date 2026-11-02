@@ -4027,6 +4027,7 @@ test('MIG-003 and MIG-007 exported document move-in resumes across sessions, hol
  assert.ok((await h.cmd('document-import.journal',{id:bpId},resumed)).provenance.every(p=>p.reversed))
  await h.cmd('document-import.apply',{...bpInput,fingerprint:bpReview.fingerprint},resumed,409)
  assert.deepEqual((await h.state(resumed)).importedDocuments,[],'an undone capture cannot replay its outputs')
+ await (await import('./document-movein-fixture.mjs')).sourceExportJourney(h)
  const actor=(await h.state(second)).actor
  const successorAddress=['synthetic-platter-6','example.invalid'].join('@')
  await h.send('/auth/invite',{email:successorAddress,displayName:'Synthetic successor',role:'member',returnTo:'/app'},second)

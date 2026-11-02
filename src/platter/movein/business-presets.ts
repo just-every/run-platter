@@ -1,6 +1,13 @@
 import { fail } from './errors.ts'
 import type { BusinessMapping } from './business-model.ts'
 
+// Export columns are reviewed against the supplied files, never inferred by a provider call.
+export const ignitionExportColumns = {
+ clients: { id: 'Client ID', name: 'Client Name' },
+ services: { id: '#ID', name: 'Service Name', description: 'Service Description', price: 'Price', currency: 'Currency' },
+ proposals: { id: 'Proposal ID', title: 'Proposal Name', clientId: 'Client ID', date: 'Created Date', status: 'Status', currency: 'Currency', value: 'Value', document: 'PDF' },
+ billingSchedules: { id: 'Billing Schedule ID', proposalId: 'Proposal ID', serviceId: 'Service ID', status: 'Status', date: 'Start Date', currency: 'Currency', value: 'Amount', frequency: 'Frequency' },
+}
 const contactFields = ['company_id', 'company_name', 'contact_id', 'first_name', 'last_name', 'email', 'title', 'phone', 'billing_address', 'service_address', 'tax_exempt']
 const catalogFields = ['id', 'name', 'sku', 'price', 'currency', 'description', 'images', 'type', 'bundle_components', 'category', 'cost', 'billing_frequency', 'quantity', 'unit_name', 'price_type', 'billing_mode', 'min_price', 'max_price', 'terms', 'tax_exempt', 'tax_code', 'income_account', 'optional', 'adjustable', 'tags']
 const addressFields = ['street_address', 'city', 'postal_code', 'country', 'state', 'service_street_address', 'service_city', 'service_postal_code', 'service_country', 'service_state']

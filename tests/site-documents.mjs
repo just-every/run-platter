@@ -1117,6 +1117,7 @@ test('MIG-003 and MIG-007 owner uploads exported ZIPs, reviews report ambiguity,
   assert.deepEqual((await undone.json()).businessRecords,{companies:[],contacts:[],catalog:[]})
   await capture('betterproposals-undone')
   const {proposifyBrowser}=await import('./document-movein-fixture.mjs');await proposifyBrowser(page,context,app)
+  await (await import('./document-movein-fixture.mjs')).sourceExportBrowser({page,context,app,capture})
   await context.close()
  }finally{await browser?.close();await app?.close()}
 })

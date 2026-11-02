@@ -45,7 +45,7 @@ export async function learningFixture(h,{size=200}={}){
 }
 export async function learningBusiness(h){
  const tables=['p_personal_templates','p_proposals','p_revisions','p_approvals','p_approval_decisions','p_priced_catalog','p_acceptances']
- return Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results])))
+ return Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table).all()).results.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))])))
 }
 export async function captureStudy(h,input,cookie=h.owner){
  const response=await h.send('/api/platter/template-learning',input,cookie);assert.equal(response.status,200,response.text);return response.value

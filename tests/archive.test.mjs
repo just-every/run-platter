@@ -1059,10 +1059,18 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
   const extraBefore=(await h.state()).proposals.filter(p=>[mergeDraft.id,fixedDraft.id,wordDraft.id].includes(p.id)).map(p=>({id:p.id,document:p.document,options:p.options})),profileBefore=(await h.state()).clients.find(c=>c.id===mergeClient.id).variable_fields,richArchiveItem=(await h.state()).libraryItems.find(i=>i.title==='Archived rich section 1'),libraryBefore=(await h.state()).libraryItems
   const {regionalConditions,restoredRegionalConditions}=await import('./conditional-journey.mjs')
   const regional=await regionalConditions(h)
+  const {learningFixture,captureStudy,learningBusiness}=await import('./template-learning-fixture.mjs'),learning=await learningFixture(h,{size:40}),learningReport=await captureStudy(h,learning.input),learningBusinessBefore=await learningBusiness(h)
+  const learningSourcePath='/api/platter/template-learning/source?id='+learningReport.id+'&source='+learning.ids[0],learningSourceBefore=(await h.send(learningSourcePath,undefined,h.owner)).value
   const identity={auth:h.auth,owner:h.owner};await h.close();h=undefined
   const archive=join(temporary,'document.rer');await command(source,['export','--output',archive,'--no-queue']);await command(target,['import','--input',archive,'--yes','--no-queue'])
   h=await harness({root:target,...identity,assetsDirectory:'public'});const owner=await h.signIn(h.auth.OWNER_EMAIL),after=(await h.state(owner)).proposals.find(p=>p.id===created.id)
   await restoredRegionalConditions(h,owner,regional)
+  assert.deepEqual((await h.send('/api/platter/template-learning?id='+learningReport.id,undefined,owner)).value,learningReport,'exact learning result and all decision references survive public CLI restore')
+  assert.deepEqual((await h.send(learningSourcePath,undefined,owner)).value,learningSourceBefore,'the exact decision revision and digest survive restore')
+  assert.deepEqual(await learningBusiness(h),learningBusinessBefore,'learning history imports no template, price or approval changes')
+  assert.equal((await h.send('/api/platter/template-learning/apply',{id:learningReport.id},owner)).status,404,'restored results grant no execution door')
+  assert.equal((await h.send('/api/platter/template-learning?id='+learningReport.id,undefined,identity.owner)).status,401,'old credentials cannot read restored learning history')
+  console.log('PROBE AGENT-007 custody: public CLI export and import -> exact result, decision references and source digest retained; old credentials refused; no apply authority')
   for(const key of ['document','documentMedia','acceptance','questions','suggestions','suggestionSections','folderId','folderVersion'])assert.deepEqual(after[key],before[key],'public CLI retains '+key)
   assert.deepEqual((await h.state(owner)).libraryItems,libraryBefore,'rich item payloads, tags, usages and change times survive the public CLI')
   assert.deepEqual((await h.state(owner)).proposals.find(p=>p.id===libraryDraft.id).document,libraryDocBefore.document)

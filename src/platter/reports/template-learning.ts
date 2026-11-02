@@ -37,10 +37,10 @@ export async function captureLearning(db:D1Database,a:Actor,input:Record<string,
  owner(a)
  const definitions=[cohort(input.baseline),cohort(input.comparison)]
  need(JSON.stringify(definitions[0])!==JSON.stringify(definitions[1]),'Choose two distinct cohorts')
- const versions=await Promise.all(definitions.map(c=>db.prepare('SELECT snapshot FROM p_template_learning_versions WHERE template_id=? AND version=?').bind(c.templateId,c.version).first<{snapshot:string}>()))
+ const versions=await Promise.all(definitions.map(c=>db.prepare('SELECT name,snapshot FROM p_template_learning_versions WHERE template_id=? AND version=?').bind(c.templateId,c.version).first<{name:string;snapshot:string}>()))
  need(versions.every(Boolean),'An exact template version is unavailable. Select a retained version.',409)
  const rows=(await db.prepare(decidedSql).all<any>()).results,sources:Source[]=[]
- const cohorts=definitions.map(c=>({...c,sampleSize:0,won:0,lost:0,signedWins:0,recordedWon:0,winRate:null as number|null,insufficient:true}))
+ const cohorts=definitions.map((c,i)=>({...c,name:versions[i]!.name,sampleSize:0,won:0,lost:0,signedWins:0,recordedWon:0,winRate:null as number|null,insufficient:true}))
  for(const row of rows){
   const snapshot=JSON.parse(row.snapshot),options=snapshot.options??[]
   const index=definitions.findIndex(c=>c.templateId===row.template_id&&c.version===row.template_version&&c.packageCount===options.length)

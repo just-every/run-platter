@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "4196a51ddf1654684cc4cc82daeded786dd85b6fc3ec74e7bd07ad0ad048aa67",
+      "sha256": "4c19f421e0793206cbc327e7f4d88eebbee43b5d5bd139ee0bae5702439b724f",
       "executable": false
     },
     "deploy-demo.json": {
@@ -655,6 +655,10 @@
     },
     "migrations/core/0101_approval_request_details.sql": {
       "sha256": "95f39a1ec5040aca8f052d94e6451a08e1f879dcc9c39fab5ef608f7750055d7",
+      "executable": false
+    },
+    "migrations/core/0102_template_learning.sql": {
+      "sha256": "11cc4a00d0d6a236d4c694d5c2bd64398f23855561af61f3af26b5774e2eb5a9",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -2965,6 +2969,10 @@
       "sha256": "5c8d19e78bddbeeb059a4aa88e5c0016a830336451deb6706e23ddcfe16318de",
       "executable": false
     },
+    "src/platter/reports/template-learning.ts": {
+      "sha256": "2bcf1210197209647eac0fad429c02da55c3cf59b836fb95a1b71dd6551bf980",
+      "executable": false
+    },
     "src/platter/reports/zone.ts": {
       "sha256": "190c7586007c1f748419f95e3d3787e70c74f00572330d6b4b6828f2b9f7aa9d",
       "executable": false
@@ -3277,6 +3285,10 @@
       "sha256": "c0fc3dceab92ff024a9dfdad18860e7e89e19d044d2ee42f6b9d4e2527be0755",
       "executable": false
     },
+    "src/platter/ui/template-learning.ts": {
+      "sha256": "3e7a9b752fa49362b9614b5ba70cfd0eba6dbc04b7b17129ae7d074e9ea0e3da",
+      "executable": false
+    },
     "src/platter/ui/templates.ts": {
       "sha256": "2f9d79bfaa5eff1e454f197b1801063139716213b729fba0e587a0a9e57dfe8e",
       "executable": false
@@ -3434,7 +3446,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "0a2d19e0118fc52184ca7297323157bacd30d946980533eb188461df12e93182",
+      "sha256": "8f19a856bbdee0fa4736e3a6ca2e4cf39240278e31a56b7cec82ecfd484564bd",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3658,7 +3670,7 @@
       "executable": false
     },
     "tests/site.test.mjs": {
-      "sha256": "df5237e8de6684de74b62de8ea30397b0648b5cee14c17eefb0c9044f3c4f168",
+      "sha256": "526d0c04a4c66d91372ade4e74217b210f847f23634b3682839b18b204f1c957",
       "executable": false
     },
     "tests/sms-completion-journey.mjs": {
@@ -3683,6 +3695,10 @@
     },
     "tests/taxes-fixture.mjs": {
       "sha256": "200013ccee3294164067d01e3d3becd521682c20ed0fdfd9c3a234f093563a8a",
+      "executable": false
+    },
+    "tests/template-learning-fixture.mjs": {
+      "sha256": "54b4f474adcafaee35e46d63aceb3817d4df65b85b0581da3614772fa270ef9b",
       "executable": false
     },
     "tests/template-variables-fixture.mjs": {

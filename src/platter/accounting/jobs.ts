@@ -125,6 +125,7 @@ async function write(env: Bindings, job: any, kind: string, body: any, authorize
  try {
   const value = await quickbooks(authorize, '/' + kind, body, requestId), record = value[kind === 'customer' ? 'Customer' : 'Invoice']
   const id = providerId(record?.Id)
+  if (kind === 'customer') need(record.DisplayName === body.DisplayName, 'QuickBooks returned a different customer', 409)
   if (kind === 'invoice') need(record.CustomerRef?.value === body.CustomerRef.value && Math.round(Number(record.TotalAmt) * 100) === JSON.parse(job.plan).depositCents, 'QuickBooks returned a different invoice amount or customer', 409)
   await db.prepare("UPDATE p_accounting_requests SET status='confirmed',provider_id=? WHERE proposal_id=? AND kind=?").bind(id,job.proposal_id,kind).run()
   return id
@@ -162,8 +163,9 @@ export async function runAccounting(env: Bindings) {
     const matches = await customerMatches(authorize,plan.clientName)
     need(matches.some((c: any) => c.id === customer.provider_id), 'The reviewed QuickBooks customer is no longer available', 409)
    }
+   need(canonical(await itemMapping(authorize,plan.mapping.itemId,plan.mapping.accountId)) === canonical(plan.mapping), 'The reviewed QuickBooks item mapping changed before invoice creation', 409)
    const day = new Date(plan.acceptedAt).toISOString().slice(0,10)
-   const invoice = { CustomerRef: { value: customer.provider_id }, DocNumber: plan.number, TxnDate: day, DueDate: day, CurrencyRef: { value: 'USD' }, GlobalTaxCalculation: 'NotApplicable', Line: [{ Amount: plan.depositCents / 100, DetailType: 'SalesItemLineDetail', Description: 'Deposit: ' + plan.title, SalesItemLineDetail: { ItemRef: { value: plan.mapping.itemId }, Qty: 1, UnitPrice: plan.depositCents / 100, TaxCodeRef: { value: 'NON' } } }] }
+   const invoice = { CustomerRef: { value: customer.provider_id }, DocNumber: plan.number.slice(0,21), PrivateNote: 'Platter deposit ' + plan.number, TxnDate: day, DueDate: day, CurrencyRef: { value: 'USD' }, GlobalTaxCalculation: 'NotApplicable', Line: [{ Amount: plan.depositCents / 100, DetailType: 'SalesItemLineDetail', Description: 'Deposit: ' + plan.title, SalesItemLineDetail: { ItemRef: { value: plan.mapping.itemId }, Qty: 1, UnitPrice: plan.depositCents / 100, TaxCodeRef: { value: 'NON' } } }] }
    const id = await write(env,job,'invoice',invoice,authorize)
    await db.prepare("UPDATE p_accounting_jobs SET status='complete',provider_id=?,completed_at=?,reason=NULL WHERE proposal_id=?").bind(id,await currentTime(db),job.proposal_id).run()
   } catch {

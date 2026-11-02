@@ -15,13 +15,13 @@ function trust(env:Bindings):Trust|null {
 export function platterBusinessSettings(env:Bindings) {
  return createBusinessSettings({db:env.DB,trust:env.RER_BUSINESS_TRUST,business:businessManifest,team:operatorAuth(env).businessTeam})
 }
-export async function localAgent(request:Request,env:Bindings) {
+export async function localAgent(request:Request,env:Bindings,reportPurpose=false) {
  try {
   const a=await principal(request,env,true)
   const row=await env.DB.prepare('SELECT label FROM p_agent_keys WHERE id=?').bind(a.keyId!).first<{label:string}>()
   if(!row)return null
   return {sponsor:{id:a.id},agent:{id:a.keyId!,name:row.label,specialist:'proposal coordinator'},clientId:'platter-key:'+a.keyId,scopes:[...nativeToolScopes]}
- } catch { return null }
+ } catch(error) { if(reportPurpose&&Number((error as any).status)===403)throw error;return null }
 }
 export async function platterAgentDoor(env:Bindings) {
  const brand=await platterBusinessSettings(env).publicBrand()

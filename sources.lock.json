@@ -2902,11 +2902,11 @@
       "executable": false
     },
     "src/platter/agent/index.ts": {
-      "sha256": "a99b1ea3b68a40f8f0bef8a41d93a77ccac46f22fdd0c2ffae09a6d53ca4dfd5",
+      "sha256": "b4125a033cf232bfebc35be71dc6ee81de427d86efba77fad4cdf1d14177a74e",
       "executable": false
     },
     "src/platter/agent/legacy.ts": {
-      "sha256": "eed079c002156fe3e2bf749d217a2a05f707c41cfd5a546d50dcdb0b3af0d8fa",
+      "sha256": "fbc4d64959ec9ad6ab0518a0247d2e263b5f6b2608049a4ba18a41b7d72fb6b7",
       "executable": false
     },
     "src/platter/agent/people.ts": {

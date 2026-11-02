@@ -1,6 +1,7 @@
 import { xeroCommand } from './accounting/xero-jobs'
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
+import { pipedriveDraftCommand } from './crm/pipedrive-draft'
 import { hubspotDraftCommand } from './crm/hubspot-draft'
 import { archiveCommand } from './archiving/jobs'
 import { clientLocale, saveClientLocale } from './locales'
@@ -79,6 +80,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name.startsWith('xero.'))return xeroCommand(env,a,name,p)
  if(name==='crm.card.configure')return configureHubspotCard(env,a,p)
  if(name.startsWith('crm.sync.'))return hubspotSyncCommand(env,a,name,p)
+ if(name.startsWith('crm.pipedrive.'))return pipedriveDraftCommand(env,a,name,p)
  if(name.startsWith('crm.deal.'))return hubspotDraftCommand(env,a,name,p)
  if(name==='proposal.locale')return saveClientLocale(db,a,p)
  if(name==='tax.rate')return saveTaxRate(db,a,p)

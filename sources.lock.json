@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "91683220b005e1a8c769254b6791d658a10c74db13f3ad54d5bd94b7a211bc86",
+      "sha256": "1af1b391d19446fadd027a1208d4ae50d771e57b6a280617835322336983348c",
       "executable": false
     },
     "deploy-demo.json": {
@@ -3610,7 +3610,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "ef9b89bd6c3fe05ce5a3b87b64b46cabd33f2f8eaef782f3d7020dbd1507df7c",
+      "sha256": "8a0e45d71b3ded4589e552a996dc14e6cf17ac877f19fa02727b6c88405e1f98",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

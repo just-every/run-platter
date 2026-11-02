@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { harness } from './harness.mjs'
+import { readFile } from 'node:fs/promises'
+import { documentFixture } from './document-fixture.mjs'
 import { pdfPages } from './pdf-document.mjs'
 const address=n=>['synthetic-platter-'+n,'example.test'].join('@')
 export async function delegationFixture(h){
@@ -80,6 +82,38 @@ export async function delegationHttp(){
   const changed=await delegationFixture(h);await changed.configure(true);const changedSession=await delegationVerify(h,changed.path)
   await h.cmd('proposal.negotiate',{...changed.offer,id:changed.id,version:(await changed.get()).version,scope:'synthetic-platter-next-offer'})
   await refused(changed.path+'/action?name=delegate',input,changedSession.cookie,409)
+  const {recipientFixture,roles,verifyRecipient}=await import('./recipients-http.mjs')
+  const configured=await recipientFixture(h,'Synthetic Platter configured delegation refusal',roles(h.auth.OWNER_EMAIL)),configuredCookie=await verifyRecipient(h,configured.links.ceo)
+  await refused(configured.links.ceo+'/action?name=delegate',{...input,revision:configured.revision},configuredCookie,409)
+  const collection=await h.cmd('proposal.prepare',{...p.offer,title:'Synthetic Platter collection delegation refusal'})
+  await h.cmd('payment.collection',{id:collection.id,version:1,completion:'due',paymentMethods:['card']})
+  await h.cmd('proposal.approve',{id:collection.id,version:2,revision:1});await h.cmd('proposal.send',{id:collection.id,version:3})
+  await refused('/api/platter/command',{name:'signer.delegation.configure',input:{id:collection.id,version:4,enabled:true}},h.owner,409)
+  const mediaOffer=await h.cmd('proposal.prepare',{...p.offer,title:'Synthetic Platter delegated media'})
+  const imageBytes=await readFile('public/brand/apple-touch-icon.png'),mediaForm=new FormData()
+  for(const [key,value]of Object.entries({id:mediaOffer.id,version:'1',consent:'yes'}))mediaForm.set(key,value)
+  mediaForm.set('file',new File([imageBytes],'synthetic-platter-9905.png',{type:'image/png'}))
+  const mediaRequest=new Request(h.origin+'/app/document-media',{method:'POST',headers:{origin:h.origin,cookie:h.owner,accept:'application/json'},body:mediaForm})
+  const uploadMedia=await h.mf.dispatchFetch(mediaRequest.url,{method:'POST',headers:mediaRequest.headers,body:await mediaRequest.arrayBuffer()});assert.equal(uploadMedia.status,200)
+  const media=(await uploadMedia.json()).media,document=documentFixture();document.blocks.push({id:'synthetic-platter-image',type:'image',title:'Synthetic Platter image',text:'',assetId:media.id,alt:'Synthetic Platter logo'})
+  await h.cmd('proposal.document',{id:mediaOffer.id,version:1,document})
+  await h.cmd('proposal.approve',{id:mediaOffer.id,version:2,revision:2});const mediaSent=await h.cmd('proposal.send',{id:mediaOffer.id,version:3}),mediaPath=new URL(mediaSent.shareUrl).pathname
+  await h.cmd('signer.delegation.configure',{id:mediaOffer.id,version:4,enabled:true})
+  const mediaSession=await delegationVerify(h,mediaPath)
+  assert.equal((await h.send(mediaPath+'/action?name=delegate',{...input,revision:2},mediaSession.cookie)).status,200)
+  const mediaDelegate='/p/'+(await h.state()).proposals.find(r=>r.id===mediaOffer.id).shareToken
+  assert.equal((await h.send(mediaDelegate+'/media/'+media.id)).status,401)
+  assert.equal((await h.send(mediaPath+'/media/'+media.id,undefined,mediaSession.cookie)).status,410)
+  const mediaVerified=await delegationVerify(h,mediaDelegate),imageResponse=await h.mf.dispatchFetch(h.origin+mediaDelegate+'/media/'+media.id,{headers:{cookie:mediaVerified.cookie}})
+  assert.equal(imageResponse.status,200);assert.deepEqual(Buffer.from(await imageResponse.arrayBuffer()),imageBytes)
+  const unsigned=await h.mf.dispatchFetch(h.origin+mediaDelegate+'/download.pdf?optionId=one',{headers:{cookie:mediaVerified.cookie}})
+  assert.equal(unsigned.status,200);assert.ok((await pdfPages(new Uint8Array(await unsigned.arrayBuffer()))).join(' ').includes(p.offer.scope))
+  const undoRace=await delegationFixture(h);await undoRace.configure(true);const undoOriginal=await delegationVerify(h,undoRace.path)
+  assert.equal((await h.send(undoRace.path+'/action?name=delegate',input,undoOriginal.cookie)).status,200)
+  const undoRow=await undoRace.get(),undoPath='/p/'+undoRow.shareToken,undoSession=await delegationVerify(h,undoPath)
+  const undoResults=await Promise.all([h.send('/api/platter/command',{name:'signer.delegation.undo',input:{id:undoRace.id,version:undoRow.version,delegationId:undoRow.delegation.currentId}},h.owner),h.send(undoPath+'/action?name=accept',{name:'Synthetic COO',optionId:'one',consent:true},undoSession.cookie)])
+  assert.equal(undoResults.filter(r=>r.status===200).length,1);assert.ok(undoResults.every(r=>[200,409,410].includes(r.status)))
+  await refused('/api/platter/command',{name:'client.erase',input:{id:p.offer.clientId,confirmName:'Synthetic Platter leadership'}},h.owner,409)
   console.log('PROBE SIGN-009 scope: verified recipient delegation, new verification, undo and acceptance -> fresh invitations, exact frozen offer and retained certificate facts')
   console.log('PROBE SIGN-009 authority: disabled, unverified, stale, expired, withdrawn, accepted and signing race -> refused without writes or duplicate notice')
  }finally{await h.close()}

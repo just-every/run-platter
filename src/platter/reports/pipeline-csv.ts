@@ -1,3 +1,4 @@
+import { performanceCsv, performanceMail } from './performance'
 import { revenueKeys, revenueLabels } from './recorded-revenue'
 import { cell } from '../invoices'
 import { nextActions } from '../pipeline'
@@ -8,6 +9,7 @@ const shown = (cents: number, currency: string) => `$${(cents / 100).toLocaleStr
 
 /** REPORT-005: the pipeline exactly as filtered and sorted on screen, then per-currency totals. */
 export function pipelineCsv(report: Report & {view?:string}) {
+ if((report as any).kind==='sales-performance')return performanceCsv(report)
  const lines = [['Title', 'Client', 'Owner', 'Status', 'Next action', 'Currency', 'Value', 'Age in days','Follow-up due']]
  for (const r of report.rows) lines.push([r.title, r.client, r.owner, r.status, nextActions[r.nextAction as keyof typeof nextActions], r.currency, decimal(r.valueCents), String(r.age),r.dueDate??''])
  for (const t of report.totals) lines.push([`Total (${t.count} proposals)`, '', '', '', '', t.currency, decimal(t.valueCents), '', ''])
@@ -17,6 +19,7 @@ export function pipelineCsv(report: Report & {view?:string}) {
 
 /** The mail body repeats the screen's count, totals and rows in its money format, then the CSV. */
 export function pipelineMail(report: Report & {view?:string}, filters: string): [string, string] {
+ if((report as any).kind==='sales-performance')return performanceMail(report,filters)
  const at = new Date(report.generatedAt).toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
  const financial=(row:any)=>report.view==='recorded-revenue'?' · '+revenueKeys.map((key,i)=>revenueLabels[i]+': '+shown(row[key]??0,row.currency)).join(' · '):''
  const body = [`Platter ${report.view==='recorded-revenue'?'recorded revenue':'pipeline'} report generated ${at}.`, `Filters: ${filters || 'all proposals'}.`, `${report.count} proposals match.`,

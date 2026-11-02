@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "7b524cfebb803bc7db724a02872ae29f58f0b7ff21013c77f2fde89cd35c3a91",
+      "sha256": "51aa621fbb3570709acafe51193d7f102f4aeb09c15f2306fc864c9855fa5566",
       "executable": false
     },
     "deploy-demo.json": {
@@ -659,6 +659,10 @@
     },
     "migrations/core/0102_betterproposals_export.sql": {
       "sha256": "0a1e457dcb4310bcb10d08701e68d194a0bc208add1a4549107a3cbf5b166a38",
+      "executable": false
+    },
+    "migrations/core/0103_client_segments.sql": {
+      "sha256": "d236f1eb90d50f6316ae9d34edf96d425552d1e6044cc09e724f5dc7a08e78cc",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -1322,7 +1326,7 @@
       "executable": false
     },
     "RELEASE.json": {
-      "sha256": "ce2fce6600660186fb58eb919099dd684ea43ef3cddbca0045684f249db2c608",
+      "sha256": "03cfd39e34cd46b40a2309e219223b76dc54653aa5ef297b0bb6ba5aea6eaac2",
       "executable": false
     },
     "rer-project.json": {
@@ -2570,7 +2574,7 @@
       "executable": false
     },
     "src/platter/commands.ts": {
-      "sha256": "8991db32851a277948419698831e17a4a9c42a8eba73205ebd27a931042809e9",
+      "sha256": "cd1cef5747294a0fe83e495b2d3a6de109f8478d9ef35d14358de35cd677f814",
       "executable": false
     },
     "src/platter/completion-mail.ts": {
@@ -2722,7 +2726,7 @@
       "executable": false
     },
     "src/platter/http.ts": {
-      "sha256": "0a9eb72bc25907edd45f8f2933f158f71ecc57c4f7937ebd5cba17c92497d75e",
+      "sha256": "7d88f02abe0b0df90186c79ebcf98e1c56b9acc6eccabbd85011cea7c0fc3f44",
       "executable": false
     },
     "src/platter/internal-pricing.ts": {
@@ -2921,6 +2925,10 @@
       "sha256": "99430719133cb353cb77a30ef3c67e5e04d7e9b6e8ba90df2f1eabdd82cee7c1",
       "executable": false
     },
+    "src/platter/price-suggestions.ts": {
+      "sha256": "99dabb0f4547ad755d886f4bda1dada237dc09e3d6eff84c50e3608703f7acaf",
+      "executable": false
+    },
     "src/platter/pricing.ts": {
       "sha256": "6a4dacf922344e993e98f679c9558973c50d8a4f6514f31b91a4f1de8cf5882f",
       "executable": false
@@ -2961,8 +2969,12 @@
       "sha256": "ece390c8c6166b9b1092181628646f88603d3fc98151edfa9231e2d196c37aeb",
       "executable": false
     },
+    "src/platter/reports/performance.ts": {
+      "sha256": "4cd17a8cffebb5526bbba970d759eaf4841bf0fd4bcc6e7418cb0108825977fa",
+      "executable": false
+    },
     "src/platter/reports/pipeline-csv.ts": {
-      "sha256": "312b1007493d5d2440578d4168c66de045e56fba195a5ebe776d028c572f8d56",
+      "sha256": "1cf7f802b10a57fd7cd8948c04c22f3aad87088ba31bf892335d398219e2cc45",
       "executable": false
     },
     "src/platter/reports/recorded-revenue.ts": {
@@ -2974,7 +2986,7 @@
       "executable": false
     },
     "src/platter/reports/schedules.ts": {
-      "sha256": "5c8d19e78bddbeeb059a4aa88e5c0016a830336451deb6706e23ddcfe16318de",
+      "sha256": "76adddfe8d0fa4f563d613f9333541b31bbfbc5f081d970cd75c4a957fe93542",
       "executable": false
     },
     "src/platter/reports/zone.ts": {
@@ -3110,7 +3122,7 @@
       "executable": false
     },
     "src/platter/ui/clients.ts": {
-      "sha256": "b640c4b0ed3cda22e19fa78bc4c3a25df64c74467de30b63139086d1d1ed1c9f",
+      "sha256": "d8ecf7a5ad9bd82e11a351eecee8fa8fe817a976ddd46a0357384ddad64a927c",
       "executable": false
     },
     "src/platter/ui/collaboration.ts": {
@@ -3221,6 +3233,10 @@
       "sha256": "19979feae1125a3ccdf6cd3de81e97980f5b5467c10971f643be7d2ae448a408",
       "executable": false
     },
+    "src/platter/ui/performance.ts": {
+      "sha256": "cc62febd1f2c5661d332937a6b3546494a3c302fbd9f26b581e53d49bcac45de",
+      "executable": false
+    },
     "src/platter/ui/pipeline.ts": {
       "sha256": "a63810f6aa3add45de1afd054cb685acd81f82231e1dbaebfb691a008b1cb441",
       "executable": false
@@ -3234,7 +3250,7 @@
       "executable": false
     },
     "src/platter/ui/proposals.ts": {
-      "sha256": "ad7e9f159d089e77de32a1c48e5ba76c7043f82f633de4cb47f9f16c966f17f4",
+      "sha256": "31b8e3f6814fc8cd42b41744ba9f13f94e45fba0fb132e39d9f1ef647db09df0",
       "executable": false
     },
     "src/platter/ui/questions.ts": {
@@ -3258,7 +3274,7 @@
       "executable": false
     },
     "src/platter/ui/report-schedules.ts": {
-      "sha256": "69b49dd29e892446392fa6df2a6cbdcba3f0252671747cdf233939ddbc1c44db",
+      "sha256": "edaa7725fec148d1bfb597de2bfc8dca640ae9cef4d166c9906540e966b75869",
       "executable": false
     },
     "src/platter/ui/section-locks.ts": {
@@ -3446,7 +3462,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "4e18cbad19e8fc299e121499efaa12ab7c9d9821fb16a60fa9ee83cc1ffc811c",
+      "sha256": "70e54ae94833525dcc86f898c011c1ec2f19465382754e16192222f0be1483dc",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3609,8 +3625,12 @@
       "sha256": "a87d24ebfc961daa440523ef346b632c1bfcd24a3f09c6407e0032c05d2d9f55",
       "executable": false
     },
+    "tests/performance-fixture.mjs": {
+      "sha256": "f7dd2fc27718c8e9da402a9ebdcfe31c7c600f7d1feead8b423e3c666efa3681",
+      "executable": false
+    },
     "tests/platter.test.mjs": {
-      "sha256": "ef9b89bd6c3fe05ce5a3b87b64b46cabd33f2f8eaef782f3d7020dbd1507df7c",
+      "sha256": "97015651cbb4947fe1564a3b5bd17bebccb37ad5d1074d0be0aeab98c2e1d97d",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3670,7 +3690,7 @@
       "executable": false
     },
     "tests/site-lifecycle.mjs": {
-      "sha256": "16ccbaf8aaeb1170b260b9a25631535e424d3b730bab6cc0272f5fec70787c1d",
+      "sha256": "6f027510c643c486a3fe27768ed226a58195cc16840df43aa56afee173d2fddd",
       "executable": false
     },
     "tests/site.test.mjs": {

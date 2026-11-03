@@ -69,8 +69,8 @@ async function prepare(db:D1Database,move:any,uploads:UploadedDocument[],actor:A
  const fingerprint=sha256(canonicalJson({mode,uploads:uploads.map(u=>({filename:u.filename,sha256:u.sha256})),files,outputs,report,owner:actor.id}))
  return {fingerprint,files,outputs,sources,report,uploadRows:uploads.map(u=>({sha256:u.sha256,filename:u.filename,size:u.bytes.length})),canApply:outputs.length>0,kind:'PandaDoc content',id:move.id}
 }
-const expectedTemplate=(o:any,owner:string)=>({id:o.id,owner_id:owner,name:o.name,version:1,snapshot:canonicalJson(o.snapshot),pdf_enabled:1,expiry:'{"mode":"never","period_days":null,"expires_on":null,"time_zone":"UTC","warning_days":null}',suggestion_sections:'[]',created_at:0,updated_at:0,shared:0,folder_id:null,delivery_sources:'{"reminders":"inherit","expiry":"inherit","warning":"inherit"}'})
-const expectedLibrary=(o:any,owner:string)=>({id:o.id,title:o.title,kind:'section',content:o.content,version:1,updated_by:owner,updated_at:0,folder_id:null,rich_kind:null,tags:'[]'})
+const expectedTemplate=(o:any,owner:string)=>({id:o.id,owner_id:owner,name:o.name,version:1,snapshot:canonicalJson(o.snapshot),pdf_enabled:1,expiry:'{"mode":"never","period_days":null,"expires_on":null,"time_zone":"UTC","warning_days":null}',suggestion_sections:'[]',created_at:o.importedAt,updated_at:o.importedAt,shared:0,folder_id:null,delivery_sources:'{"reminders":"inherit","expiry":"inherit","warning":"inherit"}'})
+const expectedLibrary=(o:any,owner:string)=>({id:o.id,title:o.title,kind:'section',content:o.content,version:1,updated_by:owner,updated_at:o.importedAt,folder_id:null,rich_kind:null,tags:'[]'})
 
 export async function contentCommand(db:D1Database,actor:Actor,name:string,input:Record<string,unknown>,move:any,uploads:()=>Promise<UploadedDocument[]>){
  const saved=await db.prepare('SELECT * FROM p_pandadoc_moves WHERE id=?').bind(move.id).first<any>()
@@ -84,7 +84,8 @@ export async function contentCommand(db:D1Database,actor:Actor,name:string,input
   const prepared=await prepare(db,move,await uploads(),actor)
   if(input.fingerprint!==prepared.fingerprint)fail('review_fingerprint_mismatch',409,'Preview the current source files and catalog matches again')
   if(!prepared.canApply)fail('content_already_imported',409,'These source files have already been imported; no outputs were added')
-  const writes:D1PreparedStatement[]=[]
+  const writes:D1PreparedStatement[]=[],importedAt=Date.now()
+  for(const output of prepared.outputs)output.importedAt=importedAt
   for(const file of prepared.files){
    const retained=await prepareAttachment(db,{filename:file.filename,mediaType:file.mediaType,bytes:Buffer.from(file.base64,'base64')})
    // Replace generated IDs only in prepared statements by preparing the stable immutable rows here.

@@ -1,4 +1,5 @@
 import { templateNotices, saveTemplateNotices, editTemplateNotices, noticeSnapshots } from './notifications/settings'
+import { dollars }  from './model'
 import { withoutTaxAddresses } from './taxes'
 import { resolveVariables, editableVariableFields, unfilledVariableFields } from './variables'
 import { proposalFields } from './commands'
@@ -124,6 +125,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  const personal = starter ? null : template as any
  const access=starter?{sql:'1',values:[]}:await folderGuard(db,a,personal.folder_id,'template')
  let content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
+ if(content.importedContent){const percent=Number(input.depositPercent);need(input.depositPercent!==undefined&&Number.isFinite(percent)&&percent>=0.01&&percent<=100,'Choose a new deposit percentage for this draft; the source contains no deposit instructions',409);content={...content,deposit_bps:Math.round(percent*100)}}
+ if(!content.options?.length){need(input.price!==undefined&&input.price!=='','This content has no source price. Enter a new proposal price before starting a draft',409);content={...content,options:[{id:'imported',label:'Reviewed content',cents:dollars(input.price)}]}}
  if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...(content.template_input??editableVariableFields(content)),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan};delete content.template_input}
  const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry,notices=await templateNotices(db,personal?.id)
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)

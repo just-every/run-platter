@@ -15,6 +15,30 @@ import { offerPdf } from './offer-pdf'
 import { pdfFonts } from './pdf-fonts'
 import { readWord, writeWord } from './word'
 
+/** Shared Word conversion keeps direct uploads and reviewed move-in on the same parser and pricing rules. */
+export async function wordContent(bytes:Uint8Array,catalog:any[],optionId:string,tables:any[],retain:(filename:string,type:string,bytes:Uint8Array)=>Promise<string>,makeId:()=>string=()=>crypto.randomUUID()){
+ const imported=readWord(bytes),report={unknown:imported.unknown,unmatched:[] as string[],missing:[...imported.missing]}
+ const parts:any[]=[]
+  for(const part of imported.parts){
+   const id=makeId()
+   if(part.type==='image'){
+    const image=imported.files[part.path!],type=image[0]===137?'image/png':image[0]===255&&image[1]===216?'image/jpeg':'';need(type,'Word images must be PNG or JPEG')
+    try{const probe=await PDFDocument.create();const decoded=type==='image/png'?await probe.embedPng(image):await probe.embedJpg(image);need(decoded.width*decoded.height<=16000000,'Word images must be at most 16 megapixels')}catch{need(false,'A Word image cannot be decoded')}
+    parts.push({id,type:'image',title:'',text:'',assetId:await retain(part.path!.split('/').at(-1)!,type,image),alt:part.title});continue
+   }
+   if(part.type==='table'){
+    const rows=part.text.split('\n').map(r=>r.split('\t')),headers=rows[0].map(h=>h.trim().toLowerCase()),column=(pattern:RegExp)=>headers.findIndex(h=>pattern.test(h)),price=column(/^(unit\s*)?price$|^rate$/),quantity=column(/^qty$|^quantity$/),sku=column(/^sku$/),name=column(/^name$|^item$|^product$|^description$/)
+    if(price>=0||quantity>=0||sku>=0){
+     need(price>=0,'A quote table needs a price column')
+     const lines=rows.slice(1).filter(r=>r.some(c=>c.trim())).map((r,index)=>{const match=catalog.find(c=>sku>=0&&r[sku]&&String(c.sku).toLowerCase()===r[sku].toLowerCase())??catalog.find(c=>name>=0&&String(c.name).toLowerCase()===r[name]?.toLowerCase()),label=r[name]||match?.name||r[sku]||'Imported line '+(index+1);if(!match)report.unmatched.push(label);return {name:label,description:'',unit:'each',quantity:quantity>=0?r[quantity]:'1',unitPrice:r[price].replace(/[$,]/g,''),...(match?{catalogId:match.id}:{})}})
+     const index=tables.filter((t:any)=>t.optionId===optionId).length;tables.push({optionId,name:'Imported quote',lines});parts.push({id,type:'pricing',title:'',text:'',optionId,tableIndex:index});report.missing.push('Quote table images absent from the Word download cannot be recovered.');continue
+    }
+   }
+   parts.push({id,type:part.type,title:part.title,text:part.text,...(part.level?{headingLevel:part.level}:{})})
+  }
+ return {parts,tables,report}
+}
+
 /** Imports are explicit revision edits. Original uploaded PDFs never become editable content. */
 export async function importDocument(env:Bindings,a:Actor,data:FormData){
  need(editors.includes(a.role),'A proposal editor imports documents',403)
@@ -32,27 +56,9 @@ export async function importDocument(env:Bindings,a:Actor,data:FormData){
   document.fixedPdf={fileId:await retain(file.name,'application/pdf',bytes),pages:pdf!.getPageCount()}
  }else{
   need(/\.docx$/i.test(file.name),'Upload a .docx or .pdf file')
-  const imported=readWord(bytes);report.unknown=imported.unknown;report.missing=imported.missing
   const catalog=[...(await db.prepare('SELECT id,sku,name FROM p_priced_catalog').all<any>()).results,...(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)}))]
   const tables=fields.pricingTables,optionId=String(data.get('optionId')??fields.packages[0].id),option=fields.packages.find((o:any)=>o.id===optionId);need(option,'Choose an offered package')
-  const parts:any[]=[]
-  for(const part of imported.parts){
-   const id=crypto.randomUUID()
-   if(part.type==='image'){
-    const image=imported.files[part.path!],type=image[0]===137?'image/png':image[0]===255&&image[1]===216?'image/jpeg':'';need(type,'Word images must be PNG or JPEG')
-    try{const probe=await PDFDocument.create();const decoded=type==='image/png'?await probe.embedPng(image):await probe.embedJpg(image);need(decoded.width*decoded.height<=16000000,'Word images must be at most 16 megapixels')}catch{need(false,'A Word image cannot be decoded')}
-    parts.push({id,type:'image',title:'',text:'',assetId:await retain(part.path!.split('/').at(-1)!,type,image),alt:part.title});continue
-   }
-   if(part.type==='table'){
-    const rows=part.text.split('\n').map(r=>r.split('\t')),headers=rows[0].map(h=>h.trim().toLowerCase()),column=(pattern:RegExp)=>headers.findIndex(h=>pattern.test(h)),price=column(/^(unit\s*)?price$|^rate$/),quantity=column(/^qty$|^quantity$/),sku=column(/^sku$/),name=column(/^name$|^item$|^product$|^description$/)
-    if(price>=0||quantity>=0||sku>=0){
-     need(price>=0,'A quote table needs a price column')
-     const lines=rows.slice(1).filter(r=>r.some(c=>c.trim())).map((r,index)=>{const match=catalog.find(c=>sku>=0&&r[sku]&&String(c.sku).toLowerCase()===r[sku].toLowerCase())??catalog.find(c=>name>=0&&String(c.name).toLowerCase()===r[name]?.toLowerCase()),label=r[name]||match?.name||r[sku]||'Imported line '+(index+1);if(!match)report.unmatched.push(label);return {name:label,description:'',unit:'each',quantity:quantity>=0?r[quantity]:'1',unitPrice:r[price].replace(/[$,]/g,''),...(match?{catalogId:match.id}:{})}})
-     const index=tables.filter((t:any)=>t.optionId===optionId).length;tables.push({optionId,name:'Imported quote',lines});parts.push({id,type:'pricing',title:'',text:'',optionId,tableIndex:index});report.missing.push('Quote table images absent from the Word download cannot be recovered.');continue
-    }
-   }
-   parts.push({id,type:part.type,title:part.title,text:part.text,...(part.level?{headingLevel:part.level}:{})})
-  }
+  const converted=await wordContent(bytes,catalog,optionId,tables,retain),parts=converted.parts;Object.assign(report,converted.report)
   if(data.get('mode')==='library'){
    need(['owner','admin','manager','content_editor'].includes(a.role),'A library editor imports sections',403)
    const sections:{title:string;blocks:any[]}[]=[];for(const part of parts){if(part.type==='heading'&&part.headingLevel===1)sections.push({title:part.title,blocks:[]});if(sections.length)sections.at(-1)!.blocks.push(part)}

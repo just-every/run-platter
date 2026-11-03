@@ -1,4 +1,5 @@
 // Reviewed Proposify source facts and fixed-page lineage are business history, never execution grants.
+// Reviewed PandaDoc sources and undo history are business custody; unfinished uploads stay local.
 // SMS assent and suppression are business history; invitation and sender authority stay local.
 // Sender notice events are business history; their local execution grant is excluded.
 // Auth identities retain approval authors. Credentials, invitations and messages stay local.

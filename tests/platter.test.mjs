@@ -149,7 +149,7 @@ test('HTTP-001 complete authorized domain dispatch journey and native auth, CSRF
  }
  // The identical reviewed source succeeds through the authorized door.
  const applied=await h.cmd('import.apply',{csv,fingerprint:preview.fingerprint});assert.equal(applied.job.state,'completed')
- const after=await h.state();assert.equal(after.clients.length,4);assert.equal(after.importJobs.length,2);assert.deepEqual(after.clients.find(row=>row.id==='synthetic-platter-9002'),{id:'synthetic-platter-9002',name:'Reviewed import',email:'synthetic-platter-9002'+String.fromCharCode(64)+'example.test',version:1,variable_fields:'{}'})
+ const after=await h.state();assert.equal(after.clients.length,4);assert.equal(after.importJobs.length,2);assert.deepEqual(after.clients.find(row=>row.id==='synthetic-platter-9002'),{id:'synthetic-platter-9002',name:'Reviewed import',email:'synthetic-platter-9002'+String.fromCharCode(64)+'example.test',version:1,variable_fields:'{}',segment:'Not recorded'})
  assert.deepEqual(after.proposals,baseline.state.proposals);assert.deepEqual(after.revisions,baseline.state.revisions)
  assert.deepEqual(await h.cmd('invoice.export',{id:p.id}),invoice);assert.equal((await h.send(downloadPath,undefined,h.owner)).text,download.text)
  assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id}),retainedJournal)

@@ -3690,7 +3690,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "fd1cf259c1104efe097533af83de37eaa5803a1e94058934bdb3bececaca0c54",
+      "sha256": "4ebbe461be03e143281e47ffa3eeded68f4cd26d4f5df48ecfa2f0bff3f19ccf",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

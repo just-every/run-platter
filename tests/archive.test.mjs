@@ -853,7 +853,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   const paidPath=new URL((await h.cmd('proposal.send',{id:paid.id,version:2})).shareUrl).pathname
   await h.send(paidPath+'/action?name=code.request',{});const code=(await h.db.prepare("SELECT body FROM p_mail WHERE subject='Your Platter verification code' ORDER BY created_at DESC").first()).body.match(/\b\d{6}\b/)[0],verified=(await h.send(paidPath+'/action?name=code.verify',{code})).cookie;assert.equal((await h.send(paidPath+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},verified)).status,200)
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-2803',webhookSecret:'synthetic-platter-2804',consent:true});const payment=await h.cmd('payment.bind',{id:paid.id,chargeId:'synthetic-platter-2801',consent:true}),refund={paymentId:payment.id,amount:'100',reason:'Synthetic partial refund',requestId:'synthetic-platter-2805',consent:true};await h.cmd('payment.refund',refund)
-  await h.cmd('payment.record',{id:paid.id,amount:'50',method:'check',reference:'synthetic-platter-2806',receivedOn:'2026-10-21',consent:true})
+  await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:paid.id,amount:'50',method:'check',reference:'synthetic-platter-2806',receivedOn:'2026-10-21',consent:true})
   await h.cmd('dispute.import',{paymentId:payment.id,disputeId:'synthetic-platter-3701'});const packet=await h.cmd('dispute.prepare',{disputeId:'synthetic-platter-3701',version:1,note:'Archived response'});const submission={disputeId:'synthetic-platter-3701',packetId:packet.id,documentHash:packet.documentHash,requestId:'synthetic-platter-3702'};await h.cmd('dispute.authorize',{...submission,consent:true});assert.equal((await h.cmd('dispute.submit',submission)).status,'submitted');const sourceEvidence=await h.mf.dispatchFetch(h.origin+'/api/platter/disputes/'+submission.disputeId+'/evidence.pdf?submission='+submission.requestId,{headers:{host:new URL(h.origin).host,cookie:h.owner}});assert.equal(sourceEvidence.status,200);const evidenceBytes=new Uint8Array(await sourceEvidence.arrayBuffer())
   assert.equal((await h.cmd('member.invite',{email:'unjoined@synthetic-platter.example',displayName:'Unjoined member',role:'sales',teams:[team.id]},people.manager.cookie)).status,'invited')
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_member_invitations').first()).n,1)
@@ -862,7 +862,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   for(const [index,condition] of [{kind:'discountOver',bps:1500},{kind:'marginBelow',bps:2000},{kind:'paymentTerms',minimumDepositBps:5000,standardTerms:'Net 30'},{kind:'template'},{kind:'termsEdited'}].entries()){const version=(await h.state()).approvalSettings.policy.version;await h.cmd('approval.rule',{version,name:'Archived condition '+condition.kind,position:10+index,condition,approvers:['role:owner'],templates:['starter:consultancy']})}
   const scopedTemplate=await h.cmd('template.start',{id:'starter:consultancy',version:1,clientId:client.id},people.sales.cookie);await h.cmd('proposal.approve',{id:p.id,version:3,revision:2},people.manager.cookie)
   const recurringReport=await acceptRevenue(h,{clientId:client.id})
-  for(const [amount,receivedOn] of [['2500','2099-03-31'],['1200','2099-04-01']])await h.cmd('payment.record',{id:recurringReport.id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4400',consent:true})
+  for(const [amount,receivedOn] of [['2500','2099-03-31'],['1200','2099-04-01']])await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:recurringReport.id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4400',consent:true})
   const revenueFilters=new URLSearchParams({view:'recorded-revenue',currency:'USD',owner:(await h.state()).actor.id,bookedFrom:'2099-01-15',bookedTo:'2099-03-31',receivedFrom:'2099-04-01',receivedTo:'2099-06-30',sort:'value'}).toString()
   await h.cmd('report.schedule',{filters:revenueFilters,cadence:'daily',hour:8,recipients:[h.auth.OWNER_EMAIL]})
   const oauthStart=await h.send('/api/platter/mailbox/authorize',{provider:'gmail',consent:true},people.sales.cookie);assert.equal(oauthStart.status,303)
@@ -1401,9 +1401,9 @@ test('PORT-002 / AUTO-002 populated product archive retains exact document archi
   const invoice=await h.cmd('invoice.export',{id:proposal.id}),invoicePath='/api/platter/invoices/'+invoice.id+'.csv'
   const invoiceCsv=(await h.send(invoicePath,undefined,h.owner)).text
   assert.match(invoiceCsv,/87\.50,200,No Tax,USD/)
-  await h.cmd('payment.record',{id:proposal.id,amount:'87.50',receivedOn:'2099-01-15',method:'wire',reference:'synthetic-platter-offline-139',consent:false},h.owner,400)
+  await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:proposal.id,amount:'87.50',receivedOn:'2099-01-15',method:'wire',reference:'synthetic-platter-offline-139',consent:false},h.owner,400)
   assert.deepEqual((await h.state()).paymentRecords,[],'unconfirmed money is never recorded')
-  const payment=await h.cmd('payment.record',{id:proposal.id,amount:'87.50',receivedOn:'2099-01-15',method:'wire',reference:'synthetic-platter-offline-139',consent:true})
+  const payment=await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:proposal.id,amount:'87.50',receivedOn:'2099-01-15',method:'wire',reference:'synthetic-platter-offline-139',consent:true})
   const filters='view=recorded-revenue&currency=USD&q=Populated%20archive%20agreement&receivedFrom=2099-01-01&receivedTo=2099-03-31'
   const expectedTotals=[{currency:'USD',count:1,valueCents:35000,oneOffCents:35000,firstYearCents:35000,receivedCents:8750,refundedCents:0,netReceivedCents:8750,uncertainRefundCents:0,exportedDepositCents:8750}]
   const revenue=(await h.send('/api/platter/pipeline?'+filters,undefined,h.owner)).value

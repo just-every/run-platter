@@ -1402,3 +1402,6 @@ test('FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke exp
   }finally{await context.close()}
  }finally{await browser?.close();await app?.close()}
 })
+test('RENEW-002 Settings authorizes and revokes fixed-term renewal drafting and opens an independent draft',{timeout:120000},async()=>{
+ const {renewalBrowserJourney}=await import('./recurring-browser.mjs');await renewalBrowserJourney()
+})

@@ -4436,3 +4436,6 @@ test('ACCT-002 reviewed Xero deposits preserve exact money, authority, unique ma
   assert.equal(edge.state.invoices.length,writes)
  }finally{await legacy.close()}
 })
+test('RENEW-002 owner-authorized fixed-term drafts require fresh approval and preserve accepted scope without replay',async()=>{
+ const h=await harness({assetsDirectory:'public'});try{const {renewalJourney}=await import('./renewal-journey.mjs');await renewalJourney(h)}finally{await h.close()}
+})

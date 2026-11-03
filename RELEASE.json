@@ -293,6 +293,10 @@
     {
       "id": "0106_reminder_dispatch_lock.sql",
       "buyerSteps": "None. Serializes scheduled reminder dispatch without changing existing reminder authorization."
+    },
+    {
+      "id": "0107_renewal_drafts.sql",
+      "buyerSteps": "Apply migrations/core/0107_renewal_drafts.sql after existing core migrations. Renewal drafting remains inactive until the current owner explicitly authorizes an accepted agreement; restored settings confer no execution authority."
     }
   ],
   "breaking": false,

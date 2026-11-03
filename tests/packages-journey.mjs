@@ -272,7 +272,7 @@ export async function duplicatePackagesJourney(){
     await page.goto(invitation.shareUrl);await page.getByRole('button',{name:'Send verification code'}).click();const state=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
     await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click();await page.getByRole('radio',{name:/Studio essentials/}).check();await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
     assert.equal(await page.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1);await capture('source-client')
-    await cmd('payment.record',{id:source.id,method:'wire',amount:'600',receivedOn:'2026-10-20',reference:'synthetic-platter-1223',consent:true})
+    await cmd('payment.record',{requestId:crypto.randomUUID(),id:source.id,method:'wire',amount:'600',receivedOn:'2026-10-20',reference:'synthetic-platter-1223',consent:true})
     await cmd('invoice.export',{id:source.id})
     const getState=async()=>{const r=await context.request.get(app.origin+'/api/platter/state');assert.equal(r.status(),200);return r.json()},sourceState=(await getState()).proposals.find(p=>p.id===source.id)
     const sourcePdfResponse=await context.request.get(app.origin+'/api/platter/agreement.pdf?id='+source.id);assert.equal(sourcePdfResponse.status(),200);const sourcePdf=await sourcePdfResponse.body()

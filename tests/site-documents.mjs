@@ -1373,3 +1373,5 @@ test('FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke exp
   }finally{await context.close()}
  }finally{await browser?.close();await app?.close()}
 })
+
+test('SIGN-009 compiled Settings and recipient controls delegate, undo and verify before completion', {timeout:120000},async()=>{const {delegationBrowser}=await import('./signer-delegation-browser.mjs');await delegationBrowser()})

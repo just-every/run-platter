@@ -285,6 +285,14 @@
     {
       "id": "0104_renewal_notices.sql",
       "buyerSteps": "Apply migrations/core/0104_renewal_notices.sql after existing core migrations. Retained notice choices and history confer no outbound authority; explicitly authorize each proposal after reviewing its current revision and settings."
+    },
+    {
+      "id": "0105_signer_delegation.sql",
+      "buyerSteps": "Apply migrations/core/0105_signer_delegation.sql after existing core migrations. Delegation is off until the current owner enables a sent single-client mailbox-verified offer; retained delegation history restores no invitation or delegation authority."
+    },
+    {
+      "id": "0106_delegation_owner_version.sql",
+      "buyerSteps": "Apply migrations/core/0106_delegation_owner_version.sql after 0105_signer_delegation.sql. Delegation consent binds the current owner identity version; revoked owner consent requires fresh authorization."
     }
   ],
   "breaking": false,

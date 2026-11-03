@@ -594,6 +594,54 @@
       "name": "0098_sms_reenable.sql",
       "sha256": "cbebdc3767ad5463c708c3ddac223639549305289aad9a1f12678d1b2c92d62b",
       "sql": "-- Provider opt-in receipts are history, never consent or sending authority.\nCREATE TABLE p_sms_provider_optins (\n id TEXT PRIMARY KEY, phone TEXT NOT NULL, transport_hash TEXT NOT NULL, received_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_reenable_eligibility (\n phone TEXT PRIMARY KEY, event_id TEXT NOT NULL REFERENCES p_sms_provider_optins(id), stopped_at INTEGER NOT NULL\n);\nCREATE TABLE p_sms_reenable_history (\n id TEXT PRIMARY KEY, phone TEXT NOT NULL, proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n assent_id TEXT NOT NULL REFERENCES p_sms_assents(id), actor_id TEXT NOT NULL,\n provider_event_id TEXT NOT NULL REFERENCES p_sms_provider_optins(id), stopped_at INTEGER NOT NULL,\n source TEXT NOT NULL, reenabled_at INTEGER NOT NULL\n);\nCREATE TRIGGER p_frozen_sms_provider_optin BEFORE UPDATE ON p_sms_provider_optins BEGIN SELECT RAISE(ABORT,'Provider opt-in history is immutable'); END;\nCREATE TRIGGER p_frozen_sms_reenable BEFORE UPDATE ON p_sms_reenable_history BEGIN SELECT RAISE(ABORT,'SMS re-enablement history is immutable'); END;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0099_proposify_exports.sql",
+      "sha256": "ecd782cd1f2eba5b939270d28ee0f614eae8261171827c75ca6fb8517d4cb338",
+      "sql": "ALTER TABLE p_document_moveins ADD COLUMN provider TEXT NOT NULL DEFAULT 'generic';\nALTER TABLE p_document_moveins ADD COLUMN configuration_json TEXT NOT NULL DEFAULT '{}';\n\n-- Reviewed fixed-page outputs retain lineage, without importing execution authority.\nCREATE TABLE p_proposify_applications (\n id TEXT PRIMARY KEY,\n movein_id TEXT NOT NULL REFERENCES p_document_moveins(id),\n document_id TEXT NOT NULL,\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n template_id TEXT NOT NULL,\n fingerprint TEXT NOT NULL UNIQUE,\n source_sha256 TEXT NOT NULL,\n previous_document TEXT NOT NULL,\n applied_document TEXT NOT NULL,\n applied_version INTEGER NOT NULL,\n applied_revision INTEGER NOT NULL,\n template_snapshot TEXT NOT NULL,\n created_at INTEGER NOT NULL,\n reversed_at INTEGER,\n UNIQUE(document_id,proposal_id)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0100_xero_deposits.sql",
+      "sha256": "c06d8d8b196987759a9cf85e04f29a9c5e06065aae738152a6cab7b94310fc7a",
+      "sql": "-- Retained mappings never grant restored provider execution authority.\nCREATE TABLE p_invoice_authority (\n singleton INTEGER PRIMARY KEY CHECK(singleton=1), authority TEXT NOT NULL,\n account_id TEXT NOT NULL, version INTEGER NOT NULL, selected_by TEXT NOT NULL, selected_at INTEGER NOT NULL\n);\nCREATE TABLE p_xero_reviews (\n id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n actor_id TEXT NOT NULL, actor_role TEXT NOT NULL, actor_version INTEGER NOT NULL, operator_version INTEGER NOT NULL,\n connection_version INTEGER NOT NULL, authority_version INTEGER NOT NULL, account_id TEXT NOT NULL,\n accepted_digest TEXT NOT NULL, source_json TEXT NOT NULL, digest TEXT NOT NULL, created_at INTEGER NOT NULL\n);\nCREATE TABLE p_xero_contacts (\n account_id TEXT NOT NULL, client_id TEXT NOT NULL REFERENCES p_clients(id),\n contact_id TEXT, status TEXT NOT NULL, request_json TEXT NOT NULL,\n PRIMARY KEY(account_id,client_id), UNIQUE(account_id,contact_id)\n);\nCREATE TABLE p_xero_jobs (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id), revision INTEGER NOT NULL,\n account_id TEXT NOT NULL, connection_version INTEGER NOT NULL, authority_version INTEGER NOT NULL,\n actor_id TEXT NOT NULL, actor_role TEXT NOT NULL, actor_version INTEGER NOT NULL, operator_version INTEGER NOT NULL,\n accepted_digest TEXT NOT NULL, request_json TEXT NOT NULL, contact_json TEXT NOT NULL,\n status TEXT NOT NULL, reason TEXT, invoice_id TEXT, created_at INTEGER NOT NULL, completed_at INTEGER,\n UNIQUE(account_id,invoice_id)\n);\nCREATE TABLE p_xero_execution (proposal_id TEXT PRIMARY KEY REFERENCES p_xero_jobs(proposal_id));\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0101_approval_request_details.sql",
+      "sha256": "95f39a1ec5040aca8f052d94e6451a08e1f879dcc9c39fab5ef608f7750055d7",
+      "sql": "-- Business history survives export; notification authority remains local.\nALTER TABLE p_approval_requests ADD COLUMN trigger_snapshot TEXT;\nALTER TABLE p_approval_requests ADD COLUMN revoked_at INTEGER;\nALTER TABLE p_approval_requests ADD COLUMN revoked_by TEXT;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0102_betterproposals_export.sql",
+      "sha256": "0a1e457dcb4310bcb10d08701e68d194a0bc208add1a4549107a3cbf5b166a38",
+      "sql": "ALTER TABLE p_document_moveins ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'documents';\nALTER TABLE p_document_moveins ADD COLUMN review_json TEXT NOT NULL DEFAULT '{}';\n-- Bindings are business custody, never recipient or sending authority.\nCREATE TABLE p_imported_document_contacts (\n document_id TEXT PRIMARY KEY REFERENCES p_imported_documents(id) ON DELETE RESTRICT,\n contact_id TEXT NOT NULL REFERENCES p_contacts(id) ON DELETE RESTRICT\n);\n-- Exact original business outputs fence every bounded undo batch together.\nCREATE TABLE p_document_business_outputs (\n kind TEXT NOT NULL CHECK(kind IN ('companies','contacts')), target_id TEXT NOT NULL,\n movein_id TEXT NOT NULL REFERENCES p_document_moveins(id), data_json TEXT NOT NULL,\n revision TEXT NOT NULL, PRIMARY KEY(kind,target_id)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0103_expiry_notice_consent.sql",
+      "sha256": "fe0d1a84bb8fba39a109d5687ec9323b3f403b3f008daec5e0e6b5b5280dbdff",
+      "sql": "-- Historical settings carry no inferred sender authorization.\nDELETE FROM p_sender_notice_authority;\nALTER TABLE p_sender_notice_authority ADD COLUMN consent_id TEXT;\n\nCREATE TABLE p_sender_notice_events (\n id TEXT PRIMARY KEY,\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n revision INTEGER NOT NULL,\n settings_version INTEGER NOT NULL,\n actor_id TEXT NOT NULL REFERENCES oa_operators(id),\n actor_role TEXT NOT NULL,\n actor_version INTEGER NOT NULL,\n member_version INTEGER NOT NULL,\n owner_id TEXT NOT NULL REFERENCES oa_operators(id),\n enabled INTEGER NOT NULL,\n lead_days INTEGER NOT NULL,\n action TEXT NOT NULL CHECK(action IN ('saved','authorized','revoked')),\n occurred_at INTEGER NOT NULL\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0104_renewal_notices.sql",
+      "sha256": "28f8ab5356f543cbd2a44d189d91597fd9101e59af3475fa76e524ceb3e0e82c",
+      "sql": "-- Portable notice choices are separate from local execution grants.\nALTER TABLE p_sender_notice_settings ADD COLUMN email_enabled INTEGER NOT NULL DEFAULT 1 CHECK(email_enabled IN (0,1));\nALTER TABLE p_sender_notice_settings ADD COLUMN slack_route TEXT REFERENCES p_notification_routes(id);\nALTER TABLE p_sender_notice_events ADD COLUMN kind TEXT NOT NULL DEFAULT 'expiry' CHECK(kind IN ('expiry','renewal'));\nALTER TABLE p_sender_notice_events ADD COLUMN email_enabled INTEGER NOT NULL DEFAULT 1;\nALTER TABLE p_sender_notice_events ADD COLUMN slack_route TEXT;\nALTER TABLE p_sender_notice_runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'expiry' CHECK(kind IN ('expiry','renewal'));\nALTER TABLE p_sender_notice_runs ADD COLUMN term_end TEXT;\nALTER TABLE p_sender_notice_runs ADD COLUMN time_zone TEXT;\n\nCREATE TABLE p_renewal_notice_settings (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),\n enabled INTEGER NOT NULL CHECK(enabled IN (0,1)), lead_days INTEGER NOT NULL,\n version INTEGER NOT NULL DEFAULT 1,\n email_enabled INTEGER NOT NULL DEFAULT 1 CHECK(email_enabled IN (0,1)),\n slack_route TEXT REFERENCES p_notification_routes(id)\n);\nCREATE TABLE p_renewal_notice_authority (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),\n consent_id TEXT NOT NULL REFERENCES p_sender_notice_events(id)\n);\nCREATE TABLE p_renewal_followups (\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id), term_end TEXT NOT NULL,\n renews_on TEXT NOT NULL, due_date TEXT NOT NULL, action TEXT NOT NULL,\n closed_at INTEGER, resolution TEXT,\n actor_id TEXT NOT NULL REFERENCES oa_operators(id), updated_at INTEGER NOT NULL,\n PRIMARY KEY(proposal_id,term_end)\n);\nCREATE TABLE p_template_notice_defaults (\n template_id TEXT PRIMARY KEY REFERENCES p_personal_templates(id),\n source TEXT NOT NULL CHECK(source IN ('inherit','override')), settings TEXT NOT NULL\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0105_signer_delegation.sql",
+      "sha256": "90d27ea997ac2e52db9df9d013b2146399f15bad71a1740bc9a157f866ad5d32",
+      "sql": "-- Delegation facts are retained business history; authority stays installation-local.\nCREATE TABLE p_signer_delegations (\n id TEXT PRIMARY KEY,\n proposal_id TEXT NOT NULL REFERENCES p_proposals(id),\n revision INTEGER NOT NULL,\n old_recipient TEXT NOT NULL,\n new_recipient TEXT NOT NULL,\n delegate_name TEXT NOT NULL,\n delegated_at INTEGER NOT NULL,\n signing_position INTEGER NOT NULL CHECK(signing_position>0),\n required_method TEXT NOT NULL,\n undone_at INTEGER,\n undone_by TEXT\n);\nCREATE TABLE p_delegation_authority (\n proposal_id TEXT PRIMARY KEY REFERENCES p_proposals(id),\n revision INTEGER NOT NULL,\n owner_id TEXT NOT NULL,\n authorized_at INTEGER NOT NULL\n);\nALTER TABLE p_shares ADD COLUMN verification_required INTEGER NOT NULL DEFAULT 0 CHECK(verification_required IN (0,1));\nALTER TABLE p_shares ADD COLUMN delegation_id TEXT;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0106_delegation_owner_version.sql",
+      "sha256": "dafe362a2ae4b8aca6db0fa1a9bf3fb1f8797b854e2a53295b73f75b5c62281f",
+      "sql": "-- Older grants carry no authority across a native identity-version change.\nALTER TABLE p_delegation_authority ADD COLUMN owner_version INTEGER;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

@@ -1683,6 +1683,11 @@ test('SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates ret
   assert.equal((await h.send(path+'/action?name=code.request',{})).status,429,'ten generations cannot be exceeded')
   assert.equal(texts.length,10)
   const code=texts.at(-1).Body.match(/\b\d{6}\b/)[0],verified=await h.send(path+'/action?name=code.verify',{code});assert.equal(verified.status,200,verified.text)
+  const textsBeforeDelegation=texts.length,mailBeforeDelegation=(await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n
+  await h.cmd('signer.delegation.configure',{id,version:row.version,enabled:true},h.owner,409)
+  assert.equal((await h.send(path+'/action?name=delegate',{revision:1,delegateName:'Synthetic COO',recipient:['synthetic-platter-9902','example.test'].join('@')},verified.cookie)).status,409)
+  assert.equal(texts.length,textsBeforeDelegation);assert.equal((await h.db.prepare('SELECT count(*) n FROM p_mail').first()).n,mailBeforeDelegation)
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_signer_delegations WHERE proposal_id=?').bind(id).first()).n,0)
   assert.equal((await h.send(path+'/action?name=code.verify',{code})).status,401,'the code is single use')
   assert.equal((await h.send(path+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},verified.cookie)).status,200)
   assert.equal((await h.db.prepare('SELECT method FROM p_signature_facts WHERE proposal_id=?').bind(id).first()).method,'SMS code')
@@ -1917,4 +1922,27 @@ test('SIGN-005 completion mail attaches the retained PDFs to both parties once, 
    }
   }finally{release();await h.close()}
  }
+})
+
+test('SIGN-009 delegation sends one delegate invitation and owner notice despite concurrent requests and replay', {timeout:120000},async()=>{
+ const messages=[],h=await harness({origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-9991'},outboundService:async request=>{messages.push(await request.json());return Response.json({id:'synthetic-platter-'+messages.length})}})
+ try{
+  const {delegationFixture,delegationVerify}=await import('./signer-delegation-http.mjs'),p=await delegationFixture(h),input={revision:1,delegateName:'Synthetic COO',recipient:['synthetic-platter-9902','example.test'].join('@')}
+  await p.configure(true);const session=await delegationVerify(h,p.path),offset=messages.length
+  const responses=await Promise.all([h.send(p.path+'/action?name=delegate',input,session.cookie),h.send(p.path+'/action?name=delegate',input,session.cookie)])
+  assert.equal(responses.filter(r=>r.status===200).length,1);assert.ok(responses.every(r=>[200,409,410].includes(r.status)))
+  const delivered=messages.slice(offset);assert.equal(delivered.length,2);assert.deepEqual(delivered.map(m=>m.to).flat().sort(),[input.recipient,h.auth.OWNER_EMAIL].sort())
+  const owner=delivered.find(m=>m.subject==='Signer delegation recorded'),invitation=delivered.find(m=>m.subject==='Your proposal: '+p.offer.title)
+  assert.ok(owner.text.includes(input.recipient));assert.ok(owner.text.includes('/app/proposal?id='+p.id));assert.ok(!owner.text.includes('/p/'))
+  const delegatePath='/p/'+(await p.get()).shareToken;assert.ok(invitation.text.includes(delegatePath));assert.ok(!invitation.text.includes(p.path))
+  assert.equal((await h.send(p.path+'/action?name=delegate',input,session.cookie)).status,410)
+  await Promise.all([(await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'}),(await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'})])
+  assert.equal(messages.length,offset+2,'no transport replay or duplicate owner notice')
+  const delegateSession=await delegationVerify(h,delegatePath),row=await p.get(),undoOffset=messages.length
+  const undo=await h.cmd('signer.delegation.undo',{id:p.id,version:row.version,delegationId:row.delegation.currentId})
+  assert.equal(messages.length,undoOffset+1);assert.equal(messages.at(-1).to[0],['synthetic-platter-9901','example.test'].join('@'));assert.ok(messages.at(-1).text.includes(new URL(undo.shareUrl).pathname))
+  assert.equal((await h.send(delegatePath+'/action?name=accept',{name:'Synthetic COO',optionId:'one',consent:true},delegateSession.cookie)).status,410)
+  assert.equal(messages.length,undoOffset+1)
+  console.log('PROBE SIGN-009 mail: concurrent delegate submissions and scheduled replay -> one invitation, one owner notice; undo -> one fresh original-recipient invitation')
+ }finally{await h.close()}
 })

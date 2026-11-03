@@ -1031,7 +1031,7 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const revokedRoute=await h.cmd('notification.route',{provider:'slack',event:'followup',kind:'channel',destination:'synthetic-platter-7101',consent:true})
   await h.cmd('notification.route.remove',{id:revokedRoute.id})
   const routesBefore=(await h.state()).notificationSettings.routes
-  assert.equal(routesBefore.length,3);assert.equal(routesBefore.filter(r=>r.available).length,2)
+  assert.equal(routesBefore.length,4);assert.equal(routesBefore.filter(r=>r.available).length,3);assert.ok(routesBefore.some(r=>r.id===personalRoute.id&&r.available),'the additional verified personal Slack route remains available')
   await h.cmd('signer.method',{id:expiry.id,version:smsRow.version,method:'SMS code'})
   const smsShare=(await h.state()).proposals.find(p=>p.id===expiry.id).shareToken,smsPath='/p/'+smsShare
   assert.equal((await h.send(smsPath+'/action?name=code.request',{})).status,200)

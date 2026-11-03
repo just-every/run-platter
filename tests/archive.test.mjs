@@ -854,7 +854,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.deepEqual(after.proposals.find(r=>r.id===mailboxDraft.id).mailReplies,replyReceipt);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_mail_reply_keys').first()).n,0);assert.deepEqual(after.proposals.find(r=>r.id===mailboxDraft.id).mailAttributions,before.proposals.find(r=>r.id===mailboxDraft.id).mailAttributions);assert.deepEqual(after.proposals.find(r=>r.id===mailboxDraft.id).mailAttributions.find(m=>m.mail_id===mailboxReceipt[0].mail_id),mailboxReceipt[0]);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_mailbox_oauth').first()).n,0);assert.doesNotMatch(JSON.stringify(after),/synthetic-platter-560[234]/)
   assert.deepEqual(after.proposals.find(r=>r.id===discounted.id).options,before.proposals.find(r=>r.id===discounted.id).options);assert.deepEqual(after.proposals.find(r=>r.id===scopedTemplate.id).approval,before.proposals.find(r=>r.id===scopedTemplate.id).approval);assert.deepEqual(after.proposals.find(r=>r.id===optional.id).internalPricing,before.proposals.find(r=>r.id===optional.id).internalPricing);assert.deepEqual(after.disputes,before.disputes);assert.equal((await h.cmd('dispute.submit',submission,owner)).status,'submitted','restored submission retries issue no provider call');const retainedEvidence=await h.mf.dispatchFetch(h.origin+'/api/platter/disputes/'+submission.disputeId+'/evidence.pdf?submission='+submission.requestId,{headers:{host:new URL(h.origin).host,cookie:owner}});assert.equal(retainedEvidence.status,200);assert.deepEqual(new Uint8Array(await retainedEvidence.arrayBuffer()),evidenceBytes);assert.deepEqual(after.catalogItems,before.catalogItems);assert.deepEqual(after.workspaceDefaults,before.workspaceDefaults);assert.deepEqual(after.approvalSettings,before.approvalSettings);assert.deepEqual(after.proposals.find(r=>r.id===p.id).internalPricing,before.proposals.find(r=>r.id===p.id).internalPricing);assert.deepEqual(after.libraryItems,before.libraryItems)
   assert.deepEqual(after.proposals.find(r=>r.id===paid.id).options,before.proposals.find(r=>r.id===paid.id).options);assert.deepEqual(after.proposals.find(r=>r.id===paid.id).internalPricing,before.proposals.find(r=>r.id===paid.id).internalPricing)
-  const restoredRevenue=await h.send('/api/platter/pipeline?'+revenueFilters,undefined,owner);assert.equal(restoredRevenue.status,200);assert.deepEqual(restoredRevenue.value.rows,beforeRevenue.value.rows);assert.deepEqual(restoredRevenue.value.totals,beforeRevenue.value.totals);assert.deepEqual(after.reportSchedules,before.reportSchedules);assert.deepEqual((await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,owner)).value.rows,allRevenue.value.rows);assert.deepEqual((await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,owner)).value.totals,allRevenue.value.totals);assert.equal((await h.send('/api/platter/pipeline.csv?'+revenueFilters,undefined,owner)).text,beforeRevenueCsv.text)
+  const restoredRevenue=await h.send('/api/platter/pipeline?'+revenueFilters,undefined,owner);assert.equal(restoredRevenue.status,200);assert.deepEqual(restoredRevenue.value.rows,beforeRevenue.value.rows);assert.deepEqual(restoredRevenue.value.totals,beforeRevenue.value.totals);assert.deepEqual(after.reportSchedules,before.reportSchedules.map(s=>({...s,active:false})));assert.deepEqual((await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,owner)).value.rows,allRevenue.value.rows);assert.deepEqual((await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,owner)).value.totals,allRevenue.value.totals);assert.equal((await h.send('/api/platter/pipeline.csv?'+revenueFilters,undefined,owner)).text,beforeRevenueCsv.text)
   for(const [i,t] of tables.entries())assert.deepEqual(canonical((await h.db.prepare('SELECT * FROM '+t).all()).results),rows[i],t)
   assert.deepEqual(restoredCalls,[],'archive restoration and dispute replay make no provider call')
   assert.deepEqual(after.templates.find(t=>t.id===deliveryTemplate.id).deliveryDefaults.paymentMethods,['card','ach'])
@@ -1432,5 +1432,49 @@ test('PORT-002 / AUTO-002 populated product archive retains exact document archi
   assert.deepEqual((await h.state(owner)).paymentRecords,beforeState.paymentRecords,'replayed capabilities and scheduled processing cannot change money')
   console.log('PROBE PORT-002 1: populated CLI export and restore -> templates, library, catalog, two media originals, exact signed artifacts, 8750-cent deposit and offline receipt, report totals and actual Drive mappings reconciled')
   console.log('PROBE PORT-002 2: decoded CLI archive and restored public doors -> no credentials, invitations, sessions, verification state or queued mail; old capabilities refused; scheduled processing made no provider calls')
+
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})
+
+test('REPORT-006 public CLI restores scoped roles and populated schedule history without mail or execution authority', {timeout:180000}, async()=>{
+ const temporary=await mkdtemp(join(tmpdir(),'platter-report-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
+ let h;const calls=[]
+ const identity={origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-10420'},outboundService:async request=>{calls.push(await request.json());throw new Error('Synthetic receiver response lost')}}
+ try{
+  for(const root of [source,restored])await checkout(root)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
+  h=await harness({root:source,...identity})
+  const colleague=['synthetic-platter-10421','example.com'].join('@')
+  await h.send('/auth/invite',{email:colleague,displayName:'Synthetic report colleague',role:'member',returnTo:'/app'},h.owner);await h.signIn(colleague)
+  const client=await h.cmd('client.save',{name:'Synthetic retained report client',email:colleague})
+  await h.cmd('proposal.prepare',{clientId:client.id,title:'Synthetic retained report',scope:'Retained scope',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+  await h.cmd('report.time-zone',{timeZone:'America/New_York'})
+  const input={filters:'q=Synthetic+retained&sort=value&direction=desc',cadence:'daily',hour:8,recipients:[h.auth.OWNER_EMAIL,colleague]}
+  const schedule=await h.cmd('report.schedule',input),saved=(await h.state()).reportSchedules.find(s=>s.id===schedule.id)
+  await h.db.prepare("UPDATE oa_operators SET status='inactive' WHERE email=?").bind(colleague).run()
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(saved.nextRunAt+3*86400000),cron:'*/15 * * * *'})
+  const before=(await h.state()).reportSchedules
+  assert.equal(before.length,1);assert.equal(before[0].active,true);assert.equal(before[0].runs.length,1);assert.equal(before[0].runs[0].count,1);assert.deepEqual(before[0].runs[0].skipped,['no longer active']);assert.equal(before[0].runs[0].mail[0].status,'uncertain');assert.equal(calls.length,1)
+  const records=await h.db.prepare('SELECT * FROM p_report_schedules').all(),runs=await h.db.prepare('SELECT * FROM p_report_runs').all()
+  await h.close();h=undefined
+  const archive=join(temporary,'reports.rer');await command(source,['export','--output',archive]);await command(restored,['import','--input',archive,'--yes'])
+  calls.length=0;h=await harness({root:restored,unclaimed:true,...identity})
+  const owner=await h.signIn(h.auth.OWNER_EMAIL)
+  const after=(await h.state(owner)).reportSchedules
+  assert.deepEqual(after,before.map(s=>({...s,active:false,runs:s.runs.map(r=>({...r,mail:[]}))})))
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_report_authority').first()).n,0)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_report_mail').first()).n,0)
+  for(const at of [before[0].nextRunAt,before[0].nextRunAt+22*86400000])await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(at),cron:'*/15 * * * *'})
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_report_schedules').all()).results,records.results)
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_report_runs').all()).results,runs.results)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_report_mail').first()).n,0)
+  assert.deepEqual(calls,[],'restored history never queues or sends a catch-up report')
+  // A fresh explicit schedule can execute in the restored installation.
+  const fresh=await h.cmd('report.schedule',{...input,recipients:[h.auth.OWNER_EMAIL]},owner)
+  const next=(await h.state(owner)).reportSchedules.find(s=>s.id===fresh.id)
+  assert.equal(next.active,true)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(next.nextRunAt),cron:'*/15 * * * *'})
+  assert.equal(calls.length,1);assert.deepEqual(calls[0].to,[h.auth.OWNER_EMAIL])
+  assert.equal((await h.state(owner)).reportSchedules.find(s=>s.id===schedule.id).runs.length,1)
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

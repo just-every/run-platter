@@ -2,7 +2,7 @@ import { date, escape, field, form, hidden, panel } from './shared'
 
 // REPORT-005/REPORT-006: export the filtered pipeline and email it to named people on a UTC schedule.
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const filterKeys = ['view','currency','bookedFrom','bookedTo','receivedFrom','receivedTo','q', 'owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
+const filterKeys = ['group','quarter','view','currency','bookedFrom','bookedTo','receivedFrom','receivedTo','q', 'owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
 const statusLabel: Record<string, string> = { local: 'Captured locally; no email was sent', pending: 'Queued', sending: 'Sending', accepted: 'Accepted by provider', uncertain: 'Provider result uncertain; not resent' }
 const when = (s: any, zone: string) => `${s.cadence === 'weekly' ? `Weekly on ${days[s.weekday]}` : 'Daily'} at ${String(s.hour).padStart(2, '0')}:00 ${zone}`
 
@@ -19,7 +19,7 @@ export function reportSchedulesPanel(state: any, selection: URLSearchParams) {
     + `<label>Day (weekly)<select name="weekday">${days.map((d, i) => `<option value="${i}"${i === 1 ? ' selected' : ''}>${d}</option>`).join('')}</select></label>`
     + `<label>Hour (${escape(state.timeZone)})<select name="hour">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === 9 ? ' selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('')}</select></label></div>`
     + `<fieldset><legend>Recipients</legend>${people}</fieldset><button>Schedule report email</button>`)
-  return panel('Report export and email', `<p><a href="/api/platter/pipeline.csv${query ? '?' + escape(query) : ''}" download>Download ${revenue?'recorded revenue':'pipeline'} CSV</a> with the filters and sort shown above.</p>`
+  return panel('Report export and email', `<p><a href="/api/platter/pipeline.csv${query ? '?' + escape(query) : ''}" download>Download ${selection.get('view')==='sales-performance'?'sales performance':revenue?'recorded revenue':'pipeline'} CSV</a> with the filters and sort shown above.</p>`
     + '<p>Scheduled email repeats the selected report view with these filters, built at the scheduled time in the installation time zone. Recipients are people in this installation; anyone no longer active is skipped. Platter records provider acceptance, not delivery.</p>'
     + form('report.time-zone', '/app' + (query ? '?' + query : ''), field('Installation time zone', 'timeZone', state.timeZone, 'required maxlength="64" autocomplete="off"') + '<p class="muted">An IANA name such as America/New_York. Schedule hours follow its daylight saving changes.</p><button>Save time zone</button>')
     + (schedules ? `<ul class="records" aria-label="Report schedules">${schedules}</ul>` : '<p>No report email is scheduled.</p>') + create)

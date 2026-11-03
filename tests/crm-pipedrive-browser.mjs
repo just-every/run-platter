@@ -44,6 +44,7 @@ export async function pipedriveBrowser() {
    await panel.getByRole('button', { name: 'Review selected deal', exact: true }).click()
    const review = panel.getByRole('article', { name: 'Reviewed Pipedrive draft' })
    assert.match(await review.innerText(), /Synthetic Pipedrive organization/); assert.match(await review.innerText(), /Taylor Reed/)
+   assert.match(await review.innerText(), /12101/); assert.match(await review.innerText(), /Source item: 12105 · Product: 12107/); assert.match(await review.innerText(), /Reviewed strategy work/)
    assert.match(await review.innerText(), /2\.5 × \$120\.50 USD/); assert.match(await review.innerText(), /3 × \$19\.99 USD/); assert.match(await review.innerText(), /\$361\.22 USD/)
    assert.equal((await h.state()).proposals.length, 0)
    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))

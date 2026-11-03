@@ -28,7 +28,7 @@ export async function requestRows(env:Bindings,a:Actor,id:string){
 }
 export async function notificationCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  const db=env.DB,at=await currentTime(db)
- if(name==='notification.watch')return watchCommand(env,a,p)
+ if(name==='notification.watch'||name==='notification.unwatch')return watchCommand(env,a,p,name==='notification.unwatch')
  if(name==='notification.renewal.complete')return renewalFollowupCommand(env,a,p)
  if(name==='notification.defaults'||name==='notification.expiry'||name==='notification.renewal')return senderNoticeCommand(env,a,name,p)
  if(name==='notification.route'){

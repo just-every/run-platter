@@ -968,7 +968,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
 
 test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority', {timeout:300000},async()=>{
  const fixed=Date.parse('2032-03-01T12:00:00Z'),sourceTexts=[];let rejected=false
- const sourceEdge=async request=>{const url=new URL(request.url);if(url.hostname==='slack.com'&&rejected)return Response.json({ok:false,error:'token_revoked'});if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-7105'});if(url.pathname==='/v1.0/chats/synthetic-platter-7106')return Response.json({chatType:'oneOnOne',members:[{email:h.auth.OWNER_EMAIL},{userId:'synthetic-platter-7105'}]});if(url.hostname==='api.twilio.com'){sourceTexts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(7112+sourceTexts.length)},{status:201})}return Response.json({ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})}
+ const sourceEdge=async request=>{const url=new URL(request.url);if(url.pathname==='/api/users.info')return Response.json({ok:true,user:{team_id:'synthetic-platter-7100',profile:{email:h.auth.OWNER_EMAIL}}});if(url.hostname==='slack.com'&&rejected)return Response.json({ok:false,error:'token_revoked'});if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-7105'});if(url.pathname==='/v1.0/chats/synthetic-platter-7106')return Response.json({chatType:'oneOnOne',members:[{email:h.auth.OWNER_EMAIL},{userId:'synthetic-platter-7105'}]});if(url.hostname==='api.twilio.com'){sourceTexts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(7112+sourceTexts.length)},{status:201})}return Response.json({ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})}
  const temporary=await mkdtemp(join(tmpdir(),'platter-notification-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored');let h
  try{
   for(const path of [source,restored])await checkout(path)
@@ -1011,7 +1011,13 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   await h.cmd('notification.expiry',{id:expiry.id,version:notice.version,action:'revoke'})
   const revokedNotice=(await h.state()).proposals.find(row=>row.id===expiry.id)
   await h.cmd('notification.expiry',{id:expiry.id,version:revokedNotice.version,consent:true})
-  await h.cmd('notification.watch',{id:expiry.id,email:true,events:['comment','signed','paid'],consent:true})
+  const personalRoute=await h.cmd('notification.route',{provider:'slack',event:'approval',kind:'direct',destination:'synthetic-platter-7110',operatorId:person.id,consent:true})
+  await h.cmd('notification.watch',{id:expiry.id,revision:1,email:true,slackRoute:personalRoute.id,events:['view','comment','signed','paid'],consent:true})
+  await h.cmd('notification.watch',{id:p.id,revision:1,email:false,slackRoute:personalRoute.id,events:['comment','signed'],consent:true})
+  await h.cmd('notification.unwatch',{id:p.id,version:1,revision:1})
+  const preferences=(await h.send('/api/platter/watch?id='+expiry.id,undefined,h.owner)).value.watcher
+  const revokedPreferences=(await h.send('/api/platter/watch?id='+p.id,undefined,h.owner)).value.watcher
+  assert.equal(preferences.authorized,1);assert.equal(revokedPreferences.authorized,0)
   const retainedOwner=h.owner,retainedAuth=h.auth;await h.close()
   const smsOptions={root:source,origin:'https://platter.example',assetsDirectory:'public',auth:{...retainedAuth,AUTH_LOCAL:'false'},outboundService:sourceEdge}
   h=await harness({...smsOptions,owner:retainedOwner})
@@ -1106,6 +1112,9 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.deepEqual(restoredNoticeState.expiryNotices.events,expiryEventsBefore.slice().sort((a,b)=>a.occurred_at-b.occurred_at||a.id.localeCompare(b.id)))
   assert.equal((await h.send('/app/proposal?id='+expiry.id,undefined,restoredOwner)).status,200)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sender_notice_authority').first()).n,0,'inspection of restored settings cannot reactivate email')
+  const restoredPreferences=(await h.send('/api/platter/watch?id='+expiry.id,undefined,restoredOwner)).value.watcher
+  assert.deepEqual(restoredPreferences,{...preferences,authorized:0},'exact event and carrier choices return without consent authority')
+  assert.deepEqual((await h.send('/api/platter/watch?id='+p.id,undefined,restoredOwner)).value.watcher,revokedPreferences,'revoked choices retain their exact history')
   const restoredCertificate=await h.send('/api/platter/certificate.json?id='+signed.id,undefined,restoredOwner);assert.equal(restoredCertificate.status,200,restoredCertificate.text);assert.deepEqual(restoredCertificate.value,certificate.value)
   assert.deepEqual(await download('/api/platter/agreement.pdf?id='+signed.id,restoredOwner),documentBytes)
   assert.deepEqual(await download('/api/platter/certificate.pdf?id='+signed.id,restoredOwner),certificateBytes)

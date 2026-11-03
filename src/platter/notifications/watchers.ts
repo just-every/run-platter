@@ -9,11 +9,17 @@ const sources={view:{table:'p_audit',id:'id',proposal:'subject',filter:"action='
 async function ownerViewConsent(db:D1Database,id:string,revision:number){
  return await db.prepare("SELECT w.cursors FROM p_watchers w JOIN p_watcher_authority a ON a.watcher_id=w.id AND a.version=w.version JOIN oa_operators o ON o.id=w.operator_id WHERE w.proposal_id=? AND w.revision=? AND o.role='owner' AND o.status='active' AND EXISTS(SELECT 1 FROM json_each(w.events) WHERE value='view')").bind(id,revision).first<{cursors:string}>()
 }
-export async function watchCommand(env:Bindings,a:Actor,p:Record<string,unknown>){
+export async function watchCommand(env:Bindings,a:Actor,p:Record<string,unknown>,revoke=false){
  need(a.role!=='agent','A person chooses their own notifications',403)
  const db=env.DB,row=await permitted(db,a,p.id),at=await currentTime(db)
  const old=await db.prepare('SELECT * FROM p_watchers WHERE proposal_id=? AND operator_id=?').bind(row.id,a.id).first<any>()
  need(Number(p.version??0)===(old?.version??0),'Notification preferences changed. Reload.',409)
+ if(p.revision!==undefined)need(Number(p.revision)===row.revision,'The proposal revision changed. Review it before choosing notifications.',409)
+ if(revoke){
+  need(old,'No personal notification preferences to revoke',409)
+  await commit(db,a,[db.prepare('UPDATE p_watchers SET version=version+1,updated_at=? WHERE id=?').bind(at,old.id),db.prepare('DELETE FROM p_watcher_authority WHERE watcher_id=?').bind(old.id),db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE watcher_id=? AND status='pending'").bind(old.id),db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),a.id,a.role,'notification.unwatch',row.id,at)],false,{sql:'EXISTS(SELECT 1 FROM p_watchers WHERE id=? AND version=?)',values:[old.id,old.version]})
+  return {id:row.id,watcherId:old.id,version:old.version+1}
+ }
  need(typeof p.email==='boolean','Choose whether to receive email');need(p.consent===true,'Explicitly authorize these personal notifications')
  const events=p.events;need(Array.isArray(events)&&events.length<=4&&events.every(e=>typeof e==='string'&&Object.hasOwn(sources,e))&&new Set(events).size===events.length,'Choose view, comment, signed or paid events')
  if(events.includes('view')&&a.role!=='owner')need(await ownerViewConsent(db,row.id,row.revision),'The owner must opt in to view alerts for this revision first',403)
@@ -29,6 +35,14 @@ export async function watchCommand(env:Bindings,a:Actor,p:Record<string,unknown>
 export async function watcherState(env:Bindings,a:Actor,id:unknown){
  await permitted(env.DB,a,id);need(a.role!=='agent','A person reads their own preferences',403)
  return await env.DB.prepare('SELECT w.*,EXISTS(SELECT 1 FROM p_watcher_authority a WHERE a.watcher_id=w.id AND a.version=w.version) AS authorized FROM p_watchers w WHERE proposal_id=? AND operator_id=?').bind(id,a.id).first()
+}
+export async function watcherSettings(env:Bindings,a:Actor,id:unknown){
+ const row=await permitted(env.DB,a,id),watcher=await watcherState(env,a,row.id)
+ const routes=(await env.DB.prepare("SELECT * FROM p_notification_routes WHERE provider='slack' AND kind='direct' AND operator_id=? ORDER BY created_at,id").bind(a.id).all<any>()).results
+ const available=[]
+ for(const route of routes)if(await routeAvailable(env,route))available.push({id:route.id,destination:route.destination})
+ const authority=watcher&&await env.DB.prepare('SELECT member_version FROM p_watcher_authority WHERE watcher_id=? AND version=?').bind(watcher.id,watcher.version).first<any>()
+ return {proposalId:row.id,title:row.title,revision:row.revision,watcher,routes:available,active:Boolean(authority&&authority.member_version===(a.memberVersion??0)&&watcher!.revision===row.revision),ownerViewOptedIn:Boolean(await ownerViewConsent(env.DB,row.id,row.revision))}
 }
 export async function activeWatcher(env:Bindings,out:any){
  const w=await env.DB.prepare('SELECT w.*,a.member_version FROM p_watchers w JOIN p_watcher_authority a ON a.watcher_id=w.id AND a.version=w.version WHERE w.id=?').bind(out.watcher_id).first<any>()

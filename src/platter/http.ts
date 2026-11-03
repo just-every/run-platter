@@ -65,7 +65,7 @@ const pages=new Set(['/app/crm-card','/app','/app/proposal','/app/clients','/app
 async function memberApp(env:Bindings,actor:Actor,path:string,feedback?:Parameters<typeof renderApp>[2]){
  const url=new URL(path,env.AUTH_ORIGIN)
  const notificationSettings=url.pathname==='/app/settings/notifications'?await watcherSettings(env,actor,url.searchParams.get('id')):undefined
- return renderApp({...await state(env,actor),notificationSettings},path,feedback)
+ return renderApp({...await state(env,actor),...(notificationSettings?{notificationSettings}:{})},path,feedback)
 }
 async function body(request:Request,maxBytes=150000){const raw=await request.text();need(new TextEncoder().encode(raw).length<=maxBytes,'Request too large',413);if(request.headers.get('content-type')?.includes('application/json')){let v;try{v=JSON.parse(raw)}catch{fail('Invalid JSON')}need(v&&typeof v==='object'&&!Array.isArray(v),'Expected an object');return v as Record<string,unknown>}need(request.headers.get('content-type')?.includes('application/x-www-form-urlencoded'),'Use JSON or a form',415);return Object.fromEntries(new URLSearchParams(raw))}
 export async function platterResponse(request:Request,original:Bindings):Promise<Response|null>{const env=runtimeBindings(original),url=new URL(request.url),path=url.pathname,isClient=path.startsWith('/p/'),isAgent=path.startsWith('/api/platter/agent/');if(!isClient&&!path.startsWith('/api/platter/')&&path!=='/app'&&!path.startsWith('/app/'))return null

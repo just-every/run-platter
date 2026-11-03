@@ -1,3 +1,4 @@
+import { renewalState } from './renewals'
 import { renewalNoticeState } from './notifications/renewal'
 import { expiryNoticeState } from './notifications/expiry'
 import { xeroState } from './accounting/xero-jobs'
@@ -92,7 +93,7 @@ export async function state(env:Bindings,a:Actor,candidateIds?:string[]){const d
  const renewalFollowups=canReport||canWork?(await db.prepare('SELECT * FROM p_renewal_followups').all<any>()).results:[]
  const followupRecords=canReport||canWork?(await db.prepare('SELECT * FROM p_followups').all<any>()).results:[]
  const notices=canReport||canWork?(await db.prepare('SELECT proposal_id,closed_at FROM p_bounce_notices').all<any>()).results:[]
- return {...result,...noticeState,xero:await xeroState(env,a),crmSyncHistory:await syncHistory(env,a),crmDraftSources:['owner','admin'].includes(a.role)?(await db.prepare('SELECT * FROM p_crm_draft_sources').all<any>()).results:[],starterTemplates:starterTemplates(),templates:await templateState(db,a),...(canReport||canWork?{followups:followupQueue(result.proposals,followupRecords,notices,personalTimeZone,logicalNow,undefined,renewalFollowups),followupActions:(await db.prepare('SELECT * FROM p_followup_actions ORDER BY occurred_at,id').all<any>()).results.filter(r=>visible.has(r.proposal_id))}:{})}
+ return {...result,renewals:await renewalState(db,a),...noticeState,xero:await xeroState(env,a),crmSyncHistory:await syncHistory(env,a),crmDraftSources:['owner','admin'].includes(a.role)?(await db.prepare('SELECT * FROM p_crm_draft_sources').all<any>()).results:[],starterTemplates:starterTemplates(),templates:await templateState(db,a),...(canReport||canWork?{followups:followupQueue(result.proposals,followupRecords,notices,personalTimeZone,logicalNow,undefined,renewalFollowups),followupActions:(await db.prepare('SELECT * FROM p_followup_actions ORDER BY occurred_at,id').all<any>()).results.filter(r=>visible.has(r.proposal_id))}:{})}
 }
 
 function copyAttachmentSearch(value:any,rows:any[]){const files=typeof value==='string'?JSON.parse(value):value??[];return files.map((file:any)=>rows.find(row=>row.file_id===file.id)?.content??'').join('\n')}

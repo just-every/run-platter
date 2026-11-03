@@ -16,6 +16,7 @@ const verbs: Record<string, string> = {
 
  'proposal.data':'read structured proposal data for',
  'sms.invitation.prepare':'prepared a text-only invitation for', 'sms.reenable':'SMS number explicitly re-enabled', 'sms.consent': 'recorded recipient SMS assent for', 'sms.revoke': 'revoked SMS authorization for',
+ 'renewal.configure': 'authorized renewal drafting', 'renewal.revoke': 'revoked renewal drafting', 'renewal.run': 'checked due renewal drafts', 'renewal.drafted': 'prepared a renewal draft',
  'client.save': 'saved the client', 'client.erase': 'erased an unused client',
  'proposal.prepare': 'prepared', 'proposal.revise': 'saved a new revision of', 'proposal.restore': 'restored an earlier revision of',
  'proposal.approve': 'approved', 'proposal.send': 'sent', 'proposal.negotiate': 'prepared a negotiated revision of',

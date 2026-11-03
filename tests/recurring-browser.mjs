@@ -37,3 +37,37 @@ export async function recurringBrowserJourney() {
   }finally{await context.close();await app.close()}
  }}finally{await browser.close()}
 }
+
+export async function renewalBrowserJourney(){
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{acceptedRenewal}=await import('./renewal-journey.mjs')
+ const edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin});edge.attach(h)
+ let browser,context
+ try{
+  browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM_PATH??process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  context=await browser.newContext({viewport:{width:1440,height:1000},ignoreHTTPSErrors:true})
+  const [name,value]=h.owner.split('=');await context.addCookies([{name,value,url:h.origin}])
+  const page=await context.newPage();await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  const source=await acceptedRenewal(h)
+  await page.goto(h.origin+'/app/settings')
+  const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Renewal drafting',exact:true})})
+  await panel.getByLabel('Recurring rate increase', {exact:true}).fill('5')
+  await panel.getByRole('checkbox').check();await panel.getByRole('button',{name:'Authorize renewal draft',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0);assert.match(await panel.innerText(),/Drafting is authorized/)
+  assert.match(await panel.innerText(),/2099-12-17/)
+  const capture=async label=>{if(!process.env.PLATTER_SCREENSHOTS)return;await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true});for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.evaluate(()=>document.fonts.ready);await (label==='independent-draft'?page.locator('[data-pricing-table]').first():panel).screenshot({path:join(process.env.PLATTER_SCREENSHOTS,'RENEW-002-'+label+'-'+width+'.png')})}await page.setViewportSize({width:1440,height:1000})}
+  await capture('authorized-settings')
+  await panel.getByRole('button',{name:'Revoke renewal authorization',exact:true}).click();assert.match(await panel.innerText(),/Drafting is inactive/)
+  await panel.getByLabel('Recurring increase type').selectOption('fixed');await panel.getByLabel('Recurring rate increase',{exact:true}).fill('0.01');await panel.getByRole('checkbox').check();await panel.getByRole('button',{name:'Authorize renewal draft',exact:true}).click()
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2099-12-17T00:00:00Z'),cron:'*/15 * * * *'})
+  await page.reload();await capture('draft-ready')
+  await panel.getByRole('link',{name:'Open renewal draft',exact:true}).click()
+  assert.equal(await page.getByRole('button',{name:'Approve this revision',exact:true}).count(),1)
+  assert.equal(await page.getByRole('button',{name:'Send approved proposal',exact:true}).count(),0)
+  const line=page.locator('[data-pricing-line]').filter({has:page.locator('[data-pricing-field=name][value="Monthly care"]')})
+  assert.equal(await line.locator('[data-pricing-field=unitPrice]').inputValue(),'1200.01')
+  assert.equal(await line.getByLabel('Recurring start date').inputValue(),'2100-01-31')
+  await capture('independent-draft')
+  const result=(await h.state()).renewals.rows.find(r=>r.proposal_id===source.id)
+  assert.ok(result.draft_id);assert.equal(result.active,0)
+ }finally{await context?.close();await browser?.close();await h.close();await edge.close()}
+}

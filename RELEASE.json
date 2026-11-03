@@ -285,6 +285,14 @@
     {
       "id": "0104_renewal_notices.sql",
       "buyerSteps": "Apply migrations/core/0104_renewal_notices.sql after existing core migrations. Retained notice choices and history confer no outbound authority; explicitly authorize each proposal after reviewing its current revision and settings."
+    },
+    {
+      "id": "0105_asana_handoff.sql",
+      "buyerSteps": "None for existing agreements. Owner or admin must connect and explicitly authorize a verified Asana account, workspace and destination team before future collection-off accepted scope is handed off; historical agreements are not backfilled."
+    },
+    {
+      "id": "0106_handoff_uploads.sql",
+      "buyerSteps": "Existing handoff grants remain mailbox-verified only. Separately opt in to future owner-recorded signed uploads with collection off; restored archives carry no execution authority."
     }
   ],
   "breaking": false,

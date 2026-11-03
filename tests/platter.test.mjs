@@ -4353,3 +4353,7 @@ test('ACCT-002 reviewed Xero deposits preserve exact money, authority, unique ma
   assert.equal(edge.state.invoices.length,writes)
  }finally{await legacy.close()}
 })
+
+test('CRM-004 reviewed Pipedrive drafts copy exact rows and refuse stale source, replay and revoked authority', async () => {
+ await (await import('./crm-pipedrive-http.mjs')).pipedriveHttpJourney(verified)
+})

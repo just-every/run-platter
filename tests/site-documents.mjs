@@ -1372,4 +1372,6 @@ test('FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke exp
    }
   }finally{await context.close()}
  }finally{await browser?.close();await app?.close()}
+test('CRM-004 Pipedrive Settings and reviewed independent draft through the compiled browser', { timeout: 120000 }, async () => {
+ await (await import('./crm-pipedrive-browser.mjs')).pipedriveBrowser()
 })

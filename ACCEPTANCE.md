@@ -2137,7 +2137,7 @@ Core · target · **partial** · Cites BASE-SECRET-001, BASE-ROLE-001, BASE-DATA
 2. Revoke one connection: its state changes and its jobs stop.
 3. Sales cannot disconnect QuickBooks; owner/admin can.
 
-**Evidence.** `src/platter/connections.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`
+**Evidence.** `src/platter/connections.ts`, `tests/platter.test.mjs`, `tests/site.test.mjs`, `tests/archive.test.mjs`; `tests/drive-credential-journey.mjs` — driveCredentialJourney; `tests/site-documents.mjs`; `migrations/core/0105_drive_oauth.sql` — private single-use authorization state.
 **Gap.** Stripe, QuickBooks, HubSpot, Salesforce, Drive, Slack, Google and Microsoft tokens are sealed with purpose-separated AES-GCM, omitted from API/UI/log fields and excluded from archives. tests/platter.test.mjs — “TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens” proves connection authority, plaintext absence and disconnect; tests/archive.test.mjs — “TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items” proves metadata restoration requires reconnection. Gap: SSO provider credentials, per-provider least-scope verification, OAuth refresh, visible breakage state and job-stop assertions for future synchronization jobs.
 
 ### Push further

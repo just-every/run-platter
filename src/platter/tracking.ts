@@ -13,8 +13,8 @@ export async function trackingSettings(db:D1Database){
 export async function purgeTracking(db:D1Database,at=Date.now()){
  const settings=await trackingSettings(db),cutoff=at-settings.retention_days*86400000
  await db.prepare('DELETE FROM p_tracking_challenges WHERE expires_at<=?').bind(at).run()
- await db.prepare('DELETE FROM p_tracking_stakeholders WHERE verified_at<? AND NOT EXISTS(SELECT 1 FROM p_tracking_holds h WHERE h.proposal_id=p_tracking_stakeholders.proposal_id)').bind(cutoff).run()
- await db.batch(['p_views','p_tracking_alerts'].map(table=>db.prepare(`DELETE FROM ${table} WHERE ${table==='p_views'?'viewed_at':'alerted_at'}<? AND NOT EXISTS(SELECT 1 FROM p_tracking_holds h WHERE h.proposal_id=${table}.proposal_id)`).bind(cutoff)))
+ await db.prepare('DELETE FROM p_tracking_stakeholders WHERE verified_at<? AND NOT EXISTS(SELECT 1 FROM p_tracking_holds h WHERE h.proposal_id=p_tracking_stakeholders.proposal_id) AND NOT EXISTS(SELECT 1 FROM p_privacy_holds h JOIN p_proposals p ON p.client_id=h.client_id WHERE p.id=p_tracking_stakeholders.proposal_id)').bind(cutoff).run()
+ await db.batch(['p_views','p_tracking_alerts'].map(table=>db.prepare(`DELETE FROM ${table} WHERE ${table==='p_views'?'viewed_at':'alerted_at'}<? AND NOT EXISTS(SELECT 1 FROM p_tracking_holds h WHERE h.proposal_id=${table}.proposal_id) AND NOT EXISTS(SELECT 1 FROM p_privacy_holds h JOIN p_proposals p ON p.client_id=h.client_id WHERE p.id=${table}.proposal_id)`).bind(cutoff)))
 }
 export async function trackingCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
  need(a.role==='owner','Only the owner manages engagement tracking',403)
@@ -37,10 +37,11 @@ export async function trackingCommand(env:Bindings,a:Actor,name:string,p:Record<
  }
  need(name==='tracking.erase','Unknown tracking action',404)
  need(p.confirm==='erase','Confirm engagement erasure')
+ need(!await db.prepare('SELECT 1 FROM p_tracking_holds WHERE proposal_id=? UNION ALL SELECT 1 FROM p_privacy_holds h JOIN p_proposals p ON p.client_id=h.client_id WHERE p.id=?').bind(row.id,row.id).first(),'A retention or legal hold prevents engagement erasure',409)
  const portability=await createPortability({db,policy:archivePolicy})
  const fence=[...await portability.redactionStatements(),...await portability.invalidateTransfersStatements()]
  // The hold and archive checkpoint are committed atomically with the erasure.
- await commit(db,a,[db.prepare('INSERT INTO p_guard(ok) VALUES(NOT EXISTS(SELECT 1 FROM p_tracking_holds WHERE proposal_id=?))').bind(row.id),...fence,...['p_tracking_challenges','p_tracking_stakeholders','p_views','p_tracking_alerts'].map(table=>db.prepare(`DELETE FROM ${table} WHERE proposal_id=?`).bind(row.id))])
+ await commit(db,a,[db.prepare('INSERT INTO p_guard(ok) VALUES(NOT EXISTS(SELECT 1 FROM p_tracking_holds WHERE proposal_id=?) AND NOT EXISTS(SELECT 1 FROM p_privacy_holds h JOIN p_proposals p ON p.client_id=h.client_id WHERE p.id=?))').bind(row.id,row.id),...fence,...['p_tracking_challenges','p_tracking_stakeholders','p_views','p_tracking_alerts'].map(table=>db.prepare(`DELETE FROM ${table} WHERE proposal_id=?`).bind(row.id))])
  return {id:row.id}
 }
 function coarse(value:unknown){return typeof value==='string'?value.replace(/[\x00-\x1f]/g,'').slice(0,100):null}

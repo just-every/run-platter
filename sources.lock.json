@@ -3794,7 +3794,7 @@
       "executable": false
     },
     "tests/watchers-browser.mjs": {
-      "sha256": "830a51dcead65b4abdb98cbd13f7529e914be6750343ee8394f3a8e81ce42f77",
+      "sha256": "88ff80c79b1cd7a3034940ed6678f710cce6c96fbdbb12dfac60845f30354e38",
       "executable": false
     },
     "tests/worker.ts": {

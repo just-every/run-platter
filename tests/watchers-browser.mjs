@@ -45,6 +45,8 @@ export async function watcherBrowser(width=1440) {
   const screenshots=process.env.PLATTER_SCREENSHOTS
   if(screenshots)await mkdir(screenshots,{recursive:true})
   const capture=async(target,name)=>{
+   await target.evaluate(()=>document.fonts.ready)
+   assert.ok(await target.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'notification settings fit the test viewport')
    if(!screenshots)return
    const panel=target.locator('section').filter({has:target.getByRole('heading',{name:'Your proposal notifications',exact:true})})
    for(const shownWidth of [1440,390]){
@@ -81,7 +83,7 @@ export async function watcherBrowser(width=1440) {
   assert.equal(await second.getByLabel('Personal Slack destination').locator('option[value="'+other.id+'"]').count(),1)
   for(const label of ['Client comment','Client signature','Recorded payment','Email to my sign-in address'])await second.getByLabel(label,{exact:true}).check()
   await second.getByRole('checkbox',{name:'I authorize these events and channels for revision 1.',exact:true}).check()
-  await second.getByRole('button',{name:'Save notification preferences',exact:true}).click()
+  await Promise.all([second.waitForNavigation({waitUntil:'load'}),second.getByRole('button',{name:'Save notification preferences',exact:true}).click()])
   await second.reload()
   const secondPreferences=await read(memberCookie)
   assert.equal(secondPreferences.authorized,1);assert.equal(secondPreferences.email_enabled,1);assert.equal(secondPreferences.slack_route,null);assert.deepEqual(JSON.parse(secondPreferences.events),['comment','signed','paid'])

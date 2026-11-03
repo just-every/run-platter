@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "e81c32b319375f848eff67068cbd64f7ca01008a6d41ebdf7a54e02574bbc6bb",
+      "sha256": "c59b5144147d731b4d7dc8505189539506038bc16809bce81f8d30f693ecd094",
       "executable": false
     },
     "deploy-demo.json": {
@@ -2778,7 +2778,7 @@
       "executable": false
     },
     "src/platter/mailboxes.ts": {
-      "sha256": "69809dd1d1fc1832e8bb5cfa4d6a27e6000e25e0964077a32e9d84291af182f3",
+      "sha256": "e8c76e2193c0ceb8ef52421f5d2daa4f1da9adc29094fb96a51ebd7338330302",
       "executable": false
     },
     "src/platter/mcp.ts": {
@@ -3618,7 +3618,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "b8c9db082c2d11d82cc6428795cf1bba2be0c23dfd4c4ba099b178d37d6fa23c",
+      "sha256": "ee0002c20311a2093e9bb6ab77cf68b902b3ab94d6f94343d0a707c8be0f101a",
       "executable": false
     },
     "tests/mcp-discovery-worker.ts": {

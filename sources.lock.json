@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "f4d9bae7443d57e7027e3a19df67137012aee2e2aa499edf0b4dcda09a07cad4",
+      "sha256": "61f9b44925b4a586c0d7a68859f501d4738d541f7b5e984007191d2a56a92e52",
       "executable": false
     },
     "deploy-demo.json": {
@@ -3658,7 +3658,7 @@
       "executable": false
     },
     "tests/packages-journey.mjs": {
-      "sha256": "2879ba3daf1f03e8b29f69b12d1d9d9bf6cf45903876479a17f89c7b0219bbfc",
+      "sha256": "7473f83dd87d758e75e184ccd6490217c83a89b8a5bab7e4af1bbf6e7fa1021d",
       "executable": false
     },
     "tests/payment-credential-journey.mjs": {

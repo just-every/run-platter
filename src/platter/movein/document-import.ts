@@ -58,7 +58,7 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    const provider=String(input.provider==='betterproposals'?'generic':input.provider??'generic')
    if(!['generic','proposify'].includes(provider))fail('invalid_import_provider',400)
    await db.batch([db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN '+ownerSql+' THEN 1 ELSE 0 END').bind(actor.id),
-    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label,provider,source_kind,kind) VALUES(?,?,?,?,?,?)').bind(id,actor.id,label,provider,sourceKind,contentKinds.includes(String(input.kind))?String(input.kind):'documents')])
+    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label,provider,source_kind,kind) VALUES(?,?,?,?,?,?)').bind(id,actor.id,label,provider,sourceKind,contentKinds.includes(String(input.contentKind??input.kind))?String(input.contentKind??input.kind):'documents')])
    return {id}
   }
   const movein=await session(db,actor,input.id),id=movein.id

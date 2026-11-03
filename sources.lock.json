@@ -3166,7 +3166,7 @@
       "executable": false
     },
     "src/platter/ui/crm-start.ts": {
-      "sha256": "9bdd66d8c7623420f1b1f12506c41672684d648d4f1dc88a03688574d5464541",
+      "sha256": "9470005646d8b3562e176ad528370677ffc21aab863dff771080ff0bd4912f47",
       "executable": false
     },
     "src/platter/ui/delivery.ts": {
@@ -3642,7 +3642,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "f468cf7fc9d93d5c363883a597dacc7c37f980cc4553b928ad0fb34cdb91afce",
+      "sha256": "4ab03724eb13a174542e3ed3ee2f5fef00b9a7cd75353059e7e2aa50c6b958e8",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

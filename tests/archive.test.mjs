@@ -899,7 +899,6 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.deepEqual(beforeRevenue.value.totals,[{currency:'USD',count:1,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:120000,refundedCents:0,netReceivedCents:120000,uncertainRefundCents:0,exportedDepositCents:0}])
   const allRevenue=await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,h.owner),beforeRevenueCsv=await h.send('/api/platter/pipeline.csv?'+revenueFilters,undefined,h.owner)
   assert.equal(beforeRevenueCsv.status,200)
-  const reevaluated=await approvalReevaluation(h)
   const before=await h.state(),tables=['p_approvals','p_outcome_settings','p_outcomes','p_outcome_records','p_crm_outcome_bindings','p_crm_outcome_consents','p_crm_outcome_attempts','p_reminder_templates','p_template_reminder_messages','p_delivery_changes','p_reminder_policy','p_reminder_settings','p_reminder_runs','p_reminder_optouts','p_mail_reply_cap_notices','p_mail_replies','p_mail_attributions','p_report_schedules','p_report_runs','p_template_sources','p_disputes','p_dispute_packets','p_dispute_packet_parts','p_dispute_authorizations','p_dispute_submissions','p_dispute_documents','p_priced_catalog','p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_template_block_locks','p_proposal_block_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_library_uses','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
   const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
@@ -909,10 +908,6 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   const restoredCalls=[]
   h=await harness({root:restored,unclaimed:true,outboundService:async request=>{restoredCalls.push(new URL(request.url).hostname);throw new Error('Restore must not call a provider')}})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
-  assert.deepEqual(reevaluationProjection(after,reevaluated),reevaluated.projection,'restored maximum-quantity rules, currencies, tied order, current decisions and every revision retain exact custody')
-  const restoredApproval=after.proposals.find(p=>p.id===reevaluated.usd)
-  await h.cmd('proposal.send',{id:reevaluated.usd,version:restoredApproval.version},owner,409)
-  assert.deepEqual(reevaluationProjection(await h.state(owner),reevaluated),reevaluated.projection,'restore does not invent approval authority')
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_member_invitations').first()).n,0,'pending delegated authority is excluded from archives');assert.equal((await h.db.prepare('SELECT status FROM oa_operators WHERE email=?').bind('unjoined@synthetic-platter.example').first()).status,'invited');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_connection_secrets').first()).n,0);assert.ok(after.connections.every(c=>c.status==='needs_reconnection'));assert.deepEqual(after.paymentRecords,before.paymentRecords);assert.equal((await h.cmd('payment.refund',refund,owner)).status,'succeeded','restored historical refund retries never issue another provider call');assert.doesNotMatch(JSON.stringify(after),/synthetic-platter-(2301|4121|2803|2804)/);assert.equal(after.connections.find(c=>c.provider==='hubspot').status,'needs_reconnection')
   const originalAuditIds=new Set(auditHistory.map(r=>r.id)),restoredAudit=canonical((await h.db.prepare('SELECT * FROM p_audit').all()).results.filter(r=>originalAuditIds.has(r.id)))
   assert.deepEqual(restoredAudit,auditHistory,'every original audit record survives unchanged; fresh sign-in has its own new audit events')
@@ -1517,5 +1512,33 @@ test('PORT-002 / AUTO-002 populated product archive retains exact document archi
   assert.deepEqual((await h.state(owner)).paymentRecords,beforeState.paymentRecords,'replayed capabilities and scheduled processing cannot change money')
   console.log('PROBE PORT-002 1: populated CLI export and restore -> templates, library, catalog, two media originals, exact signed artifacts, 8750-cent deposit and offline receipt, report totals and actual Drive mappings reconciled')
   console.log('PROBE PORT-002 2: decoded CLI archive and restored public doors -> no credentials, invitations, sessions, verification state or queued mail; old capabilities refused; scheduled processing made no provider calls')
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})
+
+test('APPROVE-004 public CLI restores scoped roles and exact evaluator configuration without approval authority', {timeout:300000},async()=>{
+ const temporary=await mkdtemp(join(tmpdir(),'platter-approval-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
+ let h
+ try{
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
+  h=await harness({root:source,assetsDirectory:'public'})
+  const reevaluated=await approvalReevaluation(h),sourceOwner=h.owner
+  const sourceState=await h.state(),oldPath='/p/'+sourceState.proposals.find(p=>p.id===reevaluated.aud).shareToken
+  const decisions=(await h.db.prepare('SELECT * FROM p_approval_decisions ORDER BY id').all()).results
+  assert.ok(decisions.some(d=>d.proposal_id===reevaluated.usd&&d.revision===1))
+  assert.ok(decisions.some(d=>d.proposal_id===reevaluated.usd&&d.revision===2))
+  assert.ok(decisions.some(d=>d.proposal_id===reevaluated.usd&&d.revision===5))
+  await h.close();h=undefined
+  const archive=join(temporary,'approvals.rer')
+  await command(source,['export','--output',archive]);await command(restored,['import','--input',archive,'--yes'])
+  h=await harness({root:restored,unclaimed:true})
+  const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
+  assert.deepEqual(reevaluationProjection(after,reevaluated),reevaluated.projection,'restored maximum-quantity rules, currencies, tied order, current decisions and every revision retain exact custody')
+  const restoredApproval=after.proposals.find(p=>p.id===reevaluated.usd)
+  await h.cmd('proposal.send',{id:reevaluated.usd,version:restoredApproval.version},owner,409)
+  assert.deepEqual(reevaluationProjection(await h.state(owner),reevaluated),reevaluated.projection,'restore does not invent approval authority')
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_approval_decisions ORDER BY id').all()).results,decisions,'retained decisions keep their exact historical revision and plan')
+  assert.equal((await h.send('/api/platter/state',undefined,sourceOwner)).status,401,'source member sessions confer no restored authority')
+  assert.equal((await h.send(oldPath)).status,404,'the historical sent draft does not restore a client invitation')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 15 | 99 | 45 | 159 |
+| Core | 15 | 100 | 44 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 15 | 99 | 49 | 163 |
+| Full target | 15 | 100 | 48 | 163 |
 
 Judged from the code and tests at commit `8f4ff0320aaafd58b41dabcf9e39bc60db7dc646` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. FOLLOW-002 retains main’s partial judgment; replayed boundary, tie-order and production-auth tests add evidence pending a fresh ct judgment. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. EDIT-009 is a builder completion claim with independently filled West and East variable conditions, pending exact-candidate Verify and guarded landing. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. APPROVE-003 retains main’s partial judgment and existing Gap; the replayed native default-role matrix, owner/admin policy audit, browser controls and exact archive custody assertions add evidence pending a fresh ct judgment. APPROVE-001 now retains additional saved-rule, parallel-decision and archive assertions; its current partial judgment is preserved rather than accepting the older candidate completion claim. FOLLOW-010 source proof is replayed from candidate `3457720b3bf75b5e3fcd51eab0b9fb80c7ba6b6b` (original candidate `dfebdf12c6de8e7b642f62846f7ac88ba7527138`). FOLLOW-010 retains main’s partial judgment; the replayed reporting journeys add a builder completion claim pending guarded landing and ct judgment. PORT-002 retains main’s partial judgment; the replayed populated archive and credential-isolation assertions add evidence pending a fresh ct judgment. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -1054,7 +1054,7 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-MAIL-001
 5. A fourth proposal accepted on 10 March with expiry on 15 March gets no expiry notice.
 6. A sales member's change to the workspace lead times is refused (403).
 
-**Evidence.** `tests/mail.test.mjs`; `tests/site-documents.mjs`; `tests/archive.test`; `tests/sender-notice-journey.mjs`; `tests/sender-notice-archive.mjs`
+**Evidence.** `tests/mail.test.mjs`; `tests/site-documents.mjs`; `tests/archive.test.mjs`; `tests/sender-notice-journey.mjs`; `tests/sender-notice-archive.mjs`
 **Gap.** Recorded sender notices and dated follow-ups exist. Default-on execution without separate activation, watchers/preferences, template and sender settings, declined-offer proof and actual renewal offers remain unproved; stored thirty-day settings do not execute renewals. RL-102 resolves the policy, without changing partial status.
 
 #### FOLLOW-004 — Client questions and comments
@@ -2224,7 +2224,7 @@ Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 
 #### AGENT-007 — Win and loss learning for templates and pricing
 
-Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
+Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008
 
 **Requirement.** From decided proposals, the specialist relates sections, packages, prices, discounts and timing to wins/losses with sample sizes. Applying template/library/catalog edits carries standard; company policy decides.
 
@@ -2232,8 +2232,8 @@ Core · push-further · **missing** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 1. From 200 decided proposals where three packages win more often, show the proposed template change and its sample size.
 2. Under the held policy, the standard-class template change waits until the admin accepts it.
 
-**Evidence.** None.
-**Gap.** No outcome analysis.
+**Evidence.** `tests/platter.test.mjs` — “AGENT-007 owner compares 200 distinct decided proposals at exact revisions without applying template or price changes”: explicit template-version cohorts, offered package counts, independently expected denominators and win rates, signed wins distinguished from recorded won overrides, exact decision sources, insufficient samples, unchanged business records and owner-only inspection. `tests/site.test.mjs` — “AGENT-007 compiled cohort recommendation and source revision inspection”: compiled comparison and decision inspection, with browser proof at desktop and phone widths. `tests/archive.test.mjs` — “EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority”: exact learning results and source references survive restore without credentials or application authority.
+**Gap.** Owner-only descriptive package-count recommendations are implemented without application authority. Section, line-price, discount and timing learning; applying template, library or catalog changes; model-generated specialist work; full sponsor and grant migration; seed-wide classification and held or all-autonomous company-policy execution remain unproved. Existing Base and authority holds remain; no outbound model calls and mandatory human approval.
 
 #### AGENT-008 — Renewal preparation from delivered results
 

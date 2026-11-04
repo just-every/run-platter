@@ -681,6 +681,10 @@
       "sha256": "11cc4a00d0d6a236d4c694d5c2bd64398f23855561af61f3af26b5774e2eb5a9",
       "executable": false
     },
+    "migrations/core/0108_template_learning_cascade.sql": {
+      "sha256": "e0a42e261cfe3f7c34d08d998fd56e94abdf9eedee14892b675ef6c524ba3c3c",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "8c4d952c03ae738703fe6d612110f94defd1e0244918e89edb794d8fe67e1eb3",
       "executable": false

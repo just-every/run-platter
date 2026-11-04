@@ -2,10 +2,10 @@ import assert from 'node:assert/strict'
 
 const address=n=>['synthetic-platter-'+n,'example.test'].join(String.fromCharCode(64))
 const packages=n=>Array.from({length:n},(_,i)=>({id:['one','two','three'][i],label:['Essentials','Campaign','Partnership'][i],price:String([1000,2000,3000][i])}))
-export async function learningFixture(h,{size=200}={}){
+export async function learningFixture(h,{size=200,shared=false}={}){
  const client=await h.cmd('client.save',{name:'Synthetic learning client',email:address(16300)})
  const fields={clientId:client.id,title:'Synthetic package study',scope:'Reviewed studio services',depositPercent:'25',packages:packages(2)}
- const seed=await h.cmd('proposal.prepare',fields),template=await h.cmd('template.save',{id:seed.id,version:1,name:'Synthetic package template'})
+ const seed=await h.cmd('proposal.prepare',fields),template=await h.cmd('template.save',{id:seed.id,version:1,name:'Synthetic package template',shared,shareConsent:shared})
  const ids=[],signed=[],overrides=[]
  const decide=async(p,win,signature)=>{
   const row=await h.db.prepare('SELECT version,revision FROM p_proposals WHERE id=?').bind(p.id).first()

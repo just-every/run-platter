@@ -4439,7 +4439,28 @@ test('ACCT-002 reviewed Xero deposits preserve exact money, authority, unique ma
 
 test('AGENT-007 owner compares 200 distinct decided proposals at exact revisions without applying template or price changes', {timeout:240000},()=>run(async h=>{
  const {learningFixture,learningBusiness,captureStudy}=await import('./template-learning-fixture.mjs')
- const f=await learningFixture(h),before=await learningBusiness(h),report=await captureStudy(h,f.input)
+ const f=await learningFixture(h,{shared:true})
+ const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+ const memberEmail=['synthetic-platter-16301','example.test'].join(String.fromCharCode(64));await h.send('/auth/invite',{email:memberEmail,displayName:'Synthetic analyst',role:'admin',returnTo:'/app'},h.owner);const admin=await h.signIn(memberEmail)
+ const privateFields={clientId:f.clientId,title:'Synthetic private offer',scope:'Private services',depositPercent:'25',packages:[{id:'private',label:'Synthetic private package',price:'7912.34'}]}
+ const memberSource=await h.cmd('proposal.prepare',privateFields,admin)
+ const memberTemplate=await h.cmd('template.save',{id:memberSource.id,version:1,name:'Synthetic private template'},admin)
+ const privateInput={...f.input,comparison:{templateId:memberTemplate.id,version:1,packageCount:1}}
+ const reportCountBefore=(await h.db.prepare('SELECT count(*) AS n FROM p_template_learning_reports').first()).n
+ assert.ok(!(await h.state()).templates.some(t=>t.id===memberTemplate.id),'normal template visibility excludes another member’s unshared template')
+ const versionList=await h.send('/api/platter/template-learning',undefined,h.owner),learningPage=await h.send('/app/template-learning',undefined,h.owner)
+ assert.equal(versionList.status,200);assert.equal(learningPage.status,200)
+ assert.ok(!versionList.value.versions.some(t=>t.templateId===memberTemplate.id));assert.ok(!learningPage.text.includes(memberTemplate.id));assert.ok(!learningPage.text.includes('Synthetic private template'))
+ assert.equal((await h.send('/api/platter/template-learning',privateInput,h.owner)).status,403)
+ assert.equal((await h.send('/app/template-learning',{baseline:JSON.stringify(f.input.baseline),baselineCount:2,comparison:JSON.stringify(privateInput.comparison),comparisonCount:1},h.owner)).status,403)
+ assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_template_learning_reports').first()).n,reportCountBefore,'refused comparison retains no private report')
+ await h.cmd('template.save',{id:memberSource.id,version:1,templateId:memberTemplate.id,templateVersion:1,name:'Synthetic shared template',shared:true,shareConsent:true},admin)
+ assert.ok((await h.send('/api/platter/template-learning',undefined,h.owner)).value.versions.some(t=>t.templateId===memberTemplate.id))
+ const sharedReport=await captureStudy(h,privateInput);assert.deepEqual(sharedReport.recommendation.before.map(p=>p.cents),[100000,200000],'explicitly shared versions can be compared')
+ const ownerSource=await h.cmd('proposal.prepare',privateFields),ownerTemplate=await h.cmd('template.save',{id:ownerSource.id,version:1,name:'Synthetic owner private template'})
+ const ownerPrivateInput={...f.input,baseline:{templateId:ownerTemplate.id,version:1,packageCount:1}},ownerPrivateReport=await captureStudy(h,ownerPrivateInput)
+ assert.deepEqual(ownerPrivateReport.recommendation.before,[{id:'private',label:'Synthetic private package',cents:791234}],'the template owner can inspect their own private prices')
+ const before=await learningBusiness(h),report=await captureStudy(h,f.input)
  assert.deepEqual(report.cohorts.map(c=>({n:c.sampleSize,won:c.won,lost:c.lost,signed:c.signedWins,recorded:c.recordedWon,rate:c.winRate,insufficient:c.insufficient})),[
   {n:100,won:30,lost:70,signed:20,recorded:10,rate:.3,insufficient:false},
   {n:100,won:70,lost:30,signed:50,recorded:20,rate:.7,insufficient:false}])
@@ -4456,7 +4477,6 @@ test('AGENT-007 owner compares 200 distinct decided proposals at exact revisions
  assert.equal(small.cohorts[1].sampleSize,1);assert.equal(small.cohorts[1].insufficient,true);assert.equal(small.recommendation.available,false);assert.deepEqual(small.recommendation.after,[])
  const zero=await captureStudy(h,{...f.input,comparison:{...f.input.comparison,packageCount:4}});assert.equal(zero.cohorts[1].sampleSize,0);assert.equal(zero.cohorts[1].winRate,null)
  const reversed=await captureStudy(h,{baseline:f.input.comparison,comparison:f.input.baseline});assert.equal(reversed.recommendation.available,false)
- const memberEmail=['synthetic-platter-16301','example.test'].join(String.fromCharCode(64));await h.send('/auth/invite',{email:memberEmail,displayName:'Synthetic analyst',role:'admin',returnTo:'/app'},h.owner);const admin=await h.signIn(memberEmail)
  const key=await h.cmd('agent.create',{label:'Synthetic learning key'})
  for(const [cookie,headers,status] of [[admin,{},403],['',{},401],['',{authorization:'Bearer '+key.token},401]]){
   for(const path of ['/app/template-learning?id='+report.id,'/api/platter/template-learning?id='+report.id,'/api/platter/template-learning/source?id='+report.id+'&source='+revised.proposalId])assert.equal((await h.send(path,undefined,cookie,headers)).status,path.startsWith('/app')&&status===401?303:status,path)
@@ -4482,6 +4502,11 @@ test('AGENT-007 owner compares 200 distinct decided proposals at exact revisions
  }
  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_template_learning_reports').first()).n,reportCount,'revoked authority writes no result')
  assert.deepEqual((await h.send('/api/platter/template-learning?id='+report.id,undefined,successor)).value,report,'current owner retains access to the exact result')
+ for(const path of ['/api/platter/template-learning?id='+ownerPrivateReport.id,'/app/template-learning?id='+ownerPrivateReport.id,'/api/platter/template-learning/source?id='+ownerPrivateReport.id+'&source='+ownerPrivateReport.sources[0].proposalId,'/app/template-learning?id='+ownerPrivateReport.id+'&source='+ownerPrivateReport.sources[0].proposalId])assert.equal((await h.send(path,undefined,successor)).status,403,'retained comparisons cannot expose the former owner’s unshared template')
+ assert.ok(!(await h.send('/api/platter/template-learning',undefined,successor)).value.versions.some(t=>t.templateId===ownerTemplate.id))
+ assert.equal((await h.send('/api/platter/template-learning',ownerPrivateInput,successor)).status,403,'replay cannot expose the former owner’s private template')
+ assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_template_learning_reports').first()).n,reportCount,'refused replay writes no private result')
+ console.log('PROBE B privacy: learning list, comparison and retained result doors -> unshared member template hidden; capture and retained reads refused 403 without writes; own and explicitly shared prices readable')
  assert.deepEqual(await learningBusiness(h),before,'authority handoff changes no template, price or approval')
  console.log('PROBE AGENT-007 1: public comparison -> 100 decided per cohort; 30% and 70%; 200 exact sources; only revision three counted for revised sources')
  console.log('PROBE AGENT-007 2: capture and replay -> complete templates, prices, proposals, catalog and approvals unchanged; admin and agent refused; no apply door')

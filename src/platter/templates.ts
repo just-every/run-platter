@@ -45,7 +45,7 @@ export async function independentFixedTemplate(db:D1Database,a:Actor,row:any,nam
  return {id,snapshot:serialized,writes}
 }
 
-async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false) {
+export async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false) {
  need(!String(id).startsWith('starter:'), 'Start a draft to customize a built-in starter; save your changes as a personal template', 403)
  const row = await db.prepare('SELECT * FROM p_personal_templates WHERE id=?').bind(text(id, 'a template')).first<any>()
  need(row, 'Template not found', 404)

@@ -1,4 +1,6 @@
 import { currentTime } from '../expiry-time'
+import { ownTemplate } from '../templates'
+import { resourceScope } from '../folders'
 import { commit, hash, need, text, type Actor } from '../model'
 
 interface Cohort { templateId:string; version:number; packageCount:number }
@@ -19,7 +21,8 @@ function cohort(value:any):Cohort {
 }
 export async function learningVersions(db:D1Database,a:Actor){
  owner(a)
- return (await db.prepare(`SELECT template_id AS templateId,version,name FROM p_template_learning_versions ORDER BY name,template_id,version`).all<{templateId:string;version:number;name:string}>()).results
+ const access=resourceScope(a,'t')
+ return (await db.prepare(`SELECT v.template_id AS templateId,v.version,v.name FROM p_template_learning_versions v JOIN p_personal_templates t ON t.id=v.template_id WHERE (t.owner_id=? OR t.shared=1) AND ${access.sql} ORDER BY v.name,v.template_id,v.version`).bind(a.id,...access.values).all<{templateId:string;version:number;name:string}>()).results
 }
 // Read all decisions together. The latest decision at the current revision wins;
 // repeated revision snapshots and duplicate legacy outcomes cannot inflate a cohort.
@@ -37,6 +40,7 @@ export async function captureLearning(db:D1Database,a:Actor,input:Record<string,
  owner(a)
  const definitions=[cohort(input.baseline),cohort(input.comparison)]
  need(JSON.stringify(definitions[0])!==JSON.stringify(definitions[1]),'Choose two distinct cohorts')
+ await Promise.all(definitions.map(c=>ownTemplate(db,a,c.templateId)))
  const versions=await Promise.all(definitions.map(c=>db.prepare('SELECT name,snapshot FROM p_template_learning_versions WHERE template_id=? AND version=?').bind(c.templateId,c.version).first<{name:string;snapshot:string}>()))
  need(versions.every(Boolean),'An exact template version is unavailable. Select a retained version.',409)
  const rows=(await db.prepare(decidedSql).all<any>()).results,sources:Source[]=[]
@@ -64,8 +68,10 @@ export async function readLearning(db:D1Database,a:Actor,id:unknown):Promise<Lea
  owner(a)
  const row=await db.prepare('SELECT result FROM p_template_learning_reports WHERE id=?').bind(text(id,'a learning result')).first<{result:string}>()
  need(row,'Learning result not found',404)
+ const result=JSON.parse(row.result)
+ await Promise.all(result.cohorts.map((c:Cohort)=>ownTemplate(db,a,c.templateId)))
  const sources=(await db.prepare('SELECT proposal_id AS proposalId,revision,cohort,basis,decided_at AS decidedAt,snapshot_hash AS snapshotHash FROM p_template_learning_sources WHERE report_id=? ORDER BY proposal_id').bind(id).all<Source>()).results
- return {...JSON.parse(row.result),sources}
+ return {...result,sources}
 }
 export async function learningSource(db:D1Database,a:Actor,id:unknown,proposalId:unknown){
  const report=await readLearning(db,a,id),source=report.sources.find(s=>s.proposalId===proposalId)

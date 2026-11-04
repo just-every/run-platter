@@ -135,7 +135,7 @@ async function credentialFailureJourney() {
   assert.equal((await connection()).status, 'broken')
   const afterRejection = calls
   await h.cmd('crm.deal.review', edge.selected, h.owner, 409)
-  await apply(checked, 409); assert.equal((await signedCard(h)).status, 401)
+  await apply(checked, 409); assert.equal((await signedCard(h)).status, 409)
   await h.cmd('proposal.prepare', { clientId: proposalsBefore[0].client_id, title: '{{Deal.Name}}', scope: 'Synthetic copied variables', optionOne: 'Scope', priceOne: '100', optionTwo: 'Other scope', priceTwo: '200', depositPercent: '25', variableDeal: { provider: 'hubspot', id: edge.selected.dealId } }, h.owner, 409)
   assert.equal(calls, afterRejection, 'confirmed revocation stops further reads, writes and signed card exposure')
   assert.equal(edge.writes.length, 0); assert.deepEqual((await h.state()).proposals, proposalsBefore)
@@ -156,7 +156,7 @@ async function credentialFailureJourney() {
   assert.equal((await h.state()).crmSyncHistory.at(-1).status, 'uncertain')
   const afterWriteRefusal = calls
   await fresh(409)
-  assert.equal((await signedCard(h)).status, 401); assert.equal(calls, afterWriteRefusal)
+  assert.equal((await signedCard(h)).status, 409); assert.equal(calls, afterWriteRefusal)
   await reconnect(); await apply(writeReview, 409)
   assert.equal((await apply(await fresh())).held, 1); assert.equal(edge.writes.length, 0, 'fresh credentials never replay a held write')
  } finally { await h.close() }

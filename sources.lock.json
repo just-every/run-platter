@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "f4d9bae7443d57e7027e3a19df67137012aee2e2aa499edf0b4dcda09a07cad4",
+      "sha256": "8a7ff8f15023822b40e0dd1a5b58e2a37553afb5910baf767f2a4b437e0ed612",
       "executable": false
     },
     "deploy-demo.json": {
@@ -242,7 +242,7 @@
       "executable": false
     },
     "integrations/hubspot/README.md": {
-      "sha256": "b12a35301e95d9fe18bef05496cc74a2ec174caaa699e140e48a72dcaa528fbb",
+      "sha256": "045b709321d5a7fad368dc3a422d38bd46803f906cb4ddc1d38c59b53f7260f5",
       "executable": false
     },
     "LICENSE": {
@@ -2610,15 +2610,19 @@
       "executable": false
     },
     "src/platter/crm/hubspot-draft.ts": {
-      "sha256": "1ac576ed96d6b0e784326a3d479b6ff7c155ba011599fe8a8bae3580dc779ca7",
+      "sha256": "c6f8dfb2011eff14db3bb861ceda84687cb490f099600c2cc5424a67bf069062",
+      "executable": false
+    },
+    "src/platter/crm/hubspot-request.ts": {
+      "sha256": "638a6c49d0ab481375534f4aa0ef1e08dadec89e0bf27d986c09391c042522cb",
       "executable": false
     },
     "src/platter/crm/hubspot-sync-plan.ts": {
-      "sha256": "8dbf82b5da81104cb88adaafb39325bb4bf94622e363dbc634d12545f98fe036",
+      "sha256": "3ac939090d851e2cfe645a8fc733e15d0012cee6803780ca4cfbb81569227682",
       "executable": false
     },
     "src/platter/crm/hubspot-sync.ts": {
-      "sha256": "a8c1e2c5a647daf8979c1e6776257d4e94def539773e5a9fa6f6d8c4e2399d8e",
+      "sha256": "a9144d8851c375b849c624155486dfcc0c27c241b23785b2dcb1c7146929daff",
       "executable": false
     },
     "src/platter/delivery-intake.d.mts": {
@@ -3482,7 +3486,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "2a87a78a98122a0f440584ea0b2b6b122ccf25fce10f43ed5c9013e46768155b",
+      "sha256": "3e7ed592941c00c177fcbdcc348abdba59206ed7fe16f9a3e2760bad393c75b1",
       "executable": false
     },
     "tests/browser-edge.mjs": {
@@ -3602,7 +3606,7 @@
       "executable": false
     },
     "tests/hubspot-archive.mjs": {
-      "sha256": "4e7c64fdfabadcefdc09dd0ae28843ea30181fc22cc06825fa82bfcda238fce1",
+      "sha256": "8388fd4ca302113561a700e54360c102aba40497e5b71b173ef667064870952c",
       "executable": false
     },
     "tests/hubspot-browser.mjs": {
@@ -3618,7 +3622,7 @@
       "executable": false
     },
     "tests/hubspot-sync-journey.mjs": {
-      "sha256": "9d9d56501b56cd13416835a53e04cf226f5481c15c1d8490e227c434cb4dae7f",
+      "sha256": "b980245020bf7f5c6ce99f7e13f943787747808fed652ec1b63ae0d8620a7baa",
       "executable": false
     },
     "tests/inbound-mail-fixture.mjs": {
@@ -3730,7 +3734,7 @@
       "executable": false
     },
     "tests/site-documents.mjs": {
-      "sha256": "14c44eb0e3d5c3292ea057b716ee7c5101e0d46089b756872a14390b43e3c39c",
+      "sha256": "247d7d0f27d41651d87123701a4ffced45529af311941f26c66062f45094e00e",
       "executable": false
     },
     "tests/site-harness.mjs": {

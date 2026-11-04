@@ -38,10 +38,13 @@ export async function learningFixture(h,{size=200}={}){
  // An unrelated version with a win must not enter either selected denominator.
  const third=await h.cmd('template.save',{id:seed.id,version:1,templateId:template.id,templateVersion:2,name:'Synthetic current version'})
  const unrelated=await h.cmd('template.start',{id:template.id,version:third.version,clientId:client.id});await decide(unrelated,true,false)
+ // A different template with the same version and package count is not selected.
+ const otherTemplate=await h.cmd('template.save',{id:seed.id,version:1,name:'Synthetic unrelated template'})
+ const foreign=await h.cmd('template.start',{id:otherTemplate.id,version:1,clientId:client.id});await decide(foreign,true,false)
  // A legacy copy of one decision must not count as a second decided proposal.
  const lost=await h.db.prepare("SELECT * FROM p_outcome_records WHERE kind='lost' ORDER BY proposal_id LIMIT 1").first()
  await h.db.prepare('INSERT INTO p_outcomes VALUES(?,?,?,?,?,?,?,?)').bind(lost.proposal_id,lost.revision,lost.kind,lost.actor_id,lost.actor_role,lost.actor_email,lost.occurred_at,lost.reason).run()
- return {input,ids,signed,overrides,undecided:undecided.id,unrelated:unrelated.id,single:single.id,clientId:client.id,templateId:template.id}
+ return {input,ids,signed,overrides,undecided:undecided.id,unrelated:unrelated.id,foreign:foreign.id,single:single.id,clientId:client.id,templateId:template.id}
 }
 export async function learningBusiness(h){
  const tables=['p_personal_templates','p_proposals','p_revisions','p_approvals','p_approval_decisions','p_priced_catalog','p_acceptances']

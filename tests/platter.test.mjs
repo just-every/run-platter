@@ -4451,6 +4451,7 @@ test('AGENT-007 owner compares 200 distinct decided proposals at exact revisions
  const revised=report.sources.find(s=>s.proposalId===f.ids[0]);assert.equal(revised.revision,3)
  const source=await h.send('/api/platter/template-learning/source?id='+report.id+'&source='+revised.proposalId,undefined,h.owner);assert.equal(source.status,200);assert.equal(source.value.snapshot.revision,3);assert.equal(source.value.snapshot.options.length,2)
  assert.equal((await h.send('/api/platter/template-learning/source?id='+report.id+'&source='+f.unrelated,undefined,h.owner)).status,404)
+ assert.equal((await h.send('/api/platter/template-learning/source?id='+report.id+'&source='+f.foreign,undefined,h.owner)).status,404)
  const small=await captureStudy(h,{...f.input,comparison:{...f.input.comparison,packageCount:1}})
  assert.equal(small.cohorts[1].sampleSize,1);assert.equal(small.cohorts[1].insufficient,true);assert.equal(small.recommendation.available,false);assert.deepEqual(small.recommendation.after,[])
  const zero=await captureStudy(h,{...f.input,comparison:{...f.input.comparison,packageCount:4}});assert.equal(zero.cohorts[1].sampleSize,0);assert.equal(zero.cohorts[1].winRate,null)
@@ -4467,6 +4468,21 @@ test('AGENT-007 owner compares 200 distinct decided proposals at exact revisions
  assert.equal((await h.send('/api/platter/template-learning/apply',{id:report.id},h.owner)).status,404)
  const unused=await h.cmd('client.save',{name:'Synthetic erased observer',email:['synthetic-platter-16302','example.test'].join(String.fromCharCode(64))});await h.cmd('client.erase',{id:unused.id,confirmName:'Synthetic erased observer'})
  const retained=await h.send('/api/platter/template-learning?id='+report.id,undefined,h.owner);assert.equal(retained.status,200);assert.deepEqual(retained.value,report);assert.ok(!retained.text.includes(unused.id))
+ assert.equal((await h.db.prepare('SELECT id FROM p_clients WHERE id=?').bind(unused.id).first()),null,'capture replay does not recreate an erased client')
+ await h.cmd('client.erase',{id:f.clientId,confirmName:'Synthetic learning client'},h.owner,409)
+ assert.deepEqual((await h.send('/api/platter/template-learning?id='+report.id,undefined,h.owner)).value,report,'retained proposal history cannot be erased through learning')
+ const oldOwner=(await h.state()).actor,adminId=(await h.state(admin)).actor.id
+ assert.equal((await h.send('/auth/operator/role',{operatorId:adminId,role:'owner'},await h.signIn(oldOwner.email))).status,200)
+ const successor=await h.signIn(memberEmail)
+ assert.equal((await h.send('/auth/operator/role',{operatorId:oldOwner.id,role:'admin'},successor)).status,200)
+ const formerOwner=await h.signIn(oldOwner.email),reportCount=(await h.db.prepare('SELECT count(*) AS n FROM p_template_learning_reports').first()).n
+ for(const [cookie,status] of [[h.owner,401],[formerOwner,403]]){
+  for(const path of ['/api/platter/template-learning?id='+report.id,'/api/platter/template-learning/source?id='+report.id+'&source='+revised.proposalId])assert.equal((await h.send(path,undefined,cookie)).status,status,'former owner cannot read retained learning')
+  assert.equal((await h.send('/api/platter/template-learning',f.input,cookie)).status,status,'former owner cannot capture or replay learning')
+ }
+ assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_template_learning_reports').first()).n,reportCount,'revoked authority writes no result')
+ assert.deepEqual((await h.send('/api/platter/template-learning?id='+report.id,undefined,successor)).value,report,'current owner retains access to the exact result')
+ assert.deepEqual(await learningBusiness(h),before,'authority handoff changes no template, price or approval')
  console.log('PROBE AGENT-007 1: public comparison -> 100 decided per cohort; 30% and 70%; 200 exact sources; only revision three counted for revised sources')
  console.log('PROBE AGENT-007 2: capture and replay -> complete templates, prices, proposals, catalog and approvals unchanged; admin and agent refused; no apply door')
 }))

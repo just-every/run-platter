@@ -3682,7 +3682,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "788f4150f172926802b5e5c4c4d135550412bf147eaafa1d808a5baee91ec29c",
+      "sha256": "9d90391454369fd58c6570ffd8342f0f7a3dafdd2bf30179fbbb80e72e7d9b08",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {
@@ -3786,7 +3786,7 @@
       "executable": false
     },
     "tests/template-learning-fixture.mjs": {
-      "sha256": "54b4f474adcafaee35e46d63aceb3817d4df65b85b0581da3614772fa270ef9b",
+      "sha256": "8c3f6c4b31dc7248ebadc4d4ab98abe1e30e5941c7aaa5db8ec88ee9a6ce1a3b",
       "executable": false
     },
     "tests/template-variables-fixture.mjs": {

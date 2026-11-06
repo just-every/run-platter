@@ -1087,6 +1087,9 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.equal(before.p_sender_notice_runs.filter(r=>r.kind==='renewal').length,1)
   const archivePolicy=(await h.state()).approvalSettings.policy
   await h.cmd('approval.policy',{version:archivePolicy.version,required:true,defaultRole:'manager'})
+  const {nativeMigrationPreflight}=await import('../node_modules/@runeditrun/rer/cli/portability-migrations.mjs')
+  await nativeMigrationPreflight({root:source,db:h.db,binding:'DB'})
+  console.log('Migration ledger preflight passed on the fully migrated source')
   await h.close();h=undefined
   const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'));assert.ok(!bytes.includes('synthetic-platter-7107'))
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')

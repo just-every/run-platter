@@ -1080,7 +1080,7 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const renewalReceipt=await prepareSenderNoticeArchive(h,client)
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-10101',publishableKey:'synthetic-platter-10102',consent:true})
   failureEdge.now=fixed+2*86400000+60000
-  const failedDeposit=await preparedNoticeDeposit(h,'required',previewed.manager.cookie);await failedDeposit.authorize();failureEdge.fail(failedDeposit.saved)
+  const failedDeposit=await preparedNoticeDeposit(h,'required');await failedDeposit.authorize();failureEdge.fail(failedDeposit.saved)
   assert.equal((await h.send(failedDeposit.path+'/payment-status.json',{},failedDeposit.cookie)).status,200)
   assert.equal((await h.db.prepare('SELECT count(*) n FROM p_payment_failure_deliveries').first()).n,2)
   for(const table of tables)before[table]=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results

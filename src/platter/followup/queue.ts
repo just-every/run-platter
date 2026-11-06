@@ -1,11 +1,15 @@
 import { offerSelection } from '../selection'
 import { localDate, addDays } from '../expiry-time'
 
-export const followupReasons = { bounced: 'Bounced email', question: 'Client question waiting', expiring: 'Expiring within 3 days', viewed: 'Viewed but not signed', unopened: 'Unopened', unavailable: 'Engagement unavailable' }
-export function followupQueue(proposals:any[], records:any[], notices:any[], zone:string, now:number, owner?:string) {
+export const followupReasons = { bounced: 'Bounced email', question: 'Client question waiting', expiring: 'Expiring within 3 days', viewed: 'Viewed but not signed', unopened: 'Unopened', unavailable: 'Engagement unavailable', renewal: 'Agreement term ending' }
+export function followupQueue(proposals:any[], records:any[], notices:any[], zone:string, now:number, owner?:string, renewalFollowups:any[]=[]) {
  const today=localDate(now,zone)
- const rows=proposals.flatMap(p=>{
-  if(p.acceptance||(p.activeWithdrawal&&!p.negotiating)||p.status==='withdrawn')return []
+ const rows:any[]=proposals.flatMap<any>(p=>{
+  if(p.acceptance){
+   const ownerZone=p.ownerTimeZone??zone,ownerToday=localDate(now,ownerZone)
+   return renewalFollowups.filter(r=>r.proposal_id===p.id&&!r.closed_at).map(r=>({id:p.id,title:p.title,ownerId:p.sales_owner_id,owner:p.sales_owner_name||'Not recorded',revision:p.revision,version:p.version,currency:p.currency,valueCents:p.acceptance.selection?.fees?.firstYearCents??p.acceptance.totalCents,dueDate:r.due_date,timeZone:ownerZone,action:r.action,reason:'renewal',engagement:'unavailable',scheduled:true,sentAt:p.expiry?.sentAt??null,period:r.due_date<ownerToday?'overdue':r.due_date===ownerToday?'today':'upcoming',termEnd:r.term_end}))
+  }
+  if((p.activeWithdrawal&&!p.negotiating)||p.status==='withdrawn')return []
   const saved=records.find(r=>r.proposal_id===p.id&&r.revision===p.revision)
   if(saved?.closed_at)return []
   const ownerZone=p.ownerTimeZone??zone,ownerToday=localDate(now,ownerZone),dueDate=saved?.due_date??localDate(p.created_at,ownerZone)
@@ -16,7 +20,7 @@ export function followupQueue(proposals:any[], records:any[], notices:any[], zon
   const engagementReason=reason==='viewed'&&section?'Read '+section.label+' for '+(section.milliseconds/1000).toFixed(1)+' seconds':undefined
   return [{...(engagementReason?{engagementReason}:{}),id:p.id,title:p.title,ownerId:p.sales_owner_id,owner:p.sales_owner_name||'Not recorded',revision:p.revision,version:p.version,currency:p.currency,valueCents:Math.max(...p.options.map((o:any)=>{const s=offerSelection(p.options,p.deposit_bps,o.id,[],p);return s.fees?.firstYearCents??o.cents})),dueDate,timeZone:ownerZone,action:saved?.action??(['draft','approved'].includes(p.status)?(p.approval?p.approval.complete?'Send approved offer':'Approve revision':p.status==='draft'?'Approve revision':'Send approved offer'):p.status==='expired'?'Review expiry or reopening':'Follow up with client'),reason,engagement:p.engagement??'unavailable',scheduled:Boolean(saved),sentAt:p.expiry?.sentAt??null,period:dueDate<ownerToday?'overdue':dueDate===ownerToday?'today':'upcoming'}]
  }).filter(r=>!owner||(r.ownerId||'unrecorded')===owner)
- const rank=(reason:string)=>['bounced','question','payment','expiring','viewed','unopened','unavailable'].indexOf(reason)
+ const rank=(reason:string)=>['bounced','question','payment','expiring','renewal','viewed','unopened','unavailable'].indexOf(reason)
  rows.sort((a,b)=>['overdue','today','upcoming'].indexOf(a.period)-['overdue','today','upcoming'].indexOf(b.period)||a.dueDate.localeCompare(b.dueDate)||rank(a.reason)-rank(b.reason)||b.valueCents-a.valueCents||(a.sentAt??Number.MAX_SAFE_INTEGER)-(b.sentAt??Number.MAX_SAFE_INTEGER)||a.id.localeCompare(b.id))
  const totals=[...new Set(rows.map(r=>r.currency))].sort().map(currency=>({currency,count:rows.filter(r=>r.currency===currency).length,valueCents:rows.filter(r=>r.currency===currency).reduce((n,r)=>n+r.valueCents,0)}))
  return {rows,count:rows.length,totals,today,timeZone:zone}

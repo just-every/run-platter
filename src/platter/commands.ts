@@ -1,4 +1,6 @@
 import { providerSyncCommand } from './crm/provider-sync'
+import { failureNoticeCommand } from './payment-failure-notices'
+import { xeroCommand } from './accounting/xero-jobs'
 import { configureHubspotCard } from './crm/hubspot-card'
 import { hubspotSyncCommand } from './crm/hubspot-sync'
 import { zohoDraftCommand } from './crm/zoho-draft'
@@ -78,6 +80,7 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
+ if(name.startsWith('xero.'))return xeroCommand(env,a,name,p)
  if(name==='crm.card.configure')return configureHubspotCard(env,a,p)
  if(name.startsWith('crm.pipedrive.sync.'))return providerSyncCommand(env,a,name,p,'pipedrive')
  if(name.startsWith('crm.zoho.sync.'))return providerSyncCommand(env,a,name,p,'zoho')
@@ -139,6 +142,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='proposal.folder')return fileProposal(db,a,p)
  if(name==='folder.save')return folderCommand(db,a,p)
  if(name==='payment.surcharge')return surchargeCommand(db,a,p)
+ if(name==='payment.failure-notices')return failureNoticeCommand(env,a,p)
  if(name==='payment.collection')return collectionPolicyCommand(env,a,name,p)
  if(name.startsWith('payment.'))return paymentCommand(env,a,name,p)
  if(name.startsWith('archive.'))return archiveCommand(env,a,name,p)

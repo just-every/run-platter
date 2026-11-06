@@ -27,15 +27,18 @@ export function sectionConditions(value: unknown, options?: Offered[]): SectionC
 export function selectedContent(view: any, optionId: string, items: Chosen = []) {
  const conditions = sectionConditions(view.section_conditions)
  const shown = (condition?: string) => !condition || (variableCondition(condition)?variableVisible(condition,documentOf(view).merge?.values):false) || (itemOf(condition) ? items.some(item => item.id === itemOf(condition)) : condition === optionId)
+ // Frozen agreements keep visibility, without retaining the excluded condition or text.
+ const retained = view.section_conditions == null && Array.isArray(view.hiddenSections) ? view.hiddenSections.filter((section: string) => ['scope','terms'].includes(section)) : []
+ const hiddenSections = [...new Set<string>([...retained,...Object.entries(conditions).filter(([, condition]) => !shown(condition)).map(([section]) => section)])]
  return { ...view,documentConditional:documentOf(view).blocks.some(b=>Boolean(b.condition)),...(Object.keys(documentFields(view)).length?{document:selectedDocument(view.document,optionId,items)}:{}),
-  scope: shown(conditions.scope) ? view.scope : '',
-  terms: shown(conditions.terms) ? view.terms : '',
-  hiddenSections: Object.entries(conditions).filter(([, condition]) => !shown(condition)).map(([section]) => section),
+  scope: hiddenSections.includes('scope') ? '' : view.scope,
+  terms: hiddenSections.includes('terms') ? '' : view.terms,
+  hiddenSections,
  }
 }
 
 /** Accepted records contain only the text selected, never excluded section text. */
 export function agreementContent(view: any, optionId: string, items: Chosen = []): any {
  const {section_conditions, hiddenSections, documentConditional, ...content} = selectedContent(view, optionId, items)
- return content
+ return {...content,...(hiddenSections.length?{hiddenSections}:{})}
 }

@@ -2,8 +2,11 @@ import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { planD1Import, createD1ImportJob, applyD1ImportBatches, undoD1Import, readD1ImportJob, readD1ImportOriginals,
  canonicalJson, sha256, d1RequestContext, type D1ImportContext, type ImportMapping } from '../../modules/import-kit/src/d1/index.ts'
+import { proposifyReview, proposifyTemplateCommand } from './proposify-export'
 import { documentSource, documentNamespace, type UploadedDocument } from './document-source'
 import { documentDestination, documentTargets } from './document-targets'
+import { betterProposalsExport, betterProposalsReview } from './betterproposals-export'
+import { businessImportConflicts } from './business-import'
 import { fail, requiredText } from './errors'
 import type { Actor } from './index'
 
@@ -11,14 +14,15 @@ const ownerSql = "EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND role='owner' 
 export async function documentOwner(db: D1Database, actor: Actor) {
  if (actor.role!=='owner' || !await db.prepare('SELECT 1 WHERE '+ownerSql).bind(actor.id).first()) fail('owner_required',403)
 }
-const context=(db:D1Database,actor:Actor):D1ImportContext=>d1RequestContext({
+const undoBusinessGuard=" AND NOT EXISTS(SELECT 1 FROM p_document_business_outputs o LEFT JOIN p_contacts c ON o.kind='contacts' AND c.id=o.target_id LEFT JOIN p_companies co ON o.kind='companies' AND co.id=o.target_id LEFT JOIN p_import_business_revisions r ON r.kind=o.kind AND r.target_id=o.target_id WHERE o.movein_id=? AND (o.data_json IS NOT CASE WHEN o.kind='contacts' THEN c.data_json ELSE co.data_json END OR o.revision IS NOT r.revision OR COALESCE(c.version,co.version) IS NOT 1))"
+const context=(db:D1Database,actor:Actor,moveinId?:string):D1ImportContext=>d1RequestContext({
  destination:documentDestination,namespace:documentNamespace,mappingVersion:'exported-documents-v1',
  storage:{database:db,targets:documentTargets},batchSize:5,maxBatches:1,
- authorization:{principalId:actor.id,predicate:()=>({sql:ownerSql,params:[actor.id]})},
+ authorization:{principalId:actor.id,predicate:()=>({sql:ownerSql+(moveinId?" AND NOT EXISTS(SELECT 1 FROM p_imported_document_links l JOIN p_imported_documents d ON d.id=l.document_id WHERE json_extract(d.data_json,'$.moveinId')=?) AND NOT EXISTS(SELECT 1 FROM p_contacts c JOIN p_companies co ON co.id=c.company_id WHERE json_extract(co.data_json,'$.movein_source.moveinId')=? AND COALESCE(json_extract(c.data_json,'$.movein_source.moveinId'),'')!=?)"+undoBusinessGuard:""),params:[actor.id,...(moveinId?[moveinId,moveinId,moveinId,moveinId]:[])]})},
 })
 const mapping:ImportMapping={version:'exported-documents-v1',map(record){
  const payload=record.payload as any
- return {effects:[{targetKind:'documents',targetId:record.sourceId,value:payload.value}]}
+ return {effects:[{targetKind:record.kind,targetId:record.sourceId,value:payload.value}]}
 }}
 async function session(db:D1Database,actor:Actor,id:unknown) {
  await documentOwner(db,actor)
@@ -47,10 +51,13 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
  await documentOwner(db,actor)
  try {
   if (name==='document-import.create') {
-   const id=randomUUID(),label=String(input.label??'Document move-in').trim()
+   const id=randomUUID(),label=String(input.label??'Document move-in').trim(),sourceKind=String(input.sourceKind??(input.provider==='betterproposals'?'betterproposals':'documents'))
+   if(!['documents','betterproposals'].includes(sourceKind))fail('invalid_input',400,'Choose an available exported-file source')
    if (!label || label.length>150) fail('invalid_input',400,'Name the move-in in 150 characters or fewer')
+   const provider=String(input.provider==='betterproposals'?'generic':input.provider??'generic')
+   if(!['generic','proposify'].includes(provider))fail('invalid_import_provider',400)
    await db.batch([db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN '+ownerSql+' THEN 1 ELSE 0 END').bind(actor.id),
-    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label) VALUES(?,?,?)').bind(id,actor.id,label)])
+    db.prepare('INSERT INTO p_document_moveins(id,owner_id,label,provider,source_kind) VALUES(?,?,?,?,?)').bind(id,actor.id,label,provider,sourceKind)])
    return {id}
   }
   const movein=await session(db,actor,input.id),id=movein.id
@@ -61,7 +68,7 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    const prior=await db.prepare('SELECT * FROM p_document_uploads WHERE movein_id=? AND sha256=?').bind(id,hash).first<any>()
    if (prior) { if(prior.size!==size)fail('upload_conflict',409);return {sha256:hash,received:prior.received,complete:Boolean(prior.complete)} }
    const total=await db.prepare('SELECT COALESCE(SUM(size),0) AS bytes,COUNT(*) AS count FROM p_document_uploads WHERE movein_id=?').bind(id).first<any>()
-   if(total.bytes+size>20*1024*1024||total.count>=30)fail('upload_limit',413,'Use up to 30 files and 20 MiB per move-in')
+   if(total.bytes+size>20*1024*1024||total.count>=32)fail('upload_limit',413,'Use up to 32 files and 20 MiB per move-in')
    await db.batch([assertion(db,actor,id),db.prepare('INSERT INTO p_document_uploads(movein_id,sha256,filename,size) VALUES(?,?,?,?)').bind(id,hash,filename,size)])
    return {sha256:hash,received:0,complete:false}
   }
@@ -93,35 +100,42 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
    return {received:upload.size,complete:true}
   }
   const kit=context(db,actor)
+  if(name.startsWith('document-import.template-'))return proposifyTemplateCommand(db,actor,name,input,movein,kit)
   if (name==='document-import.preview'||name==='document-import.apply') {
-   const selected=choices(input)
+   const selected=choices(input),review=movein.source_kind==='betterproposals'?betterProposalsReview(input):movein.provider==='proposify'?proposifyReview(input):undefined
    if(movein.fingerprint) {
-    if(name==='document-import.preview'||input.fingerprint!==movein.fingerprint||canonicalJson(selected)!==movein.choices_json)fail('review_fingerprint_mismatch',409,'Continue the exact reviewed import from its history')
+    if(name==='document-import.preview'||input.fingerprint!==movein.fingerprint||canonicalJson(selected)!==movein.choices_json||canonicalJson(review??{})!==(movein.source_kind==='betterproposals'?movein.review_json:movein.configuration_json))fail('review_fingerprint_mismatch',409,'Continue the exact reviewed import from its history')
     if(movein.job_id)return {id,job:await applyD1ImportBatches(movein.job_id,kit),report:JSON.parse(movein.report_json)}
    }
-   const prepared=await documentSource(await uploaded(db,id),selected,id)
+   const files=await uploaded(db,id)
+   const prepared=movein.source_kind==='betterproposals'?await betterProposalsExport(files,selected,id,review as ReturnType<typeof betterProposalsReview>):await documentSource(files,selected,id,review as ReturnType<typeof proposifyReview> | undefined)
    const plan=await planD1Import(prepared.source,mapping,kit)
    // A second import never replaces an already retained original or its attribution.
    const prior=await db.prepare('SELECT id FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?').bind(documentDestination,actor.id,id).first<any>()
    const existing:string[]=[]
    if(!prior)for(const p of prepared.documents)if(await db.prepare('SELECT 1 FROM p_imported_documents WHERE id=?').bind(p.id).first())existing.push(p.id)
    if(existing.length) {
-    prepared.report.held+=existing.length
-    prepared.report.arrived-=prepared.documents.filter(p=>existing.includes(p.id)&&p.signatureEvidence.length).length
+    const newlyHeld=prepared.source.records.filter(r=>existing.includes(r.sourceId)&&(r.payload as any).value.disposition==='retained-agreement').length
+    prepared.report.held+=newlyHeld
+    prepared.report.arrived-=newlyHeld
    }
-   const canApply=prepared.canApply&&existing.length===0
-   if(name==='document-import.preview')return {id,kind:'Document move-in',fingerprint:plan.fingerprint,...prepared,source:undefined,canApply,choices:selected,existing}
+   const businessConflicts=movein.source_kind==='betterproposals'?await businessImportConflicts(db,plan,Boolean(prior)):[]
+   const canApply=prepared.canApply&&existing.length===0&&businessConflicts.length===0
+   if(name==='document-import.preview')return {id,kind:'Document move-in',fingerprint:plan.fingerprint,...prepared,source:undefined,canApply,choices:selected,existing,businessConflicts,configuration:movein.provider==='proposify'?review??null:null}
    if(input.fingerprint!==plan.fingerprint)fail('review_fingerprint_mismatch',409,'Preview the exact uploaded bytes and report choices again')
    if(!canApply)fail('document_import_needs_review',409,'Resolve ambiguous report matches and existing-document conflicts before applying')
    await db.batch([db.prepare('INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN '+ownerSql+' AND EXISTS(SELECT 1 FROM p_document_moveins WHERE id=? AND (fingerprint IS NULL OR fingerprint=?)) THEN 1 ELSE 0 END').bind(actor.id,id,plan.fingerprint),
-    db.prepare('UPDATE p_document_moveins SET fingerprint=?,choices_json=?,report_json=? WHERE id=?').bind(plan.fingerprint,canonicalJson(selected),canonicalJson(prepared.report),id)])
+    db.prepare('UPDATE p_document_moveins SET fingerprint=?,choices_json=?,report_json=?,review_json=?,configuration_json=? WHERE id=?').bind(plan.fingerprint,canonicalJson(selected),canonicalJson(prepared.report),canonicalJson(review??{}),canonicalJson(movein.provider==='proposify'?review??{}:{}),id)])
    const job=await createD1ImportJob(plan,{...kit,reviewedFingerprint:plan.fingerprint,operationKey:id})
    await db.prepare('UPDATE p_document_moveins SET job_id=? WHERE id=? AND fingerprint=?').bind(job.id,id,plan.fingerprint).run()
    return {id,job:await applyD1ImportBatches(job.id,kit),report:prepared.report}
   }
   if(!movein.job_id)fail('import_job_not_found',404)
   if(name==='document-import.continue')return {id,job:await applyD1ImportBatches(movein.job_id,kit)}
-  if(name==='document-import.undo')return {id,job:await undoD1Import(movein.job_id,kit)}
+  if(name==='document-import.undo'){
+   if(await db.prepare("SELECT 1 FROM p_imported_document_links l JOIN p_imported_documents d ON d.id=l.document_id WHERE json_extract(d.data_json,'$.moveinId')=?").bind(id).first())fail('import_conflict',409,'Dependent drafts or templates still use these originals. No document was removed.')
+   return {id,job:await undoD1Import(movein.job_id,context(db,actor,id))}
+  }
   if(name==='document-import.journal'){
    const job=await readD1ImportJob(movein.job_id,kit),originals=await readD1ImportOriginals(job.id,kit)
    const provenance=(await db.prepare('SELECT record_json FROM ik_provenance WHERE job_id=? ORDER BY ordinal,effect_ordinal').bind(job.id).all<{record_json:string}>()).results.map(r=>JSON.parse(r.record_json))
@@ -131,7 +145,7 @@ export async function documentImportCommand(db:D1Database,actor:Actor,name:strin
  }catch(error){
   if(error&&typeof error==='object'&&'status' in error)throw error
   const message=error instanceof Error?error.message:''
-  if(/CONFLICT|GUARD|UNIQUE constraint|FOREIGN KEY constraint|CHECK constraint/.test(message))fail('import_conflict',409,'The import conflicts with current records or authority. Later changes and dependent proposals are preserved.')
+  if(/CONFLICT|GUARD|UNIQUE constraint|FOREIGN KEY constraint|CHECK constraint|UNDO_REQUIRES|REVERSAL_MODE_CONFLICT|IMPORT_ALREADY_REVERSING/.test(message))fail('import_conflict',409,'The import conflicts with current records or authority. Later changes and dependent proposals are preserved.')
   if(/IMPORT_PLAN_TOO_LARGE|IMPORT_D1_.*LIMIT/.test(message))fail('import_limit',413,'This move-in exceeds the reviewed import limit. Use smaller files or fewer documents in a separate move-in.')
   throw error
  }
@@ -140,7 +154,7 @@ export async function documentMoveinState(db:D1Database,actor:Actor) {
  if(actor.role!=='owner')return {documentMoveins:[],importedDocuments:[]}
  await documentOwner(db,actor)
  const moves=(await db.prepare('SELECT m.*,j.state,j.checkpoint,j.total FROM p_document_moveins m LEFT JOIN ik_jobs j ON j.id=m.job_id WHERE owner_id=? ORDER BY m.rowid DESC').bind(actor.id).all<any>()).results
- for(const move of moves)move.uploads=(await db.prepare('SELECT sha256,filename,size,received,complete FROM p_document_uploads WHERE movein_id=? ORDER BY rowid').bind(move.id).all()).results
+ for(const move of moves){move.applications=(await db.prepare('SELECT id,proposal_id,template_id,source_sha256,reversed_at FROM p_proposify_applications WHERE movein_id=? ORDER BY created_at').bind(move.id).all()).results;move.uploads=(await db.prepare('SELECT sha256,filename,size,received,complete FROM p_document_uploads WHERE movein_id=? ORDER BY rowid').bind(move.id).all()).results}
  const documents=(await db.prepare("SELECT d.data_json FROM p_imported_documents d JOIN p_document_moveins m ON m.id=json_extract(d.data_json,'$.moveinId') WHERE m.owner_id=? ORDER BY d.id").bind(actor.id).all<{data_json:string}>()).results.map(r=>JSON.parse(r.data_json))
  return {documentMoveins:moves,importedDocuments:documents}
 }
@@ -157,13 +171,15 @@ export async function importedOriginal(db:D1Database,actor:Actor,query:URLSearch
   if(file?.original.status!=='retained')fail('original_not_found',404)
   bytes=Buffer.from(file.original.base64,'base64')
   if(sha256(bytes)!==data.sha256)fail('original_integrity',409,'Original file integrity check failed')
-  filename='retained-document.pdf'
+  filename=String(data.filename).split('/').at(-1)||'retained-document.pdf'
  }else{
   const journal=await documentImportCommand(db,actor,'document-import.journal',{id:query.get('id')}) as any
   const file=journal.originals.find((o:any)=>o.name===query.get('name'))
   if(file?.original.status!=='retained')fail('original_not_found',404)
   bytes=Buffer.from(file.original.base64,'base64')
+  filename=String(file.name).split('/').at(-1)||filename
  }
  await documentOwner(db,actor)
- return new Response(new Uint8Array(bytes),{headers:{'content-type':query.has('document')?'application/pdf':'application/octet-stream','content-disposition':'attachment; filename="'+filename+'"','cache-control':'no-store','x-content-type-options':'nosniff'}})
+ const ascii=filename.replace(/[^a-zA-Z0-9._ -]/g,'_'),encoded=encodeURIComponent(filename).replace(/['()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase())
+ return new Response(new Uint8Array(bytes),{headers:{'content-type':query.has('document')?'application/pdf':'application/octet-stream','content-disposition':'attachment; filename="'+ascii+'"; filename*=UTF-8\'\''+encoded,'cache-control':'no-store','x-content-type-options':'nosniff'}})
 }

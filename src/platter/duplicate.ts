@@ -5,6 +5,7 @@ import { recipientPlan } from './recipients'
 import { paymentTerms } from './payment-terms'
 import { copyDocumentMedia } from './documents/media'
 import { documentOf, bindDocument } from './documents/blocks'
+import { copyNotices } from './notifications/settings'
 import { copyDefaults } from './workspace'
 import { copyCosts } from './internal-pricing'
 import type { Bindings } from '../auth.server'
@@ -43,7 +44,7 @@ export async function duplicateProposal(env: Bindings, a: Actor, input: Record<s
   db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_proposal_locks WHERE proposal_id=?').bind(id,source.id),
   db.prepare('INSERT INTO p_proposal_block_locks(proposal_id,section) SELECT ?,section FROM p_proposal_block_locks WHERE proposal_id=?').bind(id,source.id),
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) SELECT ?,template_id,template_version FROM p_template_sources WHERE proposal_id=?').bind(id,source.id),
-  copyDocumentMedia(db,source.id,id,documentOf(displayed)),copyCosts(db,source.id,displayed.revision,id,1),copyDefaults(db,source.id,id),
+  copyDocumentMedia(db,source.id,id,documentOf(displayed)),copyCosts(db,source.id,displayed.revision,id,1),copyDefaults(db,source.id,id),...copyNotices(db,source.id,id),
   db.prepare('UPDATE p_proposals SET recipient_plan=? WHERE id=?').bind(JSON.stringify(row.recipient_plan),id),
   db.prepare('UPDATE p_proposals SET section_conditions=?,document=?,payment_terms=? WHERE id=?').bind(typeof row.section_conditions==='string'?row.section_conditions:JSON.stringify(row.section_conditions),JSON.stringify(documentOf(row)),row.payment_terms?JSON.stringify(row.payment_terms):null,id),
   db.prepare('INSERT INTO p_revisions(proposal_id,revision,snapshot,prepared_by,prepared_at,currency) VALUES(?,1,?,?,?,?)')

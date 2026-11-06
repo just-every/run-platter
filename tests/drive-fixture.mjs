@@ -5,13 +5,13 @@ export const driveAccount='synthetic-platter-archive-account'
 export const driveRoot='synthetic-platter-archive-root'
 export const driveToken='synthetic-platter-archive-token'
 export const driveSettings={version:0,accountId:driveAccount,connectionVersion:1,folderId:driveRoot,pattern:'{client} - {title} - {date} - r{revision}',consent:true}
-export function driveFixture(){
+export function driveFixture(options={}){
  const files=new Map([[driveRoot,{id:driveRoot,name:'Completed agreements',mimeType:'application/vnd.google-apps.folder',capabilities:{canAddChildren:true}}]]),calls=[]
  let sequence=0,uncertain=false,hook
  const outboundService=async request=>{
   const url=new URL(request.url);calls.push({url:url.href,method:request.method})
-  assert.equal(url.hostname,'www.googleapis.com');assert.equal(request.headers.get('authorization'),'Bearer '+driveToken)
-  if(hook)await hook(request)
+  assert.equal(url.hostname,'www.googleapis.com');assert.equal(request.headers.get('authorization'),'Bearer '+(options.token?.()??driveToken))
+  if(hook){const response=await hook(request);if(response)return response}
   if(url.pathname.endsWith('/about'))return Response.json({user:{permissionId:driveAccount,emailAddress:['synthetic-platter-drive','example.test'].join('@')}})
   if(url.pathname.endsWith('/generateIds'))return Response.json({ids:['synthetic-platter-archive-'+(++sequence)]})
   if(request.method==='POST'){

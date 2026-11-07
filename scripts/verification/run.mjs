@@ -45,9 +45,10 @@ const archive=partitions('tests/archive.test.mjs',[
 // every current and future test exactly once without editing their assertions.
 const documentPattern='^(EDIT|COLLAB|CAT)-'
 const documentCommand=filter=>`PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 ${filter}='${documentPattern}' tests/site.test.mjs`
+const lifecycleBrowser='PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs'
 const tasks={
  core:['node src/base/contract-docs.mjs check','pnpm build','pnpm exec rer build --site','pnpm typecheck'],
- runtime:['PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs',business.drive],
+ runtime:[lifecycleBrowser,business.drive],
  browser_documents_all:['PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 tests/site.test.mjs'],
  browser_documents:[documentCommand('--test-name-pattern'),business.templates,archive.bounce,business.approvals],
  browser_commercial:[documentCommand('--test-skip-pattern')],
@@ -60,4 +61,4 @@ const tasks={
  archive_media:[archive.media,business.comments]
 }
 if(shard&&!Object.hasOwn(tasks,shard))throw Error('Unknown verification shard')
-for(const command of shard?tasks[shard]:['core','runtime','browser_documents_all','business','archive'].flatMap(key=>tasks[key])){const result=spawnSync(command,{shell:true,stdio:'inherit',env:process.env});if(result.status!==0)process.exit(result.status??1)}
+for(const command of shard?tasks[shard]:[...tasks.core,lifecycleBrowser,...tasks.browser_documents_all,...tasks.business,...tasks.archive]){const result=spawnSync(command,{shell:true,stdio:'inherit',env:process.env});if(result.status!==0)process.exit(result.status??1)}

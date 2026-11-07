@@ -63,12 +63,45 @@ jobs:
             done
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
-  shards:
+  core:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-24.04
-    # Target <540s (60% of 15m), with headroom for hosted-runner variance.
-    timeout-minutes: 15
+    timeout-minutes: 12
+    env:
+      CI: 'true'
+      PLATTER_VERIFY_SHARD: core
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.4
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Build once and check generated documents and types
+        run: pnpm verify:app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verify-build
+          path: dist/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+  shards:
+    needs: [plan, core]
+    if: needs.plan.outputs.skip != 'true'
+    runs-on: ubuntu-24.04
+    # Verify 42329924078: longest shard 763s; ceil((763 + 240) / 60) = 17m,
+    # leaving 257s of margin without another rebalance.
+    timeout-minutes: 17
     strategy:
       fail-fast: false
       matrix:
@@ -92,7 +125,11 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      # The required runtime shard checks contract docs once for the whole run.
+      - uses: actions/download-artifact@v4
+        if: matrix.shard == 'runtime' || matrix.shard == 'browser_documents' || matrix.shard == 'browser_commercial'
+        with:
+          name: verify-build
+          path: dist/
       - name: Install Chromium
         if: matrix.shard == 'runtime' || matrix.shard == 'browser_documents' || matrix.shard == 'browser_commercial'
         run: |
@@ -145,7 +182,7 @@ jobs:
           path: ${{ runner.temp }}/editor-budget.json
 
   verify:
-    needs: [plan, shards]
+    needs: [plan, core, shards]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 1

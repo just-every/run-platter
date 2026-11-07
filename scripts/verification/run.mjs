@@ -16,12 +16,18 @@ function partitions(files, groups) {
  return commands
 }
 const businessFiles='tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs'
-// EDIT-012 had a 126s group; isolate it alongside archive custody. Templates
-// use browser capacity; search and internal comments use lighter archive jobs.
+// Keep ordered, disjoint groups over the same business files. Fresh harnesses
+// keep each journey independent. The measured lifecycle run took 611s locally:
+// reporting 129s, Drive 84s, approvals 41s, learning 27s; share these with
+// lighter jobs instead of leaving them together in the lifecycle complement.
 const business=partitions(businessFiles,[
  ['templates','^EDIT-002\\b'],
  ['copies','^EDIT-012\\b'],
  ['search','^EDIT-016\\b'],
+ ['reporting','^FOLLOW-005\\b'],
+ ['drive','^AUTO-002\\b'],
+ ['approvals','^APPROVE-'],
+ ['learning','^AGENT-007\\b'],
  ['authoring','^(EDIT|PRICE|TEAM|SEND)-'],
  ['comments','^COLLAB-002\\b'],
  ['lifecycle',null]
@@ -40,17 +46,18 @@ const archive=partitions('tests/archive.test.mjs',[
 const documentPattern='^(EDIT|COLLAB|CAT)-'
 const documentCommand=filter=>`PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 ${filter}='${documentPattern}' tests/site.test.mjs`
 const tasks={
- runtime:['node src/base/contract-docs.mjs check','pnpm build','pnpm exec rer build --site','pnpm typecheck','PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs'],
- browser_documents_all:['pnpm build','PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 tests/site.test.mjs'],
- browser_documents:['pnpm build',documentCommand('--test-name-pattern'),business.templates,archive.bounce],
- browser_commercial:['pnpm build',documentCommand('--test-skip-pattern')],
+ core:['node src/base/contract-docs.mjs check','pnpm build','pnpm exec rer build --site','pnpm typecheck'],
+ runtime:['PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs',business.drive],
+ browser_documents_all:['PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 tests/site.test.mjs'],
+ browser_documents:[documentCommand('--test-name-pattern'),business.templates,archive.bounce,business.approvals],
+ browser_commercial:[documentCommand('--test-skip-pattern')],
  business:['pnpm test:platter'],
- business_authoring:[business.authoring],
+ business_authoring:[business.authoring,business.reporting],
  business_lifecycle:[business.lifecycle],
  archive:['pnpm test:archive'],
  archive_custody:[archive.custody,business.copies,archive.currency],
- archive_restore:[archive.restore,business.search],
+ archive_restore:[archive.restore,business.search,business.learning],
  archive_media:[archive.media,business.comments]
 }
 if(shard&&!Object.hasOwn(tasks,shard))throw Error('Unknown verification shard')
-for(const command of shard?tasks[shard]:['runtime','browser_documents_all','business','archive'].flatMap(key=>tasks[key])){const result=spawnSync(command,{shell:true,stdio:'inherit',env:process.env});if(result.status!==0)process.exit(result.status??1)}
+for(const command of shard?tasks[shard]:['core','runtime','browser_documents_all','business','archive'].flatMap(key=>tasks[key])){const result=spawnSync(command,{shell:true,stdio:'inherit',env:process.env});if(result.status!==0)process.exit(result.status??1)}

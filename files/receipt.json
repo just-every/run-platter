@@ -1,0 +1,151 @@
+{
+  "repository": "just-every/run-platter",
+  "branch": "cloud/sx-platter-ci-limit-1",
+  "head": "b384813c64c78665f189b5aa1f6b8f2c0fca79da",
+  "base": "4b7577be21b4266e06fd1858109a9b2ca482bcda",
+  "measuredHead": "31a16502e6e3f1333d29bee7ce0096216adde95d",
+  "priorFinalHead": "2ca0bde5b85e32134bb2b987debaaaf6ee79c193",
+  "pushed": true,
+  "productPushes": 1,
+  "timeoutBeforeMinutes": 15,
+  "timeoutAfterMinutes": 17,
+  "measuredLongestSeconds": 763,
+  "marginSeconds": 257,
+  "matrixShardsBefore": 8,
+  "matrixShardsAfter": 8,
+  "clauseStatusChanges": [],
+  "countsBefore": {
+    "Core": {
+      "done": 15,
+      "partial": 101,
+      "missing": 43,
+      "total": 159
+    },
+    "Agent surface": {
+      "done": 0,
+      "partial": 0,
+      "missing": 4,
+      "total": 4
+    },
+    "Full target": {
+      "done": 15,
+      "partial": 101,
+      "missing": 47,
+      "total": 163
+    }
+  },
+  "checks": {
+    "syntax": "passed",
+    "routing": "passed",
+    "contract-docs": "passed",
+    "source-lock": "passed",
+    "diff-whitespace": "passed"
+  },
+  "pr": null,
+  "ciRun": 42332840634,
+  "ciStatus": "completed",
+  "ciHead": "b384813c64c78665f189b5aa1f6b8f2c0fca79da",
+  "countsAfter": {
+    "Core": {
+      "done": 15,
+      "partial": 101,
+      "missing": 43,
+      "total": 159
+    },
+    "Agent surface": {
+      "done": 0,
+      "partial": 0,
+      "missing": 4,
+      "total": 4
+    },
+    "Full target": {
+      "done": 15,
+      "partial": 101,
+      "missing": 47,
+      "total": 163
+    }
+  },
+  "ciConclusion": "success",
+  "ciAttempt": 1,
+  "ciUrl": "https://github.com/just-every/run-platter/actions/runs/42332840634",
+  "reruns": 0,
+  "blockers": [],
+  "candidateJobs": [
+    {
+      "id": 128283033232,
+      "name": "plan",
+      "conclusion": "success",
+      "seconds": 5
+    },
+    {
+      "id": 128283061018,
+      "name": "core",
+      "conclusion": "success",
+      "seconds": 43
+    },
+    {
+      "id": 128283062439,
+      "name": "editor_budget",
+      "conclusion": "skipped",
+      "seconds": 0
+    },
+    {
+      "id": 128283251450,
+      "name": "shards (runtime)",
+      "conclusion": "success",
+      "seconds": 685
+    },
+    {
+      "id": 128283251458,
+      "name": "shards (browser_documents)",
+      "conclusion": "success",
+      "seconds": 520
+    },
+    {
+      "id": 128283251472,
+      "name": "shards (archive_media)",
+      "conclusion": "success",
+      "seconds": 573
+    },
+    {
+      "id": 128283251491,
+      "name": "shards (business_lifecycle)",
+      "conclusion": "success",
+      "seconds": 309
+    },
+    {
+      "id": 128283251494,
+      "name": "shards (browser_commercial)",
+      "conclusion": "success",
+      "seconds": 440
+    },
+    {
+      "id": 128283251534,
+      "name": "shards (business_authoring)",
+      "conclusion": "success",
+      "seconds": 905
+    },
+    {
+      "id": 128283251551,
+      "name": "shards (archive_custody)",
+      "conclusion": "success",
+      "seconds": 557
+    },
+    {
+      "id": 128283251598,
+      "name": "shards (archive_restore)",
+      "conclusion": "success",
+      "seconds": 622
+    },
+    {
+      "id": 128286988397,
+      "name": "verify",
+      "conclusion": "success",
+      "seconds": 2
+    }
+  ],
+  "candidateShardCount": 8,
+  "githubCalls": 7,
+  "candidateLongestShardSeconds": 905,
+  "candidateMarginSeconds": 115
+}

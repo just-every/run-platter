@@ -1,0 +1,14 @@
+[
+  {
+    "command": "node --check scripts/verification/run.mjs",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "git diff --check origin/main HEAD",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]

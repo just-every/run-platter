@@ -1,0 +1,60 @@
+{
+  "status": "passed",
+  "matrixShards": 8,
+  "business": {
+    "literalTestNames": 118,
+    "commands": 10
+  },
+  "archive": {
+    "literalTestNames": 12,
+    "commands": 5
+  },
+  "measuredShardCommands": "identical to 31a16502",
+  "finalSavedScript": "identical to 2ca0bde5",
+  "unshardedCommands": [
+    "node src/base/contract-docs.mjs check",
+    "pnpm build",
+    "pnpm exec rer build --site",
+    "pnpm typecheck",
+    "PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs",
+    "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 tests/site.test.mjs",
+    "pnpm test:platter",
+    "pnpm test:archive"
+  ],
+  "routes": {
+    "runtime": [
+      "PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^AUTO-002\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "browser_documents": [
+      "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 --test-name-pattern='^(EDIT|COLLAB|CAT)-' tests/site.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='bounce follow-ups' --test-skip-pattern='public CLI preserves business|first-release AUD' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^APPROVE-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "browser_commercial": [
+      "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 --test-skip-pattern='^(EDIT|COLLAB|CAT)-' tests/site.test.mjs"
+    ],
+    "business_authoring": [
+      "node --test --test-concurrency=1 --test-name-pattern='^(EDIT|PRICE|TEAM|SEND)-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^FOLLOW-005\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "business_lifecycle": [
+      "node --test --test-concurrency=1 --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE|TEAM|SEND)-|^COLLAB-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "archive_custody": [
+      "node --test --test-concurrency=1 --test-name-pattern='public CLI preserves business' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-012\\b' --test-skip-pattern='^EDIT-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='first-release AUD' --test-skip-pattern='public CLI preserves business' tests/archive.test.mjs"
+    ],
+    "archive_restore": [
+      "node --test --test-concurrency=1 --test-name-pattern='PORT-001 public CLI refuses|imported business|document archive history' --test-skip-pattern='public CLI preserves business|first-release AUD|bounce follow-ups' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-016\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^AGENT-007\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "archive_media": [
+      "node --test --test-concurrency=1 --test-skip-pattern='public CLI preserves business|first-release AUD|bounce follow-ups|PORT-001 public CLI refuses|imported business|document archive history' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^COLLAB-002\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE|TEAM|SEND)-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ]
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "files": [
+    {
+      "blob": "02b366791e72b96d05e7fd5cc7e9fc7cf590c950",
+      "bytes": 1540,
+      "path": "PLAN.md",
+      "sha256": "42a4a348a2c4f4307aa6bf7d8f592cdcfa0e33a2cd3c515b0c958ca6fdea16c4"
+    },
+    {
+      "blob": "f51228d99b59c3da0a62ecf9c1a8247e94349174",
+      "bytes": 4353,
+      "path": "REPORT.md",
+      "sha256": "b57cfe59d99ca76d4de25d494b7d07f1563f54a7ad3c18c1677fb750cd920198"
+    },
+    {
+      "blob": "d5c8792b2400f30e62a26c593308b623bc37ac99",
+      "bytes": 1380,
+      "path": "candidate-durations.json",
+      "sha256": "46fc00b51ee9ab00be57ff389af4e55f622b54cb2dc2d635aca09ddb360938f8"
+    },
+    {
+      "blob": "0f01e48187be14b1a2c486154bc7032890397da6",
+      "bytes": 32272,
+      "path": "candidate-jobs.json",
+      "sha256": "2cec0146ffc6195597c0abafe6691a9f26cba1d17dfcbc438b77bcbb0fea2da0"
+    },
+    {
+      "blob": "ae869b2fafd3acf46a2dc6ce35ec869497ae9cfb",
+      "bytes": 32,
+      "path": "contract-check.txt",
+      "sha256": "c21aae40192141751d6d5c7a3a1d0eb701a6852f305d592d77b4dcab9c2536ab"
+    },
+    {
+      "blob": "ad0c72d59ab6180a057b96a14df403a57235a289",
+      "bytes": 1767,
+      "path": "github-calls.json",
+      "sha256": "eeb6a94869fba01e4c98bbf3560a15a32c17083cc660ce087e5b6516e06e06ef"
+    },
+    {
+      "blob": "4b6e071b4325967f2a63d4030d4729172234516b",
+      "bytes": 125,
+      "path": "identity-check.txt",
+      "sha256": "e34e064f44e59d52d6743290251ea8b466d97794c883bf531a1dc7b9424eb544"
+    },
+    {
+      "blob": "b30c305d714e80fbff046f8ca05f557e3df42eb4",
+      "bytes": 233,
+      "path": "local-checks.json",
+      "sha256": "a88e21cecbfb25f3fc89718e21c86548cf2e0891cab112bdd902ddf633a016fa"
+    },
+    {
+      "blob": "f6c88588df65f2c7f17d685e5a062a9511c3e6f2",
+      "bytes": 154787,
+      "path": "lock-check.txt",
+      "sha256": "9a6137621d0cd626e70c6785b570ccbfb6abe659b71c0ac53d51af55eaa01ea9"
+    },
+    {
+      "blob": "3f05a9260f1f12e67bb476dce7c6e1e1256f55cc",
+      "bytes": 154773,
+      "path": "lock-write.txt",
+      "sha256": "8d41ea18d8d2df683e2b741ae421085de9d18afc3e0488c45c98539aceb3067e"
+    },
+    {
+      "blob": "2359c1262d66f381934b3cc89a6037cdfd04b2c2",
+      "bytes": 15392,
+      "path": "measured-jobs.json",
+      "sha256": "dbba3cab626b24af03027ebda05ffb8337191ae63febd5d93aac74a8c0e0abb4"
+    },
+    {
+      "blob": "f58555db6a5d5219821cf6948b850927957674f6",
+      "bytes": 1022,
+      "path": "product-push.txt",
+      "sha256": "557633e0a88bf08017e011d5217329e5363f6eddd0864ba7ed6f2bd6c1d2e973"
+    },
+    {
+      "blob": "463c11aec48dfd2580452cb320957dc0b2721316",
+      "bytes": 6989,
+      "path": "product.patch",
+      "sha256": "5f6aa6674fde6e645a7b72d0c532912cb516c09ea9523372014bbb272c5f0d0a"
+    },
+    {
+      "blob": "fade6cfec043d601f62b630bd3f9a01bdac200ce",
+      "bytes": 3341,
+      "path": "receipt.json",
+      "sha256": "ad5a20aa60043c7757c677184f3bf5a229e883abb00aa09ee405f67c953bf08e"
+    },
+    {
+      "blob": "23aebc8c1e5c959f2f06c170c8cded48755112bf",
+      "bytes": 4405,
+      "path": "routing-check.json",
+      "sha256": "b559ce0a52eca45ec12d74bf86b7a993a53761391b17b524a635fef65bb1550c"
+    },
+    {
+      "blob": "30c1eb680d876a4cdb3fc4adf66126038749fa4c",
+      "bytes": 2829,
+      "path": "routing-check.mjs",
+      "sha256": "cba84a7d0a29d694c6f6cf7ca58dad10a8eed5905a092828bb607154180a6f83"
+    },
+    {
+      "blob": "17b51d58c85f54cf4569f9974ad92a1b23ecceab",
+      "bytes": 240,
+      "path": "runs-discovery.json",
+      "sha256": "cbb17ce2f224383d443bc88019b466eb4b028ba7c6a52a95bb15c686825c8025"
+    },
+    {
+      "blob": "b90abadf0a67dbbef9d673d4babf02e79d17cd7b",
+      "bytes": 193,
+      "path": "verify-status-3.json",
+      "sha256": "891316db917b7086c2c1cf819a2e0b35444ddd3a14703b5285925473cae43d24"
+    },
+    {
+      "blob": "b90abadf0a67dbbef9d673d4babf02e79d17cd7b",
+      "bytes": 193,
+      "path": "verify-status-4.json",
+      "sha256": "891316db917b7086c2c1cf819a2e0b35444ddd3a14703b5285925473cae43d24"
+    },
+    {
+      "blob": "b90abadf0a67dbbef9d673d4babf02e79d17cd7b",
+      "bytes": 193,
+      "path": "verify-status-5.json",
+      "sha256": "891316db917b7086c2c1cf819a2e0b35444ddd3a14703b5285925473cae43d24"
+    },
+    {
+      "blob": "90626391dba4e9b210c3def7dc6b62e297d4b167",
+      "bytes": 196,
+      "path": "verify-status-6.json",
+      "sha256": "787c076ed5efd34e947dc97596a2e7b46d98d9829631c0649a04653fbcf1cbbb"
+    }
+  ],
+  "product_branch": "cloud/sx-platter-ci-limit-1",
+  "product_head": "b384813c64c78665f189b5aa1f6b8f2c0fca79da",
+  "ref": "refs/heads/evidence/sx-platter-ci-limit-1",
+  "repository": "just-every/run-platter",
+  "schema": 1,
+  "tag": "sx-platter-ci-limit-1"
+}

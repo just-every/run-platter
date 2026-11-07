@@ -1,0 +1,49 @@
+[
+  {
+    "number": 1,
+    "command": "gh run view 42329924078 --repo just-every/run-platter --json jobs",
+    "receipt": "measured-jobs.json"
+  },
+  {
+    "number": 2,
+    "command": "gh api repos/just-every/run-platter/actions/runs?head_sha=b384813c64c78665f189b5aa1f6b8f2c0fca79da&per_page=100 --jq {workflow_runs: [.workflow_runs[] | {id,name,status,conclusion,head_sha,html_url,event}]}",
+    "receipt": "runs-discovery.json",
+    "exit": 0,
+    "time": "2026-11-07T03:11:39.915757+00:00"
+  },
+  {
+    "number": 3,
+    "command": "gh api repos/just-every/run-platter/actions/runs/42332840634 --jq {status,conclusion,head_sha,html_url,run_attempt}",
+    "receipt": "verify-status-3.json",
+    "exit": 0,
+    "time": "2026-11-07T03:16:41.393464+00:00"
+  },
+  {
+    "number": 4,
+    "command": "gh api repos/just-every/run-platter/actions/runs/42332840634 --jq {status,conclusion,head_sha,html_url,run_attempt}",
+    "receipt": "verify-status-4.json",
+    "exit": 0,
+    "time": "2026-11-07T03:21:42.845527+00:00"
+  },
+  {
+    "number": 5,
+    "command": "gh api repos/just-every/run-platter/actions/runs/42332840634 --jq {status,conclusion,head_sha,html_url,run_attempt}",
+    "receipt": "verify-status-5.json",
+    "exit": 0,
+    "time": "2026-11-07T03:26:44.294482+00:00"
+  },
+  {
+    "number": 6,
+    "command": "gh api repos/just-every/run-platter/actions/runs/42332840634 --jq {status,conclusion,head_sha,html_url,run_attempt}",
+    "receipt": "verify-status-6.json",
+    "exit": 0,
+    "time": "2026-11-07T03:31:45.785307+00:00"
+  },
+  {
+    "number": 7,
+    "command": "gh api repos/just-every/run-platter/actions/runs/42332840634/jobs?per_page=100",
+    "receipt": "candidate-jobs.json",
+    "exit": 0,
+    "time": "2026-11-07T03:36:47.466814+00:00"
+  }
+]

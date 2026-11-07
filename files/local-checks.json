@@ -1,0 +1,39 @@
+{
+  "node": "22.20.0",
+  "baseline": {
+    "command": "PLATTER_VERIFY_SHARD=business_lifecycle node scripts/verification/run.mjs (before dispatcher)",
+    "tests": 61,
+    "pass": 61,
+    "fail": 0,
+    "seconds": 610.657465583
+  },
+  "core": {
+    "command": "PLATTER_VERIFY_SHARD=core node scripts/verification/run.mjs",
+    "exit_code": 0,
+    "checks": [
+      "generated contract documents",
+      "application build",
+      "hosted site build",
+      "typecheck"
+    ]
+  },
+  "compiled_site_smoke": {
+    "command": "PLATTER_BROWSER_SHARD=lifecycle node --test --test-name-pattern='^SITE-001' tests/site.test.mjs",
+    "tests": 1,
+    "pass": 1,
+    "fail": 0,
+    "browser": "/usr/bin/chromium --no-sandbox"
+  },
+  "hosted_output": {
+    "command": "node node_modules/@runeditrun/rer/cli/hosted-output.mjs",
+    "exit_code": 0,
+    "assets": 161,
+    "health": "identity"
+  },
+  "hydration": {
+    "command": "node node_modules/@runeditrun/rer/cli/hydration/check.mjs .",
+    "exit_code": 0,
+    "loads": 1,
+    "note": "Existing plain HTML root is correctly classified as not hydrating; setup redirects to sign-in. Initial standalone launch resolved a different preinstalled playwright-core browser; the external preload then selected /usr/bin/chromium --no-sandbox without repository changes."
+  }
+}

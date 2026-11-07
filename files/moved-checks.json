@@ -1,0 +1,30 @@
+[
+  {
+    "group": "drive",
+    "destination": "runtime",
+    "command": "node --test --test-concurrency=1 --test-name-pattern='^AUTO-002\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+    "exit_code": 0,
+    "seconds": 86.72776305100001
+  },
+  {
+    "group": "approvals",
+    "destination": "browser_documents",
+    "command": "node --test --test-concurrency=1 --test-name-pattern='^APPROVE-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+    "exit_code": 0,
+    "seconds": 47.34074674500005
+  },
+  {
+    "group": "reporting",
+    "destination": "business_authoring",
+    "command": "node --test --test-concurrency=1 --test-name-pattern='^FOLLOW-005\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+    "exit_code": 0,
+    "seconds": 135.71490133899988
+  },
+  {
+    "group": "learning",
+    "destination": "archive_restore",
+    "command": "node --test --test-concurrency=1 --test-name-pattern='^AGENT-007\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+    "exit_code": 0,
+    "seconds": 31.50608263999993
+  }
+]

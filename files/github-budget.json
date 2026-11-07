@@ -1,0 +1,18 @@
+{
+  "limit": 10,
+  "used": 10,
+  "calls": [
+    "gh api repos/just-every/run-platter/branches?per_page=100",
+    "gh api repos/just-every/run-platter/git/matching-refs/heads/cloud/sx-platter-ci",
+    "gh api graphql (matching ref commit timestamps)",
+    "gh run view 42304206419 --repo just-every/run-platter --json jobs",
+    "gh api repos/just-every/run-platter/actions/workflows/verify.yml/runs?branch=main&status=success&per_page=1",
+    "gh run view 42301387270 --repo just-every/run-platter --json jobs",
+    "gh api repos/just-every/run-platter/actions/workflows/verify.yml/runs?branch=main&status=success&per_page=30",
+    "gh api repos/just-every/run-platter/actions/runs?head_sha=31a16502e6e3f1333d29bee7ce0096216adde95d&per_page=100",
+    "gh api repos/just-every/run-platter/actions/runs/42329924078 --jq {status,conclusion,head_sha,html_url}",
+    "gh api repos/just-every/run-platter/actions/runs/42329924078/jobs?filter=latest&per_page=100"
+  ],
+  "remaining_plan": [],
+  "remaining": 0
+}

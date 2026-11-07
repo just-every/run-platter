@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "ci_commands_unchanged_from_green_candidate": true,
+  "push_verify_before_after": 182,
+  "ordinary_full_run_before_after": 182,
+  "every_ordinary_full_run_test_once": true,
+  "reason": "Keep lifecycle browser command separate from the mixed runtime CI shard, because ordinary full verification already runs the complete business suite."
+}

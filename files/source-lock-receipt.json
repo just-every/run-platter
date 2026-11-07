@@ -1,0 +1,12 @@
+{
+  "regenerate": "node scripts/edition-authoring/cli.mjs lock",
+  "check": "node scripts/edition-authoring/cli.mjs check",
+  "passed": true,
+  "regenerated_after_final_fallback_fix": true,
+  "changed_source_entries": [
+    ".github/workflows/verify.yml",
+    "scripts/verification/run.mjs"
+  ],
+  "file_count_before": 950,
+  "file_count_after": 950
+}

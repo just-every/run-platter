@@ -1,0 +1,64 @@
+Contract documents are current.
+
+> @proposals/platter@0.1.0 build /workspace/run-platter
+> rer build
+
+Heavy job admitted: Platter build:workflow [27c23557bfa7]
+Checking pinned pnpm
+10.12.4
+Building your application
+▲ [WARNING] Proxy environment variables detected. We'll use your proxy for fetch requests.
+
+
+(node:2546) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 135 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/client/.assetsignore                 0.02 kB
+dist/client/pdfjs/pdf.js                784.78 kB
+dist/client/pdfjs/pdf.worker.js       1,906.30 kB
+dist/client/assets/index-C_xggySh.js    311.33 kB │ gzip: 100.88 kB
+
+✓ built in 825ms
+vite v8.2.2 building ssr environment for production...
+transforming...
+✓ 984 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/server/wrangler.json                                      1.64 kB │ gzip:     0.85 kB
+dist/server/.vite/manifest.json                                3.37 kB │ gzip:     0.68 kB
+dist/server/assets/empty-plugin-adapters-D_0twvAa.js           0.28 kB │ gzip:     0.18 kB
+dist/server/assets/start-F3eVvvda.js                           0.28 kB │ gzip:     0.20 kB
+dist/server/assets/_tanstack-start-manifest_v-DZodoJby.js      0.35 kB │ gzip:     0.25 kB
+dist/server/assets/font-head-BkHiUkDT.js                       2.05 kB │ gzip:     0.92 kB
+dist/server/assets/hash-CU0xCUDk.js                            4.69 kB │ gzip:     2.16 kB
+dist/server/assets/storage-BpB50ayb.js                         4.91 kB │ gzip:     1.95 kB
+dist/server/assets/router-DGP46dtp.js                         37.20 kB │ gzip:    10.06 kB
+dist/server/assets/model-D5biXpOq.js                         118.32 kB │ gzip:    33.36 kB
+dist/server/assets/Match-f89GXau3.js                         161.09 kB │ gzip:    40.32 kB
+dist/server/assets/pdfjs-CtM5oz6C.js                       1,809.96 kB │ gzip:   439.63 kB
+dist/server/index.js                                       5,033.75 kB │ gzip: 1,385.77 kB
+
+[INEFFECTIVE_DYNAMIC_IMPORT] src/platter/collaboration.ts is dynamically imported by src/platter/notifications/dispatch.ts but also statically imported by src/platter/commands.ts, src/platter/state.ts, src/platter/ui/collaboration.ts, dynamic import will not move module into another chunk.
+
+[INEFFECTIVE_DYNAMIC_IMPORT] src/platter/notifications/expiry.ts is dynamically imported by src/platter/notifications/dispatch.ts but also statically imported by src/platter/notifications/commands.ts, src/platter/notifications/renewal.ts, src/platter/notifications/scheduled.ts, src/platter/state.ts, dynamic import will not move module into another chunk.
+
+[INEFFECTIVE_DYNAMIC_IMPORT] src/platter/notifications/renewal.ts is dynamically imported by src/platter/notifications/dispatch.ts but also statically imported by src/platter/notifications/commands.ts, src/platter/notifications/scheduled.ts, src/platter/state.ts, dynamic import will not move module into another chunk.
+
+✓ built in 994ms
+Your application is built
+build: complete (exit 0)
+Heavy job admitted: Platter build:workflow [27c23557bfa7]
+Checking pinned pnpm
+10.12.4
+Building the run site
+{"pages":14,"assets":7,"styles":0}
+Run site written to dist/site (14 pages, 158 files): [REDACTED]/dist/site
+build: complete (exit 0)
+
+> @proposals/platter@0.1.0 typecheck /workspace/run-platter
+> tsc --build --incremental
+

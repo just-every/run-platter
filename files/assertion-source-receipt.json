@@ -1,0 +1,27 @@
+{
+  "scope": "all tracked test, source, migration and contract files",
+  "unchanged": true,
+  "tracked_files": 952,
+  "test_files_unchanged": 84,
+  "new_permanent_tests": 0,
+  "status_counts_before_after": {
+    "core": {
+      "done": 15,
+      "partial": 101,
+      "missing": 43,
+      "total": 159
+    },
+    "agent_surface": {
+      "done": 0,
+      "partial": 0,
+      "missing": 4,
+      "total": 4
+    },
+    "full_target": {
+      "done": 15,
+      "partial": 101,
+      "missing": 47,
+      "total": 163
+    }
+  }
+}

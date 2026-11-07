@@ -1,0 +1,2502 @@
+{
+  "totalBefore": 182,
+  "totalAfter": 182,
+  "countsBefore": {
+    "runtime": 21,
+    "browser_documents": 15,
+    "browser_commercial": 18,
+    "business_authoring": 53,
+    "business_lifecycle": 61,
+    "archive_custody": 4,
+    "archive_restore": 5,
+    "archive_media": 5
+  },
+  "countsAfter": {
+    "runtime": 22,
+    "browser_documents": 19,
+    "browser_commercial": 18,
+    "business_authoring": 56,
+    "business_lifecycle": 52,
+    "archive_custody": 4,
+    "archive_restore": 6,
+    "archive_media": 5
+  },
+  "testSourceBlobs": {
+    "tests/platter.test.mjs": "910b6c94ae9dd1cd7b7b8e68b2d0271f115cce05",
+    "tests/demo.test.mjs": "472766ce0356c10616f796b4fa1688baac0825ec",
+    "tests/mail.test.mjs": "27b62e487ac002308872728ba394d7fd19f3c9f3",
+    "tests/archive.test.mjs": "4b672f4dba750ccd462e158dee525936b928b368",
+    "tests/site-lifecycle.mjs": "b85a330ca2d1ea64109b0a7e232185a11af0db32",
+    "tests/site-documents.mjs": "4bf04f8801fbdec083e25dff47af590a816d8b96",
+    "tests/site.test.mjs": "073b037696b531334899e475a4aa1c04fda74e30"
+  },
+  "commandsBefore": {
+    "runtime": [
+      "node src/base/contract-docs.mjs check",
+      "pnpm build",
+      "pnpm exec rer build --site",
+      "pnpm typecheck",
+      "PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs"
+    ],
+    "browser_documents": [
+      "pnpm build",
+      "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 --test-name-pattern='^(EDIT|COLLAB|CAT)-' tests/site.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='bounce follow-ups' --test-skip-pattern='public CLI preserves business|first-release AUD' tests/archive.test.mjs"
+    ],
+    "browser_commercial": [
+      "pnpm build",
+      "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 --test-skip-pattern='^(EDIT|COLLAB|CAT)-' tests/site.test.mjs"
+    ],
+    "business_authoring": [
+      "node --test --test-concurrency=1 --test-name-pattern='^(EDIT|PRICE|TEAM|SEND)-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "business_lifecycle": [
+      "node --test --test-concurrency=1 --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^(EDIT|PRICE|TEAM|SEND)-|^COLLAB-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "archive_custody": [
+      "node --test --test-concurrency=1 --test-name-pattern='public CLI preserves business' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-012\\b' --test-skip-pattern='^EDIT-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='first-release AUD' --test-skip-pattern='public CLI preserves business' tests/archive.test.mjs"
+    ],
+    "archive_restore": [
+      "node --test --test-concurrency=1 --test-name-pattern='PORT-001 public CLI refuses|imported business|document archive history' --test-skip-pattern='public CLI preserves business|first-release AUD|bounce follow-ups' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-016\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "archive_media": [
+      "node --test --test-concurrency=1 --test-skip-pattern='public CLI preserves business|first-release AUD|bounce follow-ups|PORT-001 public CLI refuses|imported business|document archive history' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^COLLAB-002\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^(EDIT|PRICE|TEAM|SEND)-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ]
+  },
+  "fullRunCommandsBefore": [
+    "node src/base/contract-docs.mjs check",
+    "pnpm build",
+    "pnpm exec rer build --site",
+    "pnpm typecheck",
+    "PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs",
+    "pnpm build",
+    "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 tests/site.test.mjs",
+    "pnpm test:platter",
+    "pnpm test:archive"
+  ],
+  "fullRunCommandsAfter": [
+    "node src/base/contract-docs.mjs check",
+    "pnpm build",
+    "pnpm exec rer build --site",
+    "pnpm typecheck",
+    "PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs",
+    "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 tests/site.test.mjs",
+    "pnpm test:platter",
+    "pnpm test:archive"
+  ],
+  "commandsAfter": {
+    "core": [
+      "node src/base/contract-docs.mjs check",
+      "pnpm build",
+      "pnpm exec rer build --site",
+      "pnpm typecheck"
+    ],
+    "runtime": [
+      "PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^AUTO-002\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "browser_documents": [
+      "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 --test-name-pattern='^(EDIT|COLLAB|CAT)-' tests/site.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='bounce follow-ups' --test-skip-pattern='public CLI preserves business|first-release AUD' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^APPROVE-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "browser_commercial": [
+      "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 --test-skip-pattern='^(EDIT|COLLAB|CAT)-' tests/site.test.mjs"
+    ],
+    "business_authoring": [
+      "node --test --test-concurrency=1 --test-name-pattern='^(EDIT|PRICE|TEAM|SEND)-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^FOLLOW-005\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "business_lifecycle": [
+      "node --test --test-concurrency=1 --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE|TEAM|SEND)-|^COLLAB-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "archive_custody": [
+      "node --test --test-concurrency=1 --test-name-pattern='public CLI preserves business' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-012\\b' --test-skip-pattern='^EDIT-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='first-release AUD' --test-skip-pattern='public CLI preserves business' tests/archive.test.mjs"
+    ],
+    "archive_restore": [
+      "node --test --test-concurrency=1 --test-name-pattern='PORT-001 public CLI refuses|imported business|document archive history' --test-skip-pattern='public CLI preserves business|first-release AUD|bounce follow-ups' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-016\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^AGENT-007\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "archive_media": [
+      "node --test --test-concurrency=1 --test-skip-pattern='public CLI preserves business|first-release AUD|bounce follow-ups|PORT-001 public CLI refuses|imported business|document archive history' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^COLLAB-002\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE|TEAM|SEND)-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ]
+  },
+  "rows": [
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-017 Spanish mailbox journey preserves authority, verification limits, authored content and actual certificate language",
+      "line": 21,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "HTTP-001 complete authorized domain dispatch journey and native auth, CSRF, roles and revocable agent boundary",
+      "line": 100,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations invalidate old authority",
+      "line": 156,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "email verification precedes acceptance, code is single-use, immutable option and deposit exported once",
+      "line": 175,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "SIGN-001 complete verified-mailbox acceptance journey",
+      "line": 185,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "money rejects malformed or unsafe prices and cannot export an unaccepted proposal",
+      "line": 292,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "Client CSV dry run, fingerprint custody, journal, replay and undo through HTTP",
+      "line": 295,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "import undo preserves clients with dependent proposals; owner erasure fences unused client",
+      "line": 313,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "COLLAB-003 every saved revision has an author/time, comparisons highlight changes, restore creates unapproved revision four",
+      "line": 317,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "NEG-001 negotiated offer requires exact approval, preserves the live offer until send, compares changes and accepts revision two",
+      "line": 343,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership",
+      "line": 385,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-004 current person, agent, invitation, signature, native, import and invoice actions have searchable/exportable actors and times",
+      "line": 448,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund",
+      "line": 510,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "NEG-002 / TEAM-004 opt-in tracked terms edits accept one/reject one into revision two, preserve offer and require fresh approval",
+      "line": 765,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-010 / TEAM-004 defaults and arbitrary files freeze with approval, download exact bytes and remain in the signed package after replacement",
+      "line": 808,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "MIG-006 imports 200 contacts across 60 companies with reviewed custody, resumable apply and complete undo",
+      "line": 862,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "MIG-006 / CAT-001 unchanged PandaDoc catalog and contact layouts preserve exact prices, packages, image bytes and explicit company associations",
+      "line": 889,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "MIG-006 reviewed mapper supports original incumbent CSVs and holds identity conflicts without merging",
+      "line": 924,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by upload, distinct from e-signature, then exports the deposit",
+      "line": 951,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures",
+      "line": 991,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and every page marked; disabling refuses download without a write",
+      "line": 1057,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "SEND-004 / SEND-013 / TEAM-004 calendar expiry warns unsigned only, supports same-link reopening and reissue, and never expires accepted agreements",
+      "line": 1105,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "SEND-010 / SEND-015 / FOLLOW-009 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval",
+      "line": 1172,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-012 duplicate accepted content into an independent member-owned draft for another client without changing the source",
+      "line": 1219,
+      "before": [
+        "archive_custody"
+      ],
+      "after": [
+        "archive_custody"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state",
+      "line": 1303,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal",
+      "line": 1422,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-009 conditional sections match selected preview, client, PDF and immutable agreement; revisions, copies and negotiations retain rules",
+      "line": 1424,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "PRICE-001 / COLLAB-003 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / PROP-001 / TEAM-004 tables recompute twelve grouped lines, preserve every carrier and refuse malformed prices and quantities",
+      "line": 1472,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-002 arbitrary packages and bounded optional quantities share server totals and immutable selection",
+      "line": 1523,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "PRICE-002 / SIGN-008 / TEAM-004 signed-upload selections use sent prices, refuse invalid quantities without writes, and freeze the exact agreement and invoice",
+      "line": 1639,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-002 / MOB-001 five starter and personal templates start independent drafts, guard ownership and versions, and retain agent approval boundaries",
+      "line": 1683,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-016 body phrase search returns exactly three of 500 proposals including an uploaded PDF with live folder permissions",
+      "line": 1685,
+      "before": [
+        "archive_restore"
+      ],
+      "after": [
+        "archive_restore"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "SEND-014 self-test mail uses only the active sign-in address, previews an unsent revision and atomically limits daily rehearsals without sending an offer",
+      "line": 1726,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval",
+      "line": 1809,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP",
+      "line": 1975,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions and templates, and stay out of sales/client data and public PDFs",
+      "line": 2187,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens",
+      "line": 2240,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund",
+      "line": 2278,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-007 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content",
+      "line": 2360,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval",
+      "line": 2411,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-006 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses",
+      "line": 2470,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices and private costs stay frozen in proposals",
+      "line": 2552,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-001 / PAY-006 dispute responses enforce financial roles, exact deposit binding, deadlines and consent, retaining the exact idempotent Stripe evidence",
+      "line": 2582,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-001 / APPROVE-003 native admins remain eligible named approvers and settings audit records identify the actual person or workspace",
+      "line": 2701,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-001 / PRICE-006 optional and flat-package costs produce exact selected totals while verified client JSON, pages and PDFs exclude private state",
+      "line": 2725,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "PRICE-004 scoped discounts preserve exact selections, private margins, templates and public PDF and JSON custody",
+      "line": 2753,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied",
+      "line": 2811,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TEAM-001 upgrading a pre-role database keeps former members as sales without inferring historical ownership",
+      "line": 2942,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-001 document revisions preserve ordered blocks and brand through preview, restore, copies, templates, negotiation and exact client PDF",
+      "line": 2968,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-001 block saves enforce live proposal scope, stale versions, content bounds, safe brand values and locked terms",
+      "line": 3029,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-001 display media requires consent and live edit scope, stays private until placed and keeps exact bytes through copies and templates",
+      "line": 3066,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-001 Client-assigned required fields and typed signature blocks validate at signing and freeze exact values with the selected agreement",
+      "line": 3148,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-001 new sections inherit verified questions and opt-in tracked edits without changing the sent document or bypassing review",
+      "line": 3174,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-011 server-confirmed quantity edits retain document content, clear approval and enforce bounds, scope and exact version",
+      "line": 3200,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-003 linked draft copies propagate atomically while detached, sent and accepted copies retain exact content",
+      "line": 3217,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-003 insertion enforces live role, folder and proposal scope, consent, stale versions and locked terms without writes",
+      "line": 3257,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "deposit signatures survive declines, required acceptance waits for Stripe success and due acceptance stays complete",
+      "line": 3315,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "card fees require admin confirmation, remain separate and exempt ACH and prohibited billing states",
+      "line": 3324,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "proposal methods copy template overrides or workspace defaults and remain independent",
+      "line": 3329,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TRACK-001 opted-in views retain trusted coarse location, verification and device with quiet-period owner alerts",
+      "line": 3331,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TRACK-004 disclosure, bounded retention and explicit erasure respect holds and owner authority",
+      "line": 3362,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TRACK-001 measured views use trusted coarse locations, label identity, claim quiet-period alerts and preserve preview isolation",
+      "line": 3384,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TRACK-004 owner retention and erasure remove views and dependent engagement without changing proposal records",
+      "line": 3418,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TRACK-002 reading events retain monotonic section times and validated package choices on the exact view",
+      "line": 3444,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "TRACK-003 forwarded viewers verify their own mailbox before owner conversion to an approver record without inherited signing authority",
+      "line": 3518,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "PRICE-003 recurring fees keep exact schedules, first-year queue value and immutable selected documents",
+      "line": 3538,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "AUTO-004 scoped REST drafting, immutable owner keys and human-only authority",
+      "line": 3545,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation",
+      "line": 3584,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "AUTO-004 published route reference matches live methods and webhook schemas both ways",
+      "line": 3661,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "AUTO-004 terminal proposal projections scoped status and analytics distinguish withdrawn and expired offers from live offers",
+      "line": 3699,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "AUTO-004 negotiated lifecycle delivery receiver gets revised and approved events for each negotiated revision before it is sent",
+      "line": 3727,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "AUTO-004 complete lifecycle receiver coverage receiver obtains all ten lifecycle types including every terminal outcome",
+      "line": 3760,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "AUTO-004 independently documented authority each published method and route declares its independently expected scope",
+      "line": 3796,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "SIGN-004 sequential and parallel recipient groups complete only after every signature",
+      "line": 3812,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP",
+      "line": 3818,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-004 linked deal variables refuse missing values, freeze the sent revision and refill destination copies",
+      "line": 3819,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections",
+      "line": 3866,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing",
+      "line": 3898,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order",
+      "line": 3922,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "PRICE-005 owner tax follows selected quantities and discounts, freezes rates and refuses unsafe writes",
+      "line": 3937,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "AUTO-002 completed agreements archive exact PDFs once under explicit current Drive authority and reconcile uncertain writes without replay",
+      "line": 4002,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "MIG-003 and MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo",
+      "line": 4075,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance and refuse changed source or authority without writes",
+      "line": 4232,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "ACCT-002 reviewed Xero deposits preserve exact money, authority, unique mappings and uncertain-write holds",
+      "line": 4328,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/platter.test.mjs",
+      "name": "AGENT-007 owner compares 200 distinct decided proposals at exact revisions without applying template or price changes",
+      "line": 4440,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "archive_restore"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/demo.test.mjs",
+      "name": "the demo opens on a lived-in studio and a send completes as mocked success",
+      "line": 8,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/demo.test.mjs",
+      "name": "hosting preflight refuses incomplete account access before any build or deployment",
+      "line": 27,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "EDIT-017 Spanish invitation and mailbox code retain authored mail and consume localized code transport",
+      "line": 33,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SEND-006 invitation, fresh link and negotiated send deliver edited text and retain exact link-free history atomically",
+      "line": 59,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "FOLLOW-004 verified client questions, native answers and one-use authenticated owner email replies",
+      "line": 108,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "client questions are limited per invitation, and a refused question stores nothing and mails no one",
+      "line": 239,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "MAIL-001 local proposal and verification mail are captured without provider contact",
+      "line": 256,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "MAIL-001 Managed relay sends proposal invitations and verification codes through its assigned endpoint",
+      "line": 287,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "MAIL-001 hosted mail commits and claims before provider acceptance; timeout is uncertain and never resent",
+      "line": 318,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SEND-006 / SEND-002 / SEND-012 signed provider delivery, durable sender notice and actionable address correction",
+      "line": 425,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SEND-002 / SEND-012 SendGrid signed correlation, queued state, uncertainty and logged dismissal",
+      "line": 517,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy",
+      "line": 559,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SEND-001 / SEND-011 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail",
+      "line": 588,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient quiet hours, caps and terminal decisions without retrying uncertain sends",
+      "line": 746,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "FOLLOW-008 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap",
+      "line": 817,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh",
+      "line": 861,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "FOLLOW-001 / FOLLOW-006 / FOLLOW-011 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority",
+      "line": 903,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority",
+      "line": 905,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once",
+      "line": 932,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests",
+      "line": 1020,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "AUTO-003 signed events reach Slack channels and approval requests reach verified Teams direct chats with session protected links",
+      "line": 1082,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "FOLLOW-003 sender expiry notices create dated follow-ups independently of signer warnings and follow extensions, workspace defaults and terminal states",
+      "line": 1167,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "FOLLOW-003 saved settings stay inactive and queued expiry email rechecks revocation, settings, sender demotion and revision authority",
+      "line": 1207,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP preserve independent email reminders",
+      "line": 1275,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically cancels queued texts without duplicate transport",
+      "line": 1374,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes cannot replay sending authority",
+      "line": 1427,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links",
+      "line": 1533,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SEND-005 personal notification revocation and lost proposal scope suppress queued and future sends",
+      "line": 1616,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash",
+      "line": 1644,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SEND-007 unsigned replacement preserves the frozen offer, revokes old authority and retains certificate custody through races",
+      "line": 1732,
+      "before": [
+        "business_authoring"
+      ],
+      "after": [
+        "business_authoring"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "COLLAB-002 scoped colleagues comment, receive consented generic email and chat, resolve and assign without exposing internal threads to clients",
+      "line": 1734,
+      "before": [
+        "archive_media"
+      ],
+      "after": [
+        "archive_media"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports",
+      "line": 1840,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/mail.test.mjs",
+      "name": "PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete, uncertain or interrupted mail without replay",
+      "line": 1924,
+      "before": [
+        "business_lifecycle"
+      ],
+      "after": [
+        "business_lifecycle"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/archive.test.mjs",
+      "name": "FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences",
+      "line": 38,
+      "before": [
+        "archive_custody"
+      ],
+      "after": [
+        "archive_custody"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/archive.test.mjs",
+      "name": "PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal",
+      "line": 438,
+      "before": [
+        "archive_restore"
+      ],
+      "after": [
+        "archive_restore"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/archive.test.mjs",
+      "name": "PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores re-exported first-release AUD bytes and new proposals and acceptances use USD without conversion",
+      "line": 494,
+      "before": [
+        "archive_custody"
+      ],
+      "after": [
+        "archive_custody"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/archive.test.mjs",
+      "name": "SEND-002 public CLI preserves bounce follow-ups and logged action without provider events or invitation credentials",
+      "line": 549,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/archive.test.mjs",
+      "name": "MIG-003, MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody",
+      "line": 583,
+      "before": [
+        "archive_restore"
+      ],
+      "after": [
+        "archive_restore"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/archive.test.mjs",
+      "name": "SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority",
+      "line": 667,
+      "before": [
+        "archive_media"
+      ],
+      "after": [
+        "archive_media"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/archive.test.mjs",
+      "name": "TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items",
+      "line": 786,
+      "before": [
+        "archive_media"
+      ],
+      "after": [
+        "archive_media"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/archive.test.mjs",
+      "name": "APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority",
+      "line": 966,
+      "before": [
+        "archive_media"
+      ],
+      "after": [
+        "archive_media"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/archive.test.mjs",
+      "name": "EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority",
+      "line": 1154,
+      "before": [
+        "archive_media"
+      ],
+      "after": [
+        "archive_media"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/archive.test.mjs",
+      "name": "PRICE-005 public CLI preserves business tax rates and frozen agreements without restoring signing authority",
+      "line": 1279,
+      "before": [
+        "archive_custody"
+      ],
+      "after": [
+        "archive_custody"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/archive.test.mjs",
+      "name": "AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority",
+      "line": 1334,
+      "before": [
+        "archive_restore"
+      ],
+      "after": [
+        "archive_restore"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/archive.test.mjs",
+      "name": "PORT-002 / AUTO-002 populated product archive retains exact document archive history, content, money and mappings without execution authority",
+      "line": 1403,
+      "before": [
+        "archive_restore"
+      ],
+      "after": [
+        "archive_restore"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "SITE-001 built homepage opens run instructions, Markdown docs work without JavaScript, installed root remains the Lobby",
+      "line": 14,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "PRICE-008 legacy AUD agreement and new USD owner/client screens show exact currency at desktop and phone widths",
+      "line": 64,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "NEG-001 desktop and phone negotiate, approve, send and accept the changed offer with client comparison",
+      "line": 101,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "EDIT-016 / REPORT-001 desktop and phone pipeline filters, value sort, totals and clear filters use recorded proposal data",
+      "line": 147,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "TEAM-004 owner searches audit actions and downloads the same filtered activity at desktop and phone widths",
+      "line": 207,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "AI-003 desktop and phone owners review MCP requests, approve/send explicitly, and dismiss stale requests",
+      "line": 235,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "NEG-002 desktop and phone client suggests two terms edits; firm accepts one, rejects one and sends revision two",
+      "line": 268,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "SEND-002 desktop and phone show provider delivery and preserve bounce notice until explicit correction",
+      "line": 304,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "SIGN-008 desktop and phone record a client-signed copy as accepted by upload and export its deposit",
+      "line": 350,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "REPORT-005 / REPORT-006 desktop and phone export the filtered pipeline CSV and schedule weekly email in the installation time zone",
+      "line": 381,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "SEND-004 expired offer requests reopening and owner extends same links at desktop and phone",
+      "line": 411,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "MOB-001 / FOLLOW-004 invited client asks exact sent sections; owner queue answers and agreement retains threads on desktop and phone",
+      "line": 448,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision",
+      "line": 480,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting",
+      "line": 553,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "SEND-006 desktop and phone rehearse to self, then edit invitations, fresh links and negotiated sends with exact retained history",
+      "line": 618,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "FOLLOW-001 / FOLLOW-006 sender controls, template delivery overrides, preview dates, manual email and inactive copies at desktop and phone widths",
+      "line": 714,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the compiled client at desktop and phone widths",
+      "line": 716,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "SEND-007 desktop and phone replace the unsigned signer, refuse the old link, verify the COO and retain completion history",
+      "line": 836,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "TRACK-001 / TRACK-004 owner consent, private alerts, client disclosure and erasure at desktop and phone widths",
+      "line": 838,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "AUTO-004 compiled public API reference exposes scoped operations and signed event examples",
+      "line": 842,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-lifecycle.mjs",
+      "name": "SIGN-004 and SEND-003 owner recipient controls, own-field previews, ordered signing and viewer revocation",
+      "line": 862,
+      "before": [
+        "runtime"
+      ],
+      "after": [
+        "runtime"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "EDIT-017 owner-selected Spanish invitation, verification, consent and completion preserve authored English through the compiled client",
+      "line": 14,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "COLLAB-003 desktop and phone compare revisions and restore an earlier draft requiring fresh approval",
+      "line": 16,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "EDIT-010 desktop and phone upload vendor defaults and MSA, download frozen bytes, replace defaults and accept the original package",
+      "line": 63,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "MIG-006 desktop and phone review original CSVs, finish imports, read records and journals, and undo",
+      "line": 96,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "EDIT-014 client selects and downloads revision 2 at desktop and phone; owner timeline and per-proposal disable remain authoritative",
+      "line": 154,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "EDIT-012 desktop and phone duplicate an accepted agreement for Beta Co and approve its separate draft",
+      "line": 188,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "EDIT-018 desktop and phone preview exact client content, switch widths and select without sending",
+      "line": 191,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "EDIT-009 desktop and phone configure, preview, select, download and accept conditional package sections",
+      "line": 247,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "EDIT-007 desktop and phone client reviews accessible pricing, corrects quantities, downloads attachments and PDF, verifies, comments and accepts by keyboard with WCAG 2.2 AA axe scans",
+      "line": 292,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "PRICE-001 / COLLAB-003 / EDIT-014 / EDIT-018 desktop and phone create grouped line tables, edit and restore, preview, send, download and accept identical server totals",
+      "line": 297,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads",
+      "line": 301,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "MOB-001 / EDIT-002 desktop and phone start all five starters, save, replace and start personal templates, preview and accept independent drafts",
+      "line": 305,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths",
+      "line": 307,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "APPROVE-002 email preview and decision links work under a member session at desktop and phone widths",
+      "line": 533,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "APPROVE-002 owner requests, revokes and re-requests approval through native controls and records a noted outcome at desktop and phone widths",
+      "line": 696,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths",
+      "line": 759,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "EDIT-003 linked and detached library insertion, frozen sending and scoped usage at desktop and phone widths",
+      "line": 761,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "deposit collection settings, retained signatures, required and due completion at desktop and phone widths",
+      "line": 821,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "COLLAB-002 internal comment, resolution and dated assignment work at desktop and phone widths",
+      "line": 823,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "PRICE-003 and PRICE-002 recurring line editing, preview, client selection and frozen agreement use the same amounts",
+      "line": 878,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads",
+      "line": 883,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "REPORT-004 booked snapshots and independent receipt periods export and schedule the visible report",
+      "line": 887,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "PRICE-005 native owner-configured tax settings, selected quantities and frozen agreement",
+      "line": 931,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "CAT-001 reviewed CSV promotion and explicit recurring insertion preserve independent defaults",
+      "line": 937,
+      "before": [
+        "browser_documents"
+      ],
+      "after": [
+        "browser_documents"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "AUTO-002 Settings authorizes Drive archiving and shows completed and held jobs with safe reconciliation",
+      "line": 961,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "MIG-003 and MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in",
+      "line": 1037,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows",
+      "line": 1151,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "AUTO-003 Settings verifies and authorizes Slack channels and Teams direct approvals, inspects history and revokes consent",
+      "line": 1203,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "ACCT-002 Settings reviews the exact deposit and explicitly issues one Xero invoice",
+      "line": 1282,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site-documents.mjs",
+      "name": "FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke expiry email without activation on inspection",
+      "line": 1283,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    },
+    {
+      "file": "tests/site.test.mjs",
+      "name": "AGENT-007 compiled cohort recommendation and source revision inspection",
+      "line": 9,
+      "before": [
+        "browser_commercial"
+      ],
+      "after": [
+        "browser_commercial"
+      ],
+      "fullRunBefore": 1,
+      "fullRunAfter": 1
+    }
+  ]
+}

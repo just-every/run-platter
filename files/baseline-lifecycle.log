@@ -1,0 +1,423 @@
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: the demo opens on a lived-in studio and a send completes as mocked success
+ok 1 - the demo opens on a lived-in studio and a send completes as mocked success
+  ---
+  duration_ms: 3801.299813
+  type: 'test'
+  ...
+# Subtest: hosting preflight refuses incomplete account access before any build or deployment
+ok 2 - hosting preflight refuses incomplete account access before any build or deployment
+  ---
+  duration_ms: 1065.665413
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: FOLLOW-004 verified client questions, native answers and one-use authenticated owner email replies
+ok 3 - FOLLOW-004 verified client questions, native answers and one-use authenticated owner email replies
+  ---
+  duration_ms: 4269.873873
+  type: 'test'
+  ...
+# Subtest: client questions are limited per invitation, and a refused question stores nothing and mails no one
+ok 4 - client questions are limited per invitation, and a refused question stores nothing and mails no one
+  ---
+  duration_ms: 2862.331047
+  type: 'test'
+  ...
+# Subtest: MAIL-001 local proposal and verification mail are captured without provider contact
+ok 5 - MAIL-001 local proposal and verification mail are captured without provider contact
+  ---
+  duration_ms: 2328.392287
+  type: 'test'
+  ...
+# Subtest: MAIL-001 Managed relay sends proposal invitations and verification codes through its assigned endpoint
+ok 6 - MAIL-001 Managed relay sends proposal invitations and verification codes through its assigned endpoint
+  ---
+  duration_ms: 2280.523301
+  type: 'test'
+  ...
+# Subtest: MAIL-001 hosted mail commits and claims before provider acceptance; timeout is uncertain and never resent
+ok 7 - MAIL-001 hosted mail commits and claims before provider acceptance; timeout is uncertain and never resent
+  ---
+  duration_ms: 18116.371833
+  type: 'test'
+  ...
+# Subtest: APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy
+ok 8 - APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy
+  ---
+  duration_ms: 2707.902292
+  type: 'test'
+  ...
+# Subtest: FOLLOW-008 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap
+ok 9 - FOLLOW-008 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap
+  ---
+  duration_ms: 3973.754749
+  type: 'test'
+  ...
+# Subtest: FOLLOW-001 / FOLLOW-006 / FOLLOW-011 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority
+ok 10 - FOLLOW-001 / FOLLOW-006 / FOLLOW-011 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority
+  ---
+  duration_ms: 10482.930461
+  type: 'test'
+  ...
+# Subtest: FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority
+ok 11 - FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority
+  ---
+  duration_ms: 4876.109564
+  type: 'test'
+  ...
+# Subtest: APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once
+ok 12 - APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once
+  ---
+  duration_ms: 9659.898384
+  type: 'test'
+  ...
+# Subtest: APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests
+ok 13 - APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests
+  ---
+  duration_ms: 4308.990998
+  type: 'test'
+  ...
+# Subtest: AUTO-003 signed events reach Slack channels and approval requests reach verified Teams direct chats with session protected links
+ok 14 - AUTO-003 signed events reach Slack channels and approval requests reach verified Teams direct chats with session protected links
+  ---
+  duration_ms: 14945.523997
+  type: 'test'
+  ...
+# Subtest: FOLLOW-003 sender expiry notices create dated follow-ups independently of signer warnings and follow extensions, workspace defaults and terminal states
+ok 15 - FOLLOW-003 sender expiry notices create dated follow-ups independently of signer warnings and follow extensions, workspace defaults and terminal states
+  ---
+  duration_ms: 20206.998897
+  type: 'test'
+  ...
+# Subtest: FOLLOW-003 saved settings stay inactive and queued expiry email rechecks revocation, settings, sender demotion and revision authority
+ok 16 - FOLLOW-003 saved settings stay inactive and queued expiry email rechecks revocation, settings, sender demotion and revision authority
+  ---
+  duration_ms: 4282.857337
+  type: 'test'
+  ...
+# Subtest: SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash
+ok 17 - SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash
+  ---
+  duration_ms: 6023.499016
+  type: 'test'
+  ...
+# Subtest: SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports
+ok 18 - SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports
+  ---
+  duration_ms: 25867.471729
+  type: 'test'
+  ...
+# Error: D1_ERROR: Synthetic interrupted receipt write: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_TRIGGER)
+#     at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:188:19)
+#     at async cloudflare-internal:d1-api:137:19
+#     ... 3 lines matching cause stack trace ...
+#     at async Object.fetch (file:///workspace/run-platter/script-0.mjs:126104:47) {
+#   [cause]: Error: Synthetic interrupted receipt write: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_TRIGGER)
+#       at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:189:24)
+#       at async cloudflare-internal:d1-api:137:19
+#       at async dispatchMail (file:///workspace/run-platter/script-0.mjs:122966:7)
+#       at async clientCollection (file:///workspace/run-platter/script-0.mjs:10473:5)
+#       at async platterResponse (file:///workspace/run-platter/script-0.mjs:125797:128)
+#       at async Object.fetch (file:///workspace/run-platter/script-0.mjs:126104:47)
+# }
+# Subtest: PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete, uncertain or interrupted mail without replay
+ok 19 - PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete, uncertain or interrupted mail without replay
+  ---
+  duration_ms: 19880.302124
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: HTTP-001 complete authorized domain dispatch journey and native auth, CSRF, roles and revocable agent boundary
+ok 20 - HTTP-001 complete authorized domain dispatch journey and native auth, CSRF, roles and revocable agent boundary
+  ---
+  duration_ms: 4121.906332
+  type: 'test'
+  ...
+# Subtest: PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations invalidate old authority
+ok 21 - PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations invalidate old authority
+  ---
+  duration_ms: 2602.950203
+  type: 'test'
+  ...
+# Subtest: email verification precedes acceptance, code is single-use, immutable option and deposit exported once
+ok 22 - email verification precedes acceptance, code is single-use, immutable option and deposit exported once
+  ---
+  duration_ms: 2280.053392
+  type: 'test'
+  ...
+# Subtest: SIGN-001 complete verified-mailbox acceptance journey
+ok 23 - SIGN-001 complete verified-mailbox acceptance journey
+  ---
+  duration_ms: 12319.512627
+  type: 'test'
+  ...
+# Subtest: money rejects malformed or unsafe prices and cannot export an unaccepted proposal
+ok 24 - money rejects malformed or unsafe prices and cannot export an unaccepted proposal
+  ---
+  duration_ms: 2237.62952
+  type: 'test'
+  ...
+# Subtest: Client CSV dry run, fingerprint custody, journal, replay and undo through HTTP
+ok 25 - Client CSV dry run, fingerprint custody, journal, replay and undo through HTTP
+  ---
+  duration_ms: 2734.80741
+  type: 'test'
+  ...
+# Subtest: import undo preserves clients with dependent proposals; owner erasure fences unused client
+ok 26 - import undo preserves clients with dependent proposals; owner erasure fences unused client
+  ---
+  duration_ms: 2661.582188
+  type: 'test'
+  ...
+# Subtest: COLLAB-003 every saved revision has an author/time, comparisons highlight changes, restore creates unapproved revision four
+ok 27 - COLLAB-003 every saved revision has an author/time, comparisons highlight changes, restore creates unapproved revision four
+  ---
+  duration_ms: 2632.641684
+  type: 'test'
+  ...
+# Subtest: NEG-001 negotiated offer requires exact approval, preserves the live offer until send, compares changes and accepts revision two
+ok 28 - NEG-001 negotiated offer requires exact approval, preserves the live offer until send, compares changes and accepts revision two
+  ---
+  duration_ms: 3274.009624
+  type: 'test'
+  ...
+# Subtest: FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership
+ok 29 - FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership
+  ---
+  duration_ms: 85550.07786
+  type: 'test'
+  ...
+# Subtest: AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund
+ok 30 - AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund
+  ---
+  duration_ms: 4755.80307
+  type: 'test'
+  ...
+# Subtest: NEG-002 / TEAM-004 opt-in tracked terms edits accept one/reject one into revision two, preserve offer and require fresh approval
+ok 31 - NEG-002 / TEAM-004 opt-in tracked terms edits accept one/reject one into revision two, preserve offer and require fresh approval
+  ---
+  duration_ms: 3317.049352
+  type: 'test'
+  ...
+# Subtest: MIG-006 imports 200 contacts across 60 companies with reviewed custody, resumable apply and complete undo
+ok 32 - MIG-006 imports 200 contacts across 60 companies with reviewed custody, resumable apply and complete undo
+  ---
+  duration_ms: 15043.481628
+  type: 'test'
+  ...
+# Subtest: MIG-006 / CAT-001 unchanged PandaDoc catalog and contact layouts preserve exact prices, packages, image bytes and explicit company associations
+ok 33 - MIG-006 / CAT-001 unchanged PandaDoc catalog and contact layouts preserve exact prices, packages, image bytes and explicit company associations
+  ---
+  duration_ms: 3691.454529
+  type: 'test'
+  ...
+# Subtest: MIG-006 reviewed mapper supports original incumbent CSVs and holds identity conflicts without merging
+ok 34 - MIG-006 reviewed mapper supports original incumbent CSVs and holds identity conflicts without merging
+  ---
+  duration_ms: 2878.978283
+  type: 'test'
+  ...
+# Subtest: SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by upload, distinct from e-signature, then exports the deposit
+ok 35 - SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by upload, distinct from e-signature, then exports the deposit
+  ---
+  duration_ms: 4196.82398
+  type: 'test'
+  ...
+# Subtest: FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures
+ok 36 - FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures
+  ---
+  duration_ms: 11339.420719
+  type: 'test'
+  ...
+# Subtest: FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal
+ok 37 - FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal
+  ---
+  duration_ms: 18840.736979
+  type: 'test'
+  ...
+# Subtest: FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval
+ok 38 - FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval
+  ---
+  duration_ms: 32334.170517
+  type: 'test'
+  ...
+# Subtest: APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied
+ok 39 - APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied
+  ---
+  duration_ms: 24011.051496
+  type: 'test'
+  ...
+# Subtest: deposit signatures survive declines, required acceptance waits for Stripe success and due acceptance stays complete
+ok 40 - deposit signatures survive declines, required acceptance waits for Stripe success and due acceptance stays complete
+  ---
+  duration_ms: 5500.75205
+  type: 'test'
+  ...
+# Subtest: card fees require admin confirmation, remain separate and exempt ACH and prohibited billing states
+ok 41 - card fees require admin confirmation, remain separate and exempt ACH and prohibited billing states
+  ---
+  duration_ms: 2827.778417
+  type: 'test'
+  ...
+# Subtest: proposal methods copy template overrides or workspace defaults and remain independent
+ok 42 - proposal methods copy template overrides or workspace defaults and remain independent
+  ---
+  duration_ms: 2306.545015
+  type: 'test'
+  ...
+# Subtest: TRACK-001 opted-in views retain trusted coarse location, verification and device with quiet-period owner alerts
+ok 43 - TRACK-001 opted-in views retain trusted coarse location, verification and device with quiet-period owner alerts
+  ---
+  duration_ms: 3225.259922
+  type: 'test'
+  ...
+# Subtest: TRACK-004 disclosure, bounded retention and explicit erasure respect holds and owner authority
+ok 44 - TRACK-004 disclosure, bounded retention and explicit erasure respect holds and owner authority
+  ---
+  duration_ms: 3419.592049
+  type: 'test'
+  ...
+# Subtest: TRACK-001 measured views use trusted coarse locations, label identity, claim quiet-period alerts and preserve preview isolation
+ok 45 - TRACK-001 measured views use trusted coarse locations, label identity, claim quiet-period alerts and preserve preview isolation
+  ---
+  duration_ms: 2643.878572
+  type: 'test'
+  ...
+# Subtest: TRACK-004 owner retention and erasure remove views and dependent engagement without changing proposal records
+ok 46 - TRACK-004 owner retention and erasure remove views and dependent engagement without changing proposal records
+  ---
+  duration_ms: 2807.49596
+  type: 'test'
+  ...
+# Subtest: TRACK-002 reading events retain monotonic section times and validated package choices on the exact view
+ok 47 - TRACK-002 reading events retain monotonic section times and validated package choices on the exact view
+  ---
+  duration_ms: 4568.614831
+  type: 'test'
+  ...
+# Subtest: TRACK-003 forwarded viewers verify their own mailbox before owner conversion to an approver record without inherited signing authority
+ok 48 - TRACK-003 forwarded viewers verify their own mailbox before owner conversion to an approver record without inherited signing authority
+  ---
+  duration_ms: 2464.302583
+  type: 'test'
+  ...
+# Subtest: AUTO-004 scoped REST drafting, immutable owner keys and human-only authority
+ok 49 - AUTO-004 scoped REST drafting, immutable owner keys and human-only authority
+  ---
+  duration_ms: 2488.42736
+  type: 'test'
+  ...
+# Subtest: AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation
+ok 50 - AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation
+  ---
+  duration_ms: 4481.036521
+  type: 'test'
+  ...
+# Subtest: AUTO-004 published route reference matches live methods and webhook schemas both ways
+ok 51 - AUTO-004 published route reference matches live methods and webhook schemas both ways
+  ---
+  duration_ms: 2773.627307
+  type: 'test'
+  ...
+# Subtest: AUTO-004 terminal proposal projections
+    # Subtest: scoped status and analytics distinguish withdrawn and expired offers from live offers
+    ok 1 - scoped status and analytics distinguish withdrawn and expired offers from live offers
+      ---
+      duration_ms: 2521.558456
+      type: 'test'
+      ...
+    1..1
+ok 52 - AUTO-004 terminal proposal projections
+  ---
+  duration_ms: 2521.993851
+  type: 'suite'
+  ...
+# Subtest: AUTO-004 negotiated lifecycle delivery
+    # Subtest: receiver gets revised and approved events for each negotiated revision before it is sent
+    ok 1 - receiver gets revised and approved events for each negotiated revision before it is sent
+      ---
+      duration_ms: 2225.30304
+      type: 'test'
+      ...
+    1..1
+ok 53 - AUTO-004 negotiated lifecycle delivery
+  ---
+  duration_ms: 2225.457802
+  type: 'suite'
+  ...
+# Subtest: AUTO-004 complete lifecycle receiver coverage
+    # Subtest: receiver obtains all ten lifecycle types including every terminal outcome
+    ok 1 - receiver obtains all ten lifecycle types including every terminal outcome
+      ---
+      duration_ms: 2826.644441
+      type: 'test'
+      ...
+    1..1
+ok 54 - AUTO-004 complete lifecycle receiver coverage
+  ---
+  duration_ms: 2826.795468
+  type: 'suite'
+  ...
+# Subtest: AUTO-004 independently documented authority
+    # Subtest: each published method and route declares its independently expected scope
+    ok 1 - each published method and route declares its independently expected scope
+      ---
+      duration_ms: 1925.919576
+      type: 'test'
+      ...
+    1..1
+ok 55 - AUTO-004 independently documented authority
+  ---
+  duration_ms: 1926.106927
+  type: 'suite'
+  ...
+# Subtest: SIGN-004 sequential and parallel recipient groups complete only after every signature
+ok 56 - SIGN-004 sequential and parallel recipient groups complete only after every signature
+  ---
+  duration_ms: 9070.93729
+  type: 'test'
+  ...
+# Subtest: AUTO-002 completed agreements archive exact PDFs once under explicit current Drive authority and reconcile uncertain writes without replay
+ok 57 - AUTO-002 completed agreements archive exact PDFs once under explicit current Drive authority and reconcile uncertain writes without replay
+  ---
+  duration_ms: 84439.002765
+  type: 'test'
+  ...
+# Subtest: MIG-003 and MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo
+ok 58 - MIG-003 and MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo
+  ---
+  duration_ms: 20155.048389
+  type: 'test'
+  ...
+# Subtest: CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance and refuse changed source or authority without writes
+ok 59 - CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance and refuse changed source or authority without writes
+  ---
+  duration_ms: 7838.111223
+  type: 'test'
+  ...
+# Subtest: ACCT-002 reviewed Xero deposits preserve exact money, authority, unique mappings and uncertain-write holds
+ok 60 - ACCT-002 reviewed Xero deposits preserve exact money, authority, unique mappings and uncertain-write holds
+  ---
+  duration_ms: 7181.192586
+  type: 'test'
+  ...
+# PROBE B privacy: learning list, comparison and retained result doors -> unshared member template hidden; capture and retained reads refused 403 without writes; own and explicitly shared prices readable
+# PROBE AGENT-007 1: public comparison -> 100 decided per cohort; 30% and 70%; 200 exact sources; only revision three counted for revised sources
+# PROBE AGENT-007 2: capture and replay -> complete templates, prices, proposals, catalog and approvals unchanged; admin and agent refused; no apply door
+# Subtest: AGENT-007 owner compares 200 distinct decided proposals at exact revisions without applying template or price changes
+ok 61 - AGENT-007 owner compares 200 distinct decided proposals at exact revisions without applying template or price changes
+  ---
+  duration_ms: 26806.427813
+  type: 'test'
+  ...
+1..61
+# tests 61
+# suites 4
+# pass 61
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 610657.465583

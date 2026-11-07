@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "changed_files": [
+    ".github/workflows/verify.yml",
+    "scripts/verification/run.mjs",
+    "sources.lock.json"
+  ],
+  "contract_status_changes": [],
+  "generated_views_changed": false,
+  "diff_sha256": "0647732aef297f464a5780f47574e3f77e053bd9de79a49b3eba8aed44744935"
+}

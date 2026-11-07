@@ -1,0 +1,44 @@
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/demo.test.mjs
+ok 1 - tests/demo.test.mjs
+  ---
+  duration_ms: 891.271053
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy
+ok 2 - APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy
+  ---
+  duration_ms: 3158.434233
+  type: 'test'
+  ...
+# Subtest: APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once
+ok 3 - APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once
+  ---
+  duration_ms: 9909.057438
+  type: 'test'
+  ...
+# Subtest: APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests
+ok 4 - APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests
+  ---
+  duration_ms: 4344.776385
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied
+ok 5 - APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied
+  ---
+  duration_ms: 26510.055319
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 47290.815278

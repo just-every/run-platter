@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "mapping_total": 182,
+  "all_original_lifecycle_test_names_match_actual_baseline": true,
+  "all_182_unique_test_names_assigned_once_before_and_after": true,
+  "ordinary_full_run_also_once": true,
+  "product_commits": [
+    "2ca0bde5b85e32134bb2b987debaaaf6ee79c193",
+    "31a16502e6e3f1333d29bee7ce0096216adde95d"
+  ],
+  "only_allowed_committed_paths": [
+    ".github/workflows/verify.yml",
+    "scripts/verification/run.mjs",
+    "sources.lock.json"
+  ]
+}

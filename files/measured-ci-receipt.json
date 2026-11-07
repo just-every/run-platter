@@ -1,0 +1,25 @@
+{
+  "head": "31a16502e6e3f1333d29bee7ce0096216adde95d",
+  "run_id": 42329924078,
+  "workflow_status": "completed",
+  "workflow_conclusion": "success",
+  "shard_count": 8,
+  "shard_total_seconds": 4615.0,
+  "shard_mean_seconds": 576.875,
+  "longest_shard": {
+    "id": 128274077968,
+    "name": "shards (runtime)",
+    "status": "completed",
+    "conclusion": "success",
+    "seconds": 763.0
+  },
+  "longest_mean_ratio": 1.3226435536294692,
+  "core_seconds": 43.0,
+  "balance_ratio_passed": true,
+  "under_12_minutes_passed": false,
+  "ready": false,
+  "blocker": "Runtime 763 seconds exceeds the brief 720-second target. One measured rebalance is exhausted; no second composition pass is authorized.",
+  "timeout_increase_justified": false,
+  "mean_fraction_of_current_900_second_limit": 0.6409722222222223,
+  "remedy_threshold_fraction": 0.85
+}

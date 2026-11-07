@@ -1,0 +1,58 @@
+{
+  "failed_run": 42304206419,
+  "attempt": 2,
+  "timings": [
+    {
+      "name": "shards (business_lifecycle)",
+      "job_id": 128200790442,
+      "seconds": 915.0,
+      "conclusion": "cancelled"
+    },
+    {
+      "name": "shards (runtime)",
+      "job_id": 128200790447,
+      "seconds": 470.0,
+      "conclusion": "success"
+    },
+    {
+      "name": "shards (browser_commercial)",
+      "job_id": 128200790470,
+      "seconds": 602.0,
+      "conclusion": "success"
+    },
+    {
+      "name": "shards (archive_custody)",
+      "job_id": 128200790563,
+      "seconds": 569.0,
+      "conclusion": "success"
+    },
+    {
+      "name": "shards (archive_restore)",
+      "job_id": 128200790586,
+      "seconds": 477.0,
+      "conclusion": "success"
+    },
+    {
+      "name": "shards (archive_media)",
+      "job_id": 128200790593,
+      "seconds": 599.0,
+      "conclusion": "success"
+    },
+    {
+      "name": "shards (browser_documents)",
+      "job_id": 128200790596,
+      "seconds": 500.0,
+      "conclusion": "success"
+    },
+    {
+      "name": "shards (business_authoring)",
+      "job_id": 128200790601,
+      "seconds": 419.0,
+      "conclusion": "success"
+    }
+  ],
+  "lifecycle_duration_is_censored": true,
+  "green_main_run": 42301387270,
+  "green_main_head": "4b7577be21b4266e06fd1858109a9b2ca482bcda",
+  "green_main_note": "plan reused a green push run; shard jobs skipped, no full-run durations available in this main run. Thirty recent green main runs all finished under two minutes, consistent with reuse."
+}

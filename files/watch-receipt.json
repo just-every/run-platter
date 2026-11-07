@@ -1,0 +1,18 @@
+{
+  "run_id": 42329924078,
+  "head": "31a16502e6e3f1333d29bee7ce0096216adde95d",
+  "status": "in_progress",
+  "conclusion": null,
+  "html_url": "https://github.com/just-every/run-platter/actions/runs/42329924078",
+  "discovered_at": "2026-11-07T02:35:26.677323+00:00",
+  "discovered_epoch": 1794018926.677339,
+  "minimum_next_api_epoch": 1794019226.677341,
+  "planned_status_epoch": 1794019826.6773417,
+  "last_status": {
+    "conclusion": "success",
+    "head_sha": "31a16502e6e3f1333d29bee7ce0096216adde95d",
+    "html_url": "https://github.com/just-every/run-platter/actions/runs/42329924078",
+    "status": "completed"
+  },
+  "last_api_epoch": 1794019826.6775644
+}

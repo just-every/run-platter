@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "plan_unchanged": true,
+  "concurrency_unchanged": true,
+  "shards": 8,
+  "builds": {
+    "product": 1,
+    "site": 1
+  },
+  "checks": "equal matrix, no timeout increase, ubuntu-24.04, core/shard aggregate dependency, artifact name/path/hidden files/failure policy, allowed files only"
+}

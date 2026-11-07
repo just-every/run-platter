@@ -1,0 +1,38 @@
+{
+  "baseline_node": "22.20.0",
+  "baseline_tests": 61,
+  "baseline_passed": 61,
+  "baseline_wall_seconds": 610.657465583,
+  "baseline_leaf_seconds": 607.262294674,
+  "group_local_seconds": {
+    "reporting": 129.223669096,
+    "drive": 84.439002765,
+    "approvals": 40.68784317,
+    "learning": 26.806427813
+  },
+  "destinations": {
+    "reporting": "business_authoring",
+    "drive": "runtime",
+    "approvals": "browser_documents",
+    "learning": "archive_restore"
+  },
+  "model_scale": 1.5067624122640522,
+  "illustrative_hosted_seconds": {
+    "business_lifecycle": 491.36328657558823,
+    "runtime": 597.2295154953624,
+    "browser_commercial": 602.0,
+    "archive_custody": 569.0,
+    "archive_restore": 517.390917835698,
+    "archive_media": 599.0,
+    "browser_documents": 561.3069127246506,
+    "business_authoring": 613.7093673687007
+  },
+  "model_limitations": [
+    "Cancelled hosted lifecycle timing is censored. Local-to-hosted scale is approximate.",
+    "Repeated builds removed from browser shards are not subtracted from these estimates.",
+    "Final exact-SHA hosted durations, not these estimates, determine balance acceptance."
+  ],
+  "longest_estimate_seconds": 613.7093673687007,
+  "longest_mean_estimate_ratio": 1.0788123355195793,
+  "timeout_increase": false
+}

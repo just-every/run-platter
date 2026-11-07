@@ -1,0 +1,307 @@
+[
+  {
+    "name": "the demo opens on a lived-in studio and a send completes as mocked success",
+    "seconds": 3.801299813,
+    "passed": true
+  },
+  {
+    "name": "hosting preflight refuses incomplete account access before any build or deployment",
+    "seconds": 1.0656654129999998,
+    "passed": true
+  },
+  {
+    "name": "FOLLOW-004 verified client questions, native answers and one-use authenticated owner email replies",
+    "seconds": 4.269873873,
+    "passed": true
+  },
+  {
+    "name": "client questions are limited per invitation, and a refused question stores nothing and mails no one",
+    "seconds": 2.862331047,
+    "passed": true
+  },
+  {
+    "name": "MAIL-001 local proposal and verification mail are captured without provider contact",
+    "seconds": 2.3283922870000002,
+    "passed": true
+  },
+  {
+    "name": "MAIL-001 Managed relay sends proposal invitations and verification codes through its assigned endpoint",
+    "seconds": 2.280523301,
+    "passed": true
+  },
+  {
+    "name": "MAIL-001 hosted mail commits and claims before provider acceptance; timeout is uncertain and never resent",
+    "seconds": 18.116371833000002,
+    "passed": true
+  },
+  {
+    "name": "APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy",
+    "seconds": 2.7079022920000004,
+    "passed": true
+  },
+  {
+    "name": "FOLLOW-008 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap",
+    "seconds": 3.9737547490000003,
+    "passed": true
+  },
+  {
+    "name": "FOLLOW-001 / FOLLOW-006 / FOLLOW-011 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority",
+    "seconds": 10.482930461,
+    "passed": true
+  },
+  {
+    "name": "FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority",
+    "seconds": 4.876109564,
+    "passed": true
+  },
+  {
+    "name": "APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once",
+    "seconds": 9.659898384,
+    "passed": true
+  },
+  {
+    "name": "APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests",
+    "seconds": 4.3089909980000005,
+    "passed": true
+  },
+  {
+    "name": "AUTO-003 signed events reach Slack channels and approval requests reach verified Teams direct chats with session protected links",
+    "seconds": 14.945523997,
+    "passed": true
+  },
+  {
+    "name": "FOLLOW-003 sender expiry notices create dated follow-ups independently of signer warnings and follow extensions, workspace defaults and terminal states",
+    "seconds": 20.206998897000002,
+    "passed": true
+  },
+  {
+    "name": "FOLLOW-003 saved settings stay inactive and queued expiry email rechecks revocation, settings, sender demotion and revision authority",
+    "seconds": 4.282857337,
+    "passed": true
+  },
+  {
+    "name": "SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash",
+    "seconds": 6.023499016,
+    "passed": true
+  },
+  {
+    "name": "SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports",
+    "seconds": 25.867471729000002,
+    "passed": true
+  },
+  {
+    "name": "PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete, uncertain or interrupted mail without replay",
+    "seconds": 19.880302124,
+    "passed": true
+  },
+  {
+    "name": "HTTP-001 complete authorized domain dispatch journey and native auth, CSRF, roles and revocable agent boundary",
+    "seconds": 4.121906332,
+    "passed": true
+  },
+  {
+    "name": "PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations invalidate old authority",
+    "seconds": 2.602950203,
+    "passed": true
+  },
+  {
+    "name": "email verification precedes acceptance, code is single-use, immutable option and deposit exported once",
+    "seconds": 2.2800533919999997,
+    "passed": true
+  },
+  {
+    "name": "SIGN-001 complete verified-mailbox acceptance journey",
+    "seconds": 12.319512627,
+    "passed": true
+  },
+  {
+    "name": "money rejects malformed or unsafe prices and cannot export an unaccepted proposal",
+    "seconds": 2.23762952,
+    "passed": true
+  },
+  {
+    "name": "Client CSV dry run, fingerprint custody, journal, replay and undo through HTTP",
+    "seconds": 2.7348074099999997,
+    "passed": true
+  },
+  {
+    "name": "import undo preserves clients with dependent proposals; owner erasure fences unused client",
+    "seconds": 2.6615821879999997,
+    "passed": true
+  },
+  {
+    "name": "COLLAB-003 every saved revision has an author/time, comparisons highlight changes, restore creates unapproved revision four",
+    "seconds": 2.632641684,
+    "passed": true
+  },
+  {
+    "name": "NEG-001 negotiated offer requires exact approval, preserves the live offer until send, compares changes and accepts revision two",
+    "seconds": 3.2740096239999996,
+    "passed": true
+  },
+  {
+    "name": "FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership",
+    "seconds": 85.55007786,
+    "passed": true
+  },
+  {
+    "name": "AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund",
+    "seconds": 4.75580307,
+    "passed": true
+  },
+  {
+    "name": "NEG-002 / TEAM-004 opt-in tracked terms edits accept one/reject one into revision two, preserve offer and require fresh approval",
+    "seconds": 3.317049352,
+    "passed": true
+  },
+  {
+    "name": "MIG-006 imports 200 contacts across 60 companies with reviewed custody, resumable apply and complete undo",
+    "seconds": 15.043481628,
+    "passed": true
+  },
+  {
+    "name": "MIG-006 / CAT-001 unchanged PandaDoc catalog and contact layouts preserve exact prices, packages, image bytes and explicit company associations",
+    "seconds": 3.691454529,
+    "passed": true
+  },
+  {
+    "name": "MIG-006 reviewed mapper supports original incumbent CSVs and holds identity conflicts without merging",
+    "seconds": 2.878978283,
+    "passed": true
+  },
+  {
+    "name": "SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by upload, distinct from e-signature, then exports the deposit",
+    "seconds": 4.1968239800000005,
+    "passed": true
+  },
+  {
+    "name": "FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures",
+    "seconds": 11.339420719,
+    "passed": true
+  },
+  {
+    "name": "FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal",
+    "seconds": 18.840736979000003,
+    "passed": true
+  },
+  {
+    "name": "FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval",
+    "seconds": 32.334170517,
+    "passed": true
+  },
+  {
+    "name": "APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied",
+    "seconds": 24.011051496,
+    "passed": true
+  },
+  {
+    "name": "deposit signatures survive declines, required acceptance waits for Stripe success and due acceptance stays complete",
+    "seconds": 5.50075205,
+    "passed": true
+  },
+  {
+    "name": "card fees require admin confirmation, remain separate and exempt ACH and prohibited billing states",
+    "seconds": 2.827778417,
+    "passed": true
+  },
+  {
+    "name": "proposal methods copy template overrides or workspace defaults and remain independent",
+    "seconds": 2.306545015,
+    "passed": true
+  },
+  {
+    "name": "TRACK-001 opted-in views retain trusted coarse location, verification and device with quiet-period owner alerts",
+    "seconds": 3.2252599220000002,
+    "passed": true
+  },
+  {
+    "name": "TRACK-004 disclosure, bounded retention and explicit erasure respect holds and owner authority",
+    "seconds": 3.419592049,
+    "passed": true
+  },
+  {
+    "name": "TRACK-001 measured views use trusted coarse locations, label identity, claim quiet-period alerts and preserve preview isolation",
+    "seconds": 2.643878572,
+    "passed": true
+  },
+  {
+    "name": "TRACK-004 owner retention and erasure remove views and dependent engagement without changing proposal records",
+    "seconds": 2.8074959600000002,
+    "passed": true
+  },
+  {
+    "name": "TRACK-002 reading events retain monotonic section times and validated package choices on the exact view",
+    "seconds": 4.568614831,
+    "passed": true
+  },
+  {
+    "name": "TRACK-003 forwarded viewers verify their own mailbox before owner conversion to an approver record without inherited signing authority",
+    "seconds": 2.4643025830000003,
+    "passed": true
+  },
+  {
+    "name": "AUTO-004 scoped REST drafting, immutable owner keys and human-only authority",
+    "seconds": 2.48842736,
+    "passed": true
+  },
+  {
+    "name": "AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation",
+    "seconds": 4.481036521,
+    "passed": true
+  },
+  {
+    "name": "AUTO-004 published route reference matches live methods and webhook schemas both ways",
+    "seconds": 2.7736273070000004,
+    "passed": true
+  },
+  {
+    "name": "AUTO-004 terminal proposal projections scoped status and analytics distinguish withdrawn and expired offers from live offers",
+    "seconds": 2.521558456,
+    "passed": true
+  },
+  {
+    "name": "AUTO-004 negotiated lifecycle delivery receiver gets revised and approved events for each negotiated revision before it is sent",
+    "seconds": 2.2253030399999996,
+    "passed": true
+  },
+  {
+    "name": "AUTO-004 complete lifecycle receiver coverage receiver obtains all ten lifecycle types including every terminal outcome",
+    "seconds": 2.826644441,
+    "passed": true
+  },
+  {
+    "name": "AUTO-004 independently documented authority each published method and route declares its independently expected scope",
+    "seconds": 1.925919576,
+    "passed": true
+  },
+  {
+    "name": "SIGN-004 sequential and parallel recipient groups complete only after every signature",
+    "seconds": 9.07093729,
+    "passed": true
+  },
+  {
+    "name": "AUTO-002 completed agreements archive exact PDFs once under explicit current Drive authority and reconcile uncertain writes without replay",
+    "seconds": 84.439002765,
+    "passed": true
+  },
+  {
+    "name": "MIG-003 and MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo",
+    "seconds": 20.155048389,
+    "passed": true
+  },
+  {
+    "name": "CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance and refuse changed source or authority without writes",
+    "seconds": 7.838111223,
+    "passed": true
+  },
+  {
+    "name": "ACCT-002 reviewed Xero deposits preserve exact money, authority, unique mappings and uncertain-write holds",
+    "seconds": 7.181192586,
+    "passed": true
+  },
+  {
+    "name": "AGENT-007 owner compares 200 distinct decided proposals at exact revisions without applying template or price changes",
+    "seconds": 26.806427813,
+    "passed": true
+  }
+]

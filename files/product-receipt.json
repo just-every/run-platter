@@ -1,0 +1,44 @@
+{
+  "repository": "just-every/run-platter",
+  "branch": "cloud/sx-platter-ci-critical-path-1",
+  "head": "2ca0bde5b85e32134bb2b987debaaaf6ee79c193",
+  "base": "4b7577be21b4266e06fd1858109a9b2ca482bcda",
+  "product_pushed": true,
+  "remote_head": "2ca0bde5b85e32134bb2b987debaaaf6ee79c193",
+  "product_checkout_clean": true,
+  "product_commits": [
+    "2ca0bde5b85e32134bb2b987debaaaf6ee79c193",
+    "31a16502e6e3f1333d29bee7ce0096216adde95d"
+  ],
+  "ready": false,
+  "status": "BLOCKED",
+  "blocker": "Runtime 763 seconds exceeds the brief 720-second target. One measured rebalance is exhausted; no second composition pass is authorized.",
+  "latest_save_skip_ci": true,
+  "latest_save_verify": "not requested; intermediate preservation save uses [skip ci]",
+  "measured_ci_head": "31a16502e6e3f1333d29bee7ce0096216adde95d",
+  "measured_ci_run_id": 42329924078,
+  "measured_ci_status": "completed/success",
+  "measured_ci_longest_shard": {
+    "id": 128274077968,
+    "name": "shards (runtime)",
+    "status": "completed",
+    "conclusion": "success",
+    "seconds": 763.0
+  },
+  "measured_ci_mean_seconds": 576.875,
+  "measured_ci_longest_mean_ratio": 1.3226435536294692,
+  "core_seconds": 43,
+  "ci_commands_unchanged_by_preservation_fix": true,
+  "test_counts": {
+    "push_before": 182,
+    "push_after": 182,
+    "ordinary_full_before": 182,
+    "ordinary_full_after": 182
+  },
+  "clause_status_changes": [],
+  "github_calls_used": 10,
+  "timeout_increase": false,
+  "rebalance_passes": 1,
+  "next_ruling_needed": "Authorize another shard-composition pass. Current mean is 64.1% of 15m; no proof justifies raising the timeout.",
+  "finished_at_utc": "2026-11-07T02:57:44.288828+00:00"
+}

@@ -1,0 +1,1 @@
+CREATE TABLE p_drive_oauth(state_hash TEXT PRIMARY KEY,operator_id TEXT NOT NULL REFERENCES oa_operators(id),operator_version INTEGER NOT NULL,member_version INTEGER NOT NULL,connection_version INTEGER NOT NULL,sealed TEXT NOT NULL,expires_at INTEGER NOT NULL,consumed_at INTEGER);

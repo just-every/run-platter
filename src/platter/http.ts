@@ -1,8 +1,11 @@
 import { clientOfflineInvoices } from './offline-invoice-view'
 import { offlineAccountingState } from './offline-accounting'
 import { financeRoles } from './payment-allocations'
+import { captureLearning, learningVersions, readLearning, learningSource } from './reports/template-learning'
+import { templateLearningPage } from './ui/template-learning'
 import { hubspotCardData, hubspotCardResponse } from './crm/hubspot-card'
 import { crmDraftSources } from './crm/hubspot-draft'
+import { driveAuthorize, driveCallback } from './drive-oauth'
 import { archiveState } from './archiving/jobs'
 import { clientLocale } from './locales'
 import { fixedPagePreview, importDocument, exportDocument } from './documents/import-export'
@@ -63,7 +66,7 @@ import { renderApp,renderClient,renderMissing } from './ui'
 import { need,fail,type Actor } from './model'
 const headers={'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}
 const json=(v:unknown,status=200)=>Response.json(v,{status,headers})
-const pages=new Set(['/app/crm-card','/app','/app/proposal','/app/clients','/app/import','/app/access','/app/audit','/app/settings','/app/team','/app/approvals','/app/library','/app/catalog'])
+const pages=new Set(['/app/template-learning','/app/crm-card','/app','/app/proposal','/app/clients','/app/import','/app/access','/app/audit','/app/settings','/app/team','/app/approvals','/app/library','/app/catalog'])
 async function body(request:Request,maxBytes=150000){const raw=await request.text();need(new TextEncoder().encode(raw).length<=maxBytes,'Request too large',413);if(request.headers.get('content-type')?.includes('application/json')){let v;try{v=JSON.parse(raw)}catch{fail('Invalid JSON')}need(v&&typeof v==='object'&&!Array.isArray(v),'Expected an object');return v as Record<string,unknown>}need(request.headers.get('content-type')?.includes('application/x-www-form-urlencoded'),'Use JSON or a form',415);return Object.fromEntries(new URLSearchParams(raw))}
 export async function platterResponse(request:Request,original:Bindings):Promise<Response|null>{const env=runtimeBindings(original),url=new URL(request.url),path=url.pathname,isClient=path.startsWith('/p/'),isAgent=path.startsWith('/api/platter/agent/');if(!isClient&&!path.startsWith('/api/platter/')&&path!=='/app'&&!path.startsWith('/app/'))return null
  let actor:Actor|undefined;const requestedBack=new URL(url.searchParams.get('returnTo')||'/app',env.AUTH_ORIGIN);const back=requestedBack.origin===env.AUTH_ORIGIN&&pages.has(requestedBack.pathname)?requestedBack.pathname+requestedBack.search:'/app';let context:any,submitted:Record<string,unknown>|undefined
@@ -91,6 +94,33 @@ export async function platterResponse(request:Request,original:Bindings):Promise
   }
   if(path==='/api/platter/crm/card')return await hubspotCardResponse(env,request)
   actor=await principal(request,env,isAgent)
+  if(path==='/api/platter/drive/authorize'){
+   need(request.method==='POST'&&request.headers.get('origin')===env.AUTH_ORIGIN,'Authorize from this installation',403)
+   const result=await driveAuthorize(env,actor,await body(request))
+   if(request.headers.get('content-type')?.includes('application/x-www-form-urlencoded'))return document('Connect Google Drive','<section><p>Authorize app-selected Drive files and folders. Existing archive work stays held; fresh authorization applies to future completions.</p><a href="'+escape(result.url)+'" rel="noreferrer">Continue to Google</a></section>',{actor,path:'/app/settings'})
+   return new Response(null,{status:303,headers:{...headers,location:result.url}})
+  }
+  if(path==='/api/platter/drive/callback'){
+   need(request.method==='GET','Use the provider callback',405)
+   const id=await driveCallback(env,actor,url);await recordAudit(env.DB,actor,'drive.connected',id)
+   return new Response(null,{status:303,headers:{...headers,location:'/app/settings'}})
+  }
+  if(path==='/app/template-learning'||path==='/api/platter/template-learning'||path==='/api/platter/template-learning/source'){
+   need(actor.role==='owner','Only the owner reads template learning',403)
+   if(request.method==='POST'){
+    need(path!=='/api/platter/template-learning/source','Source inspection is read-only',405)
+    const input=await body(request)
+    if(path==='/app/template-learning')for(const key of ['baseline','comparison']){let selected;try{selected=JSON.parse(String(input[key]))}catch{fail('Choose a template version')};input[key]={...selected,packageCount:input[key+'Count']}}
+    const result=await captureLearning(env.DB,actor,input)
+    return path.startsWith('/api/')?json(result):new Response(null,{status:303,headers:{...headers,location:'/app/template-learning?id='+encodeURIComponent(result.id)}})
+   }
+   const id=url.searchParams.get('id'),sourceId=url.searchParams.get('source')
+   if(path.endsWith('/source'))return json(await learningSource(env.DB,actor,id,sourceId))
+   const report=id?await readLearning(env.DB,actor,id):undefined
+   if(path.startsWith('/api/'))return json(report??{versions:await learningVersions(env.DB,actor)})
+   const source=sourceId?await learningSource(env.DB,actor,id,sourceId):undefined
+   return document('Template learning',templateLearningPage(await learningVersions(env.DB,actor),report,source),{actor,path,zone:await installationZone(env.DB)})
+  }
   if(path==='/api/platter/mailbox/authorize'){
    need(request.method==='POST'&&request.headers.get('origin')===env.AUTH_ORIGIN,'Authorize from this installation',403)
    const result=await mailboxAuthorize(env,actor,await body(request))
@@ -142,7 +172,7 @@ export async function platterResponse(request:Request,original:Bindings):Promise
    if(isAgent)need(['proposal.prepare','proposal.revise'].includes(name),'Agents only prepare proposal drafts',403)
    let result=name==='member.invite'?await inviteMember(env,actor,input,request):name==='send-request.resolve'?await resolveSendRequest(env.DB,actor,input):name.startsWith('agent.')?await credentialCommand(env.DB,actor,name,input):name.startsWith('document-import.')?await documentImportCommand(env.DB,actor,name,input):name.startsWith('import.')?await importCommand(env.DB,actor,name,input):await command(env,actor,name,input)
    const subject=String(name==='member.zone'?actor.id:name==='workspace.defaults'?'installation':(result as any)?.job?.id??(result as any)?.id??input.id??'clients');if(name!=='dispute.authorize'&&!name.startsWith('question.')&&name!=='proposal.withdraw'&&name!=='proposal.lose'&&name!=='proposal.test-mail')await recordAudit(env.DB,actor,name,subject)
-   if(path==='/app/action'){if(name==='document-import.create')return new Response(null,{status:303,headers:{...headers,location:'/app/import'}});if(name==='proposal.duplicate'||name==='template.start'||name==='crm.deal.apply')return new Response(null,{status:303,headers:{...headers,location:'/app/proposal?id='+encodeURIComponent(String((result as any).id))}});if(name.startsWith('document-import.'))result={...result as any,documentMovein:true};if(name.startsWith('business-import.'))result={...result as any,businessInput:input};if(['import.preview','import.apply'].includes(name))result={...result as any,csv:input.csv};const returnPath=back==='/app/proposal'?back+'?id='+encodeURIComponent(String(input.id??(result as any)?.id??'')):back;return renderApp(await state(env,actor),returnPath,{message:name==='dispute.submit'?String(result.message??'This submission is already recorded. Check its status below.'):name==='member.invite'?String(result.message??'Invitation sent. The selected role and teams apply only after verified acceptance.'):name==='payment.refund'?String(result.message??'Refund request already recorded. Check its status below.'):name==='proposal.test-mail'?'Test queued to your sign-in address. No client invitation was sent.':'Saved.',result})}
+   if(path==='/app/action'){if(['notification.route','notification.route.remove'].includes(name))return new Response(null,{status:303,headers:{...headers,location:back}});if(name==='document-import.create')return new Response(null,{status:303,headers:{...headers,location:'/app/import'}});if(name==='proposal.duplicate'||name==='template.start'||name==='crm.deal.apply'||name==='crm.pipedrive.apply'||name==='crm.zoho.apply')return new Response(null,{status:303,headers:{...headers,location:'/app/proposal?id='+encodeURIComponent(String((result as any).id))}});if(name.startsWith('document-import.'))result={...result as any,documentMovein:true};if(name.startsWith('business-import.'))result={...result as any,businessInput:input};if(['import.preview','import.apply'].includes(name))result={...result as any,csv:input.csv};const returnPath=back==='/app/proposal'?back+'?id='+encodeURIComponent(String(input.id??(result as any)?.id??'')):back;return renderApp(await state(env,actor),returnPath,{message:name==='dispute.submit'?String(result.message??'This submission is already recorded. Check its status below.'):name==='member.invite'?String(result.message??'Invitation sent. The selected role and teams apply only after verified acceptance.'):name==='payment.refund'?String(result.message??'Refund request already recorded. Check its status below.'):name==='proposal.test-mail'?'Test queued to your sign-in address. No client invitation was sent.':'Saved.',result})}
    return json(result)
   }
   return path.startsWith('/app')?renderMissing():json({error:'Not found'},404)

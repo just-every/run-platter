@@ -173,3 +173,11 @@ when those execution capabilities ship.
 
 The follow-up queue ranks package values using one-off value plus the first
 year of recurring fees, retaining separate currency totals.
+
+## Provider connection recovery
+
+Settings shows a broken workspace connection when a provider confirms that its credential was revoked or lacks the requested access. Reconnect explicitly. Held archive jobs, CRM attempts, chat messages and refunds stay available for review and never restart merely because a connection was replaced. Confirm the provider outcome before starting new work; refunds and uncertain writes retain their original reservations.
+
+When the installation has a Google Drive OAuth application configured, Settings offers **Authorize Google Drive**. It requests only files and folders selected for this app, not general Drive access. Google must make the chosen destination available to the app before archiving can use it. Authorization renews through an encrypted refresh grant. The owner or an admin must separately review the account, destination and naming pattern for future completed agreements. A restore requires a new connection and fresh authorization.
+
+A temporary provider refusal, rate limit or ambiguous request holds the affected operation without declaring the credential broken. Temporary mailbox refresh failures also hold the message instead of switching carrier. Confirmed mailbox credential refusal keeps the existing visible installation-sender fallback. No uncertain send is retried automatically.

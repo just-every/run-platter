@@ -1,6 +1,6 @@
 # Internal notifications
 
-Notifications use the existing signed-in command endpoint at `/api/platter/command`. Each request has a `name` and an `input` object. These commands do not grant a new session or create a client invitation. Settings screens and Nook are still pending.
+Notifications use the existing signed-in command endpoint at `/api/platter/command`. Each request has a `name` and an `input` object. These commands do not grant a new session or create a client invitation. Owners and admins manage the existing routes in **Settings**, under **Chat notifications**. Nook remains pending.
 
 - `provider.connect` accepts the existing Slack connection or the `teams` provider, which verifies the connected Microsoft Graph user. Tokens stay encrypted and never enter notification history or archives.
 - `notification.route` requires an owner or admin, `consent: true`, an `event` of `approval`, `signed` or `followup`, a `provider` of `slack` or `teams`, a `kind` of `channel` or `direct`, and the provider `destination` identifier. Direct routes also name an active `operatorId`. Slack verifies that user's email and workspace. Teams currently accepts only a verified one-to-one chat containing the connected user and the named member. Slack channels must be active and joined. Approval routes are always direct.
@@ -15,7 +15,7 @@ The existing scheduled Worker processes notifications. Channel events contain ge
 
 Archives preserve requests, settings, route metadata and completed sender notice facts. They exclude provider secrets, queued notification bodies and all activation authority. Restoring history never sends notifications. Historical approval requests are retained for custody; they do not automatically reactivate.
 
-The explicit-consent default and limited channel disclosure await ct approval. The contract remains partial. Future Nook, mobile push, watcher, template and renewal work must extend these same public-door proofs before claiming completion.
+The 23 October ct ruling approves explicit owner and admin consent, generic channel events with protected links, verified direct approval recipients and inactive restoration. The contract remains partial for Nook, broader events, chat-native approval interactions and live-provider qualification. Future Nook, mobile push, watcher, template and renewal work must extend these same public-door proofs before claiming completion.
 
 ## Internal collaboration
 
@@ -23,7 +23,7 @@ Open a proposal and use **Internal collaboration** to comment on its scope, pric
 
 Choose **Assign a section**, its block, assignee and calendar due date, then explicitly authorize the notices. Assignment and comment history retain their block title, author, revision and time. Resolution preserves the thread. Internal threads never enter client pages, client API projections or proposal PDFs. They are not copied into proposal templates or duplicated proposals.
 
-An owner or admin can explicitly authorize an existing verified notification route for collaboration in **Settings**, under **Internal collaboration notices**. First create that route through the documented `notification.route` command. Direct notices match the named recipient; channel notices contain only generic text and a session-protected link. Revoking the original route with `notification.route.remove` or disconnecting its provider stops its collaboration notices too.
+An owner or admin can explicitly authorize an existing verified notification route for collaboration in **Settings**, under **Internal collaboration notices**. First verify and authorize that route in **Chat notifications**, or use the documented `notification.route` command. Direct notices match the named recipient; channel notices contain only generic text and a session-protected link. Revoking the original route with `notification.route.remove` or disconnecting its provider stops its collaboration notices too.
 
 The command endpoint also accepts:
 
@@ -33,3 +33,9 @@ The command endpoint also accepts:
 - `collaboration.route`: an existing verified `routeId` and `consent: true`; owner and admins only.
 
 These commands use existing sessions, live proposal scopes and transaction-time authority. Delivery rechecks current revision, both members and route consent before provider requests. Lost receipts are held without automatic retry. Archives preserve internal threads and event history but exclude queued notices and activation authority; a restore never sends them.
+
+## Chat route settings
+
+Connect Slack or Microsoft Teams in **Workspace provider connections**. Connecting the account does not authorize any route. In **Chat notifications**, expand **Authorize a Slack channel** for generic signed or follow-up notices, or **Authorize a direct message** for the existing signed, follow-up or approval events. Select an active direct recipient and enter the Slack user id or Teams one-to-one chat id. Check the consent box and choose **Verify and authorize**. The provider must confirm the destination before any authorization is stored; approval routes always use a verified direct approver.
+
+The route list retains the event, carrier, destination, direct recipient, configuration time and current authorization state. Loading or refreshing Settings never authorizes a route or contacts its provider. Successful authorization and revocation return to a read-only Settings page. **Revoke route authorization** stops queued and future sends while retaining the historical destination. Dispatch also requires a current connected provider, the authorizing person's current owner or admin authority, an active matching direct recipient and the existing proposal scope. Restored routes remain inactive, including after account reconnection; explicitly verify and authorize a new route for future notices.

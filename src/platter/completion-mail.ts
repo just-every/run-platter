@@ -1,8 +1,15 @@
+import { clientLocales, clientText } from './locales'
 import type { Bindings } from '../auth.server'
 import { actorById } from './credentials'
 import { agreementArtifact } from './documents/agreement'
 import { collectionView } from './collection'
 import { need } from './model'
+
+// Keep recipient-language completion copy inside the guarded attachment pipeline.
+function completionText(text:string){
+ const literal=(value:string)=>"'"+value.replaceAll("'","''")+"'"
+ return 'CASE m.mail_locale '+clientLocales.map(locale=>'WHEN '+literal(locale)+' THEN '+literal(clientText(text,locale))).join(' ')+' ELSE '+literal(text)+' END'
+}
 
 /** Only a new eligible acceptance can create transport and its local execution grant. */
 export function completionMailStatements(env:Bindings,id:string){
@@ -47,10 +54,16 @@ export function readyCompletionStatements(env:Bindings,id:string){
  ON CONFLICT DO NOTHING`).bind(id))
  writes.push(db.prepare(`INSERT INTO p_mail(id,proposal_id,recipient,subject,body,status,created_at,sender_id,provider,proposal_revision)
  SELECT m.mail_id,a.proposal_id,m.recipient,
- 'Agreement complete: '||json_extract(a.snapshot,'$.title'),
- 'The signed agreement PDF and certificate of completion for revision '||a.revision||' are attached.',
+ ${completionText('Agreement complete: ')}||json_extract(a.snapshot,'$.title'),
+ ${completionText('The signed agreement PDF and certificate of completion for revision ')}||a.revision||${completionText(' are attached.')},
  ?,a.accepted_at,g.owner_id,?,a.revision
- FROM p_completion_mail m JOIN p_completion_authority g ON g.proposal_id=m.proposal_id
+ FROM (SELECT m.*,CASE WHEN m.party='firm' THEN 'en'
+ ELSE COALESCE(NULLIF(COALESCE(
+ (SELECT locale FROM p_recipient_locales WHERE proposal_id=m.proposal_id AND slot_id=substr(m.party,11)),
+ (SELECT locale FROM p_client_locales WHERE proposal_id=m.proposal_id)),'auto'),
+ (SELECT l.locale FROM p_invitation_languages l JOIN p_shares s ON s.token=l.token
+ WHERE s.proposal_id=m.proposal_id AND (s.recipient=m.recipient OR s.recipient IS NULL) ORDER BY s.rowid DESC LIMIT 1),'en') END AS mail_locale
+ FROM p_completion_mail m) m JOIN p_completion_authority g ON g.proposal_id=m.proposal_id
  JOIN p_acceptances a ON a.proposal_id=m.proposal_id AND a.revision=m.revision
  WHERE m.proposal_id=? AND m.recipient IS NOT NULL ON CONFLICT DO NOTHING`).bind(env.AUTH_LOCAL==='true'&&env.RER_DEMO!=='1'?'local':'pending',env.MAIL_PROVIDER??null,id))
  return writes

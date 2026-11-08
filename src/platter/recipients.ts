@@ -1,3 +1,4 @@
+import { clientLocale, clientText, clientLocales, recipientMailLocale, retireInvitations } from './locales'
 import { copyCosts } from './internal-pricing'
 import { documentOf, fieldSlot } from './documents/blocks'
 import type { Bindings } from '../auth.server'
@@ -5,6 +6,7 @@ import { commit, email, exact, need, secret, snapshot, text, type Actor } from '
 import { permitted } from './permissions'
 import { currentTime } from './expiry-time'
 import { invitationMail } from './invitation-mail'
+import { proposalMail } from './mail'
 
 export type Recipient = {id:string;name:string;email:string|null;role:'signer'|'approver'|'viewer'|'cc'|'countersigner';group:number}
 export function recipientPlan(row:any):Recipient[]{return typeof row.recipient_plan==='string'?JSON.parse(row.recipient_plan):row.recipient_plan??[]}
@@ -44,8 +46,11 @@ export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record
    need((url.protocol==='https:'||written===env.AUTH_ORIGIN)&&url.origin===written&&!url.hostname.includes('*')&&!url.username&&!url.password,'Use an exact secure site origin without a path, credentials or wildcard')
    origin=url.origin
   }
+  const locale=p.locale===undefined?row.client_locale??'en':String(p.locale)
+  need(clientLocales.includes(locale as any)||locale==='auto','Choose a supported client language')
   const token=secret()
   await commit(db,a,[
+   db.prepare('INSERT INTO p_recipient_locales(proposal_id,slot_id,locale) VALUES(?,?,?)').bind(row.id,recipient.id,locale),
    db.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient,slot_id,embed_origin) VALUES(?,?,?,?,?,?)').bind(row.id,row.revision,token,recipient.email,recipient.id,origin),
    db.prepare('UPDATE p_proposals SET recipient_plan=?,version=version+1 WHERE id=?').bind(JSON.stringify([...plan,recipient]),row.id),
   ],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND revision=? AND status='sent')",values:[row.id,row.version,row.revision]})
@@ -59,7 +64,7 @@ export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record
   const next=plan.filter(r=>r.id!==id)
   if(row.status!=='sent')return recipientCommand(env,a,'recipient.save',{...p,recipients:next})
   await commit(db,a,[
-   db.prepare('INSERT INTO p_replaced_links(token,proposal_id,revision) SELECT token,proposal_id,revision FROM p_shares WHERE proposal_id=? AND slot_id=? ON CONFLICT DO NOTHING').bind(row.id,id),
+   retireInvitations(db,row.id,id),
    db.prepare('DELETE FROM p_shares WHERE proposal_id=? AND slot_id=?').bind(row.id,id),
    db.prepare("UPDATE p_mail SET status='uncertain',held_reason='recipient_removed' WHERE proposal_id=? AND recipient=? AND status='pending'").bind(row.id,removed.email),
    db.prepare('DELETE FROM p_mail_reply_keys WHERE proposal_id=? AND recipient=?').bind(row.id,removed.email),
@@ -91,6 +96,10 @@ export async function recipientCommand(env:Bindings,a:Actor,name:string,p:Record
 export async function recipientInvitations(env:Bindings,a:Actor,input:Record<string,unknown>,row:any,at:number){
  const plan=recipientPlan(row)
  if(!plan.length)return null
+ // Untouched composer text is a system default, resolved for each recipient.
+ // Editing either field preserves both submitted fields as authored mail.
+ const defaults=proposalMail(row.title,'',clientLocale(row))
+ if(input.defaultInvitation==='yes'&&input.mailSubject===defaults[0].slice(0,200)&&input.mailMessage===defaults[1].trimEnd())input={...input,localizedDefaults:'yes'}
  need(a.role==='owner','Only the current owner sends configured recipient invitations',403)
  need(plan.some(r=>r.role==='signer'),'Include a client signer before sending',409)
  need(plan.every(r=>!requiredRecipient(r)||r.email),'Fill every required recipient slot before sending: '+plan.filter(r=>requiredRecipient(r)&&!r.email).map(r=>r.name).join(', '),409)
@@ -100,12 +109,12 @@ export async function recipientInvitations(env:Bindings,a:Actor,input:Record<str
  need(!signatures.some(s=>!s.voided_at),'Withdraw this partly signed revision before issuing fresh invitations',409)
  const links=plan.filter(r=>r.email).map(r=>({...r,token:secret()}))
  const writes:D1PreparedStatement[]=[
-  env.DB.prepare('INSERT INTO p_replaced_links(token,proposal_id,revision) SELECT token,proposal_id,revision FROM p_shares WHERE proposal_id=? ON CONFLICT DO NOTHING').bind(row.id),
+  retireInvitations(env.DB,row.id),
   env.DB.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(row.id),
  ]
  for(const r of links){
   const url=env.AUTH_ORIGIN+'/p/'+r.token
-  writes.push(env.DB.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient,slot_id,signing_position) VALUES(?,?,?,?,?,?)').bind(row.id,row.revision,r.token,r.email,r.id,r.group),...invitationMail(env,a,input,row,r.email!,url,at))
+  writes.push(env.DB.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient,slot_id,signing_position) VALUES(?,?,?,?,?,?)').bind(row.id,row.revision,r.token,r.email,r.id,r.group),...invitationMail(env,a,input,{...row,client_locale:(await env.DB.prepare('SELECT locale FROM p_recipient_locales WHERE proposal_id=? AND slot_id=?').bind(row.id,r.id).first<{locale:string}>())?.locale??row.client_locale},r.email!,url,at))
  }
  return {writes,links:links.map(({token,...r})=>({...r,shareUrl:env.AUTH_ORIGIN+'/p/'+token}))}
 }

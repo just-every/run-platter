@@ -1,3 +1,4 @@
+import { ui, renderingLocale } from '../locales'
 import { paymentTerms } from '../payment-terms'
 import { documentOf } from '../documents/blocks'
 import { sectionConditions } from '../conditional'
@@ -11,16 +12,17 @@ export function changes(before: any, after: any): string {
  if(JSON.stringify(documentOf(before))!==JSON.stringify(documentOf(after))){const old=documentSummary(before),next=documentSummary(after);rows.push(['Document blocks and brand',old,next+(old===next?' (media or recipient binding changed)':'')])}
  const ids = new Set([...before.options, ...after.options].map((option: any) => option.id))
  for (const id of ids) {
+  const labelId=renderingLocale()==='en'?id:id==='one'?'1':id==='two'?'2':id
   const old = before.options.find((option: any) => option.id === id), next = after.options.find((option: any) => option.id === id)
-  if(JSON.stringify(old?.tables??[])!==JSON.stringify(next?.tables??[])){const detail=(o:any)=>(o?.tables??[]).map((t:any)=>t.name+'\n'+t.lines.map((l:any)=>`${l.group}: ${l.name} — ${l.description} — ${l.quantity} ${l.unit} × ${l.unitPrice} = ${money(l.lineTotalCents,after.currency)}`).join('\n')).join('\n')||'No pricing tables';rows.push([`Option ${id} pricing tables`,detail(old),detail(next)])}
-  if(JSON.stringify(old?.optionalItems??[])!==JSON.stringify(next?.optionalItems??[])){const detail=(o:any)=>(o?.optionalItems??[]).map((x:any)=>`${x.label}: ${money(x.unitCents,after.currency)} × ${x.quantity} (${x.min}–${x.max}, ${x.editable?'client-editable':'fixed'})`).join('\n')||'No optional items';rows.push([`Option ${id} optional items`,detail(old),detail(next)])}
-  rows.push([`Option ${id} label`, old?.label ?? 'Not offered', next?.label ?? 'Not offered'], [`Option ${id} price`, old ? money(old.cents, before.currency ?? 'AUD') : 'Not offered', next ? money(next.cents, after.currency ?? 'AUD') : 'Not offered'])
+  if(JSON.stringify(old?.tables??[])!==JSON.stringify(next?.tables??[])){const detail=(o:any)=>(o?.tables??[]).map((t:any)=>t.name+'\n'+t.lines.map((l:any)=>`${l.group}: ${l.name} — ${l.description} — ${l.quantity} ${l.unit} × ${l.unitPrice} = ${money(l.lineTotalCents,after.currency)}`).join('\n')).join('\n')||'No pricing tables';rows.push([`Option ${labelId} pricing tables`,detail(old),detail(next)])}
+  if(JSON.stringify(old?.optionalItems??[])!==JSON.stringify(next?.optionalItems??[])){const detail=(o:any)=>(o?.optionalItems??[]).map((x:any)=>`${x.label}: ${money(x.unitCents,after.currency)} × ${x.quantity} (${x.min}–${x.max}, ${x.editable?'client-editable':'fixed'})`).join('\n')||'No optional items';rows.push([`Option ${labelId} optional items`,detail(old),detail(next)])}
+  rows.push([`Option ${labelId} label`, old?.label ?? ui('Not offered'), next?.label ?? ui('Not offered')], [`Option ${labelId} price`, old ? money(old.cents, before.currency ?? 'AUD') : ui('Not offered'), next ? money(next.cents, after.currency ?? 'AUD') : ui('Not offered')])
  }
  const fileRefs=(value:any)=>typeof value==='string'?JSON.parse(value):value??[]
  const files=(value:any)=>fileRefs(value).map((f:any)=>`${f.filename} (${f.size} bytes)`).join('\n')||'No attachments'
  if(JSON.stringify(fileRefs(before.attachments))!==JSON.stringify(fileRefs(after.attachments)))rows.push(['Attachments',files(before.attachments),files(after.attachments)+(files(before.attachments)===files(after.attachments)?' (new file version)':'')])
  const changed = rows.filter(([label, before, value]) => before !== value && !after.hiddenSections?.includes(label.toLowerCase()))
- return changed.length ? `<dl>${changed.map(([label, before, after]) => `<dt>${escape(label)}</dt><dd class="preserve"><del>${escape(before)}</del><br><ins>${escape(after)}</ins></dd>`).join('')}</dl>` : '<p>No content or price changes.</p>'
+ return changed.length ? `<dl>${changed.map(([label, before, after]) => `<dt>${escape(ui(label))}</dt><dd class="preserve"><del>${escape(before)}</del><br><ins>${escape(after)}</ins></dd>`).join('')}</dl>` : ui('<p>No content or price changes.</p>')
 }
 
 export function historyPanel(state: any, proposal: any, selection: URLSearchParams): string {

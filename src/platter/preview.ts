@@ -1,3 +1,4 @@
+import { clientLocale, browserLocale } from './locales'
 import { recipientPlan, recipientContent } from './recipients'
 import { trackingSettings } from './tracking'
 import { workspaceDefaults } from './workspace'
@@ -29,7 +30,8 @@ export async function previewResponse(request:Request,env:Bindings) {
  const recipients=recipientPlan(row),recipientId=url.searchParams.get('recipientId')??recipients[0]?.id
  const recipient=recipients.find(r=>r.id===recipientId)
  need(!recipients.length||recipient,'Choose a recipient preview',404)
- if(recipient){row.clientName=recipient.name;row.clientEmail=recipient.email??'Mailbox not assigned'}
+ if(recipient){row.clientName=recipient.name;row.clientEmail=recipient.email??'Mailbox not assigned';row.client_locale=(await env.DB.prepare('SELECT locale FROM p_recipient_locales WHERE proposal_id=? AND slot_id=?').bind(row.id,recipient.id).first<{locale:string}>())?.locale??row.client_locale}
+ if(row.client_locale==='auto')row.client_locale=browserLocale(request.headers.get('accept-language'))
  const progress=recipient?{recipient,clientSlot:recipients.find(r=>r.role==='signer')?.id,signatures:[],signed:false,ready:recipient.group===Math.min(...recipients.filter(r=>['signer','approver','countersigner'].includes(r.role)).map(r=>r.group))}:null
  const content=snapshot(row),optionId=url.searchParams.get('optionId')??content.options[0].id
  if(file){const attachment=copyAttachments(content.attachments).find(item=>item.id===file[1]);need(attachment,'Attachment not found',404);return downloadAttachment(env.DB,attachment)}

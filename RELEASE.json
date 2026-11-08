@@ -307,16 +307,32 @@
       "buyerSteps": "Apply migrations/core/0111_reviewed_provider_sync.sql after existing core migrations. Adds reviewed Pipedrive and Zoho lifecycle write history. Restored history confers no outbound authority; explicitly review each write against the current connection and source."
     },
     {
-      "id": "0112_payment_allocations.sql",
-      "buyerSteps": "Apply migrations/core/0112_payment_allocations.sql after existing core migrations. Adds durable received-payment identities and allocations to frozen schedule rows."
+      "id": "0112_recipient_languages.sql",
+      "buyerSteps": "Apply migrations/core/0112_recipient_languages.sql after existing core migrations. Preserve recorded language and signing context; no historical consent or outbound authority is inferred."
     },
     {
-      "id": "0113_offline_accounting.sql",
-      "buyerSteps": "Apply migrations/core/0113_offline_accounting.sql after existing core migrations. Adds reviewed offline invoice bindings and accounting reconciliation history."
+      "id": "0113_electronic_records.sql",
+      "buyerSteps": "Apply migrations/core/0113_electronic_records.sql after existing core migrations. Preserve recorded language and signing context; no historical consent or outbound authority is inferred."
     },
     {
-      "id": "0114_offline_history.sql",
-      "buyerSteps": "Apply migrations/core/0114_offline_history.sql after existing core migrations. Adds reviewed invoice issuance, remittance publication history and completion facts. Restored history confers no provider or publication authority."
+      "id": "0114_question_language.sql",
+      "buyerSteps": "Apply migrations/core/0114_question_language.sql after existing core migrations. Preserve recorded language and signing context; no historical consent or outbound authority is inferred."
+    },
+    {
+      "id": "0115_replaced_language.sql",
+      "buyerSteps": "Apply migrations/core/0115_replaced_language.sql after existing core migrations. Preserve recorded language and signing context; no historical consent or outbound authority is inferred."
+    },
+    {
+      "id": "0116_payment_allocations.sql",
+      "buyerSteps": "Apply migrations/core/0116_payment_allocations.sql after existing core migrations. Adds durable received-payment identities and allocations to frozen schedule rows."
+    },
+    {
+      "id": "0117_offline_accounting.sql",
+      "buyerSteps": "Apply migrations/core/0117_offline_accounting.sql after existing core migrations. Adds reviewed offline invoice bindings and accounting reconciliation history."
+    },
+    {
+      "id": "0118_offline_history.sql",
+      "buyerSteps": "Apply migrations/core/0118_offline_history.sql after existing core migrations. Adds reviewed invoice issuance, remittance publication history and completion facts. Restored history confers no provider or publication authority."
     }
   ],
   "breaking": false,

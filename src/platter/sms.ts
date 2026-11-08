@@ -1,3 +1,4 @@
+import { clientText, type ClientLocale } from './locales'
 import { recipientPlan } from './recipients'
 import { demoEffect } from '@runeditrun/rer/internal/modules/demo/index.mjs'
 import type { Bindings } from '../auth.server'
@@ -218,14 +219,14 @@ export async function reserveSmsCode(env:Bindings,id:string,token:string,codeHas
  await commit(db,ctx.a,[db.prepare('UPDATE p_shares SET code_hash=?,code_expires=?,code_attempts=0,code_generation=?,code_sent_at=?,code_method=? WHERE token=?').bind(codeHash,at+600000,generation,at,'SMS code',token),db.prepare("INSERT INTO p_sms_code_runs(id,proposal_id,revision,invitation_hash,assent_id,generation,queued_at,status) VALUES(?,?,?,?,?,?,?,'queued')").bind(runId,id,ctx.row.revision,ctx.c.share_hash,ctx.c.assent_id,generation,at)],false,{sql:guard.sql+" AND EXISTS(SELECT 1 FROM p_shares WHERE token=? AND code_generation=? AND code_generation<10 AND (code_sent_at IS NULL OR code_sent_at<=?)) AND NOT EXISTS(SELECT 1 FROM p_sms_code_runs WHERE proposal_id=? AND invitation_hash=? AND status IN ('queued','sending','held'))",values:[...guard.values,token,generation-1,at-60000,id,ctx.c.share_hash]})
  return runId
 }
-export async function deliverSmsCode(env:Bindings,id:string,code:string,runId:string){
+export async function deliverSmsCode(env:Bindings,id:string,code:string,runId:string,locale:ClientLocale='en'){
  const db=env.DB
  try{
   const ctx=await smsCodeContext(env,id),guard=smsGuard(ctx)
   await commit(db,ctx.a,[db.prepare("UPDATE p_sms_code_runs SET status='sending' WHERE id=? AND status='queued'").bind(runId)],false,{sql:guard.sql+" AND EXISTS(SELECT 1 FROM p_sms_code_runs r JOIN p_shares s ON s.proposal_id=r.proposal_id WHERE r.id=? AND r.status='queued' AND r.assent_id=? AND r.generation=s.code_generation AND s.code_hash IS NOT NULL)",values:[...guard.values,runId,ctx.c.assent_id]})
   const ready=await smsCodeContext(env,id)
   need(ready.c.assent_id===ctx.c.assent_id&&ready.c.phone===ctx.c.phone&&ready.share.token===ctx.share.token,'SMS authorization changed before transport',409)
-  const body=new URLSearchParams({To:ctx.c.phone,From:env.TWILIO_FROM!,Body:'Your Platter verification code is '+code+'. It expires in 10 minutes. Reply STOP to stop. HELP for help.',StatusCallback:env.AUTH_ORIGIN+'/api/platter/sms/status'})
+  const body=new URLSearchParams({To:ctx.c.phone,From:env.TWILIO_FROM!,Body:clientText('Your Platter verification code is ',locale)+code+clientText('. It expires in 10 minutes. Reply STOP to stop. HELP for help.',locale),StatusCallback:env.AUTH_ORIGIN+'/api/platter/sms/status'})
   const response=await demoEffect(()=>fetch('https://api.twilio.com/2010-04-01/Accounts/'+encodeURIComponent(env.TWILIO_ACCOUNT_SID!)+'/Messages.json',{method:'POST',headers:{authorization:'Basic '+btoa(env.TWILIO_ACCOUNT_SID+':'+env.TWILIO_AUTH_TOKEN),'content-type':'application/x-www-form-urlencoded'},body,redirect:'manual',signal:AbortSignal.timeout(15000)}),()=>Response.json({sid:'synthetic-platter-demo'}))
   const receipt=await response.json() as any
   if(Number(receipt.code)===21610){await suppress(env,ctx.c.phone,'provider');await db.prepare("UPDATE p_sms_code_runs SET status='failed' WHERE id=?").bind(runId).run()}

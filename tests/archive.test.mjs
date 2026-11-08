@@ -167,7 +167,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal((await h.send(paidPath+'/action?name=code.request',{})).status,200)
     const paidCode=(await h.state()).outbox.find(m=>m.proposal_id===paidSource.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],paidSession=await h.send(paidPath+'/action?name=code.verify',{code:paidCode})
     assert.equal(paidSession.status,200);assert.equal((await h.send(paidPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},paidSession.cookie)).status,200)
-    await h.cmd('payment.record',{id:paidSource.id,method:'wire',amount:'600',receivedOn:'2026-10-20',reference:'synthetic-platter-1214',consent:true})
+    await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:paidSource.id,method:'wire',amount:'600',receivedOn:'2026-10-20',reference:'synthetic-platter-1214',consent:true})
     const paidInvoice=await h.cmd('invoice.export',{id:paidSource.id}),paidCsv=(await h.send('/api/platter/invoices/'+paidInvoice.id+'.csv',undefined,h.owner)).text
     const paidRead=async(id,kind,cookie=h.owner)=>{const r=await h.mf.dispatchFetch(h.origin+'/api/platter/'+kind+'?id='+id,{headers:{cookie}});assert.equal(r.status,200,kind);return new Uint8Array(await r.arrayBuffer())}
     const paidPdf=await paidRead(paidSource.id,'agreement.pdf'),paidCertificate=await paidRead(paidSource.id,'certificate.pdf'),paidBefore=(await h.state()).proposals.find(p=>p.id===paidSource.id),paidRecords=(await h.state()).paymentRecords.filter(p=>p.proposal_id===paidSource.id)
@@ -682,10 +682,11 @@ test('MIG-003, MIG-006 and MIG-007 public CLI archives imported business records
 test('SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority', {timeout:180000},async()=>{
  const temporary=await mkdtemp(join(tmpdir(),'platter-test-mail-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
  let h
+ const pinClock=async instance=>(await instance.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T12:00:00Z'),cron:'*/15 * * * *'})
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
-  h=await harness({root:source,assetsDirectory:'public'})
+  h=await harness({root:source,assetsDirectory:'public'});await pinClock(h)
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Email rehearsal',scope:'A photography session',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
   await h.cmd('proposal.test-mail',{id:p.id,version:1,subject:'Archive rehearsal only',message:'Test-only message never in the agreement package'})
@@ -705,6 +706,8 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.equal((await h.send(replacementPath+'/action?name=code.request',{})).status,200)
   const code=(await h.state()).outbox.find(m=>m.proposal_id===real.id&&m.subject==='Su código de verificación de Platter').body.match(/\b\d{6}\b/)[0]
   const verified=await h.send(replacementPath+'/action?name=code.verify',{code});assert.equal(verified.status,200)
+  for(const kind of ['withdraw','paper','resume'])assert.equal((await h.send(replacementPath+'/action?name=records.request',{kind},verified.cookie)).status,200)
+  const electronicRequests=(await h.db.prepare('SELECT * FROM p_electronic_requests ORDER BY sequence').all()).results;assert.equal(electronicRequests.length,3)
   assert.equal((await h.send(replacementPath+'/action?name=accept',{name:'Northstar COO',optionId:'two',consent:true},verified.cookie)).status,200)
   const certificate=await h.send(replacementPath+'/certificate.json',undefined,verified.cookie);assert.equal(certificate.status,200,certificate.text)
   assert.equal(certificate.value.language,'es');assert.equal(certificate.value.signers[0].language,'es')
@@ -735,7 +738,22 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   const signatures=(await h.db.prepare('SELECT * FROM p_recipient_signatures ORDER BY proposal_id,revision,slot_id').all()).results
   const voids=(await h.db.prepare('SELECT * FROM p_void_signatures ORDER BY proposal_id,revision').all()).results
   assert.equal(signatures.length,4);assert.equal(voids.length,1)
-  const allInvitationHistory=[...retained,...(await h.state()).proposals.find(r=>r.id===multi.id).invitationMessages,...(await h.state()).proposals.find(r=>r.id===voided.id).invitationMessages];assert.equal(allInvitationHistory.length,8)
+  const otherLanguages=[]
+  for(const [locale,language] of [['fr','fr'],['de','de'],['pt','pt'],['auto','de']]){
+   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Language custody '+locale,scope:'Firm authored content stays exact.',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
+   await h.cmd('proposal.locale',{id:p.id,version:1,locale})
+   await h.cmd('proposal.approve',{id:p.id,version:2,revision:1})
+   const invitation=await h.cmd('proposal.send',{id:p.id,version:3}),path=new URL(invitation.shareUrl).pathname
+   assert.equal((await h.send(path,undefined,'',{'accept-language':'de-CH'})).status,200)
+   assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+   const mail=await h.db.prepare('SELECT body FROM p_mail WHERE proposal_id=? ORDER BY rowid DESC LIMIT 1').bind(p.id).first()
+   const verified=await h.send(path+'/action?name=code.verify',{code:mail.body.match(/\b\d{6}\b/)[0]});assert.equal(verified.status,200)
+   assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},verified.cookie)).status,200)
+   const artifact=await h.send(path+'/certificate.json',undefined,verified.cookie);assert.equal(artifact.status,200)
+   assert.equal(artifact.value.language,language)
+   otherLanguages.push({id:p.id,locale,language,path,certificate:artifact.text,invitationMessages:(await h.state()).proposals.find(r=>r.id===p.id).invitationMessages})
+  }
+  const allInvitationHistory=[...otherLanguages.flatMap(r=>r.invitationMessages),...retained,...(await h.state()).proposals.find(r=>r.id===multi.id).invitationMessages,...(await h.state()).proposals.find(r=>r.id===voided.id).invitationMessages];assert.equal(allInvitationHistory.length,12)
 
   await h.close();h=null
   const archive=join(temporary,'source.rer')
@@ -746,7 +764,9 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.ok(!bytes.includes(new URL(invitation.shareUrl).pathname))
   assert.ok(!bytes.includes(replacementPath))
   for(const path of [...Object.values(multi.links),...Object.values(voided.links),new URL(shared.shareUrl).pathname])assert.ok(!bytes.includes(path),'archive contains no recipient capability')
+  assert.deepEqual(records.filter(item=>item.table==='p_electronic_requests').map(item=>item.row).sort((a,b)=>a.sequence-b.sequence),electronicRequests)
   assert.equal(records.filter(item=>item.table==='p_shares').length,0)
+  assert.equal(records.filter(item=>item.table==='p_invitation_languages').length,0)
   assert.deepEqual(records.filter(item=>item.table==='p_recipient_signatures').map(item=>item.row).sort((a,b)=>a.proposal_id.localeCompare(b.proposal_id)||a.revision-b.revision||a.slot_id.localeCompare(b.slot_id)),signatures)
   assert.deepEqual(records.filter(item=>item.table==='p_void_signatures').map(item=>item.row),voids)
   assert.equal(records.filter(item=>item.table==='p_replaced_links').length,0)
@@ -757,10 +777,18 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
   assert.equal(tests.length,1)
   assert.equal(tests[0].row.subject,p.id);assert.equal(tests[0].row.actor_role,'owner')
   await command(restored,['import','--input',archive,'--yes'])
-  h=await harness({root:restored,unclaimed:true,assetsDirectory:'public'})
+  h=await harness({root:restored,unclaimed:true,assetsDirectory:'public'});await pinClock(h)
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_electronic_requests ORDER BY sequence').all()).results,electronicRequests)
   assert.deepEqual(after.proposals.find(row=>row.id===p.id),proposal)
   assert.deepEqual(after.proposals.find(row=>row.id===real.id).invitationMessages,retained)
+  for(const retained of otherLanguages){
+   assert.equal(after.proposals.find(row=>row.id===retained.id).client_locale,retained.locale)
+   assert.equal(after.proposals.find(row=>row.id===retained.id).acceptance.language,retained.language)
+   assert.equal((await h.send('/api/platter/certificate.json?id='+retained.id,undefined,owner)).text,retained.certificate)
+   assert.equal((await h.send(retained.path)).status,404)
+  }
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_invitation_languages').first()).n,0)
   assert.equal(after.proposals.find(row=>row.id===real.id).client_locale,'es')
   assert.deepEqual(after.proposals.find(row=>row.id===real.id).acceptance,acceptedLanguage)
   assert.deepEqual(await h.db.prepare('SELECT language FROM p_signature_facts WHERE proposal_id=?').bind(real.id).first(),languageFacts)
@@ -799,13 +827,14 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
 
 test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items', {timeout:180000},async()=>{
  const inbound=inboundMailFixture(),mailboxWires=[]
+ const {offlineAccountingFake,invoiceLinkInput,accountingSyncInput}=await import('./offline-accounting-fixture.mjs'),accounting=offlineAccountingFake();accounting.invoice()
  const disputeDeadline=Math.floor(Date.now()/1000)+86400
  const temporary=await mkdtemp(join(tmpdir(),'platter-team-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
  let h
  try{
   for(const path of [source,restored])await checkout(path)
   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
-  h=await harness({root:source,origin:'https://platter.example',assetsDirectory:'public',auth:{...inbound.settings,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5600',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5601',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5602'},outboundService:async request=>{const url=new URL(request.url);if(url.hostname==='oauth2.googleapis.com')return Response.json({access_token:'synthetic-platter-5603',refresh_token:'synthetic-platter-5604',scope:'openid email https://www.googleapis.com/auth/gmail.send'});if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-5605',email:'archive-mailbox@synthetic-platter.example',email_verified:true});if(url.hostname==='gmail.googleapis.com'){mailboxWires.push(Buffer.from((await request.json()).raw,'base64url').toString('utf8'));return Response.json({id:'synthetic-platter-'+(8000+mailboxWires.length)})}if(url.hostname==='api.resend.com'&&request.method==='GET')return Response.json(inbound.messages.get(url.pathname.split('/').at(-1)));if(url.hostname==='api.resend.com')return Response.json({id:'synthetic-platter-5607'});if(url.hostname==='files.stripe.com'){const upload=await request.formData();assert.equal(upload.get('purpose'),'dispute_evidence');return Response.json({id:'synthetic-platter-3700'})}if(url.hostname==='api.hubapi.com'){if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-4120'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9961',stages:[{id:'synthetic-platter-9962',metadata:{isClosed:'true',probability:'1'}},{id:'synthetic-platter-9963',metadata:{isClosed:'true',probability:'0'}}]}]});const id=url.pathname.split('/').at(-1);return Response.json({id,properties:request.method==='PATCH'?(await request.json()).properties:{pipeline:'synthetic-platter-9961'}})};if(url.hostname==='quickbooks.api.intuit.com')return Response.json({CompanyInfo:{CompanyName:'Synthetic company'}});assert.equal(url.hostname,'api.stripe.com');if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2800'});if(url.pathname.includes('/disputes/')){const id=url.pathname.split('/').at(-1);if(request.method==='POST')return Response.json({id,status:'under_review'});const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id,charge:'synthetic-platter-2801',amount:accepted.deposit_cents,currency:accepted.currency.toLowerCase(),status:'needs_response',evidence_details:{due_by:disputeDeadline}})}if(request.method==='GET'){const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id:'synthetic-platter-2801',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:0,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}})}const amount=Number(new URLSearchParams(await request.text()).get('amount'));return Response.json({id:'synthetic-platter-2802',charge:'synthetic-platter-2801',amount,status:'succeeded'})}})
+  h=await harness({root:source,origin:'https://platter.example',assetsDirectory:'public',auth:{...inbound.settings,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5600',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5601',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5602'},outboundService:async request=>{const url=new URL(request.url);if(url.hostname==='oauth2.googleapis.com')return Response.json({access_token:'synthetic-platter-5603',refresh_token:'synthetic-platter-5604',scope:'openid email https://www.googleapis.com/auth/gmail.send'});if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-5605',email:'archive-mailbox@synthetic-platter.example',email_verified:true});if(url.hostname==='gmail.googleapis.com'){mailboxWires.push(Buffer.from((await request.json()).raw,'base64url').toString('utf8'));return Response.json({id:'synthetic-platter-'+(8000+mailboxWires.length)})}if(url.hostname==='api.resend.com'&&request.method==='GET')return Response.json(inbound.messages.get(url.pathname.split('/').at(-1)));if(url.hostname==='api.resend.com')return Response.json({id:'synthetic-platter-5607'});if(url.hostname==='files.stripe.com'){const upload=await request.formData();assert.equal(upload.get('purpose'),'dispute_evidence');return Response.json({id:'synthetic-platter-3700'})}if(url.hostname==='api.hubapi.com'){if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-4120'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9961',stages:[{id:'synthetic-platter-9962',metadata:{isClosed:'true',probability:'1'}},{id:'synthetic-platter-9963',metadata:{isClosed:'true',probability:'0'}}]}]});const id=url.pathname.split('/').at(-1);return Response.json({id,properties:request.method==='PATCH'?(await request.json()).properties:{pipeline:'synthetic-platter-9961'}})};if(url.hostname==='quickbooks.api.intuit.com')return accounting.receive(request);assert.equal(url.hostname,'api.stripe.com');if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2800'});if(url.pathname.includes('/disputes/')){const id=url.pathname.split('/').at(-1);if(request.method==='POST')return Response.json({id,status:'under_review'});const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id,charge:'synthetic-platter-2801',amount:accepted.deposit_cents,currency:accepted.currency.toLowerCase(),status:'needs_response',evidence_details:{due_by:disputeDeadline}})}if(request.method==='GET'){const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id:'synthetic-platter-2801',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:0,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}})}const amount=Number(new URLSearchParams(await request.text()).get('amount'));return Response.json({id:'synthetic-platter-2802',charge:'synthetic-platter-2801',amount,status:'succeeded'})}})
   const people={}
   for(const role of ['sales','manager','other','admin']){
    const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)
@@ -865,7 +894,21 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   const paidPath=new URL((await h.cmd('proposal.send',{id:paid.id,version:2})).shareUrl).pathname
   await h.send(paidPath+'/action?name=code.request',{});const code=(await h.db.prepare("SELECT body FROM p_mail WHERE subject='Your Platter verification code' ORDER BY created_at DESC").first()).body.match(/\b\d{6}\b/)[0],verified=(await h.send(paidPath+'/action?name=code.verify',{code})).cookie;assert.equal((await h.send(paidPath+'/action?name=accept',{name:'Synthetic client',optionId:'one',consent:true},verified)).status,200)
   await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-2803',webhookSecret:'synthetic-platter-2804',consent:true});const payment=await h.cmd('payment.bind',{id:paid.id,chargeId:'synthetic-platter-2801',consent:true}),refund={paymentId:payment.id,amount:'100',reason:'Synthetic partial refund',requestId:'synthetic-platter-2805',consent:true};await h.cmd('payment.refund',refund)
-  await h.cmd('payment.record',{id:paid.id,amount:'50',method:'check',reference:'synthetic-platter-2806',receivedOn:'2026-10-21',consent:true})
+  await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:paid.id,amount:'50',method:'check',reference:'synthetic-platter-2806',receivedOn:'2026-10-21',consent:true})
+  const {allocationAgreement,receiptInput,allocationInput}=await import('./payment-allocation-fixture.mjs')
+  const allocatedAgreement=await allocationAgreement(h);await h.cmd('payment.invoice-link',await invoiceLinkInput(h,allocatedAgreement.id))
+  const checkInput=receiptInput(allocatedAgreement.id),checkReceipt=await h.cmd('payment.record',checkInput,h.owner)
+  const firstAllocation=await allocationInput(h,allocatedAgreement.id,checkReceipt.id);await h.cmd('payment.allocate',firstAllocation,h.owner)
+  const wireReceipt=await h.cmd('payment.record',receiptInput(allocatedAgreement.id,'wire','400'),h.owner),lastAllocation=await allocationInput(h,allocatedAgreement.id,wireReceipt.id,'400');await h.cmd('payment.allocate',lastAllocation,h.owner)
+  const accountingRequest=accountingSyncInput(allocatedAgreement.id,firstAllocation.requestId);assert.equal((await h.cmd('payment.accounting-sync',accountingRequest)).status,'confirmed')
+  const {completeEventInput}=await import('./payment-allocation-fixture.mjs'),{invoicePreparationInput}=await import('./offline-accounting-fixture.mjs')
+  const eventAgreement=await allocationAgreement(h,{paymentTerms:{netDays:30,milestones:[{label:'Archived event delivery',event:'Client approves delivery',percent:100}]}}),eventCompletion=await completeEventInput(h,eventAgreement.id);await h.cmd('payment.milestone-complete',eventCompletion)
+  const recurringAgreement=await allocationAgreement(h,{depositPercent:'30',paymentTerms:null,pricingTables:[{optionId:'main',name:'Monthly care',lines:[{name:'Care',quantity:'1',unit:'month',unitPrice:'1000',interval:'monthly',term:3,startsOn:'2099-01-31'}]}]}),recurringReceipt=await h.cmd('payment.record',receiptInput(recurringAgreement.id,'ach_credit','100'));await h.cmd('payment.allocate',await allocationInput(h,recurringAgreement.id,recurringReceipt.id,'100'))
+  const issuedAgreement=await allocationAgreement(h,{paymentTerms:{netDays:30,milestones:[{label:'Archived issued delivery',date:'2000-01-15',percent:100}]}}),issuedPreview=await h.cmd('payment.invoice-prepare',await invoicePreparationInput(h,issuedAgreement.id)),issuedRequest={id:issuedAgreement.id,requestId:issuedPreview.id,reviewHash:issuedPreview.reviewHash,consent:true};assert.equal((await h.cmd('payment.invoice-issue',issuedRequest)).status,'confirmed');await h.cmd('payment.invoice-share',{id:issuedAgreement.id,invoiceId:issuedPreview.id,enabled:'yes',consent:true})
+  const preparedAgreement=await allocationAgreement(h,{paymentTerms:{netDays:30,milestones:[{label:'Archived unissued delivery',date:'2000-01-15',percent:100}]}}),preparedPreview=await h.cmd('payment.invoice-prepare',await invoicePreparationInput(h,preparedAgreement.id)),preparedRequest={id:preparedAgreement.id,requestId:preparedPreview.id,reviewHash:preparedPreview.reviewHash,consent:true}
+  const allocationAccepted=await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(allocatedAgreement.id).first()
+  const allocatedPdf=await h.mf.dispatchFetch(h.origin+allocatedAgreement.path+'/agreement.pdf',{headers:{cookie:allocatedAgreement.cookie}});assert.equal(allocatedPdf.status,200);const allocationPdfBytes=new Uint8Array(await allocatedPdf.arrayBuffer())
+
   await h.cmd('dispute.import',{paymentId:payment.id,disputeId:'synthetic-platter-3701'});const packet=await h.cmd('dispute.prepare',{disputeId:'synthetic-platter-3701',version:1,note:'Archived response'});const submission={disputeId:'synthetic-platter-3701',packetId:packet.id,documentHash:packet.documentHash,requestId:'synthetic-platter-3702'};await h.cmd('dispute.authorize',{...submission,consent:true});assert.equal((await h.cmd('dispute.submit',submission)).status,'submitted');const sourceEvidence=await h.mf.dispatchFetch(h.origin+'/api/platter/disputes/'+submission.disputeId+'/evidence.pdf?submission='+submission.requestId,{headers:{host:new URL(h.origin).host,cookie:h.owner}});assert.equal(sourceEvidence.status,200);const evidenceBytes=new Uint8Array(await sourceEvidence.arrayBuffer())
   assert.equal((await h.cmd('member.invite',{email:'unjoined@synthetic-platter.example',displayName:'Unjoined member',role:'sales',teams:[team.id]},people.manager.cookie)).status,'invited')
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_member_invitations').first()).n,1)
@@ -874,7 +917,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   for(const [index,condition] of [{kind:'discountOver',bps:1500},{kind:'marginBelow',bps:2000},{kind:'paymentTerms',minimumDepositBps:5000,standardTerms:'Net 30'},{kind:'template'},{kind:'termsEdited'}].entries()){const version=(await h.state()).approvalSettings.policy.version;await h.cmd('approval.rule',{version,name:'Archived condition '+condition.kind,position:10+index,condition,approvers:['role:owner'],templates:['starter:consultancy']})}
   const scopedTemplate=await h.cmd('template.start',{id:'starter:consultancy',version:1,clientId:client.id},people.sales.cookie);await h.cmd('proposal.approve',{id:p.id,version:3,revision:2},people.manager.cookie)
   const recurringReport=await acceptRevenue(h,{clientId:client.id})
-  for(const [amount,receivedOn] of [['2500','2099-03-31'],['1200','2099-04-01']])await h.cmd('payment.record',{id:recurringReport.id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4400',consent:true})
+  for(const [amount,receivedOn] of [['2500','2099-03-31'],['1200','2099-04-01']])await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:recurringReport.id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4400',consent:true})
   const revenueFilters=new URLSearchParams({view:'recorded-revenue',currency:'USD',owner:(await h.state()).actor.id,bookedFrom:'2099-01-15',bookedTo:'2099-03-31',receivedFrom:'2099-04-01',receivedTo:'2099-06-30',sort:'value'}).toString()
   await h.cmd('report.schedule',{filters:revenueFilters,cadence:'daily',hour:8,recipients:[h.auth.OWNER_EMAIL]})
   const oauthStart=await h.send('/api/platter/mailbox/authorize',{provider:'gmail',consent:true},people.sales.cookie);assert.equal(oauthStart.status,303)
@@ -910,7 +953,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.deepEqual(beforeRevenue.value.totals,[{currency:'USD',count:1,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:120000,refundedCents:0,netReceivedCents:120000,uncertainRefundCents:0,exportedDepositCents:0}])
   const allRevenue=await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,h.owner),beforeRevenueCsv=await h.send('/api/platter/pipeline.csv?'+revenueFilters,undefined,h.owner)
   assert.equal(beforeRevenueCsv.status,200)
-  const before=await h.state(),tables=['p_approvals','p_outcome_settings','p_outcomes','p_outcome_records','p_crm_outcome_bindings','p_crm_outcome_consents','p_crm_outcome_attempts','p_reminder_templates','p_template_reminder_messages','p_delivery_changes','p_reminder_policy','p_reminder_settings','p_reminder_runs','p_reminder_optouts','p_mail_reply_cap_notices','p_mail_replies','p_mail_attributions','p_report_schedules','p_report_runs','p_template_sources','p_disputes','p_dispute_packets','p_dispute_packet_parts','p_dispute_authorizations','p_dispute_submissions','p_dispute_documents','p_priced_catalog','p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_template_block_locks','p_proposal_block_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_library_uses','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
+  const before=await h.state(),tables=['p_approvals','p_outcome_settings','p_outcomes','p_outcome_records','p_crm_outcome_bindings','p_crm_outcome_consents','p_crm_outcome_attempts','p_reminder_templates','p_template_reminder_messages','p_delivery_changes','p_reminder_policy','p_reminder_settings','p_reminder_runs','p_reminder_optouts','p_mail_reply_cap_notices','p_mail_replies','p_mail_attributions','p_report_schedules','p_report_runs','p_template_sources','p_disputes','p_dispute_packets','p_dispute_packet_parts','p_dispute_authorizations','p_dispute_submissions','p_dispute_documents','p_priced_catalog','p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_template_block_locks','p_proposal_block_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_library_uses','p_workspace_defaults','p_proposal_defaults','p_template_defaults','p_offline_invoice_publications','p_offline_invoice_requests','p_payment_milestone_events','p_offline_invoices','p_offline_accounting','p_payment_allocations']
   const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
   const auditHistory=canonical((await h.db.prepare('SELECT * FROM p_audit').all()).results)
@@ -920,6 +963,21 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   h=await harness({root:restored,unclaimed:true,outboundService:async request=>{restoredCalls.push(new URL(request.url).hostname);throw new Error('Restore must not call a provider')}})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_member_invitations').first()).n,0,'pending delegated authority is excluded from archives');assert.equal((await h.db.prepare('SELECT status FROM oa_operators WHERE email=?').bind('unjoined@synthetic-platter.example').first()).status,'invited');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_connection_secrets').first()).n,0);assert.ok(after.connections.every(c=>c.status==='needs_reconnection'));assert.deepEqual(after.paymentRecords,before.paymentRecords);assert.equal((await h.cmd('payment.refund',refund,owner)).status,'succeeded','restored historical refund retries never issue another provider call');assert.doesNotMatch(JSON.stringify(after),/synthetic-platter-(2301|4121|2803|2804)/);assert.equal(after.connections.find(c=>c.provider==='hubspot').status,'needs_reconnection')
+  assert.deepEqual(after.paymentAllocations,before.paymentAllocations);assert.deepEqual(after.paymentSchedules,before.paymentSchedules)
+  assert.deepEqual(after.offlineAccounting,before.offlineAccounting);assert.deepEqual(after.offlineInvoices,before.offlineInvoices.map(x=>({...x,authorized:0,clientVisible:0})))
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_offline_invoice_authority').first()).n,0)
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_offline_invoice_issue_authority').first()).n,0);assert.equal((await h.db.prepare('SELECT count(*) n FROM p_offline_invoice_visibility').first()).n,0)
+  assert.deepEqual(after.offlineInvoiceRequests,before.offlineInvoiceRequests);assert.equal((await h.cmd('payment.invoice-issue',issuedRequest,owner)).status,'confirmed');await h.cmd('payment.invoice-issue',preparedRequest,owner,409);assert.deepEqual(restoredCalls,[])
+  assert.equal((await h.cmd('payment.accounting-sync',accountingRequest,owner)).status,'confirmed')
+  await h.cmd('payment.accounting-sync',accountingSyncInput(allocatedAgreement.id,lastAllocation.requestId,'wire'),owner,409);assert.deepEqual(restoredCalls,[])
+  assert.equal(after.paymentSchedules.find(x=>x.proposalId===allocatedAgreement.id).rows[0].remainingCents,0)
+  assert.deepEqual(await h.db.prepare('SELECT * FROM p_acceptances WHERE proposal_id=?').bind(allocatedAgreement.id).first(),allocationAccepted)
+  assert.equal((await h.send(allocatedAgreement.path+'/agreement.pdf',undefined,allocatedAgreement.cookie)).status,404,'restored invitation tokens carry no agreement authority')
+  const nativeRows=async()=>({receipts:(await h.db.prepare('SELECT * FROM p_payment_records ORDER BY id').all()).results,allocations:(await h.db.prepare('SELECT * FROM p_payment_allocations ORDER BY id').all()).results}),nativeBefore=await nativeRows()
+  assert.equal((await h.cmd('payment.record',checkInput,owner)).id,checkReceipt.id);assert.equal((await h.cmd('payment.allocate',lastAllocation,owner)).id,lastAllocation.requestId)
+  assert.deepEqual(await nativeRows(),nativeBefore,'restored request identities return history without applying money again')
+  const ownerAgreement=await h.mf.dispatchFetch(h.origin+'/api/platter/agreement.pdf?id='+allocatedAgreement.id,{headers:{cookie:owner}})
+  assert.equal(ownerAgreement.status,200);assert.deepEqual(new Uint8Array(await ownerAgreement.arrayBuffer()),allocationPdfBytes)
   const originalAuditIds=new Set(auditHistory.map(r=>r.id)),restoredAudit=canonical((await h.db.prepare('SELECT * FROM p_audit').all()).results.filter(r=>originalAuditIds.has(r.id)))
   assert.deepEqual(restoredAudit,auditHistory,'every original audit record survives unchanged; fresh sign-in has its own new audit events')
   assert.deepEqual(await policyAudit(owner),nativePolicyAudit,'policy changes retain exact actors and times through the CLI archive')
@@ -1474,9 +1532,9 @@ test('PORT-002 / AUTO-002 populated product archive retains exact document archi
   const invoice=await h.cmd('invoice.export',{id:proposal.id}),invoicePath='/api/platter/invoices/'+invoice.id+'.csv'
   const invoiceCsv=(await h.send(invoicePath,undefined,h.owner)).text
   assert.match(invoiceCsv,/87\.50,200,No Tax,USD/)
-  await h.cmd('payment.record',{id:proposal.id,amount:'87.50',receivedOn:'2099-01-15',method:'wire',reference:'synthetic-platter-offline-139',consent:false},h.owner,400)
+  await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:proposal.id,amount:'87.50',receivedOn:'2099-01-15',method:'wire',reference:'synthetic-platter-offline-139',consent:false},h.owner,400)
   assert.deepEqual((await h.state()).paymentRecords,[],'unconfirmed money is never recorded')
-  const payment=await h.cmd('payment.record',{id:proposal.id,amount:'87.50',receivedOn:'2099-01-15',method:'wire',reference:'synthetic-platter-offline-139',consent:true})
+  const payment=await h.cmd('payment.record',{requestId:crypto.randomUUID(),id:proposal.id,amount:'87.50',receivedOn:'2099-01-15',method:'wire',reference:'synthetic-platter-offline-139',consent:true})
   const filters='view=recorded-revenue&currency=USD&q=Populated%20archive%20agreement&receivedFrom=2099-01-01&receivedTo=2099-03-31'
   const expectedTotals=[{currency:'USD',count:1,valueCents:35000,oneOffCents:35000,firstYearCents:35000,receivedCents:8750,refundedCents:0,netReceivedCents:8750,uncertainRefundCents:0,exportedDepositCents:8750}]
   const revenue=(await h.send('/api/platter/pipeline?'+filters,undefined,h.owner)).value

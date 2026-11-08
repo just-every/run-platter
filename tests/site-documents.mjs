@@ -13,7 +13,7 @@ import { chromium } from '@playwright/test'
 import { pdfPages } from './pdf-document.mjs'
 import { builtSite, installedApp } from './site-harness.mjs'
 
-test('EDIT-017 owner-selected Spanish invitation, verification, consent and completion preserve authored English through the compiled client', {timeout:120000},()=>localeBrowser())
+test('EDIT-017 owner-selected mailbox languages and ordered recipients preserve authored content through the compiled client', {timeout:120000},()=>localeBrowser())
 
 test('COLLAB-003 desktop and phone compare revisions and restore an earlier draft requiring fresh approval', { timeout: 120000 }, async () => {
  let app, browser
@@ -905,7 +905,7 @@ test('REPORT-004 booked snapshots and independent receipt periods export and sch
     const app={...h,owner,cmd:(name,input,cookie=owner)=>h.cmd(name,input,cookie),state:(cookie=owner)=>h.state(cookie)}
     const client=await app.cmd('client.save',{name:'Reporting client',email:h.auth.OWNER_EMAIL})
     const first=await acceptRevenue(app,{clientId:client.id}),later=await acceptRevenue(app,{clientId:client.id,term:24,date:'2099-04-01',title:'Two-year care'})
-    for(const [id,amount,receivedOn] of [[first.id,'2500','2099-03-31'],[first.id,'1200','2099-04-01'],[later.id,'2400','2099-06-30']])await app.cmd('payment.record',{id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4500',consent:true})
+    for(const [id,amount,receivedOn] of [[first.id,'2500','2099-03-31'],[first.id,'1200','2099-04-01'],[later.id,'2400','2099-06-30']])await app.cmd('payment.record',{requestId:crypto.randomUUID(),id,amount,receivedOn,method:'wire',reference:'synthetic-platter-4500',consent:true})
     await page.goto(h.origin+'/app?view=recorded-revenue')
     const ownerId=(await app.state()).actor.id
     await page.getByLabel('Currency',{exact:true}).selectOption('USD');await page.getByLabel('Owner',{exact:true}).selectOption(ownerId)
@@ -1200,6 +1200,50 @@ test('CRM-001 native reviewed HubSpot deal creates an independent collection-off
    await (await import('./hubspot-browser.mjs')).hubspotBrowser({h,page,provider,current,capture})
   } finally { await context.close() }
  } finally { await browser?.close(); await h?.close(); await edge.close() }
+})
+
+test('PAY-007 billing controls record and reconcile two received payments to a frozen milestone', {timeout:120000}, async()=>{
+ const {harness}=await import('./harness.mjs'),{allocationAgreement}=await import('./payment-allocation-fixture.mjs')
+ const {offlineAccountingFake,connectOfflineAccounting}=await import('./offline-accounting-fixture.mjs'),fake=offlineAccountingFake();fake.invoice()
+ const h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',outboundService:request=>fake.receive(request)});let browser
+ try{
+  const agreement=await allocationAgreement(h);await connectOfflineAccounting(h)
+  const finish=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(finish.status,303)
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  const context=await browser.newContext({viewport:{width:1440,height:1000}})
+  try{
+   const split=h.owner.indexOf('=');await context.addCookies([{name:h.owner.slice(0,split),value:h.owner.slice(split+1),url:h.origin}])
+   const page=await context.newPage();await page.goto(h.origin+'/app/proposal?id='+agreement.id)
+   const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Payments and refunds',exact:true})}),milestone=panel.locator('[data-payment-milestone="1"]')
+   assert.match(await milestone.innerText(),/Remaining \$700\.00 USD/)
+   const link=milestone.locator('form').filter({has:page.getByRole('button',{name:'Link reviewed accounting invoice',exact:true})})
+   await link.getByLabel('Existing QuickBooks invoice id').fill('synthetic-platter-invoice-1');await link.getByLabel('Reviewed QuickBooks customer id').fill('synthetic-platter-customer-1');await link.getByLabel('Reviewed invoice number').fill('SYN-700');await link.getByRole('checkbox').check();await link.getByRole('button').click();await page.waitForLoadState('load')
+   assert.match(await milestone.locator('[data-accounting-invoice]').innerText(),/SYN-700 · overdue/)
+   assert.match(await milestone.innerText(),/Send a check to Synthetic Studio, 100 Example Street/)
+   const capture=async phase=>{
+    if(!process.env.PLATTER_SCREENSHOTS)return
+    await mkdir(process.env.PLATTER_SCREENSHOTS,{recursive:true})
+    for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.evaluate(()=>document.fonts.ready);await panel.scrollIntoViewIfNeeded();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await panel.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,`PAY-007-${phase}-${width}.png`)})}
+    await page.setViewportSize({width:1440,height:1000})
+   }
+   for(const [method,amount] of [['check','300'],['wire','400']]){
+    const record=panel.locator('form').filter({has:page.getByRole('button',{name:'Record received payment',exact:true})})
+    await record.getByLabel('Payment method').selectOption(method);await record.getByLabel('Amount received').fill(amount);await record.getByLabel('Payment reference').fill('synthetic-platter-browser-'+method);await record.getByLabel('Payment received on').fill('2030-01-15');await record.getByRole('checkbox').check();await record.getByRole('button',{name:'Record received payment',exact:true}).click();await page.waitForLoadState('load')
+    const allocate=milestone.locator('form').filter({has:page.getByRole('button',{name:'Allocate received payment',exact:true})});await allocate.getByLabel('Received payment').selectOption({label:method+' · synthetic-platter-browser-'+method+' · $'+amount+'.00 USD available'});await allocate.getByLabel('Amount to allocate').fill(amount);await allocate.getByRole('checkbox').check();await allocate.getByRole('button',{name:'Allocate received payment',exact:true}).click();await page.waitForLoadState('load')
+    assert.match(await milestone.innerText(),method==='check'?/partially paid[\s\S]*Allocated \$300\.00 USD · Remaining \$400\.00 USD/:/Dated delivery · paid[\s\S]*Allocated \$700\.00 USD · Remaining \$0\.00 USD/)
+    assert.match(await milestone.innerText(),/synthetic-platter-browser-check/)
+    if(method==='wire')assert.match(await milestone.innerText(),/synthetic-platter-browser-wire/)
+    const sync=milestone.locator('form').filter({has:page.getByRole('button',{name:'Sync allocated receipt',exact:true})})
+    await sync.getByLabel('QuickBooks payment method id').fill(method);await sync.getByRole('checkbox').check();await sync.getByRole('button').click();await page.waitForLoadState('load')
+    assert.match(await milestone.locator('[data-accounting-invoice]').innerText(),method==='check'?/SYN-700 · overdue[\s\S]*Provider balance \$400\.00 USD/:/SYN-700 · paid[\s\S]*Provider balance \$0\.00 USD/)
+    await capture(method==='check'?'partial':'paid')
+   }
+   assert.equal(await milestone.getByRole('button',{name:'Allocate received payment'}).count(),0)
+   const current=await h.state();assert.equal(current.paymentAllocations.length,2);assert.equal(current.paymentSchedules[0].rows[0].remainingCents,0)
+   assert.deepEqual(current.paymentRecords.map(x=>[x.method,x.received_on,x.unallocatedCents]).sort(),[['check','2030-01-15',0],['wire','2030-01-15',0]])
+   await (await import('./offline-accounting-browser.mjs')).offlineInvoiceBrowser({h,page,browser,panel,milestone,capture})
+  }finally{await context.close()}
+ }finally{await browser?.close();await h.close()}
 })
 
 test('CRM-004 Pipedrive and Zoho Settings, reviewed drafts and explicit lifecycle writes through the compiled browser', { timeout: 120000 }, async () => {

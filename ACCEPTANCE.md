@@ -8,10 +8,10 @@ The primary journey: write and price a proposal, approve its exact revision, sen
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 15 | 103 | 41 | 159 |
+| Core | 15 | 102 | 42 | 159 |
 | Agent surface | 0 | 0 | 4 | 4 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 15 | 103 | 45 | 163 |
+| Full target | 15 | 102 | 46 | 163 |
 
 Judged from the code and tests at commit `8f4ff0320aaafd58b41dabcf9e39bc60db7dc646` (29 October 2026). The landing candidate retains these exact source and test bytes; its full SHA and Verify receipt are recorded in the handoff. FOLLOW-002 retains main’s partial judgment; replayed boundary, tie-order and production-auth tests add evidence pending a fresh ct judgment. Existing ct judgments and demotions are retained. SEND-008 is a builder completion claim pending guarded landing and ct judgment. EDIT-009 is a builder completion claim with independently filled West and East variable conditions, pending exact-candidate Verify and guarded landing. Field proof register R-3 remains not run and SIGN-006 retains its real-key hold. APPROVE-003 retains main’s partial judgment and existing Gap; the replayed native default-role matrix, owner/admin policy audit, browser controls and exact archive custody assertions add evidence pending a fresh ct judgment. APPROVE-001 now retains additional saved-rule, parallel-decision and archive assertions; its current partial judgment is preserved rather than accepting the older candidate completion claim. FOLLOW-010 source proof is replayed from candidate `3457720b3bf75b5e3fcd51eab0b9fb80c7ba6b6b` (original candidate `dfebdf12c6de8e7b642f62846f7ac88ba7527138`). FOLLOW-010 retains main’s partial judgment; the replayed reporting journeys add a builder completion claim pending guarded landing and ct judgment. PORT-002 retains main’s partial judgment; the replayed populated archive and credential-isolation assertions add evidence pending a fresh ct judgment. Field proof register: 10 rows; 0 passed, 0 failed, 10 not run.
 
@@ -1924,7 +1924,7 @@ Core · target · **missing** · Register R-7
 
 #### MIG-001 — PandaDoc move-in
 
-Core · target · **partial** · Rules D-1
+Core · target · **missing** · Rules D-1
 
 **Requirement.** A PandaDoc customer on any plan moves in without API access, because PandaDoc gives Business and Starter accounts only its Sandbox API and keeps the Production API for approved Enterprise accounts. The full mapping and custody rules in [proposal behavior](docs/contract-behavior.md#mig-001) apply to every import and resulting record.
 
@@ -1936,8 +1936,8 @@ Core · target · **partial** · Rules D-1
 5. Upload another template only as a PDF and see fixed pages listed as "Word download needed for editing".
 6. Uploading the same zip again adds nothing; undo the import.
 
-**Evidence.** `tests/platter.test.mjs` — “MIG-001 reviewed PandaDoc Word and fixed PDF content retains exact originals, catalog links and dependency-safe undo” (reviewed Word with six exact priced rows, unique catalog links and ambiguous-SKU refusals, embedded image and Client.Company variables; ten Heading 1 library items; fixed PDF template; combined catalog bundle metadata and support contacts; 250 plus 40 bulk PDFs with exact original and certificate bytes, a private three-level native folder tree, replay exclusion, explicit new fixed-page drafts, stale and unsafe refusals and dependency-safe undo); `tests/site.test.mjs` loads `tests/document-import-browser.mjs` through `tests/site-documents.mjs` — “EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads” (compiled reviewed conversion, combined catalog and Word, bulk folders and explicit new-draft controls); `tests/archive.test.mjs` — “MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody” calls `tests/pandadoc-archive.mjs` (identical restored originals, outputs, folder tree and reissue lineage, usable unused-content undo, dependent refusal and no restored invitation or mail authority).
-**Gap.** The exported-file slice uses the conservative current-owner-only import authority floor under the standing scope policy; scoped delegation and provider boundaries remain unqualified. Open PDFs become new fixed-page drafts only after separate explicit client, scope, price and deposit review; automatic draft creation during bulk apply and editable Word reissue remain unproved. Bundles retain resolved component metadata; native priced package promotion remains. API enrichment and template roles, signing order, pre-assigned recipients and assigned fields remain unproved. No source prices, recipients or signature authority are inferred. Complete PandaDoc qualification remains. URL image acquisition remains held on MIG-006’s qualified Base image-GET egress with validated public-address pinning, original-host TLS, no redirects and required 5-MiB image and 20-MiB batch bounds; the recorded POST-only 64-KiB relay is insufficient and no URL images are acquired. EDIT-013 prerequisites and SEND-003 and SIGN-004 authority holds remain unchanged. Browser controls were exercised through the local launcher with screenshots at 1440 and 390; exact-candidate Verify remains pending. No full migration or DONE claim.
+**Evidence.** None.
+**Gap.** No PandaDoc import.
 
 #### MIG-002 — Proposify move-in
 

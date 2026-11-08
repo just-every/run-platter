@@ -59,7 +59,7 @@ export async function providerSyncJourney(verified, provider) {
   assert.equal((await apply(await fresh())).held, 0)
   assert.equal(edge.state.deal[edge.mapping.statusProperty], 'signed'); assert.equal(edge.notes.length, 3)
   assert.equal(provider === 'pipedrive' ? edge.state.deal.stage_id : edge.state.deal.Stage, provider === 'pipedrive' ? 12421 : 'Closed Won')
-  await h.cmd('payment.record', { id: made.id, method: 'wire', amount: '361.22', receivedOn: '2030-01-01', reference: 'synthetic-platter-12430', consent: true })
+  await h.cmd('payment.record', { requestId: crypto.randomUUID(), id: made.id, method: 'wire', amount: '361.22', receivedOn: '2030-01-01', reference: 'synthetic-platter-12430', consent: true })
   assert.equal((await apply(await fresh())).held, 0); assert.equal(edge.state.deal[edge.mapping.statusProperty], 'paid'); assert.equal(edge.notes.length, 4)
   assert.deepEqual(edge.notes.map(n => (n.content ?? n.Note_Content).match(/: (\w+)\./)[1]), ['sent', 'viewed', 'signed', 'paid'])
   assert.ok(!JSON.stringify(edge.writes).includes(path)); assert.ok(!JSON.stringify(edge.writes).includes(['synthetic-platter-' + (provider === 'pipedrive' ? '12104' : '12404'), 'example.test'].join('@')))

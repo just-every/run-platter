@@ -13,7 +13,7 @@ export function inZone<T>(name: string | undefined, render: () => T): T {
 export const date = (value: unknown): string => {
   if (!value) return '—'
   const parsed = new Date(typeof value==='number'?value:String(value))
-  return Number.isNaN(parsed.getTime()) ? escape(value) : escape(parsed.toLocaleString(renderingLocale()==='es'?'es-ES':'en-US', { timeZone: zone, weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }))
+  return Number.isNaN(parsed.getTime()) ? escape(value) : escape(parsed.toLocaleString(({en:'en-US',es:'es-ES',fr:'fr-FR',de:'de-DE',pt:'pt-BR'}[renderingLocale()]), { timeZone: zone, weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }))
 }
 export const hidden = (name: string, value: unknown): string => `<input type="hidden" name="${escape(name)}" value="${escape(value)}">`
 export const field = (label: string, name: string, value: unknown = '', extra = ''): string => `<label>${escape(label)}<input name="${escape(name)}" value="${escape(value)}" ${extra}></label>`

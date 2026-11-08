@@ -1,4 +1,4 @@
-import { clientLocale } from './locales'
+import { clientLocale, clientText } from './locales'
 import { voidSignatureStatement } from './recipients'
 import { firmOutcomeReason, synchronizeOutcome } from './outcomes'
 import type { Bindings } from '../auth.server'
@@ -13,14 +13,14 @@ export function outcomeStatement(db:D1Database,row:any,actor:{id:string,email:st
 /** Both outcome doors use the same link revocation, queue closure and retained history as SEND-010. */
 export async function withdrawalStatements(env:Bindings,row:any,actor:{id:string,email:string,role:string},contact:string,reason:string,notice:boolean,at:number,action='proposal.withdraw') {
  const db=env.DB,eventId=crypto.randomUUID()
- const shares=(await db.prepare('SELECT s.*,COALESCE(s.recipient,c.email) AS email FROM p_shares s JOIN p_clients c ON c.id=? WHERE s.proposal_id=?').bind(row.client_id,row.id).all<any>()).results
+ const shares=(await db.prepare('SELECT s.*,COALESCE(s.recipient,c.email) AS email,COALESCE(l.locale,r.locale,?) AS client_locale FROM p_shares s JOIN p_clients c ON c.id=? LEFT JOIN p_recipient_locales r ON r.proposal_id=s.proposal_id AND r.slot_id=s.slot_id LEFT JOIN p_invitation_languages l ON l.token=s.token WHERE s.proposal_id=?').bind(clientLocale(row),row.client_id,row.id).all<any>()).results
  const writes=[
   voidSignatureStatement(db,row.id,row.revision,at,reason),
   db.prepare("UPDATE p_sms_runs SET status='cancelled' WHERE proposal_id=? AND status='queued'").bind(row.id),
   db.prepare('DELETE FROM p_sms_authority WHERE proposal_id=?').bind(row.id),
   db.prepare('INSERT INTO p_withdrawals(id,proposal_id,revision,actor_id,actor_email,withdrawn_at,reason,notice) VALUES(?,?,?,?,?,?,?,?)').bind(eventId,row.id,row.revision,actor.id,actor.email,at,reason,notice?1:0),
-  db.prepare('INSERT INTO p_withdrawn_links(token,contact_email,client_locale) SELECT token,?,? FROM p_replaced_links WHERE proposal_id=? ON CONFLICT DO NOTHING').bind(contact,clientLocale(row),row.id),
-  ...shares.map(s=>db.prepare('INSERT INTO p_withdrawn_links(token,contact_email,client_locale) VALUES(?,?,?)').bind(s.token,contact,clientLocale(row))),
+  db.prepare('INSERT INTO p_withdrawn_links(token,contact_email,client_locale) SELECT token,?,COALESCE(client_locale,?) FROM p_replaced_links WHERE proposal_id=? ON CONFLICT DO NOTHING').bind(contact,clientLocale(row),row.id),
+  ...shares.map(s=>db.prepare('INSERT INTO p_withdrawn_links(token,contact_email,client_locale) VALUES(?,?,?)').bind(s.token,contact,clientLocale(s))),
   db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(row.id),
   db.prepare("UPDATE p_followups SET closed_at=?,resolution='Proposal withdrawn',updated_at=? WHERE proposal_id=? AND closed_at IS NULL").bind(at,at,row.id),
   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(row.id),
@@ -29,7 +29,7 @@ export async function withdrawalStatements(env:Bindings,row:any,actor:{id:string
   db.prepare("UPDATE p_bounce_notices SET closed_at=?,action='Proposal withdrawn' WHERE proposal_id=? AND closed_at IS NULL").bind(at,row.id),
   db.prepare('INSERT INTO p_audit(id,actor_id,actor_role,action,subject,occurred_at) VALUES(?,?,?,?,?,?)').bind(eventId,actor.id,actor.role,action,row.id,at),
  ]
- if(notice)for(const s of shares)writes.push(queueMail(env,row.id,s.email,'Proposal withdrawn: '+row.title,`The firm has withdrawn this proposal.\nReason: ${reason}\nContact: ${contact}`,actor.id))
+ if(notice)for(const s of shares)writes.push(queueMail(env,row.id,s.email,clientText('Proposal withdrawn: ',clientLocale(s))+row.title,clientText('The firm has withdrawn this proposal.\nReason: ',clientLocale(s))+reason+clientText('\nContact: ',clientLocale(s))+contact,actor.id))
  return writes
 }
 

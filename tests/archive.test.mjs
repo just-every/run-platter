@@ -6,9 +6,9 @@ import { documentFixture } from './document-fixture.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { pricingFixture, pricingExpected } from './pricing-fixture.mjs'
 import { templateClients, variableTemplateFields } from './template-variables-fixture.mjs'
-import { test } from 'node:test'
+import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createHash } from 'node:crypto'
@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { getPlatformProxy } from 'wrangler'
 import { harness } from './harness.mjs'
+import { archiveTemplate } from './archive-template.mjs'
 const exec = promisify(execFile)
 const cli = resolve('node_modules/@runeditrun/rer/global/rer.mjs')
 const command = async (cwd, args, expected = 0) => {
@@ -31,19 +32,19 @@ const command = async (cwd, args, expected = 0) => {
   assert.equal(result.code, expected, `${args[0]}: ${result.stdout ?? ''} ${result.stderr ?? ''}`)
   return result
 }
-async function checkout(root) {
-  await mkdir(root)
-  for (const name of ['package.json','pnpm-lock.yaml','OPERATIONS.json','RUN-LOCALLY.md','ACCEPTANCE.md','SEED-COMMAND-CONTRACT.md','OPERATIONS.md','.node-version','wrangler.jsonc','deploy.json','rer-setup.json','scripts','src','migrations']) await cp(name, join(root,name), { recursive: true })
-  await symlink(resolve('node_modules'), join(root,'node_modules'), 'dir')
-}
+// Only migration-seeded data is shared. Each journey gets independent files,
+// sessions, business records and a real CLI import into its own empty schema.
+const template=archiveTemplate()
+before(()=>template.prepare(),{timeout:180_000})
+after(()=>template.close())
+const checkout=(root,options)=>template.checkout(root,options)
 // This journey follows every business record currently creatable in Platter.
 // Future product capabilities extend this fixture when their public doors ship.
 test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences', { timeout: 360_000 }, async () => {
   const temporary = await mkdtemp(join(tmpdir(),'platter-archive-')), source=join(temporary,'source'), restored=join(temporary,'restored'), erased=join(temporary,'erased')
   let h
   try {
-    for (const path of [source,restored,erased]) await checkout(path)
-    await exec(process.execPath, [resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'], { cwd:source, env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'}, maxBuffer:8e6 })
+    for (const path of [source,restored,erased]) await checkout(path,{migrated:path===source})
     h=await harness({root:source,assetsDirectory:'public',outboundService:()=>new Response(null,{status:204})})
     const p=await h.cmd('client.save',{name:'Temporary joiner',email:'temporary@studio.example'})
     const key=await h.cmd('agent.create',{label:'Excluded secret'})
@@ -440,8 +441,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
 test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal', {timeout:300000}, async()=>{
  const temporary=await mkdtemp(join(tmpdir(),'platter-erasure-')),source=join(temporary,'source'),erased=join(temporary,'erased');let h
  try{
-  for(const path of [source,erased])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
+  for(const path of [source,erased])await checkout(path,{migrated:path===source})
   h=await harness({root:source})
   const p=await h.cmd('client.save',{name:'Temporary joiner',email:'synthetic-platter-8200@example.com'}),client=await h.cmd('client.save',{name:'Retained client',email:'synthetic-platter-8201@example.com'})
   const proposal=await h.cmd('proposal.prepare',{clientId:client.id,title:'Retained agreement',scope:'Retained business record',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
@@ -502,7 +502,7 @@ test('PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores re-expor
   // Keep the original business-row expectations separate from the fresh archive inventory.
   const legacy=JSON.parse(await readFile('fixtures/first-release-aud-rows.json','utf8')),accepted=legacy.find(item=>item.table==='p_acceptances').row,invoice=legacy.find(item=>item.table==='p_invoices').row,oldProposal=legacy.find(item=>item.table==='p_proposals').row
   const ownerEmail=legacy.find(item=>item.table==='oa_operators').row.email
-  await checkout(target)
+  await checkout(target,{migrated:false})
   await command(target,['import','--input',input,'--yes','--no-queue'])
   h=await harness({root:target,unclaimed:true,auth:{OWNER_EMAIL:ownerEmail}})
   const cookie=await h.signIn(ownerEmail),cmd=(name,input)=>h.cmd(name,input,cookie)
@@ -554,7 +554,6 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   const events=resendEvents();let submitted=0
   h=await harness({root:source,origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'network-edge-key',MAIL_WEBHOOK_KEY:events.key},outboundService:()=>Response.json({id:'archive-provider-'+(++submitted)})})
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
@@ -588,7 +587,6 @@ test('MIG-003, MIG-006 and MIG-007 public CLI archives imported business records
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await Promise.all([source,restored].map(cwd=>exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})))
   const options={alias:{'cloudflare:sockets':'./tests/catalog-socket-edge.ts'},outboundService:r=>fileHost(r)}
   h=await harness({root:source,...options})
   const contacts=await applyBusiness(h,{kind:'contacts',format:'platter',csv:await businessCsv('platter-contacts.csv')})
@@ -673,7 +671,6 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
  const pinClock=async instance=>(await instance.mf.getWorker()).scheduled({scheduledTime:new Date('2030-06-01T12:00:00Z'),cron:'*/15 * * * *'})
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,assetsDirectory:'public'});await pinClock(h)
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Email rehearsal',scope:'A photography session',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
@@ -813,7 +810,12 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items', {timeout:180000},async()=>{
+test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items', {timeout:180000},async(t)=>{
+ // Keep fixture, transfer and restored-door costs visible as migrations grow.
+ const started=performance.now(),timings={}
+ let previous=started
+ const mark=stage=>{const now=performance.now();timings[stage]=Math.round(now-previous);previous=now}
+ t.after(()=>console.log('Archive team timing '+JSON.stringify({...timings,total:Math.round(performance.now()-started)})))
  const inbound=inboundMailFixture(),mailboxWires=[]
  const {offlineAccountingFake,invoiceLinkInput,accountingSyncInput}=await import('./offline-accounting-fixture.mjs'),accounting=offlineAccountingFake();accounting.invoice()
  const disputeDeadline=Math.floor(Date.now()/1000)+86400
@@ -821,7 +823,7 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
+  mark('sourceSchema')
   h=await harness({root:source,origin:'https://platter.example',assetsDirectory:'public',auth:{...inbound.settings,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5600',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5601',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5602'},outboundService:async request=>{const url=new URL(request.url);if(url.hostname==='oauth2.googleapis.com')return Response.json({access_token:'synthetic-platter-5603',refresh_token:'synthetic-platter-5604',scope:'openid email https://www.googleapis.com/auth/gmail.send'});if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-5605',email:'archive-mailbox@synthetic-platter.example',email_verified:true});if(url.hostname==='gmail.googleapis.com'){mailboxWires.push(Buffer.from((await request.json()).raw,'base64url').toString('utf8'));return Response.json({id:'synthetic-platter-'+(8000+mailboxWires.length)})}if(url.hostname==='api.resend.com'&&request.method==='GET')return Response.json(inbound.messages.get(url.pathname.split('/').at(-1)));if(url.hostname==='api.resend.com')return Response.json({id:'synthetic-platter-5607'});if(url.hostname==='files.stripe.com'){const upload=await request.formData();assert.equal(upload.get('purpose'),'dispute_evidence');return Response.json({id:'synthetic-platter-3700'})}if(url.hostname==='api.hubapi.com'){if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-4120'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9961',stages:[{id:'synthetic-platter-9962',metadata:{isClosed:'true',probability:'1'}},{id:'synthetic-platter-9963',metadata:{isClosed:'true',probability:'0'}}]}]});const id=url.pathname.split('/').at(-1);return Response.json({id,properties:request.method==='PATCH'?(await request.json()).properties:{pipeline:'synthetic-platter-9961'}})};if(url.hostname==='quickbooks.api.intuit.com')return accounting.receive(request);assert.equal(url.hostname,'api.stripe.com');if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2800'});if(url.pathname.includes('/disputes/')){const id=url.pathname.split('/').at(-1);if(request.method==='POST')return Response.json({id,status:'under_review'});const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id,charge:'synthetic-platter-2801',amount:accepted.deposit_cents,currency:accepted.currency.toLowerCase(),status:'needs_response',evidence_details:{due_by:disputeDeadline}})}if(request.method==='GET'){const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id:'synthetic-platter-2801',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:0,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}})}const amount=Number(new URLSearchParams(await request.text()).get('amount'));return Response.json({id:'synthetic-platter-2802',charge:'synthetic-platter-2801',amount,status:'succeeded'})}})
   const people={}
   for(const role of ['sales','manager','other','admin']){
@@ -946,7 +948,8 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
   const auditHistory=canonical((await h.db.prepare('SELECT * FROM p_audit').all()).results)
   await h.close();h=undefined
-  const archive=join(temporary,'teams.rer');await command(source,['export','--output',archive]);await command(restored,['import','--input',archive,'--yes'])
+  mark('sourceFixture')
+  const archive=join(temporary,'teams.rer');await command(source,['export','--output',archive]);mark('export');await command(restored,['import','--input',archive,'--yes']);mark('import')
   const restoredCalls=[]
   h=await harness({root:restored,unclaimed:true,outboundService:async request=>{restoredCalls.push(new URL(request.url).hostname);throw new Error('Restore must not call a provider')}})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
@@ -1020,7 +1023,8 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   await h.cmd('library.save',{id:archivedLibrary.id,version:1,title:'Synthetic case study',kind:'case_study',content:'Restored linked story'},owner)
   const restoredLibrary=(await h.state(owner)).proposals.find(r=>r.id===libraryCopy.id)
   assert.equal(restoredLibrary.document.blocks[0].text,'Restored linked story');assert.equal(restoredLibrary.document.blocks[1].text,'An archived text library item')
- }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+  mark('restoreAssertions')
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true});mark('cleanup')}
 })
 
 
@@ -1033,8 +1037,6 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
  const temporary=await mkdtemp(join(tmpdir(),'platter-notification-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored');let h
  try{
   for(const path of [source,restored])await checkout(path)
-  // Prepare both independent empty schemas together; import still runs through the public CLI.
-  await Promise.all([source,restored].map(cwd=>exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})))
   h=await harness({root:source,assetsDirectory:'public',auth:{AUTH_LOCAL:'true',TWILIO_ACCOUNT_SID:'synthetic-platter-7110',TWILIO_AUTH_TOKEN:'synthetic-platter-7111',TWILIO_FROM:'+15005550006'},outboundService:sourceEdge})
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(fixed),cron:'*/15 * * * *'})
   const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
@@ -1145,9 +1147,6 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.equal(before.p_sender_notice_runs.filter(r=>r.kind==='renewal').length,1)
   const archivePolicy=(await h.state()).approvalSettings.policy
   await h.cmd('approval.policy',{version:archivePolicy.version,required:true,defaultRole:'manager'})
-  const {nativeMigrationPreflight}=await import('../node_modules/@runeditrun/rer/cli/portability-migrations.mjs')
-  await nativeMigrationPreflight({root:source,db:h.db,binding:'DB'})
-  console.log('Migration ledger preflight passed on the fully migrated source')
   await h.close();h=undefined
   const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'));assert.ok(!bytes.includes('synthetic-platter-7107'))
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
@@ -1215,9 +1214,8 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
  const temporary=await mkdtemp(join(tmpdir(),'platter-doc-archive-')),source=join(temporary,'source'),target=join(temporary,'target');let h
  try{
   await checkout(source);await checkout(target)
-  // Independent empty schemas can be prepared together. The public import still
-  // verifies the target ledger and refuses occupied business data.
-  await Promise.all([source,target].map(cwd=>exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})))
+  // Independent empty schemas share only the stopped migration template. The
+  // public import still verifies the ledger and refuses occupied business data.
   const {hubspotSyncFixture}=await import('./hubspot-sync-fixture.mjs'),crm=hubspotSyncFixture()
   const {connectPipedrive,pipedriveToken}=await import('./crm-pipedrive-http.mjs'),{connectZoho,zohoToken}=await import('./crm-zoho-http.mjs'),{providerSyncFixture}=await import('./crm-provider-sync-fixture.mjs'),pipedrive=providerSyncFixture('pipedrive'),zoho=providerSyncFixture('zoho')
   h=await harness({root:source,assetsDirectory:'public',outboundService:req=>new URL(req.url).hostname==='api.pipedrive.com'?pipedrive.request(req):new URL(req.url).hostname==='www.zohoapis.com'?zoho.request(req):crm.request(req)})
@@ -1363,7 +1361,6 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
  let h
  try{
   for(const root of [source,restored])await checkout(root)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,assetsDirectory:'public'})
   const {configureTaxes,taxRequest,taxPackages,taxTables}=await import('./taxes-fixture.mjs')
   const version=await configureTaxes(h.cmd),client=await h.cmd('client.save',{name:'Synthetic tax client',email:h.auth.OWNER_EMAIL})
@@ -1419,7 +1416,6 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
  const temporary=await mkdtemp(join(tmpdir(),'platter-drive-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=driveFixture();let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,assetsDirectory:'public',auth:{GOOGLE_DRIVE_CLIENT_ID:'synthetic-platter-archive-oauth-client',GOOGLE_DRIVE_CLIENT_SECRET:'synthetic-platter-archive-oauth-secret'},outboundService:request=>new URL(request.url).hostname==='api.xero.com'?xero.outboundService(request):fake.outboundService(request)});await connectDrive(h)
   const completed=await completeDriveAgreement(h)
   await h.cmd('archive.dispatch',{})
@@ -1488,7 +1484,6 @@ test('PORT-002 / AUTO-002 populated product archive retains exact document archi
  const hash=bytes=>createHash('sha256').update(bytes).digest('hex')
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectDrive(h)
   await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?)').bind(Date.parse('2099-01-15T12:00:00Z')).run()
   const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)

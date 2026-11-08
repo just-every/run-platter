@@ -3605,8 +3605,12 @@
       "sha256": "cc6cdd3c1ac05862b4085133100273d9154166a2d5d0ff5918cbb40e44c04883",
       "executable": false
     },
+    "tests/archive-template.mjs": {
+      "sha256": "da2f65a25c9ae1bc200bd837c48b727f8e4ec11635d6fb68f24196a3db1fa6b8",
+      "executable": false
+    },
     "tests/archive.test.mjs": {
-      "sha256": "bfed6000fdd6d30a47ee88333e96179a65bf803954ada61da84be79383608207",
+      "sha256": "a6f08c597ccb7a05e8a00303826e20a73b8d65f4bf4673799d15dcaa12b21e8f",
       "executable": false
     },
     "tests/browser-edge.mjs": {

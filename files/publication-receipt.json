@@ -1,0 +1,53 @@
+{
+  "after_counts": {
+    "Agent surface": {
+      "done": 0,
+      "missing": 4,
+      "partial": 0,
+      "total": 4
+    },
+    "Core": {
+      "done": 15,
+      "missing": 42,
+      "partial": 102,
+      "total": 159
+    },
+    "Later": {
+      "done": 0,
+      "missing": 0,
+      "partial": 0,
+      "total": 0
+    }
+  },
+  "before_counts": {
+    "Agent surface": {
+      "done": 0,
+      "missing": 4,
+      "partial": 0,
+      "total": 4
+    },
+    "Core": {
+      "done": 15,
+      "missing": 42,
+      "partial": 102,
+      "total": 159
+    },
+    "Later": {
+      "done": 0,
+      "missing": 0,
+      "partial": 0,
+      "total": 0
+    }
+  },
+  "blockers": [],
+  "branch": "cloud/sx-platter-timing-1-push-1",
+  "clause_changes": [],
+  "local_head": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+  "product_commits_created": 0,
+  "push_exit": 0,
+  "remote_head": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+  "remote_ref": "refs/heads/cloud/sx-platter-timing-1-push-1",
+  "repository": "just-every/run-platter",
+  "same_commit_as_source": true,
+  "working_tree_clean": true
+}

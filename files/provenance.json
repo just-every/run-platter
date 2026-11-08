@@ -1,0 +1,42 @@
+{
+  "branch": "cloud/sx-platter-timing-1-push-1",
+  "candidate_commit_count": 2,
+  "candidates": [
+    {
+      "author_email": "fleet@runeditrun.com",
+      "author_name": "Run Edit Run fleet",
+      "committer_email": "fleet@runeditrun.com",
+      "committer_name": "Run Edit Run fleet",
+      "head": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+      "trailers": []
+    },
+    {
+      "author_email": "fleet@runeditrun.com",
+      "author_name": "Run Edit Run fleet",
+      "committer_email": "fleet@runeditrun.com",
+      "committer_name": "Run Edit Run fleet",
+      "head": "abf2ed4c807e7ee59c358638ea7c3dc6431bdc76",
+      "trailers": []
+    }
+  ],
+  "clause_changes": [],
+  "contract_unchanged": true,
+  "head": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+  "main": "7c0b92553438cdab1c78c31b6d7dcf6803a9371b",
+  "merge_base": "7c0b92553438cdab1c78c31b6d7dcf6803a9371b",
+  "product_commits_created": 0,
+  "repository": "just-every/run-platter",
+  "source_branch": "cloud/sx-platter-timing-1",
+  "source_head": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+  "tree": "b601b7f9b69d976ce75b1aa088e8085927a1b1bc",
+  "verify": {
+    "conclusion": "success",
+    "databaseId": 42512950991,
+    "headSha": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+    "name": "Verify",
+    "status": "completed",
+    "url": "https://github.com/just-every/run-platter/actions/runs/42512950991"
+  },
+  "view_files_unchanged": true,
+  "working_tree_clean": true
+}

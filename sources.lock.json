@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "0331b8f4cdfc48beaf5752594e01bc744abb2e16cfd6a02528e452bfec739700",
+      "sha256": "6e5f7d17af0ec923af204597e1f4d2db8160d3470835cf15ba02b71ff27e79d5",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "cd86cdf9e5097ece27867acf8ad8a2d1da370973e351f0eb9144701a664bbd38",
+      "sha256": "09ef88c02e5db4e892ac4ac3a8efb2d5391a9ac73517e8fa521db4467d9d86b5",
       "executable": false
     },
     "deploy-demo.json": {
@@ -122,7 +122,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "a5d8aa4702e0353921e8618ec60294a46b90f8e6d16534cf8ff603ac0939fb02",
+      "sha256": "986b69c878034718fa1d177f408ee25f4e0edfbcdd5bca16455111492ecd697b",
       "executable": false
     },
     "docs/contract-behavior.md": {
@@ -2730,7 +2730,7 @@
       "executable": false
     },
     "src/platter/documents/import-export.ts": {
-      "sha256": "e185fbd5b2da72fefc92fc6aa0555c9dd57b5ec5eb17f8e04967fba0526caf95",
+      "sha256": "61b638ecf9799babd8c3636ad8aacb88df221aefef17b8db4ef925650b593f7f",
       "executable": false
     },
     "src/platter/documents/media.ts": {
@@ -2926,7 +2926,7 @@
       "executable": false
     },
     "src/platter/movein/pandadoc-content.ts": {
-      "sha256": "d0b7689ecff1ae1724b676d408d6a76ae9e9a869fb1a4c96f53cce78b9698f5c",
+      "sha256": "70b86cbd1a6b3bb93feb99b88a573af0ba196659dff267d4eec6a59d888b91c7",
       "executable": false
     },
     "src/platter/movein/proposify-export.ts": {
@@ -3778,7 +3778,7 @@
       "executable": false
     },
     "tests/platter.test.mjs": {
-      "sha256": "8840da639acfb16a581310b11a14e79db3c5ae7318e6b180e1a9732a162e7221",
+      "sha256": "1cb5ce19f8510ea1372379832d4761fa6ad3e671323c5a7fdd532d7459daa520",
       "executable": false
     },
     "tests/pricing-fixture.mjs": {

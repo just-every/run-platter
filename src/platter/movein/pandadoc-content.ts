@@ -21,7 +21,7 @@ async function prepare(db:D1Database,move:any,uploads:UploadedDocument[],actor:A
  const mode=move.kind,files:any[]=[],outputs:any[]=[],unmapped:string[]=[],sources:any[]=[],skipped:string[]=[]
  let companyIds=input.companyIds??{}
  if(typeof companyIds==='string'){try{companyIds=JSON.parse(companyIds)}catch{fail('invalid_mapping',400,'Review the company ID mapping')}}
- const catalog=[...(await db.prepare('SELECT id,sku,name FROM p_priced_catalog').all<any>()).results,...(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)}))]
+ const catalog=[...(await db.prepare('SELECT id,sku,name,source_id FROM p_priced_catalog').all<any>()).results,...(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)}))]
  // CSV records are reviewed with the Word outputs, so SKU links bind the same original bytes.
  for(const upload of uploads.filter(u=>/\.csv$/i.test(u.filename))){
   const csv=Buffer.from(upload.bytes).toString('utf8'),kind=/^Name,SKU,/i.test(csv)?'catalog':'contacts',claimMode='pandadoc-'+kind

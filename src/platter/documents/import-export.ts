@@ -30,7 +30,10 @@ export async function wordContent(bytes:Uint8Array,catalog:any[],optionId:string
     const rows=part.text.split('\n').map(r=>r.split('\t')),headers=rows[0].map(h=>h.trim().toLowerCase()),column=(pattern:RegExp)=>headers.findIndex(h=>pattern.test(h)),price=column(/^(unit\s*)?price$|^rate$/),quantity=column(/^qty$|^quantity$/),sku=column(/^sku$/),name=column(/^name$|^item$|^product$|^description$/)
     if(price>=0||quantity>=0||sku>=0){
      need(price>=0,'A quote table needs a price column')
-     const lines=rows.slice(1).filter(r=>r.some(c=>c.trim())).map((r,index)=>{const sourceSku=sku>=0?r[sku]?.trim():'';const candidates=catalog.filter(c=>sourceSku?String(c.sku??'').trim().toLowerCase()===sourceSku.toLowerCase():name>=0&&String(c.name??'').trim().toLowerCase()===r[name]?.trim().toLowerCase());const distinct=[...new Map(candidates.map(c=>[c.id,c])).values()];const match=distinct.length===1?distinct[0]:undefined,label=r[name]||match?.name||r[sku]||'Imported line '+(index+1);if(!match)report.unmatched.push(label);return {name:label,description:'',unit:'each',quantity:quantity>=0?r[quantity]:'1',unitPrice:r[price].replace(/[$,]/g,''),...(match?{catalogId:match.id}:{})}})
+     const lines=rows.slice(1).filter(r=>r.some(c=>c.trim())).map((r,index)=>{const sourceSku=sku>=0?r[sku]?.trim():'';const candidates=catalog.filter(c=>sourceSku?String(c.sku??'').trim().toLowerCase()===sourceSku.toLowerCase():name>=0&&String(c.name??'').trim().toLowerCase()===r[name]?.trim().toLowerCase())
+      // A promoted priced item and its imported source represent one catalog candidate.
+      const distinct=new Map(candidates.map(c=>[c.id,c]));for(const candidate of candidates)if(candidate.source_id)distinct.delete(candidate.source_id)
+      const match=distinct.size===1?[...distinct.values()][0]:undefined,label=r[name]||match?.name||r[sku]||'Imported line '+(index+1);if(!match)report.unmatched.push(label);return {name:label,description:'',unit:'each',quantity:quantity>=0?r[quantity]:'1',unitPrice:r[price].replace(/[$,]/g,''),...(match?{catalogId:match.id}:{})}})
      const index=tables.filter((t:any)=>t.optionId===optionId).length;tables.push({optionId,name:'Imported quote',lines});parts.push({id,type:'pricing',title:'',text:'',optionId,tableIndex:index});report.missing.push('Quote table images absent from the Word download cannot be recovered.');continue
     }
    }
@@ -56,7 +59,7 @@ export async function importDocument(env:Bindings,a:Actor,data:FormData){
   document.fixedPdf={fileId:await retain(file.name,'application/pdf',bytes),pages:pdf!.getPageCount()}
  }else{
   need(/\.docx$/i.test(file.name),'Upload a .docx or .pdf file')
-  const catalog=[...(await db.prepare('SELECT id,sku,name FROM p_priced_catalog').all<any>()).results,...(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)}))]
+  const catalog=[...(await db.prepare('SELECT id,sku,name,source_id FROM p_priced_catalog').all<any>()).results,...(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)}))]
   const tables=fields.pricingTables,optionId=String(data.get('optionId')??fields.packages[0].id),option=fields.packages.find((o:any)=>o.id===optionId);need(option,'Choose an offered package')
   const converted=await wordContent(bytes,catalog,optionId,tables,retain),parts=converted.parts;Object.assign(report,converted.report)
   if(data.get('mode')==='library'){

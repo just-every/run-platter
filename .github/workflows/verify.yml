@@ -99,13 +99,13 @@ jobs:
     needs: [plan, core]
     if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-24.04
-    # Verify 42329924078: longest shard 763s; ceil((763 + 240) / 60) = 17m,
-    # leaving 257s of margin without another rebalance.
+    # Balance measured test work across eight jobs; retain the 17m hard limit
+    # for hosted-runner variance. Assignments live in scripts/verification/run.mjs.
     timeout-minutes: 17
     strategy:
       fail-fast: false
       matrix:
-        shard: [runtime, browser_documents, browser_commercial, business_authoring, business_lifecycle, archive_custody, archive_restore, archive_media]
+        shard: [runtime, browser_documents, browser_commercial, business_authoring, business_sending, archive_custody, archive_restore, archive_media]
     env:
       CI: 'true'
       PLATTER_VERIFY_SHARD: ${{ matrix.shard }}

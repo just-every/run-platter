@@ -3770,7 +3770,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "fcdc6422dde46dc59a206c26b86a7b059053d19b08f094f1b536ab4fe5d949a2",
+      "sha256": "a707c23d66d8c672ae1434e89798bc3477952349413118be40a5db261f67d419",
       "executable": false
     },
     "tests/mailbox-credential-journey.mjs": {

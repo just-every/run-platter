@@ -3625,8 +3625,12 @@
       "sha256": "cc6cdd3c1ac05862b4085133100273d9154166a2d5d0ff5918cbb40e44c04883",
       "executable": false
     },
+    "tests/archive-template.mjs": {
+      "sha256": "da2f65a25c9ae1bc200bd837c48b727f8e4ec11635d6fb68f24196a3db1fa6b8",
+      "executable": false
+    },
     "tests/archive.test.mjs": {
-      "sha256": "1330fe8dc7693f9626fa62ac2dbcede6bb2d1dc0ab9594136c948feb25179f39",
+      "sha256": "e4f84dfba9a52445054fce2e20d07b1fa23e4b3b0cd220e5d8ab34f50a4cc582",
       "executable": false
     },
     "tests/browser-edge.mjs": {

@@ -66,7 +66,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "04f9f6504dac64af9a3472fb1828a15a8f86c0ee2d53d62f627258490d1812c0",
+      "sha256": "b75f79133cca4b4eb4b03170b7e1552ad71b135cc2c9cf16c36783f685fbaf5e",
       "executable": false
     },
     ".gitignore": {
@@ -1534,7 +1534,7 @@
       "executable": false
     },
     "scripts/verification/run.mjs": {
-      "sha256": "da6f51d2930b1ea43278783c1db9ebdeec593df3a4ea02878d0bbc3752a86ab9",
+      "sha256": "51659dd1e954954a641b44232fbe4af4bf40f164fd38c08af5d516ff1a98cb85",
       "executable": false
     },
     "SEED-COMMAND-CONTRACT.md": {

@@ -1,8 +1,11 @@
+import { approvalRequestInput } from './approval-request.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
+import {managerApprovalPreview} from './approval-preview-fixture.mjs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { documentFixture } from './document-fixture.mjs'
 import { inboundMailFixture } from './inbound-mail-fixture.mjs'
 import { pricingFixture, pricingExpected } from './pricing-fixture.mjs'
+import { templateClients, variableTemplateFields } from './template-variables-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
@@ -40,7 +43,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
   let h
   try {
     for (const path of [source,restored,erased]) await checkout(path)
-    await exec(process.execPath, [resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'], { cwd:source, env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'}, maxBuffer:2e6 })
+    await exec(process.execPath, [resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'], { cwd:source, env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'}, maxBuffer:8e6 })
     h=await harness({root:source,assetsDirectory:'public',outboundService:()=>new Response(null,{status:204})})
     const p=await h.cmd('client.save',{name:'Temporary joiner',email:'temporary@studio.example'})
     const key=await h.cmd('agent.create',{label:'Excluded secret'})
@@ -150,6 +153,31 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const withdrawalHistory=(await h.state()).proposals.find(p=>p.id===withdrawn.id).withdrawals
     const duplicate=await h.cmd('proposal.duplicate',{id:work.id,version:4})
     const duplicateBefore=(await h.state()).proposals.find(p=>p.id===duplicate.id)
+    const address=n=>['synthetic-platter-'+n,'example.test'].join(String.fromCharCode(64))
+    const acme=await h.cmd('client.save',{name:'Synthetic Acme custody',email:address(1211),variableFields:{contactName:'Avery Chen',custom:{Region:'West'}}}),beta=await h.cmd('client.save',{name:'Synthetic Beta custody',email:address(1212),variableFields:{contactName:'Casey Lane',custom:{Region:'East'}}})
+    const {scheduleFixture:duplicateSchedule}=await import('./packages-fixture.mjs')
+    const paidSource=await h.cmd('proposal.prepare',{...offer,clientId:acme.id,title:'{{Client.Company}} custody',scope:'{{Contact.Name}} in {{Custom.Region}}',variableValues:{},document:{version:1,blocks:[{id:'destination',type:'text',title:'Recipient',text:'Prepared for {{Client.Company}}'}]},paymentTerms:duplicateSchedule()})
+    const copyFileBytes='%PDF synthetic-platter-1213 exact copy custody'
+    await upload({id:paidSource.id,version:1},'synthetic-platter-1213.pdf',copyFileBytes)
+    await h.cmd('payment.collection',{id:paidSource.id,version:2,completion:'off',paymentMethods:['ach','card']})
+    await h.cmd('expiry.set',{id:paidSource.id,version:3,mode:'days',days:14,warningDays:2})
+    await h.cmd('reminder.configure',{id:paidSource.id,version:4,enabled:false,timeZone:['America','Chicago'].join('/'),afterDays:[3,8],beforeDays:[2],cap:4,subject:'Review the quoted scope',message:'Please review the quoted services.'})
+    await h.cmd('proposal.approve',{id:paidSource.id,version:5,revision:2})
+    const paidShare=await h.cmd('proposal.send',{id:paidSource.id,version:6}),paidPath=new URL(paidShare.shareUrl).pathname
+    assert.equal((await h.send(paidPath+'/action?name=code.request',{})).status,200)
+    const paidCode=(await h.state()).outbox.find(m=>m.proposal_id===paidSource.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],paidSession=await h.send(paidPath+'/action?name=code.verify',{code:paidCode})
+    assert.equal(paidSession.status,200);assert.equal((await h.send(paidPath+'/action?name=accept',{name:'Avery Chen',optionId:'one',consent:true},paidSession.cookie)).status,200)
+    await h.cmd('payment.record',{id:paidSource.id,method:'wire',amount:'600',receivedOn:'2026-10-20',reference:'synthetic-platter-1214',consent:true})
+    const paidInvoice=await h.cmd('invoice.export',{id:paidSource.id}),paidCsv=(await h.send('/api/platter/invoices/'+paidInvoice.id+'.csv',undefined,h.owner)).text
+    const paidRead=async(id,kind,cookie=h.owner)=>{const r=await h.mf.dispatchFetch(h.origin+'/api/platter/'+kind+'?id='+id,{headers:{cookie}});assert.equal(r.status,200,kind);return new Uint8Array(await r.arrayBuffer())}
+    const paidPdf=await paidRead(paidSource.id,'agreement.pdf'),paidCertificate=await paidRead(paidSource.id,'certificate.pdf'),paidBefore=(await h.state()).proposals.find(p=>p.id===paidSource.id),paidRecords=(await h.state()).paymentRecords.filter(p=>p.proposal_id===paidSource.id)
+    const paidCopy=await h.cmd('proposal.duplicate',{id:paidSource.id,version:paidBefore.version,clientId:beta.id}),paidCopyBefore=(await h.state()).proposals.find(p=>p.id===paidCopy.id)
+    assert.equal(paidCopyBefore.scope,'Casey Lane in East');assert.equal(paidCopyBefore.document.blocks[0].text,'Prepared for Synthetic Beta custody')
+    for(const field of ['options','terms','payment_terms','deliveryDefaults','collectionPolicy','attachments'])assert.deepEqual(paidCopyBefore[field],paidBefore[field],field+' copied from the paid source')
+    assert.equal(paidCopyBefore.reminderSettings,null);assert.equal(paidCopyBefore.acceptance,undefined);assert.equal(paidCopyBefore.invoice,undefined);assert.equal(paidCopyBefore.shareToken,undefined);assert.equal(paidCopyBefore.approved_by,null)
+    assert.deepEqual((await h.state()).paymentRecords.filter(p=>p.proposal_id===paidCopy.id),[])
+    assert.deepEqual(await paidRead(paidSource.id,'agreement.pdf'),paidPdf)
+
     assert.deepEqual(JSON.parse(duplicateBefore.section_conditions),{terms:'two'},'EDIT-009 duplicate preserves conditional sections')
     const clientPreview=await h.send(`/app/preview/client?id=${duplicate.id}&revision=1&optionId=two`,undefined,h.owner);assert.equal(clientPreview.status,200);assert.match(clientPreview.text,/Preview only/)
     await h.cmd('followup.schedule',{id:pending.id,action:'Call Avery about scope',dueDate:'2027-03-10'})
@@ -159,6 +187,15 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     const starterSnapshot = (await h.state()).proposals.find(p => p.id === starterBefore.id)
     assert.match(starterSnapshot.scope, /Northstar Coffee/)
     assert.ok(starterSnapshot.options.every(o => o.tables[0].lines.length === 2))
+    const variableClients=[]
+    for(const input of templateClients)variableClients.push(await h.cmd('client.save',input))
+    const variableSource=await h.cmd('proposal.prepare',variableTemplateFields(variableClients[0].id))
+    const variableTemplate=await h.cmd('template.save',{id:variableSource.id,version:1,name:'Archived independent variable template'})
+    const variableDrafts=[]
+    for(const client of variableClients.slice(1))variableDrafts.push(await h.cmd('template.start',{id:variableTemplate.id,version:1,clientId:client.id}))
+    const variableSnapshot=(await h.state()).templates.find(t=>t.id===variableTemplate.id).snapshot
+    assert.deepEqual(variableSnapshot.document.merge.values,{})
+    for(const value of ['Synthetic source agency','Sage Source','41 Source Street','SourceOnly','97.00'])assert.ok(!JSON.stringify(variableSnapshot).includes(value),value)
     const followupsBefore=(await h.state()).followups.rows.map(({sentAt,...r})=>r)
     const actionsBefore=(await h.state()).followupActions
     const {packageFixture,packageSelection:packageItems,packageExpected,scheduleFixture}=await import('./packages-fixture.mjs')
@@ -171,6 +208,22 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal((await h.send(packagePath+'/action?name=accept',{name:'Avery Chen',optionId:'two',items:packageItems,consent:true},packageVerified.cookie)).status,200)
     const packagesBefore=(await h.state()).proposals.find(x=>x.id===packages.id),scheduleBytes=(await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(packages.id).first()).snapshot
     assert.equal(packagesBefore.acceptance.totalCents,packageExpected.totalCents);assert.equal(packagesBefore.acceptance.depositCents,packageExpected.depositCents)
+    // Keep the combined preview's sent and accepted facts through the public archive door.
+    const {configureTaxes,taxRequest}=await import('./taxes-fixture.mjs'),{previewFixture,previewExpected,previewSelection}=await import('./packages-fixture.mjs')
+    await configureTaxes(h.cmd)
+    const combined=await h.cmd('proposal.prepare',{...previewFixture(),clientId:client.id,tax:taxRequest()})
+    const combinedQuery='?optionId=premium&items='+encodeURIComponent(JSON.stringify(previewSelection))
+    const combinedBeforePreview=await h.state(),combinedPreview=await h.send('/app/preview/client'+combinedQuery+'&id='+combined.id+'&revision=1',undefined,h.owner)
+    assert.equal(combinedPreview.status,200);assert.ok(combinedPreview.text.includes('Sales tax: USD 272.33'));assert.ok(combinedPreview.text.includes(previewFixture().terms));assert.deepEqual(await h.state(),combinedBeforePreview)
+    await h.cmd('proposal.approve',{id:combined.id,version:1,revision:1});const combinedPath=new URL((await h.cmd('proposal.send',{id:combined.id,version:2})).shareUrl).pathname
+    await h.send(combinedPath+'/action?name=code.request',{})
+    const combinedCode=(await h.state()).outbox.find(m=>m.proposal_id===combined.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+    const combinedCookie=(await h.send(combinedPath+'/action?name=code.verify',{code:combinedCode})).cookie
+    const combinedSent=(await h.send(combinedPath+'/data.json'+combinedQuery,undefined,combinedCookie)).value
+    assert.equal(combinedSent.selection.totalCents,previewExpected.totalCents);assert.equal(combinedSent.selection.tax.taxCents,previewExpected.taxCents);assert.equal(combinedSent.selection.depositCents,previewExpected.depositCents);assert.deepEqual(combinedSent.paymentSchedule,previewExpected.paymentSchedule)
+    assert.equal((await h.send(combinedPath+'/action?name=accept',{name:'Synthetic preview signer',optionId:'premium',items:previewSelection,consent:true},combinedCookie)).status,200)
+    const combinedBefore=(await h.state()).proposals.find(r=>r.id===combined.id),combinedSnapshot=(await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(combined.id).first()).snapshot
+    assert.deepEqual(combinedBefore.acceptance.paymentSchedule,previewExpected.paymentSchedule);assert.equal(combinedBefore.acceptance.totalCents,previewExpected.totalCents)
     // PRICE-002 / SIGN-008: uploaded-paper choices and original file are product records too.
     const paper=await h.cmd('proposal.prepare',{...offer,title:'Archived signed-copy package',paymentTerms:{...scheduleFixture(),depositFixed:'500'},packages:packageFixture()})
     await h.cmd('proposal.approve',{id:paper.id,version:1,revision:1});await h.cmd('proposal.send',{id:paper.id,version:2})
@@ -213,7 +266,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     // audit rows exactly here, then assert the complete joined view on restore.
     const beforeAudit=beforeAuditView.map(({reason,mail_route,sender_address,...row})=>row)
     assert.ok(beforeAudit.some(row=>row.action==='proposal.preview'&&row.subject===duplicate.id&&row.actor_role==='owner'),'EDIT-018 / TEAM-004 preview action is retained without payload or invitation authority')
-    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','approved','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
+    assert.deepEqual(before.proposals.map(p=>p.status).sort(),['accepted','accepted','accepted','accepted','accepted','approved','draft','draft','draft','draft','draft','draft','draft','withdrawn','withdrawn','withdrawn'])
     const identity={auth:h.auth,owner:h.owner}
     await h.close();h=null
     const old=join(temporary,'before.rer'),later=join(temporary,'later.rer'),again=join(temporary,'again.rer')
@@ -250,6 +303,10 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     h=await harness({root:restored,...identity})
     await h.state(identity.owner,401)
     assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+key.token})).status,401)
+    const restoredDrafts=(await h.db.prepare('SELECT * FROM p_proposals ORDER BY id').all()).results
+    const restoredMcp=await h.send('/api/platter/agent/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'prepare_from_template',arguments:{templateId:'starter:agency',templateVersion:1,clientId:client.id}}},'',{authorization:'Bearer '+key.token})
+    assert.equal(restoredMcp.status,401);assert.equal(restoredMcp.value.result,undefined)
+    assert.deepEqual((await h.db.prepare('SELECT * FROM p_proposals ORDER BY id').all()).results,restoredDrafts,'Restored keys cannot create classified MCP drafts')
     assert.equal((await h.send(path,undefined,verified.cookie)).status,404)
     const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
     const restoredState=await h.state(restoredOwner)
@@ -272,7 +329,7 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).document,documentFixture(),'EDIT-001 ordered document and brand survive the public CLI archive exactly')
     const completedRestoreSetup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(completedRestoreSetup.status,303)
     const restoredDocumentPage=await h.send('/app/proposal?id='+proposal.id,undefined,restoredOwner);assert.equal(restoredDocumentPage.status,200);assert.match(restoredDocumentPage.text,/Two perspectives/)
-    assert.equal(archived.filter(item=>item.table==='p_personal_templates').length,1,'EDIT-002 personal template snapshot and defaults survive CLI restore')
+    assert.deepEqual(archived.filter(item=>item.table==='p_personal_templates').map(item=>item.row.id).sort(),[template.id,variableTemplate.id].sort(),'EDIT-002 personal template snapshots and defaults survive CLI restore')
     assert.deepEqual(restoredState.followupActions,actionsBefore,'FOLLOW-002 logged actions survive public CLI restore exactly')
     assert.deepEqual(restoredState.followups.rows.map(({sentAt,...r})=>r),followupsBefore,'FOLLOW-002 open and completed actions survive public CLI restore')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===proposal.id).questions,acceptedThread,'FOLLOW-004 agreement thread survives public CLI restore exactly')
@@ -289,6 +346,19 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     await h.cmd('proposal.send',{id:withdrawn.id,version:4},restoredOwner,409)
     assert.equal(archived.filter(item=>item.table==='p_withdrawn_links').length,0)
     assert.deepEqual(restoredState.proposals.find(p=>p.id===duplicate.id),duplicateBefore,'EDIT-012 copied content, files and delivery configuration survive CLI restore exactly')
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===paidSource.id).acceptance,paidBefore.acceptance)
+    assert.deepEqual(restoredState.proposals.find(p=>p.id===paidCopy.id),paidCopyBefore,'paid-source destination bindings and inactive delivery settings survive exactly')
+    assert.deepEqual(restoredState.paymentRecords.filter(p=>p.proposal_id===paidSource.id),paidRecords,'the real source receipt remains with Acme')
+    assert.deepEqual(restoredState.paymentRecords.filter(p=>p.proposal_id===paidCopy.id),[])
+    assert.equal((await h.send('/api/platter/invoices/'+paidInvoice.id+'.csv',undefined,restoredOwner)).text,paidCsv)
+    assert.deepEqual(await paidRead(paidSource.id,'agreement.pdf',restoredOwner),paidPdf);assert.deepEqual(await paidRead(paidSource.id,'certificate.pdf',restoredOwner),paidCertificate)
+    for(const id of [paidSource.id,paidCopy.id]){
+      const row=restoredState.proposals.find(p=>p.id===id),file=row.attachments.find(f=>f.filename==='synthetic-platter-1213.pdf')
+      assert.ok(file);const download=await h.send('/api/platter/attachments/'+id+'/'+file.id,undefined,restoredOwner);assert.equal(download.status,200);assert.equal(download.text,copyFileBytes)
+    }
+    assert.equal((await h.send(paidPath,undefined,paidSession.cookie)).status,404,'restore never restores the paid source invitation')
+    await h.cmd('proposal.send',{id:paidCopy.id,version:1},restoredOwner,409)
+
     assert.equal(restoredState.proposals.find(p=>p.id===work.id).options[0].cents,pricingExpected.grandCents,'PRICE-001 server totals survive public CLI restore')
     assert.deepEqual(restoredState.proposals.find(p=>p.id===work.id).options, before.proposals.find(p=>p.id===work.id).options,'PRICE-001 all table, line, quantity, unit, group and subtotal fields survive public CLI restore exactly')
     assert.equal((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(packages.id).first()).snapshot,scheduleBytes,'Frozen schedule snapshot survives restore byte-identically');assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).acceptance,packagesBefore.acceptance,'PRICE-002 immutable selected quantities and totals survive public CLI restore')
@@ -296,6 +366,12 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.deepEqual(restoredState.proposals.find(x=>x.id===packages.id).pdfDownloads,packagesBefore.pdfDownloads,'PRICE-002 selected PDF timeline survives public CLI restore')
     assert.deepEqual(JSON.parse(restoredState.proposals.find(x=>x.id===packages.id).section_conditions),{terms:'item:rush'},'PRICE-002 / EDIT-009 optional-item section condition survives public CLI restore')
     assert.equal(JSON.parse((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(packages.id).first()).snapshot).terms,'Rush delivery terms apply.','PRICE-002 / EDIT-009 agreement keeps the section its added optional item showed')
+    const restoredCombined=restoredState.proposals.find(r=>r.id===combined.id)
+    assert.deepEqual(restoredCombined.acceptance,combinedBefore.acceptance,'combined tax, deposit, milestones and selected quantities retain exact custody')
+    assert.deepEqual(restoredCombined.options,combinedBefore.options,'sent rates, packages and bounded quantities remain frozen')
+    assert.equal((await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(combined.id).first()).snapshot,combinedSnapshot)
+    assert.equal(JSON.parse(combinedSnapshot).terms,previewFixture().terms)
+    assert.equal((await h.send(combinedPath+'/data.json'+combinedQuery,undefined,combinedCookie)).status,404,'restore does not restore client invitation authority')
     assert.deepEqual(restoredState.proposals.find(x=>x.id===paper.id).acceptance,paperBefore.acceptance,'PRICE-002 / SIGN-008 selected upload, attestation and file metadata survive public CLI restore')
     assert.equal((await h.send(paperInvoicePath,undefined,restoredOwner)).text,paperCsv,'PRICE-002 selected deposit invoice survives restore byte-identically')
     const paperFile=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+paper.id+'/'+paperBefore.acceptance.signedCopy.id,{headers:{host:new URL(h.origin).host,cookie:restoredOwner}});assert.equal(paperFile.status,200);assert.deepEqual(new Uint8Array(await paperFile.arrayBuffer()),paperBytes,'SIGN-008 original signed copy survives restore byte-identically')
@@ -314,6 +390,21 @@ test('FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLO
     assert.equal((await h.state(restoredOwner)).starterTemplates.length, 5)
     const restarted = await h.cmd('template.start', { id: 'starter:consultancy', version: 1, clientId: client.id }, restoredOwner)
     assert.equal((await h.state(restoredOwner)).proposals.find(p => p.id === restarted.id).scope, starterSnapshot.scope, 'EDIT-002 built-in starter remains usable after CLI restore')
+    assert.deepEqual(restoredState.templates.find(t=>t.id===variableTemplate.id).snapshot,variableSnapshot,'Variable patterns survive without source values')
+    assert.equal(restoredState.proposals.find(p=>p.id===variableDrafts[0].id).scope,'Wren West at 42 West Street; region West.')
+    assert.equal(restoredState.proposals.find(p=>p.id===variableDrafts[1].id).scope,'Eden East at 43 East Street; region East.')
+    const destination=await h.cmd('client.save',{name:'Synthetic restored studio',email:['synthetic-platter-404','example.test'].join('@'),variableFields:{contactName:'River Restored',address:'44 Restored Street',custom:{Region:'Restored',Service:'Restored service',Rate:'310.00'}}},restoredOwner)
+    const refilled=await h.cmd('template.start',{id:variableTemplate.id,version:1,clientId:destination.id},restoredOwner)
+    const independent=(await h.state(restoredOwner)).proposals.find(p=>p.id===refilled.id)
+    assert.equal(independent.scope,'River Restored at 44 Restored Street; region Restored.')
+    assert.equal(independent.title,'Campaign for Synthetic restored studio')
+    assert.equal(independent.terms,'Prepared by Jordan Venue.')
+    assert.deepEqual(independent.options.map(o=>o.cents),[62000,93000])
+    assert.equal(independent.options[0].tables[0].lines[0].name,'Restored service')
+    assert.deepEqual(independent.collectionPolicy,{enabled:false,completion:'off',methods:['card']})
+    assert.equal(independent.approved_by,null);assert.equal(independent.shareToken,undefined)
+    await h.cmd('proposal.send',{id:independent.id,version:1},restoredOwner,409)
+    assert.deepEqual((await h.state(restoredOwner)).templates.find(t=>t.id===variableTemplate.id).snapshot,variableSnapshot)
     assert.deepEqual(await h.cmd('import.journal',{id:imported.job.id},restoredOwner),journal)
     assert.equal((await h.send(invoicePath,undefined,restoredOwner)).text,invoiceCsv)
     for(const file of frozenAttachments){const r=await h.mf.dispatchFetch(h.origin+'/api/platter/attachments/'+proposal.id+'/'+file.id,{headers:{cookie:restoredOwner,host:new URL(h.origin).host}});assert.equal(r.status,200);assert.deepEqual(new Uint8Array(await r.arrayBuffer()),file.kind==='w9'?attachmentBytes:new TextEncoder().encode('%PDF insurance'))}
@@ -350,7 +441,7 @@ test('PORT-001 public CLI refuses corrupt and pre-erasure archives and retains a
  const temporary=await mkdtemp(join(tmpdir(),'platter-erasure-')),source=join(temporary,'source'),erased=join(temporary,'erased');let h
  try{
   for(const path of [source,erased])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source})
   const p=await h.cmd('client.save',{name:'Temporary joiner',email:'synthetic-platter-8200@example.com'}),client=await h.cmd('client.save',{name:'Retained client',email:'synthetic-platter-8201@example.com'})
   const proposal=await h.cmd('proposal.prepare',{clientId:client.id,title:'Retained agreement',scope:'Retained business record',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
@@ -463,7 +554,7 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   const events=resendEvents();let submitted=0
   h=await harness({root:source,origin:'https://platter.example',auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'network-edge-key',MAIL_WEBHOOK_KEY:events.key},outboundService:()=>Response.json({id:'archive-provider-'+(++submitted)})})
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
@@ -491,21 +582,27 @@ test('SEND-002 public CLI preserves bounce follow-ups and logged action without 
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody', {timeout:180000},async()=>{
+test('MIG-003, MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody', {timeout:600000},async()=>{
  const {businessCsv,applyBusiness,undoBusiness,fileHost}=await import('./business-import-fixture.mjs')
  const temporary=await mkdtemp(join(tmpdir(),'platter-business-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await Promise.all([source,restored].map(cwd=>exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})))
   const options={alias:{'cloudflare:sockets':'./tests/catalog-socket-edge.ts'},outboundService:r=>fileHost(r)}
   h=await harness({root:source,...options})
   const contacts=await applyBusiness(h,{kind:'contacts',format:'platter',csv:await businessCsv('platter-contacts.csv')})
   const catalog=await applyBusiness(h,{kind:'catalog',format:'pandadoc',csv:await businessCsv('pandadoc-catalog.csv')})
   const {moveinFixture,applyMovein,hash}=await import('./document-movein-fixture.mjs'),documentFixture=await moveinFixture()
   const movein=await applyMovein(h,documentFixture)
-  const documentJournal=await h.cmd('document-import.journal',{id:movein.id}),beforeDocuments=(await h.state()).importedDocuments
-  const nativeClient=await h.cmd('client.save',{name:'Synthetic retained dependency',email:h.auth.OWNER_EMAIL})
+  const {proposifyFixture,applyProposify,fixedTemplate}=await import('./document-movein-fixture.mjs'),proposify=await proposifyFixture()
+  const sourceMovein=await applyProposify(h,proposify),fixed=await fixedTemplate(h,sourceMovein),reversible=await fixedTemplate(h,sourceMovein)
+  const sourceJournal=await h.cmd('document-import.journal',{id:sourceMovein.id}),applications=(await h.state()).documentMoveins.find(m=>m.id===sourceMovein.id).applications
+  const documentJournal=await h.cmd('document-import.journal',{id:movein.id})
+  const {betterProposalsFixture,applyBetterProposals,finishMovein}=await import('./document-movein-fixture.mjs'),bpFixture=await betterProposalsFixture()
+  const bp=await applyBetterProposals(h,bpFixture),bpJournal=await h.cmd('document-import.journal',{id:bp.id})
+  const beforeDocuments=(await h.state()).importedDocuments,bpDocuments=beforeDocuments.filter(d=>d.moveinId===bp.id)
+  const nativeClient=await h.cmd('client.save',{name:'Synthetic retained dependency',email:['synthetic-retained-dependency','example.invalid'].join('@')})
   const dependency=await h.cmd('proposal.prepare',{clientId:nativeClient.id,title:'Synthetic retained dependency',scope:'Synthetic retained dependency',optionOne:'One',priceOne:'100',optionTwo:'Two',priceTwo:'200',depositPercent:'25'})
   await h.db.prepare('INSERT INTO p_imported_document_links(document_id,proposal_id) VALUES(?,?)').bind(hash(documentFixture.originals[0]),dependency.id).run()
   const before=(await h.state()).businessRecords,journal=await h.cmd('business-import.journal',{id:catalog.job.id})
@@ -515,6 +612,21 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
   const cookie=await h.signIn(identity.auth.OWNER_EMAIL)
   assert.deepEqual((await h.state(cookie)).businessRecords,before)
   assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments)
+  assert.deepEqual((await h.state(cookie)).documentMoveins.find(m=>m.id===sourceMovein.id).applications,applications)
+  const restoredSourceJournal=await h.cmd('document-import.journal',{id:sourceMovein.id},cookie)
+  assert.deepEqual(restoredSourceJournal,sourceJournal,'restored source bytes, choices and provenance stay exact')
+  for(const bytes of [...proposify.originals,proposify.template]){const response=await h.mf.dispatchFetch(h.origin+'/api/platter/imported-original?document='+hash(bytes),{headers:{cookie}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)}
+  const template=(await h.state(cookie)).templates.find(t=>t.id===fixed.applied.templateId)
+  const child=await h.cmd('template.start',{id:template.id,version:template.version,clientId:fixed.client.id,title:'Synthetic restored template draft'},cookie)
+  const usable=(await h.state(cookie)).proposals.find(p=>p.id===child.id)
+  assert.equal(usable.status,'draft');assert.equal(usable.options[0].cents,72525);assert.equal(usable.document.fixedPdf.source,'proposify')
+  const fixedOriginal=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+child.id+'/'+usable.document.fixedPdf.fileId,{headers:{cookie}})
+  assert.equal(fixedOriginal.status,200);assert.deepEqual(Buffer.from(await fixedOriginal.arrayBuffer()),proposify.template)
+  await h.cmd('document-import.template-undo',{id:sourceMovein.id,applicationId:fixed.applied.applicationId},cookie,409)
+  await h.cmd('document-import.template-undo',{id:sourceMovein.id,applicationId:reversible.applied.applicationId},cookie)
+  const guarded=(await h.state(cookie)).importedDocuments
+  await h.cmd('document-import.undo',{id:sourceMovein.id},cookie,409)
+  assert.deepEqual((await h.state(cookie)).importedDocuments,guarded)
   const restoredDocumentJournal=await h.cmd('document-import.journal',{id:movein.id},cookie)
   assert.deepEqual(restoredDocumentJournal.originals,documentJournal.originals)
   assert.deepEqual(restoredDocumentJournal.provenance,documentJournal.provenance)
@@ -523,13 +635,26 @@ test('MIG-006 and MIG-007 public CLI archives imported business records, exporte
    const response=await h.mf.dispatchFetch(h.origin+'/api/platter/imported-original?document='+hash(bytes),{headers:{cookie}})
    assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)
   }
+  const restoredBpJournal=await h.cmd('document-import.journal',{id:bp.id},cookie)
+  assert.deepEqual(restoredBpJournal.originals,bpJournal.originals)
+  assert.deepEqual(restoredBpJournal.provenance,bpJournal.provenance)
+  assert.deepEqual(restoredBpJournal.report,bpJournal.report)
+  assert.deepEqual(Buffer.from(restoredBpJournal.originals.find(o=>o.name==='contacts.csv').original.base64,'base64'),bpFixture.contacts.bytes)
+  for(const file of bpFixture.pdfs){
+   const response=await h.mf.dispatchFetch(h.origin+'/api/platter/imported-original?document='+hash(file.bytes),{headers:{cookie}})
+   assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),file.bytes)
+  }
   const originalId=hash(documentFixture.originals[0])
   assert.deepEqual(await h.db.prepare('SELECT document_id,proposal_id FROM p_imported_document_links WHERE document_id=?').bind(originalId).first(),{document_id:originalId,proposal_id:dependency.id})
   await h.cmd('document-import.undo',{id:movein.id},cookie,409)
   assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments)
   await h.db.prepare('DELETE FROM p_imported_document_links WHERE document_id=?').bind(originalId).run()
   await h.cmd('document-import.undo',{id:movein.id},cookie)
-  assert.deepEqual((await h.state(cookie)).importedDocuments,[])
+  assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments.filter(d=>d.moveinId===sourceMovein.id||d.moveinId===bp.id))
+  await finishMovein(h,bp.id,cookie,true)
+  assert.deepEqual((await h.state(cookie)).importedDocuments,beforeDocuments.filter(d=>d.moveinId===sourceMovein.id))
+  assert.ok((await h.cmd('document-import.journal',{id:bp.id},cookie)).provenance.every(p=>p.reversed))
+  assert.equal((await h.state(cookie)).businessRecords.contacts.some(c=>c.id==='bp-contact-1'),false)
   assert.ok((await h.cmd('document-import.journal',{id:movein.id},cookie)).provenance.every(p=>p.reversed))
   const after=await h.cmd('business-import.journal',{id:catalog.job.id},cookie)
   assert.deepEqual(after.originals,journal.originals);assert.deepEqual(after.provenance,journal.provenance)
@@ -547,7 +672,7 @@ test('SEND-006 public CLI retains real invitation text, excludes rehearsal conte
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,assetsDirectory:'public'})
   const client=await h.cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Email rehearsal',scope:'A photography session',optionOne:'Studio',priceOne:'2400',optionTwo:'Campaign',priceTwo:'4200',depositPercent:'25'})
@@ -667,10 +792,10 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
  let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,origin:'https://platter.example',assetsDirectory:'public',auth:{...inbound.settings,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5600',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5601',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5602'},outboundService:async request=>{const url=new URL(request.url);if(url.hostname==='oauth2.googleapis.com')return Response.json({access_token:'synthetic-platter-5603',refresh_token:'synthetic-platter-5604',scope:'openid email https://www.googleapis.com/auth/gmail.send'});if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-5605',email:'archive-mailbox@synthetic-platter.example',email_verified:true});if(url.hostname==='gmail.googleapis.com'){mailboxWires.push(Buffer.from((await request.json()).raw,'base64url').toString('utf8'));return Response.json({id:'synthetic-platter-'+(8000+mailboxWires.length)})}if(url.hostname==='api.resend.com'&&request.method==='GET')return Response.json(inbound.messages.get(url.pathname.split('/').at(-1)));if(url.hostname==='api.resend.com')return Response.json({id:'synthetic-platter-5607'});if(url.hostname==='files.stripe.com'){const upload=await request.formData();assert.equal(upload.get('purpose'),'dispute_evidence');return Response.json({id:'synthetic-platter-3700'})}if(url.hostname==='api.hubapi.com'){if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-4120'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9961',stages:[{id:'synthetic-platter-9962',metadata:{isClosed:'true',probability:'1'}},{id:'synthetic-platter-9963',metadata:{isClosed:'true',probability:'0'}}]}]});const id=url.pathname.split('/').at(-1);return Response.json({id,properties:request.method==='PATCH'?(await request.json()).properties:{pipeline:'synthetic-platter-9961'}})};if(url.hostname==='quickbooks.api.intuit.com')return Response.json({CompanyInfo:{CompanyName:'Synthetic company'}});assert.equal(url.hostname,'api.stripe.com');if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2800'});if(url.pathname.includes('/disputes/')){const id=url.pathname.split('/').at(-1);if(request.method==='POST')return Response.json({id,status:'under_review'});const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id,charge:'synthetic-platter-2801',amount:accepted.deposit_cents,currency:accepted.currency.toLowerCase(),status:'needs_response',evidence_details:{due_by:disputeDeadline}})}if(request.method==='GET'){const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id:'synthetic-platter-2801',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:0,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}})}const amount=Number(new URLSearchParams(await request.text()).get('amount'));return Response.json({id:'synthetic-platter-2802',charge:'synthetic-platter-2801',amount,status:'succeeded'})}})
   const people={}
-  for(const role of ['sales','manager','other']){
+  for(const role of ['sales','manager','other','admin']){
    const email=role+'@synthetic-platter.example';await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)
    const cookie=await h.signIn(email);people[role]={cookie,...(await h.state(cookie)).actor}
   }
@@ -679,10 +804,39 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   await h.cmd('workspace.defaults',{version:0,reminderDays:[2,5],expiryDays:30,paymentMethods:['card']})
   const team=await h.cmd('team.create',{name:'Archive team'})
   for(const role of ['sales','manager'])await h.cmd('member.set',{operatorId:people[role].id,version:0,role,teams:[team.id]})
+  await h.cmd('member.set',{operatorId:people.admin.id,version:0,role:'admin',teams:[]})
   await h.cmd('member.zone',{timeZone:'America/New_York'},people.sales.cookie)
   await h.cmd('approval.policy',{version:0,required:false,defaultRole:'manager'})
   await h.cmd('approval.rule',{version:1,name:'High value manager',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager']})
   const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
+  const nativeApprovals=[],policyAudit=async(cookie=h.owner)=>{const r=await h.send('/api/platter/audit?action=approval.policy',undefined,cookie);assert.equal(r.status,200);return r.value.rows}
+  const setPolicy=async(required,defaultRole,cookie=h.owner)=>{
+   const prior=(await h.state()).approvalSettings
+   await h.cmd('approval.policy',{version:prior.policy.version,required,defaultRole},cookie)
+   assert.deepEqual((await h.state()).approvalSettings,{policy:{singleton:1,required:required?1:0,default_role:defaultRole,version:prior.policy.version+1},rules:prior.rules})
+  }
+  const nativeOffer={clientId:client.id,scope:'Ordinary single-client delivery',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'3000'}]}
+  const unruled=await h.cmd('proposal.prepare',{...nativeOffer,title:'Unruled archive offer'},people.sales.cookie)
+  await h.cmd('proposal.send',{id:unruled.id,version:1},people.sales.cookie)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_approvals WHERE proposal_id=?').bind(unruled.id).first()).n,0)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_approval_decisions WHERE proposal_id=?').bind(unruled.id).first()).n,0)
+  for(const defaultRole of ['owner','admin','manager']){
+   await setPolicy(true,defaultRole)
+   await setPolicy(false,defaultRole,people.admin.cookie);await setPolicy(true,defaultRole,people.admin.cookie)
+   const draft=await h.cmd('proposal.prepare',{...nativeOffer,title:'Archived '+defaultRole+' decision'},people.sales.cookie)
+   const cookie=defaultRole==='owner'?h.owner:people[defaultRole].cookie
+   await h.cmd('proposal.approve',{id:draft.id,version:1,revision:1},cookie)
+   const approved=(await h.state()).proposals.find(r=>r.id===draft.id),decision=approved.approval.steps[0].decisions[0]
+   assert.deepEqual(approved.approval.steps[0].approvers,['role:'+defaultRole])
+   assert.equal(decision.actor_id,defaultRole==='owner'?(await h.state()).actor.id:people[defaultRole].id)
+   assert.equal(decision.plan,approved.approval.plan);assert.equal(decision.decision,'approved');assert.equal(decision.revision,1)
+   await h.cmd('proposal.send',{id:draft.id,version:2},people.sales.cookie)
+   nativeApprovals.push({id:draft.id,decision})
+  }
+  await setPolicy(false,'manager')
+  const nativePolicyAudit=await policyAudit()
+  assert.equal(nativePolicyAudit.filter(r=>r.actor_id===people.admin.id&&r.actor_role==='admin').length,6)
+  assert.ok(nativePolicyAudit.every(r=>r.occurred_at>0))
   const p=await h.cmd('proposal.prepare',{clientId:client.id,document:documentFixture(),title:'Archive routed offer',scope:'An audited scope',optionOne:'First',priceOne:'28000',optionTwo:'Second',priceTwo:'30000',depositPercent:'25',pricingTables:[{optionId:'one',name:'Services',lines:[{name:'Delivery',description:'Public scope',unit:'project',quantity:'1',unitPrice:'28000'}]}]},people.sales.cookie)
   await h.cmd('proposal.share',{id:p.id,operatorId:people.other.id},people.sales.cookie)
   const line=(await h.state()).proposals.find(r=>r.id===p.id).internalPricing.lines[0];await h.cmd('pricing.cost',{id:p.id,version:1,lineKey:line.key,unitCost:'7000'},people.manager.cookie)
@@ -744,15 +898,27 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
   assert.deepEqual(beforeRevenue.value.totals,[{currency:'USD',count:1,valueCents:1690000,oneOffCents:250000,firstYearCents:1690000,receivedCents:120000,refundedCents:0,netReceivedCents:120000,uncertainRefundCents:0,exportedDepositCents:0}])
   const allRevenue=await h.send('/api/platter/pipeline?view=recorded-revenue&sort=value',undefined,h.owner),beforeRevenueCsv=await h.send('/api/platter/pipeline.csv?'+revenueFilters,undefined,h.owner)
   assert.equal(beforeRevenueCsv.status,200)
-  const before=await h.state(),tables=['p_outcome_settings','p_outcomes','p_outcome_records','p_crm_outcome_bindings','p_crm_outcome_consents','p_crm_outcome_attempts','p_reminder_templates','p_template_reminder_messages','p_delivery_changes','p_reminder_policy','p_reminder_settings','p_reminder_runs','p_reminder_optouts','p_mail_reply_cap_notices','p_mail_replies','p_mail_attributions','p_report_schedules','p_report_runs','p_template_sources','p_disputes','p_dispute_packets','p_dispute_packet_parts','p_dispute_authorizations','p_dispute_submissions','p_dispute_documents','p_priced_catalog','p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_template_block_locks','p_proposal_block_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_library_uses','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
+  const before=await h.state(),tables=['p_approvals','p_outcome_settings','p_outcomes','p_outcome_records','p_crm_outcome_bindings','p_crm_outcome_consents','p_crm_outcome_attempts','p_reminder_templates','p_template_reminder_messages','p_delivery_changes','p_reminder_policy','p_reminder_settings','p_reminder_runs','p_reminder_optouts','p_mail_reply_cap_notices','p_mail_replies','p_mail_attributions','p_report_schedules','p_report_runs','p_template_sources','p_disputes','p_dispute_packets','p_dispute_packet_parts','p_dispute_authorizations','p_dispute_submissions','p_dispute_documents','p_priced_catalog','p_resource_folders','p_folder_teams','p_template_locks','p_proposal_locks','p_template_block_locks','p_proposal_block_locks','p_personal_templates','p_payment_records','p_refunds','p_connections','p_members','p_teams','p_team_members','p_collaborators','p_approval_policy','p_approval_rules','p_approval_decisions','p_internal_costs','p_template_costs','p_library_items','p_library_uses','p_workspace_defaults','p_proposal_defaults','p_template_defaults']
   const canonical=rows=>rows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
+  const auditHistory=canonical((await h.db.prepare('SELECT * FROM p_audit').all()).results)
   await h.close();h=undefined
   const archive=join(temporary,'teams.rer');await command(source,['export','--output',archive]);await command(restored,['import','--input',archive,'--yes'])
   const restoredCalls=[]
   h=await harness({root:restored,unclaimed:true,outboundService:async request=>{restoredCalls.push(new URL(request.url).hostname);throw new Error('Restore must not call a provider')}})
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_member_invitations').first()).n,0,'pending delegated authority is excluded from archives');assert.equal((await h.db.prepare('SELECT status FROM oa_operators WHERE email=?').bind('unjoined@synthetic-platter.example').first()).status,'invited');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_connection_secrets').first()).n,0);assert.ok(after.connections.every(c=>c.status==='needs_reconnection'));assert.deepEqual(after.paymentRecords,before.paymentRecords);assert.equal((await h.cmd('payment.refund',refund,owner)).status,'succeeded','restored historical refund retries never issue another provider call');assert.doesNotMatch(JSON.stringify(after),/synthetic-platter-(2301|4121|2803|2804)/);assert.equal(after.connections.find(c=>c.provider==='hubspot').status,'needs_reconnection')
+  const originalAuditIds=new Set(auditHistory.map(r=>r.id)),restoredAudit=canonical((await h.db.prepare('SELECT * FROM p_audit').all()).results.filter(r=>originalAuditIds.has(r.id)))
+  assert.deepEqual(restoredAudit,auditHistory,'every original audit record survives unchanged; fresh sign-in has its own new audit events')
+  assert.deepEqual(await policyAudit(owner),nativePolicyAudit,'policy changes retain exact actors and times through the CLI archive')
+  const unruledAfter=after.proposals.find(r=>r.id===unruled.id)
+  assert.equal(unruledAfter.status,'sent');assert.equal(unruledAfter.approved_by,null)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_approval_decisions WHERE proposal_id=?').bind(unruled.id).first()).n,0)
+  for(const retained of nativeApprovals){
+   const row=after.proposals.find(r=>r.id===retained.id)
+   assert.equal(row.status,'sent');assert.equal(row.approved_by,before.proposals.find(r=>r.id===retained.id).approved_by)
+   assert.deepEqual(await h.db.prepare('SELECT * FROM p_approval_decisions WHERE id=?').bind(retained.decision.id).first(),retained.decision,'restore preserves the exact original decision instead of fabricating a new approval')
+  }
   assert.deepEqual(after.outcomeSettings,before.outcomeSettings);assert.deepEqual(after.proposals.find(r=>r.id===outcomeDraft.id).outcomes,before.proposals.find(r=>r.id===outcomeDraft.id).outcomes)
   assert.equal(after.proposals.find(r=>r.id===outcomeDraft.id).pipelineStatus,'won');assert.equal(after.proposals.find(r=>r.id===outcomeDraft.id).acceptance,undefined)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_crm_outcome_authority').first()).n,0);assert.ok(after.crmOutcomes.bindings.every(b=>b.authorized===0));assert.deepEqual(after.crmOutcomes.attempts,before.crmOutcomes.attempts)
@@ -800,12 +966,19 @@ test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, tea
 })
 
 
-test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority', {timeout:180000},async()=>{
- const temporary=await mkdtemp(join(tmpdir(),'platter-notification-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored');let h,rejected=false
+test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority', {timeout:300000},async()=>{
+ const {depositEdge,preparedNoticeDeposit}=await import('./collection-journey.mjs')
+ const failureEdge=depositEdge()
+ const fixed=Date.parse('2032-03-01T12:00:00Z'),sourceTexts=[];let rejected=false
+ failureEdge.now=fixed
+ const sourceEdge=async request=>{const url=new URL(request.url);if(['api.stripe.com','api.resend.com'].includes(url.hostname))return failureEdge.outboundService(request);if(url.hostname==='slack.com'&&rejected)return Response.json({ok:false,error:'token_revoked'});if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-7105'});if(url.pathname==='/v1.0/chats/synthetic-platter-7106')return Response.json({chatType:'oneOnOne',members:[{email:h.auth.OWNER_EMAIL},{userId:'synthetic-platter-7105'}]});if(url.hostname==='api.twilio.com'){sourceTexts.push(Object.fromEntries(new URLSearchParams(await request.text())));return Response.json({sid:'synthetic-platter-'+(7112+sourceTexts.length)},{status:201})}return Response.json({ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})}
+ const temporary=await mkdtemp(join(tmpdir(),'platter-notification-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored');let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source,assetsDirectory:'public',outboundService:()=>rejected?Response.json({ok:false,error:'token_revoked'}):Response.json({ok:true,team_id:'synthetic-platter-7100',channel:{id:'synthetic-platter-7101',is_member:true}})})
+  // Prepare both independent empty schemas together; import still runs through the public CLI.
+  await Promise.all([source,restored].map(cwd=>exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})))
+  h=await harness({root:source,assetsDirectory:'public',auth:{AUTH_LOCAL:'true',TWILIO_ACCOUNT_SID:'synthetic-platter-7110',TWILIO_AUTH_TOKEN:'synthetic-platter-7111',TWILIO_FROM:'+15005550006'},outboundService:sourceEdge})
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(fixed),cron:'*/15 * * * *'})
   const client=await h.cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
   const p=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archive notification',scope:'Exact retained scope',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
   await h.cmd('provider.connect',{provider:'slack',version:0,token:'synthetic-platter-7102',consent:true})
@@ -814,11 +987,17 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const person=(await h.state()).actor
   const comment=await h.cmd('collaboration.comment',{id:p.id,version:1,blockId:'pricing',text:'synthetic-platter-private-custody',recipientId:person.id,consent:true})
   await h.cmd('collaboration.resolve',{id:p.id,version:1,threadId:comment.threadId,threadVersion:1})
-  await h.cmd('collaboration.assign',{id:p.id,version:1,blockId:'scope',recipientId:person.id,dueDate:'2030-03-04',consent:true})
-  await h.cmd('notification.request',{id:p.id,version:1,consent:true});await h.cmd('notification.expiry',{id:p.id,version:1,consent:true})
+  await h.cmd('collaboration.assign',{id:p.id,version:1,blockId:'scope',recipientId:person.id,dueDate:'2032-03-04',consent:true})
+  await h.cmd('notification.request',await approvalRequestInput(h,{id:p.id,version:1,consent:true}))
+  const revoked=await h.cmd('proposal.prepare',{clientId:client.id,title:'Revoked notification history',scope:'Retained scope',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+  const requestInput=await approvalRequestInput(h,{id:revoked.id,version:1,consent:true}),requested=await h.cmd('notification.request',requestInput)
+  await h.cmd('notification.revoke',{...requestInput,requestId:requested.requests[0]})
+  const retainedRequest=(await h.cmd('notification.requests',{id:revoked.id})).requests[0]
+  assert.equal(retainedRequest.trigger.detail,'Approval is required for every proposal.');assert.equal(retainedRequest.revoked_by,person.id);assert.ok(retainedRequest.revoked_at)
+  await h.cmd('notification.expiry',{id:p.id,version:1,consent:true})
   const expiry=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archived sender notice',scope:'Exact expiry scope',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
   await h.cmd('expiry.set',{id:expiry.id,version:1,mode:'days',days:4,warningDays:1});await h.cmd('notification.expiry',{id:expiry.id,version:2,consent:true});await h.cmd('proposal.approve',{id:expiry.id,version:3,revision:1});await h.cmd('proposal.send',{id:expiry.id,version:4})
-  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+2*86400000),cron:'*/15 * * * *'})
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(fixed+2*86400000),cron:'*/15 * * * *'})
   const signed=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archived signed agreement',scope:'Exact signed scope',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
   await h.cmd('proposal.approve',{id:signed.id,version:1,revision:1});const signedShare=await h.cmd('proposal.send',{id:signed.id,version:2}),signedPath=new URL(signedShare.shareUrl).pathname
   await h.send(signedPath+'/action?name=code.request',{})
@@ -831,25 +1010,118 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   const completionRefs=(await h.db.prepare('SELECT * FROM p_completion_mail WHERE proposal_id=? ORDER BY party').bind(signed.id).all()).results
   assert.equal(completionRefs.length,2)
   for(const ref of completionRefs)assert.equal((await h.db.prepare('SELECT status FROM p_mail WHERE id=?').bind(ref.mail_id).first()).status,'local')
+  const notice=(await h.state()).proposals.find(row=>row.id===expiry.id)
+  await h.cmd('notification.expiry',{id:expiry.id,version:notice.version,action:'revoke'})
+  const revokedNotice=(await h.state()).proposals.find(row=>row.id===expiry.id)
+  await h.cmd('notification.expiry',{id:expiry.id,version:revokedNotice.version,consent:true})
   await h.cmd('notification.watch',{id:expiry.id,email:true,events:['comment','signed','paid'],consent:true})
+  const retainedOwner=h.owner,retainedAuth=h.auth;await h.close()
+  const smsOptions={root:source,origin:'https://platter.example',assetsDirectory:'public',auth:{...retainedAuth,AUTH_LOCAL:'false'},outboundService:sourceEdge}
+  h=await harness({...smsOptions,owner:retainedOwner})
+  const smsOwner=await h.signIn(h.auth.OWNER_EMAIL);await h.close()
+  h=await harness({...smsOptions,owner:smsOwner})
   const smsRow=(await h.state()).proposals.find(row=>row.id===expiry.id)
-  await h.cmd('sms.configure',{id:expiry.id,version:smsRow.version,consent:true,phone:'+12025550127',timeZone:'America/Los_Angeles',evidence:'synthetic-platter-7103'})
+  await h.cmd('sms.configure',{recipient:(await h.state()).clients.find(c=>c.id===client.id).email,firm:'Synthetic Platter firm',purposes:['invitation','reminder','identity'],disclosure:'Synthetic Platter proposal invitations, reminders and identity codes. Reply STOP to stop all SMS.',assentedAt:'2026-01-01T10:00:00Z',method:'Recipient signed instruction',id:expiry.id,version:smsRow.version,consent:true,phone:'+12025550127',timeZone:'Etc/UTC',evidence:'synthetic-platter-7103'})
   await h.cmd('sms.send',{id:expiry.id,message:'Review the archived proposal',requestId:'synthetic-platter-7104'})
+  await h.cmd('provider.connect',{provider:'teams',version:0,token:'synthetic-platter-7107',consent:true})
+  await h.cmd('notification.route',{provider:'teams',event:'approval',kind:'direct',destination:'synthetic-platter-7106',operatorId:person.id,consent:true})
+  const revokedRoute=await h.cmd('notification.route',{provider:'slack',event:'followup',kind:'channel',destination:'synthetic-platter-7101',consent:true})
+  await h.cmd('notification.route.remove',{id:revokedRoute.id})
+  const routesBefore=(await h.state()).notificationSettings.routes
+  assert.equal(routesBefore.length,3);assert.equal(routesBefore.filter(r=>r.available).length,2)
+  await h.cmd('signer.method',{id:expiry.id,version:smsRow.version,method:'SMS code'})
+  const smsShare=(await h.state()).proposals.find(p=>p.id===expiry.id).shareToken,smsPath='/p/'+smsShare
+  assert.equal((await h.send(smsPath+'/action?name=code.request',{})).status,200)
+  assert.equal(sourceTexts.length,2)
+  const smsCode=sourceTexts[1].Body.match(/\b\d{6}\b/)[0]
+  const smsVerification=await h.send(smsPath+'/action?name=code.verify',{code:smsCode});assert.equal(smsVerification.status,200)
+  await h.cmd('sms.revoke',{id:expiry.id,version:smsRow.version})
+  const callbackUrl=h.origin+'/api/platter/sms/inbound',form=new URLSearchParams({AccountSid:'synthetic-platter-7110',From:'+12025550127',To:'+15005550006',Body:'STOP'})
+  const signature=(await import('node:crypto')).createHmac('sha1','synthetic-platter-7111').update(callbackUrl+[...form.keys()].sort().map(k=>k+form.get(k)).join('')).digest('base64')
+  const callback=await h.mf.dispatchFetch(callbackUrl,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','x-twilio-signature':signature},body:form.toString()});assert.equal(callback.status,200);await callback.text()
+  const optIn=new URLSearchParams({AccountSid:'synthetic-platter-7110',From:'+12025550127',To:'+15005550006',Body:'START',OptOutType:'START',MessageSid:'synthetic-platter-7117'})
+  const optInSignature=(await import('node:crypto')).createHmac('sha1','synthetic-platter-7111').update(callbackUrl+[...optIn.keys()].sort().map(k=>k+optIn.get(k)).join('')).digest('base64')
+  const optInResponse=await h.mf.dispatchFetch(callbackUrl,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','x-twilio-signature':optInSignature},body:optIn.toString()});assert.equal(optInResponse.status,200);await optInResponse.text()
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,8,'the original seven notices plus the explicitly requested then revoked approval remain before the additional scheduler tick')
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(fixed+2*86400000+60000),cron:'*/15 * * * *'})
+  await h.cmd('sms.reenable',{recipient:(await h.state()).clients.find(c=>c.id===client.id).email,firm:'Synthetic Platter firm',purposes:['invitation','reminder','identity'],disclosure:'New proposal text assent. Reply STOP to stop all SMS.',assentedAt:'2032-03-03T12:01:00Z',method:'New recipient signed instruction',id:expiry.id,version:smsRow.version,consent:true,reenableConsent:true,phone:'+12025550127',timeZone:'Etc/UTC',evidence:'synthetic-platter-7118'})
+  const stoppedAgain=await h.mf.dispatchFetch(callbackUrl,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','x-twilio-signature':signature},body:form.toString()});assert.equal(stoppedAgain.status,200);await stoppedAgain.text()
+  const completedSms=await h.cmd('proposal.prepare',{clientId:client.id,title:'Archived completion text',scope:'Exact completed scope',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+  await h.cmd('proposal.approve',{id:completedSms.id,version:1,revision:1})
+  const completedShare=await h.cmd('proposal.send',{id:completedSms.id,version:2}),completedPath=new URL(completedShare.shareUrl).pathname
+  await h.cmd('sms.configure',{id:completedSms.id,version:3,consent:true,recipient:(await h.state()).clients.find(c=>c.id===client.id).email,firm:'Synthetic Platter firm',purposes:['completion'],disclosure:'Completion texts from Synthetic Platter firm. Reply STOP to stop all texts.',assentedAt:'2026-01-01T10:00:00Z',method:'Recipient signed instruction',phone:'+12025550147',timeZone:'Etc/UTC',evidence:'synthetic-platter-7116'})
+  assert.equal((await h.send(completedPath+'/action?name=code.request',{})).status,200)
+  const completedCode=(await h.db.prepare("SELECT body FROM p_mail WHERE proposal_id=? AND subject='Your Platter verification code'").bind(completedSms.id).first()).body.match(/\b\d{6}\b/)[0]
+  const completedVerification=await h.send(completedPath+'/action?name=code.verify',{code:completedCode});assert.equal(completedVerification.status,200)
+  assert.equal((await h.send(completedPath+'/action?name=accept',{name:'Synthetic signer',optionId:'one',consent:true},completedVerification.cookie)).status,200)
+  assert.equal(sourceTexts.length,3);assert.ok(sourceTexts.at(-1).Body.includes(completedShare.shareUrl))
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sms_completion_authority').first()).n,1,'a real completion grant exists before export')
+  const previewed=await managerApprovalPreview(h,{clientId:client.id,title:'Archived manager preview',scope:'Exact preview custody',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+  await h.cmd('notification.decide',{requestId:previewed.request.id,version:1,decision:'approved',note:'Reviewed revision one before archive'},previewed.manager.cookie)
+  const previewDecisions=(await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(previewed.proposal.id).all()).results
+  assert.equal(previewDecisions.length,1);assert.equal(previewDecisions[0].actor_id,previewed.manager.id);assert.equal(previewDecisions[0].revision,1)
   rejected=true
   await h.cmd('notification.route',{provider:'slack',event:'signed',kind:'channel',destination:'synthetic-platter-7101',consent:true},h.owner,409)
   assert.equal((await h.state()).connections.find(c=>c.provider==='slack').status,'broken')
-  const tables=['p_connections','p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
-  assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,7)
+  const noticePolicy=(await h.state()).approvalSettings.policy
+  await h.cmd('approval.policy',{version:noticePolicy.version,required:true,defaultRole:'owner'})
+  const future=await h.cmd('proposal.prepare',{clientId:client.id,title:'Inactive restored future notice',scope:'Still open when the restored notice becomes due',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+  await h.cmd('expiry.set',{id:future.id,version:1,mode:'days',days:30,warningDays:1})
+  await h.cmd('notification.expiry',{id:future.id,version:2,consent:true})
+  await h.cmd('proposal.approve',{id:future.id,version:3,revision:1});await h.cmd('proposal.send',{id:future.id,version:4})
+  const tables=['p_payment_failures','p_payment_failure_deliveries','p_payment_failure_settings','p_collection_intents','p_connections','p_sms_provider_optins','p_sms_reenable_history','p_sms_assents','p_sms_revocations','p_sms_code_runs','p_internal_threads','p_collaboration_events','p_signer_methods','p_signature_facts','p_agreement_artifacts','p_completion_mail','p_watchers','p_sms_consent','p_sms_runs','p_sms_optouts','p_sender_notice_runs','p_sender_notice_events','p_renewal_notice_settings','p_renewal_followups','p_template_notice_defaults','p_followups','p_followup_actions','p_approval_requests','p_notification_routes','p_sender_notice_defaults','p_sender_notice_settings'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results])))
+  assert.equal(before.p_sms_assents.length,3);assert.equal(before.p_sms_provider_optins.length,1);assert.equal(before.p_sms_reenable_history.length,1);assert.equal(before.p_sms_runs.filter(r=>r.kind==='completion').length,1)
+  for(const table of ['p_sms_revocations','p_sms_code_runs','p_sms_optouts'])assert.equal(before[table].length,1,table+' has real history')
+  assert.equal(before.p_sender_notice_runs.length,1);assert.equal(before.p_followups[0].action,'Review approaching expiry');assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox').first()).n,10,'the scheduler signature notice, explicit manager request and revoked request history are retained')
+  assert.ok(before.p_approval_requests.find(row=>row.proposal_id===p.id).reminded_at);assert.equal(before.p_approval_requests.find(row=>row.proposal_id===revoked.id).reminded_at,null);assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_notification_outbox WHERE request_id=?').bind(requested.requests[0]).first()).n,1,'revocation retains only the initial request and creates no reminder')
+  assert.equal(before.p_sender_notice_events.length,5);assert.ok(before.p_sender_notice_events.some(e=>e.action==='revoked'))
+  const expiryEventsBefore=before.p_sender_notice_events.slice()
+  const {prepareSenderNoticeArchive,assertSenderNoticeRestore}=await import('./sender-notice-archive.mjs')
+  const renewalReceipt=await prepareSenderNoticeArchive(h,client)
+  await h.cmd('provider.connect',{provider:'stripe',version:0,token:'synthetic-platter-10101',publishableKey:'synthetic-platter-10102',consent:true})
+  failureEdge.now=fixed+2*86400000+60000
+  const failedDeposit=await preparedNoticeDeposit(h,'required');await failedDeposit.authorize();failureEdge.fail(failedDeposit.saved)
+  assert.equal((await h.send(failedDeposit.path+'/payment-status.json',{},failedDeposit.cookie)).status,200)
+  assert.equal((await h.db.prepare('SELECT count(*) n FROM p_payment_failure_deliveries').first()).n,2)
+  for(const table of tables)before[table]=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results
+  assert.equal(before.p_sender_notice_runs.filter(r=>r.kind==='renewal').length,1)
+  const archivePolicy=(await h.state()).approvalSettings.policy
+  await h.cmd('approval.policy',{version:archivePolicy.version,required:true,defaultRole:'manager'})
+  const {nativeMigrationPreflight}=await import('../node_modules/@runeditrun/rer/cli/portability-migrations.mjs')
+  await nativeMigrationPreflight({root:source,db:h.db,binding:'DB'})
+  console.log('Migration ledger preflight passed on the fully migrated source')
   await h.close();h=undefined
-  const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'))
+  const archive=join(temporary,'notifications.rer');await command(source,['export','--output',archive]);const bytes=await readFile(archive,'utf8');assert.ok(!bytes.includes('synthetic-platter-7102'));assert.ok(!bytes.includes('synthetic-platter-7107'))
   const records=bytes.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
-  for(const table of ['p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0,table+' stays local')
+  assert.deepEqual(records.filter(r=>r.table==='p_audit'&&previewed.audit.some(a=>a.id===r.row.id)).map(r=>r.row).sort((a,b)=>a.id.localeCompare(b.id)),previewed.audit.map(({mail_route,sender_address,reason,...row})=>row).sort((a,b)=>a.id.localeCompare(b.id)),'the exact manager preview audit is exported through the public CLI')
+  for(const table of ['oa_sessions','oa_tokens','p_shares'])assert.equal(records.filter(r=>r.table===table).length,0,'preview audit custody carries no native session or invitation authority')
+  for(const table of ['p_payment_failure_authority','p_sms_reenable_eligibility','p_sms_completion_authority','p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_renewal_notice_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0,table+' stays local')
   await command(restored,['import','--input',archive,'--yes'])
-  const calls=[];h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:request=>{calls.push(request.url);return Response.json({ok:true})}})
+  const calls=[];h=await harness({root:restored,origin:'https://platter.example',unclaimed:true,assetsDirectory:'public',auth:{AUTH_LOCAL:'false',TWILIO_ACCOUNT_SID:'synthetic-platter-7110',TWILIO_AUTH_TOKEN:'synthetic-platter-7111',TWILIO_FROM:'+15005550006'},outboundService:request=>{calls.push(request.url);if(new URL(request.url).pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-7100'});throw Error('Unexpected restored provider request')}})
   for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1').all()).results,before[table],table+' retains exact business history')
-  for(const table of ['p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
-  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+10*86400000),cron:'*/15 * * * *'})
+  for(const path of [previewed.path,previewed.inner])assert.equal((await h.send(path,undefined,previewed.manager.cookie)).status,401,'archive history never restores a member session')
+  assert.deepEqual((await h.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(previewed.proposal.id).all()).results,previewDecisions)
+  const replayedOptIn=await h.mf.dispatchFetch(callbackUrl,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','x-twilio-signature':optInSignature},body:optIn.toString()});assert.equal(replayedOptIn.status,200);await replayedOptIn.text()
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sms_reenable_eligibility').first()).n,0,'restored provider receipt replay never creates eligibility')
+  for(const table of ['p_payment_failure_authority','p_sms_reenable_eligibility','p_sms_completion_authority','p_completion_authority','p_mail','p_collaboration_authority','p_collaboration_routes','p_watcher_authority','p_sms_authority','p_notification_outbox','p_notification_authority','p_notification_route_authority','p_sender_notice_authority','p_renewal_notice_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(fixed+30*86400000),cron:'*/15 * * * *'})
   const restoredOwner=await h.signIn(h.auth.OWNER_EMAIL)
+  const restoredFailure=(await h.state(restoredOwner)).proposals.find(p=>p.id===failedDeposit.id)
+  assert.equal(restoredFailure.collection.failures.length,1)
+  assert.equal(restoredFailure.collection.failures[0].reason,'The payment method has insufficient funds.')
+  assert.equal((await h.state(restoredOwner)).paymentFailureNotices.find(p=>p.id===failedDeposit.id).authorized,0)
+  assert.equal((await h.send(failedDeposit.path+'/payment-status.json',{},failedDeposit.cookie)).status,404,'Retained failed attempts cannot restore client access or notice execution')
+  const restoredPreviewAudit=(await h.send('/api/platter/audit?action=proposal.preview&subject='+previewed.proposal.id,undefined,restoredOwner)).value.rows
+  assert.deepEqual(restoredPreviewAudit,previewed.audit,'actor, scoped subject and original server time survive public CLI restore exactly; refusals add no preview audit')
+  const restoredRequest=(await h.cmd('notification.requests',{id:revoked.id},restoredOwner)).requests[0];assert.deepEqual(restoredRequest.trigger,retainedRequest.trigger);assert.equal(restoredRequest.revoked_at,retainedRequest.revoked_at);assert.equal(restoredRequest.current,false)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sender_notice_runs WHERE proposal_id=?').bind(future.id).first()).n,0,'a due but still unexpired restored notice has no execution authority')
+  const setupResponse=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:restoredOwner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'})
+  assert.equal(setupResponse.status,303);await setupResponse.text()
+  const restoredNoticeState=await h.state(restoredOwner)
+  assert.deepEqual(restoredNoticeState.expiryNotices.active,[])
+  assert.deepEqual(restoredNoticeState.expiryNotices.events,expiryEventsBefore.slice().sort((a,b)=>a.occurred_at-b.occurred_at||a.id.localeCompare(b.id)))
+  assert.equal((await h.send('/app/proposal?id='+expiry.id,undefined,restoredOwner)).status,200)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sender_notice_authority').first()).n,0,'inspection of restored settings cannot reactivate email')
   const restoredCertificate=await h.send('/api/platter/certificate.json?id='+signed.id,undefined,restoredOwner);assert.equal(restoredCertificate.status,200,restoredCertificate.text);assert.deepEqual(restoredCertificate.value,certificate.value)
   assert.deepEqual(await download('/api/platter/agreement.pdf?id='+signed.id,restoredOwner),documentBytes)
   assert.deepEqual(await download('/api/platter/certificate.pdf?id='+signed.id,restoredOwner),certificateBytes)
@@ -857,16 +1129,54 @@ test('APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification busine
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_completion_authority').first()).n,0)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_mail').first()).n,0,'retained attachment references cannot recreate the outbox')
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_sms_authority').first()).n,0,'restored SMS consent never restores sending authority')
+  assert.equal((await h.send(smsPath+'/action?name=code.verify',{code:smsCode},smsVerification.cookie)).status,404,'restored history cannot verify an old code')
+  const restoredSms=(await h.state(restoredOwner)).proposals.find(p=>p.id===expiry.id)
+  // The later manager policy invalidates the earlier owner decision. Fresh
+  // sign-in and a current approval are required before issuing a new link.
+  const restoredManager=await h.signIn(previewed.manager.email)
+  await h.cmd('proposal.approve',{id:expiry.id,version:restoredSms.version,revision:restoredSms.revision},restoredManager)
+  const newInvitation=await h.cmd('proposal.send',{id:expiry.id,version:restoredSms.version+1},restoredOwner),newPath=new URL(newInvitation.shareUrl).pathname
+  assert.equal((await h.send(newPath+'/action?name=code.request',{})).status,409,'a new invitation cannot reactivate restored SMS assent')
+  await h.cmd('sms.send',{id:expiry.id,message:'Restored SMS must stay stopped',requestId:'synthetic-platter-7115'},restoredOwner,409)
+  await assertSenderNoticeRestore(h,restoredOwner,renewalReceipt)
   assert.deepEqual(calls,[],'restored historical requests and routes cannot reactivate outbound work')
+  const settings=(await h.state(restoredOwner)).notificationSettings.routes
+  assert.deepEqual(settings.map(({available,consented,...r})=>r),routesBefore.map(({available,consented,...r})=>r))
+  assert.ok(settings.every(r=>!r.available&&!r.consented),'restored route history has no outbound authority')
+  const reconnected=await h.cmd('provider.connect',{provider:'slack',version:1,token:'synthetic-platter-7108',consent:true},restoredOwner)
+  assert.equal(reconnected.status,'connected')
+  const connectionChecks=calls.length;assert.equal(connectionChecks,1)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(Date.now()+11*86400000),cron:'*/15 * * * *'})
+  assert.equal(calls.length,connectionChecks,'reconnection without fresh route consent cannot replay historical events')
+  assert.ok((await h.state(restoredOwner)).notificationSettings.routes.every(r=>!r.available&&!r.consented))
+
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority', {timeout:240000},async()=>{
+test('EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority', {timeout:600000},async()=>{
  const temporary=await mkdtemp(join(tmpdir(),'platter-doc-archive-')),source=join(temporary,'source'),target=join(temporary,'target');let h
  try{
   await checkout(source);await checkout(target)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source,assetsDirectory:'public'})
+  // Independent empty schemas can be prepared together. The public import still
+  // verifies the target ledger and refuses occupied business data.
+  await Promise.all([source,target].map(cwd=>exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})))
+  const {hubspotSyncFixture}=await import('./hubspot-sync-fixture.mjs'),crm=hubspotSyncFixture()
+  const {connectPipedrive,pipedriveToken}=await import('./crm-pipedrive-http.mjs'),{connectZoho,zohoToken}=await import('./crm-zoho-http.mjs'),{providerSyncFixture}=await import('./crm-provider-sync-fixture.mjs'),pipedrive=providerSyncFixture('pipedrive'),zoho=providerSyncFixture('zoho')
+  h=await harness({root:source,assetsDirectory:'public',outboundService:req=>new URL(req.url).hostname==='api.pipedrive.com'?pipedrive.request(req):new URL(req.url).hostname==='www.zohoapis.com'?zoho.request(req):crm.request(req)})
+  await connectPipedrive(h)
+  const pipedriveReview=await h.cmd('crm.pipedrive.review',pipedrive.selected),pipedriveDraft=await h.cmd('crm.pipedrive.apply',{id:pipedriveReview.id,digest:pipedriveReview.digest,consent:true}),unusedPipedriveReview=await h.cmd('crm.pipedrive.review',pipedrive.selected)
+  const pipedriveSourceBefore=(await h.send('/api/platter/crm/source?id='+pipedriveDraft.id,undefined,h.owner)).value,pipedriveDraftBefore=(await h.state()).proposals.find(p=>p.id===pipedriveDraft.id)
+  assert.deepEqual(pipedriveSourceBefore.source.lines.map(r=>[r.id,r.productId,r.quantity,r.unitPrice]),[['12105','12107','2.5','120.5'],['12106','12108','3','19.99']]);assert.equal(pipedriveDraftBefore.options[0].cents,36122)
+  await connectZoho(h)
+  const zohoReview=await h.cmd('crm.zoho.review',zoho.selected),zohoDraft=await h.cmd('crm.zoho.apply',{id:zohoReview.id,digest:zohoReview.digest,consent:true}),unusedZohoReview=await h.cmd('crm.zoho.review',zoho.selected)
+  const zohoSourceBefore=(await h.send('/api/platter/crm/source?id='+zohoDraft.id,undefined,h.owner)).value,zohoDraftBefore=(await h.state()).proposals.find(p=>p.id===zohoDraft.id)
+  assert.deepEqual(zohoSourceBefore.source.lines.map(r=>[r.id,r.productId,r.quantity,r.unitPrice]),[['12406','12408','2.5','120.5'],['12407','12409','3','19.99']]);assert.equal(zohoDraftBefore.options[0].cents,36122)
+  const {seedProviderArchive,assertProviderArchive}=await import('./crm-provider-archive.mjs'),pipedriveSyncBefore=await seedProviderArchive(h,'pipedrive',pipedrive,pipedriveDraft.id),zohoSyncBefore=await seedProviderArchive(h,'zoho',zoho,zohoDraft.id)
+  await h.cmd('provider.connect',{provider:'hubspot',version:0,token:'synthetic-platter-4607',consent:true})
+  const crmReview=await h.cmd('crm.deal.review',crm.selected),crmDraft=await h.cmd('crm.deal.apply',{id:crmReview.id,digest:crmReview.digest,consent:true}),unusedCrmReview=await h.cmd('crm.deal.review',crm.selected)
+  const crmSourceBefore=(await h.send('/api/platter/crm/source?id='+crmDraft.id,undefined,h.owner)).value,crmDraftBefore=(await h.state()).proposals.find(p=>p.id===crmDraft.id)
+  assert.equal(crmSourceBefore.source.lines.length,2);assert.equal(crmDraftBefore.options[0].cents,36122)
+  const crmSyncBefore=await (await import('./hubspot-archive.mjs')).seedHubspotArchive(h,crmDraft.id)
   const completedSetup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(completedSetup.status,303)
   const fields={clientId:(await h.cmd('client.save',{name:'Synthetic Platter client',email:'synthetic-platter-1@example.com'})).id,title:'Document custody',scope:'A reviewed project.',optionOne:'Studio',priceOne:'1000',optionTwo:'Campaign',priceTwo:'2000',depositPercent:'25',pricingTables:[{optionId:'one',name:'Library services',lines:[{name:'Workshop',quantity:'2',unit:'hour',unitPrice:'10.01'}]}]},created=await h.cmd('proposal.prepare',fields)
   const bytes=await readFile('public/brand/apple-touch-icon.png'),form=new FormData();form.set('id',created.id);form.set('version','1');form.set('consent','yes');form.set('file',new File([bytes],'synthetic-platter-1.png',{type:'image/png'}))
@@ -900,14 +1210,45 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
   await uploadDocument(h,fixedDraft.id,1,fixedBytes,'synthetic-platter-8502.pdf')
   const wordDraft=await h.cmd('proposal.prepare',{...fields,title:'Synthetic Word custody'});await uploadDocument(h,wordDraft.id,1,await wordFixture({headings:1,rows:2,images:1,tokens:false}),'synthetic-platter-8503.docx');await uploadDocument(h,wordDraft.id,2,await wordFixture({headings:1,rows:2,images:1,tokens:false,prefix:'Archived rich section'}),'synthetic-platter-8504.docx',{mode:'library'})
   const extraBefore=(await h.state()).proposals.filter(p=>[mergeDraft.id,fixedDraft.id,wordDraft.id].includes(p.id)).map(p=>({id:p.id,document:p.document,options:p.options})),profileBefore=(await h.state()).clients.find(c=>c.id===mergeClient.id).variable_fields,richArchiveItem=(await h.state()).libraryItems.find(i=>i.title==='Archived rich section 1'),libraryBefore=(await h.state()).libraryItems
+  const {regionalConditions,restoredRegionalConditions}=await import('./conditional-journey.mjs')
+  const regional=await regionalConditions(h)
+  const {learningFixture,captureStudy,learningBusiness}=await import('./template-learning-fixture.mjs'),learning=await learningFixture(h,{size:40}),learningReport=await captureStudy(h,learning.input),learningBusinessBefore=await learningBusiness(h)
+  const learningSourcePath='/api/platter/template-learning/source?id='+learningReport.id+'&source='+learning.ids[0],learningSourceBefore=(await h.send(learningSourcePath,undefined,h.owner)).value
   const identity={auth:h.auth,owner:h.owner};await h.close();h=undefined
   const archive=join(temporary,'document.rer');await command(source,['export','--output',archive,'--no-queue']);await command(target,['import','--input',archive,'--yes','--no-queue'])
   h=await harness({root:target,...identity,assetsDirectory:'public'});const owner=await h.signIn(h.auth.OWNER_EMAIL),after=(await h.state(owner)).proposals.find(p=>p.id===created.id)
+  await restoredRegionalConditions(h,owner,regional)
+  assert.deepEqual((await h.send('/api/platter/template-learning?id='+learningReport.id,undefined,owner)).value,learningReport,'exact learning result and all decision references survive public CLI restore')
+  assert.deepEqual((await h.send(learningSourcePath,undefined,owner)).value,learningSourceBefore,'the exact decision revision and digest survive restore')
+  assert.deepEqual(await learningBusiness(h),learningBusinessBefore,'learning history imports no template, price or approval changes')
+  assert.equal((await h.send('/api/platter/template-learning/apply',{id:learningReport.id},owner)).status,404,'restored results grant no execution door')
+  assert.equal((await h.send('/api/platter/template-learning?id='+learningReport.id,undefined,identity.owner)).status,401,'old credentials cannot read restored learning history')
+  console.log('PROBE AGENT-007 custody: public CLI export and import -> exact result, decision references and source digest retained; old credentials refused; no apply authority')
   for(const key of ['document','documentMedia','acceptance','questions','suggestions','suggestionSections','folderId','folderVersion'])assert.deepEqual(after[key],before[key],'public CLI retains '+key)
   assert.deepEqual((await h.state(owner)).libraryItems,libraryBefore,'rich item payloads, tags, usages and change times survive the public CLI')
   assert.deepEqual((await h.state(owner)).proposals.find(p=>p.id===libraryDraft.id).document,libraryDocBefore.document)
   assert.deepEqual((await h.state(owner)).proposals.filter(p=>extraBefore.some(b=>b.id===p.id)).map(p=>({id:p.id,document:p.document,options:p.options})),extraBefore,'Word blocks, fixed PDF references, catalog links and variable patterns survive the public CLI')
   assert.equal((await h.state(owner)).clients.find(c=>c.id===mergeClient.id).variable_fields,profileBefore)
+  assert.deepEqual((await h.send('/api/platter/crm/source?id='+crmDraft.id,undefined,owner)).value,crmSourceBefore,'CRM source IDs, selected contact and exact priced provenance survive the public CLI')
+  assert.deepEqual((await h.state(owner)).proposals.find(p=>p.id===crmDraft.id).options,crmDraftBefore.options)
+  await (await import('./hubspot-archive.mjs')).assertHubspotArchive(h,owner,crmSyncBefore)
+  assert.deepEqual((await h.send('/api/platter/crm/source?id='+pipedriveDraft.id,undefined,owner)).value,pipedriveSourceBefore,'Pipedrive selected organization, person, attached product IDs and exact values survive public CLI restore')
+  assert.deepEqual((await h.state(owner)).proposals.find(p=>p.id===pipedriveDraft.id).options,pipedriveDraftBefore.options)
+  await assertProviderArchive(h,owner,pipedriveSyncBefore);await assertProviderArchive(h,owner,zohoSyncBefore)
+  assert.deepEqual((await h.send('/api/platter/crm/source?id='+zohoDraft.id,undefined,owner)).value,zohoSourceBefore,'Zoho selected quote, account, contact and exact product source survive restore')
+  assert.deepEqual((await h.state(owner)).proposals.find(p=>p.id===zohoDraft.id).options,zohoDraftBefore.options)
+  assert.ok(!JSON.stringify((await h.state(owner)).crmDraftSources).includes(zohoToken))
+  await h.cmd('crm.zoho.apply',{id:unusedZohoReview.id,digest:unusedZohoReview.digest,consent:true},owner,409)
+  await h.cmd('crm.zoho.review',zoho.selected,owner,409)
+  assert.ok(!JSON.stringify((await h.state(owner)).crmDraftSources).includes(pipedriveToken))
+  assert.equal((await h.state(owner)).connections.find(r=>r.provider==='pipedrive').status,'needs_reconnection')
+  await h.cmd('crm.pipedrive.apply',{id:unusedPipedriveReview.id,digest:unusedPipedriveReview.digest,consent:true},owner,409)
+  await h.cmd('crm.pipedrive.review',pipedrive.selected,owner,409)
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_crm_draft_reviews').first()).n,0,'restored provenance carries no review execution authority')
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_connection_secrets').first()).n,0)
+  await h.cmd('crm.deal.apply',{id:unusedCrmReview.id,digest:unusedCrmReview.digest,consent:true},owner,409)
+  await h.cmd('crm.deal.review',crm.selected,owner,409)
+  assert.ok(!JSON.stringify((await h.state(owner)).crmDraftSources).includes('synthetic-platter-4607'))
   const restoredFixed=(await h.state(owner)).proposals.find(p=>p.id===fixedDraft.id),fixedResponse=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+fixedDraft.id+'/'+restoredFixed.document.fixedPdf.fileId,{headers:{cookie:owner}});assert.equal(fixedResponse.status,200);assert.deepEqual(new Uint8Array(await fixedResponse.arrayBuffer()),fixedBytes)
   const richDestination=await h.cmd('proposal.prepare',{...fields,title:'Restored imported library use'},owner);await h.cmd('library.insert',{id:richDestination.id,version:1,itemId:richArchiveItem.id,itemVersion:1,mode:'detached',consent:true},owner);assert.deepEqual((await h.state(owner)).proposals.find(p=>p.id===richDestination.id).document.blocks.map(b=>b.type),['heading','text','pricing','image'])
   const refillClient=await h.cmd('client.save',{name:'Synthetic refill archive client',email:['synthetic-platter-8505','example.test'].join('@'),variableFields:{contactName:'Taylor Reed',title:'Buyer',custom:{Region:'East'}}},owner),refilled=await h.cmd('proposal.duplicate',{id:mergeDraft.id,version:1,clientId:refillClient.id},owner);assert.equal((await h.state(owner)).proposals.find(p=>p.id===refilled.id).scope,'Taylor Reed Buyer East')
@@ -928,12 +1269,43 @@ test('EDIT-001 public CLI retains displayed media bytes, Client field values, bl
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
+async function savedApprovalArchive(h,clientId){
+ const people={},team=await h.cmd('team.create',{name:'Synthetic archived approval team'})
+ for(const role of ['manager','sales','admin','billing']){
+  const email='synthetic-platter-93-archive-'+role+String.fromCharCode(64)+'example.test'
+  assert.equal((await h.send('/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'},h.owner)).status,202)
+  const cookie=await h.signIn(email),actor=(await h.state(cookie)).actor
+  await h.cmd('member.set',{operatorId:actor.id,version:0,role,teams:[team.id]});people[role]={cookie,...actor}
+ }
+ const owner=(await h.state()).actor
+ assert.deepEqual(await h.cmd('approval.policy',{version:0,required:false,defaultRole:'owner'}),{saved:true,id:'installation'})
+ const amount=await h.cmd('approval.rule',{version:1,name:'Manager over $25,000',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager'],templates:[]})
+ const discount=await h.cmd('approval.rule',{version:2,name:'Owner above 15% discount',position:1,condition:{kind:'discountOver',bps:1500},approvers:['role:owner'],templates:[]})
+ const legal=await h.cmd('approval.rule',{version:3,name:'Counsel and finance legal review',position:2,condition:{kind:'termsEdited'},approvers:['person:'+people.admin.id,'person:'+people.billing.id],templates:[]},people.admin.cookie)
+ const settings={policy:{singleton:1,required:0,default_role:'owner',version:4},rules:[
+  {id:amount.id,name:'Manager over $25,000',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager'],templates:[]},
+  {id:discount.id,name:'Owner above 15% discount',position:1,condition:{kind:'discountOver',bps:1500},approvers:['role:owner'],templates:[]},
+  {id:legal.id,name:'Counsel and finance legal review',position:2,condition:{kind:'termsEdited'},approvers:['person:'+people.admin.id,'person:'+people.billing.id],templates:[]},
+ ]}
+ assert.deepEqual((await h.state()).approvalSettings,settings)
+ const fields={clientId,title:'Archived parallel approvals',scope:'Public delivery',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'30000',discountPercent:'20'}],terms:'Original legal terms'}
+ const draft=await h.cmd('proposal.prepare',fields,people.sales.cookie)
+ await h.cmd('proposal.revise',{...fields,id:draft.id,version:1,terms:'Edited legal terms'},people.sales.cookie)
+ for(const [index,cookie] of [people.manager.cookie,h.owner,people.billing.cookie,people.admin.cookie].entries())assert.deepEqual(await h.cmd('proposal.approve',{id:draft.id,version:index+2,revision:2,note:'Synthetic archived decision '+index},cookie),{approved:index===3,rejected:false})
+ const approval=(await h.state()).proposals.find(row=>row.id===draft.id).approval
+ const plan=createHash('sha256').update(JSON.stringify({version:4,steps:settings.rules.map(r=>({id:r.id,name:r.name,approvers:r.approvers,any:false})),revision:2})).digest('hex')
+ const projection=row=>row.steps.flatMap(step=>step.decisions).map(d=>({proposal:d.proposal_id,revision:d.revision,plan:d.plan,step:d.step,actor:d.actor_id,index:d.approver_index,decision:d.decision,note:d.note})).sort((a,b)=>a.note.localeCompare(b.note))
+ const expected=[people.manager.id,owner.id,people.billing.id,people.admin.id].map((actor,index)=>({proposal:draft.id,revision:2,plan,step:[amount.id,discount.id,legal.id,legal.id][index],actor,index:[0,0,1,0][index],decision:'approved',note:'Synthetic archived decision '+index}))
+ assert.equal(approval.complete,true);assert.equal(approval.plan,plan);assert.deepEqual(projection(approval),expected)
+ return {id:draft.id,settings,approval,projection,expected,cookies:[people.admin.cookie,people.billing.cookie]}
+}
+
 test('PRICE-005 public CLI preserves business tax rates and frozen agreements without restoring signing authority',{timeout:360000},async()=>{
  const temporary=await mkdtemp(join(tmpdir(),'platter-tax-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored')
  let h
  try{
   for(const root of [source,restored])await checkout(root)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source,assetsDirectory:'public'})
   const {configureTaxes,taxRequest,taxPackages,taxTables}=await import('./taxes-fixture.mjs')
   const version=await configureTaxes(h.cmd),client=await h.cmd('client.save',{name:'Synthetic tax client',email:h.auth.OWNER_EMAIL})
@@ -951,6 +1323,7 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
   const code=(await h.state()).outbox.find(m=>m.proposal_id===p.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0],session=await h.send(path+'/action?name=code.verify',{code})
   assert.equal((await h.send(path+'/action?name=accept',{name:'Synthetic signer',optionId:'two',items:[{id:'extra',quantity:4}],consent:true},session.cookie)).status,200)
   await h.cmd('tax.rate',{version,level:'city',region:'TX',jurisdiction:'Austin',startsOn:'2099-01-01',percent:'2'})
+  const archivedApprovals=await savedApprovalArchive(h,client.id)
   const before=await h.state(),proposalBefore=before.proposals.find(p1=>p1.id===p.id),bytes=(await h.db.prepare('SELECT snapshot FROM p_acceptances WHERE proposal_id=?').bind(p.id).first()).snapshot,identity={auth:h.auth,owner:h.owner}
   assert.equal(proposalBefore.acceptance.totalCents,146885);assert.equal(proposalBefore.acceptance.depositCents,73443);assert.equal(proposalBefore.acceptance.selection.tax.taxCents,7885)
   await h.close();h=null
@@ -958,6 +1331,11 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
   h=await harness({root:restored,...identity})
   await h.state(identity.owner,401);assert.equal((await h.send(path,undefined,session.cookie)).status,404)
   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner),agreement=after.proposals.find(p1=>p1.id===p.id)
+  assert.deepEqual(after.approvalSettings,archivedApprovals.settings,'the complete saved policy and all three independently expected rules survive public CLI restore')
+  const restoredApprovals=after.proposals.find(row=>row.id===archivedApprovals.id).approval
+  assert.deepEqual(restoredApprovals,archivedApprovals.approval,'exact plan, actors, notes, decisions and times survive unchanged')
+  assert.deepEqual(archivedApprovals.projection(restoredApprovals),archivedApprovals.expected)
+  for(const cookie of archivedApprovals.cookies)assert.equal((await h.send('/api/platter/state',undefined,cookie)).status,401,'retained approval history restores no member session')
   assert.deepEqual(after.catalogItems,before.catalogItems)
   assert.deepEqual(after.businessRecords,before.businessRecords)
   for(const id of [recurringCatalog.id,catalogTemplateDraft.id]){
@@ -977,13 +1355,14 @@ test('PRICE-005 public CLI preserves business tax rates and frozen agreements wi
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })
 
-test('AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority', {timeout:180000},async()=>{
+test('AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority', {timeout:360000},async()=>{
  const {driveFixture,driveToken,driveSettings,connectDrive,completeDriveAgreement}=await import('./drive-fixture.mjs')
+ const {xeroFixture}=await import('./provider-network.mjs'),{connectXero,chooseXero,acceptXeroDeposit,reviewXero,issueXero}=await import('./xero-fixture.mjs'),xero=xeroFixture()
  const temporary=await mkdtemp(join(tmpdir(),'platter-drive-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=driveFixture();let h
  try{
   for(const path of [source,restored])await checkout(path)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
-  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService,auth:{GOOGLE_DRIVE_CLIENT_ID:'synthetic-platter-archive-oauth-client',GOOGLE_DRIVE_CLIENT_SECRET:'synthetic-platter-archive-oauth-secret'}});await connectDrive(h)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
+  h=await harness({root:source,assetsDirectory:'public',auth:{GOOGLE_DRIVE_CLIENT_ID:'synthetic-platter-archive-oauth-client',GOOGLE_DRIVE_CLIENT_SECRET:'synthetic-platter-archive-oauth-secret'},outboundService:request=>new URL(request.url).hostname==='api.xero.com'?xero.outboundService(request):fake.outboundService(request)});await connectDrive(h)
   const completed=await completeDriveAgreement(h)
   await h.cmd('archive.dispatch',{})
   const broken=await completeDriveAgreement(h,'Broken credential archive history',completed.client.id)
@@ -999,19 +1378,36 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
    const response=await h.mf.dispatchFetch(h.origin+completed.path+'/'+kind+'.pdf',{headers:{cookie:completed.cookie}});assert.equal(response.status,200);artifacts[kind]=Buffer.from(await response.arrayBuffer())
   }
   const certificate=(await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).value
+  await connectXero(h,xero);await chooseXero(h,xero)
+  const deposit=await acceptXeroDeposit(h),review=await reviewXero(h,deposit.p.id);await issueXero(h,review)
+  const nextDeposit=await acceptXeroDeposit(h,'Synthetic pending review',deposit.client.id),unusedReview=await reviewXero(h,nextDeposit.p.id,h.owner,{contactId:xero.state.contacts[0].ContactID})
+  const xeroTables=['p_invoice_authority','p_xero_contacts','p_xero_jobs'],xeroBefore=Object.fromEntries(await Promise.all(xeroTables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
+  // Include completion artifacts materialized by the additional accounting agreements.
+  for(const table of tables)before[table]=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results
+  assert.equal((await h.state()).archiving.settings.active,true,'Drive configuration remains authorized at export')
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM p_archive_authority').first()).n,1,'export exercises live configuration authority')
+  assert.ok((await h.db.prepare('SELECT COUNT(*) AS n FROM p_archive_job_authority').first()).n>0,'export exercises live job authority')
   const authorization=await h.send('/api/platter/drive/authorize',{consent:true},h.owner);assert.equal(authorization.status,303)
   assert.equal((await h.db.prepare('SELECT count(*) AS n FROM p_drive_oauth').first()).n,1)
+  await h.db.prepare('INSERT INTO p_reminder_dispatch_lock VALUES(1,?,?)').bind(crypto.randomUUID(),Date.now()+900000).run()
   await h.close();h=undefined
   const archive=join(temporary,'drive.rer');await command(source,['export','--output',archive])
-  const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(driveToken))
+  const contents=await readFile(archive,'utf8');assert.ok(!contents.includes(driveToken));assert.ok(!contents.includes(xero.token))
   const records=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part').flatMap(p=>p.items).filter(r=>r.kind==='row')
-  for(const table of ['p_drive_oauth','p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal(records.filter(r=>r.table===table).length,0)
+  for(const table of ['p_drive_oauth','p_reminder_dispatch_lock','p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets','p_xero_reviews','p_xero_execution'])assert.equal(records.filter(r=>r.table===table).length,0)
   await command(restored,['import','--input',archive,'--yes'])
-  const restoredFake=driveFixture();h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:restoredFake.outboundService})
-  for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table],table+' retains exact history')
-  for(const table of ['p_drive_oauth','p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  const restoredFake=driveFixture(),restoredXero=xeroFixture();h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:request=>new URL(request.url).hostname==='api.xero.com'?restoredXero.outboundService(request):restoredFake.outboundService(request)})
+  for(const table of tables){const rows=(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results;assert.equal(rows.length,before[table].length,table+' retains every record');assert.deepEqual(rows,before[table],table+' retains exact history')}
+  for(const table of ['p_drive_oauth','p_reminder_dispatch_lock','p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets','p_xero_reviews','p_xero_execution'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
   await (await h.mf.getWorker()).scheduled({scheduledTime:new Date(),cron:'*/15 * * * *'});assert.equal(restoredFake.calls.length,0)
   const owner=await h.signIn(h.auth.OWNER_EMAIL)
+  for(const table of xeroTables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,xeroBefore[table],table+' preserves exact Xero custody')
+  assert.ok((await h.state(owner)).xero.jobs.every(j=>!j.executable));assert.equal(restoredXero.calls.length,0)
+  await connectXero(h,restoredXero,owner,1)
+  const noReplay=restoredXero.calls.length
+  await issueXero(h,review,owner,409);await issueXero(h,unusedReview,owner,409)
+  await h.cmd('xero.review',{id:deposit.p.id},owner,409)
+  assert.equal(restoredXero.calls.length,noReplay,'reconnection cannot revive a restored request or review')
   for(const kind of ['agreement','certificate']){
    const response=await h.mf.dispatchFetch(h.origin+'/api/platter/'+kind+'.pdf?id='+completed.proposal.id,{headers:{cookie:owner}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),artifacts[kind])
   }
@@ -1025,5 +1421,156 @@ test('AUTO-002 public CLI retains exact document archive history and artifacts w
   await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
   await h.cmd('archive.reconcile',{id:broken.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
   assert.equal((await h.send('/api/platter/archives',undefined,owner)).value.jobs.find(j=>j.proposal_id===broken.proposal.id).status,'held')
+ }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+})
+
+test('PORT-002 / AUTO-002 populated product archive retains exact document archive history, content, money and mappings without execution authority', {timeout:240000},async()=>{
+ const {driveFixture,driveAccount,driveRoot,driveToken,driveSettings,connectDrive,completeDriveAgreement}=await import('./drive-fixture.mjs')
+ const temporary=await mkdtemp(join(tmpdir(),'platter-product-archive-')),source=join(temporary,'source'),restored=join(temporary,'restored'),fake=driveFixture();let h
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex')
+ try{
+  for(const path of [source,restored])await checkout(path)
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
+  h=await harness({root:source,assetsDirectory:'public',outboundService:fake.outboundService});await connectDrive(h)
+  await h.db.prepare('INSERT INTO p_expiry_clock(singleton,observed_at) VALUES(1,?)').bind(Date.parse('2099-01-15T12:00:00Z')).run()
+  const setup=await h.mf.dispatchFetch(h.origin+'/setup',{method:'POST',headers:{origin:h.origin,cookie:h.owner,'content-type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});assert.equal(setup.status,303)
+  const client=await h.cmd('client.save',{name:'Synthetic archive studio',email:['synthetic-platter-139','example.test'].join('@')})
+  const catalog=await h.cmd('catalog.save',{name:'Archived workshop',sku:'synthetic-platter-139',description:'Two hours of reviewed work',unit:'hour',unitPrice:'125',unitCost:'40',defaultRecurrence:'one-off',taxable:'no',incomeAccount:'synthetic-platter-income'})
+  const library=await h.cmd('library.save',{title:'Archived case study',kind:'case_study',content:'A retained studio outcome.'})
+  const proposal=await h.cmd('proposal.prepare',{clientId:client.id,title:'Populated archive agreement',scope:'Reviewed archive scope',optionOne:'Studio',priceOne:'100',optionTwo:'Campaign',priceTwo:'200',depositPercent:'25'})
+  await h.cmd('catalog.insert',{id:proposal.id,version:1,catalogId:catalog.id,catalogVersion:1,optionId:'one',quantity:'2'})
+  await h.cmd('library.insert',{id:proposal.id,version:2,itemId:library.id,itemVersion:1,mode:'detached',consent:true})
+  const imageBytes=await readFile('public/brand/apple-touch-icon.png'),videoBytes=await readFile('fixtures/editor/synthetic-platter-1.webm'),media=[]
+  for(const [filename,type,bytes]of [['synthetic-platter-139.png','image/png',imageBytes],['synthetic-platter-139.webm','video/webm',videoBytes]]){
+   const form=new FormData();form.set('id',proposal.id);form.set('version','3');form.set('consent','yes');form.set('file',new File([bytes],filename,{type}))
+   const request=new Request(h.origin+'/app/document-media',{method:'POST',headers:{origin:h.origin,cookie:h.owner,accept:'application/json'},body:form})
+   const response=await h.mf.dispatchFetch(request.url,{method:'POST',headers:request.headers,body:await request.arrayBuffer()});assert.equal(response.status,200);media.push((await response.json()).media)
+  }
+  const document=(await h.state()).proposals.find(p=>p.id===proposal.id).document
+  document.blocks.push({id:'archive-image',type:'image',title:'Retained image',text:'Original image',assetId:media[0].id,alt:'Synthetic archive image'},{id:'archive-video',type:'video',title:'Retained video',text:'Original video',assetId:media[1].id,posterId:media[0].id,alt:'Synthetic archive video'})
+  await h.cmd('proposal.document',{id:proposal.id,version:3,document})
+  const template=await h.cmd('template.save',{id:proposal.id,version:4,name:'Populated archive template'})
+  await h.cmd('proposal.approve',{id:proposal.id,version:4,revision:4})
+  const path=new URL((await h.cmd('proposal.send',{id:proposal.id,version:5})).shareUrl).pathname
+  assert.equal((await h.send(path+'/action?name=code.request',{})).status,200)
+  const code=(await h.state()).outbox.find(m=>m.proposal_id===proposal.id&&m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
+  const verified=await h.send(path+'/action?name=code.verify',{code});assert.equal(verified.status,200)
+  const acceptance={name:'Synthetic archive signer',optionId:'one',consent:true}
+  assert.equal((await h.send(path+'/action?name=accept',acceptance,verified.cookie)).status,200)
+  const completed={proposal,client,path,cookie:verified.cookie}
+  // The selected original 100 dollars plus two 125-dollar hours books 350 dollars.
+  const invoice=await h.cmd('invoice.export',{id:proposal.id}),invoicePath='/api/platter/invoices/'+invoice.id+'.csv'
+  const invoiceCsv=(await h.send(invoicePath,undefined,h.owner)).text
+  assert.match(invoiceCsv,/87\.50,200,No Tax,USD/)
+  await h.cmd('payment.record',{id:proposal.id,amount:'87.50',receivedOn:'2099-01-15',method:'wire',reference:'synthetic-platter-offline-139',consent:false},h.owner,400)
+  assert.deepEqual((await h.state()).paymentRecords,[],'unconfirmed money is never recorded')
+  const payment=await h.cmd('payment.record',{id:proposal.id,amount:'87.50',receivedOn:'2099-01-15',method:'wire',reference:'synthetic-platter-offline-139',consent:true})
+  const filters='view=recorded-revenue&currency=USD&q=Populated%20archive%20agreement&receivedFrom=2099-01-01&receivedTo=2099-03-31'
+  const expectedTotals=[{currency:'USD',count:1,valueCents:35000,oneOffCents:35000,firstYearCents:35000,receivedCents:8750,refundedCents:0,netReceivedCents:8750,uncertainRefundCents:0,exportedDepositCents:8750}]
+  const revenue=(await h.send('/api/platter/pipeline?'+filters,undefined,h.owner)).value
+  assert.deepEqual(revenue.totals,expectedTotals)
+  const reportCsv=(await h.send('/api/platter/pipeline.csv?'+filters,undefined,h.owner)).text
+  await h.cmd('archive.dispatch',{})
+  const queued=await completeDriveAgreement(h,'Queued archive history',client.id)
+  const tables=['p_archive_settings','p_archive_jobs','p_archive_files','p_archive_folders','p_agreement_artifacts'],before=Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results])))
+  assert.deepEqual(before.p_archive_jobs.map(j=>j.status).sort(),['complete','queued'])
+  const artifacts={}
+  for(const kind of ['agreement','certificate']){
+   const response=await h.mf.dispatchFetch(h.origin+completed.path+'/'+kind+'.pdf',{headers:{cookie:completed.cookie}});assert.equal(response.status,200);artifacts[kind]=Buffer.from(await response.arrayBuffer())
+  }
+  const {pdfPages}=await import('./pdf-document.mjs')
+  const agreementText=(await pdfPages(artifacts.agreement)).join(' '),certificateText=(await pdfPages(artifacts.certificate)).join(' ')
+  assert.match(agreementText,/Signed agreement, revision 4/);assert.match(agreementText,/Total: USD 350\.00/);assert.match(agreementText,/Signed by: Synthetic archive signer/)
+  assert.match(certificateText,/Certificate of completion/);assert.match(certificateText,/Verification method: mailbox code/);assert.match(certificateText,/Synthetic archive signer/)
+  const certificate=(await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).value
+  assert.equal(certificate.documentSha256,hash(artifacts.agreement));assert.equal(certificate.signers[0].method,'mailbox code')
+  const mappings=(await h.send('/api/platter/archives',undefined,h.owner)).value
+  for(const kind of ['agreement','certificate']){
+   const mapping=before.p_archive_files.find(f=>f.kind===kind)
+   assert.equal(mapping.proposal_id,proposal.id);assert.equal(mapping.status,'complete');assert.equal(mapping.sha256,hash(artifacts[kind]))
+   assert.deepEqual(fake.files.get(mapping.provider_id).bytes,artifacts[kind],'the retained mapping names the actual uploaded bytes')
+  }
+  const agent=await h.cmd('agent.create',{label:'Synthetic archive excluded key'})
+  const restKey=(await h.send('/api/platter/v1/keys',{label:'Synthetic archive excluded REST key',scopes:['proposals.read']},h.owner)).value
+  const webhook=(await h.send('/api/platter/v1/webhooks',{url:'https://hooks.example.com/synthetic-platter-139',consent:true},h.owner)).value
+  assert.equal((await h.send('/api/platter/agent/context',undefined,'',{authorization:'Bearer '+agent.token})).status,200)
+  assert.equal((await h.send('/api/platter/v1/proposals',undefined,'',{authorization:'Bearer '+restKey.token})).status,200)
+  const beforeState=await h.state(),ownerCookie=h.owner
+  assert.ok(beforeState.outbox.length>0,'queued invitation and verification mail really exists before export')
+  const shares=(await h.db.prepare('SELECT * FROM p_shares').all()).results
+  assert.ok(shares.some(s=>s.session_hash&&s.session_verified_at),'live verification and client session facts exist before export')
+  const sessionHashes=(await h.db.prepare('SELECT token_hash FROM oa_sessions').all()).results.map(r=>r.token_hash)
+  assert.ok(sessionHashes.length>0,'a native owner session exists before export')
+  const secretRows=(await h.db.prepare('SELECT * FROM p_connection_secrets').all()).results
+  assert.equal(secretRows.length,1)
+  await h.close();h=undefined
+  const archive=join(temporary,'product.rer');await command(source,['export','--output',archive])
+  const contents=await readFile(archive,'utf8'),parts=contents.split('\n').filter(Boolean).map(JSON.parse).filter(r=>r.kind==='part')
+  const records=parts.flatMap(p=>p.items).filter(r=>r.kind==='row'),rows=table=>records.filter(r=>r.table===table).map(r=>r.row)
+  const one=(table,predicate)=>{const found=rows(table).filter(predicate);assert.equal(found.length,1,table+' has one expected populated record');return found[0]}
+  // Independently inventory the exported records, original media and materialized artifacts.
+  assert.equal(one('p_personal_templates',r=>r.id===template.id).name,'Populated archive template')
+  assert.equal(one('p_library_items',r=>r.id===library.id).content,'A retained studio outcome.')
+  const priced=one('p_priced_catalog',r=>r.id===catalog.id);assert.equal(priced.sku,'synthetic-platter-139');assert.equal(priced.unit_cents,12500);assert.equal(priced.unit_cost_cents,4000)
+  const accepted=one('p_acceptances',r=>r.proposal_id===proposal.id);assert.equal(accepted.total_cents,35000);assert.equal(accepted.deposit_cents,8750);assert.equal(accepted.currency,'USD')
+  const snapshot=JSON.parse(accepted.snapshot);assert.equal(snapshot.title,'Populated archive agreement');assert.equal(snapshot.options.find(o=>o.id==='one').cents,35000)
+  const receipt=one('p_payment_records',r=>r.id===payment.id);assert.equal(receipt.proposal_id,proposal.id);assert.equal(receipt.method,'wire');assert.equal(receipt.cents,8750);assert.equal(receipt.received_on,'2099-01-15');assert.equal(receipt.reference,'synthetic-platter-offline-139')
+  assert.equal(one('p_invoices',r=>r.id===invoice.id).csv,invoiceCsv)
+  const stored=one('p_agreement_artifacts',r=>r.proposal_id===proposal.id)
+  for(const [kind,column]of [['agreement','document'],['certificate','certificate']])assert.deepEqual(Buffer.from(stored[column].blob,'base64'),artifacts[kind])
+  assert.equal(JSON.parse(stored.facts).documentSha256,hash(artifacts.agreement))
+  for(const [index,bytes]of [imageBytes,videoBytes].entries()){
+   const file=one('p_attachment_files',r=>r.id===media[index].id);assert.equal(file.size,bytes.length);assert.equal(file.sha256,hash(bytes))
+   const original=Buffer.concat(rows('p_attachment_chunks').filter(r=>r.file_id===file.id).sort((a,b)=>a.part-b.part).map(r=>Buffer.from(r.bytes_base64,'base64')))
+   assert.deepEqual(original,bytes);assert.equal(one('p_document_media',r=>r.proposal_id===proposal.id&&r.file_id===file.id).file_id,file.id)
+   assert.equal(one('p_template_document_media',r=>r.template_id===template.id&&r.file_id===file.id).file_id,file.id)
+  }
+  const connection=one('p_connections',r=>r.id==='workspace:google_drive');assert.equal(connection.account_id,driveAccount);assert.equal(connection.provider,'google_drive')
+  const folder=one('p_archive_folders',r=>r.client_id===client.id);assert.equal(folder.account_id,driveAccount);assert.equal(folder.root_folder,driveRoot);assert.equal(fake.files.get(folder.provider_id).parents[0],driveRoot)
+  for(const kind of ['agreement','certificate']){
+   const mapping=one('p_archive_files',r=>r.proposal_id===proposal.id&&r.kind===kind)
+   assert.equal(mapping.folder_id,folder.provider_id);assert.equal(mapping.sha256,hash(artifacts[kind]));assert.deepEqual(fake.files.get(mapping.provider_id).bytes,artifacts[kind])
+  }
+  const decoded=parts.flatMap(p=>p.items).map(item=>JSON.stringify(item)+'\n'+Object.entries(item.row??item).flatMap(([key,value])=>value&&typeof value==='object'&&value.blob?[Buffer.from(value.blob,'base64').toString('latin1')]:['bytes_base64','data'].includes(key)&&typeof value==='string'?[Buffer.from(value,'base64').toString('latin1')]:[]).join('\n')).join('\n')
+  const excludedTables=['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets','p_agent_keys','p_rest_keys','p_webhook_secrets','oa_sessions','oa_tokens','oa_invitations','p_member_invitations','p_shares','p_mail','rer_mail_development_outbox','p_completion_authority']
+  for(const table of excludedTables)assert.equal(rows(table).length,0,table+' never exports local authority or queued mail')
+  const secrets=[...sessionHashes,hash(agent.token),hash(restKey.token),driveToken,agent.token,restKey.token,webhook.secret,ownerCookie.split('=')[1],verified.cookie.split('=')[1],...shares.flatMap(s=>[s.token,s.session_hash,s.code_hash]).filter(Boolean),...secretRows.flatMap(r=>Object.values(r).filter(v=>typeof v==='string'&&v.length>100))]
+  for(const secret of secrets)for(const view of [contents,decoded])assert.ok(!view.includes(secret),'decoded archive excludes live capability bytes')
+  for(const mail of beforeState.outbox)assert.ok(!decoded.includes(mail.body),'queued mail body is never product history')
+  await command(restored,['import','--input',archive,'--yes'])
+  const restoredFake=driveFixture();h=await harness({root:restored,unclaimed:true,assetsDirectory:'public',outboundService:restoredFake.outboundService})
+  for(const table of tables)assert.deepEqual((await h.db.prepare('SELECT * FROM '+table+' ORDER BY 1,2').all()).results,before[table],table+' retains exact history')
+  for(const table of ['p_archive_dispatch_lock','p_archive_authority','p_archive_job_authority','p_connection_secrets','p_agent_keys','p_rest_keys','p_shares','p_mail'])assert.equal((await h.db.prepare('SELECT count(*) AS n FROM '+table).first()).n,0)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2099-01-15T12:00:00Z'),cron:'*/15 * * * *'});assert.equal(restoredFake.calls.length,0)
+  assert.equal((await h.send('/api/platter/state',undefined,ownerCookie)).status,401)
+  for(const [door,token]of [['/api/platter/agent/context',agent.token],['/api/platter/v1/proposals',restKey.token]])assert.equal((await h.send(door,undefined,'',{authorization:'Bearer '+token})).status,401)
+  for(const suffix of ['', '/agreement.pdf','/certificate.json'])assert.equal((await h.send(path+suffix,undefined,verified.cookie)).status,404)
+  for(const [action,input]of [['code.verify',{code}],['accept',acceptance]])assert.equal((await h.send(path+'/action?name='+action,input,verified.cookie)).status,404)
+  const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
+  assert.deepEqual(after.templates,beforeState.templates);assert.deepEqual(after.libraryItems,beforeState.libraryItems);assert.deepEqual(after.catalogItems,beforeState.catalogItems);assert.deepEqual(after.paymentRecords,beforeState.paymentRecords)
+  for(const kind of ['agreement','certificate']){
+   const response=await h.mf.dispatchFetch(h.origin+'/api/platter/'+kind+'.pdf?id='+proposal.id,{headers:{cookie:owner}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),artifacts[kind])
+  }
+  assert.deepEqual((await h.send('/api/platter/certificate.json?id='+proposal.id,undefined,owner)).value,certificate)
+  for(const [index,bytes]of [imageBytes,videoBytes].entries()){
+   const response=await h.mf.dispatchFetch(h.origin+'/api/platter/document-media/'+proposal.id+'/'+media[index].id,{headers:{cookie:owner}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)
+  }
+  assert.equal((await h.send(invoicePath,undefined,owner)).text,invoiceCsv);assert.equal((await h.cmd('invoice.export',{id:proposal.id},owner)).id,invoice.id)
+  const restoredRevenue=(await h.send('/api/platter/pipeline?'+filters,undefined,owner)).value
+  assert.deepEqual(restoredRevenue.totals,expectedTotals);assert.deepEqual(restoredRevenue.rows,revenue.rows)
+  assert.equal((await h.send('/api/platter/pipeline.csv?'+filters,undefined,owner)).text,reportCsv)
+  const history=(await h.send('/api/platter/archives',undefined,owner)).value;assert.equal(history.settings.active,false);assert.ok(history.jobs.every(j=>!j.executable))
+  assert.deepEqual(history.jobs.map(({executable,...j})=>j).sort((a,b)=>a.proposal_id.localeCompare(b.proposal_id)),mappings.jobs.map(({executable,...j})=>j).sort((a,b)=>a.proposal_id.localeCompare(b.proposal_id)))
+  assert.equal(after.connections.find(c=>c.provider==='google_drive').status,'needs_reconnection')
+  assert.equal((await h.send(completed.path+'/certificate.json',undefined,completed.cookie)).status,404)
+  // Even reconnecting and explicitly authorizing future agreements cannot replay imported jobs.
+  await h.cmd('provider.connect',{provider:'google_drive',version:1,token:driveToken,consent:true},owner)
+  await h.cmd('archive.configure',{...driveSettings,version:1,connectionVersion:2},owner)
+  const calls=restoredFake.calls.length;await h.cmd('archive.dispatch',{},owner);assert.equal(restoredFake.calls.length,calls)
+  await h.cmd('archive.reconcile',{id:queued.proposal.id},owner,409);assert.equal(restoredFake.calls.length,calls)
+  await (await h.mf.getWorker()).scheduled({scheduledTime:new Date('2099-01-16T12:00:00Z'),cron:'*/15 * * * *'});assert.equal(restoredFake.calls.length,calls)
+  assert.deepEqual((await h.state(owner)).paymentRecords,beforeState.paymentRecords,'replayed capabilities and scheduled processing cannot change money')
+  console.log('PROBE PORT-002 1: populated CLI export and restore -> templates, library, catalog, two media originals, exact signed artifacts, 8750-cent deposit and offline receipt, report totals and actual Drive mappings reconciled')
+  console.log('PROBE PORT-002 2: decoded CLI archive and restored public doors -> no credentials, invitations, sessions, verification state or queued mail; old capabilities refused; scheduled processing made no provider calls')
  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
 })

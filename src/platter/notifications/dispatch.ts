@@ -5,12 +5,17 @@ import { operatorMail } from '../../mail.server.mjs'
 import { capturesMail } from '../mail'
 import { providerCredential, providerFetch, type ProviderCredential } from '../connections'
 import { actorById } from '../credentials'
-import { approvalPlan } from '../approvals'
-import { permitted } from '../permissions'
+import { approvalPlan, approvalTrigger } from '../approvals'
+import { administrators, permitted } from '../permissions'
 import { negotiatedView, pendingNegotiation } from '../negotiation'
 import { need } from '../model'
 
+export function requestBody(env:Bindings,r:any,a:any,overdue=false){
+ const trigger=approvalTrigger(r.trigger_snapshot?JSON.parse(r.trigger_snapshot):null,a)
+ return (overdue?'Approval overdue: ':'Approval required: ')+trigger.name+'\nTriggered by: '+trigger.detail+'\nRevision '+r.revision+'\nPreview: '+env.AUTH_ORIGIN+'/app/preview?id='+encodeURIComponent(r.proposal_id)+'&revision='+r.revision+'\nReview and decide: '+env.AUTH_ORIGIN+'/app/proposal?id='+encodeURIComponent(r.proposal_id)+'\nA signed-in approver must explicitly approve or reject with a note. Request id: '+r.id
+}
 export async function activeRequest(env:Bindings,r:any) {
+ if(r.revoked_at||!await env.DB.prepare('SELECT 1 FROM p_notification_authority WHERE request_id=?').bind(r.id).first())return false
  const a=await actorById(env.DB,r.approver_id),requester=await actorById(env.DB,r.requester_id)
  if(!a||!requester)return false
  try{
@@ -29,16 +34,20 @@ export async function chatJson(env:Bindings,credential:ProviderCredential,url:st
  const value=JSON.parse(raw);need(value&&value.ok!==false,'Chat provider refused the request',409);return value
 }
 export async function routeAvailable(env:Bindings,r:any) {
+ const authorizer=await actorById(env.DB,r.configured_by)
+ if(!authorizer||!administrators.includes(authorizer.role))return false
  return Boolean(await env.DB.prepare("SELECT 1 FROM p_notification_route_authority a JOIN p_connections c ON c.id=? WHERE a.route_id=? AND c.status='connected' AND c.version=? AND c.broken_at IS NULL AND EXISTS(SELECT 1 FROM p_connection_secrets s WHERE s.connection_id=c.id) AND EXISTS(SELECT 1 FROM p_notification_routes r WHERE r.id=a.route_id AND (r.operator_id IS NULL OR EXISTS(SELECT 1 FROM oa_operators o WHERE o.id=r.operator_id AND o.status='active' AND o.email=r.recipient_email)))").bind('workspace:'+r.provider,r.id,r.connection_version).first())
 }
 export async function flushNotifications(env:Bindings) {
  const db=env.DB,rows=(await db.prepare("SELECT * FROM p_notification_outbox WHERE status='pending' ORDER BY created_at,id LIMIT 100").all<any>()).results
  for(const row of rows){
+  let body=row.body
   const allowed=async()=>{
    if(row.event_key.startsWith('collab:')){const { activeCollaboration }=await import('../collaboration');if(!await activeCollaboration(env,row))return false}
    if(row.watcher_id&&!await activeWatcher(env,row))return false
+   if(row.event_key.startsWith('renewal:')){const { activeRenewalNotice }=await import('./renewal');if(!await activeRenewalNotice(env,row))return false}
    if(row.event_key.startsWith('expiry:')){const { activeExpiryNotice }=await import('./expiry');if(!await activeExpiryNotice(env,row))return false}
-   if(row.request_id){const r=await db.prepare('SELECT r.* FROM p_approval_requests r JOIN p_notification_authority a ON a.request_id=r.id WHERE r.id=?').bind(row.request_id).first<any>();if(!r||!await activeRequest(env,r))return false;if(row.recipient){const person=await actorById(db,r.approver_id);if(person?.email!==row.recipient)return false}}
+   if(row.request_id){const r=await db.prepare('SELECT r.* FROM p_approval_requests r JOIN p_notification_authority a ON a.request_id=r.id WHERE r.id=?').bind(row.request_id).first<any>();if(!r||!await activeRequest(env,r))return false;body=requestBody(env,r,await actorById(db,r.approver_id),row.event_key.endsWith(':overdue'));if(row.recipient){const person=await actorById(db,r.approver_id);if(person?.email!==row.recipient)return false}}
    if(row.route_id){const r=await db.prepare('SELECT * FROM p_notification_routes WHERE id=?').bind(row.route_id).first<any>();if(!r||!await routeAvailable(env,r))return false;if(r.kind==='direct'){const person=await actorById(db,r.operator_id);if(!person)return false;try{await permitted(db,person,row.proposal_id)}catch{return false}}}
    return true
   }
@@ -52,11 +61,11 @@ export async function flushNotifications(env:Bindings) {
     if(r.provider==='slack'&&r.kind==='direct')destination=(await chatJson(env,credential,'https://slack.com/api/conversations.open',{users:r.destination})).channel?.id
     need(destination,'The direct conversation is unavailable',409)
     if(!await allowed()){await db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE id=?").bind(row.id).run();continue}
-    await demoEffect(()=>r.provider==='slack'?chatJson(env,credential,'https://slack.com/api/chat.postMessage',{channel:destination,text:row.subject+'\n'+row.body,unfurl_links:false,unfurl_media:false}):chatJson(env,credential,'https://graph.microsoft.com/v1.0/chats/'+encodeURIComponent(destination)+'/messages',{body:{contentType:'text',content:row.subject+'\n'+row.body}}),()=>({}))
+    await demoEffect(()=>r.provider==='slack'?chatJson(env,credential,'https://slack.com/api/chat.postMessage',{channel:destination,text:row.subject+'\n'+body,unfurl_links:false,unfurl_media:false}):chatJson(env,credential,'https://graph.microsoft.com/v1.0/chats/'+encodeURIComponent(destination)+'/messages',{body:{contentType:'text',content:row.subject+'\n'+body}}),()=>({}))
    }else{
     const mail=operatorMail(env);need(mail,'Configure installation mail before sending notifications',409)
     if(!await allowed()){await db.prepare("UPDATE p_notification_outbox SET status='withheld' WHERE id=?").bind(row.id).run();continue}
-    const receipt=await demoEffect(()=>mail.send({from:env.MAIL_FROM!,to:[row.recipient],deliveryId:row.id,subject:row.subject,text:row.body,html:row.body.replace(/[&<>]/g,(c:string)=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]!)),headers:{}}),()=>({status:'accepted'}))
+    const receipt=await demoEffect(()=>mail.send({from:env.MAIL_FROM!,to:[row.recipient],deliveryId:row.id,subject:row.subject,text:body,html:body.replace(/[&<>]/g,(c:string)=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]!)),headers:{}}),()=>({status:'accepted'}))
     need(receipt.status==='accepted','Mail delivery is uncertain',409)
    }
    await db.prepare("UPDATE p_notification_outbox SET status='sent' WHERE id=?").bind(row.id).run()

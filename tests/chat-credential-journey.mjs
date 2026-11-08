@@ -1,3 +1,4 @@
+import { approvalRequestInput } from './approval-request.mjs'
 import assert from 'node:assert/strict'
 
 export async function chatCredentialJourney(h){
@@ -6,7 +7,7 @@ export async function chatCredentialJourney(h){
  const reconnect=async provider=>{h.setHook(undefined);const c=await connection(provider);await h.cmd('provider.connect',{provider,version:c?.version??0,token:'synthetic-platter-chat-credential',consent:true})}
  const actor=(await h.state()).actor
  const route=provider=>h.cmd('notification.route',{provider,event:'approval',kind:'direct',destination:provider==='slack'?'synthetic-platter-7009':'synthetic-platter-7006',operatorId:actor.id,consent:true})
- const request=async title=>{const p=await h.prepare(title);await h.cmd('notification.request',{id:p.id,version:1,consent:true});return p}
+ const request=async title=>{const p=await h.prepare(title);await h.cmd('notification.request',await approvalRequestInput(h,{id:p.id,version:1,consent:true}));return p}
  const privateValue='synthetic-platter-private-chat-diagnostic'
  for(const provider of ['slack','teams']){
   await reconnect(provider);await route(provider)

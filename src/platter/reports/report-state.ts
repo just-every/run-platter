@@ -2,7 +2,7 @@ import type { Bindings } from '../../auth.server'
 import { capturesMail } from '../mail'
 import type { Actor } from '../model'
 
-// REPORT-005 read side for the owner: who may be named, each schedule and its recent runs.
+// REPORT-006 read side for the owner: who may be named, each schedule and its recent runs.
 export const installationZone = async (db: D1Database) => (await db.prepare('SELECT time_zone FROM p_installation_settings WHERE singleton=1').first<any>())?.time_zone ?? 'UTC'
 export const activePeople = (db: D1Database) => db.prepare("SELECT id,email,display_name,role FROM oa_operators WHERE status='active' AND role IN ('owner','admin','member') ORDER BY role DESC,display_name").all<any>().then(r => r.results)
 

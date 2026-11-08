@@ -21,6 +21,21 @@ export function mergeFields(value:any):MergeFields|undefined{
 }
 const replace=(text:string,values:Record<string,string>)=>text.replace(variableToken,(original,key)=>Object.hasOwn(values,key)?values[key]:original)
 export function editableVariableFields(row:any){return {clientId:row.client_id,title:row.title,scope:row.scope,terms:row.terms??'',depositPercent:row.deposit_bps/100,packages:editablePackages(typeof row.options==='string'?JSON.parse(row.options):row.options),pricingTables:pricingInput(typeof row.options==='string'?JSON.parse(row.options):row.options),recipientPlan:typeof row.recipient_plan==='string'?JSON.parse(row.recipient_plan):row.recipient_plan??[],sectionConditions:row.section_conditions??{},document:typeof row.document==='string'?JSON.parse(row.document):row.document,paymentTerms:editableTerms(row)}}
+/** Templates keep reusable patterns without a source person's resolved values. */
+export function unfilledVariableFields(row:any){
+ const fields=structuredClone(editableVariableFields(row)),merge=mergeFields(fields.document?.merge)
+ if(!merge)return fields
+ for(const [path,pattern]of Object.entries(merge.patterns)){
+  const keys=path.slice(1).split('/');let parent:any=fields
+  for(const key of keys.slice(0,-1)){parent=parent?.[key];if(!parent)break}
+  if(parent&&typeof parent==='object')parent[keys.at(-1)!]=pattern
+ }
+ // Table-backed package totals and optional-item cents are derived source values.
+ // Recompute them only when the new client fills the editable pricing inputs.
+ fields.packages=fields.packages.map((p:any)=>({...p,...(fields.pricingTables.some((t:any)=>t.optionId===p.id)?{price:'0.01'}:{}),optionalItems:p.optionalItems.map(({unitCents,...item}:any)=>item)}))
+ fields.document.merge={patterns:merge.patterns,values:{},...(merge.conditions?{conditions:merge.conditions}:{})}
+ return fields
+}
 async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFields['deal']){
  const c=await env.DB.prepare('SELECT * FROM p_clients WHERE id=?').bind(clientId).first<any>();need(c,'Client not found',404)
  const profile=JSON.parse(c.variable_fields??'{}'),sender=await env.DB.prepare('SELECT display_name FROM oa_operators WHERE id=?').bind(a.id).first<any>(),name=sender?.display_name??''
@@ -51,6 +66,8 @@ async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFiel
 /** Resolve only requested token fields. Original patterns survive for independent destination refills. */
 export async function resolveVariables(env:Bindings,a:Actor,input:Record<string,any>,rebind=false){
  let p=structuredClone(input);for(const key of ['packages','pricingTables','document','sectionConditions'])if(typeof p[key]==='string'){try{p[key]=JSON.parse(p[key])}catch{}}
+ // Form selections must become conditions before collecting their variable bindings.
+ if(p.sectionConditions===undefined&&(p.scopeOption!==undefined||p.termsOption!==undefined))p.sectionConditions=Object.fromEntries(['scope','terms'].filter(key=>p[key+'Option']).map(key=>[key,p[key+'Option']==='variable'?'variable:'+String(p[key+'Variable']??'')+'='+String(p[key+'VariableValue']??''):p[key+'Option']]))
  if(!p.packages&&[p.optionOne,p.optionTwo,p.priceOne,p.priceTwo].some(v=>variableNames(v).length))p.packages=[{id:'one',label:p.optionOne,price:p.priceOne},{id:'two',label:p.optionTwo,price:p.priceTwo}]
  const old=mergeFields(p.document?.merge),patterns:Record<string,string>={},previous=old?.values??{},deal=p.variableDeal===undefined?(rebind?undefined:old?.deal):p.variableDeal||undefined
  const conditionNames=new Set<string>();walk(p,v=>{const parsed=variableCondition(v);if(parsed)conditionNames.add(parsed[1]);return v})
@@ -86,3 +103,8 @@ export function missingMerge(row:any){const doc=typeof row.document==='string'?J
 
 export const variableCondition=(value:string)=>/^variable:([A-Za-z][A-Za-z0-9_.]{0,99})=(.{0,200})$/.exec(value)
 export function variableVisible(condition:string,values:Record<string,string>={}){const parsed=variableCondition(condition);return Boolean(parsed&&Object.hasOwn(values,parsed[1])&&values[parsed[1]]===parsed[2])}
+
+/** Copy reviewed contact values; no provider credential or execution grant travels. */
+export function copiedContactFields(contact:{name:string;firstName:string;lastName:string;title:string},address:string){
+ return clientVariableFields({contactName:contact.name,firstName:contact.firstName,lastName:contact.lastName,title:contact.title,address})
+}

@@ -10,7 +10,7 @@ import { pipelineMail } from './pipeline-csv'
 import { activePeople, installationZone } from './report-state'
 import { nextRun, validZone } from './zone'
 
-// REPORT-005: owner-named people receive a report at an hour in the installation's time zone; each run is claimed once.
+// REPORT-006: owner-named people receive a report at an hour in the installation's time zone; each run is claimed once.
 const filterKeys = ['view','currency','bookedFrom','bookedTo','receivedFrom','receivedTo','q', 'owner', 'status', 'client', 'nextAction', 'dueFollowup', 'minValue', 'maxValue', 'minAge', 'maxAge', 'sort', 'direction']
 
 /** Keep only the pipeline's own filters, in a fixed order, after the pipeline validates them. */

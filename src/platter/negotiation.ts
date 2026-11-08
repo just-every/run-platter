@@ -4,7 +4,7 @@ import { detachChangedLibraryCopies } from './library-links'
 import { documentOf } from './documents/blocks'
 import { copyCosts, patchCosts } from './internal-pricing'
 import { approvalPlan } from './approvals'
-import { invitationMail } from './invitation-mail'
+import { invitationMail, smsOnlyDelivery } from './invitation-mail'
 import { expirySendStatements, currentTime } from './expiry'
 import type { Bindings } from '../auth.server'
 import { commit, exact, need, secret, snapshot, type Actor } from './model'
@@ -59,7 +59,7 @@ export async function negotiationCommand(env: Bindings, actor: Actor, name: stri
   db.prepare('UPDATE p_proposals SET section_conditions=?,document=?,payment_terms=? WHERE id=?').bind(JSON.stringify(next.section_conditions??{}),JSON.stringify(documentOf(next)),next.payment_terms?JSON.stringify(next.payment_terms):null,offer.id),
   voidSignatureStatement(db,offer.id,offer.revision,at,'Revision replaced'),
   ...(invitations?invitations.writes:[db.prepare('DELETE FROM p_shares WHERE proposal_id=?').bind(offer.id),
-  db.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient) VALUES(?,?,?,?)').bind(offer.id, next.revision, token,client.email),...invitationMail(env,actor,input,{...next,id:offer.id},client.email,shareUrl,at)]),
+  db.prepare('INSERT INTO p_shares(proposal_id,revision,token,recipient) VALUES(?,?,?,?)').bind(offer.id, next.revision, token,client.email),...invitationMail(env,actor,input,{...next,id:offer.id},client.email,shareUrl,at,smsOnlyDelivery(env,input,next))]),
   db.prepare('DELETE FROM p_negotiations WHERE proposal_id=?').bind(offer.id),
   ...await expirySendStatements(db,offer.id,actor.id,at,true),
 

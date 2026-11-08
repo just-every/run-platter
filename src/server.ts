@@ -49,7 +49,7 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
     if (lobby) return lobby
     return rejectedResponse(request, await dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request))))
   },
-  // REPORT-005 scheduled report email, built as of the trigger's own time.
+  // REPORT-006 scheduled report email, built as of the trigger's own time.
   async scheduled(controller, env) {
     await purgeTracking(env.DB,controller.scheduledTime)
     await runExpiry(runtimeBindings(env), controller.scheduledTime)

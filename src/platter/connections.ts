@@ -1,3 +1,5 @@
+import { verifyZoho } from './crm/zoho-http'
+import { xeroOrganization } from './accounting/xero'
 import type { Bindings } from '../auth.server'
 import { administrators, senders } from './permissions'
 import { commit, email, fail, need, text, type Actor } from './model'
@@ -91,7 +93,7 @@ export async function connectionState(env:Bindings,a:Actor){
  return rows.map(r=>({id:r.id,provider:r.provider,operatorId:r.operator_id,accountId:r.account_id,mailboxEmail:r.mailbox_email,status:r.status==='connected'&&!r.has_secret?'needs_reconnection':r.broken_at?'broken':r.status,version:r.version,connectedAt:r.connected_at}))
 }
 export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Record<string,unknown>){
- const provider=String(p.provider??'');need(['stripe','quickbooks','gmail','microsoft','hubspot','salesforce','google_drive','slack','teams'].includes(provider),'Choose a supported provider')
+ const provider=String(p.provider??'');need(['xero','stripe','quickbooks','gmail','microsoft','hubspot','pipedrive','zoho','salesforce','google_drive','slack','teams'].includes(provider),'Choose a supported provider')
  need((isMailbox(provider)?mailboxRoles:administrators).includes(a.role),isMailbox(provider)?'Your role cannot connect a mailbox':'Only owner and admins connect workspace providers',403)
  need(p.operatorId===undefined||p.operatorId===a.id,'Connect only your own mailbox',403)
  const db=env.DB,id=connectionId(provider,a)
@@ -112,12 +114,26 @@ export async function connectionCommand(env:Bindings,a:Actor,name:string,p:Recor
   webhookSecret=p.webhookSecret?text(p.webhookSecret,'the Stripe webhook signing secret',8192):undefined
   if(p.publishableKey!==undefined&&p.publishableKey!=='')need(typeof p.publishableKey==='string'&&p.publishableKey.length>0&&p.publishableKey.length<=8192&&!/[\r\n\0]/.test(p.publishableKey),'Use the Stripe publishable key')
   const result=await providerJson('https://api.stripe.com/v1/account',token);accountId=text(result.id,'the verified provider account',200)
+ }else if(provider==='xero'){
+  const selected=text(p.organizationId,'the selected Xero organization',200)
+  accountId=await xeroOrganization(token,selected)
+  const locked=await db.prepare('SELECT account_id FROM p_xero_jobs LIMIT 1').first<any>()
+  need(!locked||locked.account_id===accountId,'The Xero organization is locked after the first retained request',409)
+  guard.sql+=" AND NOT EXISTS(SELECT 1 FROM p_xero_jobs WHERE account_id!=?)";guard.values.push(accountId)
  }else if(provider==='quickbooks'){
   const realm=text(p.realmId,'the QuickBooks company id',100),result=await providerJson('https://quickbooks.api.intuit.com/v3/company/'+encodeURIComponent(realm)+'/companyinfo/'+encodeURIComponent(realm),token)
   need(result.CompanyInfo&&typeof result.CompanyInfo.CompanyName==='string','QuickBooks did not confirm this company');accountId=realm
  }else if(provider==='hubspot'){
   const result=await providerJson('https://api.hubapi.com/account-info/v3/details',token),value=result.portalId
   need((typeof value==='string'&&value.length>0)||(typeof value==='number'&&Number.isSafeInteger(value)&&value>0),'HubSpot did not confirm the portal');accountId=text(String(value),'the verified HubSpot portal',200)
+ }else if(provider==='pipedrive'){
+  const selected=text(p.tenantId,'the selected Pipedrive company id',100)
+  const result=await providerJson('https://api.pipedrive.com/v1/users/me',token)
+  need(result.success===true&&result.data?.active_flag===true&&String(result.data.company_id)===selected,'Pipedrive did not confirm the selected company',409)
+  accountId=selected
+ }else if(provider==='zoho'){
+  const selected=text(p.tenantId,'the selected Zoho organization id',100)
+  await verifyZoho(token,selected);accountId=selected
  }else if(provider==='salesforce'){
   const result=await providerJson('https://login.salesforce.com/services/oauth2/userinfo',token);accountId=text(result.organization_id,'the verified Salesforce organization',200);need(typeof result.user_id==='string'&&result.user_id.length>0,'Salesforce did not confirm the authorized user')
   if(result.urls?.rest){const url=new URL(result.urls.rest);need(url.protocol==='https:'&&/\.(?:salesforce|force)\.com$/.test(url.hostname)&&!url.username&&!url.password,'Salesforce returned an invalid instance');instanceOrigin=url.origin}

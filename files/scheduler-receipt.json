@@ -1,0 +1,74 @@
+{
+  "result": "passed",
+  "checks": [
+    {
+      "name": "bounded overlap and successful completion",
+      "result": "passed",
+      "commands_started": 4,
+      "commands_finished": 4,
+      "peak_children": 2,
+      "peak_archive_commands": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "continue queued commands and retain nonzero status",
+      "result": "passed",
+      "commands_started": 4,
+      "commands_finished": 4,
+      "peak_children": 2,
+      "peak_archive_commands": 0,
+      "exit_code": 7
+    },
+    {
+      "name": "spawn refusal cannot become a successful verification",
+      "result": "passed",
+      "commands_started": 3,
+      "commands_finished": 3,
+      "peak_children": 2,
+      "peak_archive_commands": 1,
+      "exit_code": 1
+    },
+    {
+      "name": "signal cannot become a successful verification",
+      "result": "passed",
+      "commands_started": 2,
+      "commands_finished": 2,
+      "peak_children": 2,
+      "peak_archive_commands": 0,
+      "exit_code": 1
+    },
+    {
+      "name": "archive commands serialize while eligible business work bypasses the blocked command",
+      "result": "passed",
+      "commands_started": 6,
+      "commands_finished": 6,
+      "peak_children": 2,
+      "peak_archive_commands": 1,
+      "exit_code": 0
+    },
+    {
+      "name": "core build order remains serial",
+      "result": "passed",
+      "commands_started": 4,
+      "commands_finished": 4,
+      "peak_children": 1,
+      "peak_archive_commands": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "failed core build prevents dependent commands",
+      "result": "passed",
+      "commands_started": 1,
+      "commands_finished": 1,
+      "peak_children": 1,
+      "peak_archive_commands": 0,
+      "exit_code": 7
+    },
+    {
+      "name": "unknown shard refuses before launching commands",
+      "result": "passed"
+    }
+  ],
+  "head": "5aa43601ddc3b37c5924638860ea41a6173148c8",
+  "node": "22.20.0"
+}

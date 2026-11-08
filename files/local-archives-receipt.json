@@ -1,0 +1,23 @@
+{
+  "head": "5aa43601ddc3b37c5924638860ea41a6173148c8",
+  "node": "v22.20.0",
+  "worktree_clean_at_start": true,
+  "checks": [
+    {
+      "shard": "archive_restore",
+      "command": "PLATTER_VERIFY_SHARD=archive_restore pnpm verify:app",
+      "started_at": "2026-11-08T20:35:25.567911+00:00",
+      "elapsed_seconds": 466.063,
+      "exit_code": 0,
+      "log": "final-archive_restore.log"
+    },
+    {
+      "shard": "archive_media",
+      "command": "PLATTER_VERIFY_SHARD=archive_media pnpm verify:app",
+      "started_at": "2026-11-08T20:43:11.631482+00:00",
+      "elapsed_seconds": 392.2,
+      "exit_code": 0,
+      "log": "final-archive_media.log"
+    }
+  ]
+}

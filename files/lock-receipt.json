@@ -1,0 +1,13 @@
+{
+  "lock": "node scripts/edition-authoring/cli.mjs lock",
+  "check": "node scripts/edition-authoring/cli.mjs check",
+  "result": "passed",
+  "changed_entries": [
+    ".github/workflows/verify.yml",
+    "scripts/verification/run.mjs"
+  ],
+  "head": "5aa43601ddc3b37c5924638860ea41a6173148c8",
+  "checked_with_node": "22.20.0",
+  "base": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+  "checked_after_final_main_merge": true
+}

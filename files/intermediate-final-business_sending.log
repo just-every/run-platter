@@ -1,0 +1,273 @@
+
+> @proposals/platter@0.1.0 verify:app /workspace/run-platter
+> node scripts/verification/run.mjs
+
+TAP version 13
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: tests/demo.test.mjs
+ok 1 - tests/demo.test.mjs
+  ---
+  duration_ms: 1210.207502
+  type: 'test'
+  ...
+1..0
+# Subtest: tests/demo.test.mjs
+ok 1 - tests/demo.test.mjs
+  ---
+  duration_ms: 1263.426486
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: SEND-006 invitation, fresh link and negotiated send deliver edited text and retain exact link-free history atomically
+ok 2 - SEND-006 invitation, fresh link and negotiated send deliver edited text and retain exact link-free history atomically
+  ---
+  duration_ms: 4959.898522
+  type: 'test'
+  ...
+# Subtest: SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash
+ok 2 - SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash
+  ---
+  duration_ms: 9054.537252
+  type: 'test'
+  ...
+# Subtest: SEND-006 / SEND-002 / SEND-012 signed provider delivery, durable sender notice and actionable address correction
+ok 3 - SEND-006 / SEND-002 / SEND-012 signed provider delivery, durable sender notice and actionable address correction
+  ---
+  duration_ms: 6923.72765
+  type: 'test'
+  ...
+# Subtest: SEND-002 / SEND-012 SendGrid signed correlation, queued state, uncertainty and logged dismissal
+ok 4 - SEND-002 / SEND-012 SendGrid signed correlation, queued state, uncertainty and logged dismissal
+  ---
+  duration_ms: 10820.939769
+  type: 'test'
+  ...
+# Subtest: SEND-001 / SEND-011 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail
+ok 5 - SEND-001 / SEND-011 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail
+  ---
+  duration_ms: 15710.702017
+  type: 'test'
+  ...
+# Subtest: SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports
+ok 3 - SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports
+  ---
+  duration_ms: 34357.513816
+  type: 'test'
+  ...
+# Subtest: SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient quiet hours, caps and terminal decisions without retrying uncertain sends
+ok 6 - SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient quiet hours, caps and terminal decisions without retrying uncertain sends
+  ---
+  duration_ms: 7662.07515
+  type: 'test'
+  ...
+# Error: D1_ERROR: Synthetic interrupted receipt write: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_TRIGGER)
+#     at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:188:19)
+#     at async cloudflare-internal:d1-api:137:19
+#     ... 3 lines matching cause stack trace ...
+#     at async Object.fetch (file:///workspace/run-platter/script-0.mjs:128966:47) {
+#   [cause]: Error: Synthetic interrupted receipt write: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_TRIGGER)
+#       at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:189:24)
+#       at async cloudflare-internal:d1-api:137:19
+#       at async dispatchMail (file:///workspace/run-platter/script-0.mjs:125705:7)
+#       at async clientCollection (file:///workspace/run-platter/script-0.mjs:12753:5)
+#       at async platterResponse (file:///workspace/run-platter/script-0.mjs:128649:128)
+#       at async Object.fetch (file:///workspace/run-platter/script-0.mjs:128966:47)
+# }
+# Subtest: SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh
+ok 7 - SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh
+  ---
+  duration_ms: 5394.695853
+  type: 'test'
+  ...
+# Subtest: SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP preserve independent email reminders
+ok 8 - SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP preserve independent email reminders
+  ---
+  duration_ms: 17050.38438
+  type: 'test'
+  ...
+# Subtest: PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete, uncertain or interrupted mail without replay
+ok 4 - PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete, uncertain or interrupted mail without replay
+  ---
+  duration_ms: 29504.499177
+  type: 'test'
+  ...
+# Subtest: SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically cancels queued texts without duplicate transport
+ok 9 - SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically cancels queued texts without duplicate transport
+  ---
+  duration_ms: 5135.228091
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes cannot replay sending authority
+ok 10 - SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes cannot replay sending authority
+  ---
+  duration_ms: 7573.492701
+  type: 'test'
+  ...
+# Subtest: SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links
+ok 11 - SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links
+  ---
+  duration_ms: 5413.298241
+  type: 'test'
+  ...
+# Subtest: SIGN-001 complete verified-mailbox acceptance journey
+ok 5 - SIGN-001 complete verified-mailbox acceptance journey
+  ---
+  duration_ms: 15921.699987
+  type: 'test'
+  ...
+# Subtest: SEND-005 personal notification revocation and lost proposal scope suppress queued and future sends
+ok 12 - SEND-005 personal notification revocation and lost proposal scope suppress queued and future sends
+  ---
+  duration_ms: 3628.962353
+  type: 'test'
+  ...
+# Subtest: SEND-007 unsigned replacement preserves the frozen offer, revokes old authority and retains certificate custody through races
+ok 13 - SEND-007 unsigned replacement preserves the frozen offer, revokes old authority and retains certificate custody through races
+  ---
+  duration_ms: 5751.253474
+  type: 'test'
+  ...
+# Subtest: SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by upload, distinct from e-signature, then exports the deposit
+ok 6 - SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by upload, distinct from e-signature, then exports the deposit
+  ---
+  duration_ms: 5723.121427
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: TEAM-004 current person, agent, invitation, signature, native, import and invoice actions have searchable/exportable actors and times
+ok 14 - TEAM-004 current person, agent, invitation, signature, native, import and invoice actions have searchable/exportable actors and times
+  ---
+  duration_ms: 5001.569062
+  type: 'test'
+  ...
+# Subtest: SIGN-004 sequential and parallel recipient groups complete only after every signature
+ok 7 - SIGN-004 sequential and parallel recipient groups complete only after every signature
+  ---
+  duration_ms: 12968.940336
+  type: 'test'
+  ...
+# Subtest: SEND-004 / SEND-013 / TEAM-004 calendar expiry warns unsigned only, supports same-link reopening and reissue, and never expires accepted agreements
+ok 15 - SEND-004 / SEND-013 / TEAM-004 calendar expiry warns unsigned only, supports same-link reopening and reissue, and never expires accepted agreements
+  ---
+  duration_ms: 11018.406795
+  type: 'test'
+  ...
+# Subtest: SEND-010 / SEND-015 / FOLLOW-009 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval
+ok 16 - SEND-010 / SEND-015 / FOLLOW-009 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval
+  ---
+  duration_ms: 7754.001817
+  type: 'test'
+  ...
+# Subtest: SEND-014 self-test mail uses only the active sign-in address, previews an unsent revision and atomically limits daily rehearsals without sending an offer
+ok 17 - SEND-014 self-test mail uses only the active sign-in address, previews an unsent revision and atomically limits daily rehearsals without sending an offer
+  ---
+  duration_ms: 4984.414958
+  type: 'test'
+  ...
+# Subtest: PAY-007 received offline money reconciles frozen dated milestones once and refuses unsafe allocations without writes
+ok 8 - PAY-007 received offline money reconciles frozen dated milestones once and refuses unsafe allocations without writes
+  ---
+  duration_ms: 43755.168066
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 155441.050939
+# Subtest: TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP
+ok 18 - TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP
+  ---
+  duration_ms: 121224.667783
+  type: 'test'
+  ...
+# Subtest: TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions and templates, and stay out of sales/client data and public PDFs
+ok 19 - TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions and templates, and stay out of sales/client data and public PDFs
+  ---
+  duration_ms: 7162.357585
+  type: 'test'
+  ...
+# Subtest: TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens
+ok 20 - TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens
+  ---
+  duration_ms: 5342.019941
+  type: 'test'
+  ...
+# Subtest: TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund
+ok 21 - TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund
+  ---
+  duration_ms: 13241.495836
+  type: 'test'
+  ...
+# Subtest: TEAM-007 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content
+ok 22 - TEAM-007 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content
+  ---
+  duration_ms: 6860.974865
+  type: 'test'
+  ...
+# Subtest: TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval
+ok 23 - TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval
+  ---
+  duration_ms: 4544.716875
+  type: 'test'
+  ...
+# Subtest: TEAM-006 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses
+ok 24 - TEAM-006 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses
+  ---
+  duration_ms: 3943.202489
+  type: 'test'
+  ...
+# Subtest: TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices and private costs stay frozen in proposals
+ok 25 - TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices and private costs stay frozen in proposals
+  ---
+  duration_ms: 11584.001378
+  type: 'test'
+  ...
+# Subtest: TEAM-001 / PAY-006 dispute responses enforce financial roles, exact deposit binding, deadlines and consent, retaining the exact idempotent Stripe evidence
+ok 26 - TEAM-001 / PAY-006 dispute responses enforce financial roles, exact deposit binding, deadlines and consent, retaining the exact idempotent Stripe evidence
+  ---
+  duration_ms: 14097.255359
+  type: 'test'
+  ...
+# Subtest: TEAM-001 / APPROVE-003 native admins remain eligible named approvers and settings audit records identify the actual person or workspace
+ok 27 - TEAM-001 / APPROVE-003 native admins remain eligible named approvers and settings audit records identify the actual person or workspace
+  ---
+  duration_ms: 3678.450723
+  type: 'test'
+  ...
+# Subtest: TEAM-001 / PRICE-006 optional and flat-package costs produce exact selected totals while verified client JSON, pages and PDFs exclude private state
+ok 28 - TEAM-001 / PRICE-006 optional and flat-package costs produce exact selected totals while verified client JSON, pages and PDFs exclude private state
+  ---
+  duration_ms: 4424.656725
+  type: 'test'
+  ...
+# Subtest: TEAM-001 upgrading a pre-role database keeps former members as sales without inferring historical ownership
+ok 29 - TEAM-001 upgrading a pre-role database keeps former members as sales without inferring historical ownership
+  ---
+  duration_ms: 2800.538486
+  type: 'test'
+  ...
+# Subtest: SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP
+ok 30 - SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP
+  ---
+  duration_ms: 8966.871177
+  type: 'test'
+  ...
+1..30
+# tests 30
+# suites 0
+# pass 30
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 336877.712317

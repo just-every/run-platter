@@ -1,0 +1,23 @@
+{
+  "head": "e3914e429b4b0725ebb0c518f050713e2f7e1a52",
+  "node": "v22.20.0",
+  "worktree_clean_at_start": true,
+  "checks": [
+    {
+      "shard": "business_authoring",
+      "command": "PLATTER_VERIFY_SHARD=business_authoring pnpm verify:app",
+      "started_at": "2026-11-08T20:22:32.972250+00:00",
+      "elapsed_seconds": 328.245,
+      "exit_code": 0,
+      "log": "intermediate-final-business_authoring.log"
+    },
+    {
+      "shard": "business_sending",
+      "command": "PLATTER_VERIFY_SHARD=business_sending pnpm verify:app",
+      "started_at": "2026-11-08T20:28:01.221582+00:00",
+      "elapsed_seconds": 337.212,
+      "exit_code": 0,
+      "log": "intermediate-final-business_sending.log"
+    }
+  ]
+}

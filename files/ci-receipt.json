@@ -1,0 +1,10 @@
+{
+  "name": "Verify",
+  "head_sha": "5aa43601ddc3b37c5924638860ea41a6173148c8",
+  "status": "not queried",
+  "conclusion": null,
+  "reason": "Ten-invocation GitHub budget exhausted before follow-up push; no exact-SHA green claim. Fleet must discover and verify the final run.",
+  "prior_verified_run_id": 42517570284,
+  "prior_verified_head": "ca0e2a18b2751698553e056eae9334355fcb5c80",
+  "prior_conclusion": "success"
+}

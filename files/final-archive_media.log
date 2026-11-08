@@ -1,0 +1,197 @@
+
+> @proposals/platter@0.1.0 verify:app /workspace/run-platter
+> node scripts/verification/run.mjs
+
+TAP version 13
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/demo.test.mjs
+ok 1 - tests/demo.test.mjs
+  ---
+  duration_ms: 1023.359353
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Archive schema template completed in 34214 ms (118 migrations; ledger preflight passed)
+# Subtest: COLLAB-002 scoped colleagues comment, receive consented generic email and chat, resolve and assign without exposing internal threads to clients
+ok 2 - COLLAB-002 scoped colleagues comment, receive consented generic email and chat, resolve and assign without exposing internal threads to clients
+  ---
+  duration_ms: 35029.196557
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/platter.test.mjs
+ok 3 - tests/platter.test.mjs
+  ---
+  duration_ms: 1429.565535
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 38575.205255
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/demo.test.mjs
+ok 1 - tests/demo.test.mjs
+  ---
+  duration_ms: 1056.4177
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: MAIL-001 local proposal and verification mail are captured without provider contact
+ok 2 - MAIL-001 local proposal and verification mail are captured without provider contact
+  ---
+  duration_ms: 3508.183723
+  type: 'test'
+  ...
+# Subtest: MAIL-001 Managed relay sends proposal invitations and verification codes through its assigned endpoint
+ok 3 - MAIL-001 Managed relay sends proposal invitations and verification codes through its assigned endpoint
+  ---
+  duration_ms: 2804.318983
+  type: 'test'
+  ...
+# Subtest: MAIL-001 hosted mail commits and claims before provider acceptance; timeout is uncertain and never resent
+ok 4 - MAIL-001 hosted mail commits and claims before provider acceptance; timeout is uncertain and never resent
+  ---
+  duration_ms: 18327.820259
+  type: 'test'
+  ...
+# Archive CLI export completed in 24059 ms
+# Subtest: AUTO-003 signed events reach Slack channels and approval requests reach verified Teams direct chats with session protected links
+ok 5 - AUTO-003 signed events reach Slack channels and approval requests reach verified Teams direct chats with session protected links
+  ---
+  duration_ms: 18437.910152
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: AUTO-004 scoped REST drafting, immutable owner keys and human-only authority
+ok 6 - AUTO-004 scoped REST drafting, immutable owner keys and human-only authority
+  ---
+  duration_ms: 3816.197011
+  type: 'test'
+  ...
+# Subtest: AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation
+ok 7 - AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation
+  ---
+  duration_ms: 5582.249316
+  type: 'test'
+  ...
+# Subtest: AUTO-004 published route reference matches live methods and webhook schemas both ways
+ok 8 - AUTO-004 published route reference matches live methods and webhook schemas both ways
+  ---
+  duration_ms: 3913.057921
+  type: 'test'
+  ...
+# Subtest: AUTO-004 terminal proposal projections
+    # Subtest: scoped status and analytics distinguish withdrawn and expired offers from live offers
+    ok 1 - scoped status and analytics distinguish withdrawn and expired offers from live offers
+      ---
+      duration_ms: 3429.976682
+      type: 'test'
+      ...
+    1..1
+ok 9 - AUTO-004 terminal proposal projections
+  ---
+  duration_ms: 3430.378914
+  type: 'suite'
+  ...
+# Archive CLI import completed in 36329 ms
+# Subtest: AUTO-004 negotiated lifecycle delivery
+    # Subtest: receiver gets revised and approved events for each negotiated revision before it is sent
+    ok 1 - receiver gets revised and approved events for each negotiated revision before it is sent
+      ---
+      duration_ms: 2874.140888
+      type: 'test'
+      ...
+    1..1
+ok 10 - AUTO-004 negotiated lifecycle delivery
+  ---
+  duration_ms: 2874.400901
+  type: 'suite'
+  ...
+# Subtest: SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority
+ok 1 - SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority
+  ---
+  duration_ms: 104862.741539
+  type: 'test'
+  ...
+# Subtest: AUTO-004 complete lifecycle receiver coverage
+    # Subtest: receiver obtains all ten lifecycle types including every terminal outcome
+    ok 1 - receiver obtains all ten lifecycle types including every terminal outcome
+      ---
+      duration_ms: 3532.69726
+      type: 'test'
+      ...
+    1..1
+ok 11 - AUTO-004 complete lifecycle receiver coverage
+  ---
+  duration_ms: 3532.884505
+  type: 'suite'
+  ...
+# Subtest: AUTO-004 independently documented authority
+    # Subtest: each published method and route declares its independently expected scope
+    ok 1 - each published method and route declares its independently expected scope
+      ---
+      duration_ms: 2510.639378
+      type: 'test'
+      ...
+    1..1
+ok 12 - AUTO-004 independently documented authority
+  ---
+  duration_ms: 2510.906073
+  type: 'suite'
+  ...
+1..12
+# tests 12
+# suites 4
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 72234.384278
+# Archive CLI export completed in 29980 ms
+# Archive CLI import completed in 46346 ms
+# Archive team timing {"sourceSchema":353,"sourceFixture":19059,"export":29980,"import":46346,"restoreAssertions":4973,"cleanup":34,"total":100745}
+# Subtest: TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items
+ok 2 - TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items
+  ---
+  duration_ms: 100747.671312
+  type: 'test'
+  ...
+# Archive CLI export completed in 27327 ms
+# Archive CLI import completed in 40657 ms
+# Subtest: APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority
+ok 3 - APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority
+  ---
+  duration_ms: 80845.797619
+  type: 'test'
+  ...
+# Archive CLI export completed in 27232 ms
+# Archive CLI import completed in 41236 ms
+# PROBE AGENT-007 custody: public CLI export and import -> exact result, decision references and source digest retained; old credentials refused; no apply authority
+# Subtest: EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority
+ok 4 - EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority
+  ---
+  duration_ms: 104020.600077
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 391915.318017

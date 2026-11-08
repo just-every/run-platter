@@ -1,0 +1,4 @@
+
+> @proposals/platter@0.1.0 typecheck /workspace/run-platter
+> tsc --build --incremental
+

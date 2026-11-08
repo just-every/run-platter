@@ -1,0 +1,123 @@
+ WARN  Unsupported engine: wanted: {"node":"22.20.0"} (current: {"node":"v24.19.0","pnpm":"10.12.4"})
+
+> @proposals/platter@0.1.0 verify:app /workspace/run-platter
+> node scripts/verification/run.mjs
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ tests/demo.test.mjs (874.940111ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ EDIT-017 Spanish invitation and mailbox code retain authored mail and consume localized code transport (5868.210378ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ EDIT-017 mailbox languages preserve authority, verification limits, authored content and actual certificate language (11726.036863ms)
+Warning: Indexing all PDF objects
+Warning: Indexing all PDF objects
+Warning: Indexing all PDF objects
+Warning: Indexing all PDF objects
+Warning: Indexing all PDF objects
+Warning: Indexing all PDF objects
+✔ EDIT-010 / TEAM-004 defaults and arbitrary files freeze with approval, download exact bytes and remain in the signed package after replacement (4733.43947ms)
+✔ EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and every page marked; disabling refuses download without a write (4803.864534ms)
+Warning: Indexing all PDF objects
+✔ EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state (8652.293163ms)
+✔ EDIT-009 conditional sections match selected preview, client, PDF and immutable agreement; revisions, copies and negotiations retain rules (8503.232973ms)
+✔ PRICE-001 / COLLAB-003 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / PROP-001 / TEAM-004 tables recompute twelve grouped lines, preserve every carrier and refuse malformed prices and quantities (4771.561198ms)
+✔ PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-002 arbitrary packages and bounded optional quantities share server totals and immutable selection (14416.327478ms)
+✔ PRICE-002 / SIGN-008 / TEAM-004 signed-upload selections use sent prices, refuse invalid quantities without writes, and freeze the exact agreement and invoice (4863.341083ms)
+✔ PRICE-004 scoped discounts preserve exact selections, private margins, templates and public PDF and JSON custody (7428.124526ms)
+✔ EDIT-001 document revisions preserve ordered blocks and brand through preview, restore, copies, templates, negotiation and exact client PDF (5529.374737ms)
+✔ EDIT-001 block saves enforce live proposal scope, stale versions, content bounds, safe brand values and locked terms (3176.738025ms)
+✔ EDIT-001 display media requires consent and live edit scope, stays private until placed and keeps exact bytes through copies and templates (8509.26245ms)
+✔ EDIT-001 Client-assigned required fields and typed signature blocks validate at signing and freeze exact values with the selected agreement (4783.200352ms)
+✔ EDIT-001 new sections inherit verified questions and opt-in tracked edits without changing the sent document or bypassing review (3448.10369ms)
+✔ EDIT-011 server-confirmed quantity edits retain document content, clear approval and enforce bounds, scope and exact version (3057.784873ms)
+✔ EDIT-003 linked draft copies propagate atomically while detached, sent and accepted copies retain exact content (20254.233243ms)
+✔ EDIT-003 insertion enforces live role, folder and proposal scope, consent, stale versions and locked terms without writes (5066.946303ms)
+✔ PRICE-003 recurring fees keep exact schedules, first-year queue value and immutable selected documents (10639.499289ms)
+✔ EDIT-004 linked deal variables refuse missing values, freeze the sent revision and refill destination copies (6016.281896ms)
+✔ EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections (4254.929891ms)
+✔ EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing (4441.17918ms)
+✔ EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order (2764.630553ms)
+✔ PRICE-005 owner tax follows selected quantities and discounts, freezes rates and refuses unsafe writes (7996.714065ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 168830.318422
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ tests/demo.test.mjs (844.039323ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ tests/mail.test.mjs (919.787408ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership (93507.53283ms)
+✔ FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures (12077.594829ms)
+✔ FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval (33258.424941ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 141979.024309
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ tests/demo.test.mjs (952.213951ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy (3632.354757ms)
+✔ APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once (10905.746303ms)
+✔ APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests (5478.070781ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied (27334.831514ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 50812.61541
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ tests/demo.test.mjs (942.666908ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ FOLLOW-004 verified client questions, native answers and one-use authenticated owner email replies (4164.343389ms)
+✔ FOLLOW-008 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap (3837.220644ms)
+✔ FOLLOW-001 / FOLLOW-006 / FOLLOW-011 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority (11815.38667ms)
+✔ FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority (5439.34489ms)
+✔ FOLLOW-003 sender expiry notices create dated follow-ups independently of signer warnings and follow extensions, workspace defaults and terminal states (25028.327627ms)
+✔ FOLLOW-003 saved settings stay inactive and queued expiry email rechecks revocation, settings, sender demotion and revision authority (4874.957455ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal (22342.263988ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 80590.604893

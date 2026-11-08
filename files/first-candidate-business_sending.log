@@ -1,0 +1,90 @@
+ WARN  Unsupported engine: wanted: {"node":"22.20.0"} (current: {"node":"v24.19.0","pnpm":"10.12.4"})
+
+> @proposals/platter@0.1.0 verify:app /workspace/run-platter
+> node scripts/verification/run.mjs
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ tests/demo.test.mjs (919.155523ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ SEND-006 invitation, fresh link and negotiated send deliver edited text and retain exact link-free history atomically (3834.017187ms)
+✔ SEND-006 / SEND-002 / SEND-012 signed provider delivery, durable sender notice and actionable address correction (5505.563991ms)
+✔ SEND-002 / SEND-012 SendGrid signed correlation, queued state, uncertainty and logged dismissal (8275.201029ms)
+✔ SEND-001 / SEND-011 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail (14430.289252ms)
+✔ SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient quiet hours, caps and terminal decisions without retrying uncertain sends (7172.720811ms)
+✔ SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh (4455.542895ms)
+✔ SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP preserve independent email reminders (12501.877465ms)
+✔ SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically cancels queued texts without duplicate transport (4611.466786ms)
+✔ SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes cannot replay sending authority (5833.86345ms)
+✔ SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links (4216.835429ms)
+✔ SEND-005 personal notification revocation and lost proposal scope suppress queued and future sends (2443.163548ms)
+✔ SEND-007 unsigned replacement preserves the frozen offer, revokes old authority and retains certificate custody through races (4540.929167ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ TEAM-004 current person, agent, invitation, signature, native, import and invoice actions have searchable/exportable actors and times (3992.478363ms)
+✔ SEND-004 / SEND-013 / TEAM-004 calendar expiry warns unsigned only, supports same-link reopening and reissue, and never expires accepted agreements (10197.627907ms)
+✔ SEND-010 / SEND-015 / FOLLOW-009 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval (7887.312057ms)
+✔ SEND-014 self-test mail uses only the active sign-in address, previews an unsent revision and atomically limits daily rehearsals without sending an offer (4847.8254ms)
+✔ TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP (122793.302807ms)
+✔ TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions and templates, and stay out of sales/client data and public PDFs (6611.277331ms)
+✔ TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens (5395.103818ms)
+✔ TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund (13500.504711ms)
+✔ TEAM-007 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content (6583.407127ms)
+✔ TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval (4546.614732ms)
+✔ TEAM-006 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses (3910.719493ms)
+✔ TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices and private costs stay frozen in proposals (11216.761143ms)
+✔ TEAM-001 / PAY-006 dispute responses enforce financial roles, exact deposit binding, deadlines and consent, retaining the exact idempotent Stripe evidence (14001.330042ms)
+✔ TEAM-001 / APPROVE-003 native admins remain eligible named approvers and settings audit records identify the actual person or workspace (3458.914977ms)
+✔ TEAM-001 / PRICE-006 optional and flat-package costs produce exact selected totals while verified client JSON, pages and PDFs exclude private state (4255.759608ms)
+✔ TEAM-001 upgrading a pre-role database keeps former members as sales without inferring historical ownership (2622.583875ms)
+✔ SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP (8444.301748ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 315208.4174
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ tests/demo.test.mjs (855.9185ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash (7210.480514ms)
+✔ SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports (28062.02178ms)
+Error: D1_ERROR: Synthetic interrupted receipt write: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_TRIGGER)
+    at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:188:19)
+    at async cloudflare-internal:d1-api:137:19
+    ... 3 lines matching cause stack trace ...
+    at async Object.fetch (file:///workspace/run-platter/script-0.mjs:128966:47) {
+  [cause]: Error: Synthetic interrupted receipt write: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_TRIGGER)
+      at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:189:24)
+      at async cloudflare-internal:d1-api:137:19
+      at async dispatchMail (file:///workspace/run-platter/script-0.mjs:125705:7)
+      at async clientCollection (file:///workspace/run-platter/script-0.mjs:12753:5)
+      at async platterResponse (file:///workspace/run-platter/script-0.mjs:128649:128)
+      at async Object.fetch (file:///workspace/run-platter/script-0.mjs:128966:47)
+}
+✔ PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete, uncertain or interrupted mail without replay (22990.538626ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ SIGN-001 complete verified-mailbox acceptance journey (13836.935673ms)
+✔ SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by upload, distinct from e-signature, then exports the deposit (4852.734432ms)
+✔ SIGN-004 sequential and parallel recipient groups complete only after every signature (11326.383082ms)
+✔ PAY-007 received offline money reconciles frozen dated milestones once and refuses unsafe allocations without writes (37349.228335ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 128646.589009

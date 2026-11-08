@@ -1,0 +1,82 @@
+{
+  "before": {
+    "runtime": [
+      "PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^AUTO-002\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "browser_documents": [
+      "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 --test-name-pattern='^(EDIT|COLLAB|CAT)-' tests/site.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='bounce follow-ups' --test-skip-pattern='public CLI preserves business|first-release AUD' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^APPROVE-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "browser_commercial": [
+      "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 --test-skip-pattern='^(EDIT|COLLAB|CAT)-' tests/site.test.mjs"
+    ],
+    "business_authoring": [
+      "node --test --test-concurrency=1 --test-name-pattern='^(EDIT|PRICE|TEAM|SEND)-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^FOLLOW-005\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "business_lifecycle": [
+      "node --test --test-concurrency=1 --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE|TEAM|SEND)-|^COLLAB-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "archive_custody": [
+      "node --test --test-concurrency=1 --test-name-pattern='public CLI preserves business' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-012\\b' --test-skip-pattern='^EDIT-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='first-release AUD' --test-skip-pattern='public CLI preserves business' tests/archive.test.mjs"
+    ],
+    "archive_restore": [
+      "node --test --test-concurrency=1 --test-name-pattern='PORT-001 public CLI refuses|imported business|document archive history' --test-skip-pattern='public CLI preserves business|first-release AUD|bounce follow-ups' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-016\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^AGENT-007\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "archive_media": [
+      "node --test --test-concurrency=1 --test-skip-pattern='public CLI preserves business|first-release AUD|bounce follow-ups|PORT-001 public CLI refuses|imported business|document archive history' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^COLLAB-002\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE|TEAM|SEND)-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ]
+  },
+  "after": {
+    "runtime": [
+      "PLATTER_BROWSER_SHARD=lifecycle node --test --test-concurrency=1 tests/site.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^AUTO-002\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^TRACK-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE)-|^(TEAM|SEND)-|^COLLAB-002\\b|^FOLLOW-|^(SIGN|PAY)-|^MIG-|^ACCT-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "browser_documents": [
+      "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 --test-name-pattern='^(EDIT|COLLAB|CAT)-' tests/site.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='bounce follow-ups' --test-skip-pattern='public CLI preserves business|first-release AUD' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^MIG-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE)-|^(TEAM|SEND)-|^COLLAB-002\\b|^FOLLOW-|^(SIGN|PAY)-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "browser_commercial": [
+      "PLATTER_BROWSER_SHARD=documents node --test --test-concurrency=1 --test-skip-pattern='^(EDIT|COLLAB|CAT)-' tests/site.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^ACCT-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE)-|^(TEAM|SEND)-|^COLLAB-002\\b|^FOLLOW-|^(SIGN|PAY)-|^MIG-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "business_authoring": [
+      "node --test --test-concurrency=1 --test-name-pattern='^(EDIT|PRICE)-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^FOLLOW-005\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^APPROVE-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^FOLLOW-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE)-|^(TEAM|SEND)-|^COLLAB-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "business_sending": [
+      "node --test --test-concurrency=1 --test-name-pattern='^(TEAM|SEND)-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE)-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^(SIGN|PAY)-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE)-|^(TEAM|SEND)-|^COLLAB-002\\b|^FOLLOW-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "archive_custody": [
+      "node --test --test-concurrency=1 --test-name-pattern='public CLI preserves business' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-012\\b' --test-skip-pattern='^EDIT-002\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='first-release AUD' --test-skip-pattern='public CLI preserves business' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^AGENT-007\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^CRM-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE)-|^(TEAM|SEND)-|^COLLAB-002\\b|^FOLLOW-|^(SIGN|PAY)-|^MIG-|^ACCT-|^TRACK-|^(AUTO|MAIL)-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE)-|^(TEAM|SEND)-|^COLLAB-002\\b|^FOLLOW-|^(SIGN|PAY)-|^MIG-|^ACCT-|^TRACK-|^(AUTO|MAIL)-|^CRM-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "archive_restore": [
+      "node --test --test-concurrency=1 --test-name-pattern='PORT-001 public CLI refuses|imported business|document archive history' --test-skip-pattern='public CLI preserves business|first-release AUD|bounce follow-ups' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^EDIT-016\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ],
+    "archive_media": [
+      "node --test --test-concurrency=1 --test-skip-pattern='public CLI preserves business|first-release AUD|bounce follow-ups|PORT-001 public CLI refuses|imported business|document archive history' tests/archive.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^COLLAB-002\\b' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE)-|^(TEAM|SEND)-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs",
+      "node --test --test-concurrency=1 --test-name-pattern='^(AUTO|MAIL)-' --test-skip-pattern='^EDIT-002\\b|^EDIT-012\\b|^EDIT-016\\b|^FOLLOW-005\\b|^AUTO-002\\b|^APPROVE-|^AGENT-007\\b|^(EDIT|PRICE)-|^(TEAM|SEND)-|^COLLAB-002\\b|^FOLLOW-|^(SIGN|PAY)-|^MIG-|^ACCT-|^TRACK-' tests/platter.test.mjs tests/demo.test.mjs tests/mail.test.mjs"
+    ]
+  }
+}

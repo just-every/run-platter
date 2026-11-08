@@ -1,0 +1,2886 @@
+[
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "SITE-001 built homepage opens run instructions, Markdown docs work without JavaScript, installed root remains the Lobby",
+    "seconds": 8.148377759,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "PRICE-008 legacy AUD agreement and new USD owner/client screens show exact currency at desktop and phone widths",
+    "seconds": 14.346510272,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "NEG-001 desktop and phone negotiate, approve, send and accept the changed offer with client comparison",
+    "seconds": 19.425330692,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "EDIT-016 / REPORT-001 desktop and phone pipeline filters, value sort, totals and clear filters use recorded proposal data",
+    "seconds": 22.49652653,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "TEAM-004 owner searches audit actions and downloads the same filtered activity at desktop and phone widths",
+    "seconds": 9.006488406,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "AI-003 desktop and phone owners review MCP requests, approve/send explicitly, and dismiss stale requests",
+    "seconds": 13.320289645,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "NEG-002 desktop and phone client suggests two terms edits; firm accepts one, rejects one and sends revision two",
+    "seconds": 16.448392586999997,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "SEND-002 desktop and phone show provider delivery and preserve bounce notice until explicit correction",
+    "seconds": 15.578238005,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "SIGN-008 desktop and phone record a client-signed copy as accepted by upload and export its deposit",
+    "seconds": 11.255937791000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "REPORT-005 / REPORT-006 desktop and phone export the filtered pipeline CSV and schedule weekly email in the installation time zone",
+    "seconds": 11.748209897,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "SEND-004 expired offer requests reopening and owner extends same links at desktop and phone",
+    "seconds": 16.085608379,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "MOB-001 / FOLLOW-004 invited client asks exact sent sections; owner queue answers and agreement retains threads on desktop and phone",
+    "seconds": 17.561115589,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision",
+    "seconds": 25.405544711999998,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting",
+    "seconds": 140.243443609,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "SEND-006 desktop and phone rehearse to self, then edit invitations, fresh links and negotiated sends with exact retained history",
+    "seconds": 17.014464724,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "FOLLOW-001 / FOLLOW-006 sender controls, template delivery overrides, preview dates, manual email and inactive copies at desktop and phone widths",
+    "seconds": 24.649149777999998,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the compiled client at desktop and phone widths",
+    "seconds": 23.276395350999998,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "SEND-007 desktop and phone replace the unsigned signer, refuse the old link, verify the COO and retain completion history",
+    "seconds": 13.660058477,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "TRACK-001 / TRACK-004 owner consent, private alerts, client disclosure and erasure at desktop and phone widths",
+    "seconds": 24.286980891,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "TRACK-001 and TRACK-004 client disclosure, first-party measurement and private owner controls work at desktop and phone widths",
+    "seconds": 64.798428241,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "AUTO-004 compiled public API reference exposes scoped operations and signed event examples",
+    "seconds": 2.694194998,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "SIGN-004 and SEND-003 owner recipient controls, own-field previews, ordered signing and viewer revocation",
+    "seconds": 17.905178075,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "tests/demo.test.mjs",
+    "seconds": 1.075341729,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "tests/mail.test.mjs",
+    "seconds": 1.0716713039999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "runtime",
+    "name": "AUTO-002 completed agreements archive exact PDFs once under explicit current Drive authority and reconcile uncertain writes without replay",
+    "seconds": 107.5116123,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "MIG-006 desktop and phone review original CSVs, finish imports, read records and journals, and undo",
+    "seconds": 87.130648787,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "PRICE-001 / COLLAB-003 / EDIT-014 / EDIT-018 desktop and phone create grouped line tables, edit and restore, preview, send, download and accept identical server totals",
+    "seconds": 30.490272848,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads",
+    "seconds": 48.361375319,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "MOB-001 / EDIT-002 desktop and phone start all five starters, save, replace and start personal templates, preview and accept independent drafts",
+    "seconds": 85.36816786,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths",
+    "seconds": 167.75990416500002,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "APPROVE-002 email preview and decision links work under a member session at desktop and phone widths",
+    "seconds": 26.250620582,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "APPROVE-002 owner requests, revokes and re-requests approval through native controls and records a noted outcome at desktop and phone widths",
+    "seconds": 12.619763606000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "deposit collection settings, retained signatures, required and due completion at desktop and phone widths",
+    "seconds": 25.840385424,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "PRICE-003 and PRICE-002 recurring line editing, preview, client selection and frozen agreement use the same amounts",
+    "seconds": 8.080870638,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "REPORT-004 booked snapshots and independent receipt periods export and schedule the visible report",
+    "seconds": 15.279215182,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "PRICE-005 native owner-configured tax settings, selected quantities and frozen agreement",
+    "seconds": 13.060120888,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "AUTO-002 Settings authorizes Drive archiving and shows completed and held jobs with safe reconciliation",
+    "seconds": 10.708663361000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "MIG-003 and MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in",
+    "seconds": 31.837124154,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows",
+    "seconds": 10.005049409,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "PAY-007 billing controls record and reconcile two received payments to a frozen milestone",
+    "seconds": 15.699026212000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "CRM-004 Pipedrive and Zoho Settings, reviewed drafts and explicit lifecycle writes through the compiled browser",
+    "seconds": 16.7542985,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "AUTO-003 Settings verifies and authorizes Slack channels and Teams direct approvals, inspects history and revokes consent",
+    "seconds": 6.649393551,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "ACCT-002 Settings reviews the exact deposit and explicitly issues one Xero invoice",
+    "seconds": 6.140517718,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke expiry email without activation on inspection",
+    "seconds": 17.137545863,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_commercial",
+    "name": "AGENT-007 compiled cohort recommendation and source revision inspection",
+    "seconds": 16.045812039,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_custody",
+    "name": "FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences",
+    "seconds": 271.97640584600003,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_custody",
+    "name": "PRICE-005 public CLI preserves business tax rates and frozen agreements without restoring signing authority",
+    "seconds": 108.509121415,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_custody",
+    "name": "tests/demo.test.mjs",
+    "seconds": 0.868226116,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_custody",
+    "name": "tests/mail.test.mjs",
+    "seconds": 0.87698596,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_custody",
+    "name": "EDIT-012 duplicate accepted content into an independent member-owned draft for another client without changing the source",
+    "seconds": 14.085046399000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_custody",
+    "name": "PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores re-exported first-release AUD bytes and new proposals and acceptances use USD without conversion",
+    "seconds": 62.684370807,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_restore",
+    "name": "PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal",
+    "seconds": 207.01116369300001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_restore",
+    "name": "MIG-003, MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody",
+    "seconds": 121.262480352,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_restore",
+    "name": "AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority",
+    "seconds": 111.550107828,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_restore",
+    "name": "PORT-002 / AUTO-002 populated product archive retains exact document archive history, content, money and mappings without execution authority",
+    "seconds": 118.291419492,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_restore",
+    "name": "tests/demo.test.mjs",
+    "seconds": 0.8993981639999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_restore",
+    "name": "tests/mail.test.mjs",
+    "seconds": 0.8889116340000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_restore",
+    "name": "EDIT-016 body phrase search returns exactly three of 500 proposals including an uploaded PDF with live folder permissions",
+    "seconds": 74.676047425,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_restore",
+    "name": "tests/demo.test.mjs",
+    "seconds": 0.9031579329999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_restore",
+    "name": "tests/mail.test.mjs",
+    "seconds": 0.877237734,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_restore",
+    "name": "AGENT-007 owner compares 200 distinct decided proposals at exact revisions without applying template or price changes",
+    "seconds": 46.231736839,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "tests/demo.test.mjs",
+    "seconds": 0.7054661059999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-017 Spanish invitation and mailbox code retain authored mail and consume localized code transport",
+    "seconds": 9.998582889,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-006 invitation, fresh link and negotiated send deliver edited text and retain exact link-free history atomically",
+    "seconds": 3.0399825959999998,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-006 / SEND-002 / SEND-012 signed provider delivery, durable sender notice and actionable address correction",
+    "seconds": 5.740664167,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-002 / SEND-012 SendGrid signed correlation, queued state, uncertainty and logged dismissal",
+    "seconds": 7.119528804,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-001 / SEND-011 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail",
+    "seconds": 15.695850844,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient quiet hours, caps and terminal decisions without retrying uncertain sends",
+    "seconds": 6.860558555,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh",
+    "seconds": 4.283042534,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP preserve independent email reminders",
+    "seconds": 12.258264272,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically cancels queued texts without duplicate transport",
+    "seconds": 4.058475904,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes cannot replay sending authority",
+    "seconds": 5.339057067,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links",
+    "seconds": 3.560075546,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-005 personal notification revocation and lost proposal scope suppress queued and future sends",
+    "seconds": 2.110857258,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-007 unsigned replacement preserves the frozen offer, revokes old authority and retains certificate custody through races",
+    "seconds": 3.8442642670000002,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-017 mailbox languages preserve authority, verification limits, authored content and actual certificate language",
+    "seconds": 10.346645709,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-004 current person, agent, invitation, signature, native, import and invoice actions have searchable/exportable actors and times",
+    "seconds": 2.72698106,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-010 / TEAM-004 defaults and arbitrary files freeze with approval, download exact bytes and remain in the signed package after replacement",
+    "seconds": 4.450606101,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and every page marked; disabling refuses download without a write",
+    "seconds": 4.169090432,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-004 / SEND-013 / TEAM-004 calendar expiry warns unsigned only, supports same-link reopening and reissue, and never expires accepted agreements",
+    "seconds": 8.897052403,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-010 / SEND-015 / FOLLOW-009 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval",
+    "seconds": 6.124807199,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state",
+    "seconds": 7.694865568,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-009 conditional sections match selected preview, client, PDF and immutable agreement; revisions, copies and negotiations retain rules",
+    "seconds": 7.699141493,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "PRICE-001 / COLLAB-003 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / PROP-001 / TEAM-004 tables recompute twelve grouped lines, preserve every carrier and refuse malformed prices and quantities",
+    "seconds": 3.834563802,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-002 arbitrary packages and bounded optional quantities share server totals and immutable selection",
+    "seconds": 12.696729295999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "PRICE-002 / SIGN-008 / TEAM-004 signed-upload selections use sent prices, refuse invalid quantities without writes, and freeze the exact agreement and invoice",
+    "seconds": 4.285864752,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-014 self-test mail uses only the active sign-in address, previews an unsent revision and atomically limits daily rehearsals without sending an offer",
+    "seconds": 3.112390711,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP",
+    "seconds": 98.953037682,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions and templates, and stay out of sales/client data and public PDFs",
+    "seconds": 5.584870314,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens",
+    "seconds": 4.602198472,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund",
+    "seconds": 12.544703114,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-007 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content",
+    "seconds": 5.685575027,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval",
+    "seconds": 3.909759739,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-006 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses",
+    "seconds": 3.0222595350000003,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices and private costs stay frozen in proposals",
+    "seconds": 10.397929261,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / PAY-006 dispute responses enforce financial roles, exact deposit binding, deadlines and consent, retaining the exact idempotent Stripe evidence",
+    "seconds": 12.097249206,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / APPROVE-003 native admins remain eligible named approvers and settings audit records identify the actual person or workspace",
+    "seconds": 2.77821325,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / PRICE-006 optional and flat-package costs produce exact selected totals while verified client JSON, pages and PDFs exclude private state",
+    "seconds": 3.805051074,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "PRICE-004 scoped discounts preserve exact selections, private margins, templates and public PDF and JSON custody",
+    "seconds": 6.319006257,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "TEAM-001 upgrading a pre-role database keeps former members as sales without inferring historical ownership",
+    "seconds": 2.027063321,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-001 document revisions preserve ordered blocks and brand through preview, restore, copies, templates, negotiation and exact client PDF",
+    "seconds": 4.611709531000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-001 block saves enforce live proposal scope, stale versions, content bounds, safe brand values and locked terms",
+    "seconds": 2.468460927,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-001 display media requires consent and live edit scope, stays private until placed and keeps exact bytes through copies and templates",
+    "seconds": 6.355489307,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-001 Client-assigned required fields and typed signature blocks validate at signing and freeze exact values with the selected agreement",
+    "seconds": 2.64185354,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-001 new sections inherit verified questions and opt-in tracked edits without changing the sent document or bypassing review",
+    "seconds": 2.236665174,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-011 server-confirmed quantity edits retain document content, clear approval and enforce bounds, scope and exact version",
+    "seconds": 1.952912501,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-003 linked draft copies propagate atomically while detached, sent and accepted copies retain exact content",
+    "seconds": 16.328337383,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-003 insertion enforces live role, folder and proposal scope, consent, stale versions and locked terms without writes",
+    "seconds": 4.278770907,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "PRICE-003 recurring fees keep exact schedules, first-year queue value and immutable selected documents",
+    "seconds": 9.522357237,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP",
+    "seconds": 7.686942890999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-004 linked deal variables refuse missing values, freeze the sent revision and refill destination copies",
+    "seconds": 5.4883148,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections",
+    "seconds": 3.4945600530000003,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing",
+    "seconds": 3.544381893,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order",
+    "seconds": 1.877953612,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "PRICE-005 owner tax follows selected quantities and discounts, freezes rates and refuses unsafe writes",
+    "seconds": 7.207729929,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "tests/demo.test.mjs",
+    "seconds": 0.713639425,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "tests/mail.test.mjs",
+    "seconds": 0.67864639,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership",
+    "seconds": 82.994049061,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures",
+    "seconds": 10.960238756,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_authoring",
+    "name": "FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval",
+    "seconds": 32.231814379,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "the demo opens on a lived-in studio and a send completes as mocked success",
+    "seconds": 3.784526406,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "hosting preflight refuses incomplete account access before any build or deployment",
+    "seconds": 1.086730825,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-004 verified client questions, native answers and one-use authenticated owner email replies",
+    "seconds": 8.09831502,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "client questions are limited per invitation, and a refused question stores nothing and mails no one",
+    "seconds": 3.204859792,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "MAIL-001 local proposal and verification mail are captured without provider contact",
+    "seconds": 2.364727517,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "MAIL-001 Managed relay sends proposal invitations and verification codes through its assigned endpoint",
+    "seconds": 2.383866774,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "MAIL-001 hosted mail commits and claims before provider acceptance; timeout is uncertain and never resent",
+    "seconds": 18.085135146,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-008 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap",
+    "seconds": 4.191679575,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-001 / FOLLOW-006 / FOLLOW-011 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority",
+    "seconds": 14.190080404,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority",
+    "seconds": 4.792583982,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "AUTO-003 signed events reach Slack channels and approval requests reach verified Teams direct chats with session protected links",
+    "seconds": 15.538731905,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-003 sender expiry notices create dated follow-ups independently of signer warnings and follow extensions, workspace defaults and terminal states",
+    "seconds": 21.642723765,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-003 saved settings stay inactive and queued expiry email rechecks revocation, settings, sender demotion and revision authority",
+    "seconds": 4.493644285,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash",
+    "seconds": 5.718152706,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports",
+    "seconds": 22.960069878,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete, uncertain or interrupted mail without replay",
+    "seconds": 17.478585481,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "HTTP-001 complete authorized domain dispatch journey and native auth, CSRF, roles and revocable agent boundary",
+    "seconds": 3.555734386,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations invalidate old authority",
+    "seconds": 2.550018995,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "email verification precedes acceptance, code is single-use, immutable option and deposit exported once",
+    "seconds": 2.022529668,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "SIGN-001 complete verified-mailbox acceptance journey",
+    "seconds": 13.067441207,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "money rejects malformed or unsafe prices and cannot export an unaccepted proposal",
+    "seconds": 1.583386156,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "Client CSV dry run, fingerprint custody, journal, replay and undo through HTTP",
+    "seconds": 2.208692848,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "import undo preserves clients with dependent proposals; owner erasure fences unused client",
+    "seconds": 2.341504585,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "COLLAB-003 every saved revision has an author/time, comparisons highlight changes, restore creates unapproved revision four",
+    "seconds": 2.395878932,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "NEG-001 negotiated offer requires exact approval, preserves the live offer until send, compares changes and accepts revision two",
+    "seconds": 3.09546635,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund",
+    "seconds": 4.4220876019999995,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "NEG-002 / TEAM-004 opt-in tracked terms edits accept one/reject one into revision two, preserve offer and require fresh approval",
+    "seconds": 3.201587555,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "MIG-006 imports 200 contacts across 60 companies with reviewed custody, resumable apply and complete undo",
+    "seconds": 12.198252323999998,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "MIG-006 / CAT-001 unchanged PandaDoc catalog and contact layouts preserve exact prices, packages, image bytes and explicit company associations",
+    "seconds": 3.363416069,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "MIG-006 reviewed mapper supports original incumbent CSVs and holds identity conflicts without merging",
+    "seconds": 2.69209732,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by upload, distinct from e-signature, then exports the deposit",
+    "seconds": 4.377099642999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal",
+    "seconds": 20.449569477,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "deposit signatures survive declines, required acceptance waits for Stripe success and due acceptance stays complete",
+    "seconds": 5.172666111,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "card fees require admin confirmation, remain separate and exempt ACH and prohibited billing states",
+    "seconds": 2.530170291,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "proposal methods copy template overrides or workspace defaults and remain independent",
+    "seconds": 1.939639525,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "TRACK-001 opted-in views retain trusted coarse location, verification and device with quiet-period owner alerts",
+    "seconds": 3.032887737,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "TRACK-004 disclosure, bounded retention and explicit erasure respect holds and owner authority",
+    "seconds": 3.508527516,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "TRACK-001 measured views use trusted coarse locations, label identity, claim quiet-period alerts and preserve preview isolation",
+    "seconds": 2.491819313,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "TRACK-004 owner retention and erasure remove views and dependent engagement without changing proposal records",
+    "seconds": 2.5760080710000004,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "TRACK-002 reading events retain monotonic section times and validated package choices on the exact view",
+    "seconds": 4.433466894,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "TRACK-003 forwarded viewers verify their own mailbox before owner conversion to an approver record without inherited signing authority",
+    "seconds": 2.188901492,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 scoped REST drafting, immutable owner keys and human-only authority",
+    "seconds": 2.2488386919999996,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation",
+    "seconds": 4.264992099,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 published route reference matches live methods and webhook schemas both ways",
+    "seconds": 2.5160562669999997,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 terminal proposal projections",
+    "seconds": 2.1889279339999996,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "scoped status and analytics distinguish withdrawn and expired offers from live offers",
+    "seconds": 2.1889279339999996,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 negotiated lifecycle delivery",
+    "seconds": 1.821504921,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "receiver gets revised and approved events for each negotiated revision before it is sent",
+    "seconds": 1.821504921,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 complete lifecycle receiver coverage",
+    "seconds": 2.563468155,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "receiver obtains all ten lifecycle types including every terminal outcome",
+    "seconds": 2.563468155,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 independently documented authority",
+    "seconds": 1.564434786,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "each published method and route declares its independently expected scope",
+    "seconds": 1.564434786,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "SIGN-004 sequential and parallel recipient groups complete only after every signature",
+    "seconds": 9.180660241,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "MIG-003 and MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo",
+    "seconds": 17.472578441000003,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance and refuse changed source or authority without writes",
+    "seconds": 7.431904646,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "PAY-007 received offline money reconciles frozen dated milestones once and refuses unsafe allocations without writes",
+    "seconds": 34.824990109,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "CRM-004 reviewed Pipedrive and Zoho drafts and lifecycle writes retain exact money and refuse stale source, replay and revoked authority",
+    "seconds": 28.135765398,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "business_lifecycle",
+    "name": "ACCT-002 reviewed Xero deposits preserve exact money, authority, unique mappings and uncertain-write holds",
+    "seconds": 6.989319651,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_media",
+    "name": "SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority",
+    "seconds": 90.72926818299999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_media",
+    "name": "TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items",
+    "seconds": 117.552633879,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_media",
+    "name": "APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority",
+    "seconds": 80.755629229,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_media",
+    "name": "EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority",
+    "seconds": 100.822304041,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_media",
+    "name": "tests/demo.test.mjs",
+    "seconds": 0.713594425,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_media",
+    "name": "COLLAB-002 scoped colleagues comment, receive consented generic email and chat, resolve and assign without exposing internal threads to clients",
+    "seconds": 25.980447953,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "archive_media",
+    "name": "tests/platter.test.mjs",
+    "seconds": 0.799884221,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "EDIT-017 owner-selected mailbox languages and ordered recipients preserve authored content through the compiled client",
+    "seconds": 68.291339668,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "COLLAB-003 desktop and phone compare revisions and restore an earlier draft requiring fresh approval",
+    "seconds": 15.852545953,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "EDIT-010 desktop and phone upload vendor defaults and MSA, download frozen bytes, replace defaults and accept the original package",
+    "seconds": 19.750226331,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "EDIT-014 client selects and downloads revision 2 at desktop and phone; owner timeline and per-proposal disable remain authoritative",
+    "seconds": 15.152443034,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "EDIT-012 desktop and phone duplicate an accepted agreement for Beta Co and approve its separate draft",
+    "seconds": 8.92020028,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "EDIT-018 desktop and phone preview exact client content, switch widths and select without sending",
+    "seconds": 30.783066737000002,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "EDIT-009 desktop and phone configure, preview, select, download and accept conditional package sections",
+    "seconds": 50.666935607,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "EDIT-007 desktop and phone client reviews accessible pricing, corrects quantities, downloads attachments and PDF, verifies, comments and accepts by keyboard with WCAG 2.2 AA axe scans",
+    "seconds": 19.189489305,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths",
+    "seconds": 52.198369335,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "EDIT-003 linked and detached library insertion, frozen sending and scoped usage at desktop and phone widths",
+    "seconds": 44.211454824,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "COLLAB-002 internal comment, resolution and dated assignment work at desktop and phone widths",
+    "seconds": 11.835127156,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads",
+    "seconds": 10.388459824,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "CAT-001 reviewed CSV promotion and explicit recurring insertion preserve independent defaults",
+    "seconds": 9.927173327,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "tests/demo.test.mjs",
+    "seconds": 1.1255511329999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "tests/mail.test.mjs",
+    "seconds": 1.1025549410000002,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "EDIT-002 / MOB-001 five starter and personal templates start independent drafts, guard ownership and versions, and retain agent approval boundaries",
+    "seconds": 48.264126256000004,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "SEND-002 public CLI preserves bounce follow-ups and logged action without provider events or invitation credentials",
+    "seconds": 117.847640278,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "tests/demo.test.mjs",
+    "seconds": 1.122455593,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy",
+    "seconds": 4.132432294,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once",
+    "seconds": 15.202420823,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests",
+    "seconds": 6.428533913,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42501941877",
+    "shard": "browser_documents",
+    "name": "APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied",
+    "seconds": 41.995293645,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "the demo opens on a lived-in studio and a send completes as mocked success",
+    "seconds": 6.129774543000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "hosting preflight refuses incomplete account access before any build or deployment",
+    "seconds": 1.662983536,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-004 verified client questions, native answers and one-use authenticated owner email replies",
+    "seconds": 6.122418867,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "client questions are limited per invitation, and a refused question stores nothing and mails no one",
+    "seconds": 4.266886995,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "MAIL-001 local proposal and verification mail are captured without provider contact",
+    "seconds": 3.258393175,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "MAIL-001 Managed relay sends proposal invitations and verification codes through its assigned endpoint",
+    "seconds": 3.165611907,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "MAIL-001 hosted mail commits and claims before provider acceptance; timeout is uncertain and never resent",
+    "seconds": 19.089538598,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-008 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap",
+    "seconds": 5.504581125,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-001 / FOLLOW-006 / FOLLOW-011 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority",
+    "seconds": 17.637821929999998,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority",
+    "seconds": 7.059085194000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "AUTO-003 signed events reach Slack channels and approval requests reach verified Teams direct chats with session protected links",
+    "seconds": 21.758039955,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-003 sender expiry notices create dated follow-ups independently of signer warnings and follow extensions, workspace defaults and terminal states",
+    "seconds": 32.127433246,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-003 saved settings stay inactive and queued expiry email rechecks revocation, settings, sender demotion and revision authority",
+    "seconds": 6.425701003,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "SIGN-006 SMS verification limits wrong codes and SIGN-005 certificates retain the actual method and exact signed PDF hash",
+    "seconds": 8.874347808,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "SIGN-005 completion mail attaches the retained PDFs to both parties once, through installation and connected mailbox transports",
+    "seconds": 35.851617465000004,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "PAY-005 confirmed deposit attempts notify both parties once and hold revoked, obsolete, uncertain or interrupted mail without replay",
+    "seconds": 26.025118693,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "HTTP-001 complete authorized domain dispatch journey and native auth, CSRF, roles and revocable agent boundary",
+    "seconds": 5.3818428240000005,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "PROP-001 / PROP-002 exact approvals, frozen offers and fresh invitations invalidate old authority",
+    "seconds": 3.7506545580000004,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "email verification precedes acceptance, code is single-use, immutable option and deposit exported once",
+    "seconds": 3.088837587,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "SIGN-001 complete verified-mailbox acceptance journey",
+    "seconds": 19.768141248,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "money rejects malformed or unsafe prices and cannot export an unaccepted proposal",
+    "seconds": 2.466612588,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "Client CSV dry run, fingerprint custody, journal, replay and undo through HTTP",
+    "seconds": 3.18560813,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "import undo preserves clients with dependent proposals; owner erasure fences unused client",
+    "seconds": 3.482203845,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "COLLAB-003 every saved revision has an author/time, comparisons highlight changes, restore creates unapproved revision four",
+    "seconds": 3.4798698789999998,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "NEG-001 negotiated offer requires exact approval, preserves the live offer until send, compares changes and accepts revision two",
+    "seconds": 4.487173232,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "AI-003 MCP client searches, drafts, reads engagement and queues exact revisions without authority to approve/send/sign/refund",
+    "seconds": 6.750819644,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "NEG-002 / TEAM-004 opt-in tracked terms edits accept one/reject one into revision two, preserve offer and require fresh approval",
+    "seconds": 4.78401124,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "MIG-006 imports 200 contacts across 60 companies with reviewed custody, resumable apply and complete undo",
+    "seconds": 19.082090957000002,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "MIG-006 / CAT-001 unchanged PandaDoc catalog and contact layouts preserve exact prices, packages, image bytes and explicit company associations",
+    "seconds": 5.208489239,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "MIG-006 reviewed mapper supports original incumbent CSVs and holds identity conflicts without merging",
+    "seconds": 3.961296834,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "SIGN-008 / TEAM-004 owner records a client-signed copy as accepted by upload, distinct from e-signature, then exports the deposit",
+    "seconds": 6.527810563,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal",
+    "seconds": 33.818114838,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "deposit signatures survive declines, required acceptance waits for Stripe success and due acceptance stays complete",
+    "seconds": 7.824708869,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "card fees require admin confirmation, remain separate and exempt ACH and prohibited billing states",
+    "seconds": 4.142427862,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "proposal methods copy template overrides or workspace defaults and remain independent",
+    "seconds": 3.095202963,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "TRACK-001 opted-in views retain trusted coarse location, verification and device with quiet-period owner alerts",
+    "seconds": 4.58233073,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "TRACK-004 disclosure, bounded retention and explicit erasure respect holds and owner authority",
+    "seconds": 5.126014841,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "TRACK-001 measured views use trusted coarse locations, label identity, claim quiet-period alerts and preserve preview isolation",
+    "seconds": 3.538704737,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "TRACK-004 owner retention and erasure remove views and dependent engagement without changing proposal records",
+    "seconds": 4.114164684,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "TRACK-002 reading events retain monotonic section times and validated package choices on the exact view",
+    "seconds": 6.952282415,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "TRACK-003 forwarded viewers verify their own mailbox before owner conversion to an approver record without inherited signing authority",
+    "seconds": 3.518459091,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 scoped REST drafting, immutable owner keys and human-only authority",
+    "seconds": 3.427592884,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 signed lifecycle webhooks retry, log, redact and stop on revocation",
+    "seconds": 6.830177799,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 published route reference matches live methods and webhook schemas both ways",
+    "seconds": 4.1041299140000005,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 terminal proposal projections",
+    "seconds": 3.699657061,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "scoped status and analytics distinguish withdrawn and expired offers from live offers",
+    "seconds": 3.699657061,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 negotiated lifecycle delivery",
+    "seconds": 2.961053513,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "receiver gets revised and approved events for each negotiated revision before it is sent",
+    "seconds": 2.961053513,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 complete lifecycle receiver coverage",
+    "seconds": 4.185603198,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "receiver obtains all ten lifecycle types including every terminal outcome",
+    "seconds": 4.185603198,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "AUTO-004 independently documented authority",
+    "seconds": 2.539874511,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "each published method and route declares its independently expected scope",
+    "seconds": 2.539874511,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "SIGN-004 sequential and parallel recipient groups complete only after every signature",
+    "seconds": 14.832842027,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "MIG-003 and MIG-007 exported document move-in resumes across sessions, holds ambiguous report matches and guards originals and undo",
+    "seconds": 26.725960608,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "CRM-001 reviewed HubSpot deal drafts retain exact prices and provenance and refuse changed source or authority without writes",
+    "seconds": 11.238503941000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "MIG-001 reviewed PandaDoc Word and fixed PDF content retains exact originals, catalog links and dependency-safe undo",
+    "seconds": 44.945816394000005,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "PAY-007 received offline money reconciles frozen dated milestones once and refuses unsafe allocations without writes",
+    "seconds": 57.981196393,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "CRM-004 reviewed Pipedrive and Zoho drafts and lifecycle writes retain exact money and refuse stale source, replay and revoked authority",
+    "seconds": 44.286594615,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_lifecycle",
+    "name": "ACCT-002 reviewed Xero deposits preserve exact money, authority, unique mappings and uncertain-write holds",
+    "seconds": 11.013223809,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "MIG-006 desktop and phone review original CSVs, finish imports, read records and journals, and undo",
+    "seconds": 86.530151585,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "PRICE-001 / COLLAB-003 / EDIT-014 / EDIT-018 desktop and phone create grouped line tables, edit and restore, preview, send, download and accept identical server totals",
+    "seconds": 30.876869779,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "MOB-001 / PRICE-002 / SIGN-008 / EDIT-009 / EDIT-014 / EDIT-018 desktop and phone edit packages, review quantities, download, accept and record signed uploads",
+    "seconds": 49.002381003,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "MOB-001 / EDIT-002 desktop and phone start all five starters, save, replace and start personal templates, preview and accept independent drafts",
+    "seconds": 85.259504788,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queues with manager approval at desktop and phone widths",
+    "seconds": 165.94553001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "APPROVE-002 email preview and decision links work under a member session at desktop and phone widths",
+    "seconds": 25.853534653,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "APPROVE-002 owner requests, revokes and re-requests approval through native controls and records a noted outcome at desktop and phone widths",
+    "seconds": 12.759766968,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "deposit collection settings, retained signatures, required and due completion at desktop and phone widths",
+    "seconds": 25.459013109,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "PRICE-003 and PRICE-002 recurring line editing, preview, client selection and frozen agreement use the same amounts",
+    "seconds": 7.903465875,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "REPORT-004 booked snapshots and independent receipt periods export and schedule the visible report",
+    "seconds": 15.091051659000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "PRICE-005 native owner-configured tax settings, selected quantities and frozen agreement",
+    "seconds": 12.983768373,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "AUTO-002 Settings authorizes Drive archiving and shows completed and held jobs with safe reconciliation",
+    "seconds": 11.068137155,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "MIG-003 and MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in",
+    "seconds": 31.984163186,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows",
+    "seconds": 10.197457796999998,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "PAY-007 billing controls record and reconcile two received payments to a frozen milestone",
+    "seconds": 16.016069545,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "CRM-004 Pipedrive and Zoho Settings, reviewed drafts and explicit lifecycle writes through the compiled browser",
+    "seconds": 16.744183254,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "AUTO-003 Settings verifies and authorizes Slack channels and Teams direct approvals, inspects history and revokes consent",
+    "seconds": 6.661127886999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "ACCT-002 Settings reviews the exact deposit and explicitly issues one Xero invoice",
+    "seconds": 6.161492372,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke expiry email without activation on inspection",
+    "seconds": 15.354521205,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_commercial",
+    "name": "AGENT-007 compiled cohort recommendation and source revision inspection",
+    "seconds": 15.971405895,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_restore",
+    "name": "PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal",
+    "seconds": 149.71316052400002,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_restore",
+    "name": "MIG-003, MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody",
+    "seconds": 171.70114431800002,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_restore",
+    "name": "AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority",
+    "seconds": 80.25017718699999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_restore",
+    "name": "PORT-002 / AUTO-002 populated product archive retains exact document archive history, content, money and mappings without execution authority",
+    "seconds": 85.47256933499999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_restore",
+    "name": "tests/demo.test.mjs",
+    "seconds": 0.6802281259999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_restore",
+    "name": "tests/mail.test.mjs",
+    "seconds": 0.6822715960000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_restore",
+    "name": "EDIT-016 body phrase search returns exactly three of 500 proposals including an uploaded PDF with live folder permissions",
+    "seconds": 46.370604477,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_restore",
+    "name": "tests/demo.test.mjs",
+    "seconds": 0.645977213,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_restore",
+    "name": "tests/mail.test.mjs",
+    "seconds": 0.659636954,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_restore",
+    "name": "AGENT-007 owner compares 200 distinct decided proposals at exact revisions without applying template or price changes",
+    "seconds": 26.372186587,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_custody",
+    "name": "FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences",
+    "seconds": 287.859116921,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_custody",
+    "name": "PRICE-005 public CLI preserves business tax rates and frozen agreements without restoring signing authority",
+    "seconds": 113.095236673,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_custody",
+    "name": "tests/demo.test.mjs",
+    "seconds": 0.903696084,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_custody",
+    "name": "tests/mail.test.mjs",
+    "seconds": 0.9060224729999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_custody",
+    "name": "EDIT-012 duplicate accepted content into an independent member-owned draft for another client without changing the source",
+    "seconds": 14.523798304,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_custody",
+    "name": "PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores re-exported first-release AUD bytes and new proposals and acceptances use USD without conversion",
+    "seconds": 66.583339473,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_media",
+    "name": "SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority",
+    "seconds": 134.899095516,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_media",
+    "name": "TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items",
+    "seconds": 180.000880056,
+    "tap_result": "not ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_media",
+    "name": "APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority",
+    "seconds": 122.493043122,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "archive_media",
+    "name": "EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority",
+    "seconds": 158.68579009299998,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "tests/demo.test.mjs",
+    "seconds": 1.2086467950000002,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-017 Spanish invitation and mailbox code retain authored mail and consume localized code transport",
+    "seconds": 8.333703865,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-006 invitation, fresh link and negotiated send deliver edited text and retain exact link-free history atomically",
+    "seconds": 4.736934681,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-006 / SEND-002 / SEND-012 signed provider delivery, durable sender notice and actionable address correction",
+    "seconds": 10.389890963,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-002 / SEND-012 SendGrid signed correlation, queued state, uncertainty and logged dismissal",
+    "seconds": 13.220199568,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-001 / SEND-011 OAuth mailboxes verify ownership and scopes, refresh, attribute sends, and visibly fall back without retrying uncertain mail",
+    "seconds": 22.383192631,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-001 / FOLLOW-001 signed-mailbox scheduled reminders honor recipient quiet hours, caps and terminal decisions without retrying uncertain sends",
+    "seconds": 10.249759881,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-001 / TEAM-001 reminder sending rechecks opt-out, acceptance, withdrawal, invitation rotation and sender role after mailbox refresh",
+    "seconds": 6.648509584,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-008 explicit SMS consent, signed delivery callbacks, HELP and STOP preserve independent email reminders",
+    "seconds": 18.047069429,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-008 quiet hours defer manual SMS and SEND-010 withdrawal atomically cancels queued texts without duplicate transport",
+    "seconds": 6.253947218,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-008 rotated invitations, lost sender scope and uncertain SMS outcomes cannot replay sending authority",
+    "seconds": 8.821607691999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-005 personal Slack and email preferences deliver client open, comment, signature and payment events once through scoped links",
+    "seconds": 5.767873709000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-005 personal notification revocation and lost proposal scope suppress queued and future sends",
+    "seconds": 3.38075366,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-007 unsigned replacement preserves the frozen offer, revokes old authority and retains certificate custody through races",
+    "seconds": 6.835335019,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-017 mailbox languages preserve authority, verification limits, authored content and actual certificate language",
+    "seconds": 16.885183616,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-004 current person, agent, invitation, signature, native, import and invoice actions have searchable/exportable actors and times",
+    "seconds": 4.457169973,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-010 / TEAM-004 defaults and arbitrary files freeze with approval, download exact bytes and remain in the signed package after replacement",
+    "seconds": 7.523137889,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and every page marked; disabling refuses download without a write",
+    "seconds": 6.4588841089999995,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-004 / SEND-013 / TEAM-004 calendar expiry warns unsigned only, supports same-link reopening and reissue, and never expires accepted agreements",
+    "seconds": 15.56274252,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-010 / SEND-015 / FOLLOW-009 withdrawal revokes every current public door, preserves history, notifies optionally and reissues only with approval",
+    "seconds": 10.394225066999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state",
+    "seconds": 12.577838170000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-009 conditional sections match selected preview, client, PDF and immutable agreement; revisions, copies and negotiations retain rules",
+    "seconds": 12.940323679999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "PRICE-001 / COLLAB-003 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / PROP-001 / TEAM-004 tables recompute twelve grouped lines, preserve every carrier and refuse malformed prices and quantities",
+    "seconds": 6.28033076,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-002 arbitrary packages and bounded optional quantities share server totals and immutable selection",
+    "seconds": 22.041486575,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "PRICE-002 / SIGN-008 / TEAM-004 signed-upload selections use sent prices, refuse invalid quantities without writes, and freeze the exact agreement and invoice",
+    "seconds": 7.374686173,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-014 self-test mail uses only the active sign-in address, previews an unsent revision and atomically limits daily rehearsals without sending an offer",
+    "seconds": 5.323057563,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / APPROVE-003 / APPROVE-001 role scopes, collaborator rights, policy, sequential amount and parallel legal approvals through HTTP",
+    "seconds": 187.125759463,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / PRICE-006 internal line costs round exactly, follow revisions and templates, and stay out of sales/client data and public PDFs",
+    "seconds": 10.094004939,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-001 provider connections verify accounts, seal credentials, enforce admin and own-mailbox rights and disconnect without exposing tokens",
+    "seconds": 8.324021939,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-001 billing records received payments and refunds a verified Stripe deposit; sales cannot call Stripe and retries or uncertain outcomes cannot double refund",
+    "seconds": 23.368911163,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-007 shared templates and library folders enforce role edits and live team audience when listing, starting and replacing content",
+    "seconds": 10.693663381,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / EDIT-015 template locks survive starts, copies and personal templates; proposal unlocks require scope and edited terms require approval",
+    "seconds": 7.309379861,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-006 delegated invitations bind roles and teams to current inviter authority and refuse native-route bypasses",
+    "seconds": 5.725952055,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / CAT-001 catalog edits enforce the role matrix; copied prices and private costs stay frozen in proposals",
+    "seconds": 19.24926323,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / PAY-006 dispute responses enforce financial roles, exact deposit binding, deadlines and consent, retaining the exact idempotent Stripe evidence",
+    "seconds": 18.445763915,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / APPROVE-003 native admins remain eligible named approvers and settings audit records identify the actual person or workspace",
+    "seconds": 4.969294357,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-001 / PRICE-006 optional and flat-package costs produce exact selected totals while verified client JSON, pages and PDFs exclude private state",
+    "seconds": 6.273239795,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "PRICE-004 scoped discounts preserve exact selections, private margins, templates and public PDF and JSON custody",
+    "seconds": 11.514964755000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "TEAM-001 upgrading a pre-role database keeps former members as sales without inferring historical ownership",
+    "seconds": 3.579031958,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-001 document revisions preserve ordered blocks and brand through preview, restore, copies, templates, negotiation and exact client PDF",
+    "seconds": 8.609679515,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-001 block saves enforce live proposal scope, stale versions, content bounds, safe brand values and locked terms",
+    "seconds": 4.283859659,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-001 display media requires consent and live edit scope, stays private until placed and keeps exact bytes through copies and templates",
+    "seconds": 11.921236159,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-001 Client-assigned required fields and typed signature blocks validate at signing and freeze exact values with the selected agreement",
+    "seconds": 4.57787464,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-001 new sections inherit verified questions and opt-in tracked edits without changing the sent document or bypassing review",
+    "seconds": 3.918620473,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-011 server-confirmed quantity edits retain document content, clear approval and enforce bounds, scope and exact version",
+    "seconds": 3.4470135070000003,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-003 linked draft copies propagate atomically while detached, sent and accepted copies retain exact content",
+    "seconds": 30.412162744,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-003 insertion enforces live role, folder and proposal scope, consent, stale versions and locked terms without writes",
+    "seconds": 7.706231101999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "PRICE-003 recurring fees keep exact schedules, first-year queue value and immutable selected documents",
+    "seconds": 17.371806074,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "SEND-003 separately verified roles, removed viewers and unfilled template slots through HTTP",
+    "seconds": 13.960763504,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-004 linked deal variables refuse missing values, freeze the sent revision and refill destination copies",
+    "seconds": 9.987033714999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections",
+    "seconds": 7.499143347,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing",
+    "seconds": 5.565354973000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order",
+    "seconds": 3.161872079,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "PRICE-005 owner tax follows selected quantities and discounts, freezes rates and refuses unsafe writes",
+    "seconds": 13.030193715,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "tests/demo.test.mjs",
+    "seconds": 1.0680628650000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "tests/mail.test.mjs",
+    "seconds": 1.0778451279999999,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership",
+    "seconds": 155.063659346,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures",
+    "seconds": 20.813247636,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "business_authoring",
+    "name": "FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval",
+    "seconds": 59.409795911,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "EDIT-017 owner-selected mailbox languages and ordered recipients preserve authored content through the compiled client",
+    "seconds": 82.854861086,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "COLLAB-003 desktop and phone compare revisions and restore an earlier draft requiring fresh approval",
+    "seconds": 16.73546125,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "EDIT-010 desktop and phone upload vendor defaults and MSA, download frozen bytes, replace defaults and accept the original package",
+    "seconds": 19.852996268,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "EDIT-014 client selects and downloads revision 2 at desktop and phone; owner timeline and per-proposal disable remain authoritative",
+    "seconds": 14.578397891,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "EDIT-012 desktop and phone duplicate an accepted agreement for Beta Co and approve its separate draft",
+    "seconds": 9.773185125,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "EDIT-018 desktop and phone preview exact client content, switch widths and select without sending",
+    "seconds": 38.998284785,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "EDIT-009 desktop and phone configure, preview, select, download and accept conditional package sections",
+    "seconds": 58.924600177,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "EDIT-007 desktop and phone client reviews accessible pricing, corrects quantities, downloads attachments and PDF, verifies, comments and accepts by keyboard with WCAG 2.2 AA axe scans",
+    "seconds": 18.073070967,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "EDIT-001 ordered blocks, brand, autosave, drag and keyboard reorder, undo, reload and matching client PDF at desktop and phone widths",
+    "seconds": 56.075754882,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "EDIT-003 linked and detached library insertion, frozen sending and scoped usage at desktop and phone widths",
+    "seconds": 44.075756151,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "COLLAB-002 internal comment, resolution and dated assignment work at desktop and phone widths",
+    "seconds": 12.185578296,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "EDIT-004 and EDIT-005 native variable fill, editable Word import, fixed-page fields and document downloads",
+    "seconds": 29.988860799999998,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "CAT-001 reviewed CSV promotion and explicit recurring insertion preserve independent defaults",
+    "seconds": 15.599013766,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "tests/demo.test.mjs",
+    "seconds": 0.8933591,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "tests/mail.test.mjs",
+    "seconds": 0.896327265,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "EDIT-002 / MOB-001 five starter and personal templates start independent drafts, guard ownership and versions, and retain agent approval boundaries",
+    "seconds": 77.924449251,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "SEND-002 public CLI preserves bounce follow-ups and logged action without provider events or invitation credentials",
+    "seconds": 117.311977298,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "tests/demo.test.mjs",
+    "seconds": 0.902140264,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy",
+    "seconds": 3.44364927,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once",
+    "seconds": 13.204110473,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests",
+    "seconds": 5.725590584,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "browser_documents",
+    "name": "APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied",
+    "seconds": 50.658449621,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "SITE-001 built homepage opens run instructions, Markdown docs work without JavaScript, installed root remains the Lobby",
+    "seconds": 9.957885253,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "PRICE-008 legacy AUD agreement and new USD owner/client screens show exact currency at desktop and phone widths",
+    "seconds": 16.251218555,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "NEG-001 desktop and phone negotiate, approve, send and accept the changed offer with client comparison",
+    "seconds": 20.832784495,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "EDIT-016 / REPORT-001 desktop and phone pipeline filters, value sort, totals and clear filters use recorded proposal data",
+    "seconds": 24.873111972,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "TEAM-004 owner searches audit actions and downloads the same filtered activity at desktop and phone widths",
+    "seconds": 9.689584942,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "AI-003 desktop and phone owners review MCP requests, approve/send explicitly, and dismiss stale requests",
+    "seconds": 14.605415854,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "NEG-002 desktop and phone client suggests two terms edits; firm accepts one, rejects one and sends revision two",
+    "seconds": 17.404057585,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "SEND-002 desktop and phone show provider delivery and preserve bounce notice until explicit correction",
+    "seconds": 17.229360247,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "SIGN-008 desktop and phone record a client-signed copy as accepted by upload and export its deposit",
+    "seconds": 12.45355387,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "REPORT-005 / REPORT-006 desktop and phone export the filtered pipeline CSV and schedule weekly email in the installation time zone",
+    "seconds": 13.437374615000001,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "SEND-004 expired offer requests reopening and owner extends same links at desktop and phone",
+    "seconds": 18.184037023000002,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "MOB-001 / FOLLOW-004 invited client asks exact sent sections; owner queue answers and agreement retains threads on desktop and phone",
+    "seconds": 19.087159017,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "FOLLOW-005 / SEND-010 / FOLLOW-002 desktop and phone withdraw, inspect revoked offer and audit, then approve a new revision",
+    "seconds": 29.196778861,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "MOB-001 / FOLLOW-002 desktop and phone schedule, notify, complete, dismiss and reopen sales actions with due pipeline reporting",
+    "seconds": 167.98327895499997,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "SEND-006 desktop and phone rehearse to self, then edit invitations, fresh links and negotiated sends with exact retained history",
+    "seconds": 18.75388231,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "FOLLOW-001 / FOLLOW-006 sender controls, template delivery overrides, preview dates, manual email and inactive copies at desktop and phone widths",
+    "seconds": 27.602800025,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "SIGN-006 SMS-code verification and SIGN-005 signed downloads work in the compiled client at desktop and phone widths",
+    "seconds": 24.685315105,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "SEND-007 desktop and phone replace the unsigned signer, refuse the old link, verify the COO and retain completion history",
+    "seconds": 14.583065463,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "TRACK-001 / TRACK-004 owner consent, private alerts, client disclosure and erasure at desktop and phone widths",
+    "seconds": 25.529844215,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "TRACK-001 and TRACK-004 client disclosure, first-party measurement and private owner controls work at desktop and phone widths",
+    "seconds": 65.563539838,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "AUTO-004 compiled public API reference exposes scoped operations and signed event examples",
+    "seconds": 2.738943868,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "SIGN-004 and SEND-003 owner recipient controls, own-field previews, ordered signing and viewer revocation",
+    "seconds": 19.122273976,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "tests/demo.test.mjs",
+    "seconds": 1.12372857,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "tests/mail.test.mjs",
+    "seconds": 1.109126168,
+    "tap_result": "ok"
+  },
+  {
+    "run_id": "42504861947",
+    "shard": "runtime",
+    "name": "AUTO-002 completed agreements archive exact PDFs once under explicit current Drive authority and reconcile uncertain writes without replay",
+    "seconds": 117.673088413,
+    "tap_result": "ok"
+  }
+]

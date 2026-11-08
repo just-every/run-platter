@@ -1,0 +1,10 @@
+{"call": 1, "time": 1794167498.8177614, "args": ["api", "repos/just-every/run-platter/actions/runs/42504861947/jobs?per_page=100"]}
+{"call": 2, "time": 1794167500.8706505, "args": ["api", "repos/just-every/run-platter/actions/runs/42501941877/jobs?per_page=100"]}
+{"call": 3, "time": 1794167518.3127277, "args": ["run", "view", "42504861947", "--repo", "just-every/run-platter", "--log"]}
+{"call": 4, "time": 1794167521.9706955, "args": ["run", "view", "42501941877", "--repo", "just-every/run-platter", "--log"]}
+{"call": 5, "time": 1794167534.1052678, "args": ["run", "view", "42504861947", "--repo", "just-every/run-platter", "--job", "128816388758", "--log"]}
+{"call": 6, "time": 1794167534.8156288, "args": ["run", "view", "42501941877", "--repo", "just-every/run-platter", "--job", "128796576604", "--log"]}
+{"call": 7, "time": 1794167608.1655567, "args": ["run", "view", "42504861947", "--repo", "just-every/run-platter", "--attempt", "1", "--job", "128816388758", "--log"]}
+{"call": 8, "time": 1794167824.211834, "args": ["api", "repos/just-every/run-platter/actions/runs?head_sha=ca0e2a18b2751698553e056eae9334355fcb5c80&per_page=100"]}
+{"call": 9, "time": 1794169032.9197178, "args": ["api", "repos/just-every/run-platter/actions/runs/42517570284", "--jq", "{status,conclusion,head_sha,html_url}"]}
+{"call": 10, "time": 1794169045.4572718, "args": ["api", "repos/just-every/run-platter/actions/runs/42517570284/jobs?per_page=100"]}

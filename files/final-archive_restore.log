@@ -1,0 +1,90 @@
+
+> @proposals/platter@0.1.0 verify:app /workspace/run-platter
+> node scripts/verification/run.mjs
+
+TAP version 13
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/demo.test.mjs
+ok 1 - tests/demo.test.mjs
+  ---
+  duration_ms: 1088.32485
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/mail.test.mjs
+ok 2 - tests/mail.test.mjs
+  ---
+  duration_ms: 1055.507684
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# EDIT-016 500-proposal HTTP search elapsed ms: 202
+# Archive schema template completed in 37679 ms (118 migrations; ledger preflight passed)
+# Archive CLI export completed in 24638 ms
+# Archive CLI import completed in 848 ms
+# Subtest: EDIT-016 body phrase search returns exactly three of 500 proposals including an uploaded PDF with live folder permissions
+ok 3 - EDIT-016 body phrase search returns exactly three of 500 proposals including an uploaded PDF with live folder permissions
+  ---
+  duration_ms: 66006.754774
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 69635.511666
+# Archive CLI export completed in 22820 ms
+# Archive CLI import completed in 49587 ms
+# Archive CLI export completed in 21656 ms
+# Archive CLI import completed in 26169 ms
+# Archive CLI import completed in 30440 ms
+# Archive CLI import completed in 28066 ms
+# Subtest: PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal
+ok 1 - PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal
+  ---
+  duration_ms: 246010.905294
+  type: 'test'
+  ...
+# Archive CLI export completed in 27722 ms
+# Archive CLI import completed in 41641 ms
+# Subtest: MIG-003, MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody
+ok 2 - MIG-003, MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody
+  ---
+  duration_ms: 93839.808804
+  type: 'test'
+  ...
+# Archive CLI export completed in 23725 ms
+# Archive CLI import completed in 27499 ms
+# Subtest: AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority
+ok 3 - AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority
+  ---
+  duration_ms: 57235.477459
+  type: 'test'
+  ...
+# Archive CLI export completed in 24968 ms
+# Archive CLI import completed in 37616 ms
+# PROBE PORT-002 1: populated CLI export and restore -> templates, library, catalog, two media originals, exact signed artifacts, 8750-cent deposit and offline receipt, report totals and actual Drive mappings reconciled
+# PROBE PORT-002 2: decoded CLI archive and restored public doors -> no credentials, invitations, sessions, verification state or queued mail; old capabilities refused; scheduled processing made no provider calls
+# Subtest: PORT-002 / AUTO-002 populated product archive retains exact document archive history, content, money and mappings without execution authority
+ok 4 - PORT-002 / AUTO-002 populated product archive retains exact document archive history, content, money and mappings without execution authority
+  ---
+  duration_ms: 67215.772588
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 465796.516495

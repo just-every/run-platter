@@ -1,0 +1,22 @@
+{
+  "head": "ca0e2a18b2751698553e056eae9334355fcb5c80",
+  "checks": [
+    {
+      "shard": "business_authoring",
+      "command": "PLATTER_VERIFY_SHARD=business_authoring pnpm verify:app",
+      "started_at": "2026-11-08T20:02:17.784683+00:00",
+      "elapsed_seconds": 442.834,
+      "exit_code": 0,
+      "log": "first-candidate-business_authoring.log"
+    },
+    {
+      "shard": "business_sending",
+      "command": "PLATTER_VERIFY_SHARD=business_sending pnpm verify:app",
+      "started_at": "2026-11-08T20:09:40.620220+00:00",
+      "elapsed_seconds": 444.364,
+      "exit_code": 0,
+      "log": "first-candidate-business_sending.log"
+    }
+  ],
+  "environment": "Dedicated cloud VM, Node v24.19.0; local durations are not hosted-runner p90 estimates"
+}

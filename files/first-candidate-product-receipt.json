@@ -1,0 +1,13 @@
+{
+  "repository": "just-every/run-platter",
+  "branch": "cloud/sx-platter-ci-shape-2",
+  "head": "ca0e2a18b2751698553e056eae9334355fcb5c80",
+  "base": "7c0b92553438cdab1c78c31b6d7dcf6803a9371b",
+  "push_guard": "python3 $HOME/rer-consolidation/.tools/cloud-push.py origin cloud/sx-platter-ci-shape-2",
+  "push_result": "PUSH_OK on first attempt",
+  "remote_ref_verified": "ca0e2a18b2751698553e056eae9334355fcb5c80\trefs/heads/cloud/sx-platter-ci-shape-2",
+  "candidate_identity_and_trailers": "Run Edit Run fleet <fleet@runeditrun.com>\nRun Edit Run fleet <fleet@runeditrun.com>\n\n",
+  "commit_messages": "ca0e2a18b2751698553e056eae9334355fcb5c80\nBalance authoring and lifecycle work across eight Verify shards\n\n",
+  "worktree_clean": true,
+  "checked_at": "2026-11-08T19:59:22.253186+00:00"
+}

@@ -1,0 +1,326 @@
+
+> @proposals/platter@0.1.0 verify:app /workspace/run-platter
+> node scripts/verification/run.mjs
+
+TAP version 13
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/demo.test.mjs
+ok 1 - tests/demo.test.mjs
+  ---
+  duration_ms: 1420.535751
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/demo.test.mjs
+ok 1 - tests/demo.test.mjs
+  ---
+  duration_ms: 1656.146181
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/mail.test.mjs
+ok 2 - tests/mail.test.mjs
+  ---
+  duration_ms: 1316.978375
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: EDIT-017 Spanish invitation and mailbox code retain authored mail and consume localized code transport
+ok 2 - EDIT-017 Spanish invitation and mailbox code retain authored mail and consume localized code transport
+  ---
+  duration_ms: 10484.892822
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: EDIT-017 mailbox languages preserve authority, verification limits, authored content and actual certificate language
+ok 3 - EDIT-017 mailbox languages preserve authority, verification limits, authored content and actual certificate language
+  ---
+  duration_ms: 19233.561854
+  type: 'test'
+  ...
+# Warning: Indexing all PDF objects
+# Warning: Indexing all PDF objects
+# Warning: Indexing all PDF objects
+# Warning: Indexing all PDF objects
+# Warning: Indexing all PDF objects
+# Warning: Indexing all PDF objects
+# Subtest: EDIT-010 / TEAM-004 defaults and arbitrary files freeze with approval, download exact bytes and remain in the signed package after replacement
+ok 4 - EDIT-010 / TEAM-004 defaults and arbitrary files freeze with approval, download exact bytes and remain in the signed package after replacement
+  ---
+  duration_ms: 7516.096712
+  type: 'test'
+  ...
+# Subtest: EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and every page marked; disabling refuses download without a write
+ok 5 - EDIT-014 / TEAM-004 exact unsigned revision PDF keeps selected prices and every page marked; disabling refuses download without a write
+  ---
+  duration_ms: 8780.691315
+  type: 'test'
+  ...
+# Warning: Indexing all PDF objects
+# Subtest: EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state
+ok 6 - EDIT-018 / EDIT-022 member-only exact-revision previews share selection math and never change business state
+  ---
+  duration_ms: 14674.377421
+  type: 'test'
+  ...
+# Subtest: EDIT-009 conditional sections match selected preview, client, PDF and immutable agreement; revisions, copies and negotiations retain rules
+ok 7 - EDIT-009 conditional sections match selected preview, client, PDF and immutable agreement; revisions, copies and negotiations retain rules
+  ---
+  duration_ms: 12134.568585
+  type: 'test'
+  ...
+# Subtest: PRICE-001 / COLLAB-003 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / PROP-001 / TEAM-004 tables recompute twelve grouped lines, preserve every carrier and refuse malformed prices and quantities
+ok 8 - PRICE-001 / COLLAB-003 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / PROP-001 / TEAM-004 tables recompute twelve grouped lines, preserve every carrier and refuse malformed prices and quantities
+  ---
+  duration_ms: 6204.945715
+  type: 'test'
+  ...
+# Subtest: PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-002 arbitrary packages and bounded optional quantities share server totals and immutable selection
+ok 9 - PRICE-002 / EDIT-009 / EDIT-012 / EDIT-014 / EDIT-018 / COLLAB-003 / PORT-002 arbitrary packages and bounded optional quantities share server totals and immutable selection
+  ---
+  duration_ms: 17574.815854
+  type: 'test'
+  ...
+# Subtest: PRICE-002 / SIGN-008 / TEAM-004 signed-upload selections use sent prices, refuse invalid quantities without writes, and freeze the exact agreement and invoice
+ok 10 - PRICE-002 / SIGN-008 / TEAM-004 signed-upload selections use sent prices, refuse invalid quantities without writes, and freeze the exact agreement and invoice
+  ---
+  duration_ms: 6394.658127
+  type: 'test'
+  ...
+# Subtest: PRICE-004 scoped discounts preserve exact selections, private margins, templates and public PDF and JSON custody
+ok 11 - PRICE-004 scoped discounts preserve exact selections, private margins, templates and public PDF and JSON custody
+  ---
+  duration_ms: 10005.656091
+  type: 'test'
+  ...
+# Subtest: EDIT-001 document revisions preserve ordered blocks and brand through preview, restore, copies, templates, negotiation and exact client PDF
+ok 12 - EDIT-001 document revisions preserve ordered blocks and brand through preview, restore, copies, templates, negotiation and exact client PDF
+  ---
+  duration_ms: 7074.138295
+  type: 'test'
+  ...
+# Subtest: EDIT-001 block saves enforce live proposal scope, stale versions, content bounds, safe brand values and locked terms
+ok 13 - EDIT-001 block saves enforce live proposal scope, stale versions, content bounds, safe brand values and locked terms
+  ---
+  duration_ms: 4208.164274
+  type: 'test'
+  ...
+# Subtest: FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership
+ok 3 - FOLLOW-005 / REPORT-001 / FOLLOW-002 / SEND-004 / SEND-010 thirty proposals filter by recorded owner and status and every field, sort and total exact values without changing ownership
+  ---
+  duration_ms: 124710.138766
+  type: 'test'
+  ...
+# Subtest: EDIT-001 display media requires consent and live edit scope, stays private until placed and keeps exact bytes through copies and templates
+ok 14 - EDIT-001 display media requires consent and live edit scope, stays private until placed and keeps exact bytes through copies and templates
+  ---
+  duration_ms: 9976.978697
+  type: 'test'
+  ...
+# Subtest: EDIT-001 Client-assigned required fields and typed signature blocks validate at signing and freeze exact values with the selected agreement
+ok 15 - EDIT-001 Client-assigned required fields and typed signature blocks validate at signing and freeze exact values with the selected agreement
+  ---
+  duration_ms: 4522.16818
+  type: 'test'
+  ...
+# Subtest: FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures
+ok 4 - FOLLOW-005 / EDIT-016 / REPORT-005 / REPORT-006 / FOLLOW-002 / TEAM-004 pipeline exports to CSV as filtered and emails weekly to two named people with the screen figures
+  ---
+  duration_ms: 14619.044754
+  type: 'test'
+  ...
+# Subtest: EDIT-001 new sections inherit verified questions and opt-in tracked edits without changing the sent document or bypassing review
+ok 16 - EDIT-001 new sections inherit verified questions and opt-in tracked edits without changing the sent document or bypassing review
+  ---
+  duration_ms: 4206.602152
+  type: 'test'
+  ...
+# Subtest: EDIT-011 server-confirmed quantity edits retain document content, clear approval and enforce bounds, scope and exact version
+ok 17 - EDIT-011 server-confirmed quantity edits retain document content, clear approval and enforce bounds, scope and exact version
+  ---
+  duration_ms: 3882.16552
+  type: 'test'
+  ...
+# Subtest: EDIT-003 linked draft copies propagate atomically while detached, sent and accepted copies retain exact content
+ok 18 - EDIT-003 linked draft copies propagate atomically while detached, sent and accepted copies retain exact content
+  ---
+  duration_ms: 21790.806355
+  type: 'test'
+  ...
+# Subtest: EDIT-003 insertion enforces live role, folder and proposal scope, consent, stale versions and locked terms without writes
+ok 19 - EDIT-003 insertion enforces live role, folder and proposal scope, consent, stale versions and locked terms without writes
+  ---
+  duration_ms: 7265.32896
+  type: 'test'
+  ...
+# Subtest: FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval
+ok 5 - FOLLOW-005 / SEND-010 / FOLLOW-002 verified decline and owner loss close offers, retain reasons and reopen only through fresh approval
+  ---
+  duration_ms: 44437.38371
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 189137.642305
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/demo.test.mjs
+ok 1 - tests/demo.test.mjs
+  ---
+  duration_ms: 1306.968349
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: PRICE-003 recurring fees keep exact schedules, first-year queue value and immutable selected documents
+ok 20 - PRICE-003 recurring fees keep exact schedules, first-year queue value and immutable selected documents
+  ---
+  duration_ms: 15739.898933
+  type: 'test'
+  ...
+# Subtest: APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy
+ok 2 - APPROVE-003 / TEAM-001 a sales sender owns bounce correction, foreign senders are refused, and every fresh invitation obeys the current approval policy
+  ---
+  duration_ms: 5914.312142
+  type: 'test'
+  ...
+# Subtest: EDIT-004 linked deal variables refuse missing values, freeze the sent revision and refill destination copies
+ok 21 - EDIT-004 linked deal variables refuse missing values, freeze the sent revision and refill destination copies
+  ---
+  duration_ms: 8089.18343
+  type: 'test'
+  ...
+# Subtest: EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections
+ok 22 - EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections
+  ---
+  duration_ms: 6281.023384
+  type: 'test'
+  ...
+# Subtest: APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once
+ok 3 - APPROVE-002 explicit requests deliver exact revision previews by email and Slack, bind noted decisions and remind pending approvers once
+  ---
+  duration_ms: 14433.790177
+  type: 'test'
+  ...
+# Subtest: EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing
+ok 23 - EDIT-005 fixed PDF originals remain exact with a page-three signature and appended selected unsigned pricing
+  ---
+  duration_ms: 6357.156227
+  type: 'test'
+  ...
+# Subtest: APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests
+ok 4 - APPROVE-002 notification consent, exact plan, active scope and uncertain delivery prevent unauthorized or repeated outbound requests
+  ---
+  duration_ms: 6762.496389
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order
+ok 24 - EDIT-005 Word and PDF exports retain heading styles, four exact table lines, two images and reading order
+  ---
+  duration_ms: 4382.184608
+  type: 'test'
+  ...
+# Subtest: PRICE-005 owner tax follows selected quantities and discounts, freezes rates and refuses unsafe writes
+ok 25 - PRICE-005 owner tax follows selected quantities and discounts, freezes rates and refuses unsafe writes
+  ---
+  duration_ms: 10197.739482
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 231926.02909
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/demo.test.mjs
+ok 1 - tests/demo.test.mjs
+  ---
+  duration_ms: 1135.928307
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: FOLLOW-004 verified client questions, native answers and one-use authenticated owner email replies
+ok 2 - FOLLOW-004 verified client questions, native answers and one-use authenticated owner email replies
+  ---
+  duration_ms: 6687.07871
+  type: 'test'
+  ...
+# Subtest: FOLLOW-008 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap
+ok 3 - FOLLOW-008 / TEAM-001 manual reminders require live send scope, editable text and a once-per-recipient calendar-day claim independent of the scheduled cap
+  ---
+  duration_ms: 5922.195122
+  type: 'test'
+  ...
+# Subtest: APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied
+ok 5 - APPROVE-001 gross value and 20% discount require manager then owner; margin, payment-term and template conditions skip only when satisfied
+  ---
+  duration_ms: 32752.93229
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 64322.102263
+# Subtest: FOLLOW-001 / FOLLOW-006 / FOLLOW-011 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority
+ok 4 - FOLLOW-001 / FOLLOW-006 / FOLLOW-011 template and workspace delivery snapshots preview exact dates, send on those dates, remain editable without approval and never copy authority
+  ---
+  duration_ms: 13691.527243
+  type: 'test'
+  ...
+# Subtest: FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority
+ok 5 - FOLLOW-001 / SEND-006 shared reminder messages fill explicit variables, enforce default and template choices and locks, and preserve exact per-attempt text without copying identity or authority
+  ---
+  duration_ms: 5939.820881
+  type: 'test'
+  ...
+# Subtest: FOLLOW-003 sender expiry notices create dated follow-ups independently of signer warnings and follow extensions, workspace defaults and terminal states
+ok 6 - FOLLOW-003 sender expiry notices create dated follow-ups independently of signer warnings and follow extensions, workspace defaults and terminal states
+  ---
+  duration_ms: 28562.012067
+  type: 'test'
+  ...
+# Subtest: FOLLOW-003 saved settings stay inactive and queued expiry email rechecks revocation, settings, sender demotion and revision authority
+ok 7 - FOLLOW-003 saved settings stay inactive and queued expiry email rechecks revocation, settings, sender demotion and revision authority
+  ---
+  duration_ms: 5825.31404
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal
+ok 8 - FOLLOW-002 / FOLLOW-009 / FOLLOW-010 sales queue orders current reasons and separates notification, logged completion, correction and withdrawal
+  ---
+  duration_ms: 25619.524672
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 95895.293944

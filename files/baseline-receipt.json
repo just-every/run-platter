@@ -1,0 +1,32 @@
+{
+  "base": "7c0b92553438cdab1c78c31b6d7dcf6803a9371b",
+  "command": "PLATTER_VERIFY_SHARD=business_authoring pnpm verify:app (original planner loaded before edits)",
+  "exit_code": 0,
+  "reporter_counts_by_command": {
+    "tests": [
+      54,
+      5
+    ],
+    "pass": [
+      54,
+      5
+    ],
+    "fail": [
+      0,
+      0
+    ],
+    "cancelled": [
+      0,
+      0
+    ],
+    "skipped": [
+      0,
+      0
+    ]
+  },
+  "reporter_duration_ms_by_command": [
+    438903.577602,
+    138514.373808
+  ],
+  "note": "Includes successful empty filtered file records; 56 named registrations in the original assignment, no skipped registered tests."
+}

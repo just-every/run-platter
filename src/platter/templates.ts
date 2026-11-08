@@ -1,6 +1,8 @@
+import { templateNotices, saveTemplateNotices, editTemplateNotices, noticeSnapshots } from './notifications/settings'
 import { withoutTaxAddresses } from './taxes'
-import { resolveVariables, editableVariableFields } from './variables'
+import { resolveVariables, editableVariableFields, unfilledVariableFields } from './variables'
 import { proposalFields } from './commands'
+import { packageInputs, pricedOptions } from './pricing'
 import { documentMediaIds } from './documents/media'
 import { methodsInput } from './collection-policy'
 import { documentOf, bindDocument } from './documents/blocks'
@@ -25,10 +27,25 @@ export async function templateState(db: D1Database, a: Actor) {
  const locks=(await db.prepare('SELECT * FROM p_template_locks UNION ALL SELECT * FROM p_template_block_locks ORDER BY section').all<any>()).results
  const delivery=(await db.prepare('SELECT * FROM p_template_defaults').all<any>()).results
  const messages=(await db.prepare('SELECT * FROM p_template_reminder_messages').all<any>()).results
- return rows.map(row => ({reminderTemplateId:messages.some(m=>m.template_id===row.id)?messages.find(m=>m.template_id===row.id).message_id:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}').reminderTemplateId??null,deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:a.role==='agent'?agentDeliveryDefaults(JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}')):JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, attachmentText:(JSON.parse(row.snapshot).attachments??[]).map((f:any)=>search.find(s=>s.file_id===f.id)?.content??'').join('\n'),snapshot:JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
+ const notices=new Map(await Promise.all(rows.map(async row=>[row.id,await templateNotices(db,row.id)] as const)))
+ return rows.map(row => ({noticeDefaults:notices.get(row.id),reminderTemplateId:messages.some(m=>m.template_id===row.id)?messages.find(m=>m.template_id===row.id).message_id:JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}').reminderTemplateId??null,deliverySources:JSON.parse(row.delivery_sources),deliveryDefaults:a.role==='agent'?agentDeliveryDefaults(JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}')):JSON.parse(delivery.find(d=>d.template_id===row.id)?.settings??'{}'),lockedSections:locks.filter(l=>l.template_id===row.id).map(l=>l.section), ...row, attachmentText:(JSON.parse(row.snapshot).attachments??[]).map((f:any)=>search.find(s=>s.file_id===f.id)?.content??'').join('\n'),snapshot:JSON.parse(row.snapshot), expiry: JSON.parse(row.expiry), suggestion_sections: JSON.parse(row.suggestion_sections) }))
 }
 
-async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false) {
+/** A reviewed fixed-page move-in saves independent content, never approval or sending authority. */
+export async function independentFixedTemplate(db:D1Database,a:Actor,row:any,name:string,at:number) {
+ const {id:_id,client_id:_client,revision:_revision,...content}=snapshot(row)
+ content.document=bindDocument(content.document)
+ content.options=withoutTaxAddresses(content.options)
+ const id=crypto.randomUUID(),serialized=JSON.stringify(content),mediaIds=documentMediaIds(documentOf(content))
+ const savedExpiry=await db.prepare('SELECT mode,period_days,expires_on,time_zone,warning_days FROM p_expiry WHERE proposal_id=?').bind(row.id).first<any>()
+ const expiry=savedExpiry??{mode:'never',period_days:null,expires_on:null,time_zone:await installationZone(db),warning_days:null}
+ const writes=[db.prepare('INSERT INTO p_personal_templates(id,owner_id,name,version,snapshot,pdf_enabled,expiry,suggestion_sections,created_at,updated_at) VALUES(?,?,?,1,?,1,?,?,?,?)').bind(id,a.id,name,serialized,JSON.stringify(expiry),'[]',at,at),
+  ...templateDefaults(db,row.id,id),...saveTemplateCosts(db,row.id,row.revision-1,id),
+  db.prepare('INSERT INTO p_template_document_media(template_id,file_id) SELECT ?,file_id FROM p_document_media WHERE proposal_id=? AND file_id IN ('+mediaIds.map(()=>'?').join(',')+')').bind(id,row.id,...mediaIds)]
+ return {id,snapshot:serialized,writes}
+}
+
+export async function ownTemplate(db: D1Database, a: Actor, id: unknown, editing=false) {
  need(!String(id).startsWith('starter:'), 'Start a draft to customize a built-in starter; save your changes as a personal template', 403)
  const row = await db.prepare('SELECT * FROM p_personal_templates WHERE id=?').bind(text(id, 'a template')).first<any>()
  need(row, 'Template not found', 404)
@@ -55,9 +72,22 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   const folderId=shared?(input.folderId===undefined?existing?.folder_id??null:input.folderId||null):null,folder=await folderGuard(db,a,folderId,'template'),previous=existing?await folderGuard(db,a,existing.folder_id,'template'):{sql:'1',values:[]}
   if(existing?.shared===1)await requireAudienceConsent(db,existing.folder_id,folderId,input.shareConsent)
   const templateName = text(input.name, 'a template name')
-  const { id: _id, client_id: _client, revision: _revision, ...content } = snapshot(displayed)
-  if(content.document){content.document=bindDocument(content.document);if(content.document.merge)content.document.merge={patterns:content.document.merge.patterns,values:{}}}
+  const { id: _id, client_id: _client, revision: _revision, ...savedContent } = snapshot(displayed)
+  const content:typeof savedContent&{template_input?:Omit<ReturnType<typeof unfilledVariableFields>,'clientId'>}=savedContent
+  if(content.document?.merge){
+   const fields=unfilledVariableFields({...content,client_id:source.client_id})
+   const {clientId:_sourceClient,...templateInput}=fields
+   const variablePrices=Object.keys(fields.document.merge.patterns).some(path=>/^\/(?:priceOne|priceTwo)$/.test(path)||/^\/(?:packages|pricingTables)\//.test(path)&&! /\/(?:label|name|description|unit|incomeAccount|taxCode)$/.test(path))
+   const options=variablePrices?fields.packages.map((p:any)=>({...p,cents:0,tables:fields.pricingTables.filter((t:any)=>t.optionId===p.id)}))
+    :pricedOptions(packageInputs(fields.packages,fields.pricingTables),fields.pricingTables).map((p:any,i:number)=>({...p,...(content.options[i].tax?{tax:content.options[i].tax}:{})}))
+   // Retain editable pricing patterns, never a calculation using source values.
+   Object.assign(content,{template_input:templateInput,title:fields.title,scope:fields.scope,terms:fields.terms,document:fields.document,
+    options})
+   if(content.recipient_plan)content.recipient_plan=fields.recipientPlan
+  }
+  if(content.document)content.document=bindDocument(content.document)
   if(content.recipient_plan)content.recipient_plan=content.recipient_plan.map((r:any)=>({...r,email:null}))
+  if(content.template_input){content.template_input.recipientPlan=content.recipient_plan??[];content.template_input.document=content.document}
   if(existing)await assertTemplateLocks(db,existing,content)
   const [pdf, savedExpiry, sections] = await Promise.all([
    db.prepare('SELECT enabled FROM p_pdf_settings WHERE proposal_id=?').bind(source.id).first<any>(),
@@ -77,7 +107,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
   writes.push(db.prepare('INSERT OR IGNORE INTO p_template_block_locks(template_id,section) SELECT ?,section FROM p_proposal_block_locks WHERE proposal_id=?').bind(id,source.id))
   const mediaIds=documentMediaIds(documentOf(displayed))
   writes.push(db.prepare('DELETE FROM p_template_document_media WHERE template_id=?').bind(id),db.prepare('INSERT INTO p_template_document_media(template_id,file_id) SELECT ?,file_id FROM p_document_media WHERE proposal_id=? AND file_id IN ('+(mediaIds.map(()=>'?').join(',')||'NULL')+')').bind(id,source.id,...mediaIds))
-  writes.push(...saveTemplateCosts(db,source.id,displayed.revision,id),...templateDefaults(db,source.id,id))
+  writes.push(...saveTemplateCosts(db,source.id,displayed.revision,id),...templateDefaults(db,source.id,id),await saveTemplateNotices(db,source.id,id))
   await commit(db, a, writes, false, {
    sql: 'EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=?) AND '+folder.sql+' AND '+previous.sql+(existing?' AND EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?)':''),
    values:[source.id,source.version,...folder.values,...previous.values,...(existing?[id,existing.version]:[])],
@@ -96,8 +126,8 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
  let content = starter ? { ...starter.content, attachments: await vendorDocuments(db) } : JSON.parse(personal.snapshot)
  if(content.importedContent){const percent=Number(input.depositPercent);need(input.depositPercent!==undefined&&Number.isFinite(percent)&&percent>=0.01&&percent<=100,'Choose a new deposit percentage for this draft; the source contains no deposit instructions',409);content={...content,scope:text(input.scope,'the new proposal scope',10000),deposit_bps:Math.round(percent*100)}}
  if(!content.options?.length){need(input.price!==undefined&&input.price!=='','This content has no source price. Enter a new proposal price before starting a draft',409);content={...content,options:[{id:'imported',label:'Reviewed content',cents:dollars(input.price)}]}}
- if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...editableVariableFields(content),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan}}
- const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry
+ if(documentOf(content).merge){const fill=await resolveVariables(env,a,{...(content.template_input??editableVariableFields(content)),clientId,...(input.deal?{variableDeal:input.deal}:{})},true);content={...content,...proposalFields(fill.fields),recipient_plan:fill.fields.recipientPlan};delete content.template_input}
+ const resolved=await resolveTemplateDelivery(db,personal),expiry=resolved.expiry,notices=await templateNotices(db,personal?.id)
  const sections: string[] = starter ? [] : JSON.parse(personal.suggestion_sections)
  need(content.currency === 'USD', 'Personal templates require USD content', 409)
  const id = crypto.randomUUID(), title = input.title === undefined || input.title === '' ? content.title : text(input.title, 'a title')
@@ -112,6 +142,7 @@ export async function templateCommand(env: Bindings, a: Actor, name: string, inp
    VALUES(?,?,?,?,?,1,1,'draft',?,?,?,?,?,?,?,?)`)
    .bind(id, clientId, title, row.scope, row.terms ?? '', row.deposit_bps, JSON.stringify(row.options), preparer, at, 'USD', a.id, a.email, JSON.stringify(attachments)),
   db.prepare('INSERT INTO p_template_sources(proposal_id,template_id,template_version) VALUES(?,?,?)').bind(id,template.id,template.version),
+  ...noticeSnapshots(db,id,notices.settings),
   ...(!starter?[db.prepare('INSERT INTO p_proposal_locks(proposal_id,section) SELECT ?,section FROM p_template_locks WHERE template_id=?').bind(id,template.id),db.prepare('INSERT INTO p_proposal_block_locks(proposal_id,section) SELECT ?,section FROM p_template_block_locks WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[db.prepare('INSERT INTO p_document_media(proposal_id,file_id) SELECT ?,file_id FROM p_template_document_media WHERE template_id=?').bind(id,template.id)]:[]),
   ...(!starter?[startTemplateCosts(db,template.id,id)]:[]),db.prepare('INSERT INTO p_proposal_defaults(proposal_id,settings) VALUES(?,?)').bind(id,JSON.stringify(resolved.settings)),
@@ -144,6 +175,7 @@ async function templateDeliveryCommand(db:D1Database,a:Actor,p:Record<string,unk
  const messageId=p.reminderTemplateId===undefined?undefined:String(p.reminderTemplateId)||null
  if(messageId)need(await db.prepare('SELECT 1 FROM p_reminder_templates WHERE id=?').bind(messageId).first(),'Reminder template not found',404)
  const nextExpiry={...expiry,...(p.expiryDays!==undefined?{mode:expiryDays===null?'never':'days',period_days:expiryDays,expires_on:null}:{}),warning_days:warningDays}
- await commit(db,a,[...(messageId===undefined?[]:[db.prepare('INSERT INTO p_template_reminder_messages(template_id,message_id) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET message_id=excluded.message_id').bind(row.id,messageId)]),db.prepare('UPDATE p_personal_templates SET delivery_sources=?,expiry=?,version=version+1,updated_at=? WHERE id=?').bind(JSON.stringify(sources),JSON.stringify(nextExpiry),at,row.id),db.prepare('INSERT INTO p_template_defaults(template_id,settings) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET settings=excluded.settings').bind(row.id,JSON.stringify(settings))],false,{sql:'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?) AND '+access.sql,values:[row.id,row.version,...access.values]})
+ const noticeSettings=await editTemplateNotices(db,row.id,p)
+ await commit(db,a,[noticeSettings,...(messageId===undefined?[]:[db.prepare('INSERT INTO p_template_reminder_messages(template_id,message_id) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET message_id=excluded.message_id').bind(row.id,messageId)]),db.prepare('UPDATE p_personal_templates SET delivery_sources=?,expiry=?,version=version+1,updated_at=? WHERE id=?').bind(JSON.stringify(sources),JSON.stringify(nextExpiry),at,row.id),db.prepare('INSERT INTO p_template_defaults(template_id,settings) VALUES(?,?) ON CONFLICT(template_id) DO UPDATE SET settings=excluded.settings').bind(row.id,JSON.stringify(settings))],false,{sql:'EXISTS(SELECT 1 FROM p_personal_templates WHERE id=? AND version=?) AND '+access.sql,values:[row.id,row.version,...access.values]})
  return {id:row.id,version:row.version+1}
 }

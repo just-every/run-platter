@@ -11,7 +11,7 @@ export async function pandaReissueArchive({checkout,command,exec}){
  let h
  try{
   for(const root of [source,restored])await checkout(root)
-  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:2e6})
+  await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
   h=await harness({root:source})
   const files=await integratedPandaFixture(),content=await applyPandaContent(h,'pandadoc-template',[files.catalog,files.quote]),contentJournal=await h.cmd('document-import.journal',{id:content.id})
   const bulkFiles=await bulkPandaFixture([2],2000),bulk=await applyPandaBulk(h,bulkFiles),client=await h.cmd('client.save',{name:'Synthetic restored new draft',email:h.auth.OWNER_EMAIL})

@@ -1,5 +1,5 @@
 import type { Bindings } from '../auth.server'
-import { providerCredential, providerJson } from './connections'
+import { providerCredential, connectedJson } from './connections'
 import { editablePackages, pricingInput } from './pricing'
 import { editableTerms } from './payment-terms'
 import { need, type Actor } from './model'
@@ -21,6 +21,21 @@ export function mergeFields(value:any):MergeFields|undefined{
 }
 const replace=(text:string,values:Record<string,string>)=>text.replace(variableToken,(original,key)=>Object.hasOwn(values,key)?values[key]:original)
 export function editableVariableFields(row:any){return {clientId:row.client_id,title:row.title,scope:row.scope,terms:row.terms??'',depositPercent:row.deposit_bps/100,packages:editablePackages(typeof row.options==='string'?JSON.parse(row.options):row.options),pricingTables:pricingInput(typeof row.options==='string'?JSON.parse(row.options):row.options),recipientPlan:typeof row.recipient_plan==='string'?JSON.parse(row.recipient_plan):row.recipient_plan??[],sectionConditions:row.section_conditions??{},document:typeof row.document==='string'?JSON.parse(row.document):row.document,paymentTerms:editableTerms(row)}}
+/** Templates keep reusable patterns without a source person's resolved values. */
+export function unfilledVariableFields(row:any){
+ const fields=structuredClone(editableVariableFields(row)),merge=mergeFields(fields.document?.merge)
+ if(!merge)return fields
+ for(const [path,pattern]of Object.entries(merge.patterns)){
+  const keys=path.slice(1).split('/');let parent:any=fields
+  for(const key of keys.slice(0,-1)){parent=parent?.[key];if(!parent)break}
+  if(parent&&typeof parent==='object')parent[keys.at(-1)!]=pattern
+ }
+ // Table-backed package totals and optional-item cents are derived source values.
+ // Recompute them only when the new client fills the editable pricing inputs.
+ fields.packages=fields.packages.map((p:any)=>({...p,...(fields.pricingTables.some((t:any)=>t.optionId===p.id)?{price:'0.01'}:{}),optionalItems:p.optionalItems.map(({unitCents,...item}:any)=>item)}))
+ fields.document.merge={patterns:merge.patterns,values:{},...(merge.conditions?{conditions:merge.conditions}:{})}
+ return fields
+}
 async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFields['deal']){
  const c=await env.DB.prepare('SELECT * FROM p_clients WHERE id=?').bind(clientId).first<any>();need(c,'Client not found',404)
  const profile=JSON.parse(c.variable_fields??'{}'),sender=await env.DB.prepare('SELECT display_name FROM oa_operators WHERE id=?').bind(a.id).first<any>(),name=sender?.display_name??''
@@ -29,20 +44,20 @@ async function recordValues(env:Bindings,a:Actor,clientId:string,deal?:MergeFiel
  if(deal){
   need(['owner','admin'].includes(a.role),'Only owner and admins read connected deals',403)
   need(deal.provider!=='orbit','Orbit currently exposes deal fields but no scoped contact-read route. Its contact API is required for complete variable refill.',409)
-  const {secret}=await providerCredential(env,'workspace:'+deal.provider)
+  const credential=await providerCredential(env,'workspace:'+deal.provider),{secret}=credential
   if(deal.provider==='salesforce'){
    need(typeof secret.instanceOrigin==='string','Reconnect Salesforce with a verified REST instance before reading opportunities',409)
-   const d=await providerJson(secret.instanceOrigin+'/services/data/v64.0/sobjects/Opportunity/'+encodeURIComponent(deal.id)+'?fields=Name,Amount,Account.Name,Account.BillingStreet',secret.token)
+   const d=await connectedJson(env,credential,secret.instanceOrigin+'/services/data/v64.0/sobjects/Opportunity/'+encodeURIComponent(deal.id)+'?fields=Name,Amount,Account.Name,Account.BillingStreet')
    if(d.Name)values['Deal.Name']=String(d.Name);if(d.Amount!==undefined&&d.Amount!==null)values['Deal.Amount']=String(d.Amount);if(d.Account?.Name)values['Client.Company']=String(d.Account.Name);if(d.Account?.BillingStreet)values['Client.Address']=String(d.Account.BillingStreet)
-   const roles=await providerJson(secret.instanceOrigin+'/services/data/v64.0/query?q='+encodeURIComponent("SELECT Contact.FirstName,Contact.LastName,Contact.Title,Contact.Email FROM OpportunityContactRole WHERE OpportunityId = '"+deal.id+"' AND IsPrimary = true"),secret.token),contact=roles.records?.[0]?.Contact
+   const roles=await connectedJson(env,credential,secret.instanceOrigin+'/services/data/v64.0/query?q='+encodeURIComponent("SELECT Contact.FirstName,Contact.LastName,Contact.Title,Contact.Email FROM OpportunityContactRole WHERE OpportunityId = '"+deal.id+"' AND IsPrimary = true")),contact=roles.records?.[0]?.Contact
    if(contact){for(const [key,v]of Object.entries({'Client.FirstName':contact.FirstName,'Client.LastName':contact.LastName,'Client.Name':[contact.FirstName,contact.LastName].filter(Boolean).join(' '),'Contact.Name':[contact.FirstName,contact.LastName].filter(Boolean).join(' '),'Contact.Title':contact.Title,'Client.Title':contact.Title,'Client.Email':contact.Email}))if(v)values[key]=String(v)}
    return values
   }
-  const d=await providerJson('https://api.hubapi.com/crm/v3/objects/deals/'+encodeURIComponent(deal.id)+'?properties=dealname,amount&associations=contacts',secret.token),props=d.properties??{}
+  const d=await connectedJson(env,credential,'https://api.hubapi.com/crm/v3/objects/deals/'+encodeURIComponent(deal.id)+'?properties=dealname,amount&associations=contacts'),props=d.properties??{}
   if(props.dealname)values['Deal.Name']=String(props.dealname)
   if(props.amount!==undefined&&props.amount!==null)values['Deal.Amount']=String(props.amount)
   const id=d.associations?.contacts?.results?.[0]?.id
-  if(id){const contact=await providerJson('https://api.hubapi.com/crm/v3/objects/contacts/'+encodeURIComponent(id)+'?properties=firstname,lastname,jobtitle,company,address,email',secret.token),p=contact.properties??{}
+  if(id){const contact=await connectedJson(env,credential,'https://api.hubapi.com/crm/v3/objects/contacts/'+encodeURIComponent(id)+'?properties=firstname,lastname,jobtitle,company,address,email'),p=contact.properties??{}
    for(const [key,v]of Object.entries({'Client.Company':p.company,'Client.FirstName':p.firstname,'Client.LastName':p.lastname,'Client.Name':[p.firstname,p.lastname].filter(Boolean).join(' '),'Contact.Name':[p.firstname,p.lastname].filter(Boolean).join(' '),'Client.Title':p.jobtitle,'Contact.Title':p.jobtitle,'Client.Address':p.address,'Client.Email':p.email}))if(v)values[key]=String(v)
   }
  }

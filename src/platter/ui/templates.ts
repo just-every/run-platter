@@ -14,7 +14,7 @@ function templateDelivery(state:any,t:any){
  +field('Template days after sending','reminderDays',(d.reminderDays??[]).join(', '))+field('Template days before expiry','beforeExpiryDays',(d.beforeExpiryDays??[]).join(', '))+field('Template reminder cap','reminderCap',d.reminderCap??3,'type="number" required min="0" max="365"')
  +reminderMessageChoice(state,t.reminderTemplateId,'reminderTemplateId','Template reminder message')+source('expiry','Expiry source')+field('Template expiry days (empty for no expiry)','expiryDays',t.expiry.period_days??'','type="number" min="1" max="36500"')+(t.expiry.mode==='date'?'<p>The saved fixed expiry date '+escape(t.expiry.expires_on)+' will be replaced by the period above when saving these controls.</p>':'')
  +source('warning','Warning source')+field('Template warning days (empty for no warning)','warningDays',t.expiry.warning_days??'','type="number" min="1" max="36500"')
- +hidden('methodsProvided','yes')+'<fieldset><legend>Template payment methods</legend>'+[['card','Card'],['ach','ACH'],['apple_pay','Apple Pay'],['google_pay','Google Pay']].map(([id,label])=>'<label><input type="checkbox" name="method:'+id+'" value="yes"'+((d.paymentMethods??[]).includes(id)?' checked':'')+'>'+escape(label)+'</label>').join('')+'</fieldset><p>New drafts copy these payment choices with collection off. Configure collection separately on each proposal.</p><button>Save template delivery defaults</button>')+'</details>'
+ +hidden('methodsProvided','yes')+'<fieldset><legend>Template payment methods</legend>'+[['card','Card'],['ach','ACH'],['apple_pay','Apple Pay'],['google_pay','Google Pay']].map(([id,label])=>'<label><input type="checkbox" name="method:'+id+'" value="yes"'+((d.paymentMethods??[]).includes(id)?' checked':'')+'>'+escape(label)+'</label>').join('')+'</fieldset><p>New drafts copy these payment choices with collection off. Configure collection separately on each proposal.</p>'+senderNoticeDefaults(t)+'<button>Save template delivery defaults</button>')+'</details>'
 }
 
 export function personalTemplates(state: any,query='',params=new URLSearchParams()): string {
@@ -32,7 +32,7 @@ export function savePersonalTemplate(state: any, p: any): string {
   + hidden('templateId', t.id) + hidden('templateVersion', t.version) + hidden('name', t.name)
   + (t.shared?folderSelect(state,'template',t.folder_id)+'<label><input type="checkbox" name="shareConsent" value="yes">I authorize sharing with the selected folder audience if it widens access.</label>':'')
   + `<button class="secondary">Replace ${escape(t.name)} with this revision</button>`)).join('')
- return panel('Save a personal template', '<p>Keep this displayed revision’s content, packages, attachments, PDF-download choice and expiry settings for future drafts. Approvals, client details and signing links are not copied.</p>'
+ return panel('Save a personal template', '<p>Keep this displayed revision’s content, packages, attachments, PDF-download choice and expiry settings for future drafts. Variable patterns refill from the new client and sender. Filled variable values, approvals and signing links are not copied.</p>'
   + form('template.save', proposalPath(p.id), source + field('Template name', 'name', p.title, 'required maxlength="200"') + '<button>Save personal template</button>')
   + (resourceEditors.includes(state.actor.role)?form('template.save',proposalPath(p.id),source+hidden('shared','yes')+field('Shared template name','name',p.title,'required maxlength="200"')+folderSelect(state,'template')+'<label><input type="checkbox" name="shareConsent" value="yes" required>I authorize sharing this content with the selected audience.</label><button>Save shared template</button>'):'')
   + (replace ? `<details><summary>Replace an existing personal template</summary>${replace}</details>` : ''))
@@ -47,4 +47,9 @@ export function starterTemplatesPanel(state: any): string {
    + `<label for="starter-template">Starter template</label><select id="starter-template" name="id" required>${choices}</select>`
    + `<label for="starter-client">Client for starter proposal</label><select id="starter-client" name="starterClientId" required>${clients}</select>`
    + '<button>Start starter proposal</button>') : '<p>Add a client to start from Agency, Consultancy, IT managed services, Creative studio or Professional services.</p>'))
+}
+
+function senderNoticeDefaults(t:any){
+ const notices=t.noticeDefaults??{source:'inherit',settings:{expiry:{enabled:1,leadDays:3},renewal:{enabled:1,leadDays:30}}}
+ return '<fieldset><legend>Sender notice Settings</legend><label>Sender notice source<select name="noticeSource" aria-label="Sender notice source"><option value="inherit"'+(notices.source==='inherit'?' selected':'')+'>Follow workspace at creation</option><option value="override"'+(notices.source==='override'?' selected':'')+'>Use this template’s override</option></select></label>'+(['expiry','renewal'] as const).map(kind=>{const label=kind==='expiry'?'Expiry':'Renewal',d=notices.settings[kind];return '<label>Template '+label.toLowerCase()+' notices<select name="'+kind+'NoticeEnabled"><option value="yes"'+(d.enabled?' selected':'')+'>On when explicitly authorized</option><option value="no"'+(!d.enabled?' selected':'')+'>Off</option></select></label>'+field('Template '+label.toLowerCase()+' lead days',kind+'NoticeDays',d.leadDays,'type="number" min="1" max="365" required')}).join('')+'<p>New drafts copy independent timing choices. Personal destinations and outbound authorization are never copied.</p></fieldset>'
 }

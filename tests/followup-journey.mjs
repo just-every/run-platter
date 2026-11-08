@@ -141,19 +141,97 @@ export async function followupJourney(h, {offer, verified}) {
   assert.ok((await queue()).rows.some(row => row.id === fixture.A.id), 'denied commands do not alter the owner queue')
   const key=await h.cmd('agent.create',{label:'Sales drafting assistant'})
   assert.equal((await h.send('/api/platter/agent/command',{name:'followup.complete',input:{id:fixture.A.id,action:'Agent attempt'}},'',{authorization:'Bearer '+key.token})).status,403)
-  const tied=[]
-  for(let i=0;i<3;i++){
-    await h.db.prepare('UPDATE p_expiry_clock SET observed_at=? WHERE singleton=1').bind(at+(i?2000:1000)).run()
-    const client=await h.cmd('client.save',{name:'Juniper Studio '+i,email:`juniper${i}@studio.example`})
-    const p=await h.cmd('proposal.prepare',{...offer,clientId:client.id,title:'Juniper campaign '+i,priceOne:'6000',priceTwo:'6000'})
-    await h.cmd('proposal.approve',{id:p.id,version:1,revision:1});await h.cmd('proposal.send',{id:p.id,version:2})
-    await h.cmd('followup.schedule',{id:p.id,action:'Call Juniper',dueDate:'2027-04-01'})
-    tied.push(p.id)
-  }
-  assert.deepEqual((await queue()).rows.filter(r=>tied.includes(r.id)).map(r=>r.id),[tied[0],...tied.slice(1).sort()],'earliest first send wins, then stable id')
-  await h.db.prepare('UPDATE p_expiry SET sent_at=NULL WHERE proposal_id=?').bind(tied[0]).run()
-  assert.deepEqual((await queue()).rows.filter(r=>tied.includes(r.id)).map(r=>r.id),[...tied.slice(1).sort(),tied[0]],'legacy missing sent time sorts last without invented history')
   await h.db.prepare('UPDATE p_expiry_clock SET observed_at=? WHERE singleton=1').bind(Date.parse('2027-03-11T01:00:00Z')).run()
   await h.cmd('report.time-zone',{timeZone:'Pacific/Honolulu'});assert.equal((await queue()).today,'2027-03-10')
   await h.cmd('report.time-zone',{timeZone:'UTC'});assert.equal((await queue()).today,'2027-03-11')
+  await followupBoundaryJourney(h, {offer, peer: admin})
+}
+
+/** Real commands and cron instants, shared with the compiled browser journey. */
+export async function followupBoundaryJourney(h, {offer, peer}) {
+  const command = (name, input, cookie = h.owner) => h.cmd(name, input, cookie)
+  const tick = async at => (await h.mf.getWorker()).scheduled({scheduledTime: new Date(at), cron: '*/15 * * * *'})
+  const read = async cookie => {
+    const response = await h.send('/api/platter/followups', undefined, cookie)
+    assert.equal(response.status, 200, response.text)
+    return response.value
+  }
+  if (!peer) {
+    const email = ['synthetic-platter-9701', 'example.test'].join('@')
+    assert.equal((await h.send('/auth/invite', {email, displayName: 'Honolulu sales owner', role: 'member', returnTo: '/app'}, h.owner)).status, 202)
+    peer = await h.signIn(email)
+    await command('member.set', {operatorId: (await h.state(peer)).actor.id, version: 0, role: 'admin', teams: []})
+  }
+  const owner = (await h.state(h.owner)).actor, other = (await h.state(peer)).actor
+  await command('member.zone', {timeZone: 'America/New_York'})
+  await command('member.zone', {timeZone: 'Pacific/Honolulu'}, peer)
+  await command('tracking.settings', {enabled: 'no', alerts: 'no', retentionDays: 90, quietMinutes: 30})
+  const baseline = (await read(h.owner)).totals
+  const start = Date.parse('2027-03-11T12:00:00Z')
+  const client = await command('client.save', {name: 'Personal-zone campaign client', email: ['synthetic-platter-9702', 'example.test'].join('@')})
+  const create = async (title, price, offset, dueDate = '2027-03-12', cookie = h.owner, currency = 'USD') => {
+    await tick(start + offset)
+    const p = await command('proposal.prepare', {...offer, clientId: client.id, title, priceOne: price, priceTwo: price}, cookie)
+    // Only historical installations have AUD records; new offers remain USD.
+    if (currency === 'AUD') await h.db.prepare("UPDATE p_proposals SET currency='AUD' WHERE id=?").bind(p.id).run()
+    await command('proposal.approve', {id: p.id, version: 1, revision: 1})
+    await command('proposal.send', {id: p.id, version: 2}, cookie)
+    await command('followup.schedule', {id: p.id, action: 'Discuss ' + title, dueDate}, cookie)
+    return p.id
+  }
+  const low = await create('Earlier lower value', '4000', 0)
+  const early = await create('First sent at equal value', '6000', 1000)
+  const zulu = await create('Zulu simultaneous offer', '6000', 2000)
+  const alpha = await create('Alpha simultaneous offer', '6000', 2000)
+  const high = await create('Later higher value', '9000', 3000)
+  const aud = await create('Historical AUD offer', '7000', 4000, '2027-03-12', h.owner, 'AUD')
+  const ownerPast = await create('New York prior day', '1300', 5000, '2027-03-11')
+  const ownerFuture = await create('New York future day', '1400', 6000, '2027-03-13')
+  const peerPast = await create('Honolulu prior day', '1100', 7000, '2027-03-11', peer)
+  const peerNext = await create('Honolulu next day', '1200', 8000, '2027-03-12', peer)
+  const ties = [low, early, zulu, alpha, high, aud]
+  // Amounts and recorded send instants are independently specified above. Only
+  // the last tie uses the generated IDs, as the documented numbering interim.
+  const expectedTies = [high, aud, early, ...[zulu, alpha].sort(), low]
+  const initial = await read(h.owner)
+  assert.deepEqual(initial.rows.filter(r => ties.includes(r.id)).map(r => r.id), expectedTies, 'value wins before send time; simultaneous sends use stable IDs, not titles')
+  assert.deepEqual(initial.rows.filter(r => ties.includes(r.id)).map(r => [r.valueCents, r.sentAt]), [
+    [900000, start + 3000], [700000, start + 4000],
+    [600000, start + 1000], [600000, start + 2000], [600000, start + 2000], [400000, start],
+  ])
+  await h.db.prepare('UPDATE p_expiry SET sent_at=NULL WHERE proposal_id=?').bind(early).run()
+  assert.deepEqual((await read(h.owner)).rows.filter(r => ties.includes(r.id)).map(r => r.id), [high, aud, ...[zulu, alpha].sort(), early, low], 'legacy missing sent time sorts last within its value without invented history')
+  await h.db.prepare('UPDATE p_expiry SET sent_at=? WHERE proposal_id=?').bind(start + 1000, early).run()
+  const expectedTotals = ['AUD', 'USD'].map(currency => {
+    const before = baseline.find(row => row.currency === currency)
+    return {currency, count: (before?.count ?? 0) + (currency === 'USD' ? 9 : 1), valueCents: (before?.valueCents ?? 0) + (currency === 'USD' ? 3600000 : 700000)}
+  })
+  const samples = [ownerPast, early, ownerFuture, peerPast, peerNext]
+  // March 12 is before New York's spring DST transition: its midnight is
+  // 05:00 UTC. Honolulu's is 10:00 UTC. These expectations use neither the
+  // production date formatter nor the queue's sorting function.
+  for (const [instant, ownerToday, peerToday, periods] of [
+    ['2027-03-12T04:59:59.999Z', '2027-03-11', '2027-03-11', ['today', 'upcoming', 'upcoming', 'today', 'upcoming']],
+    ['2027-03-12T05:00:00.000Z', '2027-03-12', '2027-03-11', ['overdue', 'today', 'upcoming', 'today', 'upcoming']],
+    ['2027-03-12T09:59:59.999Z', '2027-03-12', '2027-03-11', ['overdue', 'today', 'upcoming', 'today', 'upcoming']],
+    ['2027-03-12T10:00:00.000Z', '2027-03-12', '2027-03-12', ['overdue', 'today', 'upcoming', 'overdue', 'today']],
+  ]) {
+    await tick(Date.parse(instant))
+    for (const [cookie, today, zone] of [[h.owner, ownerToday, 'America/New_York'], [peer, peerToday, 'Pacific/Honolulu']]) {
+      const queue = await read(cookie)
+      assert.equal(queue.today, today, instant)
+      assert.equal(queue.timeZone, zone)
+      assert.deepEqual(samples.map(id => queue.rows.find(r => r.id === id).period), periods, 'each recorded owner determines the boundary, regardless of reader: ' + instant)
+      for (const [ids, actor, timeZone] of [[[...ties, ownerPast, ownerFuture], owner, 'America/New_York'], [[peerPast, peerNext], other, 'Pacific/Honolulu']]) {
+        for (const id of ids) {
+          const row = queue.rows.find(r => r.id === id)
+          assert.equal(row.ownerId, actor.id)
+          assert.equal(row.timeZone, timeZone)
+        }
+      }
+      assert.deepEqual(queue.rows.filter(r => ties.includes(r.id)).map(r => r.id), expectedTies)
+      assert.deepEqual(queue.totals, expectedTotals, 'face-value totals remain separate, without exchange conversion')
+    }
+  }
+  return {expectedTies, expectedTotals, ownerPast, ownerFuture, peerPast, peerNext}
 }

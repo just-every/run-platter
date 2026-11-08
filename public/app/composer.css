@@ -139,3 +139,6 @@ button.quiet:hover{background:var(--pl-wash);color:var(--pl-ink)}
 .packages-foot{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin:-4px 0 18px}
 .packages-foot p{margin:0;font-size:13px}.packages-foot p:empty{display:none}
 .packages-foot button{width:auto}
+
+/* Long itemised proposals render each row when it approaches the viewport. */
+.itemised [data-pricing-line]{content-visibility:auto;contain-intrinsic-block-size:auto 540px}

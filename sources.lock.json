@@ -1562,7 +1562,7 @@
       "executable": false
     },
     "scripts/verification/run.mjs": {
-      "sha256": "594a96613b51b23db416789c1e11a54055bcdb3bb8c55d4a7ff689dd07bbdb60",
+      "sha256": "02e2c99cb89f5fc2bcde83371f9362c68c26ea7bf403d5721432c7b362678f1e",
       "executable": false
     },
     "SEED-COMMAND-CONTRACT.md": {

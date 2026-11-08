@@ -42,15 +42,12 @@ const business=partitions(businessFiles,[
  ['lifecycle',null]
 ])
 // Move bounce custody and legacy currency to lighter jobs, and Drive history
-// from media to restore. Separate the long restore/media groups so independent
-// CLI checkouts can overlap; keep the media remainder open to future tests.
+// from media to restore. Keep the media remainder open to future archive tests.
 const archive=partitions('tests/archive.test.mjs',[
  ['custody','public CLI preserves business'],
  ['currency','first-release AUD'],
  ['bounce','bounce follow-ups'],
- ['restore_imports','imported business'],
- ['restore','PORT-001 public CLI refuses|document archive history'],
- ['media_documents','^(TEAM|EDIT)-'],
+ ['restore','PORT-001 public CLI refuses|imported business|document archive history'],
  ['media',null]
 ])
 // Split serial document browser journeys. Complementary filters retain
@@ -69,26 +66,36 @@ const tasks={
  business_sending:[business.sending,business.signing],
  archive:['pnpm test:archive'],
  archive_custody:[archive.custody,business.copies,archive.currency,business.learning,business.crm,business.lifecycle],
- archive_restore:[archive.restore,archive.restore_imports,business.search],
- archive_media:[archive.media_documents,archive.media,business.comments,business.notifications]
+ archive_restore:[archive.restore,business.search],
+ archive_media:[archive.media,business.comments,business.notifications]
 }
 if(shard&&!Object.hasOwn(tasks,shard))throw Error('Unknown verification shard')
 const commands=shard?tasks[shard]:[...tasks.core,lifecycleBrowser,...tasks.browser_documents_all,...tasks.business,...tasks.archive]
 // Core/default builds have ordered inputs. A CI shard's commands instead own
 // fresh harnesses/CLI checkouts and only read the shared build. Overlap at most
 // two commands, with at most one browser command in any shard; each Node test
-// command still runs its files serially. Wait for every child, retaining errors.
+// command still runs its files serially. Archive CLI builds are heavier: allow
+// only one archive command at once, bypassing it for eligible business work.
+// Wait for every child, retaining errors.
 const concurrency=shard&&!['core','business','archive','browser_documents_all'].includes(shard)?2:1
-let next=0,exitCode=0
+const pending=commands.map(command=>({command,archive:command.endsWith(' tests/archive.test.mjs')}))
+let archiveBusy=false,exitCode=0
+const waiters=[]
+function wake(){for(const resolve of waiters.splice(0))resolve()}
 async function worker(){
- while(next<commands.length){
-  const command=commands[next++]
+ while(pending.length){
+  const index=pending.findIndex(task=>!task.archive||!archiveBusy)
+  if(index<0){await new Promise(resolve=>waiters.push(resolve));continue}
+  const {command,archive}=pending.splice(index,1)[0]
+  if(archive)archiveBusy=true
   const code=await new Promise(resolve=>{
    const child=spawn(command,{shell:true,stdio:'inherit',env:process.env})
    child.once('error',error=>{console.error(error);resolve(1)})
    child.once('close',code=>resolve(code??1))
   })
-  if(code){exitCode||=code;if(concurrency===1)break}
+  if(archive)archiveBusy=false
+  if(code){exitCode||=code;if(concurrency===1)pending.length=0}
+  wake()
  }
 }
 await Promise.all(Array.from({length:Math.min(concurrency,commands.length)},worker))

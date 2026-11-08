@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 const shard=process.env.PLATTER_VERIFY_SHARD
 // Each ordered partition subtracts all earlier matches over the SAME files.
 // The final complement catches every other current or future test name, so a
@@ -42,12 +42,15 @@ const business=partitions(businessFiles,[
  ['lifecycle',null]
 ])
 // Move bounce custody and legacy currency to lighter jobs, and Drive history
-// from media to restore. Keep the media remainder open to future archive tests.
+// from media to restore. Separate the long restore/media groups so independent
+// CLI checkouts can overlap; keep the media remainder open to future tests.
 const archive=partitions('tests/archive.test.mjs',[
  ['custody','public CLI preserves business'],
  ['currency','first-release AUD'],
  ['bounce','bounce follow-ups'],
- ['restore','PORT-001 public CLI refuses|imported business|document archive history'],
+ ['restore_imports','imported business'],
+ ['restore','PORT-001 public CLI refuses|document archive history'],
+ ['media_documents','^(TEAM|EDIT)-'],
  ['media',null]
 ])
 // Split serial document browser journeys. Complementary filters retain
@@ -66,8 +69,27 @@ const tasks={
  business_sending:[business.sending,business.signing],
  archive:['pnpm test:archive'],
  archive_custody:[archive.custody,business.copies,archive.currency,business.learning,business.crm,business.lifecycle],
- archive_restore:[archive.restore,business.search],
- archive_media:[archive.media,business.comments,business.notifications]
+ archive_restore:[archive.restore,archive.restore_imports,business.search],
+ archive_media:[archive.media_documents,archive.media,business.comments,business.notifications]
 }
 if(shard&&!Object.hasOwn(tasks,shard))throw Error('Unknown verification shard')
-for(const command of shard?tasks[shard]:[...tasks.core,lifecycleBrowser,...tasks.browser_documents_all,...tasks.business,...tasks.archive]){const result=spawnSync(command,{shell:true,stdio:'inherit',env:process.env});if(result.status!==0)process.exit(result.status??1)}
+const commands=shard?tasks[shard]:[...tasks.core,lifecycleBrowser,...tasks.browser_documents_all,...tasks.business,...tasks.archive]
+// Core/default builds have ordered inputs. A CI shard's commands instead own
+// fresh harnesses/CLI checkouts and only read the shared build. Overlap at most
+// two commands, with at most one browser command in any shard; each Node test
+// command still runs its files serially. Wait for every child, retaining errors.
+const concurrency=shard&&!['core','business','archive','browser_documents_all'].includes(shard)?2:1
+let next=0,exitCode=0
+async function worker(){
+ while(next<commands.length){
+  const command=commands[next++]
+  const code=await new Promise(resolve=>{
+   const child=spawn(command,{shell:true,stdio:'inherit',env:process.env})
+   child.once('error',error=>{console.error(error);resolve(1)})
+   child.once('close',code=>resolve(code??1))
+  })
+  if(code){exitCode||=code;if(concurrency===1)break}
+ }
+}
+await Promise.all(Array.from({length:Math.min(concurrency,commands.length)},worker))
+process.exitCode=exitCode

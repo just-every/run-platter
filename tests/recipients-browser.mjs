@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { installedApp } from './site-harness.mjs'
 
@@ -136,6 +137,24 @@ export async function recipientsBrowser(width=1440){
   for(const r of plan){await pages[r.name].reload();assert.equal(await pages[r.name].getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1)}
   const completion=(await app.db.prepare("SELECT recipient FROM p_mail WHERE proposal_id=? AND subject LIKE 'Agreement complete:%'").bind(p.id).all()).results
   assert.deepEqual(completion.map(r=>r.recipient).sort(),plan.map(r=>r.id===cfo.id?address(1011):r.email).sort())
+  const retained=await app.db.prepare('SELECT * FROM p_agreement_artifacts WHERE proposal_id=?').bind(p.id).first()
+  for(const name of ['CEO','CFO','Owner']){
+   const active=pages[name];await active.reload()
+   await active.getByRole('heading',{name:'Agreement downloads',exact:true}).waitFor()
+   if(width===1440){
+    for(const [label,bytes] of [['Signed agreement PDF',retained.document],['Certificate of completion',retained.certificate]]){
+     const response=await active.request.get(new URL(await active.getByRole('link',{name:label,exact:true}).getAttribute('href'),app.origin).href)
+     assert.equal(response.status(),200);assert.deepEqual(await response.body(),Buffer.from(bytes))
+    }
+    assert.equal(JSON.parse(retained.facts).documentSha256,createHash('sha256').update(Buffer.from(retained.document)).digest('hex'))
+   }
+   if(screenshots)await active.screenshot({path:join(screenshots,'recipients-completed-'+name.toLowerCase()+'-'+width+'.png'),fullPage:true})
+  }
+  if(width===1440){
+   const refs=(await app.db.prepare('SELECT * FROM p_completion_mail WHERE proposal_id=?').bind(p.id).all()).results
+   assert.equal(refs.length,plan.length)
+   for(const ref of refs)assert.equal((await app.db.prepare('SELECT status FROM p_mail WHERE id=?').bind(ref.mail_id).first()).status,'local')
+  }
   await page.goto(app.origin+'/app/proposal?id='+p.id);await capture('complete-owner')
   // The same owner form revokes a viewer before any agreement completion.
   const second=await cmd('proposal.prepare',{...offer,title:'Revocable viewing agreement'})

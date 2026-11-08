@@ -1,21 +1,24 @@
 import { clientLocale, clientText } from './locales'
+import { recordPaymentFailure, failureHistory } from './payment-failure-notices'
 import { currentTime } from './expiry-time'
+import { queueReadyCompletionMail } from './completion-mail'
+import { dispatchMail } from './mail'
 import { collectionQuote } from './collection-fees'
 import type { Bindings } from '../auth.server'
-import { providerCredential } from './connections'
+import { providerCredential, providerFetch, type ProviderCredential } from './connections'
 import { collectionPolicy } from './collection-policy'
 import { need, fail } from './model'
 
-export async function collectionView(db:D1Database,id:string,accepted?:any){
+export async function collectionView(db:D1Database,id:string,accepted?:any,showFailures=false){
  const frozen=accepted?JSON.parse(accepted.snapshot).collectionPolicy:null
  const policy=accepted?(frozen??{enabled:false,completion:'off',methods:[]}):await collectionPolicy(db,id)
  const intent=await db.prepare('SELECT method,status,cents,deposit_cents,fee_cents,billing_state,currency,authorization,authorized_at,provider_mandate FROM p_collection_intents WHERE proposal_id=? AND revision=?').bind(id,accepted?.revision??0).first<any>()
- return {...policy,payment:intent,agreementState:!accepted?'unsigned':!policy.enabled||policy.completion==='due'||accepted.deposit_cents===0||intent?.status==='succeeded'&&Boolean(intent.authorized_at)?'complete':'waiting_for_payment',complete:!policy.enabled||policy.completion==='due'||accepted?.deposit_cents===0||intent?.status==='succeeded'&&Boolean(intent.authorized_at)}
+ return {...policy,payment:intent,failures:showFailures?await failureHistory(db,id):[],agreementState:!accepted?'unsigned':!policy.enabled||policy.completion==='due'||accepted.deposit_cents===0||intent?.status==='succeeded'&&Boolean(intent.authorized_at)?'complete':'waiting_for_payment',complete:!policy.enabled||policy.completion==='due'||accepted?.deposit_cents===0||intent?.status==='succeeded'&&Boolean(intent.authorized_at)}
 }
 
-async function stripe(token:string,path:string,body?:URLSearchParams,idempotency?:string){
+async function stripe(env:Bindings,credential:ProviderCredential,path:string,body?:URLSearchParams,idempotency?:string){
  try{
-  const response=await fetch('https://api.stripe.com/v1/'+path,{method:body?'POST':'GET',redirect:'manual',headers:{authorization:'Bearer '+token,...(body?{'content-type':'application/x-www-form-urlencoded'}:{}),...(idempotency?{'idempotency-key':idempotency}:{})},...(body?{body}:{}),signal:AbortSignal.timeout(20000)})
+  const response=await providerFetch(env,credential,'https://api.stripe.com/v1/'+path,{method:body?'POST':'GET',redirect:'manual',headers:{...(body?{'content-type':'application/x-www-form-urlencoded'}:{}),...(idempotency?{'idempotency-key':idempotency}:{})},...(body?{body}:{}),signal:AbortSignal.timeout(20000)})
   need(response.ok,'Stripe could not prepare this payment. Contact the firm.',409)
   return await response.json() as any
  }catch{fail('Stripe could not confirm this payment. Refresh its status before trying again.',409)}
@@ -31,7 +34,7 @@ async function boundClient(env:Bindings,c:any){
 }
 
 export async function clientCollection(env:Bindings,c:any,input:Record<string,unknown>,refresh=false){
- const {accepted,policy}=await boundClient(env,c),db=env.DB,{secret}=await providerCredential(env,'workspace:stripe')
+ const {accepted,policy}=await boundClient(env,c),db=env.DB,credential=await providerCredential(env,'workspace:stripe'),{secret,connection}=credential
  let saved=await db.prepare('SELECT * FROM p_collection_intents WHERE proposal_id=? AND revision=?').bind(accepted.proposal_id,accepted.revision).first<any>()
  const method=String(input.method??saved?.method??'card')
  need(policy.methods.includes(method),'This payment method is not offered',400)
@@ -51,10 +54,10 @@ export async function clientCollection(env:Bindings,c:any,input:Record<string,un
   const body=new URLSearchParams({amount:String(quote.cents),currency:accepted.currency.toLowerCase(),'automatic_payment_methods[enabled]':'true','automatic_payment_methods[allow_redirects]':'never','metadata[platter_proposal_id]':accepted.proposal_id,'metadata[platter_revision]':String(accepted.revision)})
   body.append('excluded_payment_method_types[]',method==='ach'?'card':'us_bank_account')
   // A reservation is retained after a timeout; no second intent is created automatically.
-  const intent=await stripe(secret.token,'payment_intents',body,'platter-deposit-'+id)
+  const intent=await stripe(env,credential,'payment_intents',body,'platter-deposit-'+id)
   const expected=method==='ach'?'us_bank_account':'card'
   if(!Array.isArray(intent.payment_method_types)||!intent.payment_method_types.includes(expected)||intent.payment_method_types.some((m:string)=>m!==expected&&m!=='link')){
-   await stripe(secret.token,'payment_intents/'+encodeURIComponent(intent.id)+'/cancel',new URLSearchParams())
+   await stripe(env,credential,'payment_intents/'+encodeURIComponent(intent.id)+'/cancel',new URLSearchParams())
    await db.prepare("UPDATE p_collection_intents SET status='unavailable',provider_intent=?,updated_at=? WHERE id=?").bind(intent.id,Date.now(),id).run()
    fail('Stripe does not offer this payment method for the connected account',409)
   }
@@ -63,9 +66,10 @@ export async function clientCollection(env:Bindings,c:any,input:Record<string,un
   saved=await db.prepare('SELECT * FROM p_collection_intents WHERE id=?').bind(id).first<any>()
  }
  need(saved.provider_intent,'Payment preparation is held for reconciliation. Contact the firm.',409)
- const intent=await stripe(secret.token,'payment_intents/'+encodeURIComponent(saved.provider_intent)+'?expand[]=latest_charge')
+ const intent=await stripe(env,credential,'payment_intents/'+encodeURIComponent(saved.provider_intent)+'?expand[]=latest_charge')
  need(intent.id===saved.provider_intent&&intent.amount===saved.cents&&intent.currency===saved.currency.toLowerCase()&&intent.metadata?.platter_proposal_id===accepted.proposal_id&&intent.metadata?.platter_revision===String(accepted.revision),'Stripe deposit binding changed. Contact the firm.',409)
  await boundClient(env,c)
+ need(await db.prepare("SELECT 1 FROM p_connections WHERE id='workspace:stripe' AND version=? AND account_id=? AND status='connected' AND broken_at IS NULL").bind(connection.version,saved.account_id).first(),'The Stripe connection changed. Refresh with the firm.',409)
  const mandate=intent.latest_charge?.payment_method_details?.us_bank_account?.mandate
  if(intent.status==='succeeded'){
   const charge=intent.latest_charge
@@ -75,6 +79,8 @@ export async function clientCollection(env:Bindings,c:any,input:Record<string,un
  }
  await db.prepare('UPDATE p_collection_intents SET status=?,provider_mandate=COALESCE(?,provider_mandate),updated_at=? WHERE id=? AND (status!=\'succeeded\' OR ?=\'succeeded\')').bind(intent.status,typeof mandate==='string'?mandate:null,Date.now(),saved.id,intent.status).run()
  const status=(await db.prepare('SELECT status FROM p_collection_intents WHERE id=?').bind(saved.id).first<{status:string}>())!.status
+ if(status!=='succeeded'){await recordPaymentFailure(env,saved,intent);await dispatchMail(env,accepted.proposal_id)}
+ if(status==='succeeded'){await queueReadyCompletionMail(env,accepted.proposal_id);await dispatchMail(env,accepted.proposal_id)}
  return {quote:{depositCents:saved.deposit_cents,feeCents:saved.fee_cents,cents:saved.cents},status,complete:policy.completion==='due'||status==='succeeded'&&Boolean(saved.authorized_at),...(refresh||status==='succeeded'?{}:{clientSecret:intent.client_secret,publishableKey:secret.publishableKey,methods:policy.methods,method:saved.method}),authorization:saved.authorization}
 }
 
@@ -87,5 +93,6 @@ export async function authorizeCollection(env:Bindings,c:any,input:Record<string
  need(saved?.provider_intent&&saved.deposit_cents===accepted.deposit_cents&&saved.currency===accepted.currency,'Prepare this deposit before authorizing it',409)
  need(input.consent===true&&Number(input.cents)===saved.cents,'Review and authorize the exact payment total',400)
  await db.batch([db.prepare('INSERT INTO p_guard(ok) VALUES(EXISTS(SELECT 1 FROM p_shares WHERE token=? AND session_hash=? AND session_expires>?))').bind(c.token,c.share.session_hash,await currentTime(db)),db.prepare('UPDATE p_collection_intents SET authorized_at=COALESCE(authorized_at,?) WHERE id=?').bind(await currentTime(db),saved.id),db.prepare('DELETE FROM p_guard')])
+ await queueReadyCompletionMail(env,accepted.proposal_id);await dispatchMail(env,accepted.proposal_id)
  return {authorized:true}
 }

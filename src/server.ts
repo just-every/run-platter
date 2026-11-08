@@ -1,3 +1,4 @@
+import { runCompletionMail } from './platter/mail'
 import { runArchives } from './platter/archiving/jobs'
 import { runWebhooks } from './platter/api/webhooks'
 import { purgeTracking } from './platter/tracking'
@@ -48,7 +49,7 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
     if (lobby) return lobby
     return rejectedResponse(request, await dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request))))
   },
-  // REPORT-005 scheduled report email, built as of the trigger's own time.
+  // REPORT-006 scheduled report email, built as of the trigger's own time.
   async scheduled(controller, env) {
     await purgeTracking(env.DB,controller.scheduledTime)
     await runExpiry(runtimeBindings(env), controller.scheduledTime)
@@ -58,5 +59,6 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
     await runNotifications(runtimeBindings(env))
     await runWebhooks(runtimeBindings(env),controller.scheduledTime)
     await runArchives(runtimeBindings(env))
+    await runCompletionMail(runtimeBindings(env))
   },
 } satisfies ExportedHandler<Bindings>, { seed: seedDemo })

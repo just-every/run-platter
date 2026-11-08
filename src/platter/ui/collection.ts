@@ -1,5 +1,5 @@
 import { ui, clientScriptCopy } from '../locales'
-import { escape, hidden, money, panel } from './shared'
+import { date, escape, form, hidden, money, panel } from './shared'
 const labels:Record<string,string>={card:'Card',ach:'ACH bank debit',apple_pay:'Apple Pay',google_pay:'Google Pay'}
 export function collectionPanel(view:any,token:string){
  const c=view.collection
@@ -17,5 +17,16 @@ export function collectionPanel(view:any,token:string){
   if(held)body+='<p>'+escape(ui(c.payment?.status==='processing'?'Stripe is processing this deposit. Refresh the status to confirm its outcome.':'Contact the firm before attempting another payment.'))+'</p>'+ui`<form method="post" action="/p/${encodeURIComponent(token)}/action?name=payment.refresh"><button class="secondary">Refresh payment status</button></form>`
   else body+=ui`<form data-collection data-client-copy="${escape(JSON.stringify(clientScriptCopy(view.clientLocale??'en')))}" action="/p/${encodeURIComponent(token)}/payment.json" method="post"><label>Payment method<select name="method">${choices.map((m:string)=>'<option value="'+escape(m)+'">'+escape(ui(labels[m]))+'</option>').join('')}</select></label><label>Billing state<input name="billingState" value="${escape(c.payment?.billing_state??'')}"${method?' readonly':''} maxlength="2" autocomplete="address-level1" placeholder="Two-letter state code"></label><label class="choice"><input type="checkbox" name="consent" value="yes" required><span>Prepare my one-time deposit of ${money(amount,view.currency)}. I will review the total and any card fee before paying. No future charges are authorized. Stripe collects payment details and any bank debit mandate.</span></label><button>Continue to secure payment</button></form><form data-stripe-payment hidden><div data-payment-element></div><button>Pay deposit</button></form><p data-payment-feedback role="status" tabindex="-1"></p><form method="post" action="/p/${encodeURIComponent(token)}/action?name=payment.refresh">${method?hidden('method',method):''}<button class="secondary">Refresh payment status</button></form><script src="/collection.js" defer></script>`
  }
- return panel(ui(status),body)
+ return failureHistoryPanel(c)+panel(ui(status),body)
+}
+
+// The existing Settings surface owns activation; proposal and client panels show history.
+export function failureNoticesSettings(state:any){
+ if(state.actor.role!=='owner')return ''
+ return panel('Deposit failure notices','<p>Explicitly authorize notices for each current deposit after the client authorizes its exact amount. Only a confirmed failed provider attempt can notify the client and you. Automatic retries remain off.</p>'+state.paymentFailureNotices.map((p:any)=>form('payment.failure-notices','/app/settings',hidden('id',p.id)+hidden('version',p.version)+`<h3>${escape(p.title)}</h3><p>${p.authorized?'Notices authorized for this deposit.':'Notices inactive.'}</p>`+(p.authorized?hidden('enabled','no')+'<button class="secondary">Revoke failure notices</button>':hidden('enabled','yes')+'<label class="choice"><input type="checkbox" name="consent" value="yes" required><span>Authorize once-only failure notices to the current client and my owner mailbox for this deposit.</span></label><button>Authorize failure notices</button>'))).join(''))
+}
+const noticeDelivery:Record<string,string>={local:'Captured locally',pending:'Awaiting delivery',sending:'Delivery in progress',accepted:'Accepted by mail provider',uncertain:'Held for review',withheld:'Withheld after authority changed'}
+export function failureHistoryPanel(collection:any){
+ if(!collection?.failures?.length)return ''
+ return panel('Deposit attempt history','<ol>'+collection.failures.map((f:any)=>`<li><p>${escape(f.reason)}</p><p>${date(f.attemptedAt)} · Client notice: ${escape(noticeDelivery[f.clientStatus]??'Held for review')} · Owner notice: ${escape(noticeDelivery[f.firmStatus]??'Held for review')}</p></li>`).join('')+'</ol>')
 }

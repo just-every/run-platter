@@ -1,3 +1,11 @@
+import { providerSyncCommand } from './crm/provider-sync'
+import { failureNoticeCommand } from './payment-failure-notices'
+import { xeroCommand } from './accounting/xero-jobs'
+import { configureHubspotCard } from './crm/hubspot-card'
+import { hubspotSyncCommand } from './crm/hubspot-sync'
+import { zohoDraftCommand } from './crm/zoho-draft'
+import { pipedriveDraftCommand } from './crm/pipedrive-draft'
+import { hubspotDraftCommand } from './crm/hubspot-draft'
 import { archiveCommand } from './archiving/jobs'
 import { clientLocale, saveClientLocale } from './locales'
 import { hasTaxable, taxRequest, optionTax, resolveTax, saveTaxRate, validateTaxOptions, type TaxSnapshot } from './taxes'
@@ -32,7 +40,7 @@ import { saveCost, copyCosts, patchCosts, type CostPatch } from './internal-pric
 import { libraryCommand } from './library'
 import { approvalCommand, approvalPlan } from './approvals'
 import { authorizeCommand, teamCommand } from './permissions'
-import { invitationMail } from './invitation-mail'
+import { invitationMail, smsOnlyDelivery } from './invitation-mail'
 import { sendTestMail } from './test-mail'
 import { pricedOptions, pricingInput, tableInputs, packageInputs, editablePackages } from './pricing'
 import { templateCommand } from './templates'
@@ -72,6 +80,14 @@ export function proposalFields(p:Record<string,unknown>,tax?:TaxSnapshot){
 }
 export async function command(env:Bindings,a:Actor,name:string,p:Record<string,unknown>,restoredAttachments?:unknown,internalCosts?:CostPatch[],costSourceRevision?:number,restoredTax?:TaxSnapshot|null):Promise<any>{const db=env.DB,at=await currentTime(env.DB)
  await authorizeCommand(db,a,name,p)
+ if(name.startsWith('xero.'))return xeroCommand(env,a,name,p)
+ if(name==='crm.card.configure')return configureHubspotCard(env,a,p)
+ if(name.startsWith('crm.pipedrive.sync.'))return providerSyncCommand(env,a,name,p,'pipedrive')
+ if(name.startsWith('crm.zoho.sync.'))return providerSyncCommand(env,a,name,p,'zoho')
+ if(name.startsWith('crm.sync.'))return hubspotSyncCommand(env,a,name,p)
+ if(name.startsWith('crm.zoho.'))return zohoDraftCommand(env,a,name,p)
+ if(name.startsWith('crm.pipedrive.'))return pipedriveDraftCommand(env,a,name,p)
+ if(name.startsWith('crm.deal.'))return hubspotDraftCommand(env,a,name,p)
  if(name==='proposal.locale')return saveClientLocale(db,a,p)
  if(name==='tax.rate')return saveTaxRate(db,a,p)
  let tax:TaxSnapshot|undefined
@@ -126,6 +142,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
  if(name==='proposal.folder')return fileProposal(db,a,p)
  if(name==='folder.save')return folderCommand(db,a,p)
  if(name==='payment.surcharge')return surchargeCommand(db,a,p)
+ if(name==='payment.failure-notices')return failureNoticeCommand(env,a,p)
  if(name==='payment.collection')return collectionPolicyCommand(env,a,name,p)
  if(name.startsWith('payment.'))return paymentCommand(env,a,name,p)
  if(name.startsWith('archive.'))return archiveCommand(env,a,name,p)
@@ -158,7 +175,7 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   need(a.role==='owner','Only the owner erases clients',403);const id=text(p.id,'a client'),c=await db.prepare('SELECT * FROM p_clients WHERE id=?').bind(id).first<any>();need(c,'Client not found',404);need(p.confirmName===c.name,'Type the exact client name to confirm erasure');
   const unused=`NOT EXISTS(SELECT 1 FROM p_proposals WHERE client_id=?) AND NOT EXISTS(SELECT 1 FROM p_import_client_revisions WHERE client_id=?)`
   const check=await db.prepare(`SELECT (${unused}) AS ok`).bind(id,id).first<any>();need(check?.ok,'Clients with proposal or import history must be retained. Undo an unused import first.',409)
-  const portability=await createPortability({db,policy:archivePolicy});await commit(db,a,[...await portability.erasureStatements('p_clients',{id}),...await portability.invalidateTransfersStatements(),db.prepare('DELETE FROM p_clients WHERE id=?').bind(id)],true,{sql:unused,values:[id,id]});return{erased:true}
+  const portability=await createPortability({db,policy:archivePolicy});await commit(db,a,[...await portability.erasureStatements('p_clients',{id}),...await portability.invalidateTransfersStatements(),db.prepare("DELETE FROM p_crm_draft_reviews WHERE json_extract(source_json,'$.contact.email')=? OR json_extract(client_json,'$.id')=?").bind(c.email,id),db.prepare('DELETE FROM p_clients WHERE id=?').bind(id)],true,{sql:unused,values:[id,id]});return{erased:true}
  }
  if(name==='proposal.negotiate'||name==='proposal.revise'){
   const current=await proposal(db,p.id)
@@ -201,10 +218,11 @@ export async function command(env:Bindings,a:Actor,name:string,p:Record<string,u
   const old=await proposal(db,p.id);exact(old,p)
   const pending=await pendingNegotiation(db,old.id);if(name==='proposal.send'){
    const offered=snapshot(negotiatedView(old,pending)).options;need(!hasTaxable(offered)||optionTax(offered),'Set explicit owner-configured tax addresses before sending taxable items.',409);const missing=[...new Set([...unfilledVariables(snapshot(negotiatedView(old,pending))),...missingMerge(negotiatedView(old,pending))])];need(!missing.length,'Fill variables before sending: '+missing.join(', '),409)}assertDiscountDates(snapshot(negotiatedView(old,pending)).options,at)
+  const smsOnly=name==='proposal.send'&&smsOnlyDelivery(env,p,negotiatedView(old,pending))
   if(pending)return negotiationCommand(env,a,name,p,old)
   need(['draft','approved','sent'].includes(old.status),'Only an open proposal can be sent',409);const approval=await approvalPlan(db,old,a);need(approval.complete,'Approve this revision before sending',409);const token=secret(),client=await db.prepare('SELECT c.*,COALESCE(s.recipient,c.email) AS email FROM p_clients c LEFT JOIN p_shares s ON s.proposal_id=? WHERE c.id=?').bind(old.id,old.client_id).first<any>(),shareUrl=env.AUTH_ORIGIN+'/p/'+token
   const invitations=await recipientInvitations(env,a,p,old,at)
-  await commit(db,a,[db.prepare("UPDATE p_proposals SET status='sent',version=version+1 WHERE id=?").bind(old.id),...(invitations?invitations.writes:[db.prepare('INSERT INTO p_shares(proposal_id,revision,token) VALUES(?,?,?) ON CONFLICT(proposal_id,slot_id) DO UPDATE SET token=excluded.token,revision=excluded.revision,code_hash=NULL,code_expires=NULL,code_attempts=0,code_generation=0,code_sent_at=NULL,session_hash=NULL,session_expires=NULL').bind(old.id,old.revision,token),...invitationMail(env,a,p,old,client.email,shareUrl,at)]),...await expirySendStatements(db,old.id,a.id,at)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved','sent')) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=? AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))",values:[old.id,old.version,approval.policyVersion,discountDeadline(snapshot(old).options),at]});await dispatchMail(env,old.id);return{shareUrl:invitations?.links[0]?.shareUrl??shareUrl,...(invitations?{recipients:invitations.links}:{})}
+  await commit(db,a,[db.prepare("UPDATE p_proposals SET status='sent',version=version+1 WHERE id=?").bind(old.id),...(invitations?invitations.writes:[db.prepare('INSERT INTO p_shares(proposal_id,revision,token) VALUES(?,?,?) ON CONFLICT(proposal_id,slot_id) DO UPDATE SET token=excluded.token,revision=excluded.revision,code_hash=NULL,code_expires=NULL,code_attempts=0,code_generation=0,code_sent_at=NULL,session_hash=NULL,session_expires=NULL').bind(old.id,old.revision,token),...invitationMail(env,a,p,old,client.email,shareUrl,at,smsOnly)]),...await expirySendStatements(db,old.id,a.id,at)],true,{sql:"EXISTS(SELECT 1 FROM p_proposals WHERE id=? AND version=? AND status IN ('draft','approved','sent')) AND COALESCE((SELECT version FROM p_approval_policy WHERE singleton=1),0)=? AND ?>=MAX(?,COALESCE((SELECT observed_at FROM p_expiry_clock WHERE singleton=1),0))",values:[old.id,old.version,approval.policyVersion,discountDeadline(snapshot(old).options),at]});await dispatchMail(env,old.id);return{shareUrl:invitations?.links[0]?.shareUrl??shareUrl,...(invitations?{recipients:invitations.links}:{})}
  }
  fail('Unknown command',404)
 }

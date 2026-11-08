@@ -9,7 +9,8 @@ ALTER TABLE p_client_locales_next RENAME TO p_client_locales;
 CREATE TABLE p_signature_facts_next (
  proposal_id TEXT PRIMARY KEY REFERENCES p_acceptances(proposal_id), revision INTEGER NOT NULL,
  method TEXT NOT NULL CHECK(method IN ('mailbox code','SMS code')), verified_at INTEGER,
- language TEXT CHECK(language IN ('en','es','fr','de','pt'))
+ language TEXT CHECK(language IN ('en','es','fr','de','pt')),
+ context TEXT
 );
 INSERT INTO p_signature_facts_next SELECT * FROM p_signature_facts;
 DROP TABLE p_signature_facts;

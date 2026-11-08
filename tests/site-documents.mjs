@@ -1,3 +1,4 @@
+import { duplicatePackagesJourney } from './packages-journey.mjs'
 import { acceptRevenue } from './revenue-fixture.mjs'
 import { localeBrowser } from './locale-browser.mjs'
 import { collectionBrowser } from './collection-browser.mjs'
@@ -187,40 +188,13 @@ test('EDIT-014 client selects and downloads revision 2 at desktop and phone; own
 })
 
 
-test('EDIT-012 desktop and phone duplicate an accepted agreement for Beta Co and approve its separate draft', {timeout:180000},async()=>{
- let app,browser
- const screenshots=process.env.PLATTER_SCREENSHOTS
- try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});if(screenshots)await mkdir(screenshots,{recursive:true})
-  for(const width of [1440,390]){
-   app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
-   try{
-    const page=await context.newPage(),capture=async name=>{await page.waitForLoadState('load');await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(screenshots)await page.screenshot({path:join(screenshots,`EDIT-012-${name}-${width}.png`),fullPage:true})}
-    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Jordan Northstar'},maxRedirects:0})).status(),303)
-    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
-    const cmd=async(name,input)=>{const r=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(r.status(),200,await r.text());return r.json()}
-    const client=await cmd('client.save',{name:'Northstar Coffee',email:'avery@northstar.example'}),beta=await cmd('client.save',{name:'Beta Co',email:'contact@beta.example'})
-    const source=await cmd('proposal.prepare',{title:'Brand photography',clientId:client.id,scope:'Studio photography and campaign usage.',terms:'Delivery within two weeks.',optionOne:'Studio essentials',priceOne:'2400',optionTwo:'Full campaign',priceTwo:'4200',depositPercent:'25'})
-    await cmd('proposal.approve',{id:source.id,version:1,revision:1});const invitation=await cmd('proposal.send',{id:source.id,version:2})
-    await page.goto(invitation.shareUrl);await page.getByRole('button',{name:'Send verification code'}).click();const state=await(await context.request.get(app.origin+'/api/platter/state')).json(),code=state.outbox.find(m=>m.subject.includes('verification code')).body.match(/\b\d{6}\b/)[0]
-    await page.getByLabel('Email verification code').fill(code);await page.getByRole('button',{name:'Verify email',exact:true}).click();await page.getByRole('radio',{name:/Studio essentials/}).check();await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
-    assert.equal(await page.getByRole('heading',{name:'Proposal accepted',exact:true}).count(),1);await capture('source-client')
-    await page.goto(app.origin+'/app/proposal?id='+source.id);await page.getByLabel('Copy for client').selectOption(beta.id);await capture('source')
-    await page.getByRole('button',{name:'Duplicate proposal',exact:true}).click();assert.notEqual(new URL(page.url()).searchParams.get('id'),source.id)
-    assert.equal(await page.getByRole('heading',{name:'Brand photography (copy)',exact:true}).count(),1);assert.match(await page.locator('.proposal-status').innerText(),/draft.*Revision 1/i);assert.match(await page.locator('main').innerText(),/Beta Co/);assert.equal(await page.locator('textarea[name="scope"]').inputValue(),'Studio photography and campaign usage.');assert.equal(await page.locator('[name="priceOne"]').inputValue(),'2400.00');await capture('copy')
-    const copyId=new URL(page.url()).searchParams.get('id');const beforeApproval=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name:'proposal.send',input:{id:copyId,version:1}}});assert.equal(beforeApproval.status(),409)
-    await page.getByRole('button',{name:'Approve this revision'}).click();await page.getByRole('button',{name:'Send approved proposal'}).click();await capture('sent-copy')
-    const final=await(await context.request.get(app.origin+'/api/platter/state')).json();assert.equal(final.proposals.find(p=>p.id===source.id).status,'accepted');assert.equal(final.proposals.find(p=>p.id===copyId).status,'sent');assert.equal(final.proposals.find(p=>p.id===source.id).acceptance.name,'Avery Chen')
-   }finally{await context.close();await app.close();app=undefined}
-  }
- }finally{await browser?.close();await app?.close()}
-})
+test('EDIT-012 desktop and phone duplicate an accepted agreement for Beta Co and approve its separate draft', {timeout:180000},()=>duplicatePackagesJourney())
 
 test('EDIT-018 desktop and phone preview exact client content, switch widths and select without sending', {timeout:120000}, async()=>{
  let app,browser
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
    app=await installedApp({businessFixture:'fixtures/first-release-aud.ndjson'});const context=await browser.newContext({viewport:{width,height:900}})
@@ -268,6 +242,7 @@ test('EDIT-018 desktop and phone preview exact client content, switch widths and
     assert.match(await page.locator('main').innerText(),/GST-free in AUD/);assert.match(await page.getByLabel('Selected total').innerText(),/AUD/);await capture('legacy-aud-preview')
    }finally{await context.close();await app.close();app=undefined}
   }
+  const {combinedPreviewBrowser}=await import('./packages-journey.mjs');await combinedPreviewBrowser(browser,screenshots)
  }finally{await browser?.close();await app?.close()}
 })
 
@@ -275,7 +250,7 @@ test('EDIT-009 desktop and phone configure, preview, select, download and accept
  let app,browser
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
    app=await installedApp();const context=await browser.newContext({viewport:{width,height:900}})
@@ -310,6 +285,7 @@ test('EDIT-009 desktop and phone configure, preview, select, download and accept
      await page.getByLabel('Your full name').fill('Avery Chen');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Accept proposal',exact:true}).click()
      assert.match(await page.locator('main').innerText(),/This agreement is complete/);assert.equal((await page.locator('main').innerText()).includes(fields.terms),selection==='two');await capture('accepted-'+selection)
     }
+    await (await import('./conditional-browser.mjs')).regionalBrowser({page,context,origin:app.origin,command,width,screenshots})
    }finally{await context.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}
@@ -336,7 +312,7 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
  let app,browser
  const screenshots=process.env.PLATTER_SCREENSHOTS
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
    const inbound=inboundMailFixture(),edge=await browserEdge(),mailCalls=[],disputeStatuses=new Map(),disputeUploads=[],disputeDeadline=Math.floor(Date.now()/1000)+86400
@@ -418,6 +394,27 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
 
 
     const simple=await command(sales,'template.start',{id:'starter:consultancy',version:1,clientId:client.id});await command(sales,'proposal.document',{id:simple.id,version:1,document:{version:1,blocks:[{id:'warranty',type:'columns',title:'Warranty',text:'Our warranty',second:'Warranty limitations'},{id:'legal',type:'terms',title:'Legal terms',text:'Written approval required'},{id:'notes',type:'text',title:'Notes',text:'Editable notes'}]}});await page.goto(app.origin+'/app/proposal?id='+simple.id);assert.equal(await page.getByRole('button',{name:'Send proposal',exact:true}).count(),1);assert.equal(await page.getByRole('button',{name:'Approve this revision',exact:true}).count(),0);await capture(page,'sales-unruled');await page.getByRole('button',{name:'Send proposal',exact:true}).click();assert.equal((await state(sales)).proposals.find(p=>p.id===simple.id).status,'sent')
+    const approvalPages={owner:op,admin:settingsPage,manager:review},approvalContexts={owner,admin,manager}
+    for(const defaultRole of ['owner','admin','manager']){
+     await op.goto(app.origin+'/app/approvals')
+     await op.getByLabel('Require approval for every proposal').selectOption('yes');await op.getByLabel('Default approver').selectOption(defaultRole);await op.getByRole('button',{name:'Save approval policy',exact:true}).click()
+     if(width===1440){const saved=(await state()).approvalSettings.policy;assert.equal(saved.required,1);assert.equal(saved.default_role,defaultRole);assert.equal(await op.getByRole('alert').count(),0)}
+     await capture(op,'approval-default-'+defaultRole)
+     const draft=await command(sales,'proposal.prepare',{clientId:client.id,title:'Default '+defaultRole+' decision',scope:'Ordinary single-client delivery',depositPercent:'25',packages:[{id:'main',label:'Delivery',price:'3000'}]})
+     await page.goto(app.origin+'/app/proposal?id='+draft.id)
+     if(width===1440){assert.equal(await page.getByRole('button',{name:'Send approved proposal',exact:true}).count(),0);await command(sales,'proposal.send',{id:draft.id,version:1},409)}
+     const approverPage=approvalPages[defaultRole];await approverPage.goto(app.origin+'/app/proposal?id='+draft.id)
+     await capture(approverPage,'approval-waiting-'+defaultRole)
+     await approverPage.getByRole('button',{name:'Approve this revision',exact:true}).click()
+     if(width===1440){const approved=(await state(approvalContexts[defaultRole])).proposals.find(p=>p.id===draft.id);assert.equal(approved.approval.complete,true);assert.equal(approved.approval.steps[0].decisions[0].actor_id,(await state(approvalContexts[defaultRole])).actor.id)}
+     await page.reload();await page.getByRole('button',{name:'Send approved proposal',exact:true}).click()
+     if(width===1440)assert.equal((await state(sales)).proposals.find(p=>p.id===draft.id).status,'sent')
+     await capture(page,'approval-sent-'+defaultRole)
+    }
+    await settingsPage.goto(app.origin+'/app/approvals')
+    await settingsPage.getByLabel('Require approval for every proposal').selectOption('no');await settingsPage.getByRole('button',{name:'Save approval policy',exact:true}).click()
+    if(width===1440){const saved=(await state()).approvalSettings.policy;assert.equal(saved.required,0);assert.equal(saved.default_role,'manager');assert.equal(await settingsPage.getByRole('alert').count(),0)}
+    await capture(settingsPage,'admin-approval-policy')
     await op.goto(app.origin+'/app/team');const folderForm=op.locator('form').filter({has:op.getByRole('button',{name:'Create shared folder',exact:true})});await folderForm.getByLabel('Folder name',{exact:true}).fill('East templates');await folderForm.getByRole('checkbox',{name:'East team',exact:true}).check();await folderForm.getByRole('checkbox',{name:'I authorize this folder’s visibility for its contents.',exact:true}).check();await folderForm.getByRole('button').click();assert.equal(await op.getByRole('alert').count(),0);const folder=(await state(owner)).resourceFolders.find(f=>f.name==='East templates');await capture(op,'team-folders')
     await review.goto(app.origin+'/app/team');const inviteForm=review.locator('form').filter({has:review.getByRole('button',{name:'Send member invitation',exact:true})});await inviteForm.getByLabel('New member name',{exact:true}).fill('New salesperson');await inviteForm.getByLabel('New member email',{exact:true}).fill('delegated@synthetic-platter.example');await inviteForm.getByLabel('New member role',{exact:true}).selectOption('sales');await inviteForm.getByRole('checkbox',{name:'East team',exact:true}).check();await inviteForm.getByRole('button').click();assert.equal(await review.getByRole('alert').count(),0);await capture(review,'manager-invitation');const delegatedMail=mailCalls.findLast(m=>m.to.includes('delegated@synthetic-platter.example')),delegatedToken=new URL(delegatedMail.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get('token');const admission=await post(newMember,'/auth/confirm',{token:delegatedToken});assert.equal(admission.status(),303,await admission.text());const joined=await state(newMember);assert.equal(joined.actor.role,'sales');assert.deepEqual(joined.teams.map(t=>t.id),[team.id]);const joinedPage=await newMember.newPage();await joinedPage.goto(app.origin+'/app/team');await capture(joinedPage,'invited-sales-member')
     await command(owner,'proposal.share',{id:simple.id,operatorId:ep.id});await editorPage.goto(app.origin+'/app/proposal?id='+simple.id);const sharedForm=editorPage.locator('form').filter({has:editorPage.getByRole('button',{name:'Save shared template',exact:true})});await sharedForm.getByLabel('Shared template name',{exact:true}).fill('Shared legal');await sharedForm.getByLabel('Resource folder',{exact:true}).selectOption(folder.id);await sharedForm.getByRole('checkbox').check();await sharedForm.getByRole('button').click();assert.equal(await editorPage.getByRole('alert').count(),0)
@@ -536,9 +533,172 @@ test('MOB-001 / TEAM-001 / APPROVE-003 sales templates, sends, answers and queue
 })
 
 test('APPROVE-002 email preview and decision links work under a member session at desktop and phone widths', {timeout:120000},async()=>{
+ const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs')
  let app,browser
  try{
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  browser=await chromium.launch({headless:true,executablePath:process.env.PLATTER_CHROMIUM,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  const screenshots=process.env.PLATTER_SCREENSHOTS;if(screenshots)await mkdir(screenshots,{recursive:true})
+  for(const width of [1440,390]){
+   const edge=await browserEdge(),mailCalls=[]
+   let h
+   try{h=await harness({entry:'dist/server/index.js',assetsDirectory:'./dist/client',origin:edge.origin,unclaimed:true,auth:{AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-7223'},outboundService:async request=>{assert.equal(new URL(request.url).hostname,'api.resend.com');mailCalls.push(await request.json());return Response.json({id:'synthetic-platter-'+(7230+mailCalls.length)})}});edge.attach(h)}catch(error){await edge.close();throw error}
+   app={...h,token:h.auth.SETUP_TOKEN,close:async()=>{await edge.close();await h.close()}}
+   const context=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true}),manager=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true})
+   try{
+    const page=await context.newPage()
+    assert.equal((await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic approver'},maxRedirects:0})).status(),303)
+    await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+    const cmd=async(name,input)=>{const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
+    const boundInput=async input=>{const proposal=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals.find(row=>row.id===input.id);return {revision:proposal.revision,plan:proposal.approval.plan,...input}}
+    const email=['synthetic-platter-7220','example.test'].join('@')
+    assert.equal((await context.request.post(app.origin+'/auth/invite',{headers:{origin:app.origin},data:{email,displayName:'Preview manager',role:'member',returnTo:'/app'}})).status(),202)
+    assert.equal((await manager.request.post(app.origin+'/auth/magic-link',{headers:{origin:app.origin},data:{email}})).status(),202)
+    const authMail=mailCalls.findLast(m=>m.to.includes(email))
+    const confirm=new URL(authMail.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0])
+    assert.equal((await manager.request.post(app.origin+'/auth/confirm',{headers:{origin:app.origin},data:{token:confirm.searchParams.get('token')},maxRedirects:0})).status(),303)
+    const managerActor=(await(await manager.request.get(app.origin+'/api/platter/state')).json()).actor,ownerActor=(await(await context.request.get(app.origin+'/api/platter/state')).json()).actor
+    const team=await cmd('team.create',{name:'Preview approval team'})
+    await cmd('member.set',{operatorId:managerActor.id,version:0,role:'manager',teams:[team.id]})
+    await cmd('team.member',{operatorId:ownerActor.id,teamId:team.id})
+    await cmd('approval.policy',{version:0,required:true,defaultRole:'manager'})
+    const review=await manager.newPage()
+    const client=await cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
+    const input={clientId:client.id,title:'Notification preview',scope:'Scope reviewed from an email notification',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'}
+    const p=await cmd('proposal.prepare',input)
+    await cmd('notification.request',await boundInput({id:p.id,version:1,consent:true}))
+    const mail=await app.db.prepare('SELECT * FROM p_notification_outbox WHERE proposal_id=?').bind(p.id).first()
+    const preview=mail.body.match(/https?:\/\/[^\s]+\/app\/preview[^\s]+/)[0]
+    assert.equal(preview,app.origin+'/app/preview?id='+p.id+'&revision=1')
+    assert.equal(mail.recipient,email)
+    const beforePreview=(await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals
+    assert.equal((await review.goto(preview+'&width='+width)).status(),200)
+    await review.frameLocator('iframe[title="Client-page preview"]').getByRole('heading',{name:'Notification preview',exact:true}).waitFor()
+    assert.match(await review.locator('main').innerText(),/Revision 1/)
+    assert.ok(await review.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'preview fits the viewport')
+    if(screenshots)await review.screenshot({path:join(screenshots,'APPROVE-002-preview-'+width+'.png'),fullPage:true})
+    const frame=review.frameLocator('iframe[title="Client-page preview"]')
+    const disabled=frame.locator('fieldset[disabled]');assert.ok(await disabled.count()>0)
+    assert.ok(await frame.getByRole('button',{name:'Accept proposal',exact:true}).isDisabled())
+    const audit=(await(await context.request.get(app.origin+'/api/platter/audit?action=proposal.preview&subject='+p.id)).json()).rows
+    assert.ok(audit.length>=2);assert.ok(audit.every(r=>r.actor_id===managerActor.id&&r.actor_role==='manager'&&r.subject===p.id))
+    assert.deepEqual((await(await context.request.get(app.origin+'/api/platter/state')).json()).proposals,beforePreview)
+    const decision=mail.body.match(/Review and decide: (https?:\/\/[^\s]+)/)[1]
+    assert.equal((await review.goto(decision)).status(),200)
+    const iconOnly=await review.locator('button,a[role="button"]').evaluateAll(nodes=>nodes.filter(n=>!n.textContent.trim()).map(n=>n.outerHTML));assert.deepEqual(iconOnly,[],'the notification destination has no icon-only controls')
+    await review.getByRole('button',{name:'Approve this revision',exact:true}).click()
+    await review.getByText('All required approvals complete.',{exact:true}).waitFor()
+    const approved=await app.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(p.id).first()
+    assert.equal(approved.actor_id,managerActor.id);assert.equal(approved.revision,1);assert.equal(approved.decision,'approved')
+    if(screenshots)await review.screenshot({path:join(screenshots,'EDIT-022-manager-approved-'+width+'.png'),fullPage:true})
+    const rejected=await cmd('proposal.prepare',{...input,title:'Notification rejection'})
+    await cmd('notification.request',await boundInput({id:rejected.id,version:1,consent:true}))
+    const rejectMail=await app.db.prepare('SELECT * FROM p_notification_outbox WHERE proposal_id=?').bind(rejected.id).first()
+    const rejectDecision=rejectMail.body.match(/Review and decide: (https?:\/\/[^\s]+)/)[1]
+    assert.equal((await review.goto(rejectDecision)).status(),200)
+    await review.getByLabel('Rejection note',{exact:true}).fill('Please revise this exact offer')
+    await review.getByRole('button',{name:'Reject revision',exact:true}).click()
+    await review.getByText('Rejected. Save a new revision before requesting approval again.',{exact:true}).waitFor()
+    assert.ok(await review.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'decision fits the viewport')
+    if(screenshots){await review.screenshot({path:join(screenshots,'APPROVE-002-decision-'+width+'.png'),fullPage:true});await review.getByRole('heading',{name:'Revision approvals',exact:true}).locator('..').screenshot({path:join(screenshots,'APPROVE-002-approval-panel-'+width+'.png')})}
+    const decisions=(await app.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(rejected.id).all()).results;assert.equal(decisions.length,1);assert.equal(decisions[0].revision,1);assert.equal(decisions[0].note,'Please revise this exact offer')
+    const actors={},contexts=[]
+    const post=(ctx,path,data)=>ctx.request.post(app.origin+path,{headers:{origin:app.origin},data,maxRedirects:0})
+    const state=async(ctx=context)=>(await ctx.request.get(app.origin+'/api/platter/state')).json()
+    const command=async(ctx,name,input,status=200)=>{const r=await post(ctx,'/api/platter/command',{name,input});assert.equal(r.status(),status,await r.text());return r.json()}
+    const capture=async(screen,name)=>{
+     await screen.evaluate(()=>document.fonts.ready)
+     if(width===1440)assert.ok(await screen.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'approval controls fit the viewport')
+     if(screenshots)await screen.screenshot({path:join(screenshots,'APPROVE-001-'+name+'-'+width+'.png'),fullPage:true})
+    }
+    try{
+     const team=await command(context,'team.create',{name:'Synthetic approval team'})
+     for(const role of ['manager','sales','admin','billing']){
+      const ctx=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true});contexts.push(ctx)
+      const email='synthetic-platter-93-browser-'+role+String.fromCharCode(64)+'example.test'
+      assert.equal((await post(context,'/auth/invite',{email,displayName:role,role:'member',returnTo:'/app'})).status(),202)
+      assert.equal((await post(ctx,'/auth/magic-link',{email})).status(),202)
+      const mail=mailCalls.findLast(m=>m.to.includes(email)),url=mail.text.match(/https?:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]
+      assert.equal((await post(ctx,'/auth/confirm',{token:new URL(url).searchParams.get('token')})).status(),303)
+      const actor=(await state(ctx)).actor
+      await command(context,'member.set',{operatorId:actor.id,version:0,role,teams:[team.id]})
+      actors[role]={context:ctx,id:actor.id,page:await ctx.newPage()}
+     }
+     await page.goto(app.origin+'/app/approvals')
+     await page.getByLabel('Require approval for every proposal').selectOption('no')
+     await page.getByLabel('Default approver').selectOption('owner')
+     await page.getByRole('button',{name:'Save approval policy',exact:true}).click()
+     for(const [name,condition,position,approver] of [['Manager over $25,000','totalOver',0,'role:manager'],['Owner above 15% discount','discountOver',1,'role:owner']]){
+      await page.getByLabel('Rule name',{exact:true}).fill(name)
+      await page.getByLabel('Condition',{exact:true}).selectOption(condition)
+      await page.getByLabel('Sequence order',{exact:true}).fill(String(position))
+      await page.getByLabel('First approver',{exact:true}).selectOption(approver)
+      await page.getByRole('button',{name:'Add approval rule',exact:true}).click()
+     }
+     const settingsPage=actors.admin.page,billingPage=actors.billing.page
+     await settingsPage.goto(app.origin+'/app/approvals')
+     await settingsPage.getByLabel('Rule name',{exact:true}).fill('Counsel and finance legal review')
+     await settingsPage.getByLabel('Sequence order',{exact:true}).fill('2')
+     await settingsPage.getByLabel('Condition',{exact:true}).selectOption('termsEdited')
+     await settingsPage.getByLabel('First approver',{exact:true}).selectOption('person:'+actors.admin.id)
+     await settingsPage.getByLabel('Second approver (parallel)',{exact:true}).selectOption('person:'+actors.billing.id)
+     await settingsPage.getByRole('button',{name:'Add approval rule',exact:true}).click()
+     const savedApprovals=(await state()).approvalSettings,legalRule=savedApprovals.rules[2]
+     if(width===1440){
+      assert.equal(await settingsPage.getByRole('alert').count(),0)
+      assert.deepEqual(savedApprovals,{policy:{singleton:1,required:0,default_role:'owner',version:5},rules:[
+       {id:savedApprovals.rules[0].id,name:'Manager over $25,000',position:0,condition:{kind:'totalOver',cents:2500000,currency:'USD'},approvers:['role:manager'],templates:[]},
+       {id:savedApprovals.rules[1].id,name:'Owner above 15% discount',position:1,condition:{kind:'discountOver',bps:1500},approvers:['role:owner'],templates:[]},
+       {id:legalRule.id,name:'Counsel and finance legal review',position:2,condition:{kind:'termsEdited'},approvers:['person:'+actors.admin.id,'person:'+actors.billing.id],templates:[]},
+      ]})
+      assert.ok((await settingsPage.locator('main').innerText()).includes('billing'))
+     }
+     await capture(settingsPage,'saved-rules')
+     const fields={clientId:client.id,title:'Synthetic parallel approval',scope:'Public delivery',depositPercent:'25',terms:'Original legal terms',packages:[{id:'main',label:'Delivery',price:'30000',discountPercent:'20'}]}
+     const prepare=async title=>{
+      const draft=await command(actors.sales.context,'proposal.prepare',{...fields,title})
+      await command(actors.sales.context,'proposal.revise',{...fields,title,id:draft.id,version:1,terms:'Edited legal terms'})
+      await command(actors.manager.context,'proposal.approve',{id:draft.id,version:2,revision:2})
+      await command(context,'proposal.approve',{id:draft.id,version:3,revision:2})
+      return draft
+     }
+     const parallel=await prepare('Synthetic parallel approval')
+     await settingsPage.goto(app.origin+'/app/proposal?id='+parallel.id)
+     await billingPage.goto(app.origin+'/app/proposal?id='+parallel.id)
+     if(width===1440){assert.equal(await settingsPage.getByRole('button',{name:'Approve this revision',exact:true}).count(),1);assert.equal(await billingPage.getByRole('button',{name:'Approve this revision',exact:true}).count(),1)}
+     await capture(settingsPage,'both-eligible')
+     await settingsPage.getByRole('button',{name:'Approve this revision',exact:true}).click();await billingPage.reload()
+     if(width===1440){assert.equal((await state()).proposals.find(p=>p.id===parallel.id).approval.complete,false);assert.match(await billingPage.locator('main').innerText(),/Awaiting approval of this exact revision/)}
+     await capture(billingPage,'one-decision')
+     await billingPage.getByRole('button',{name:'Approve this revision',exact:true}).click()
+     if(width===1440){assert.match(await billingPage.locator('main').innerText(),/All required approvals complete/);assert.equal((await state()).proposals.find(p=>p.id===parallel.id).approval.complete,true)}
+     await capture(billingPage,'complete')
+     const salesPage=actors.sales.page
+     await salesPage.goto(app.origin+'/app/proposal?id='+parallel.id);await salesPage.getByRole('button',{name:'Send approved proposal',exact:true}).click()
+     const rejected=await prepare('Synthetic rejected legal review')
+     await billingPage.goto(app.origin+'/app/proposal?id='+rejected.id)
+     await billingPage.getByLabel('Rejection note',{exact:true}).fill('Synthetic legal changes refused')
+     await billingPage.getByRole('button',{name:'Reject revision',exact:true}).click()
+     await salesPage.goto(app.origin+'/app/proposal?id='+rejected.id)
+     if(width===1440){
+      assert.match(await salesPage.locator('main').innerText(),/Rejected. Save a new revision/)
+      assert.equal((await state()).proposals.find(p=>p.id===rejected.id).approval.rejected,true)
+      await command(actors.sales.context,'proposal.send',{id:rejected.id,version:5},409)
+      assert.deepEqual((await state()).approvalSettings,savedApprovals)
+      const iconOnly=await settingsPage.locator('main button,main a[role="button"]').evaluateAll(nodes=>nodes.filter(n=>!n.textContent.trim()).map(n=>n.outerHTML))
+      assert.deepEqual(iconOnly,[],'approval controls have text labels')
+     }
+     await capture(salesPage,'rejected')
+    }finally{for(const ctx of contexts)await ctx.close()}
+
+   }finally{await manager.close();await context.close();await app.close();app=undefined}
+  }
+ }finally{await browser?.close();await app?.close()}
+})
+
+test('APPROVE-002 owner requests, revokes and re-requests approval through native controls and records a noted outcome at desktop and phone widths', {timeout:120000},async()=>{
+ let app,browser
+ try{
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--use-mock-keychain','--password-store=basic','--no-sandbox']})
   const screenshots=process.env.PLATTER_SCREENSHOTS;if(screenshots)await mkdir(screenshots,{recursive:true})
   for(const width of [1440,390]){
    app=await installedApp({scheduled:true});const context=await browser.newContext({viewport:{width,height:900}})
@@ -549,23 +709,50 @@ test('APPROVE-002 email preview and decision links work under a member session a
     const cmd=async(name,input)=>{const response=await context.request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
     const client=await cmd('client.save',{name:'Synthetic client',email:'client@synthetic-platter.example'})
     const p=await cmd('proposal.prepare',{clientId:client.id,title:'Notification preview',scope:'Scope reviewed from an email notification',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
-    await cmd('notification.request',{id:p.id,version:1,consent:true})
-    const mail=await app.db.prepare('SELECT * FROM p_notification_outbox WHERE proposal_id=?').bind(p.id).first()
+    await page.goto(app.origin+'/app/proposal?id='+p.id)
+    const panel=page.getByRole('heading',{name:'Revision approvals',exact:true}).locator('..')
+    const capture=async name=>{await page.evaluate(()=>document.fonts.ready);if(screenshots)await panel.screenshot({path:join(screenshots,'APPROVE-002-'+name+'-'+width+'.png')})}
+    assert.equal((await app.db.prepare('SELECT count(*) AS n FROM p_approval_requests').first()).n,0,'loading controls creates no request')
+    assert.equal(await panel.locator('input[name="consent"]').isChecked(),false)
+    await panel.getByLabel('Overdue reminder delay (days)').fill('2')
+    await panel.getByLabel('Notify the currently eligible approvers for this exact revision and approval plan').check()
+    await panel.getByRole('button',{name:'Request approval',exact:true}).click()
+    await page.waitForLoadState('load')
+    const request=(await app.db.prepare('SELECT * FROM p_approval_requests WHERE proposal_id=?').bind(p.id).all()).results[0]
+    assert.equal(request.remind_at-request.requested_at,2*86400000)
+    assert.match(await panel.innerText(),/Current holders: Synthetic approver/)
+    assert.match(await panel.innerText(),/Approval is required for every proposal/)
+    assert.match(await panel.innerText(),/Overdue reminder due/)
+    await capture('requested')
+    await page.reload();assert.match(await panel.innerText(),/Awaiting decision/)
+    await panel.getByRole('button',{name:'Revoke approval request',exact:true}).click()
+    await page.waitForLoadState('load');assert.match(await panel.innerText(),/Revoked/)
+    assert.equal((await app.db.prepare('SELECT count(*) AS n FROM p_notification_authority').first()).n,0)
+    await capture('revoked')
+    // Fresh revision, fresh explicit consent; history stays visible.
+    await page.locator('textarea[name="scope"]').fill('Revised scope reviewed from an email notification')
+    await page.getByRole('button',{name:'Save revision',exact:true}).click()
+    await panel.getByLabel('Notify the currently eligible approvers for this exact revision and approval plan').check()
+    await panel.getByRole('button',{name:'Request approval',exact:true}).click()
+    await page.waitForLoadState('load')
+    const mail=await app.db.prepare('SELECT * FROM p_notification_outbox WHERE proposal_id=? ORDER BY created_at DESC,id DESC').bind(p.id).first()
     const preview=mail.body.match(/https?:\/\/[^\s]+\/app\/preview[^\s]+/)[0]
     assert.equal((await page.goto(preview+'&width='+width)).status(),200)
     await page.frameLocator('iframe[title="Client-page preview"]').getByRole('heading',{name:'Notification preview',exact:true}).waitFor()
-    assert.match(await page.locator('main').innerText(),/Revision 1/)
+    assert.match(await page.locator('main').innerText(),/Revision 2/)
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'preview fits the viewport')
     if(screenshots)await page.screenshot({path:join(screenshots,'APPROVE-002-preview-'+width+'.png'),fullPage:true})
     const decision=mail.body.match(/Review and decide: (https?:\/\/[^\s]+)/)[1]
     assert.equal((await page.goto(decision)).status(),200)
     const iconOnly=await page.locator('button,a[role="button"]').evaluateAll(nodes=>nodes.filter(n=>!n.textContent.trim()).map(n=>n.outerHTML));assert.deepEqual(iconOnly,[],'the notification destination has no icon-only controls')
-    await page.getByLabel('Rejection note',{exact:true}).fill('Please revise this exact offer')
-    await page.getByRole('button',{name:'Reject revision',exact:true}).click()
+    await panel.getByLabel('Decision',{exact:true}).selectOption('rejected')
+    await panel.getByLabel('Decision note',{exact:true}).fill('Please revise this exact offer')
+    await panel.getByRole('button',{name:'Record requested decision',exact:true}).click()
     await page.getByText('Rejected. Save a new revision before requesting approval again.',{exact:true}).waitFor()
+    assert.match(await panel.innerText(),/Decision: rejected · Please revise this exact offer/)
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'decision fits the viewport')
     if(screenshots){await page.screenshot({path:join(screenshots,'APPROVE-002-decision-'+width+'.png'),fullPage:true});await page.getByRole('heading',{name:'Revision approvals',exact:true}).locator('..').screenshot({path:join(screenshots,'APPROVE-002-approval-panel-'+width+'.png')})}
-    const decisions=(await app.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(p.id).all()).results;assert.equal(decisions.length,1);assert.equal(decisions[0].revision,1);assert.equal(decisions[0].note,'Please revise this exact offer')
+    const decisions=(await app.db.prepare('SELECT * FROM p_approval_decisions WHERE proposal_id=?').bind(p.id).all()).results;assert.equal(decisions.length,1);assert.equal(decisions[0].revision,2);assert.equal(decisions[0].note,'Please revise this exact offer')
    }finally{await context.close();await app.close();app=undefined}
   }
  }finally{await browser?.close();await app?.close()}
@@ -775,7 +962,7 @@ test('CAT-001 reviewed CSV promotion and explicit recurring insertion preserve i
 
 test('AUTO-002 Settings authorizes Drive archiving and shows completed and held jobs with safe reconciliation', {timeout:120000},async()=>{
  const {harness}=await import('./harness.mjs'),{browserEdge}=await import('./browser-edge.mjs'),{driveFixture,driveToken,driveRoot,completeDriveAgreement}=await import('./drive-fixture.mjs')
- const fake=driveFixture(),edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,outboundService:fake.outboundService});edge.attach(h)
+ const fake=driveFixture(),edge=await browserEdge(),h=await harness({entry:'dist/server/index.js',assetsDirectory:'dist/client',origin:edge.origin,auth:{GOOGLE_DRIVE_CLIENT_ID:'synthetic-platter-site-drive-client',GOOGLE_DRIVE_CLIENT_SECRET:'synthetic-platter-site-drive-secret'},outboundService:request=>new URL(request.url).hostname==='slack.com'?(new URL(request.url).pathname.endsWith('/auth.test')?Response.json({ok:true,team_id:'synthetic-platter-site-chat'}):Response.json({ok:false,error:'token_revoked'})):fake.outboundService(request)});edge.attach(h)
  let browser,context
  try{
   browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
@@ -784,7 +971,7 @@ test('AUTO-002 Settings authorizes Drive archiving and shows completed and held 
   const page=await context.newPage();await page.goto(h.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
   await page.goto(h.origin+'/app/settings')
   const connection=page.locator('article').filter({has:page.getByRole('heading',{name:'Google Drive',exact:true})})
-  await connection.getByLabel('Google Drive access token').fill(driveToken);await connection.getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect Google Drive',exact:true}).click()
+  await connection.getByLabel('Google Drive access token').fill(driveToken);await connection.locator('form').filter({has:page.getByRole('button',{name:'Connect Google Drive',exact:true})}).getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect Google Drive',exact:true}).click()
   const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Completed document archiving',exact:true})})
   await panel.getByLabel('Drive destination folder id').fill(driveRoot);await panel.getByLabel('Archive naming pattern').fill('{client} - {title} - r{revision}');await panel.getByRole('checkbox').check();await panel.getByRole('button',{name:'Authorize Drive archiving',exact:true}).click()
   assert.equal(await page.getByRole('alert').count(),0);assert.match(await panel.innerText(),/Archiving is authorized/)
@@ -809,13 +996,47 @@ test('AUTO-002 Settings authorizes Drive archiving and shows completed and held 
    await panel.screenshot({path:join(screenshots,'AUTO-002-settings-390.png')})
   }
   await page.setViewportSize({width:1440,height:1000})
+  const stopped=await completeDriveAgreement(h,'Credential rejected archive',signed.client.id)
+  fake.setUncertain(false);fake.setHook(()=>Response.json({error:{message:driveToken}},{status:401}))
+  await fire();await page.reload()
+  assert.match(await connection.innerText(),/broken/)
+  assert.match(await connection.innerText(),/Reconnect to restore access/)
+  assert.match(await panel.innerText(),/Archiving is inactive/)
+  assert.match(await panel.getByRole('list',{name:'Document archive history'}).innerText(),/Credential rejected archive[\s\S]*held/)
+  const blockedCalls=fake.calls.length;await fire();assert.equal(fake.calls.length,blockedCalls)
+  assert.ok(!(await page.content()).includes(driveToken))
+  assert.ok(await connection.locator('p,button,label,input').evaluateAll(nodes=>nodes.every(node=>parseFloat(getComputedStyle(node).fontSize)>=13)))
+  await h.cmd('provider.connect',{provider:'slack',version:0,token:'synthetic-platter-site-chat-credential',consent:true})
+  await h.cmd('notification.route',{provider:'slack',event:'signed',kind:'channel',destination:'synthetic-platter-site-channel',consent:true},h.owner,409)
+  await page.reload()
+  const chat=page.locator('article').filter({has:page.getByRole('heading',{name:'Slack',exact:true})})
+  assert.match(await chat.innerText(),/broken/);assert.match(await chat.innerText(),/Reconnect to restore access/);assert.match(await chat.innerText(),/held work remains for review/)
+  if(screenshots){
+   for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000});await documentFonts(page)
+    await connection.screenshot({path:join(screenshots,'SEC-001-broken-connection-'+width+'.png')})
+    await chat.screenshot({path:join(screenshots,'SEC-001-broken-chat-'+width+'.png')})
+    await panel.screenshot({path:join(screenshots,'SEC-001-held-archives-'+width+'.png')})
+   }
+  }
+  await page.setViewportSize({width:1440,height:1000});fake.setHook(undefined)
+  await connection.getByLabel('Google Drive access token').fill(driveToken);await connection.locator('form').filter({has:page.getByRole('button',{name:'Connect Google Drive',exact:true})}).getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect Google Drive',exact:true}).click()
+  assert.doesNotMatch(await connection.innerText(),/broken/)
+  assert.match(await panel.innerText(),/Archiving is inactive/)
+  await panel.getByRole('checkbox').check();await panel.getByRole('button',{name:'Authorize Drive archiving',exact:true}).click()
+  const reconnectedCalls=fake.calls.length;await fire();assert.equal(fake.calls.length,reconnectedCalls)
+  assert.equal((await h.send('/api/platter/archives',undefined,h.owner)).value.jobs.find(j=>j.proposal_id===stopped.proposal.id).status,'held')
   await panel.getByRole('button',{name:'Revoke archiving authorization',exact:true}).click()
   assert.match(await panel.innerText(),/Archiving is inactive/)
+  await connection.getByLabel('I authorize app-selected Drive files and folders.').check()
+  await connection.getByRole('button',{name:'Authorize Google Drive',exact:true}).click()
+  const provider=new URL(await page.getByRole('link',{name:'Continue to Google',exact:true}).getAttribute('href'))
+  assert.equal(provider.origin,'https://accounts.google.com');assert.equal(provider.searchParams.get('scope'),'https://www.googleapis.com/auth/drive.file')
  }finally{await context?.close();await browser?.close();await edge.close();await h.close()}
 })
 async function documentFonts(page){await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))})}
 
-test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in', {timeout:180000},async()=>{
+test('MIG-003 and MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads read-only originals and undoes the move-in', {timeout:300000},async()=>{
  const {moveinFixture,hash}=await import('./document-movein-fixture.mjs'),fixture=await moveinFixture()
  let app,browser
  try{
@@ -828,7 +1049,8 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
    for(const width of [1440,390]){
     await page.setViewportSize({width,height:1000})
     await page.evaluate(async()=>{await document.fonts.ready})
-    await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,'MIG-007-'+phase+'-'+width+'.png'),fullPage:true})
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'move-in fits this viewport')
+    await page.screenshot({path:join(process.env.PLATTER_SCREENSHOTS,(phase.startsWith('betterproposals')?'MIG-003-':'MIG-007-')+phase+'-'+width+'.png'),fullPage:true})
    }
    await page.setViewportSize({width:1440,height:1000})
   }
@@ -876,6 +1098,312 @@ test('MIG-007 owner uploads exported ZIPs, reviews report ambiguity, downloads r
   await section.getByRole('button',{name:'Undo document move-in',exact:true}).click()
   assert.equal(await page.getByRole('heading',{name:'Retained imported originals',exact:true}).count(),0)
   assert.match(await section.innerText(),/Import undone/)
+  const {betterProposalsFixture}=await import('./document-movein-fixture.mjs'),bp=await betterProposalsFixture()
+  await page.getByLabel('Export source',{exact:true}).selectOption('betterproposals')
+  await page.getByLabel('Move-in name',{exact:true}).fill('Synthetic Better Proposals review')
+  await page.getByRole('button',{name:'Start document move-in',exact:true}).click()
+  section=page.locator('section').filter({has:page.getByRole('heading',{name:'Synthetic Better Proposals review',exact:true})})
+  await section.getByLabel('Exported files').setInputFiles([...bp.pdfs,bp.contacts].map(f=>({name:f.filename,mimeType:f.filename.endsWith('.pdf')?'application/pdf':'text/csv',buffer:f.bytes})))
+  await section.getByRole('button',{name:'Upload or resume files',exact:true}).click()
+  await page.waitForFunction(()=>Array.from(document.querySelectorAll('[data-document-upload]')).every(f=>!f.querySelector('input[type=file]').files.length))
+  await section.getByLabel('Contacts CSV',{exact:true}).selectOption(bp.review.contactsFile)
+  await section.getByLabel('Reviewed contact mapping',{exact:true}).fill(JSON.stringify(bp.review.mapping))
+  await section.getByRole('button',{name:'Preview document move-in',exact:true}).click()
+  assert.match(await section.innerText(),/Arrived agreements\s+0\s+Held for review\s+30/)
+  assert.match(await section.innerText(),/Contacts arrived\s+2\s+Contacts held\s+2/)
+  await section.locator('[name="contact:bp-contact-3"]').selectOption('include')
+  for(const [doc,contact] of Object.entries(bp.review.bindings))await section.locator('select[name="bind:'+doc+'"]').selectOption(contact)
+  await section.getByRole('button',{name:'Review contact bindings',exact:true}).click()
+  assert.match(await section.innerText(),/Arrived agreements\s+23\s+Held for review\s+7\s+Unmapped items\s+1/)
+  assert.match(await section.innerText(),/Contacts arrived\s+3\s+Contacts held\s+1\s+Companies arrived\s+2/)
+  assert.match(await section.innerText(),/Finance Director.*\+44 020 1234/)
+  await capture('betterproposals-review')
+  await section.getByRole('button',{name:'Apply reviewed document move-in',exact:true}).click()
+  for(let i=0;await section.getByRole('button',{name:'Continue document move-in',exact:true}).count();i++){
+   assert.ok(i<20,'browser import makes bounded progress')
+   await section.getByRole('button',{name:'Continue document move-in',exact:true}).click()
+  }
+  assert.equal(await retained.getByRole('link',{name:'Download original PDF',exact:true}).count(),30)
+  assert.equal(await retained.getByText('Read-only retained agreement',{exact:true}).count(),23)
+  assert.equal(await retained.getByText('Read-only open document; reissue pending',{exact:true}).count(),6)
+  assert.equal(await retained.getByText('Read-only document; contact review pending',{exact:true}).count(),1)
+  const download=await context.request.get(app.origin+'/api/platter/imported-original?document='+hash(bp.pdfs[0].bytes))
+  assert.equal(download.status(),200);assert.deepEqual(await download.body(),bp.pdfs[0].bytes)
+  assert.ok(download.headers()['content-disposition'].includes('filename="proposal-1.pdf"'))
+  await section.getByRole('button',{name:'Open document journal',exact:true}).click()
+  assert.match(await section.innerText(),/35 import changes recorded/)
+  const csvLink=section.getByRole('link',{name:'Download contacts.csv',exact:true}),csvDownload=await context.request.get(app.origin+await csvLink.getAttribute('href'))
+  assert.equal(csvDownload.status(),200);assert.deepEqual(await csvDownload.body(),bp.contacts.bytes)
+  await capture('betterproposals-journal')
+  await section.getByRole('button',{name:'Undo document move-in',exact:true}).click()
+  for(let i=0;await section.getByRole('button',{name:'Continue document undo',exact:true}).count();i++){
+   assert.ok(i<20,'browser undo makes bounded progress')
+   await section.getByRole('button',{name:'Continue document undo',exact:true}).click()
+  }
+  assert.equal(await page.getByRole('heading',{name:'Retained imported originals',exact:true}).count(),0)
+  assert.match(await section.innerText(),/Import undone/)
+  const undone=await context.request.get(app.origin+'/api/platter/state')
+  assert.deepEqual((await undone.json()).businessRecords,{companies:[],contacts:[],catalog:[]})
+  await capture('betterproposals-undone')
+  const {proposifyBrowser}=await import('./document-movein-fixture.mjs');await proposifyBrowser(page,context,app)
   await context.close()
+ }finally{await browser?.close();await app?.close()}
+})
+
+test('CRM-001 native reviewed HubSpot deal creates an independent collection-off draft with exact priced rows', { timeout: 120000 }, async () => {
+ const { harness } = await import('./harness.mjs'), { browserEdge } = await import('./browser-edge.mjs'), { hubspotSyncFixture } = await import('./hubspot-sync-fixture.mjs')
+ const edge = await browserEdge(), provider = hubspotSyncFixture()
+ let h, browser
+ try {
+  h = await harness({ entry: './dist/server/index.js', assetsDirectory: './dist/client', origin: edge.origin, outboundService: provider.request }); edge.attach(h)
+  browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ignoreHTTPSErrors: true })
+  try {
+   const [name, value] = h.owner.split('='); await context.addCookies([{ name, value, url: h.origin }])
+   const page = await context.newPage()
+   await page.goto(h.origin + '/setup'); await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Finish setup' }).click()
+   await h.cmd('provider.connect', { provider: 'hubspot', version: 0, token: 'synthetic-platter-4607', consent: true })
+   await page.goto(h.origin + '/app')
+   const panel = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Start from HubSpot', exact: true }) })
+   await panel.getByLabel('HubSpot deal ID', { exact: true }).fill(provider.selected.dealId); await panel.getByLabel('Draft scope (optional)', { exact: true }).fill('A separately reviewed CRM scope.'); await panel.getByRole('button', { name: 'Read HubSpot deal', exact: true }).click()
+   assert.equal(await panel.getByLabel('Company from deal').inputValue(), ''); assert.equal(await panel.getByLabel('Contact from deal').inputValue(), '')
+   assert.equal((await h.state()).proposals.length, 0)
+   await panel.getByLabel('Company from deal').selectOption(provider.selected.companyId); await panel.getByLabel('Contact from deal').selectOption(provider.selected.contactId)
+   await panel.getByRole('button', { name: 'Review selected deal', exact: true }).click()
+   const review = panel.getByRole('article', { name: 'Reviewed HubSpot draft' })
+   assert.equal(await panel.getByLabel('Company from deal').inputValue(), provider.selected.companyId); assert.equal(await panel.getByLabel('Contact from deal').inputValue(), provider.selected.contactId)
+   assert.match(await review.innerText(), /Synthetic reviewed company/); assert.match(await review.innerText(), /Taylor Reed/)
+   assert.match(await review.innerText(), /2\.5 × \$120\.50 USD/); assert.match(await review.innerText(), /3 × \$19\.99 USD/); assert.match(await review.innerText(), /\$361\.22 USD/)
+   assert.equal((await h.state()).proposals.length, 0, 'review alone creates no draft or approval')
+   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+   const shots = process.env.PLATTER_SCREENSHOTS
+   const capture = async (locator, label) => {
+    if (!shots) return
+    await mkdir(shots, { recursive: true })
+    for (const width of [1440, 390]) { await page.setViewportSize({ width, height: 900 }); await locator.scrollIntoViewIfNeeded(); await locator.screenshot({ path: join(shots, `CRM-001-${label}-${width}.png`) }) }
+    await page.setViewportSize({ width: 1440, height: 900 })
+   }
+   await capture(panel, 'review')
+   await review.getByRole('checkbox').check(); await review.getByRole('button', { name: 'Create reviewed draft', exact: true }).click()
+   await page.waitForURL(/\/app\/proposal\?id=/)
+   const current = (await h.state()).proposals[0]
+   assert.equal(current.scope, 'A separately reviewed CRM scope.'); assert.equal(current.title, 'Synthetic launch engagement'); assert.equal(current.options[0].cents, 36122); assert.equal(current.collection.enabled, false)
+   assert.equal(current.status, 'draft'); assert.equal(current.approved_by, null)
+   assert.equal(await page.getByRole('button', { name: 'Approve this revision', exact: true }).count(), 1); assert.equal(await page.getByRole('button', { name: 'Send approved proposal', exact: true }).count(), 0)
+   const source = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Copied HubSpot source', exact: true }) })
+   assert.match(await source.innerText(), /synthetic-platter-4605/); assert.match(await source.innerText(), /no synchronization or sending authority/)
+   await capture(source, 'copied-source')
+   const calls = provider.calls.length
+   provider.state.line_items[0].properties.price = '999.00'; await page.reload()
+   assert.equal(provider.calls.length, calls, 'opening a copied draft never synchronizes provider data')
+   assert.equal((await h.state()).proposals[0].options[0].cents, 36122)
+   await (await import('./hubspot-browser.mjs')).hubspotBrowser({h,page,provider,current,capture})
+  } finally { await context.close() }
+ } finally { await browser?.close(); await h?.close(); await edge.close() }
+})
+
+test('CRM-004 Pipedrive and Zoho Settings, reviewed drafts and explicit lifecycle writes through the compiled browser', { timeout: 120000 }, async () => {
+ await (await import('./crm-pipedrive-browser.mjs')).pipedriveBrowser()
+ await (await import('./crm-zoho-browser.mjs')).zohoBrowser()
+})
+
+test('AUTO-003 Settings verifies and authorizes Slack channels and Teams direct approvals, inspects history and revokes consent', {timeout:120000},async()=>{
+ const checks=[],screenshots=process.env.PLATTER_SCREENSHOTS
+ let app,browser,context,ownerEmail
+ try{
+  app=await installedApp({scheduled:true,outboundService:async request=>{
+   const url=new URL(request.url);checks.push(url.pathname)
+   if(url.pathname==='/api/auth.test')return Response.json({ok:true,team_id:'synthetic-platter-9030'})
+   if(url.pathname==='/api/conversations.info')return Response.json({ok:true,channel:{id:'synthetic-platter-9031',is_member:true}})
+   if(url.pathname==='/v1.0/me')return Response.json({id:'synthetic-platter-9032'})
+   if(url.pathname==='/v1.0/chats/synthetic-platter-9033')return Response.json({chatType:'oneOnOne',members:[{email:ownerEmail},{userId:'synthetic-platter-9032'}]})
+   throw Error('Unexpected provider request')
+  }})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  context=await browser.newContext({viewport:{width:1440,height:1000}})
+  const page=await context.newPage()
+  const claimed=await context.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Synthetic administrator'},maxRedirects:0});assert.equal(claimed.status(),303)
+  await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+  const state=async()=>{const response=await context.request.get(app.origin+'/api/platter/state');assert.equal(response.status(),200);return response.json()}
+  const person=(await state()).actor;ownerEmail=person.email
+  await page.goto(app.origin+'/app/settings')
+  const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Chat notifications',exact:true})})
+  assert.match(await panel.innerText(),/No chat routes have been authorized/)
+  assert.deepEqual(checks,[])
+  for(const [provider,label] of [['slack','Slack'],['teams','Microsoft Teams']]){
+   const connection=page.locator('article').filter({has:page.getByRole('heading',{name:label,exact:true})})
+   await connection.getByLabel(label+' access token').fill('synthetic-platter-9034')
+   await connection.getByRole('checkbox').check();await connection.getByRole('button',{name:'Connect '+label,exact:true}).click()
+   assert.equal(await page.getByRole('alert').count(),0)
+  }
+  assert.deepEqual(checks,['/api/auth.test','/v1.0/me'])
+  await page.goto(app.origin+'/app/settings');assert.equal((await state()).notificationSettings.routes.length,0);assert.equal(checks.length,2)
+  await panel.getByText('Authorize a Slack channel',{exact:true}).click()
+  const channel=panel.locator('form').filter({has:page.getByRole('button',{name:'Verify and authorize channel',exact:true})})
+  await channel.getByLabel('Notification event',{exact:true}).selectOption('signed')
+  await channel.getByLabel('Provider destination id',{exact:true}).fill('synthetic-platter-9031')
+  assert.equal(await channel.getByRole('checkbox').isChecked(),false)
+  await channel.getByRole('checkbox').check();await channel.getByRole('button',{name:'Verify and authorize channel',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0)
+  assert.equal(checks.at(-1),'/api/conversations.info')
+  await panel.getByText('Authorize a direct message',{exact:true}).click()
+  const direct=panel.locator('form').filter({has:page.getByRole('button',{name:'Verify and authorize direct message',exact:true})})
+  await direct.getByLabel('Chat provider',{exact:true}).selectOption('teams')
+  await direct.getByLabel('Notification event',{exact:true}).selectOption('approval')
+  await direct.getByLabel('Direct recipient',{exact:true}).selectOption(person.id)
+  await direct.getByLabel('Provider destination id',{exact:true}).fill('synthetic-platter-9033')
+  assert.equal(await direct.getByRole('checkbox').isChecked(),false)
+  await direct.getByRole('checkbox').check();await direct.getByRole('button',{name:'Verify and authorize direct message',exact:true}).click()
+  assert.equal(await page.getByRole('alert').count(),0)
+  assert.equal(checks.at(-1),'/v1.0/chats/synthetic-platter-9033')
+  const configured=(await state()).notificationSettings.routes
+  assert.equal(configured.length,2)
+  assert.deepEqual(configured.map(r=>[r.event,r.provider,r.kind,r.destination,r.operator_id,r.available,r.consented]).sort(),[
+   ['signed','slack','channel','synthetic-platter-9031',null,true,true],
+   ['approval','teams','direct','synthetic-platter-9033',person.id,true,true]
+  ].sort())
+  await page.reload()
+  assert.deepEqual((await state()).notificationSettings.routes,configured)
+  assert.equal(checks.length,4,'inspection never contacts the providers')
+  const history=panel.getByRole('list',{name:'Chat notification routes',exact:true})
+  assert.match(await history.innerText(),/Proposal signed/);assert.match(await history.innerText(),/Approval requested/)
+  assert.equal(await history.getByRole('button',{name:'Revoke route authorization',exact:true}).count(),2)
+  assert.ok(await panel.locator('p,label,summary,button,input,select').evaluateAll(nodes=>nodes.every(n=>parseFloat(getComputedStyle(n).fontSize)>=13)))
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+  if(screenshots){
+   await mkdir(screenshots,{recursive:true});await panel.getByText('Authorize a Slack channel',{exact:true}).click();await panel.getByText('Authorize a direct message',{exact:true}).click();await documentFonts(page)
+   await panel.screenshot({path:join(screenshots,'AUTO-003-settings-1440.png')})
+   await page.setViewportSize({width:390,height:1000});await documentFonts(page)
+   await panel.screenshot({path:join(screenshots,'AUTO-003-settings-390.png')})
+   await page.setViewportSize({width:1440,height:1000})
+  }
+  for(const route of configured)await panel.locator('[data-notification-route="'+route.id+'"]').getByRole('button',{name:'Revoke route authorization',exact:true}).click()
+  const revoked=(await state()).notificationSettings.routes
+  assert.deepEqual(revoked.map(({available,consented,...r})=>r),configured.map(({available,consented,...r})=>r))
+  assert.ok(revoked.every(r=>!r.available&&!r.consented));assert.equal(checks.length,4)
+  await page.reload();assert.match(await history.innerText(),/Inactive — new consent required/)
+  assert.equal(await history.getByRole('button').count(),0)
+ }finally{await context?.close();await browser?.close();await app?.close()}
+})
+test('ACCT-002 Settings reviews the exact deposit and explicitly issues one Xero invoice', {timeout:120000}, async()=>{await (await import('./xero-browser.mjs')).xeroBrowser()})
+test('FOLLOW-003 sender Settings explicitly save, authorize, edit and revoke expiry email without activation on inspection', {timeout:120000},async()=>{
+ let app,browser
+ try{
+  app=await installedApp({scheduled:true})
+  browser=await chromium.launch({headless:true,...(process.env.PLATTER_CHROMIUM?{executablePath:process.env.PLATTER_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  const context=await browser.newContext({viewport:{width:1440,height:1000}})
+  try{
+   const page=await context.newPage(),request=context.request
+   assert.equal((await request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:app.token,displayName:'Expiry owner'},maxRedirects:0})).status(),303)
+   await page.goto(app.origin+'/setup');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup'}).click()
+   const cmd=async(name,input)=>{const response=await request.post(app.origin+'/api/platter/command',{headers:{origin:app.origin},data:{name,input}});assert.equal(response.status(),200,await response.text());return response.json()}
+   const state=async()=>{const response=await request.get(app.origin+'/api/platter/state');assert.equal(response.status(),200);return response.json()}
+   await app.fireCron('2033-03-01T12:00:00Z')
+   const client=await cmd('client.save',{name:'Expiry client',email:['expiry-client','synthetic-platter.example'].join(String.fromCharCode(64))})
+   const p=await cmd('proposal.prepare',{clientId:client.id,title:'Expiry controls',scope:'Notice timing controls',optionOne:'First',priceOne:'100',optionTwo:'Second',priceTwo:'200',depositPercent:'25'})
+   await page.goto(app.origin+'/app/settings')
+   const defaults=page.locator('section').filter({has:page.getByRole('heading',{name:'Sender expiry defaults',exact:true})})
+   await defaults.getByLabel('Expiry lead days',{exact:true}).fill('5')
+   await defaults.getByLabel('Renewal lead days',{exact:true}).fill('40')
+   await defaults.getByRole('button',{name:'Save sender defaults'}).click()
+   assert.equal((await state()).expiryNoticeDefaults.lead_days,5)
+   assert.equal((await state()).expiryNoticeDefaults.renewal_days,40)
+   assert.deepEqual((await state()).expiryNotices.active,[])
+   await page.goto(app.origin+'/app/proposal?id='+p.id)
+   const notice=page.locator('section').filter({has:page.getByRole('heading',{name:'Sender expiry notice',exact:true})})
+   assert.match(await notice.innerText(),/Inactive/)
+   assert.ok((await notice.innerText()).includes((await state()).actor.email),'the recorded recipient is visible')
+   assert.equal((await state()).expiryNotices.events.length,0,'inspection creates no consent')
+   await notice.getByText('Expiry notice Settings',{exact:true}).click()
+   await notice.getByLabel('Proposal expiry lead days').fill('3')
+   await notice.getByRole('button',{name:'Save expiry settings'}).click()
+   assert.deepEqual((await state()).expiryNotices.active,[])
+   const consent=notice.getByRole('checkbox')
+   await consent.check();await notice.getByRole('button',{name:'Authorize expiry email',exact:true}).click()
+   assert.match(await notice.innerText(),/Authorized for this revision/)
+   assert.deepEqual((await state()).expiryNotices.active,[p.id])
+   await notice.getByText('Expiry notice Settings',{exact:true}).click()
+   await notice.getByLabel('Proposal expiry lead days').fill('4')
+   await notice.getByRole('button',{name:'Save expiry settings'}).click()
+   assert.deepEqual((await state()).expiryNotices.active,[],'editing needs new authorization')
+   await consent.check();await notice.getByRole('button',{name:'Authorize expiry email',exact:true}).click()
+   await notice.getByRole('button',{name:'Revoke expiry email',exact:true}).click()
+   let snapshot=await state()
+   assert.deepEqual(snapshot.expiryNotices.active,[])
+   assert.equal(snapshot.expiryNotices.events.filter(e=>e.action==='authorized').length,2)
+   assert.equal(snapshot.expiryNotices.events.filter(e=>e.action==='revoked').length,1)
+   const renewal=page.locator('section').filter({has:page.getByRole('heading',{name:'Sender renewal notice',exact:true})})
+   assert.match(await renewal.innerText(),/Inactive/)
+   await renewal.getByText('Renewal notice Settings',{exact:true}).click()
+   await renewal.getByLabel('Proposal renewal lead days').fill('30')
+   await renewal.getByRole('button',{name:'Save renewal settings',exact:true}).click()
+   assert.deepEqual((await state()).renewalNotices.active,[])
+   await renewal.getByRole('checkbox').check();await renewal.getByRole('button',{name:'Authorize renewal notices',exact:true}).click()
+   assert.deepEqual((await state()).renewalNotices.active,[p.id])
+   await renewal.getByRole('button',{name:'Revoke renewal notices',exact:true}).click()
+   assert.deepEqual((await state()).renewalNotices.active,[])
+   await renewal.getByText('Renewal notice Settings',{exact:true}).click()
+   await renewal.getByLabel('Proposal renewal lead days').fill('45')
+   await renewal.getByRole('button',{name:'Save renewal settings',exact:true}).click()
+   assert.equal((await state()).renewalNotices.settings.find(r=>r.proposal_id===p.id).lead_days,45)
+   const template=await cmd('template.save',{id:p.id,version:(await state()).proposals.find(r=>r.id===p.id).version,name:'Notice template'})
+   await page.goto(app.origin+'/app')
+   const templates=page.locator('section').filter({has:page.getByRole('heading',{name:'Personal templates',exact:true})})
+   await templates.getByText('Reminder and expiry defaults for Notice template',{exact:true}).click()
+   await templates.getByLabel('Sender notice source',{exact:true}).selectOption('override')
+   await templates.getByLabel('Template expiry lead days',{exact:true}).fill('6')
+   await templates.getByLabel('Template renewal lead days',{exact:true}).fill('35')
+   await templates.getByRole('button',{name:'Save template delivery defaults',exact:true}).click()
+   const savedTemplate=(await state()).templates.find(r=>r.id===template.id)
+   assert.deepEqual(savedTemplate.noticeDefaults,{source:'override',settings:{expiry:{enabled:1,leadDays:6},renewal:{enabled:1,leadDays:35}}})
+   await templates.getByRole('button',{name:'Start from Notice template',exact:true}).click()
+   const started=(await state()).proposals.find(r=>r.id!==p.id)
+   assert.equal((await state()).renewalNotices.settings.find(r=>r.proposal_id===started.id).lead_days,35)
+   assert.ok(!(await state()).renewalNotices.active.includes(started.id))
+   await page.goto(app.origin+'/app/proposal?id='+p.id)
+   const fields=await notice.locator('input,select,button,summary,p,label').evaluateAll(nodes=>nodes.filter(n=>getComputedStyle(n).display!=='none').every(n=>parseFloat(getComputedStyle(n).fontSize)>=13))
+   assert.equal(fields,true)
+   const agreement=await cmd('proposal.prepare',{clientId:client.id,title:'Renewal review controls',scope:'Selected accepted care',depositPercent:'25',packages:[{id:'one',label:'Care',price:'1'}],pricingTables:[{optionId:'one',name:'Services',lines:[{name:'Care',quantity:'1',unit:'month',unitPrice:'1200',interval:'monthly',term:12,startsOn:'2033-03-01'}]}]})
+   await cmd('notification.renewal',{id:agreement.id,version:1,consent:true,leadDays:30})
+   await cmd('proposal.approve',{id:agreement.id,version:2,revision:1})
+   const sent=await cmd('proposal.send',{id:agreement.id,version:3}),clientPath=new URL(sent.shareUrl).pathname
+   assert.equal((await request.post(app.origin+clientPath+'/action?name=code.request',{headers:{origin:app.origin},data:{}})).status(),200)
+   const code=(await state()).outbox.find(r=>r.proposal_id===agreement.id&&r.subject==='Your Platter verification code').body.match(/\b\d{6}\b/)[0]
+   assert.equal((await request.post(app.origin+clientPath+'/action?name=code.verify',{headers:{origin:app.origin},data:{code}})).status(),200)
+   assert.equal((await request.post(app.origin+clientPath+'/action?name=accept',{headers:{origin:app.origin},data:{name:'Synthetic client',optionId:'one',consent:true}})).status(),200)
+   await app.fireCron('2034-01-29T00:00:00Z')
+   await page.goto(app.origin+'/app/proposal?id='+agreement.id)
+   assert.match(await renewal.innerText(),/Term ends 2034-02-28/)
+   assert.match(await renewal.innerText(),/due 2034-01-29/)
+   await renewal.getByLabel('Renewal review outcome',{exact:true}).fill('Reviewed the accepted scope')
+   await renewal.getByRole('button',{name:'Complete renewal review',exact:true}).click()
+   assert.match(await renewal.innerText(),/Reviewed: Reviewed the accepted scope/)
+   const acceptedBefore=(await state()).proposals.find(r=>r.id===agreement.id).acceptance
+   await renewal.getByRole('button',{name:'Prepare independent renewal copy',exact:true}).click()
+   const copyId=new URL(page.url()).searchParams.get('id'),copy=(await state()).proposals.find(r=>r.id===copyId)
+   assert.notEqual(copyId,agreement.id);assert.equal(copy.status,'draft');assert.equal(copy.acceptance,undefined)
+   assert.ok(!(await state()).renewalNotices.active.includes(copyId))
+   assert.deepEqual((await state()).proposals.find(r=>r.id===agreement.id).acceptance,acceptedBefore)
+   const screenshots=process.env.PLATTER_SCREENSHOTS
+   if(screenshots){
+    await mkdir(screenshots,{recursive:true})
+    for(const width of [1440,390]){
+     await page.setViewportSize({width,height:1000})
+     await page.goto(app.origin+'/app/settings')
+     await defaults.screenshot({path:join(screenshots,'FOLLOW-003-defaults-'+width+'.png')})
+     await page.goto(app.origin+'/app/proposal?id='+p.id)
+     await notice.getByText('Expiry notice Settings',{exact:true}).click()
+     await notice.getByText('Expiry notice history',{exact:true}).click()
+     await notice.screenshot({path:join(screenshots,'FOLLOW-003-controls-'+width+'.png')})
+     await renewal.getByText('Renewal notice Settings',{exact:true}).click()
+     await renewal.getByText('Renewal notice history',{exact:true}).click()
+     await renewal.screenshot({path:join(screenshots,'FOLLOW-003-renewal-'+width+'.png')})
+     await page.goto(app.origin+'/app');await templates.getByText('Reminder and expiry defaults for Notice template',{exact:true}).click()
+     await templates.screenshot({path:join(screenshots,'FOLLOW-003-template-'+width+'.png')})
+     await page.goto(app.origin+'/app/proposal?id='+agreement.id)
+     await renewal.screenshot({path:join(screenshots,'FOLLOW-003-renewal-review-'+width+'.png')})
+    }
+   }
+  }finally{await context.close()}
  }finally{await browser?.close();await app?.close()}
 })

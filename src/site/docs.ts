@@ -60,7 +60,7 @@ function inline(value: string, source: string): string {
 const keepLastPair = (html: string): string => html.replace(/ ([^\s<>]+ [^\s<>]+)$/, (whole, pair: string) => pair.length <= 20 ? ` ${pair.replace(' ', '\u00a0')}` : whole)
 
 function renderMarkdown(content: string, source: string): string {
-  const lines = content.replace(/\r\n?/g, '\n').split('\n')
+  const lines = content.replace(/\r\n?/g, '\n').split('\n').filter(line => !/^\s*<!--.*-->\s*$/.test(line))
   const result: string[] = []
   const slugs = new Map<string, number>()
   const listItem = (line: string) => line.match(/^\s*(?:([-+*])|\d+\.)\s+(.+)$/)

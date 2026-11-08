@@ -6,7 +6,7 @@ import { commit, email, exact, need, secret, snapshot, text, type Actor } from '
 import { permitted } from './permissions'
 import { currentTime } from './expiry-time'
 import { invitationMail } from './invitation-mail'
-import { proposalMail, queueMail } from './mail'
+import { proposalMail } from './mail'
 
 export type Recipient = {id:string;name:string;email:string|null;role:'signer'|'approver'|'viewer'|'cc'|'countersigner';group:number}
 export function recipientPlan(row:any):Recipient[]{return typeof row.recipient_plan==='string'?JSON.parse(row.recipient_plan):row.recipient_plan??[]}
@@ -128,10 +128,6 @@ export async function recipientProgress(db:D1Database,row:any,slotId:string){
 export function voidSignatureStatement(db:D1Database,id:string,revision:number,at:number,reason:string){
  return db.prepare('INSERT INTO p_void_signatures(proposal_id,revision,voided_at,reason) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM p_recipient_signatures WHERE proposal_id=? AND revision=?) ON CONFLICT DO NOTHING').bind(id,revision,at,reason,id,revision)
 }
-export async function completionMail(env:Bindings,row:any,plan:Recipient[],at:number){
- return Promise.all(plan.filter(r=>r.email).map(async r=>{const locale=await recipientMailLocale(env.DB,row.id,r.id,r.email!);return queueMail(env,row.id,r.email!,clientText('Agreement complete: ',locale)+row.title,clientText('All required recipients have completed revision ',locale)+row.revision+clientText('. Open your personal invitation to review the completed agreement.',locale))}))
-}
-
 export function recipientContent(view:any,progress:any){
  if(!progress||view.status==='accepted')return view
  const doc=documentOf(view)

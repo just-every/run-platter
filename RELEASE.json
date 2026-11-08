@@ -269,6 +269,58 @@
     {
       "id": "0090_client_locale.sql",
       "buyerSteps": "None. Adds owner-selected English or Spanish client language while retaining historical agreement language without inference."
+    },
+    {
+      "id": "0101_approval_request_details.sql",
+      "buyerSteps": "None. Retains exact-revision approval request trigger summaries and revocation details without restoring outbound authority."
+    },
+    {
+      "id": "0102_betterproposals_export.sql",
+      "buyerSteps": "Apply migrations/core/0102_betterproposals_export.sql after existing core migrations. No manual data changes; existing document imports retain their documents source kind."
+    },
+    {
+      "id": "0103_expiry_notice_consent.sql",
+      "buyerSteps": "Apply migrations/core/0103_expiry_notice_consent.sql after existing core migrations. Retained notice choices and history confer no outbound authority; explicitly authorize each proposal after reviewing its current revision and settings."
+    },
+    {
+      "id": "0104_renewal_notices.sql",
+      "buyerSteps": "Apply migrations/core/0104_renewal_notices.sql after existing core migrations. Retained notice choices and history confer no outbound authority; explicitly authorize each proposal after reviewing its current revision and settings."
+    },
+    {
+      "id": "0105_drive_oauth.sql",
+      "buyerSteps": "None. Adds private, single-use Drive OAuth callback state; owners must explicitly authorize app-selected Drive access. Existing held jobs do not restart."
+    },
+    {
+      "id": "0106_reminder_dispatch_lock.sql",
+      "buyerSteps": "None. Serializes scheduled reminder dispatch without changing existing reminder authorization."
+    },
+    {
+      "id": "0109_payment_failure_notices.sql",
+      "buyerSteps": "Apply migrations/core/0109_payment_failure_notices.sql after existing core migrations. Retained notice settings and delivery history confer no outbound authority; the owner must explicitly authorize deposit failure notices."
+    },
+    {
+      "id": "0110_pipedrive_drafts.sql",
+      "buyerSteps": "Apply migrations/core/0110_pipedrive_drafts.sql after existing core migrations. Adds retained reviewed Pipedrive draft sources; credentials and review authority are excluded from archives."
+    },
+    {
+      "id": "0111_reviewed_provider_sync.sql",
+      "buyerSteps": "Apply migrations/core/0111_reviewed_provider_sync.sql after existing core migrations. Adds reviewed Pipedrive and Zoho lifecycle write history. Restored history confers no outbound authority; explicitly review each write against the current connection and source."
+    },
+    {
+      "id": "0112_recipient_languages.sql",
+      "buyerSteps": "Apply migrations/core/0112_recipient_languages.sql after existing core migrations. Preserve recorded language and signing context; no historical consent or outbound authority is inferred."
+    },
+    {
+      "id": "0113_electronic_records.sql",
+      "buyerSteps": "Apply migrations/core/0113_electronic_records.sql after existing core migrations. Preserve recorded language and signing context; no historical consent or outbound authority is inferred."
+    },
+    {
+      "id": "0114_question_language.sql",
+      "buyerSteps": "Apply migrations/core/0114_question_language.sql after existing core migrations. Preserve recorded language and signing context; no historical consent or outbound authority is inferred."
+    },
+    {
+      "id": "0115_replaced_language.sql",
+      "buyerSteps": "Apply migrations/core/0115_replaced_language.sql after existing core migrations. Preserve recorded language and signing context; no historical consent or outbound authority is inferred."
     }
   ],
   "breaking": false,

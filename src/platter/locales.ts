@@ -538,6 +538,18 @@ const electronicTranslations:Record<string,string[]> = {
 }
 for(const [key,values] of Object.entries(electronicTranslations))for(const [i,locale] of (['es','fr','de','pt'] as const).entries())catalogs[locale][key]=values[i]
 const mailTranslations:Record<string,string[]> = {
+ "The signed agreement PDF and certificate of completion for revision ": [
+  "Se adjuntan el PDF del acuerdo firmado y el certificado de finalización de la revisión ",
+  "Le PDF de l’accord signé et le certificat de réalisation de la version ",
+  "Das PDF des unterzeichneten Vertrags und das Abschlusszertifikat für Fassung ",
+  "O PDF do acordo assinado e o certificado de conclusão da versão "
+ ],
+ " are attached.": [
+  ".",
+  " sont joints.",
+  " sind angehängt.",
+  " estão anexados."
+ ],
  "Agreement complete: ": [
   "Acuerdo completo: ",
   "Accord terminé : ",

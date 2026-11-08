@@ -110,7 +110,7 @@ export async function localeProviderBrowser(width,browser,directory,catalog){
   context=await browser.newContext({viewport:{width,height:900},ignoreHTTPSErrors:true});const smsPage=await context.newPage()
   for(const locale of locales){
    const p=await prepare(h,smsClient.id,locale,false),row=(await h.state()).proposals.find(r=>r.id===p.id)
-   await h.cmd('sms.configure',{id:p.id,version:row.version,consent:true,phone:'+12025550129',timeZone:'Etc/UTC',evidence:'synthetic-platter-9821'})
+   await h.cmd('sms.configure',{id:p.id,version:row.version,consent:true,recipient:address(9820),firm:'Synthetic Platter firm',purposes:['identity'],disclosure:'Identity verification texts from Synthetic Platter firm. Reply STOP to stop all texts.',assentedAt:'2030-06-01T11:55:00Z',method:'Recipient signed instruction',phone:'+12025550129',timeZone:'Etc/UTC',evidence:'synthetic-platter-9821'})
    await h.cmd('signer.method',{id:p.id,version:row.version,method:'SMS code'})
    await smsPage.goto(p.url);await smsPage.getByRole('heading',{name:smsHeadings[locale],exact:true}).waitFor()
    checkCopy(await smsPage.locator('body').innerText(),locale,catalog)

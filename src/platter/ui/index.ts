@@ -1,5 +1,11 @@
 import { electronicRequestNotices } from './electronic-records'
+import { failureNoticesSettings } from './collection'
+import { expiryNoticeDefaults } from './expiry-notices'
+import { xeroAccounting } from './xero-accounting'
+import { crmSettings, crmCardPage } from './crm-settings'
+import { crmStartPanel, crmSourcePanel } from './crm-start'
 import { archivePanel } from './archiving'
+import { notificationSettings } from './notifications'
 import { trackingPanel, trackingNotices } from './tracking'
 import { collaborationSettings } from './collaboration'
 import { documentBrandCss } from './blocks'
@@ -40,12 +46,13 @@ export function renderApp(state: any, path: string, feedback?: Feedback): Respon
       case '/app/library': title='Content library'; content=libraryPage(state,url.searchParams); break
       case '/app/team': title='Team'; content=teamPage(state)+foldersPanel(state)+connectionsPanel(state,true); break
       case '/app/approvals': title='Approvals'; content=approvalsPage(state); break
-      case '/app/settings': title = 'Vendor documents'; above = eyebrow('Settings · defaults for new proposals'); content = clientLanguageSettings(state)+trackingPanel(state)+vendorSettings(state)+workspacePanel(state)+connectionsPanel(state,false)+archivePanel(state)+collaborationSettings(state); break
-      case '/app': title = 'Proposals'; above = eyebrow(`Pipeline · ${count((state.proposals ?? []).length, 'proposal')} · ${count((state.clients ?? []).length, 'client')}`); layout = 'proposals-page'; content = proposalsPage(state, url.searchParams, composerRefusal); break
+      case '/app/settings': title = 'Vendor documents'; above = eyebrow('Settings · defaults for new proposals'); content = failureNoticesSettings(state)+expiryNoticeDefaults(state)+clientLanguageSettings(state)+trackingPanel(state)+vendorSettings(state)+workspacePanel(state)+connectionsPanel(state,false)+notificationSettings(state)+archivePanel(state)+xeroAccounting(state,feedback)+collaborationSettings(state)+crmSettings(state,feedback); break
+      case '/app/crm-card': title='HubSpot deal'; content=crmCardPage(state,url.searchParams,feedback)+crmStartPanel(state,feedback,url.searchParams); break
+      case '/app': title = 'Proposals'; above = eyebrow(`Pipeline · ${count((state.proposals ?? []).length, 'proposal')} · ${count((state.clients ?? []).length, 'client')}`); layout = 'proposals-page'; content = proposalsPage(state, url.searchParams, composerRefusal)+crmStartPanel(state,feedback); break
       case '/app/proposal': {
         const id = url.searchParams.get('id') ?? ''
         title = state.proposals?.find((p: any) => String(p.id) === id)?.title ?? 'Proposal'; above = proposalEyebrow(state, id); layout = 'proposal-page'
-        content = proposalPage(state, id, url.searchParams, feedback); break
+        content = proposalPage(state, id, url.searchParams, feedback)+crmSourcePanel(state,id); break
       }
       case '/app/clients': title = 'Clients'; above = eyebrow(`Clients · ${count((state.clients ?? []).length, 'client')} on file`); layout = 'clients-page'; content = clientsPage(state); break
       case '/app/import': title = 'Import'; above = eyebrow('Move in · documents, clients and catalog'); content = importPage(state, feedback); break

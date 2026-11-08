@@ -3610,7 +3610,7 @@
       "executable": false
     },
     "tests/archive.test.mjs": {
-      "sha256": "c629028c338d3448e627ae39fac8759ee930c39bf14c46051ee3d42bc351e80c",
+      "sha256": "a6f08c597ccb7a05e8a00303826e20a73b8d65f4bf4673799d15dcaa12b21e8f",
       "executable": false
     },
     "tests/browser-edge.mjs": {

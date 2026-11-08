@@ -1,0 +1,13 @@
+core	Build once and check generated documents and types	﻿2026-11-08T16:11:58.1712244Z ##[group]Run pnpm verify:app
+core	Build once and check generated documents and types	2026-11-08T16:11:58.1712873Z [36;1mpnpm verify:app[0m
+core	Build once and check generated documents and types	2026-11-08T16:11:58.1732952Z shell: /usr/bin/bash -e {0}
+[Actions environment rendering omitted]
+core	Build once and check generated documents and types	2026-11-08T16:11:58.1734523Z ##[endgroup]
+core	Build once and check generated documents and types	2026-11-08T16:11:58.4466967Z 
+core	Build once and check generated documents and types	2026-11-08T16:11:58.4467886Z > @proposals/platter@0.1.0 verify:app /home/runner/work/run-platter/run-platter
+core	Build once and check generated documents and types	2026-11-08T16:11:58.4468635Z > node scripts/verification/run.mjs
+core	Build once and check generated documents and types	2026-11-08T16:11:58.4468905Z 
+core	Build once and check generated documents and types	2026-11-08T16:11:58.5752365Z ACCEPTANCE.md: generated content differs; run contract-docs write.
+core	Build once and check generated documents and types	2026-11-08T16:11:58.5753850Z docs/CLAIMS.md: generated content differs; run contract-docs write.
+core	Build once and check generated documents and types	2026-11-08T16:11:58.6029773Z  ELIFECYCLE  Command failed with exit code 1.
+core	Build once and check generated documents and types	2026-11-08T16:11:58.6230993Z ##[error]Process completed with exit code 1.

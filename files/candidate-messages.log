@@ -1,0 +1,50 @@
+3e61e44ae3423feae417173fef1640716a54a68f
+Count promoted catalog sources once in Word quote matching
+
+2c253ebbe384ea925ce9e49b19c2aae36fe6dd7b
+Merge current main into PandaDoc move-in candidate
+
+Preserve PandaDoc conversion, bulk-folder and reissue custody alongside main's
+Proposify and Better Proposals imports. Keep main's contract conflict text,
+identity map and Verify workflow, regenerate contract views, and renumber the
+candidate migrations above main to 0112 and 0113. Rebuild deployment metadata
+and regenerate the source lock last.
+
+Retain all assertions from both parents. Capture the combined template snapshot
+after all import fixtures; match the PandaDoc migration output buffer to main's
+8 MB capacity and preserve both dependency-refusal explanations.
+
+Validated locally with Node 22.20.0: typecheck, production build, five targeted
+business journeys, the combined public CLI archive custody journey (including
+PandaDoc reissue restoration), and both affected compiled browser journeys.
+Contract generation, deployment specification and source-lock checks pass.
+Publication scanning and exact-head GitHub Verify remain with the guarded worker.
+
+154a89d923e9d17d4269796bcdde716e3dcc2485
+Integrate current main with reviewed PandaDoc migration
+
+3e97cb230df7eae9efbdd8a947bd1fa70db5abdc
+Verify reviewed PandaDoc migration and explicit draft controls
+
+fd3dd430f256c4b2a269cbc556028d96aaa2c1b7
+Merge current main while retaining PandaDoc progress [skip ci]
+
+b7e173216a15bd488990133ca71ce2da2537f934
+Extend reviewed PandaDoc migration custody and new drafts [skip ci]
+
+58bccf09e85c71e81a7dc99c710178e23074a998
+Keep ambiguous imported quote rows unmatched [skip ci]
+
+f7ce3954c6fbbb1769d651069cdc9edb0a076282
+Keep conversion controls distinct from catalog imports
+
+Use an independent content-kind form field and retain the existing retained-agreement report labels. Preserve all existing browser assertions.
+
+43c730c84311606e5c20ae5011f56415c782a6fd
+Finish reviewed PandaDoc Word content and restore custody
+
+Convert exported Word content into reviewed templates and library sections, retain fixed PDF originals, and guard replay and dependent undo. Record MIG-001 as partial with the remaining migration and authority gaps intact.
+
+5df5b028f9d0947276937121e40dfffdcc844724
+Add reviewed PandaDoc exported-content conversion [skip ci]
+

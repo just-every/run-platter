@@ -1,0 +1,66 @@
+commit 3e61e44ae3423feae417173fef1640716a54a68f
+Author:     Run Edit Run fleet <fleet@runeditrun.com>
+AuthorDate: Sun Nov 8 16:08:22 2026 +0000
+Commit:     Run Edit Run fleet <fleet@runeditrun.com>
+CommitDate: Sun Nov 8 16:08:22 2026 +0000
+
+    Count promoted catalog sources once in Word quote matching
+
+diff --git a/src/platter/documents/import-export.ts b/src/platter/documents/import-export.ts
+index 8c75a5f..b20cfcc 100644
+--- a/src/platter/documents/import-export.ts
++++ b/src/platter/documents/import-export.ts
+@@ -30,7 +30,10 @@ export async function wordContent(bytes:Uint8Array,catalog:any[],optionId:string
+     const rows=part.text.split('\n').map(r=>r.split('\t')),headers=rows[0].map(h=>h.trim().toLowerCase()),column=(pattern:RegExp)=>headers.findIndex(h=>pattern.test(h)),price=column(/^(unit\s*)?price$|^rate$/),quantity=column(/^qty$|^quantity$/),sku=column(/^sku$/),name=column(/^name$|^item$|^product$|^description$/)
+     if(price>=0||quantity>=0||sku>=0){
+      need(price>=0,'A quote table needs a price column')
+-     const lines=rows.slice(1).filter(r=>r.some(c=>c.trim())).map((r,index)=>{const sourceSku=sku>=0?r[sku]?.trim():'';const candidates=catalog.filter(c=>sourceSku?String(c.sku??'').trim().toLowerCase()===sourceSku.toLowerCase():name>=0&&String(c.name??'').trim().toLowerCase()===r[name]?.trim().toLowerCase());const distinct=[...new Map(candidates.map(c=>[c.id,c])).values()];const match=distinct.length===1?distinct[0]:undefined,label=r[name]||match?.name||r[sku]||'Imported line '+(index+1);if(!match)report.unmatched.push(label);return {name:label,description:'',unit:'each',quantity:quantity>=0?r[quantity]:'1',unitPrice:r[price].replace(/[$,]/g,''),...(match?{catalogId:match.id}:{})}})
++     const lines=rows.slice(1).filter(r=>r.some(c=>c.trim())).map((r,index)=>{const sourceSku=sku>=0?r[sku]?.trim():'';const candidates=catalog.filter(c=>sourceSku?String(c.sku??'').trim().toLowerCase()===sourceSku.toLowerCase():name>=0&&String(c.name??'').trim().toLowerCase()===r[name]?.trim().toLowerCase())
++      // A promoted priced item and its imported source represent one catalog candidate.
++      const distinct=new Map(candidates.map(c=>[c.id,c]));for(const candidate of candidates)if(candidate.source_id)distinct.delete(candidate.source_id)
++      const match=distinct.size===1?[...distinct.values()][0]:undefined,label=r[name]||match?.name||r[sku]||'Imported line '+(index+1);if(!match)report.unmatched.push(label);return {name:label,description:'',unit:'each',quantity:quantity>=0?r[quantity]:'1',unitPrice:r[price].replace(/[$,]/g,''),...(match?{catalogId:match.id}:{})}})
+      const index=tables.filter((t:any)=>t.optionId===optionId).length;tables.push({optionId,name:'Imported quote',lines});parts.push({id,type:'pricing',title:'',text:'',optionId,tableIndex:index});report.missing.push('Quote table images absent from the Word download cannot be recovered.');continue
+     }
+    }
+@@ -56,7 +59,7 @@ export async function importDocument(env:Bindings,a:Actor,data:FormData){
+   document.fixedPdf={fileId:await retain(file.name,'application/pdf',bytes),pages:pdf!.getPageCount()}
+  }else{
+   need(/\.docx$/i.test(file.name),'Upload a .docx or .pdf file')
+-  const catalog=[...(await db.prepare('SELECT id,sku,name FROM p_priced_catalog').all<any>()).results,...(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)}))]
++  const catalog=[...(await db.prepare('SELECT id,sku,name,source_id FROM p_priced_catalog').all<any>()).results,...(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)}))]
+   const tables=fields.pricingTables,optionId=String(data.get('optionId')??fields.packages[0].id),option=fields.packages.find((o:any)=>o.id===optionId);need(option,'Choose an offered package')
+   const converted=await wordContent(bytes,catalog,optionId,tables,retain),parts=converted.parts;Object.assign(report,converted.report)
+   if(data.get('mode')==='library'){
+diff --git a/src/platter/movein/pandadoc-content.ts b/src/platter/movein/pandadoc-content.ts
+index e5671e1..08d935c 100644
+--- a/src/platter/movein/pandadoc-content.ts
++++ b/src/platter/movein/pandadoc-content.ts
+@@ -21,7 +21,7 @@ async function prepare(db:D1Database,move:any,uploads:UploadedDocument[],actor:A
+  const mode=move.kind,files:any[]=[],outputs:any[]=[],unmapped:string[]=[],sources:any[]=[],skipped:string[]=[]
+  let companyIds=input.companyIds??{}
+  if(typeof companyIds==='string'){try{companyIds=JSON.parse(companyIds)}catch{fail('invalid_mapping',400,'Review the company ID mapping')}}
+- const catalog=[...(await db.prepare('SELECT id,sku,name FROM p_priced_catalog').all<any>()).results,...(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)}))]
++ const catalog=[...(await db.prepare('SELECT id,sku,name,source_id FROM p_priced_catalog').all<any>()).results,...(await db.prepare('SELECT id,data_json FROM p_catalog_items').all<any>()).results.map(r=>({id:r.id,...JSON.parse(r.data_json)}))]
+  // CSV records are reviewed with the Word outputs, so SKU links bind the same original bytes.
+  for(const upload of uploads.filter(u=>/\.csv$/i.test(u.filename))){
+   const csv=Buffer.from(upload.bytes).toString('utf8'),kind=/^Name,SKU,/i.test(csv)?'catalog':'contacts',claimMode='pandadoc-'+kind
+diff --git a/tests/platter.test.mjs b/tests/platter.test.mjs
+index a18785e..da3306e 100644
+--- a/tests/platter.test.mjs
++++ b/tests/platter.test.mjs
+@@ -3875,6 +3875,15 @@ test('EDIT-005 Word import maps tokens and catalog quote rows, keeps editable bl
+   assert.match(doc.blocks.find(b=>b.type==='text').text,/\{\{Client.Company\}\} \{\{Sender.FirstName\}\} \{\{Custom.Unmapped_Case\}\}/)
+   assert.deepEqual(imported.report.unknown,['Custom.Unmapped_Case']);assert.deepEqual(imported.report.unmatched,['Synthetic product 6']);assert.match(imported.report.missing.join(' '),/images absent/)
+   const lines=current.options[0].tables[0].lines;assert.equal(lines.length,6);assert.deepEqual(lines.map(l=>l.catalogId??null),['synthetic-platter-300','synthetic-platter-301','synthetic-platter-302','synthetic-platter-303','synthetic-platter-304',null]);assert.deepEqual(lines.map(l=>[l.name,l.quantity,l.unitPrice,l.lineTotalCents]),Array.from({length:6},(_,i)=>['Synthetic product '+(i+1),String(i+1),(10+i)+'.00',(i+1)*(10+i)*100]));assert.equal(current.options[0].cents,28000)
++  // Promoting imported records must not make their shared SKUs ambiguous on either Word import door.
++  const selection={itemIds:Array.from({length:5},(_,i)=>'synthetic-platter-'+(300+i)),fallbackUnit:'each'},promotion=await h.cmd('business-import.promote-preview',selection)
++  const promoted=await h.cmd('business-import.promote',{...selection,fingerprint:promotion.fingerprint}),promotedIds=selection.itemIds.map(id=>promoted.items.find(item=>item.sourceId===id).id)
++  const promotedDraft=await h.cmd('proposal.prepare',{...offer,clientId:current.client_id,title:'Synthetic promoted quote'}),promotedBytes=await wordFixture()
++  const direct=await uploadDocument(h,promotedDraft.id,1,promotedBytes,'synthetic-platter-307.docx'),directLines=(await h.state()).proposals.find(row=>row.id===promotedDraft.id).options[0].tables[0].lines
++  const moved=await (await import('./document-import-fixture.mjs')).applyPandaContent(h,'pandadoc-template',[{filename:'synthetic-platter-308.docx',bytes:Buffer.from(promotedBytes)}]),movedLines=(await h.state()).templates.find(row=>row.name==='synthetic-platter-308').snapshot.options[0].tables[0].lines
++  const promotedResults=[{links:directLines.map(line=>line.catalogId??null),unmatched:direct.report.unmatched},{links:movedLines.map(line=>line.catalogId??null),unmatched:moved.result.report.unmappedItems.filter(item=>item.includes('unmatched quote row ')).map(item=>item.split('unmatched quote row ')[1])}]
++  console.log('PROBE promoted Word quotes:',JSON.stringify(promotedResults.map(result=>({linked:result.links.filter(Boolean).length,unmatched:result.unmatched.length}))))
++  assert.deepEqual(promotedResults,Array.from({length:2},()=>({links:[...promotedIds,null],unmatched:['Synthetic product 6']})),'direct and PandaDoc Word imports link promoted priced items once and list only the unknown SKU')
+   assert.equal(s.templates.find(t=>t.name==='Synthetic imported template').snapshot.document.blocks.length,doc.blocks.length)
+   const importedTemplate=s.templates.find(t=>t.name==='Synthetic imported template'),variableDraft=await h.cmd('template.start',{id:importedTemplate.id,version:1,clientId:current.client_id});await h.cmd('proposal.approve',{id:variableDraft.id,version:1,revision:1});const missingTokens=await h.send('/api/platter/command',{name:'proposal.send',input:{id:variableDraft.id,version:2}},h.owner);assert.equal(missingTokens.status,409);assert.match(missingTokens.text,/Custom.Unmapped_Case/)
+   await h.cmd('proposal.variables',{id:variableDraft.id,version:2,values:{'Custom.Unmapped_Case':'Synthetic custom value'}});const filledImport=(await h.state()).proposals.find(p=>p.id===variableDraft.id);assert.equal(filledImport.document.blocks.find(b=>b.type==='text').text,'Northstar Coffee Jordan Synthetic custom value Paragraph 1');await h.cmd('proposal.approve',{id:variableDraft.id,version:3,revision:2});assert.ok((await h.cmd('proposal.send',{id:variableDraft.id,version:4})).shareUrl)

@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "tag": "sx-platter-f133fix1",
+  "repository": "just-every/run-platter",
+  "branch": "cloud/sx-platter-f133fix1",
+  "head": "3e61e44ae3423feae417173fef1640716a54a68f",
+  "resolver_head": "2c253ebbe384ea925ce9e49b19c2aae36fe6dd7b",
+  "main": "c62b55101024f4d23e9fd1cc324df793e294411d",
+  "full_history": true,
+  "before": {
+    "source": "resolver source plus the one added regression assertion",
+    "command": "node --test --test-concurrency=1 --test-name-pattern='^EDIT-005 Word import maps' tests/platter.test.mjs",
+    "exit": 1,
+    "direct": {
+      "linked": 0,
+      "unmatched": 6
+    },
+    "pandadoc": {
+      "linked": 0,
+      "unmatched": 6
+    },
+    "log": "before-test.log"
+  },
+  "after": {
+    "command": "node --test --test-concurrency=1 --test-name-pattern='^EDIT-005 Word import maps|^MIG-001 reviewed PandaDoc' tests/platter.test.mjs",
+    "exit": 0,
+    "passed": 2,
+    "failed": 0,
+    "direct": {
+      "linked": 5,
+      "unmatched": 1
+    },
+    "pandadoc": {
+      "linked": 5,
+      "unmatched": 1
+    },
+    "log": "after-test.log",
+    "tested_head": "3e61e44ae3423feae417173fef1640716a54a68f"
+  },
+  "typecheck": {
+    "command": "pnpm typecheck",
+    "exit": 0,
+    "log": "typecheck.log"
+  },
+  "contract": {
+    "restored_whole_from_main": true,
+    "source_equals_main": true,
+    "id_map_equals_main": true,
+    "write": "contract-write.log",
+    "check_exit": 0,
+    "check": "contract-check.log",
+    "committed_generated_views_check_exit": 1,
+    "committed_generated_views_check": "committed-contract-check.log",
+    "generated_view_files_in_fix_commit": false,
+    "note": "Main CONTRACT.md is authoritative. Main view bytes are restored locally and omitted from the fix commit as instructed. Lander writes the two inherited stale views and regenerates the source lock before landing."
+  },
+  "lock": {
+    "command": "node scripts/edition-authoring/cli.mjs lock; node scripts/edition-authoring/cli.mjs check",
+    "check_exit": 0,
+    "check": "source-lock-check.log",
+    "scope": "main-restored generated views, authoritative contract and final source/test edits"
+  },
+  "counts": {
+    "static_test_registrations_before": 186,
+    "static_test_registrations_after": 186,
+    "new_test_registrations": 0,
+    "added_regression_assertions": 1,
+    "cap": 200,
+    "main_and_final_contract": {
+      "done": 15,
+      "partial": 102,
+      "missing": 46,
+      "total": 163
+    },
+    "resolver_contract": {
+      "done": 15,
+      "partial": 103,
+      "missing": 45,
+      "total": 163
+    }
+  },
+  "publication_scan": "not run, per FIX brief; fleet owns independent publication scan",
+  "push": {
+    "exit": 0,
+    "attempts": 1,
+    "log": "product-push.log"
+  },
+  "ci": {
+    "run_id": 42498610142,
+    "url": "https://github.com/just-every/run-platter/actions/runs/42498610142",
+    "head_sha": "3e61e44ae3423feae417173fef1640716a54a68f",
+    "status": "completed",
+    "conclusion": "failure",
+    "exception": "Confirmed generated-view-only failure: core fails on ACCEPTANCE.md and docs/CLAIMS.md check; downstream shards skip and verify fails its required-dependency assertion. This is the explicit READY exception in the cloud brief.",
+    "core_job_id": 128786293517,
+    "aggregate_job_id": 128786403071,
+    "core_log": "ci-core-failed.log",
+    "aggregate_log": "ci-verify-failed.log",
+    "ready_contract": "eligible under documented generated-view exception; not a fully green workflow",
+    "github_call_budget": 10,
+    "github_calls_used": 4,
+    "failed_job_archive_reads": 2,
+    "github_call_minimum_interval_seconds": 300.56865644454956,
+    "final_disposition": "READY under the explicitly permitted generated-view-only Verify exception",
+    "aggregate_log_read_exit": 0,
+    "core_log_read_exit": 0
+  },
+  "pr": null,
+  "ui_changed": false,
+  "browser_proof": "No UI change; both changed import paths exercised through authenticated public HTTP doors. No browser proof added in this blocking-only FIX.",
+  "claims": [
+    "CLAIM EDIT-005 DONE points=1,2,3 tests=tests/platter.test.mjs#EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections",
+    "CLAIM MIG-001 PARTIAL points=3,4,5,6 tests=tests/platter.test.mjs#MIG-001 reviewed PandaDoc Word and fixed PDF content retains exact originals, catalog links and dependency-safe undo"
+  ],
+  "remaining_gaps": "No expanded migration or provider qualification. Existing migration, authority, recipient and image acquisition holds remain. No new clause judgment.",
+  "remaining_blockers": []
+}

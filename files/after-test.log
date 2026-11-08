@@ -1,0 +1,22 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+PROBE promoted Word quotes: [{"linked":5,"unmatched":1},{"linked":5,"unmatched":1}]
+✔ EDIT-005 Word import maps tokens and catalog quote rows, keeps editable blocks and splits Heading 1 library sections (6554.124305ms)
+PROBE MIG-001 integrated CSV: reviewed Word, catalog bundle and support contacts -> 9 bound outputs; exact originals; undo removes the batch; replay adds nothing
+PROBE MIG-001 images: URL-image batch -> refused without explicit omission; reviewed apply without images retains not-fetched metadata; changing omission choice -> 409
+PROBE MIG-001 bulk: 250 plus 40 PDFs -> 261 exact retained agreements, 29 held open documents, 4 private folders across 3 levels; repeated ZIP adds nothing; undo removes documents and folders
+PROBE MIG-001 reissue: open original plus explicit new choices -> one independent fixed-page draft; stale review, missing consent, erased client and signed original refused; dependent undo preserves originals
+PROBE MIG-001 Word: reviewed DOCX -> 6 exact priced rows, 5 linked SKUs, 1 unmatched; image and Client.Company retained
+PROBE MIG-001 library: 10 Heading 1 sections -> 10 independent library items; undo -> 0
+PROBE MIG-001 PDF: fixed template -> exact original and explicit new-price refusal; Word editing requirement reported
+PROBE MIG-001 custody: changed upload and replay -> 409; concurrent apply -> 2 outputs once; dependent undo and member requests -> refused without changes
+✔ MIG-001 reviewed PandaDoc Word and fixed PDF content retains exact originals, catalog links and dependency-safe undo (38093.442803ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 46179.541992

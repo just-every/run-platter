@@ -1,0 +1,36 @@
+{
+  "budget": 10,
+  "calls": [
+    {
+      "number": 1,
+      "kind": "exact-SHA discovery",
+      "time": 1794154333.7140455,
+      "file": "ci-discovery.json"
+    },
+    {
+      "number": 2,
+      "kind": "completed-run failed job metadata",
+      "time": 1794154634.282702,
+      "file": "ci-jobs.json",
+      "exit": 0
+    },
+    {
+      "number": 3,
+      "kind": "completed failed-job archive read",
+      "time": 1794154935.8676398,
+      "job_id": 128786293517,
+      "command": "gh run view 42498610142 --repo just-every/run-platter --job 128786293517 --log-failed",
+      "exit": 0,
+      "file": "ci-core-failed.log"
+    },
+    {
+      "number": 4,
+      "kind": "completed failed-job archive read",
+      "time": 1794155236.8822715,
+      "job_id": 128786403071,
+      "command": "gh run view 42498610142 --repo just-every/run-platter --job 128786403071 --log-failed",
+      "exit": 0,
+      "file": "ci-verify-failed.log"
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "method": "TypeScript AST static registration count for all tracked tests/*.mjs; loop registrations separately noted; no new registrations",
+  "before": 186,
+  "after": 186,
+  "files": [
+    {
+      "path": "tests/archive.test.mjs",
+      "before": {
+        "count": 12,
+        "looped": []
+      },
+      "after": {
+        "count": 12,
+        "looped": []
+      }
+    },
+    {
+      "path": "tests/demo.test.mjs",
+      "before": {
+        "count": 2,
+        "looped": []
+      },
+      "after": {
+        "count": 2,
+        "looped": []
+      }
+    },
+    {
+      "path": "tests/mail.test.mjs",
+      "before": {
+        "count": 31,
+        "looped": []
+      },
+      "after": {
+        "count": 31,
+        "looped": []
+      }
+    },
+    {
+      "path": "tests/platter.test.mjs",
+      "before": {
+        "count": 87,
+        "looped": []
+      },
+      "after": {
+        "count": 87,
+        "looped": []
+      }
+    },
+    {
+      "path": "tests/site-documents.mjs",
+      "before": {
+        "count": 31,
+        "looped": []
+      },
+      "after": {
+        "count": 31,
+        "looped": []
+      }
+    },
+    {
+      "path": "tests/site-lifecycle.mjs",
+      "before": {
+        "count": 21,
+        "looped": []
+      },
+      "after": {
+        "count": 21,
+        "looped": []
+      }
+    },
+    {
+      "path": "tests/site.test.mjs",
+      "before": {
+        "count": 1,
+        "looped": []
+      },
+      "after": {
+        "count": 1,
+        "looped": []
+      }
+    },
+    {
+      "path": "tests/tracking-details-browser.mjs",
+      "before": {
+        "count": 1,
+        "looped": []
+      },
+      "after": {
+        "count": 1,
+        "looped": []
+      }
+    }
+  ]
+}

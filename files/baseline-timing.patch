@@ -1,0 +1,43 @@
+--- a/tests/archive.test.mjs
++++ b/tests/archive.test.mjs
+@@ -813,7 +813,11 @@
+  }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
+ })
+ 
+-test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items', {timeout:180000},async()=>{
++test('TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items', {timeout:180000},async(t)=>{
++ const started=performance.now(),timings={}
++ let previous=started
++ const mark=stage=>{const now=performance.now();timings[stage]=Math.round(now-previous);previous=now}
++ t.after(()=>console.log('Archive team timing '+JSON.stringify({...timings,total:Math.round(performance.now()-started)})))
+  const inbound=inboundMailFixture(),mailboxWires=[]
+  const {offlineAccountingFake,invoiceLinkInput,accountingSyncInput}=await import('./offline-accounting-fixture.mjs'),accounting=offlineAccountingFake();accounting.invoice()
+  const disputeDeadline=Math.floor(Date.now()/1000)+86400
+@@ -822,6 +826,7 @@
+  try{
+   for(const path of [source,restored])await checkout(path)
+   await exec(process.execPath,[resolve('node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','foundation','--local'],{cwd:source,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:8e6})
++  mark('sourceSchema')
+   h=await harness({root:source,origin:'https://platter.example',assetsDirectory:'public',auth:{...inbound.settings,AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_API_KEY:'synthetic-platter-5600',GOOGLE_MAIL_CLIENT_ID:'synthetic-platter-5601',GOOGLE_MAIL_CLIENT_SECRET:'synthetic-platter-5602'},outboundService:async request=>{const url=new URL(request.url);if(url.hostname==='oauth2.googleapis.com')return Response.json({access_token:'synthetic-platter-5603',refresh_token:'synthetic-platter-5604',scope:'openid email https://www.googleapis.com/auth/gmail.send'});if(url.hostname==='openidconnect.googleapis.com')return Response.json({sub:'synthetic-platter-5605',email:'archive-mailbox@synthetic-platter.example',email_verified:true});if(url.hostname==='gmail.googleapis.com'){mailboxWires.push(Buffer.from((await request.json()).raw,'base64url').toString('utf8'));return Response.json({id:'synthetic-platter-'+(8000+mailboxWires.length)})}if(url.hostname==='api.resend.com'&&request.method==='GET')return Response.json(inbound.messages.get(url.pathname.split('/').at(-1)));if(url.hostname==='api.resend.com')return Response.json({id:'synthetic-platter-5607'});if(url.hostname==='files.stripe.com'){const upload=await request.formData();assert.equal(upload.get('purpose'),'dispute_evidence');return Response.json({id:'synthetic-platter-3700'})}if(url.hostname==='api.hubapi.com'){if(url.pathname==='/account-info/v3/details')return Response.json({portalId:'synthetic-platter-4120'});if(url.pathname==='/crm/v3/pipelines/deals')return Response.json({results:[{id:'synthetic-platter-9961',stages:[{id:'synthetic-platter-9962',metadata:{isClosed:'true',probability:'1'}},{id:'synthetic-platter-9963',metadata:{isClosed:'true',probability:'0'}}]}]});const id=url.pathname.split('/').at(-1);return Response.json({id,properties:request.method==='PATCH'?(await request.json()).properties:{pipeline:'synthetic-platter-9961'}})};if(url.hostname==='quickbooks.api.intuit.com')return accounting.receive(request);assert.equal(url.hostname,'api.stripe.com');if(url.pathname==='/v1/account')return Response.json({id:'synthetic-platter-2800'});if(url.pathname.includes('/disputes/')){const id=url.pathname.split('/').at(-1);if(request.method==='POST')return Response.json({id,status:'under_review'});const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id,charge:'synthetic-platter-2801',amount:accepted.deposit_cents,currency:accepted.currency.toLowerCase(),status:'needs_response',evidence_details:{due_by:disputeDeadline}})}if(request.method==='GET'){const accepted=await h.db.prepare('SELECT * FROM p_acceptances LIMIT 1').first();return Response.json({id:'synthetic-platter-2801',paid:true,status:'succeeded',amount:accepted.deposit_cents,amount_refunded:0,currency:accepted.currency.toLowerCase(),metadata:{platter_proposal_id:accepted.proposal_id,platter_revision:String(accepted.revision)}})}const amount=Number(new URLSearchParams(await request.text()).get('amount'));return Response.json({id:'synthetic-platter-2802',charge:'synthetic-platter-2801',amount,status:'succeeded'})}})
+   const people={}
+   for(const role of ['sales','manager','other','admin']){
+@@ -946,7 +951,8 @@
+   const rows=await Promise.all(tables.map(t=>h.db.prepare('SELECT * FROM '+t).all().then(r=>canonical(r.results))))
+   const auditHistory=canonical((await h.db.prepare('SELECT * FROM p_audit').all()).results)
+   await h.close();h=undefined
+-  const archive=join(temporary,'teams.rer');await command(source,['export','--output',archive]);await command(restored,['import','--input',archive,'--yes'])
++  mark('sourceFixture')
++  const archive=join(temporary,'teams.rer');await command(source,['export','--output',archive]);mark('export');await command(restored,['import','--input',archive,'--yes']);mark('import')
+   const restoredCalls=[]
+   h=await harness({root:restored,unclaimed:true,outboundService:async request=>{restoredCalls.push(new URL(request.url).hostname);throw new Error('Restore must not call a provider')}})
+   const owner=await h.signIn(h.auth.OWNER_EMAIL),after=await h.state(owner)
+@@ -1020,7 +1026,8 @@
+   await h.cmd('library.save',{id:archivedLibrary.id,version:1,title:'Synthetic case study',kind:'case_study',content:'Restored linked story'},owner)
+   const restoredLibrary=(await h.state(owner)).proposals.find(r=>r.id===libraryCopy.id)
+   assert.equal(restoredLibrary.document.blocks[0].text,'Restored linked story');assert.equal(restoredLibrary.document.blocks[1].text,'An archived text library item')
+- }finally{await h?.close();await rm(temporary,{recursive:true,force:true})}
++  mark('restoreAssertions')
++ }finally{await h?.close();await rm(temporary,{recursive:true,force:true});mark('cleanup')}
+ })
+ 
+ 

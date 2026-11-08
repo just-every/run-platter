@@ -1,0 +1,21 @@
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Archive schema template completed in 30936 ms (118 migrations; ledger preflight passed)
+# Archive CLI export completed in 31098 ms
+# Archive CLI import completed in 45577 ms
+# Archive team timing {"sourceSchema":320,"sourceFixture":19295,"export":31098,"import":45577,"restoreAssertions":4716,"cleanup":35,"total":101041}
+# Subtest: TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items
+ok 1 - TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items
+  ---
+  duration_ms: 131976.376876
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 133373.468061

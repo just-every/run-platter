@@ -1,0 +1,12 @@
+{
+  "productHeadDuringFullTouchedChecks": "abf2ed4c807e7ee59c358638ea7c3dc6431bdc76",
+  "sourceFiles": {
+    "tests/archive.test.mjs": "a6f08c597ccb7a05e8a00303826e20a73b8d65f4bf4673799d15dcaa12b21e8f",
+    "tests/archive-template.mjs": "da2f65a25c9ae1bc200bd837c48b727f8e4ec11635d6fb68f24196a3db1fa6b8"
+  },
+  "diagnosticsUncommittedDuringFullTouchedChecks": true,
+  "commands": [
+    "CI=true WRANGLER_SEND_METRICS=false PLATTER_VERIFY_SHARD=archive_media pnpm verify:app",
+    "CI=true WRANGLER_SEND_METRICS=false node --test --test-concurrency=1 --test-name-pattern='public CLI preserves business|first-release AUD|bounce follow-ups|PORT-001 public CLI refuses|imported business|document archive history' tests/archive.test.mjs"
+  ]
+}

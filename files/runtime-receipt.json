@@ -1,0 +1,16 @@
+{
+  "node": "v22.20.0",
+  "pnpm": "10.12.4",
+  "system": "Linux",
+  "machine": "x86_64",
+  "ci": true,
+  "wranglerMetrics": false,
+  "testTimeoutMs": 180000,
+  "verifyJobTimeoutMinutes": 17,
+  "baseSha": "7c0b92553438cdab1c78c31b6d7dcf6803a9371b",
+  "commands": {
+    "focused": "node --test --test-concurrency=1 --test-name-pattern=^TEAM-001 tests/archive.test.mjs",
+    "shard": "PLATTER_VERIFY_SHARD=archive_media pnpm verify:app",
+    "typecheck": "pnpm typecheck"
+  }
+}

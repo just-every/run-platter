@@ -1,0 +1,7 @@
+{
+  "mainSha": "7c0b92553438cdab1c78c31b6d7dcf6803a9371b",
+  "originalSourceSha256": "bfed6000fdd6d30a47ee88333e96179a65bf803954ada61da84be79383608207",
+  "timingInstrumentedSourceSha256": "cfc89127b08fe0f99b49cd8e19ece54838fcc0e4a8c28a830b4d4fb5c606e41f",
+  "instrumentationPatch": "baseline-timing.patch",
+  "businessSourceUnchanged": true
+}

@@ -1,0 +1,1120 @@
+{
+  "jobs": [
+    {
+      "completed_at": "2026-11-08T19:02:17Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/just-every/run-platter/actions/runs/42512950991/job/128829768785",
+      "id": 128829768785,
+      "name": "plan",
+      "started_at": "2026-11-08T19:02:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-11-08T19:02:13Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-11-08T19:02:13Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:15Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 2,
+          "started_at": "2026-11-08T19:02:13Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:15Z",
+          "conclusion": "success",
+          "name": "Run set -euo pipefail",
+          "number": 3,
+          "started_at": "2026-11-08T19:02:15Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:15Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 6,
+          "started_at": "2026-11-08T19:02:15Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:15Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 7,
+          "started_at": "2026-11-08T19:02:15Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-11-08T19:02:55Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/just-every/run-platter/actions/runs/42512950991/job/128829796604",
+      "id": 128829796604,
+      "name": "core",
+      "started_at": "2026-11-08T19:02:19Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-11-08T19:02:21Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-11-08T19:02:20Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:23Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 2,
+          "started_at": "2026-11-08T19:02:21Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:23Z",
+          "conclusion": "success",
+          "name": "Run pnpm/action-setup@v4",
+          "number": 3,
+          "started_at": "2026-11-08T19:02:23Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:31Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v4",
+          "number": 4,
+          "started_at": "2026-11-08T19:02:23Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:36Z",
+          "conclusion": "success",
+          "name": "Run pnpm install --frozen-lockfile",
+          "number": 5,
+          "started_at": "2026-11-08T19:02:31Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:49Z",
+          "conclusion": "success",
+          "name": "Build once and check generated documents and types",
+          "number": 6,
+          "started_at": "2026-11-08T19:02:36Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:53Z",
+          "conclusion": "success",
+          "name": "Run actions/upload-artifact@v4",
+          "number": 7,
+          "started_at": "2026-11-08T19:02:49Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:53Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v4",
+          "number": 12,
+          "started_at": "2026-11-08T19:02:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:53Z",
+          "conclusion": "success",
+          "name": "Post Run pnpm/action-setup@v4",
+          "number": 13,
+          "started_at": "2026-11-08T19:02:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:53Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 14,
+          "started_at": "2026-11-08T19:02:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:02:53Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "started_at": "2026-11-08T19:02:53Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-11-08T19:02:17Z",
+      "conclusion": "skipped",
+      "html_url": "https://github.com/just-every/run-platter/actions/runs/42512950991/job/128829798487",
+      "id": 128829798487,
+      "name": "editor_budget",
+      "started_at": "2026-11-08T19:02:18Z",
+      "status": "completed",
+      "steps": []
+    },
+    {
+      "completed_at": "2026-11-08T19:10:38Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/just-every/run-platter/actions/runs/42512950991/job/128829963278",
+      "id": 128829963278,
+      "name": "shards (business_lifecycle)",
+      "started_at": "2026-11-08T19:02:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-11-08T19:02:58Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-11-08T19:02:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:00Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 2,
+          "started_at": "2026-11-08T19:02:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:01Z",
+          "conclusion": "success",
+          "name": "Run pnpm/action-setup@v4",
+          "number": 3,
+          "started_at": "2026-11-08T19:03:00Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:09Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v4",
+          "number": 4,
+          "started_at": "2026-11-08T19:03:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:14Z",
+          "conclusion": "success",
+          "name": "Run pnpm install --frozen-lockfile",
+          "number": 5,
+          "started_at": "2026-11-08T19:03:09Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:14Z",
+          "conclusion": "skipped",
+          "name": "Run actions/download-artifact@v4",
+          "number": 6,
+          "started_at": "2026-11-08T19:03:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:14Z",
+          "conclusion": "skipped",
+          "name": "Install Chromium",
+          "number": 7,
+          "started_at": "2026-11-08T19:03:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:14Z",
+          "conclusion": "skipped",
+          "name": "Verify runtime and hosted output",
+          "number": 8,
+          "started_at": "2026-11-08T19:03:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:35Z",
+          "conclusion": "success",
+          "name": "Verify business or archive flow",
+          "number": 9,
+          "started_at": "2026-11-08T19:03:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:35Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v4",
+          "number": 16,
+          "started_at": "2026-11-08T19:10:35Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:35Z",
+          "conclusion": "success",
+          "name": "Post Run pnpm/action-setup@v4",
+          "number": 17,
+          "started_at": "2026-11-08T19:10:35Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:35Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 18,
+          "started_at": "2026-11-08T19:10:35Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:35Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 19,
+          "started_at": "2026-11-08T19:10:35Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-11-08T19:10:44Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/just-every/run-platter/actions/runs/42512950991/job/128829963280",
+      "id": 128829963280,
+      "name": "shards (browser_commercial)",
+      "started_at": "2026-11-08T19:02:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-11-08T19:03:00Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-11-08T19:02:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:01Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 2,
+          "started_at": "2026-11-08T19:03:00Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:02Z",
+          "conclusion": "success",
+          "name": "Run pnpm/action-setup@v4",
+          "number": 3,
+          "started_at": "2026-11-08T19:03:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:10Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v4",
+          "number": 4,
+          "started_at": "2026-11-08T19:03:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:14Z",
+          "conclusion": "success",
+          "name": "Run pnpm install --frozen-lockfile",
+          "number": 5,
+          "started_at": "2026-11-08T19:03:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:16Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 6,
+          "started_at": "2026-11-08T19:03:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:23Z",
+          "conclusion": "success",
+          "name": "Install Chromium",
+          "number": 7,
+          "started_at": "2026-11-08T19:03:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:23Z",
+          "conclusion": "skipped",
+          "name": "Verify runtime and hosted output",
+          "number": 8,
+          "started_at": "2026-11-08T19:03:23Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:41Z",
+          "conclusion": "success",
+          "name": "Verify business or archive flow",
+          "number": 9,
+          "started_at": "2026-11-08T19:03:23Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:41Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v4",
+          "number": 16,
+          "started_at": "2026-11-08T19:10:41Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:41Z",
+          "conclusion": "success",
+          "name": "Post Run pnpm/action-setup@v4",
+          "number": 17,
+          "started_at": "2026-11-08T19:10:41Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:41Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 18,
+          "started_at": "2026-11-08T19:10:41Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:41Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 19,
+          "started_at": "2026-11-08T19:10:41Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-11-08T19:12:28Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/just-every/run-platter/actions/runs/42512950991/job/128829963304",
+      "id": 128829963304,
+      "name": "shards (archive_custody)",
+      "started_at": "2026-11-08T19:02:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-11-08T19:03:00Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-11-08T19:02:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:01Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 2,
+          "started_at": "2026-11-08T19:03:00Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:03Z",
+          "conclusion": "success",
+          "name": "Run pnpm/action-setup@v4",
+          "number": 3,
+          "started_at": "2026-11-08T19:03:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:11Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v4",
+          "number": 4,
+          "started_at": "2026-11-08T19:03:03Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:17Z",
+          "conclusion": "success",
+          "name": "Run pnpm install --frozen-lockfile",
+          "number": 5,
+          "started_at": "2026-11-08T19:03:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:17Z",
+          "conclusion": "skipped",
+          "name": "Run actions/download-artifact@v4",
+          "number": 6,
+          "started_at": "2026-11-08T19:03:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:17Z",
+          "conclusion": "skipped",
+          "name": "Install Chromium",
+          "number": 7,
+          "started_at": "2026-11-08T19:03:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:17Z",
+          "conclusion": "skipped",
+          "name": "Verify runtime and hosted output",
+          "number": 8,
+          "started_at": "2026-11-08T19:03:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:12:25Z",
+          "conclusion": "success",
+          "name": "Verify business or archive flow",
+          "number": 9,
+          "started_at": "2026-11-08T19:03:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:12:25Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v4",
+          "number": 16,
+          "started_at": "2026-11-08T19:12:25Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:12:25Z",
+          "conclusion": "success",
+          "name": "Post Run pnpm/action-setup@v4",
+          "number": 17,
+          "started_at": "2026-11-08T19:12:25Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:12:25Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 18,
+          "started_at": "2026-11-08T19:12:25Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:12:25Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 19,
+          "started_at": "2026-11-08T19:12:25Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-11-08T19:20:14Z",
+      "conclusion": "cancelled",
+      "html_url": "https://github.com/just-every/run-platter/actions/runs/42512950991/job/128829963311",
+      "id": 128829963311,
+      "name": "shards (business_authoring)",
+      "started_at": "2026-11-08T19:02:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-11-08T19:02:59Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-11-08T19:02:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:01Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 2,
+          "started_at": "2026-11-08T19:02:59Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:02Z",
+          "conclusion": "success",
+          "name": "Run pnpm/action-setup@v4",
+          "number": 3,
+          "started_at": "2026-11-08T19:03:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:11Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v4",
+          "number": 4,
+          "started_at": "2026-11-08T19:03:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:17Z",
+          "conclusion": "success",
+          "name": "Run pnpm install --frozen-lockfile",
+          "number": 5,
+          "started_at": "2026-11-08T19:03:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:17Z",
+          "conclusion": "skipped",
+          "name": "Run actions/download-artifact@v4",
+          "number": 6,
+          "started_at": "2026-11-08T19:03:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:17Z",
+          "conclusion": "skipped",
+          "name": "Install Chromium",
+          "number": 7,
+          "started_at": "2026-11-08T19:03:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:17Z",
+          "conclusion": "skipped",
+          "name": "Verify runtime and hosted output",
+          "number": 8,
+          "started_at": "2026-11-08T19:03:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:20:10Z",
+          "conclusion": "cancelled",
+          "name": "Verify business or archive flow",
+          "number": 9,
+          "started_at": "2026-11-08T19:03:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:20:10Z",
+          "conclusion": "skipped",
+          "name": "Post Run actions/setup-node@v4",
+          "number": 16,
+          "started_at": "2026-11-08T19:20:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:20:10Z",
+          "conclusion": "success",
+          "name": "Post Run pnpm/action-setup@v4",
+          "number": 17,
+          "started_at": "2026-11-08T19:20:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:20:10Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 18,
+          "started_at": "2026-11-08T19:20:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:20:10Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 19,
+          "started_at": "2026-11-08T19:20:10Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-11-08T19:10:15Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/just-every/run-platter/actions/runs/42512950991/job/128829963320",
+      "id": 128829963320,
+      "name": "shards (archive_media)",
+      "started_at": "2026-11-08T19:02:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-11-08T19:02:59Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-11-08T19:02:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:01Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 2,
+          "started_at": "2026-11-08T19:02:59Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:02Z",
+          "conclusion": "success",
+          "name": "Run pnpm/action-setup@v4",
+          "number": 3,
+          "started_at": "2026-11-08T19:03:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:11Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v4",
+          "number": 4,
+          "started_at": "2026-11-08T19:03:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:16Z",
+          "conclusion": "success",
+          "name": "Run pnpm install --frozen-lockfile",
+          "number": 5,
+          "started_at": "2026-11-08T19:03:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:16Z",
+          "conclusion": "skipped",
+          "name": "Run actions/download-artifact@v4",
+          "number": 6,
+          "started_at": "2026-11-08T19:03:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:16Z",
+          "conclusion": "skipped",
+          "name": "Install Chromium",
+          "number": 7,
+          "started_at": "2026-11-08T19:03:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:16Z",
+          "conclusion": "skipped",
+          "name": "Verify runtime and hosted output",
+          "number": 8,
+          "started_at": "2026-11-08T19:03:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:11Z",
+          "conclusion": "success",
+          "name": "Verify business or archive flow",
+          "number": 9,
+          "started_at": "2026-11-08T19:03:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:11Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v4",
+          "number": 16,
+          "started_at": "2026-11-08T19:10:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:12Z",
+          "conclusion": "success",
+          "name": "Post Run pnpm/action-setup@v4",
+          "number": 17,
+          "started_at": "2026-11-08T19:10:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:12Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 18,
+          "started_at": "2026-11-08T19:10:12Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:10:12Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 19,
+          "started_at": "2026-11-08T19:10:12Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-11-08T19:16:35Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/just-every/run-platter/actions/runs/42512950991/job/128829963330",
+      "id": 128829963330,
+      "name": "shards (runtime)",
+      "started_at": "2026-11-08T19:02:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-11-08T19:02:59Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-11-08T19:02:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:02Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 2,
+          "started_at": "2026-11-08T19:02:59Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:03Z",
+          "conclusion": "success",
+          "name": "Run pnpm/action-setup@v4",
+          "number": 3,
+          "started_at": "2026-11-08T19:03:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:11Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v4",
+          "number": 4,
+          "started_at": "2026-11-08T19:03:03Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:18Z",
+          "conclusion": "success",
+          "name": "Run pnpm install --frozen-lockfile",
+          "number": 5,
+          "started_at": "2026-11-08T19:03:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:19Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 6,
+          "started_at": "2026-11-08T19:03:18Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:29Z",
+          "conclusion": "success",
+          "name": "Install Chromium",
+          "number": 7,
+          "started_at": "2026-11-08T19:03:19Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:16:32Z",
+          "conclusion": "success",
+          "name": "Verify runtime and hosted output",
+          "number": 8,
+          "started_at": "2026-11-08T19:03:29Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:16:32Z",
+          "conclusion": "skipped",
+          "name": "Verify business or archive flow",
+          "number": 9,
+          "started_at": "2026-11-08T19:16:32Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:16:32Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v4",
+          "number": 16,
+          "started_at": "2026-11-08T19:16:32Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:16:33Z",
+          "conclusion": "success",
+          "name": "Post Run pnpm/action-setup@v4",
+          "number": 17,
+          "started_at": "2026-11-08T19:16:32Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:16:33Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 18,
+          "started_at": "2026-11-08T19:16:33Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:16:33Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 19,
+          "started_at": "2026-11-08T19:16:33Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-11-08T19:09:51Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/just-every/run-platter/actions/runs/42512950991/job/128829963403",
+      "id": 128829963403,
+      "name": "shards (browser_documents)",
+      "started_at": "2026-11-08T19:02:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-11-08T19:02:59Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-11-08T19:02:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:00Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 2,
+          "started_at": "2026-11-08T19:02:59Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:01Z",
+          "conclusion": "success",
+          "name": "Run pnpm/action-setup@v4",
+          "number": 3,
+          "started_at": "2026-11-08T19:03:00Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:10Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v4",
+          "number": 4,
+          "started_at": "2026-11-08T19:03:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:15Z",
+          "conclusion": "success",
+          "name": "Run pnpm install --frozen-lockfile",
+          "number": 5,
+          "started_at": "2026-11-08T19:03:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:16Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 6,
+          "started_at": "2026-11-08T19:03:15Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:23Z",
+          "conclusion": "success",
+          "name": "Install Chromium",
+          "number": 7,
+          "started_at": "2026-11-08T19:03:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:23Z",
+          "conclusion": "skipped",
+          "name": "Verify runtime and hosted output",
+          "number": 8,
+          "started_at": "2026-11-08T19:03:23Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:09:49Z",
+          "conclusion": "success",
+          "name": "Verify business or archive flow",
+          "number": 9,
+          "started_at": "2026-11-08T19:03:23Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:09:49Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v4",
+          "number": 16,
+          "started_at": "2026-11-08T19:09:49Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:09:49Z",
+          "conclusion": "success",
+          "name": "Post Run pnpm/action-setup@v4",
+          "number": 17,
+          "started_at": "2026-11-08T19:09:49Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:09:49Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 18,
+          "started_at": "2026-11-08T19:09:49Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:09:49Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 19,
+          "started_at": "2026-11-08T19:09:49Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-11-08T19:14:01Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/just-every/run-platter/actions/runs/42512950991/job/128829963441",
+      "id": 128829963441,
+      "name": "shards (archive_restore)",
+      "started_at": "2026-11-08T19:02:58Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-11-08T19:03:00Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-11-08T19:02:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:01Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 2,
+          "started_at": "2026-11-08T19:03:00Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:03Z",
+          "conclusion": "success",
+          "name": "Run pnpm/action-setup@v4",
+          "number": 3,
+          "started_at": "2026-11-08T19:03:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:11Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v4",
+          "number": 4,
+          "started_at": "2026-11-08T19:03:03Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:17Z",
+          "conclusion": "success",
+          "name": "Run pnpm install --frozen-lockfile",
+          "number": 5,
+          "started_at": "2026-11-08T19:03:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:17Z",
+          "conclusion": "skipped",
+          "name": "Run actions/download-artifact@v4",
+          "number": 6,
+          "started_at": "2026-11-08T19:03:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:17Z",
+          "conclusion": "skipped",
+          "name": "Install Chromium",
+          "number": 7,
+          "started_at": "2026-11-08T19:03:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:03:17Z",
+          "conclusion": "skipped",
+          "name": "Verify runtime and hosted output",
+          "number": 8,
+          "started_at": "2026-11-08T19:03:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:13:58Z",
+          "conclusion": "success",
+          "name": "Verify business or archive flow",
+          "number": 9,
+          "started_at": "2026-11-08T19:03:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:13:58Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v4",
+          "number": 16,
+          "started_at": "2026-11-08T19:13:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:13:58Z",
+          "conclusion": "success",
+          "name": "Post Run pnpm/action-setup@v4",
+          "number": 17,
+          "started_at": "2026-11-08T19:13:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:13:58Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 18,
+          "started_at": "2026-11-08T19:13:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:13:58Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 19,
+          "started_at": "2026-11-08T19:13:58Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-11-08T19:20:20Z",
+      "conclusion": "failure",
+      "html_url": "https://github.com/just-every/run-platter/actions/runs/42512950991/job/128834510156",
+      "id": 128834510156,
+      "name": "verify",
+      "started_at": "2026-11-08T19:20:16Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-11-08T19:20:17Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-11-08T19:20:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:20:17Z",
+          "conclusion": "failure",
+          "name": "Require the plan and every shard",
+          "number": 2,
+          "started_at": "2026-11-08T19:20:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-11-08T19:20:17Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 3,
+          "started_at": "2026-11-08T19:20:17Z",
+          "status": "completed"
+        }
+      ]
+    }
+  ],
+  "total_count": 12
+}

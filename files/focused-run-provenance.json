@@ -1,0 +1,23 @@
+[
+  {
+    "run": 1,
+    "exit": 0,
+    "head": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+    "completedAt": "2026-11-08T19:04:36.773081+00:00",
+    "command": "CI=true WRANGLER_SEND_METRICS=false node --test --test-concurrency=1 --test-name-pattern='^TEAM-001' tests/archive.test.mjs"
+  },
+  {
+    "run": 2,
+    "exit": 0,
+    "head": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+    "completedAt": "2026-11-08T19:06:52.574354+00:00",
+    "command": "CI=true WRANGLER_SEND_METRICS=false node --test --test-concurrency=1 --test-name-pattern='^TEAM-001' tests/archive.test.mjs"
+  },
+  {
+    "run": 3,
+    "exit": 0,
+    "head": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+    "completedAt": "2026-11-08T19:09:06.021369+00:00",
+    "command": "CI=true WRANGLER_SEND_METRICS=false node --test --test-concurrency=1 --test-name-pattern='^TEAM-001' tests/archive.test.mjs"
+  }
+]

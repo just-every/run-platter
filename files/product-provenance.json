@@ -1,0 +1,15 @@
+{
+  "repository": "just-every/run-platter",
+  "branch": "cloud/sx-platter-timing-1",
+  "head": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+  "saveHead": "abf2ed4c807e7ee59c358638ea7c3dc6431bdc76",
+  "originMain": "7c0b92553438cdab1c78c31b6d7dcf6803a9371b",
+  "originProductHead": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+  "fullHistory": true,
+  "cleanTrackedTree": true,
+  "sourceFiles": {
+    "tests/archive.test.mjs": "a6f08c597ccb7a05e8a00303826e20a73b8d65f4bf4673799d15dcaa12b21e8f",
+    "tests/archive-template.mjs": "da2f65a25c9ae1bc200bd837c48b727f8e4ec11635d6fb68f24196a3db1fa6b8"
+  },
+  "recordedAt": "2026-11-08T19:02:09.136904+00:00"
+}

@@ -1,0 +1,83 @@
+
+> @proposals/platter@0.1.0 verify:app /workspace/run-platter
+> node scripts/verification/run.mjs
+
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Archive schema template completed in 31306 ms (118 migrations; ledger preflight passed)
+# Archive CLI export completed in 23637 ms
+# Archive CLI import completed in 32038 ms
+# Subtest: SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority
+ok 1 - SEND-006 public CLI retains real invitation text, excludes rehearsal content and preserves its test-send audit without invitation authority
+  ---
+  duration_ms: 96195.570238
+  type: 'test'
+  ...
+# Archive CLI export completed in 33362 ms
+# Archive CLI import completed in 51513 ms
+# Archive team timing {"sourceSchema":383,"sourceFixture":20687,"export":33362,"import":51513,"restoreAssertions":5644,"cleanup":48,"total":111638}
+# Subtest: TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items
+ok 2 - TEAM-001 / APPROVE-003 / APPROVE-001 public CLI restores scoped roles, teams, collaborators, policy and exact revision decisions, costs and library items
+  ---
+  duration_ms: 111640.343305
+  type: 'test'
+  ...
+# Archive CLI export completed in 29233 ms
+# Archive CLI import completed in 42786 ms
+# Subtest: APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority
+ok 3 - APPROVE-002 / AUTO-003 / FOLLOW-003 public CLI retains notification business history without credentials, queued messages or restored outbound authority
+  ---
+  duration_ms: 86047.974963
+  type: 'test'
+  ...
+# Archive CLI export completed in 26251 ms
+# Archive CLI import completed in 39946 ms
+# PROBE AGENT-007 custody: public CLI export and import -> exact result, decision references and source digest retained; old credentials refused; no apply authority
+# Subtest: EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority
+ok 4 - EDIT-001 public CLI retains displayed media bytes, Client field values, block questions and suggestions without restoring client authority
+  ---
+  duration_ms: 99285.420262
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 394581.083636
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/demo.test.mjs
+ok 1 - tests/demo.test.mjs
+  ---
+  duration_ms: 1070.612332
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: COLLAB-002 scoped colleagues comment, receive consented generic email and chat, resolve and assign without exposing internal threads to clients
+ok 2 - COLLAB-002 scoped colleagues comment, receive consented generic email and chat, resolve and assign without exposing internal threads to clients
+  ---
+  duration_ms: 30603.385908
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+1..0
+# Subtest: tests/platter.test.mjs
+ok 3 - tests/platter.test.mjs
+  ---
+  duration_ms: 1351.151912
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 34004.813648

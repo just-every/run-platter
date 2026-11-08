@@ -1,0 +1,8 @@
+Sanitized failed-step archive excerpt: the Actions-generated environment metadata block is omitted. Script and failure output follow.
+verify	Require the plan and every shard	﻿2026-11-08T19:20:17.3880689Z ##[group]Run test "$PLAN" = success
+verify	Require the plan and every shard	2026-11-08T19:20:17.3881659Z [36;1mtest "$PLAN" = success[0m
+verify	Require the plan and every shard	2026-11-08T19:20:17.3882287Z [36;1mif [ "$SKIP" = true ]; then exit 0; fi[0m
+verify	Require the plan and every shard	2026-11-08T19:20:17.3883138Z [36;1mfor result in $RESULTS; do test "$result" = success; done[0m
+verify	Require the plan and every shard	2026-11-08T19:20:17.4040424Z shell: /usr/bin/bash -e {0}
+verify	Require the plan and every shard	2026-11-08T19:20:17.4043846Z ##[endgroup]
+verify	Require the plan and every shard	2026-11-08T19:20:17.4195423Z ##[error]Process completed with exit code 1.

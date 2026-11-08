@@ -1,0 +1,22 @@
+{
+  "assertions": {
+    "before": 842,
+    "after": 842,
+    "unchanged": true,
+    "sha256": "37c358c1521040f94b82abb10f070c7bd39280b39cf94756b9ecbd3457902279"
+  },
+  "registrations": {
+    "before": 12,
+    "after": 12,
+    "unchanged": true
+  },
+  "publicHarnessCalls": {
+    "before": 563,
+    "after": 563,
+    "unchanged": true
+  },
+  "source": {
+    "before": "bfed6000fdd6d30a47ee88333e96179a65bf803954ada61da84be79383608207",
+    "after": "a6f08c597ccb7a05e8a00303826e20a73b8d65f4bf4673799d15dcaa12b21e8f"
+  }
+}

@@ -1,0 +1,206 @@
+{
+  "selection": "Explicit report and receipt files only; no credentials, environment dumps, private held-out gates, archives, database files or symlinks selected.",
+  "credentialShapeScan": "passed",
+  "regularFilesVerified": true,
+  "selectedFiles": [
+    "REPORT.md",
+    "PLAN.md",
+    "base-sha.txt",
+    "before-1.tap",
+    "before-2.tap",
+    "before-3.tap",
+    "after-1.tap",
+    "after-2.tap",
+    "after-3.tap",
+    "optimization-pilot.tap",
+    "archive-media.tap",
+    "archive-complement.tap",
+    "typecheck.txt",
+    "runtime-receipt.json",
+    "baseline-source-receipt.json",
+    "baseline-timing.patch",
+    "assertion-receipt.json",
+    "team-assertion-receipt.json",
+    "local-test-receipt.json",
+    "touched-source-receipt.json",
+    "focused-run-provenance.json",
+    "product-provenance.json",
+    "source-lock-receipt.json",
+    "commit-audit.txt",
+    "push-save.txt",
+    "push-candidate.txt",
+    "ci-receipt.json",
+    "ci-watch.txt",
+    "ci-jobs.json",
+    "github-call-receipt.json",
+    "ci-cancellation-report.md",
+    "ci-verify-failed.log",
+    "packet-review.json"
+  ],
+  "reviewedFiles": [
+    {
+      "file": "REPORT.md",
+      "bytes": 9623,
+      "sha256": "1b76023cd91f2e2f50340fa5cad3506d8fa5dce7226f31547725b161a20346cb"
+    },
+    {
+      "file": "PLAN.md",
+      "bytes": 2641,
+      "sha256": "368b1fdad14e9a2c42fae9f018ea5af1f79020effdcd9995ec1184b1f70375b9"
+    },
+    {
+      "file": "base-sha.txt",
+      "bytes": 41,
+      "sha256": "823010759f47eadc54ee591254ac5941a09757c976676d3b486beda10d0a681d"
+    },
+    {
+      "file": "before-1.tap",
+      "bytes": 876,
+      "sha256": "5ef0fa5fbe59ce8dcb05664f53ce7e56e128b3d6f98ab0e6cfe6514c3feae115"
+    },
+    {
+      "file": "before-2.tap",
+      "bytes": 876,
+      "sha256": "37d8f4f6c2486b0eb09c309eb5be8c3b25e039cff1216a22a829a75ae97dd6e3"
+    },
+    {
+      "file": "before-3.tap",
+      "bytes": 876,
+      "sha256": "1d0f59733d0faf7b6a47654b23013d406c6964f1e35ee76c202f2b9d2dd2f694"
+    },
+    {
+      "file": "after-1.tap",
+      "bytes": 964,
+      "sha256": "c3185d07651d9662a428b0a58fcd8a385526edd26ebbc04be6e544cde50faac5"
+    },
+    {
+      "file": "after-2.tap",
+      "bytes": 964,
+      "sha256": "00757dec21f4913af648335aec43ac3f756dc53c078d872252e3d2454974f53b"
+    },
+    {
+      "file": "after-3.tap",
+      "bytes": 964,
+      "sha256": "847e09a383f2b78530f82a97764265fd987f5cb4b2fab8dafd91cf4505b94aa7"
+    },
+    {
+      "file": "optimization-pilot.tap",
+      "bytes": 816,
+      "sha256": "5417f0f7ca616f7e46c20cdf0c54e6bd24717f5de554acb74a217ebdb4b2d136"
+    },
+    {
+      "file": "archive-media.tap",
+      "bytes": 3699,
+      "sha256": "1b7e6fa2c4ae161013f8db5c35bd8acfab9e4990a244ad369b49f027112a4378"
+    },
+    {
+      "file": "archive-complement.tap",
+      "bytes": 5160,
+      "sha256": "457c401078e3e0447a470528c89ef5c92432e21bdb8fe74dd444a2449239c945"
+    },
+    {
+      "file": "typecheck.txt",
+      "bytes": 90,
+      "sha256": "8d34ecd5e20765ca59e0574cbe7a1e6d25d1683e9ebedd5c5b14fb94671bda23"
+    },
+    {
+      "file": "runtime-receipt.json",
+      "bytes": 475,
+      "sha256": "05d9d1f253fdf41381d52be228384eec465de4e9f1d9e4ed82ec3f6b59283278"
+    },
+    {
+      "file": "baseline-source-receipt.json",
+      "bytes": 344,
+      "sha256": "8fe76be2c3a4c8b2c947d6e6a4adf48ff9336eca87d6b794d56b3ae5d093ee87"
+    },
+    {
+      "file": "baseline-timing.patch",
+      "bytes": 6217,
+      "sha256": "d585e2ae989729b24a964b02252e79e2c9e4ffc4cec8c3d8fe06daaad1df73d6"
+    },
+    {
+      "file": "assertion-receipt.json",
+      "bytes": 521,
+      "sha256": "c0553d566ec3bc17620cca985a3721b39e441b4ef5cc3dc4a8c715a9596dce5f"
+    },
+    {
+      "file": "team-assertion-receipt.json",
+      "bytes": 346,
+      "sha256": "0c7ff05195da49590ccd23d57383b144cffc33a07f091bac3dd485b2ac3021a2"
+    },
+    {
+      "file": "local-test-receipt.json",
+      "bytes": 4770,
+      "sha256": "64627acd1b3b1358612994cf6bf5dfb9291f587c64407b9e961a52f449503ca6"
+    },
+    {
+      "file": "touched-source-receipt.json",
+      "bytes": 739,
+      "sha256": "0dd552be18e7c3897fef89cb01b70802028662f2adb98aca9b5f0f69f3551ea4"
+    },
+    {
+      "file": "focused-run-provenance.json",
+      "bytes": 873,
+      "sha256": "4763444abc08428ba2f4d77aeeeeb0d802d510a4a240c69a158d4c98e5015684"
+    },
+    {
+      "file": "product-provenance.json",
+      "bytes": 651,
+      "sha256": "b41e528e4572e985fa27ac0963a9e54acbfc284b2180b8dd3eca9e7750a264fc"
+    },
+    {
+      "file": "source-lock-receipt.json",
+      "bytes": 470,
+      "sha256": "5755176d14cc893eadf592254b6fde2af89803aef66128b3145d6d3adbe3b51b"
+    },
+    {
+      "file": "commit-audit.txt",
+      "bytes": 254,
+      "sha256": "4ba8d5dcbe8c0172cce2c7e6cbd9587127ec247ab0d630c0dcbb787ae1690066"
+    },
+    {
+      "file": "push-save.txt",
+      "bytes": 926,
+      "sha256": "dcca6df2aa1193274a6028f54397bce13541b1587bac09449665a6044686a19b"
+    },
+    {
+      "file": "push-candidate.txt",
+      "bytes": 731,
+      "sha256": "98125d3d12db576de50297447c4e01df5775d8f91860752c6628f68c006d83ea"
+    },
+    {
+      "file": "ci-receipt.json",
+      "bytes": 291,
+      "sha256": "887b12c1a27971cfc8ed200ed28d36075623af006159e15607fd0fe627947d02"
+    },
+    {
+      "file": "ci-watch.txt",
+      "bytes": 1364,
+      "sha256": "0a8a8f64da9383e977df7486bfed479305fa9b87904e228cc9a01485c9782a25"
+    },
+    {
+      "file": "ci-jobs.json",
+      "bytes": 36550,
+      "sha256": "9ea67964fccae2382eccaf5f19cf7fc752a77bf8c7d52109b0075473d06e7a20"
+    },
+    {
+      "file": "github-call-receipt.json",
+      "bytes": 418,
+      "sha256": "4ceb5d207b396bb437ae856d46c4b3b42e9f2a192d1f685caadc6d245f6c1bf5"
+    },
+    {
+      "file": "ci-cancellation-report.md",
+      "bytes": 2834,
+      "sha256": "b5596bf9391638188d75e138b5509bcb7e6f5ca1906a58fd870937d018fd35ea"
+    },
+    {
+      "file": "ci-verify-failed.log",
+      "bytes": 895,
+      "sha256": "264c72abea5d4669883fa26788d9dac20449694804c7ec2154076d246cfed545"
+    }
+  ],
+  "productHead": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+  "ciStatus": "completed",
+  "ciConclusion": "cancelled",
+  "reviewedAt": "2026-11-08T19:34:33.410310+00:00"
+}

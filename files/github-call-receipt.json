@@ -1,0 +1,10 @@
+{
+  "statusCalls": 5,
+  "jobInspectionCalls": 1,
+  "failedJobArchiveCalls": 1,
+  "totalCalls": 7,
+  "lastCallAt": 1794166425.1242712,
+  "failedArchiveCommand": "gh run view 42512950991 --repo just-every/run-platter --job 128834510156 --log-failed",
+  "failedArchiveExit": 0,
+  "logSanitization": "Credential values and URL queries masked; Actions-generated environment metadata block omitted from selected excerpt."
+}

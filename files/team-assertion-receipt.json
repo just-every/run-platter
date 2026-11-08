@@ -1,0 +1,14 @@
+{
+  "teamAssertions": {
+    "before": 137,
+    "after": 137,
+    "unchanged": true,
+    "sha256": "a343c5c8d0e299ff08ab589d91a01b575786d061d8a816da18f207f7df328719"
+  },
+  "teamRestoreAssertions": {
+    "before": 100,
+    "after": 100,
+    "unchanged": true,
+    "sha256": "d29c462031c5e70c726cd68cb40fce76f709906bd542ca00198338daefc6f278"
+  }
+}

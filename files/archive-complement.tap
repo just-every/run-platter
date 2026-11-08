@@ -1,0 +1,93 @@
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Archive schema template completed in 32112 ms (118 migrations; ledger preflight passed)
+# Warning: Indexing all PDF objects
+# Warning: Indexing all PDF objects
+# Warning: Indexing all PDF objects
+# Warning: Indexing all PDF objects
+# Warning: Indexing all PDF objects
+# Archive CLI export completed in 32354 ms
+# Archive CLI import completed in 71237 ms
+# Archive CLI export completed in 29991 ms
+# Archive CLI export completed in 29620 ms
+# Archive CLI import completed in 63076 ms
+# Archive CLI import completed in 44577 ms
+# Subtest: FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences
+ok 1 - FOLLOW-005 / EDIT-002 / MOB-001 / PRICE-002 / PRICE-001 / EDIT-009 / FOLLOW-002 / EDIT-018 / EDIT-012 / SEND-010 / FOLLOW-004 / SEND-004 / EDIT-014 / EDIT-010 / NEG-002 / AI-003 / TEAM-004 / NEG-001 / PORT-001 / PORT-002 public CLI preserves business records and import custody, excludes credentials, and enforces restore fences
+  ---
+  duration_ms: 324870.245252
+  type: 'test'
+  ...
+# Archive CLI export completed in 22484 ms
+# Archive CLI import completed in 775 ms
+# Archive CLI export completed in 21622 ms
+# Archive CLI import completed in 52621 ms
+# Archive CLI export completed in 22405 ms
+# Archive CLI import completed in 26030 ms
+# Archive CLI import completed in 33456 ms
+# Archive CLI import completed in 29234 ms
+# Subtest: PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal
+ok 2 - PORT-001 public CLI refuses corrupt and pre-erasure archives and retains accepted money through the later erasure journal
+  ---
+  duration_ms: 212151.693506
+  type: 'test'
+  ...
+# Archive CLI import completed in 53311 ms
+# Archive CLI export completed in 21944 ms
+# Subtest: PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores re-exported first-release AUD bytes and new proposals and acceptances use USD without conversion
+ok 3 - PRICE-002 / EDIT-012 / REPORT-001 / PRICE-008 public CLI restores re-exported first-release AUD bytes and new proposals and acceptances use USD without conversion
+  ---
+  duration_ms: 76949.880292
+  type: 'test'
+  ...
+# Archive CLI export completed in 21776 ms
+# Archive CLI import completed in 31634 ms
+# Subtest: SEND-002 public CLI preserves bounce follow-ups and logged action without provider events or invitation credentials
+ok 4 - SEND-002 public CLI preserves bounce follow-ups and logged action without provider events or invitation credentials
+  ---
+  duration_ms: 55541.686112
+  type: 'test'
+  ...
+# Archive CLI export completed in 29745 ms
+# Archive CLI import completed in 41357 ms
+# Subtest: MIG-003, MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody
+ok 5 - MIG-003, MIG-006 and MIG-007 public CLI archives imported business records, exported documents, original CSV and image bytes with undo custody
+  ---
+  duration_ms: 97122.26098
+  type: 'test'
+  ...
+# Archive CLI export completed in 24683 ms
+# Archive CLI import completed in 42889 ms
+# Subtest: PRICE-005 public CLI preserves business tax rates and frozen agreements without restoring signing authority
+ok 6 - PRICE-005 public CLI preserves business tax rates and frozen agreements without restoring signing authority
+  ---
+  duration_ms: 72527.334031
+  type: 'test'
+  ...
+# Archive CLI export completed in 23534 ms
+# Archive CLI import completed in 33579 ms
+# Subtest: AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority
+ok 7 - AUTO-002 public CLI retains exact document archive history and artifacts without restoring credentials or execution authority
+  ---
+  duration_ms: 63230.132251
+  type: 'test'
+  ...
+# Archive CLI export completed in 25643 ms
+# Archive CLI import completed in 37537 ms
+# PROBE PORT-002 1: populated CLI export and restore -> templates, library, catalog, two media originals, exact signed artifacts, 8750-cent deposit and offline receipt, report totals and actual Drive mappings reconciled
+# PROBE PORT-002 2: decoded CLI archive and restored public doors -> no credentials, invitations, sessions, verification state or queued mail; old capabilities refused; scheduled processing made no provider calls
+# Subtest: PORT-002 / AUTO-002 populated product archive retains exact document archive history, content, money and mappings without execution authority
+ok 8 - PORT-002 / AUTO-002 populated product archive retains exact document archive history, content, money and mappings without execution authority
+  ---
+  duration_ms: 67777.149323
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 971538.538421

@@ -1,0 +1,19 @@
+{
+  "head": "1e5ec5dc9db032ea1319d6bb65d506a93d38004b",
+  "commands": [
+    {
+      "command": "node scripts/edition-authoring/cli.mjs lock",
+      "exit": 0
+    },
+    {
+      "command": "node scripts/edition-authoring/cli.mjs check",
+      "exit": 0
+    },
+    {
+      "command": "pnpm typecheck",
+      "exit": 0
+    }
+  ],
+  "sourceLockSha256": "926bfd45c6efd13f8c189dc1b2ad1a1144c0934f570016f80d5455d97f9814af",
+  "recordedAt": "2026-11-08T19:02:09.136904+00:00"
+}

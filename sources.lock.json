@@ -78,7 +78,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "1e8befe2df92655fa01e211f0ea06be88091774f5ead5dbde60352242d082cb4",
+      "sha256": "6e5f7d17af0ec923af204597e1f4d2db8160d3470835cf15ba02b71ff27e79d5",
       "executable": false
     },
     "AGENTS.md": {
@@ -98,7 +98,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "74cb276dfe9849cb29b0d58445326c01dd39fd09abecf24c085e45d77be45ebf",
+      "sha256": "09ef88c02e5db4e892ac4ac3a8efb2d5391a9ac73517e8fa521db4467d9d86b5",
       "executable": false
     },
     "deploy-demo.json": {
@@ -3750,7 +3750,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "b7fdc44367eda4e4965dd1fd8bb9717346559e29deece379513ede4a5e67525a",
+      "sha256": "2a2fb70bee82d7280e7db99f92f2ef6afafae88ab32c43f71bfbc1dd05d70a0a",
       "executable": false
     },
     "tests/mailbox-credential-journey.mjs": {

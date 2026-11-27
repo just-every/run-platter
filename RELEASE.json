@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "publicReleaseNotes": "Platter prepares its first installable listing with hosted deployment metadata, Managed mail support and retained source provenance. It provides two-option proposals, owner approval, email-verified acceptance and deposit invoice export. See CONTRACT.md for published guarantees and unfinished target work.",
+  "publicReleaseNotes": "Platter prepares its first installable listing with hosted deployment metadata, Managed mail support, a mail-off mode (MAIL_PROVIDER=none, owner sign-in with rer signin) and retained source provenance. It provides two-option proposals, owner approval, email-verified acceptance and deposit invoice export. See CONTRACT.md for published guarantees and unfinished target work.",
   "migrations": [
     {
       "id": "0001_owner.sql",
@@ -263,12 +263,144 @@
       "buyerSteps": "None."
     },
     {
+      "id": "0066_rich_block_locks.sql",
+      "buyerSteps": "Apply migrations/core/0066_rich_block_locks.sql after existing core migrations."
+    },
+    {
+      "id": "0067_outcome_settings.sql",
+      "buyerSteps": "Apply migrations/core/0067_outcome_settings.sql after existing core migrations."
+    },
+    {
+      "id": "0068_crm_outcome_consents.sql",
+      "buyerSteps": "Apply migrations/core/0068_crm_outcome_consents.sql after existing core migrations."
+    },
+    {
+      "id": "0069_payment_terms.sql",
+      "buyerSteps": "Apply migrations/core/0069_payment_terms.sql after existing core migrations."
+    },
+    {
+      "id": "0070_collection.sql",
+      "buyerSteps": "Apply migrations/core/0070_collection.sql after existing core migrations."
+    },
+    {
+      "id": "0071_sms.sql",
+      "buyerSteps": "Apply migrations/core/0071_sms.sql after existing core migrations."
+    },
+    {
+      "id": "0072_watchers.sql",
+      "buyerSteps": "Apply migrations/core/0072_watchers.sql after existing core migrations."
+    },
+    {
+      "id": "0073_signer_methods.sql",
+      "buyerSteps": "Apply migrations/core/0073_signer_methods.sql after existing core migrations."
+    },
+    {
+      "id": "0074_signer_replacement.sql",
+      "buyerSteps": "Apply migrations/core/0074_signer_replacement.sql after existing core migrations."
+    },
+    {
+      "id": "0075_collaboration.sql",
+      "buyerSteps": "Apply migrations/core/0075_collaboration.sql after existing core migrations."
+    },
+    {
+      "id": "0076_tracking.sql",
+      "buyerSteps": "Apply migrations/core/0076_tracking.sql after existing core migrations."
+    },
+    {
+      "id": "0077_tracking_details.sql",
+      "buyerSteps": "Apply migrations/core/0077_tracking_details.sql after existing core migrations."
+    },
+    {
+      "id": "0078_public_api.sql",
+      "buyerSteps": "Apply migrations/core/0078_public_api.sql after existing core migrations."
+    },
+    {
+      "id": "0079_negotiated_webhooks.sql",
+      "buyerSteps": "Apply migrations/core/0079_negotiated_webhooks.sql after existing core migrations."
+    },
+    {
+      "id": "0080_recipients.sql",
+      "buyerSteps": "Apply migrations/core/0080_recipients.sql after existing core migrations."
+    },
+    {
+      "id": "0081_recipient_embedding.sql",
+      "buyerSteps": "Apply migrations/core/0081_recipient_embedding.sql after existing core migrations."
+    },
+    {
+      "id": "0082_merge_fields.sql",
+      "buyerSteps": "Apply migrations/core/0082_merge_fields.sql after existing core migrations."
+    },
+    {
+      "id": "0083_imported_library.sql",
+      "buyerSteps": "Apply migrations/core/0083_imported_library.sql after existing core migrations."
+    },
+    {
+      "id": "0084_owner_taxes.sql",
+      "buyerSteps": "Apply migrations/core/0084_owner_taxes.sql after existing core migrations."
+    },
+    {
+      "id": "0085_catalog_defaults.sql",
+      "buyerSteps": "Apply migrations/core/0085_catalog_defaults.sql after existing core migrations."
+    },
+    {
+      "id": "0086_drive_archiving.sql",
+      "buyerSteps": "Apply migrations/core/0086_drive_archiving.sql after existing core migrations."
+    },
+    {
+      "id": "0087_archive_dispatch_lock.sql",
+      "buyerSteps": "Apply migrations/core/0087_archive_dispatch_lock.sql after existing core migrations."
+    },
+    {
+      "id": "0088_document_movein.sql",
+      "buyerSteps": "Apply migrations/core/0088_document_movein.sql after existing core migrations."
+    },
+    {
       "id": "0089_tracking_history.sql",
       "buyerSteps": "None. Adds ordered reading-choice history and attachment-open attribution to opted-in client views."
     },
     {
       "id": "0090_client_locale.sql",
       "buyerSteps": "None. Adds owner-selected English or Spanish client language while retaining historical agreement language without inference."
+    },
+    {
+      "id": "0091_completion_mail.sql",
+      "buyerSteps": "Apply migrations/core/0091_completion_mail.sql after existing core migrations."
+    },
+    {
+      "id": "0092_completion_recipients.sql",
+      "buyerSteps": "Apply migrations/core/0092_completion_recipients.sql after existing core migrations."
+    },
+    {
+      "id": "0093_signing_context.sql",
+      "buyerSteps": "Apply migrations/core/0093_signing_context.sql after existing core migrations."
+    },
+    {
+      "id": "0094_hubspot_drafts.sql",
+      "buyerSteps": "Apply migrations/core/0094_hubspot_drafts.sql after existing core migrations."
+    },
+    {
+      "id": "0095_hubspot_reviewed_sync.sql",
+      "buyerSteps": "Apply migrations/core/0095_hubspot_reviewed_sync.sql after existing core migrations."
+    },
+    {
+      "id": "0096_sms_assent.sql",
+      "buyerSteps": "Apply migrations/core/0096_sms_assent.sql after existing core migrations."
+    },
+    {
+      "id": "0097_sms_completion.sql",
+      "buyerSteps": "Apply migrations/core/0097_sms_completion.sql after existing core migrations."
+    },
+    {
+      "id": "0098_sms_reenable.sql",
+      "buyerSteps": "Apply migrations/core/0098_sms_reenable.sql after existing core migrations."
+    },
+    {
+      "id": "0099_proposify_exports.sql",
+      "buyerSteps": "Apply migrations/core/0099_proposify_exports.sql after existing core migrations."
+    },
+    {
+      "id": "0100_xero_deposits.sql",
+      "buyerSteps": "Apply migrations/core/0100_xero_deposits.sql after existing core migrations."
     },
     {
       "id": "0101_approval_request_details.sql",
@@ -293,6 +425,14 @@
     {
       "id": "0106_reminder_dispatch_lock.sql",
       "buyerSteps": "None. Serializes scheduled reminder dispatch without changing existing reminder authorization."
+    },
+    {
+      "id": "0107_template_learning.sql",
+      "buyerSteps": "Apply migrations/core/0107_template_learning.sql after existing core migrations."
+    },
+    {
+      "id": "0108_template_learning_cascade.sql",
+      "buyerSteps": "Apply migrations/core/0108_template_learning_cascade.sql after existing core migrations."
     },
     {
       "id": "0109_payment_failure_notices.sql",

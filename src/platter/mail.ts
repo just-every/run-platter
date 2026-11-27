@@ -32,7 +32,7 @@ export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string
    actor=await sendingActor(env,row)
    const sealedReply=actor?await prepareClientReply(env,actor,row):row.reply_to
    const replyTo=sealedReply?await openReplyAddress(env,sealedReply):undefined
-   let result:{status:string;providerMessageId:string|null}|undefined
+   let result:{status:string;providerMessageId:string|null;code?:string}|undefined
    if(mailbox&&!mailbox.broken&&actor){
     route=mailbox.connection.provider;address=mailbox.connection.mailbox_email
     const outcome=await demoEffect(()=>sendMailbox(env,actor,row,mailbox,replyTo,attachments),()=>({fallback:false as const,status:'accepted' as const,providerMessageId:null}))
@@ -45,8 +45,8 @@ export async function dispatchMail(env:Bindings,proposalId:string,mailId?:string
     if(!sender){await env.DB.batch([env.DB.prepare("UPDATE p_mail SET status='pending' WHERE id=?").bind(row.id),failureDeliveryStatement(env,row.id,'pending')]);continue}
     result=await demoEffect(()=>sender.send({from:env.MAIL_FROM!,to:[row.recipient],deliveryId:row.id,subject:row.subject,text:row.body,html:row.body.replace(/[&<>]/g,(c:string)=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]!)),headers:{},...(attachments?{attachments}:{}),...(replyTo?{replyTo}:{})}),()=>({provider:'demo',status:'accepted' as const,providerMessageId:null}))
    }
-   const status=result?.status==='accepted'?'accepted':'uncertain'
-   await env.DB.batch([env.DB.prepare("UPDATE p_mail SET status=?,provider=?,provider_message_id=? WHERE id=?").bind(status,route==='installation'?env.MAIL_PROVIDER??null:route,result?.providerMessageId??null,row.id),env.DB.prepare("UPDATE p_bounce_notices SET closed_at=? WHERE closed_at IS NULL AND id IN (SELECT notice_id FROM p_bounce_notice_transport WHERE correction_mail_id=?) AND ?='accepted'").bind(Date.now(),row.id,status),failureDeliveryStatement(env,row.id,status)])
+   const status=result?.status==='accepted'?'accepted':'uncertain',held=result?.code==='mail_off'?'mail_off':null
+   await env.DB.batch([env.DB.prepare("UPDATE p_mail SET status=?,provider=?,provider_message_id=?,held_reason=COALESCE(?,held_reason) WHERE id=?").bind(status,route==='installation'?env.MAIL_PROVIDER??null:route,result?.providerMessageId??null,held,row.id),env.DB.prepare("UPDATE p_bounce_notices SET closed_at=? WHERE closed_at IS NULL AND id IN (SELECT notice_id FROM p_bounce_notice_transport WHERE correction_mail_id=?) AND ?='accepted'").bind(Date.now(),row.id,status),failureDeliveryStatement(env,row.id,status)])
    await recordSender(env,row,route,address,status,fallback)
   }catch(error){
    const outcome=(error as any)?.status===403?'withheld':'uncertain'

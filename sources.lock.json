@@ -6,7 +6,7 @@
   "toolchain": {
     "id": "runeditrun/edition-authoring",
     "version": "1.1.0",
-    "sha256": "3ce2f4bc6357b80a2a744ab7572160ca73eea08c5c627402957bce492f22b6a5"
+    "sha256": "4afb54aff4bb60a05f902e67bb9b20f8478c2d6cb76819ce8e17f142224c25b8"
   },
   "components": [
     {
@@ -50,7 +50,7 @@
   ],
   "files": {
     ".github/workflows/journey.yml": {
-      "sha256": "9e2d3d901cd0b1e933fa1b380bd1370638ac4c8ab2e452c3382e0e6ebd9719d1",
+      "sha256": "7868818d225f14d9dfb0356181263c5c1ab3a5b9cbd0a8ff8bf4991c915137f6",
       "executable": false
     },
     ".github/workflows/rer-managed.yml": {
@@ -58,7 +58,7 @@
       "executable": false
     },
     ".github/workflows/run-demo.yml": {
-      "sha256": "41365ec7c002e9451166313b085f9e64ed2e3ea002c27f3d5ead845bc9c302b2",
+      "sha256": "8a9f011fa892b7adc7941f2ddd09cb08c8af4c77c05c584c89b70de2cc1ab9b7",
       "executable": false
     },
     ".github/workflows/run-site.yml": {
@@ -86,11 +86,11 @@
       "executable": false
     },
     "base-copies.json": {
-      "sha256": "fd0003ae4817372f013ffe32eb10823fd0c9616d66997ace201c7f9e68402f60",
+      "sha256": "95723dfe5c12849aa9e98e8e118e9d02edc26ed2ed838ccd5c1e7b320b5fdee4",
       "executable": false
     },
     "CHANGELOG.md": {
-      "sha256": "475af6af035ae286ebf7b14aaf1c1f9e3a49eec2bb269e428e6e6b19b04f86ee",
+      "sha256": "db4fb6d97fe9c1d760eda0eead73a2893217ee90f4484a8e5247a49608626df4",
       "executable": false
     },
     "composition.lock.json": {
@@ -110,7 +110,7 @@
       "executable": false
     },
     "deploy.json": {
-      "sha256": "f9b058f54a9b82fa494174b7081ecd3d251f0926c5ca6daf9062add6d3bd0270",
+      "sha256": "fc3479efa51dfcb271484368e8337ccd5ff5c97f2b1056265950c24ee4fff6ec",
       "executable": false
     },
     "docs/AGENT-ACCESS.md": {
@@ -250,7 +250,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "3e5c727525394ce5931ccfee35ba6c700761969138ade0f4cc7c350b03b4c576",
+      "sha256": "d40df5be3bc0fc69133328523f99faebc369869d1ff918a0ea4cff791523698c",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -746,7 +746,7 @@
       "executable": false
     },
     "package.json": {
-      "sha256": "ccdccc5f257e2224519bc2184d616dc0073bfb2978fa9b5087f8f9ec439a228e",
+      "sha256": "b9405304e951587efddaceda28013f47a3fd20cd30fe919ee2967cca6d75fee3",
       "executable": false
     },
     "packaging.json": {
@@ -754,7 +754,7 @@
       "executable": false
     },
     "pnpm-lock.yaml": {
-      "sha256": "bfdcc50cbde0b98581ebd95f5ef1906790e36b0bb60869ecccea82fe46198ca8",
+      "sha256": "bc81511e6e77cf3bc2a4e506988a51b1dc3377eebdb5b6fb137094da53c778c3",
       "executable": false
     },
     "public/app/composer.css": {
@@ -1390,19 +1390,19 @@
       "executable": false
     },
     "README.md": {
-      "sha256": "7d91745d757ade65a640848d33063a16499d0ecb1d9342116ceafc9478987fca",
+      "sha256": "0faa0a493c9d04b2b53974dbf095d7414f09c52aae47244fbfee82df7f201c1f",
       "executable": false
     },
     "RELEASE.json": {
-      "sha256": "0f13e914a067c60cadae476056f7be28b23607dec39a129fb7e1aff6e1809cdd",
+      "sha256": "2d25218254800d79a5d474affd199424a33a072113191d84ba4e55380aad9d91",
       "executable": false
     },
     "rer-project.json": {
-      "sha256": "e2f9f03a276ff3951b9bf9f6ac305f6d91d3209bf7a4a63def38ebf8cc6e5d2b",
+      "sha256": "face4144b2f564eb739de0bd0cfa33f33d33bfbcf0b053a736034888be90a4af",
       "executable": false
     },
     "rer-setup.json": {
-      "sha256": "f4c3c9b4f0adae487c0f5870d80d1260abcf397d2ea1c2b955829620ddc81173",
+      "sha256": "67e897d51d692882774f5a7d9eec79237f8b015fbbc926710874dd6af84604ec",
       "executable": false
     },
     "RULINGS.md": {
@@ -1410,7 +1410,7 @@
       "executable": false
     },
     "RUN-LOCALLY.md": {
-      "sha256": "d5a2eef6ed49d825c001e044b975f0fec6b4792304b4893c513ac50ce3a30c74",
+      "sha256": "51262e1d8617acab913fa7db41faaeb673353741f693c87136620cacc6785463",
       "executable": false
     },
     "scripts/build-deployment-spec.mjs": {
@@ -1538,11 +1538,11 @@
       "executable": false
     },
     "scripts/installer/deploy.mjs": {
-      "sha256": "6cb381cea7c0cbb46769d5814795fa535553826c52b403fcd4b446cb82c7ef6f",
+      "sha256": "e832205f360cff7a2c70875e075c7b423beb27669c36be72ff2c6e4c0c9218c8",
       "executable": false
     },
     "scripts/installer/local.mjs": {
-      "sha256": "9eb566d396595dcd67aff550c29a18fd819e78c0cd14a2400c7d85fc069889d2",
+      "sha256": "ccb268793141af6bfd7499c18559f577db8a870642a29a46babed731e2cc9b35",
       "executable": false
     },
     "scripts/installer/seed.mjs": {
@@ -1582,7 +1582,7 @@
       "executable": false
     },
     "src/auth.server.ts": {
-      "sha256": "8c5cab0382bf365ff6b5ddcc23d86eb13eafd8e4f5b2e3d890db3ec735dba449",
+      "sha256": "d3787b44a3e351afbe22e3b623ac1f4fc79830e1a4c42a5a45fe6692ddcf4a3b",
       "executable": false
     },
     "src/base/contract-docs.mjs": {
@@ -1710,11 +1710,11 @@
       "executable": false
     },
     "src/mail.server.d.mts": {
-      "sha256": "36f046dd7133aa89aaa714a204af7ea5e181942b31f57548bdaecf32a6aad6f0",
+      "sha256": "82cf8a84393fb5a198bf5c5d16a1cd06adc6660f2296ccbae162c7d983fb5719",
       "executable": false
     },
     "src/mail.server.mjs": {
-      "sha256": "74c7214ddfca01c967a853527df71a35c5366b01d740c712a3bb41130c6a0c03",
+      "sha256": "7f0d0916f8e20fa979a0478bcf8961a12909926ce44936e0e90fce80b71422a4",
       "executable": false
     },
     "src/modules/d1-transport/index.d.mts": {
@@ -2882,7 +2882,7 @@
       "executable": false
     },
     "src/platter/mail.ts": {
-      "sha256": "1846a8eadc0d358c4c7db54b19223893a141cd1c2d36c4028110ab437e8a1e87",
+      "sha256": "cfe1346db4219fc516efd9ae5e9fa8e183080e74a0d16746fdd5beedd65cf111",
       "executable": false
     },
     "src/platter/mailboxes.ts": {
@@ -3822,7 +3822,7 @@
       "executable": false
     },
     "tests/mail.test.mjs": {
-      "sha256": "edd44f2685733203e4bf1e0ac718c72e587b2f912ab98f78ae8ee9f1222e957d",
+      "sha256": "696a2e6d6d1d5c31043e56b2290f83fe3b8cd524f06b8563e71d87cfefd77484",
       "executable": false
     },
     "tests/mailbox-credential-journey.mjs": {
@@ -4022,7 +4022,7 @@
       "executable": false
     },
     "wrangler.jsonc": {
-      "sha256": "9b048d1da5ad8a266bb15249d0f1ee65d4d0e92e17cb6603ca64bafeff09f1c0",
+      "sha256": "bc6f6749001e7f595d620011516ba9a3b8965ee5141b5449ffb007a166123082",
       "executable": false
     }
   }

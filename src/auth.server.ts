@@ -6,7 +6,7 @@ import { createIdpOwnerClaimHandler, createOwnerClaimHandler } from '@runeditrun
 import { firstRunResponse } from './base/setup'
 import { fontDocumentResponse } from './base/font-response'
 import { createOperatorAuth, createSignInHandler, type AuthConfig } from '@runeditrun/rer/internal/modules/operator-auth/index.mjs'
-import { operatorMail } from './mail.server.mjs'
+import { mailOff, operatorMail } from './mail.server.mjs'
 import branding from './branding.json'
 
 // The edition's declared theme (public/rer-theme.css), as Base frames link it.
@@ -38,7 +38,7 @@ export interface Bindings {
  OWNER_EMAIL: string
  SESSION_SECRET: string
  SETUP_TOKEN?: string
- MAIL_PROVIDER?: 'development' | 'resend' | 'sendgrid' | 'cloudflare' | 'rer'
+ MAIL_PROVIDER?: 'none' | 'development' | 'resend' | 'sendgrid' | 'cloudflare' | 'rer'
  MAIL_FROM?: string
  MAIL_RELAY_URL?: string
  MAIL_API_KEY?: string
@@ -60,7 +60,7 @@ export interface Bindings {
 export const runtimeBindings = (env: Bindings): Bindings => env.RER_DEV_ORIGIN && env.AUTH_LOCAL === 'true' ? { ...env, AUTH_ORIGIN: env.RER_DEV_ORIGIN } : env
 export const authConfig = (env: Bindings): AuthConfig => ({ dependencies: true, origin: env.AUTH_ORIGIN, local: env.AUTH_LOCAL === 'true', OWNER_EMAIL: env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, SETUP_TOKEN: env.SETUP_TOKEN, MAIL_FROM: env.MAIL_FROM, branding: { productName: branding.name, accentColor: branding.primaryColor, signInPath: '/signin', theme: theme.href } })
 export function operatorAuth(env: Bindings) {
- return createOperatorAuth({ ...memberAuthOptions(env), db: env.DB, config: authConfig(env), mailSender: operatorMail(env), clientIp: request => request.headers.get('CF-Connecting-IP') ?? '' })
+ return createOperatorAuth({ ...memberAuthOptions(env), db: env.DB, config: authConfig(env), mailSender: mailOff(env) ? undefined : operatorMail(env), clientIp: request => request.headers.get('CF-Connecting-IP') ?? '' })
 }
 
 async function handleAuthResponse(request: Request, original: Bindings): Promise<Response | null> {

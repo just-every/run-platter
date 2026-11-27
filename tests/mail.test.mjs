@@ -357,6 +357,22 @@ test('MAIL-001 Managed relay sends proposal invitations and verification codes t
   } finally { await h.close() }
 })
 
+test('MAIL-001 mail off refuses proposal and sign-in email without provider contact', async () => {
+  const calls = []
+  const h = await harness({origin: 'https://platter.example', auth: {AUTH_LOCAL: 'false', MAIL_PROVIDER: 'none', MAIL_FROM: '', MAIL_API_KEY: ''},
+    outboundService: async request => { calls.push(request.url); return new Response(null, {status: 500}) }})
+  try {
+    await finishSetup(h)
+    const id = await approved(h)
+    await h.cmd('proposal.send', {id, version: 2})
+    const [row] = await mailRows(h)
+    assert.deepEqual([row.status, row.provider, row.held_reason], ['uncertain', 'none', 'mail_off'])
+    const signIn = await h.send('/auth/magic-link', {email: 'owner@studio.example'})
+    assert.equal(signIn.status, 503, signIn.text)
+    assert.deepEqual(calls, [])
+  } finally { await h.close() }
+})
+
 test('MAIL-001 hosted mail commits and claims before provider acceptance; timeout is uncertain and never resent', { timeout: 60000 }, async () => {
   const calls = []
   let timeoutNext = false

@@ -13,8 +13,8 @@
   "originVar": "AUTH_ORIGIN",
   "vars": {
     "AUTH_LOCAL": "false",
-    "MAIL_PROVIDER": "resend",
-    "MAIL_FROM": "auth@example.invalid",
+    "MAIL_PROVIDER": "none",
+    "MAIL_FROM": "",
     "MAIL_RELAY_URL": "",
     "MAIL_ACCOUNT_ID": ""
   },
@@ -33,7 +33,9 @@
     },
     {
       "binding": "MAIL_API_KEY",
-      "environment": "MAIL_API_KEY"
+      "environment": "MAIL_API_KEY",
+      "optional": true,
+      "verifyStandIn": "test-only-provider-key"
     },
     {
       "binding": "TWILIO_ACCOUNT_SID",
@@ -55,5 +57,11 @@
       "environment": "SMS_PROVIDER",
       "optional": true
     }
+  ],
+  "publicSettings": [
+    "MAIL_PROVIDER",
+    "MAIL_FROM",
+    "MAIL_RELAY_URL",
+    "MAIL_ACCOUNT_ID"
   ]
 }

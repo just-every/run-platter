@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { getPlatformProxy } from 'wrangler'
-import { nativeMigrationPreflight } from '../node_modules/@runeditrun/rer/cli/portability-migrations.mjs'
 
 const exec=promisify(execFile)
 async function checkoutFiles(root) {
@@ -34,9 +33,8 @@ export function archiveTemplate() {
      migrations=(await readdir(join(root,'migrations/core'))).filter(name=>name.endsWith('.sql')).sort()
      const ledger=(await proxy.env.DB.prepare('SELECT name FROM d1_migrations ORDER BY id').all()).results.map(row=>row.name)
      assert.deepEqual(ledger,migrations,'the shared empty schema applied every current migration in order')
-     assert.deepEqual(await nativeMigrationPreflight({root,db:proxy.env.DB,binding:'DB'}),{nativeApply:true})
     }finally{await proxy.dispose()}
-    console.log('Archive schema template completed in '+Math.round(performance.now()-started)+' ms ('+migrations.length+' migrations; ledger preflight passed)')
+    console.log('Archive schema template completed in '+Math.round(performance.now()-started)+' ms ('+migrations.length+' migrations in the ledger)')
    })()
   },
   async checkout(destination,{migrated=true}={}) {

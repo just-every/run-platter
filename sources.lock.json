@@ -1390,7 +1390,7 @@
       "executable": false
     },
     "README.md": {
-      "sha256": "0faa0a493c9d04b2b53974dbf095d7414f09c52aae47244fbfee82df7f201c1f",
+      "sha256": "957483efa56a5ea8831668daadeac4d0f42e607fa6de0be261d8987a7c70af71",
       "executable": false
     },
     "RELEASE.json": {
@@ -3726,7 +3726,7 @@
       "executable": false
     },
     "tests/demo.test.mjs": {
-      "sha256": "782490d54986fe8fcbacace99b5beb02e7585fe71c719e398bb45d819336ac7c",
+      "sha256": "9ca43251d0f7b2f480f3a95227c45b5a8b7233372bccde14ce1b4b354f6b9718",
       "executable": false
     },
     "tests/document-fixture.mjs": {

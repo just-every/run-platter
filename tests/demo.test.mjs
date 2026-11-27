@@ -35,7 +35,8 @@ test('hosting preflight refuses incomplete account access before any build or de
   const env={...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'}
   const inputs=JSON.parse(await readFile('OPERATIONS.json','utf8')).requiredEnvironment
   for(const key of [...inputs,'RER_LOCAL_OPERATION','RER_LOCAL_STATE_PATH'])delete env[key]
-  for(const args of [['deploy','--dry-run'],['deploy','--non-interactive']]){
+  // rer 0.2.143's dry run is local and credential-free; a real deploy still refuses first.
+  for(const args of [['deploy','--non-interactive']]){
    let result
    try{result=await promisify(execFile)(process.execPath,[resolve('node_modules/@runeditrun/rer/global/rer.mjs'),...args,'--no-queue'],{cwd:directory,env,maxBuffer:2e6})}catch(error){result=error}
    assert.equal(result.code,3,result.stdout+' '+result.stderr)
